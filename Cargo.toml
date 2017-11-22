@@ -3,5 +3,9 @@ name = "mmtk"
 version = "0.0.1"
 authors = [" <>"]
 
+[lib]
+name = "mmtk"
+crate-type = ["dylib"]
+
 [dependencies]
 memmap = "0.6.1"
