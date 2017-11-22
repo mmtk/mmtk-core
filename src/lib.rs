@@ -49,6 +49,9 @@ pub extern fn gc_init(heap_size: usize) {
 
 #[no_mangle]
 pub extern fn alloc(size: usize, align: usize) -> ObjectReference {
-    let tmp = IMMORTAL_SPACE.read().unwrap();
-    unsafe { tmp.as_ref().unwrap().heap_start.to_object_reference() }
+    let mut tmp = IMMORTAL_SPACE.write().unwrap();
+    let old_start = tmp.as_ref().unwrap().heap_start;
+    let ret = unsafe { old_start.to_object_reference() };
+    tmp.as_mut().unwrap().heap_start = (old_start + size).align_up(align);
+    ret
 }
