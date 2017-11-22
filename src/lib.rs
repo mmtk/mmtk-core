@@ -49,9 +49,16 @@ pub extern fn gc_init(heap_size: usize) {
 
 #[no_mangle]
 pub extern fn alloc(size: usize, align: usize) -> ObjectReference {
-    let mut tmp = IMMORTAL_SPACE.write().unwrap();
-    let old_start = tmp.as_ref().unwrap().heap_start;
-    let ret = unsafe { old_start.to_object_reference() };
-    tmp.as_mut().unwrap().heap_start = (old_start + size).align_up(align);
-    ret
+    println!("Allocating");
+    let mut space = IMMORTAL_SPACE.write().unwrap();
+    let old_cursor = space.as_ref().unwrap().heap_cursor;
+    let new_cursor = (old_cursor + size).align_up(align);
+    if new_cursor > space.as_ref().unwrap().heap_end {
+        println!("GC is triggered when GC is disabled");
+        unsafe { Address::zero().to_object_reference() }
+    } else {
+        space.as_mut().unwrap().heap_cursor = new_cursor;
+        println!("Allocated");
+        unsafe { old_cursor.to_object_reference() }
+    }
 }
