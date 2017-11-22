@@ -9,3 +9,4 @@ crate-type = ["dylib"]
 
 [dependencies]
 memmap = "0.6.1"
+lazy_static = "0.2.11"
