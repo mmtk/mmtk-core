@@ -69,7 +69,6 @@ pub extern fn alloc(size: usize, align: usize, offset: usize) -> ObjectReference
     let old_cursor = space.as_ref().unwrap().heap_cursor;
     let new_cursor = align_allocation(old_cursor + size, align, offset);
     if new_cursor > space.as_ref().unwrap().heap_end {
-        println!("Run out of heap space");
         unsafe { Address::zero().to_object_reference() }
     } else {
         space.as_mut().unwrap().heap_cursor = new_cursor;
