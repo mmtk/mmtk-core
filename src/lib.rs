@@ -55,6 +55,7 @@ pub extern fn gc_init(heap_size: usize) {
     unsafe { *IMMORTAL_SPACE.value.get() = Some(Space::new(heap_size)) };
 }
 
+#[inline(always)]
 fn align_allocation(region: Address, align: usize, offset: usize) -> Address {
     let region_isize = region.as_usize() as isize;
     let mask = (align - 1) as isize; // fromIntSignExtend
