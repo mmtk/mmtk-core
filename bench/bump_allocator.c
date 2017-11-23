@@ -14,14 +14,14 @@ size_t align_up (size_t addr, size_t align) {
 }
 
 void gc_init(size_t heap_size) {
-    size_t SAPCE_ALIGN = 1 << 19;
-    void* raw_start = malloc(heap_size);
-    if (!raw_start) {
+    size_t SPACE_ALIGN = 1 << 19;
+    void* alloced = malloc(heap_size + SPACE_ALIGN);
+    if (!alloced) {
         printf("Unable to allocate memory\n");
         exit(1);
     }
-    IMMORTAL_SPACE.heap_end = raw_start + heap_size;
-    IMMORTAL_SPACE.heap_start = (void*) align_up((size_t) raw_start, SAPCE_ALIGN);
+    IMMORTAL_SPACE.heap_start = (void*) align_up((size_t) alloced, SPACE_ALIGN);
+    IMMORTAL_SPACE.heap_end = (void*) ((size_t) IMMORTAL_SPACE.heap_start + heap_size);
     IMMORTAL_SPACE.heap_cursor = IMMORTAL_SPACE.heap_start;
 }
 
