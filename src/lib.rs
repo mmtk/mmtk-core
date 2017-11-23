@@ -44,12 +44,21 @@ pub extern fn gc_init(heap_size: usize) {
     }
 }
 
+fn align_allocation(region: Address, align: usize, offset: usize) -> Address {
+    let region_isize = region.as_usize() as isize;
+    let mask = (align - 1) as isize; // fromIntSignExtend
+    let neg_off = -region_isize; // fromIntSignExtend
+    let delta = (neg_off - region_isize) & mask;
+
+    region + delta
+}
+
 #[no_mangle]
-pub extern fn alloc(size: usize, align: usize) -> ObjectReference {
+pub extern fn alloc(size: usize, align: usize, offset: usize) -> ObjectReference {
     println!("Allocating");
     let mut space = IMMORTAL_SPACE.write().unwrap();
     let old_cursor = space.as_ref().unwrap().heap_cursor;
-    let new_cursor = (old_cursor + size).align_up(align);
+    let new_cursor = align_allocation(old_cursor + size, align, offset);
     if new_cursor > space.as_ref().unwrap().heap_end {
         println!("GC is triggered when GC is disabled");
         unsafe { Address::zero().to_object_reference() }
