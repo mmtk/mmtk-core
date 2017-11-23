@@ -28,7 +28,7 @@ impl Space {
             heap_start: Address::zero(),
             heap_cursor: Address::zero(),
             heap_end: Address::zero(),
-            address_range: MmapMut::map_anon(heap_size).unwrap(),
+            address_range: MmapMut::map_anon(heap_size + SPACE_ALIGN).unwrap(),
         };
 
         ret.heap_start = Address::from_ptr::<u8>(ret.address_range.as_ptr())
