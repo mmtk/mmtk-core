@@ -54,11 +54,20 @@ pub extern fn gc_init(heap_size: usize) {
     unsafe { *IMMORTAL_SPACE.value.get() = Some(Space::new(heap_size)) };
 }
 
+fn align_allocation(region: Address, align: usize, offset: usize) -> Address {
+    let region_isize = region.as_usize() as isize;
+    let mask = (align - 1) as isize; // fromIntSignExtend
+    let neg_off = -region_isize; // fromIntSignExtend
+    let delta = (neg_off - region_isize) & mask;
+
+    region + delta
+}
+
 #[no_mangle]
-pub extern fn alloc(size: usize, align: usize) -> ObjectReference {
+pub extern fn alloc(size: usize, align: usize, offset: usize) -> ObjectReference {
     let space: &mut Option<Space> = unsafe { &mut *IMMORTAL_SPACE.get() };
     let old_cursor = space.as_ref().unwrap().heap_cursor;
-    let new_cursor = (old_cursor + size).align_up(align);
+    let new_cursor = align_allocation(old_cursor + size, align, offset);
     if new_cursor > space.as_ref().unwrap().heap_end {
         println!("Run out of heap space");
         unsafe { Address::zero().to_object_reference() }
