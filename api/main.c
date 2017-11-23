@@ -21,7 +21,6 @@ int main(int argc, char* argv[]){
         }
         printf("%p\n", my_arr);
     }
-    int tmp;
-    scanf("%d", &tmp);
+    getchar();
     return 0;
 }

@@ -36,15 +36,16 @@ lazy_static! {
 
 impl Space {
     pub unsafe fn new(heap_size: usize) -> Self {
-        let address_range = MmapMut::map_anon(heap_size).
+        let address_range = MmapMut::map_anon(heap_size + SPACE_ALIGN).
             expect("Unable to allocate memory");
-        let raw_start: Address = Address::from_ptr::<u8>(address_range.as_ptr());
-        let heap_start: Address = raw_start.align_up(SPACE_ALIGN);
+
+        let heap_start: Address = Address::from_ptr::<u8>(address_range.as_ptr())
+            .align_up(SPACE_ALIGN);
 
         Space {
             heap_start: heap_start,
             heap_cursor: heap_start,
-            heap_end: raw_start + heap_size,
+            heap_end: heap_start + heap_size,
             address_range: address_range,
         }
     }
