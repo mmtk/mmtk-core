@@ -6,10 +6,22 @@ mod address;
 
 use address::{Address, ObjectReference};
 use memmap::*;
-
-use std::sync::RwLock;
+use std::cell::UnsafeCell;
+use std::marker::Sync;
 
 const SPACE_ALIGN: usize = 1 << 19;
+
+pub struct NotThreadSafe<T> {
+    value: UnsafeCell<T>,
+}
+
+unsafe impl<T> Sync for NotThreadSafe<T> {}
+
+impl<T> NotThreadSafe<T> {
+    pub fn get(&self) -> *mut T {
+        self.value.get()
+    }
+}
 
 pub struct Space {
     heap_start: Address,
@@ -19,7 +31,7 @@ pub struct Space {
 }
 
 lazy_static! {
-    pub static ref IMMORTAL_SPACE: RwLock<Option<Space>> = RwLock::new(None);
+    static ref IMMORTAL_SPACE: NotThreadSafe<Option<Space>> = NotThreadSafe { value: UnsafeCell::new(None) };
 }
 
 impl Space {
@@ -39,23 +51,19 @@ impl Space {
 
 #[no_mangle]
 pub extern fn gc_init(heap_size: usize) {
-    unsafe {
-        *IMMORTAL_SPACE.write().unwrap() = Some(Space::new(heap_size));
-    }
+    unsafe { *IMMORTAL_SPACE.value.get() = Some(Space::new(heap_size)) };
 }
 
 #[no_mangle]
 pub extern fn alloc(size: usize, align: usize) -> ObjectReference {
-    println!("Allocating");
-    let mut space = IMMORTAL_SPACE.write().unwrap();
+    let space: &mut Option<Space> = unsafe { &mut *IMMORTAL_SPACE.get() };
     let old_cursor = space.as_ref().unwrap().heap_cursor;
     let new_cursor = (old_cursor + size).align_up(align);
     if new_cursor > space.as_ref().unwrap().heap_end {
-        println!("GC is triggered when GC is disabled");
+        println!("Run out of heap space");
         unsafe { Address::zero().to_object_reference() }
     } else {
         space.as_mut().unwrap().heap_cursor = new_cursor;
-        println!("Allocated");
         unsafe { old_cursor.to_object_reference() }
     }
 }
