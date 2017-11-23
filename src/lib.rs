@@ -24,19 +24,16 @@ lazy_static! {
 
 impl Space {
     pub unsafe fn new(heap_size: usize) -> Self {
-        let mut ret = Space {
-            heap_start: Address::zero(),
-            heap_cursor: Address::zero(),
-            heap_end: Address::zero(),
-            address_range: MmapMut::map_anon(heap_size + SPACE_ALIGN).unwrap(),
-        };
-
-        ret.heap_start = Address::from_ptr::<u8>(ret.address_range.as_ptr())
+        let address_range = MmapMut::map_anon(heap_size + SPACE_ALIGN).unwrap();
+        let heap_start = Address::from_ptr::<u8>(address_range.as_ptr())
             .align_up(SPACE_ALIGN);
-        ret.heap_cursor = ret.heap_start;
-        ret.heap_end = ret.heap_start + heap_size;
 
-        ret
+        Space {
+            heap_start: heap_start,
+            heap_cursor: heap_start,
+            heap_end: heap_start + heap_size,
+            address_range: address_range,
+        }
     }
 }
 
