@@ -6,20 +6,28 @@ mod address;
 
 use address::{Address, ObjectReference};
 use memmap::*;
-use std::cell::UnsafeCell;
 use std::marker::Sync;
 
 const SPACE_ALIGN: usize = 1 << 19;
 
-pub struct NotThreadSafe<T> {
-    value: UnsafeCell<T>,
+pub struct VeryUnsafeCell<T: ? Sized> {
+    value: T,
 }
 
-unsafe impl<T> Sync for NotThreadSafe<T> {}
+unsafe impl<T> Sync for VeryUnsafeCell<T> {}
 
-impl<T> NotThreadSafe<T> {
+impl<T> VeryUnsafeCell<T> {
+    #[inline(always)]
+    pub fn new(value: T) -> VeryUnsafeCell<T> {
+        VeryUnsafeCell { value }
+    }
+    #[inline(always)]
+    pub unsafe fn into_inner(self) -> T {
+        self.value
+    }
+    #[inline(always)]
     pub fn get(&self) -> *mut T {
-        self.value.get()
+        &self.value as *const T as *mut T
     }
 }
 
@@ -27,11 +35,12 @@ pub struct Space {
     heap_start: Address,
     heap_cursor: Address,
     heap_end: Address,
-    address_range: Option<MmapMut>, // we do not access this in fast path
+    address_range: Option<MmapMut>,
+    // we do not access this in fast path
 }
 
 lazy_static! {
-    static ref IMMORTAL_SPACE: NotThreadSafe<Space> = NotThreadSafe {value: UnsafeCell::new(Space::new()) };
+    static ref IMMORTAL_SPACE: VeryUnsafeCell<Space> = VeryUnsafeCell {value: Space::new() };
 }
 
 impl Space {
@@ -63,7 +72,7 @@ impl Space {
 #[no_mangle]
 pub extern fn gc_init(heap_size: usize) {
     unsafe {
-        (*IMMORTAL_SPACE.value.get()).init(heap_size);
+        (*IMMORTAL_SPACE.get()).init(heap_size);
     }
 }
 
