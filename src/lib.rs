@@ -50,16 +50,8 @@ impl Space {
     pub fn init(&mut self, heap_size: usize) {
         self.mmap_start = unsafe {
             mmap(null_mut(), heap_size + SPACE_ALIGN, PROT_READ | PROT_WRITE,
-                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+                 MAP_PRIVATE | MAP_ANON, -1, 0)
         };
-
-        if self.mmap_start == MAP_FAILED {
-            unsafe {
-                let errno_ptr = __errno_location();
-                let errno = *errno_ptr;
-                panic!("Could not mmap {}", errno);
-            }
-        }
 
         self.heap_start = Address::from_ptr::<c_void>(self.mmap_start).align_up(SPACE_ALIGN);
 
