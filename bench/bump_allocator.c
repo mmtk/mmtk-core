@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/mman.h>
 
 typedef struct {
     void* heap_start;
@@ -15,7 +16,7 @@ size_t align_up (size_t addr, size_t align) {
 
 void gc_init(size_t heap_size) {
     size_t SPACE_ALIGN = 1 << 19;
-    void* alloced = malloc(heap_size + SPACE_ALIGN);
+    void* alloced = mmap(NULL, heap_size + SPACE_ALIGN, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     if (!alloced) {
         printf("Unable to allocate memory\n");
         exit(1);
