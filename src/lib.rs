@@ -91,12 +91,12 @@ fn align_allocation(region: Address, align: usize, offset: usize) -> Address {
 #[no_mangle]
 pub extern fn alloc(size: usize, align: usize, offset: usize) -> ObjectReference {
     let space: &mut Space = unsafe { &mut *IMMORTAL_SPACE.get() };
-    let old_cursor = space.heap_cursor;
-    let new_cursor = align_allocation(old_cursor + size, align, offset);
+    let result = align_allocation(space.heap_cursor, align, offset);
+    let new_cursor = result + size;
     if new_cursor > space.heap_end {
         unsafe { Address::zero().to_object_reference() }
     } else {
         space.heap_cursor = new_cursor;
-        unsafe { old_cursor.to_object_reference() }
+        unsafe { result.to_object_reference() }
     }
 }
