@@ -1,11 +1,10 @@
-extern crate memmap;
-#[macro_use]
-extern crate lazy_static;
+extern crate libc;
 
 mod address;
 
 use address::{Address, ObjectReference};
-use memmap::*;
+use libc::*;
+use std::ptr::null_mut;
 use std::marker::Sync;
 
 const SPACE_ALIGN: usize = 1 << 19;
@@ -32,40 +31,40 @@ impl<T> VeryUnsafeCell<T> {
 }
 
 pub struct Space {
+    mmap_start: *mut c_void,
     heap_start: Address,
     heap_cursor: Address,
     heap_end: Address,
-    address_range: Option<MmapMut>,
-    // we do not access this in fast path
 }
 
-lazy_static! {
-    static ref IMMORTAL_SPACE: VeryUnsafeCell<Space> = VeryUnsafeCell {value: Space::new() };
-}
+static mut IMMORTAL_SPACE: VeryUnsafeCell<Space> = VeryUnsafeCell {value:
+    Space {
+        mmap_start: 0 as *mut c_void,
+        heap_start: Address(0),
+        heap_cursor: Address(0),
+        heap_end: Address(0),
+    }
+};
 
 impl Space {
-    pub fn new() -> Self {
-        unsafe {
-            Space {
-                heap_start: Address::zero(),
-                heap_cursor: Address::zero(),
-                heap_end: Address::zero(),
-                address_range: None,
+    pub fn init(&mut self, heap_size: usize) {
+        self.mmap_start = unsafe {
+            mmap(null_mut(), heap_size + SPACE_ALIGN, PROT_READ | PROT_WRITE,
+                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+        };
+
+        if self.mmap_start == MAP_FAILED {
+            unsafe {
+                let errno_ptr = __errno_location();
+                let errno = *errno_ptr;
+                panic!("Could not mmap {}", errno);
             }
         }
-    }
 
-    pub fn init(&mut self, heap_size: usize) {
-        let address_range = MmapMut::map_anon(heap_size + SPACE_ALIGN).
-            expect("Unable to allocate memory");
-
-        self.heap_start = Address::from_ptr::<u8>(address_range.as_ptr())
-            .align_up(SPACE_ALIGN);
+        self.heap_start = Address::from_ptr::<c_void>(self.mmap_start).align_up(SPACE_ALIGN);
 
         self.heap_cursor = self.heap_start;
         self.heap_end = self.heap_start + heap_size;
-
-        self.address_range = Some(address_range);
     }
 }
 
