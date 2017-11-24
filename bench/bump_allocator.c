@@ -26,11 +26,11 @@ void gc_init(size_t heap_size) {
 }
 
 void* alloc(size_t size, size_t align, size_t offset) {
-    void* old_cursor = IMMORTAL_SPACE.heap_cursor;
-    void* new_cursor = (void*) align_up ((size_t) old_cursor + size, align);
+    void* result = (void*) align_up((size_t) IMMORTAL_SPACE.heap_cursor, align);
+    void* new_cursor = (void*)((size_t) result + size);
     if (new_cursor > IMMORTAL_SPACE.heap_end) {
         return NULL;
     }
     IMMORTAL_SPACE.heap_cursor = new_cursor;
-    return old_cursor;
+    return result;
 }
