@@ -5,7 +5,7 @@ authors = [" <>"]
 
 [lib]
 name = "mmtk"
-crate-type = ["dylib"]
+crate-type = ["staticlib", "dylib"]
 
 [dependencies]
 memmap = "0.6.1"
