@@ -8,5 +8,4 @@ name = "mmtk"
 crate-type = ["staticlib", "dylib"]
 
 [dependencies]
-memmap = "0.6.1"
-lazy_static = "0.2.11"
+libc = "0.2"
