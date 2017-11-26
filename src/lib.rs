@@ -37,7 +37,8 @@ pub struct Space {
     heap_end: Address,
 }
 
-static mut IMMORTAL_SPACE: VeryUnsafeCell<Space> = VeryUnsafeCell {value:
+static mut IMMORTAL_SPACE: VeryUnsafeCell<Space> = VeryUnsafeCell {
+    value:
     Space {
         mmap_start: 0 as *mut c_void,
         heap_start: Address(0),
@@ -90,4 +91,14 @@ pub extern fn alloc(size: usize, align: usize, offset: usize) -> ObjectReference
         space.heap_cursor = new_cursor;
         unsafe { result.to_object_reference() }
     }
+}
+
+#[no_mangle]
+pub extern fn malloc(size: usize) -> ObjectReference {
+    alloc(size, 1, 0)
+}
+
+#[no_mangle]
+pub extern fn free(ptr: * c_void) {
+    panic!("free is not implemented");
 }
