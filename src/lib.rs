@@ -99,6 +99,6 @@ pub extern fn malloc(size: usize) -> ObjectReference {
 }
 
 #[no_mangle]
-pub extern fn free(ptr: * c_void) {
+pub extern fn free(ptr: *const c_void) {
     panic!("free is not implemented");
 }
