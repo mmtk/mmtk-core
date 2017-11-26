@@ -94,11 +94,11 @@ pub extern fn alloc(size: usize, align: usize, offset: usize) -> ObjectReference
 }
 
 #[no_mangle]
-pub extern fn malloc(size: usize) -> ObjectReference {
+pub extern fn mmtk_malloc(size: usize) -> ObjectReference {
     alloc(size, 1, 0)
 }
 
 #[no_mangle]
-pub extern fn free(ptr: *const c_void) {
+pub extern fn mmtk_free(ptr: *const c_void) {
     panic!("free is not implemented");
 }
