@@ -50,7 +50,7 @@ static mut IMMORTAL_SPACE: VeryUnsafeCell<Space> = VeryUnsafeCell {
 impl Space {
     pub fn init(&mut self, heap_size: usize) {
         self.mmap_start = unsafe {
-            mmap(null_mut(), heap_size + SPACE_ALIGN, PROT_READ | PROT_WRITE,
+            mmap(null_mut(), heap_size + SPACE_ALIGN, PROT_READ | PROT_WRITE | PROT_EXEC,
                  MAP_PRIVATE | MAP_ANON, -1, 0)
         };
 

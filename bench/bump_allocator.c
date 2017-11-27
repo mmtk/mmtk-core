@@ -16,7 +16,7 @@ size_t align_up (size_t addr, size_t align) {
 
 void gc_init(size_t heap_size) {
     size_t SPACE_ALIGN = 1 << 19;
-    void* alloced = mmap(NULL, heap_size + SPACE_ALIGN, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    void* alloced = mmap(NULL, heap_size + SPACE_ALIGN, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     if (!alloced) {
         printf("Unable to allocate memory\n");
         exit(1);
