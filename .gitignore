@@ -3,3 +3,5 @@
 Cargo.lock
 .idea/
 mmtk.iml
+*.dylib
+*.so
