@@ -2,7 +2,7 @@ extern crate libc;
 
 mod address;
 
-use address::{Address, ObjectReference};
+use address::Address;
 use libc::*;
 use std::ptr::null_mut;
 use std::marker::Sync;
@@ -81,20 +81,20 @@ fn align_allocation(region: Address, align: usize, offset: isize) -> Address {
 }
 
 #[no_mangle]
-pub extern fn alloc(size: usize, align: usize, offset: isize) -> ObjectReference {
+pub extern fn alloc(size: usize, align: usize, offset: isize) -> *mut c_void {
     let space: &mut Space = unsafe { &mut *IMMORTAL_SPACE.get() };
     let result = align_allocation(space.heap_cursor, align, offset);
     let new_cursor = result + size;
     if new_cursor > space.heap_end {
-        unsafe { Address::zero().to_object_reference() }
+        unsafe { Address::zero().to_object_reference().value() as *mut c_void }
     } else {
         space.heap_cursor = new_cursor;
-        unsafe { result.to_object_reference() }
+        unsafe { result.to_object_reference().value() as *mut c_void }
     }
 }
 
 #[no_mangle]
-pub extern fn mmtk_malloc(size: usize) -> ObjectReference {
+pub extern fn mmtk_malloc(size: usize) -> *mut c_void {
     alloc(size, 1, 0)
 }
 
