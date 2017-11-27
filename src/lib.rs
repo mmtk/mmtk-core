@@ -68,7 +68,7 @@ pub extern fn gc_init(heap_size: usize) {
 }
 
 #[inline(always)]
-fn align_allocation(region: Address, align: usize, offset: usize) -> Address {
+fn align_allocation(region: Address, align: usize, offset: isize) -> Address {
     let region_isize = region.as_usize() as isize;
     let offset_isize = offset as isize;
 
@@ -80,7 +80,7 @@ fn align_allocation(region: Address, align: usize, offset: usize) -> Address {
 }
 
 #[no_mangle]
-pub extern fn alloc(size: usize, align: usize, offset: usize) -> ObjectReference {
+pub extern fn alloc(size: usize, align: usize, offset: isize) -> ObjectReference {
     let space: &mut Space = unsafe { &mut *IMMORTAL_SPACE.get() };
     let result = align_allocation(space.heap_cursor, align, offset);
     let new_cursor = result + size;

@@ -6,7 +6,7 @@ int main(int argc, char* argv[]){
     
     for (int i=0;i<10000;i++){
         int arr_size = 10000;
-        int* my_arr = alloc(sizeof(int)*arr_size, 8, 0);
+        int* my_arr = alloc(sizeof(int)*arr_size, 8, -4);
         if (!my_arr){
             printf("OOM\n");
             break;
