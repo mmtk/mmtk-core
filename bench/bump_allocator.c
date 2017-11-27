@@ -26,12 +26,31 @@ void gc_init(size_t heap_size) {
     IMMORTAL_SPACE.heap_cursor = IMMORTAL_SPACE.heap_start;
 }
 
+void* align_allocation(void* region, size_t align, size_t offset) {
+    ssize_t region_signed = (ssize_t) region;
+    ssize_t offset_signed = (ssize_t) offset;
+
+    ssize_t mask = (ssize_t) (align - 1);
+    ssize_t neg_off = -offset_signed;
+    ssize_t delta = (neg_off - region_signed) & mask;
+
+    return (void*) ((ssize_t)region + delta);
+}
+
 void* alloc(size_t size, size_t align, size_t offset) {
-    void* result = (void*) align_up((size_t) IMMORTAL_SPACE.heap_cursor, align);
+    void* result = align_allocation(IMMORTAL_SPACE.heap_cursor, align, offset);
     void* new_cursor = (void*)((size_t) result + size);
     if (new_cursor > IMMORTAL_SPACE.heap_end) {
         return NULL;
     }
     IMMORTAL_SPACE.heap_cursor = new_cursor;
-    return result;
+    return (void*) result;
+}
+
+void* malloc(size_t size) {
+    return alloc(size, 1, 0);
+}
+
+void free(void* ptr) {
+    return;
 }

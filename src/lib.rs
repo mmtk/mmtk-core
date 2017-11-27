@@ -99,6 +99,4 @@ pub extern fn mmtk_malloc(size: usize) -> *mut c_void {
 }
 
 #[no_mangle]
-pub extern fn mmtk_free(ptr: *const c_void) {
-    panic!("free is not implemented");
-}
+pub extern fn mmtk_free(ptr: *const c_void) {}
