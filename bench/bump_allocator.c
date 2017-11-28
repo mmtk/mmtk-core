@@ -47,10 +47,10 @@ void* alloc(size_t size, size_t align, size_t offset) {
     return (void*) result;
 }
 
-void* malloc(size_t size) {
+void* mmtk_malloc(size_t size) {
     return alloc(size, 1, 0);
 }
 
-void free(void* ptr) {
+void mmtk_free(void* ptr) {
     return;
 }
