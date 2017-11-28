@@ -5,7 +5,7 @@ authors = [" <>"]
 
 [lib]
 name = "mmtk"
-crate-type = ["staticlib", "dylib"]
+crate-type = ["rlib", "dylib", "staticlib"]
 
 [dependencies]
 libc = "0.2"

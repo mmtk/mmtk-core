@@ -239,28 +239,6 @@ impl fmt::Debug for Address {
     }
 }
 
-#[cfg(test)]
-mod addr_tests {
-    use super::*;
-
-    #[test]
-    fn test_align_up() {
-        let addr = Address(0);
-        let aligned = addr.align_up(8);
-
-        assert_eq!(addr, aligned);
-    }
-
-    #[test]
-    fn test_is_aligned() {
-        let addr = Address(0);
-        assert!(addr.is_aligned_to(8));
-
-        let addr = Address(8);
-        assert!(addr.is_aligned_to(8));
-    }
-}
-
 /// ObjectReference represents address for an object. Compared with Address,
 /// operations allowed on ObjectReference are very limited. No address arithmetics
 /// are allowed for ObjectReference. The idea is from the paper

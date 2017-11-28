@@ -1,6 +1,6 @@
 extern crate libc;
 
-mod address;
+pub mod address;
 
 use address::Address;
 use libc::*;
