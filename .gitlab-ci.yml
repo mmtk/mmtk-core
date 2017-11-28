@@ -4,4 +4,5 @@ stages:
 test:
   stage: test
   script:
+    - ./build.py
     - cargo test
