@@ -38,6 +38,11 @@ exec_and_redirect(["cargo", "build", "--release"])
 shutil.copyfile("target/release/libmmtk{}".format(SUFFIX),
                 "./libmmtk{}".format(SUFFIX))
 
+if system == "Linux":
+    exec_and_redirect(["cargo", "build", "--target=i686-unknown-linux-gnu"])
+    exec_and_redirect(
+        ["cargo", "build", "--release", "--target=i686-unknown-linux-gnu"])
+
 exec_and_redirect([
     "clang",
     "-shared",
