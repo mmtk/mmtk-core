@@ -3,10 +3,12 @@
 
 int main(int argc, char* argv[]){
     gc_init(1024*1024);
+
+    MMTk_Handle handle = bind_allocator(0);
     
     for (int i=0;i<10000;i++){
         int arr_size = 10000;
-        int* my_arr = alloc(sizeof(int)*arr_size, 8, -4);
+        int* my_arr = alloc(handle, sizeof(int)*arr_size, 8, -4);
         if (!my_arr){
             printf("OOM\n");
             break;

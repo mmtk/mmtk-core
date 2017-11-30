@@ -9,6 +9,8 @@ use std::marker::Sync;
 
 const SPACE_ALIGN: usize = 1 << 19;
 
+type MMTkHandle = *mut c_void;
+
 pub struct VeryUnsafeCell<T: ? Sized> {
     value: T,
 }
@@ -81,10 +83,18 @@ fn align_allocation(region: Address, align: usize, offset: isize) -> Address {
 }
 
 #[no_mangle]
-pub extern fn alloc(size: usize, align: usize, offset: isize) -> *mut c_void {
+pub extern fn bind_allocator(thread_id: usize) -> MMTkHandle {
+    null_mut()
+}
+
+#[no_mangle]
+pub extern fn alloc(handle: MMTkHandle, size: usize,
+                    align: usize, offset: isize) -> *mut c_void {
+
     let space: &mut Space = unsafe { &mut *IMMORTAL_SPACE.get() };
     let result = align_allocation(space.heap_cursor, align, offset);
     let new_cursor = result + size;
+
     if new_cursor > space.heap_end {
         unsafe { Address::zero().to_object_reference().value() as *mut c_void }
     } else {
@@ -94,9 +104,17 @@ pub extern fn alloc(size: usize, align: usize, offset: isize) -> *mut c_void {
 }
 
 #[no_mangle]
+pub extern fn alloc_slow(handle: MMTkHandle, size: usize,
+                         align: usize, offset: isize) -> *mut c_void {
+
+    panic!("Not implemented");
+
+}
+
+/*#[no_mangle]
 pub extern fn mmtk_malloc(size: usize) -> *mut c_void {
     alloc(size, 1, 0)
 }
 
 #[no_mangle]
-pub extern fn mmtk_free(_ptr: *const c_void) {}
+pub extern fn mmtk_free(_ptr: *const c_void) {}*/
