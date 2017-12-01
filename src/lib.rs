@@ -90,7 +90,6 @@ pub extern fn bind_allocator(thread_id: usize) -> MMTkHandle {
 #[no_mangle]
 pub extern fn alloc(handle: MMTkHandle, size: usize,
                     align: usize, offset: isize) -> *mut c_void {
-
     let space: &mut Space = unsafe { &mut *IMMORTAL_SPACE.get() };
     let result = align_allocation(space.heap_cursor, align, offset);
     let new_cursor = result + size;
@@ -104,17 +103,21 @@ pub extern fn alloc(handle: MMTkHandle, size: usize,
 }
 
 #[no_mangle]
-pub extern fn alloc_slow(handle: MMTkHandle, size: usize,
-                         align: usize, offset: isize) -> *mut c_void {
-
+pub extern fn alloc_large(handle: MMTkHandle, size: usize,
+                          align: usize, offset: isize) -> *mut c_void {
     panic!("Not implemented");
-
-}
-
-/*#[no_mangle]
-pub extern fn mmtk_malloc(size: usize) -> *mut c_void {
-    alloc(size, 1, 0)
 }
 
 #[no_mangle]
-pub extern fn mmtk_free(_ptr: *const c_void) {}*/
+pub extern fn alloc_slow(handle: MMTkHandle, size: usize,
+                         align: usize, offset: isize) -> *mut c_void {
+    panic!("Not implemented");
+}
+
+#[no_mangle]
+pub extern fn mmtk_malloc(size: usize) -> *mut c_void {
+    alloc(null_mut(), size, 1, 0)
+}
+
+#[no_mangle]
+pub extern fn mmtk_free(_ptr: *const c_void) {}
