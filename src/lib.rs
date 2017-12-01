@@ -8,7 +8,6 @@ pub mod address;
 use address::Address;
 
 use std::ptr::null_mut;
-use std::mem::size_of;
 
 use std::sync::{Mutex};
 
@@ -76,18 +75,11 @@ fn align_allocation(region: Address, align: usize, offset: isize) -> Address {
 
 #[no_mangle]
 pub extern fn bind_allocator(thread_id: usize) -> MMTkHandle {
-    // TODO: There has got to be a better way of doing this
-    unsafe {
-        let unsafe_handle = malloc(size_of::<ThreadLocalAllocData>())
-            as *mut ThreadLocalAllocData;
-        let handle = &mut *unsafe_handle;
-
-        handle.thread_id = thread_id;
-        handle.cursor = Address::zero();
-        handle.limit = Address::zero();
-
-        unsafe_handle
-    }
+    Box::into_raw(Box::new(ThreadLocalAllocData {
+        thread_id: thread_id,
+        cursor: unsafe { Address::zero() },
+        limit: unsafe { Address::zero() },
+    }))
 }
 
 #[no_mangle]
