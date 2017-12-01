@@ -15,7 +15,7 @@ pub type ByteOffset = isize;
 /// High-level Low-level Programming (VEE09) and JikesRVM.
 #[repr(C)]
 #[derive(Copy, Clone, Eq, Hash)]
-pub struct Address(pub usize);
+pub struct Address(usize);
 
 /// Address + ByteSize (positive)
 impl Add<ByteSize> for Address {

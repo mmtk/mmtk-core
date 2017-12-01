@@ -1,73 +1,65 @@
 extern crate libc;
+use libc::*;
+
+#[macro_use]
+extern crate lazy_static;
 
 pub mod address;
-
 use address::Address;
-use libc::*;
+
 use std::ptr::null_mut;
-use std::marker::Sync;
+use std::mem::size_of;
+
+use std::sync::{Mutex};
 
 const SPACE_ALIGN: usize = 1 << 19;
 
-type MMTkHandle = *mut c_void;
+type MMTkHandle = *mut ThreadLocalAllocData;
 
-pub struct VeryUnsafeCell<T: ? Sized> {
-    value: T,
-}
-
-unsafe impl<T> Sync for VeryUnsafeCell<T> {}
-
-impl<T> VeryUnsafeCell<T> {
-    #[inline(always)]
-    pub fn new(value: T) -> VeryUnsafeCell<T> {
-        VeryUnsafeCell { value }
-    }
-    #[inline(always)]
-    pub unsafe fn into_inner(self) -> T {
-        self.value
-    }
-    #[inline(always)]
-    pub fn get(&self) -> *mut T {
-        &self.value as *const T as *mut T
-    }
+pub struct ThreadLocalAllocData {
+    thread_id: usize,
+    cursor: Address,
+    limit: Address,
 }
 
 pub struct Space {
-    mmap_start: *mut c_void,
-    heap_start: Address,
+    mmap_start: usize,
     heap_cursor: Address,
-    heap_end: Address,
+    heap_limit: Address,
 }
 
-static mut IMMORTAL_SPACE: VeryUnsafeCell<Space> = VeryUnsafeCell {
-    value:
-    Space {
-        mmap_start: 0 as *mut c_void,
-        heap_start: Address(0),
-        heap_cursor: Address(0),
-        heap_end: Address(0),
-    }
-};
+lazy_static! {
+    static ref IMMORTAL_SPACE: Mutex<Space> = Mutex::new(Space::new());
+}
 
 impl Space {
+    pub fn new() -> Self {
+        Space {
+            mmap_start: 0,
+            heap_cursor: unsafe { Address::zero() },
+            heap_limit: unsafe { Address::zero() },
+        }
+    }
+
     pub fn init(&mut self, heap_size: usize) {
-        self.mmap_start = unsafe {
+        let mmap_start = unsafe {
             mmap(null_mut(), heap_size + SPACE_ALIGN, PROT_READ | PROT_WRITE | PROT_EXEC,
                  MAP_PRIVATE | MAP_ANON, -1, 0)
         };
 
-        self.heap_start = Address::from_ptr::<c_void>(self.mmap_start).align_up(SPACE_ALIGN);
+        self.heap_cursor = Address::from_ptr::<c_void>(mmap_start)
+            .align_up(SPACE_ALIGN);
 
-        self.heap_cursor = self.heap_start;
-        self.heap_end = self.heap_start + heap_size;
+        self.heap_limit = self.heap_cursor + heap_size;
+
+        self.mmap_start = mmap_start as usize;
     }
 }
 
 #[no_mangle]
 pub extern fn gc_init(heap_size: usize) {
-    unsafe {
-        (*IMMORTAL_SPACE.get()).init(heap_size);
-    }
+        let mut globl = IMMORTAL_SPACE.lock().unwrap();
+        (*globl).init(heap_size);
 }
 
 #[inline(always)]
@@ -84,29 +76,41 @@ fn align_allocation(region: Address, align: usize, offset: isize) -> Address {
 
 #[no_mangle]
 pub extern fn bind_allocator(thread_id: usize) -> MMTkHandle {
-    null_mut()
+    // TODO: There has got to be a better way of doing this
+    unsafe {
+        let unsafe_handle = malloc(size_of::<ThreadLocalAllocData>())
+            as *mut ThreadLocalAllocData;
+        let handle = &mut *unsafe_handle;
+
+        handle.thread_id = thread_id;
+        handle.cursor = Address::zero();
+        handle.limit = Address::zero();
+
+        unsafe_handle
+    }
 }
 
 #[no_mangle]
 pub extern fn alloc(handle: MMTkHandle, size: usize,
                     align: usize, offset: isize) -> *mut c_void {
 
-    let space: &mut Space = unsafe { &mut *IMMORTAL_SPACE.get() };
-    let result = align_allocation(space.heap_cursor, align, offset);
+    let local = unsafe { &mut *handle };
+    let result = align_allocation(local.cursor, align, offset);
     let new_cursor = result + size;
 
-    if new_cursor > space.heap_end {
-        unsafe { Address::zero().to_object_reference().value() as *mut c_void }
+    if new_cursor > local.limit {
+        alloc_slow(handle, size, align, offset)
     } else {
-        space.heap_cursor = new_cursor;
-        unsafe { result.to_object_reference().value() as *mut c_void }
+        local.cursor = new_cursor;
+        result.as_usize() as *mut c_void
     }
 }
 
-#[no_mangle]
+#[no_mangle] #[inline(never)]
 pub extern fn alloc_slow(handle: MMTkHandle, size: usize,
                          align: usize, offset: isize) -> *mut c_void {
 
+    let space = IMMORTAL_SPACE.lock().unwrap();
     panic!("Not implemented");
 
 }
