@@ -8,21 +8,31 @@ extern crate lazy_static;
 pub mod address;
 
 use address::Address;
-
 use std::ptr::null_mut;
-
 use std::sync::Mutex;
 
 const SPACE_ALIGN: usize = 1 << 19;
+const BYTES_IN_PAGE: usize = 1 << 12;
+const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
+const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 type MMTkHandle = *mut ThreadLocalAllocData;
 
+#[derive(Debug)]
 pub struct ThreadLocalAllocData {
     thread_id: usize,
     cursor: Address,
     limit: Address,
 }
 
+impl ThreadLocalAllocData {
+    pub fn set_limit(&mut self, cursor: Address, limit: Address) {
+        self.cursor = cursor;
+        self.limit = limit;
+    }
+}
+
+#[derive(Debug)]
 pub struct Space {
     mmap_start: usize,
     heap_cursor: Address,
@@ -55,6 +65,17 @@ impl Space {
 
         self.mmap_start = mmap_start as usize;
     }
+
+    pub fn acquire(&mut self, size: usize) -> Address {
+        let old_cursor = self.heap_cursor;
+        let new_cursor = self.heap_cursor + size;
+        if new_cursor > self.heap_limit {
+            unsafe { Address::zero() }
+        } else {
+            self.heap_cursor = new_cursor;
+            old_cursor
+        }
+    }
 }
 
 #[no_mangle]
@@ -78,7 +99,7 @@ fn align_allocation(region: Address, align: usize, offset: isize) -> Address {
 #[no_mangle]
 pub extern fn bind_allocator(thread_id: usize) -> MMTkHandle {
     Box::into_raw(Box::new(ThreadLocalAllocData {
-        thread_id: thread_id,
+        thread_id,
         cursor: unsafe { Address::zero() },
         limit: unsafe { Address::zero() },
     }))
@@ -103,14 +124,22 @@ pub extern fn alloc(handle: MMTkHandle, size: usize,
 #[inline(never)]
 pub extern fn alloc_slow(handle: MMTkHandle, size: usize,
                          align: usize, offset: isize) -> *mut c_void {
-    let space = IMMORTAL_SPACE.lock().unwrap();
-    panic!("Not implemented");
+    let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
+    let mut space = IMMORTAL_SPACE.lock().unwrap();
+    let acquired_start: Address = (*space).acquire(block_size);
+    if acquired_start.is_zero() {
+        acquired_start.as_usize() as *mut c_void
+    } else {
+        let local = unsafe { &mut *handle };
+        local.set_limit(acquired_start, acquired_start + block_size);
+        alloc(handle, size, align, offset)
+    }
 }
 
 #[no_mangle]
 #[inline(never)]
-pub extern fn alloc_large(handle: MMTkHandle, size: usize,
-                          align: usize, offset: isize) -> *mut c_void {
+pub extern fn alloc_large(_handle: MMTkHandle, _size: usize,
+                          _align: usize, _offset: isize) -> *mut c_void {
     panic!("Not implemented");
 }
 
