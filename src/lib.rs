@@ -1,15 +1,17 @@
 extern crate libc;
+
 use libc::*;
 
 #[macro_use]
 extern crate lazy_static;
 
 pub mod address;
+
 use address::Address;
 
 use std::ptr::null_mut;
 
-use std::sync::{Mutex};
+use std::sync::Mutex;
 
 const SPACE_ALIGN: usize = 1 << 19;
 
@@ -57,8 +59,8 @@ impl Space {
 
 #[no_mangle]
 pub extern fn gc_init(heap_size: usize) {
-        let mut globl = IMMORTAL_SPACE.lock().unwrap();
-        (*globl).init(heap_size);
+    let mut globl = IMMORTAL_SPACE.lock().unwrap();
+    (*globl).init(heap_size);
 }
 
 #[inline(always)]
@@ -97,16 +99,18 @@ pub extern fn alloc(handle: MMTkHandle, size: usize,
     }
 }
 
-#[no_mangle] #[inline(never)]
+#[no_mangle]
+#[inline(never)]
 pub extern fn alloc_slow(handle: MMTkHandle, size: usize,
-                          align: usize, offset: isize) -> *mut c_void {
+                         align: usize, offset: isize) -> *mut c_void {
     let space = IMMORTAL_SPACE.lock().unwrap();
     panic!("Not implemented");
 }
 
-#[no_mangle] #[inline(never)]
+#[no_mangle]
+#[inline(never)]
 pub extern fn alloc_large(handle: MMTkHandle, size: usize,
-                         align: usize, offset: isize) -> *mut c_void {
+                          align: usize, offset: isize) -> *mut c_void {
     panic!("Not implemented");
 }
 
