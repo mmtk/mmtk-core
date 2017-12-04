@@ -30,6 +30,30 @@ impl ThreadLocalAllocData {
         self.cursor = cursor;
         self.limit = limit;
     }
+
+    pub fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        let result = align_allocation(self.cursor, align, offset);
+        let new_cursor = result + size;
+
+        if new_cursor > self.limit {
+            self.alloc_slow(size, align, offset)
+        } else {
+            self.cursor = new_cursor;
+            result
+        }
+    }
+
+    pub fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
+        let mut space = IMMORTAL_SPACE.lock().unwrap();
+        let acquired_start: Address = (*space).acquire(block_size);
+        if acquired_start.is_zero() {
+            acquired_start
+        } else {
+            self.set_limit(acquired_start, acquired_start + block_size);
+            self.alloc(size, align, offset)
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -109,31 +133,16 @@ pub extern fn bind_allocator(thread_id: usize) -> MMTkHandle {
 pub extern fn alloc(handle: MMTkHandle, size: usize,
                     align: usize, offset: isize) -> *mut c_void {
     let local = unsafe { &mut *handle };
-    let result = align_allocation(local.cursor, align, offset);
-    let new_cursor = result + size;
-
-    if new_cursor > local.limit {
-        alloc_slow(handle, size, align, offset)
-    } else {
-        local.cursor = new_cursor;
-        result.as_usize() as *mut c_void
-    }
+    local.alloc(size, align, offset).as_usize() as *mut c_void
 }
 
 #[no_mangle]
 #[inline(never)]
 pub extern fn alloc_slow(handle: MMTkHandle, size: usize,
                          align: usize, offset: isize) -> *mut c_void {
-    let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-    let mut space = IMMORTAL_SPACE.lock().unwrap();
-    let acquired_start: Address = (*space).acquire(block_size);
-    if acquired_start.is_zero() {
-        acquired_start.as_usize() as *mut c_void
-    } else {
-        let local = unsafe { &mut *handle };
-        local.set_limit(acquired_start, acquired_start + block_size);
-        alloc(handle, size, align, offset)
-    }
+
+    let local = unsafe { &mut *handle };
+    local.alloc_slow(size, align, offset).as_usize() as *mut c_void
 }
 
 #[no_mangle]
