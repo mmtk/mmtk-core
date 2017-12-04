@@ -1,5 +1,3 @@
-extern crate libc;
-
 use libc::{mmap, PROT_READ, PROT_WRITE, PROT_EXEC, MAP_PRIVATE, MAP_ANON, c_void, munmap};
 use super::super::address::Address;
 use std::ptr::null_mut;
