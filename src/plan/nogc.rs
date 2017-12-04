@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 use libc::c_void;
-use super::super::heap_space::HeapSpace;
+use super::super::space::space::Space;
 use super::super::address::Address;
 use super::super::util::align_allocation;
 
@@ -9,7 +9,7 @@ const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
 const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 lazy_static! {
-    static ref IMMORTAL_SPACE: Mutex<HeapSpace> = Mutex::new(HeapSpace::new());
+    static ref IMMORTAL_SPACE: Mutex<Space> = Mutex::new(Space::new());
 }
 
 #[repr(C)]

@@ -4,7 +4,7 @@ extern crate lazy_static;
 
 pub mod address;
 pub mod util;
-mod heap_space;
+mod space;
 mod plan;
 
 use std::ptr::null_mut;

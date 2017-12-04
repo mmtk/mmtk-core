@@ -1,22 +1,22 @@
 extern crate libc;
 
 use libc::{mmap, PROT_READ, PROT_WRITE, PROT_EXEC, MAP_PRIVATE, MAP_ANON, c_void, munmap};
-use super::address::Address;
+use super::super::address::Address;
 use std::ptr::null_mut;
 
 const SPACE_ALIGN: usize = 1 << 19;
 
 #[derive(Debug)]
-pub struct HeapSpace {
+pub struct Space {
     mmap_start: usize,
     mmap_len: usize,
     heap_cursor: Address,
     heap_limit: Address,
 }
 
-impl HeapSpace {
+impl Space {
     pub fn new() -> Self {
-        HeapSpace {
+        Space {
             mmap_start: 0,
             mmap_len: 0,
             heap_cursor: unsafe { Address::zero() },
@@ -48,7 +48,7 @@ impl HeapSpace {
     }
 }
 
-impl Drop for HeapSpace {
+impl Drop for Space {
     fn drop(&mut self) {
         let unmap_result = unsafe { munmap(self.mmap_start as *mut c_void, self.mmap_len) };
         if unmap_result != 0 {
