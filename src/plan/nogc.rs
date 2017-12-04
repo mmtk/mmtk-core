@@ -1,8 +1,8 @@
 use std::sync::Mutex;
 use libc::c_void;
-use super::super::space::space::Space;
-use super::super::address::Address;
-use super::super::util::align_allocation;
+use ::space::Space;
+use ::util::Address;
+use ::util::align_allocation;
 
 const BYTES_IN_PAGE: usize = 1 << 12;
 const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;

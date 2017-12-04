@@ -1,6 +1,6 @@
 extern crate mmtk;
 
-use mmtk::address::Address;
+use mmtk::util::Address;
 
 #[test]
 fn test_align_up() {

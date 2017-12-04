@@ -2,14 +2,12 @@ extern crate libc;
 #[macro_use]
 extern crate lazy_static;
 
-pub mod address;
 pub mod util;
 mod space;
 mod plan;
 
 use std::ptr::null_mut;
 use libc::c_void;
-use address::Address;
 use plan::nogc as gc_plan;
 
 type MMTkHandle = *mut gc_plan::ThreadLocalAllocData;

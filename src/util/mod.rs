@@ -1,4 +1,6 @@
-use super::Address;
+mod address;
+
+pub use self::address::Address;
 
 #[inline(always)]
 pub fn align_allocation(region: Address, align: usize, offset: isize) -> Address {
