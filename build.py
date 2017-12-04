@@ -16,6 +16,8 @@ def exec_and_redirect(cmd, env=None):
         print line.strip()
     for line in p.stderr:
         print line.strip()
+    if p.returncode != 0:
+        exit(p.returncode)
 
 
 system = platform.system()
