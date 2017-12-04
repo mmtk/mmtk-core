@@ -6,6 +6,7 @@ authors = [" <>"]
 [lib]
 name = "mmtk"
 crate-type = ["rlib", "dylib", "staticlib"]
+doctest = false
 
 [dependencies]
 libc = "0.2"

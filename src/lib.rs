@@ -1,12 +1,10 @@
 extern crate libc;
-
-use libc::*;
-
 #[macro_use]
 extern crate lazy_static;
 
 pub mod address;
 
+use libc::*;
 use address::Address;
 use std::ptr::null_mut;
 use std::sync::Mutex;
@@ -18,6 +16,7 @@ const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 type MMTkHandle = *mut ThreadLocalAllocData;
 
+#[repr(C)]
 #[derive(Debug)]
 pub struct ThreadLocalAllocData {
     thread_id: usize,
@@ -140,7 +139,6 @@ pub extern fn alloc(handle: MMTkHandle, size: usize,
 #[inline(never)]
 pub extern fn alloc_slow(handle: MMTkHandle, size: usize,
                          align: usize, offset: isize) -> *mut c_void {
-
     let local = unsafe { &mut *handle };
     local.alloc_slow(size, align, offset).as_usize() as *mut c_void
 }
