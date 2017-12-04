@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 use libc::c_void;
-use ::space::Space;
+use ::policy::Space;
 use ::util::Address;
 use ::util::align_allocation;
 

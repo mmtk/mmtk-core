@@ -3,7 +3,7 @@ extern crate libc;
 extern crate lazy_static;
 
 pub mod util;
-mod space;
+mod policy;
 mod plan;
 
 use std::ptr::null_mut;
