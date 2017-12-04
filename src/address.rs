@@ -129,23 +129,6 @@ impl Address {
         *(self.0 as *mut T) = value;
     }
 
-    // commented out the function due to the fact that Rust does not have non-64bits atomic types
-    // Issue #51
-
-    //    /// loads a value of type T from the address with specified memory order
-    //    #[inline(always)]
-    //    pub unsafe fn load_order<T: Copy> (&self, order: Ordering) -> T {
-    //        let atomic_ptr : AtomicPtr<T> = mem::transmute(self.0);
-    //        *atomic_ptr.load(order)
-    //    }
-
-    //    /// stores a value of type T to the address with specified memory order
-    //    #[inline(always)]
-    //    pub unsafe fn store_order<T: Copy> (&self, mut value: T, order: Ordering) {
-    //        let atomic_ptr : AtomicPtr<T> = mem::transmute(self.0);
-    //        atomic_ptr.store(&mut value, order)
-    //    }
-
     /// is this address zero?
     #[inline(always)]
     pub fn is_zero(&self) -> bool {

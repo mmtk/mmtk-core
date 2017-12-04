@@ -3,13 +3,14 @@ extern crate libc;
 extern crate lazy_static;
 
 pub mod address;
+mod heap_space;
 
-use libc::*;
-use address::Address;
 use std::ptr::null_mut;
 use std::sync::Mutex;
+use libc::c_void;
+use address::Address;
+use heap_space::HeapSpace;
 
-const SPACE_ALIGN: usize = 1 << 19;
 const BYTES_IN_PAGE: usize = 1 << 12;
 const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
 const BLOCK_MASK: usize = BLOCK_SIZE - 1;
@@ -55,50 +56,8 @@ impl ThreadLocalAllocData {
     }
 }
 
-#[derive(Debug)]
-pub struct Space {
-    mmap_start: usize,
-    heap_cursor: Address,
-    heap_limit: Address,
-}
-
 lazy_static! {
-    static ref IMMORTAL_SPACE: Mutex<Space> = Mutex::new(Space::new());
-}
-
-impl Space {
-    pub fn new() -> Self {
-        Space {
-            mmap_start: 0,
-            heap_cursor: unsafe { Address::zero() },
-            heap_limit: unsafe { Address::zero() },
-        }
-    }
-
-    pub fn init(&mut self, heap_size: usize) {
-        let mmap_start = unsafe {
-            mmap(null_mut(), heap_size + SPACE_ALIGN, PROT_READ | PROT_WRITE | PROT_EXEC,
-                 MAP_PRIVATE | MAP_ANON, -1, 0)
-        };
-
-        self.heap_cursor = Address::from_ptr::<c_void>(mmap_start)
-            .align_up(SPACE_ALIGN);
-
-        self.heap_limit = self.heap_cursor + heap_size;
-
-        self.mmap_start = mmap_start as usize;
-    }
-
-    pub fn acquire(&mut self, size: usize) -> Address {
-        let old_cursor = self.heap_cursor;
-        let new_cursor = self.heap_cursor + size;
-        if new_cursor > self.heap_limit {
-            unsafe { Address::zero() }
-        } else {
-            self.heap_cursor = new_cursor;
-            old_cursor
-        }
-    }
+    static ref IMMORTAL_SPACE: Mutex<HeapSpace> = Mutex::new(HeapSpace::new());
 }
 
 #[no_mangle]
