@@ -7,15 +7,10 @@ import os
 
 
 def exec_and_redirect(cmd, env=None):
+    print "[exec_and_redirect] {}".format(cmd)
     p = subprocess.Popen(cmd,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE,
-                         bufsize=1,  # line buffered
                          env=env)
-    for line in p.stdout:
-        print line.strip()
-    for line in p.stderr:
-        print line.strip()
+    p.communicate()
     if p.returncode != 0:
         exit(p.returncode)
 
