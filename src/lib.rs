@@ -10,7 +10,7 @@ use std::ptr::null_mut;
 use libc::c_void;
 use plan::nogc as gc_plan;
 
-type MMTkHandle = *mut gc_plan::ThreadLocalAllocData;
+type Mutator = *mut gc_plan::NoGCMutator;
 
 #[no_mangle]
 pub extern fn gc_init(heap_size: usize) {
@@ -18,26 +18,26 @@ pub extern fn gc_init(heap_size: usize) {
 }
 
 #[no_mangle]
-pub extern fn bind_allocator(thread_id: usize) -> MMTkHandle {
-    gc_plan::bind_allocator(thread_id)
+pub extern fn bind_mutator(thread_id: usize) -> Mutator {
+    gc_plan::bind_mutator(thread_id)
 }
 
 #[no_mangle]
-pub extern fn alloc(handle: MMTkHandle, size: usize,
+pub extern fn alloc(mutator: Mutator, size: usize,
                     align: usize, offset: isize) -> *mut c_void {
-    gc_plan::alloc(handle, size, align, offset)
+    gc_plan::alloc(mutator, size, align, offset)
 }
 
 #[no_mangle]
 #[inline(never)]
-pub extern fn alloc_slow(handle: MMTkHandle, size: usize,
+pub extern fn alloc_slow(mutator: Mutator, size: usize,
                          align: usize, offset: isize) -> *mut c_void {
-    gc_plan::alloc_slow(handle, size, align, offset)
+    gc_plan::alloc_slow(mutator, size, align, offset)
 }
 
 #[no_mangle]
 #[inline(never)]
-pub extern fn alloc_large(_handle: MMTkHandle, _size: usize,
+pub extern fn alloc_large(_mutator: Mutator, _size: usize,
                           _align: usize, _offset: isize) -> *mut c_void {
     panic!("Not implemented");
 }

@@ -14,13 +14,13 @@ lazy_static! {
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct ThreadLocalAllocData {
+pub struct NoGCMutator {
     thread_id: usize,
     cursor: Address,
     limit: Address,
 }
 
-impl ThreadLocalAllocData {
+impl NoGCMutator {
     pub fn set_limit(&mut self, cursor: Address, limit: Address) {
         self.cursor = cursor;
         self.limit = limit;
@@ -56,22 +56,22 @@ pub fn init(heap_size: usize) {
     (*globl).init(heap_size);
 }
 
-pub fn bind_allocator(thread_id: usize) -> *mut ThreadLocalAllocData {
-    Box::into_raw(Box::new(ThreadLocalAllocData {
+pub fn bind_mutator(thread_id: usize) -> *mut NoGCMutator {
+    Box::into_raw(Box::new(NoGCMutator {
         thread_id,
         cursor: unsafe { Address::zero() },
         limit: unsafe { Address::zero() },
     }))
 }
 
-pub fn alloc(handle: *mut ThreadLocalAllocData, size: usize,
+pub fn alloc(mutator: *mut NoGCMutator, size: usize,
              align: usize, offset: isize) -> *mut c_void {
-    let local = unsafe { &mut *handle };
+    let local = unsafe { &mut *mutator };
     local.alloc(size, align, offset).as_usize() as *mut c_void
 }
 
-pub fn alloc_slow(handle: *mut ThreadLocalAllocData, size: usize,
+pub fn alloc_slow(mutator: *mut NoGCMutator, size: usize,
                   align: usize, offset: isize) -> *mut c_void {
-    let local = unsafe { &mut *handle };
+    let local = unsafe { &mut *mutator };
     local.alloc_slow(size, align, offset).as_usize() as *mut c_void
 }

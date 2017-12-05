@@ -4,7 +4,7 @@
 int main(int argc, char* argv[]){
     gc_init(1024*1024);
 
-    MMTk_Handle handle = bind_allocator(0);
+    MMTk_Mutator handle = bind_mutator(0);
     
     for (int i=0;i<10000;i++){
         int arr_size = 10000;
