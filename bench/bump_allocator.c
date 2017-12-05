@@ -31,12 +31,11 @@ extern MMTk_Mutator bind_mutator(size_t thread_id) {
     return NULL;
 }
 
-extern void* align_allocation(void* region, size_t align, size_t offset) {
+extern void* align_allocation(void* region, size_t align, ssize_t offset) {
     ssize_t region_signed = (ssize_t) region;
-    ssize_t offset_signed = (ssize_t) offset;
 
     ssize_t mask = (ssize_t) (align - 1);
-    ssize_t neg_off = -offset_signed;
+    ssize_t neg_off = -offset;
     ssize_t delta = (neg_off - region_signed) & mask;
 
     return (void*) ((ssize_t)region + delta);
