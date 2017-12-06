@@ -2,6 +2,8 @@ use libc::{mmap, PROT_READ, PROT_WRITE, PROT_EXEC, MAP_PRIVATE, MAP_ANON, c_void
 use ::util::address::Address;
 use std::ptr::null_mut;
 
+use std::mem::uninitialized;
+
 const SPACE_ALIGN: usize = 1 << 19;
 
 #[derive(Debug)]
@@ -14,12 +16,15 @@ pub struct Space {
 
 impl Space {
     pub fn new() -> Self {
-        Space {
-            mmap_start: 0,
-            mmap_len: 0,
-            heap_cursor: unsafe { Address::zero() },
-            heap_limit: unsafe { Address::zero() },
-        }
+        // FIXME: We need to find a better solution here.
+        //
+        //       This is a workaround for what appears to be a compiler bug.
+        //       Essentially, it tries to initialize multiple fields at once
+        //       using a `movapd` but fails because the alignment is wrong.
+        //
+        //       This is (relatively) safe to do because the fields only get
+        //       properly initialized in `init`, not here.
+        unsafe { uninitialized() }
     }
 
     pub fn init(&mut self, heap_size: usize) {
