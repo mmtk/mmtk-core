@@ -40,6 +40,9 @@ if system == "Linux":
     exec_and_redirect(
         ["cargo", "build", "--release", "--target=i686-unknown-linux-gnu"])
 
+    shutil.copyfile("target/i686-unknown-linux-gnu/release/libmmtk{}".format(SUFFIX),
+                    "./libmmtk_32{}".format(SUFFIX))
+
 exec_and_redirect([
     "clang",
     "-shared",
@@ -47,6 +50,7 @@ exec_and_redirect([
     "-o", "libmmtkc{}".format(SUFFIX),
     "-O3",
     "bench/bump_allocator.c"])
+
 exec_and_redirect([
     "clang",
     "-lmmtk",
@@ -56,6 +60,18 @@ exec_and_redirect([
     "-o",
     "test_mmtk",
     "./api/main.c"])
+
+if system == "Linux":
+    exec_and_redirect([
+        "clang",
+        "-lmmtk_32",
+        "-L.",
+        "-Iapi",
+        "-O3", "-m32",
+        "-o",
+        "test_mmtk_32",
+        "./api/main.c"])
+
 exec_and_redirect([
     "clang",
     "-lmmtkc",
@@ -65,7 +81,12 @@ exec_and_redirect([
     "-o",
     "test_mmtkc",
     "./api/main.c"])
+
 exec_and_redirect(["./test_mmtk"], env={LIBRARY_PATH: "."})
 exec_and_redirect(["./test_mmtkc"], env={LIBRARY_PATH: "."})
+if system == "Linux":
+    exec_and_redirect(["./test_mmtk_32"], env={LIBRARY_PATH: "."})
 os.remove("./test_mmtk")
 os.remove("./test_mmtkc")
+if system == "Linux":
+    os.remove("./test_mmtk_32")
