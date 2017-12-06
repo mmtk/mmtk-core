@@ -10,7 +10,7 @@ def exec_and_redirect(cmd, env=None):
     print "[exec_and_redirect] {}".format(cmd)
     p = subprocess.Popen(cmd,
                          env=env)
-    p.communicate()
+    p.wait()
     if p.returncode != 0:
         exit(p.returncode)
 
