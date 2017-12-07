@@ -18,12 +18,12 @@ impl Space {
     pub fn new() -> Self {
         // FIXME: We need to find a better solution here.
         //
-        //       This is a workaround for what appears to be a compiler bug.
-        //       Essentially, it tries to initialize multiple fields at once
-        //       using a `movapd` but fails because the alignment is wrong.
+        // This is a workaround for what appears to be a compiler bug.
+        // Essentially, it tries to initialize multiple fields at once
+        // using a `movapd` but fails because the alignment is wrong.
         //
-        //       This is (relatively) safe to do because the fields only get
-        //       properly initialized in `init`, not here.
+        // This is (relatively) safe to do because the fields only get
+        // properly initialized in `init`, not here.
         unsafe { uninitialized() }
     }
 
