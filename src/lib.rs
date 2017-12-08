@@ -3,46 +3,46 @@ extern crate libc;
 extern crate lazy_static;
 
 pub mod util;
+pub mod vm;
 mod policy;
 mod plan;
 
 use std::ptr::null_mut;
 use libc::c_void;
+use plan::plan::Plan;
+use util::alloc::allocator::Allocator;
 
-use ::util::alloc::allocator::Allocator;
-use plan::nogc as gc_plan;
-
-type MMTkHandle<'a> = *mut gc_plan::SelectedAllocator<'a>;
+type SelectedPlan = ::plan::nogc::NoGC;
+type SelectedMutator<'a> = ::plan::nogc::NoGCMutator<'a>;
 
 #[no_mangle]
 pub extern fn gc_init(heap_size: usize) {
-    let mut globl = gc_plan::SPACE.lock().unwrap();
-    (*globl).init(heap_size);
+    SelectedPlan::gc_init(heap_size);
 }
 
 #[no_mangle]
-pub extern fn bind_mutator(thread_id: usize) -> MMTkHandle<'static> {
-    Box::into_raw(Box::new(gc_plan::SelectedAllocator::new(thread_id, &gc_plan::SPACE)))
+pub extern fn bind_mutator(thread_id: usize) -> *mut c_void {
+    SelectedPlan::bind_mutator(thread_id)
 }
 
 #[no_mangle]
-pub fn alloc(mutator: MMTkHandle, size: usize,
+pub fn alloc(mutator: *mut c_void, size: usize,
              align: usize, offset: isize) -> *mut c_void {
-    let local : &mut gc_plan::SelectedAllocator = unsafe { &mut *mutator };
+    let local = unsafe { &mut *(mutator as *mut SelectedMutator) };
     local.alloc(size, align, offset).as_usize() as *mut c_void
 }
 
 #[no_mangle]
 #[inline(never)]
-pub fn alloc_slow(mutator: MMTkHandle, size: usize,
+pub fn alloc_slow(mutator: *mut c_void, size: usize,
                   align: usize, offset: isize) -> *mut c_void {
-    let local: &mut gc_plan::SelectedAllocator = unsafe { &mut *mutator };
+    let local = unsafe { &mut *(mutator as *mut SelectedMutator) };
     local.alloc_slow(size, align, offset).as_usize() as *mut c_void
 }
 
 #[no_mangle]
 #[inline(never)]
-pub extern fn alloc_large(_mutator: MMTkHandle, _size: usize,
+pub extern fn alloc_large(_mutator: *mut c_void, _size: usize,
                           _align: usize, _offset: isize) -> *mut c_void {
     panic!("Not implemented");
 }
