@@ -7,28 +7,30 @@ use ::util::address::Address;
 use ::util::alloc::allocator::align_allocation;
 use ::util::alloc::allocator::Allocator;
 
+use ::policy::space::Space;
+
 const BYTES_IN_PAGE: usize = 1 << 12;
 const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
 const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct BumpAllocator<'a> {
+pub struct BumpAllocator<'a,T: 'a> where T: Space {
     thread_id: usize,
     cursor: Address,
     limit: Address,
-    space: &'a Mutex<MonotonePageResource>,
+    space: &'a T,
 }
 
-impl<'a> BumpAllocator<'a> {
+impl<'a,T> BumpAllocator<'a,T> where T: Space {
     pub fn set_limit(&mut self, cursor: Address, limit: Address) {
         self.cursor = cursor;
         self.limit = limit;
     }
 }
 
-impl<'a> Allocator<'a> for BumpAllocator<'a> {
-    fn new(thread_id: usize, space: &'a Mutex<MonotonePageResource>) -> Self {
+impl<'a,T> Allocator<'a,T> for BumpAllocator<'a,T> where T: Space {
+    fn new(thread_id: usize, space: &'a T) -> Self {
         BumpAllocator {
             thread_id,
             cursor: unsafe { Address::zero() },
@@ -51,8 +53,7 @@ impl<'a> Allocator<'a> for BumpAllocator<'a> {
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let mut space = self.space.lock().unwrap();
-        let acquired_start: Address = (*space).get_new_pages(block_size);
+        let acquired_start: Address = self.space.acquire(block_size);
         if acquired_start.is_zero() {
             acquired_start
         } else {
