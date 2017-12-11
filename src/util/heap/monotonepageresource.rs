@@ -2,6 +2,8 @@ use libc::{mmap, PROT_READ, PROT_WRITE, PROT_EXEC, MAP_PRIVATE, MAP_ANON, c_void
 use ::util::address::Address;
 use std::ptr::null_mut;
 
+use super::PageResource;
+
 const SPACE_ALIGN: usize = 1 << 19;
 
 #[derive(Debug)]
@@ -12,8 +14,8 @@ pub struct MonotonePageResource {
     heap_limit: Address,
 }
 
-impl MonotonePageResource {
-    pub fn new() -> Self {
+impl PageResource for MonotonePageResource {
+    fn new() -> Self {
         MonotonePageResource {
             mmap_start: 0,
             mmap_len: 0,
@@ -22,7 +24,7 @@ impl MonotonePageResource {
         }
     }
 
-    pub fn init(&mut self, heap_size: usize) {
+    fn init(&mut self, heap_size: usize) {
         let mmap_start = unsafe {
             mmap(null_mut(), heap_size + SPACE_ALIGN, PROT_READ | PROT_WRITE | PROT_EXEC,
                  MAP_PRIVATE | MAP_ANON, -1, 0)
@@ -34,7 +36,7 @@ impl MonotonePageResource {
         self.mmap_len = heap_size + SPACE_ALIGN;
     }
 
-    pub fn get_new_pages(&mut self, size: usize) -> Address {
+    fn get_new_pages(&mut self, size: usize) -> Address {
         let old_cursor = self.heap_cursor;
         let new_cursor = self.heap_cursor + size;
         if new_cursor > self.heap_limit {

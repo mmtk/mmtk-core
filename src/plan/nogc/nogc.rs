@@ -1,5 +1,7 @@
 use std::sync::Mutex;
 use ::util::heap::MonotonePageResource;
+use ::util::heap::PageResource;
+
 use ::util::alloc::bumpallocator::BumpAllocator;
 use ::util::alloc::allocator::Allocator;
 use libc::c_void;

@@ -1,6 +1,7 @@
 use std::sync::Mutex;
 
 use ::util::heap::MonotonePageResource;
+use ::util::heap::PageResource;
 use ::util::address::Address;
 
 use ::util::alloc::allocator::align_allocation;
