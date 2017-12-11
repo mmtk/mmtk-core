@@ -9,3 +9,6 @@ extern void* alloc(MMTk_Mutator mutator, size_t size,
 
 extern void* alloc_slow(MMTk_Mutator mutator, size_t size,
     size_t align, ssize_t offset);
+
+// JikesRVM specific
+extern void jikesrvm_gc_init(void* jtoc, size_t heap_size);
