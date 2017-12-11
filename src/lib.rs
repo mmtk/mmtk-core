@@ -12,11 +12,33 @@ use libc::c_void;
 use plan::plan::Plan;
 use util::alloc::allocator::Allocator;
 
+#[cfg(feature = "jikesrvm")]
+use ::vm::JTOC_BASE;
+
+#[cfg(feature = "jikesrvm")]
+use ::util::address::Address;
+
 type SelectedPlan = ::plan::nogc::NoGC;
 type SelectedMutator<'a> = ::plan::nogc::NoGCMutator<'a>;
 
 #[no_mangle]
+#[cfg(feature = "jikesrvm")]
+pub extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
+    unsafe { JTOC_BASE = Address::from_mut_ptr(jtoc); }
+    SelectedPlan::gc_init(heap_size);
+}
+
+#[no_mangle]
+#[cfg(not(feature = "jikesrvm"))]
+pub extern fn jikesrvm_gc_init(_jtoc: *mut c_void, _heap_size: usize) {
+    panic!("Cannot call jikesrvm_gc_init when not building for JikesRVM");
+}
+
+#[no_mangle]
 pub extern fn gc_init(heap_size: usize) {
+    if cfg!(feature = "jikesrvm") {
+        panic!("Should be calling jikesrvm_gc_init instead");
+    }
     SelectedPlan::gc_init(heap_size);
 }
 

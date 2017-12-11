@@ -1,4 +1,5 @@
 use std::sync::{Mutex, Condvar};
+use ::vm::scheduler::{stop_all_mutators, resume_mutators};
 
 struct RequestSync {
     request_flag: bool,
@@ -28,10 +29,10 @@ impl ControllerCollectorContext {
     pub fn run(&mut self) {
         loop {
             self.wait_for_request();
-            // Pause all threads here
+            stop_all_mutators();
             self.clear_request();
             // Do collection
-            // Unpause threads
+            resume_mutators();
         }
     }
 
