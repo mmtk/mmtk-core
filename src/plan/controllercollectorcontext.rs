@@ -28,14 +28,21 @@ impl ControllerCollectorContext {
     pub fn run(&mut self) {
         loop {
             self.wait_for_request();
+            // Pause all threads here
             self.clear_request();
+            // Do collection
+            // Unpause threads
         }
     }
 
     fn request(&mut self) {
-        /*if self.request_flag {
-            return;
-        }*/
+        // This will probably blow up later on
+        {
+            let unsafe_handle = self.request_sync.get_mut().unwrap();
+            if unsafe_handle.request_flag {
+                return;
+            }
+        }
 
         let mut guard = self.request_sync.lock().unwrap();
         if !guard.request_flag {
