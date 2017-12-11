@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use ::policy::Space;
+use ::util::heap::MonotonePageResource;
 use ::util::address::Address;
 
 use ::util::alloc::allocator::align_allocation;
@@ -16,7 +16,7 @@ pub struct BumpAllocator<'a> {
     thread_id: usize,
     cursor: Address,
     limit: Address,
-    space: &'a Mutex<Space>,
+    space: &'a Mutex<MonotonePageResource>,
 }
 
 impl<'a> BumpAllocator<'a> {
@@ -27,7 +27,7 @@ impl<'a> BumpAllocator<'a> {
 }
 
 impl<'a> Allocator<'a> for BumpAllocator<'a> {
-    fn new(thread_id: usize, space: &'a Mutex<Space>) -> Self {
+    fn new(thread_id: usize, space: &'a Mutex<MonotonePageResource>) -> Self {
         BumpAllocator {
             thread_id,
             cursor: unsafe { Address::zero() },
@@ -51,7 +51,7 @@ impl<'a> Allocator<'a> for BumpAllocator<'a> {
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
         let mut space = self.space.lock().unwrap();
-        let acquired_start: Address = (*space).acquire(block_size);
+        let acquired_start: Address = (*space).get_new_pages(block_size);
         if acquired_start.is_zero() {
             acquired_start
         } else {

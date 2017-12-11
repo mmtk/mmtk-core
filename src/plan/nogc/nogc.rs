@@ -1,12 +1,12 @@
 use std::sync::Mutex;
-use ::policy::space::Space;
+use ::util::heap::MonotonePageResource;
 use ::util::alloc::bumpallocator::BumpAllocator;
 use ::util::alloc::allocator::Allocator;
 use libc::c_void;
 use ::plan::Plan;
 
 lazy_static! {
-    pub static ref SPACE: Mutex<Space> = Mutex::new(Space::new());
+    pub static ref SPACE: Mutex<MonotonePageResource> = Mutex::new(MonotonePageResource::new());
 }
 pub type NoGCMutator<'a> = BumpAllocator<'a>;
 

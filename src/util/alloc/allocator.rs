@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use ::policy::space::Space;
+use ::util::heap::MonotonePageResource;
 use ::util::address::Address;
 
 #[inline(always)]
@@ -15,7 +15,7 @@ pub fn align_allocation(region: Address, align: usize, offset: isize) -> Address
 }
 
 pub trait Allocator<'a> {
-    fn new(thread_id: usize, space: &'a Mutex<Space>) -> Self;
+    fn new(thread_id: usize, space: &'a Mutex<MonotonePageResource>) -> Self;
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 
