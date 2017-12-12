@@ -21,7 +21,9 @@ pub fn stop_all_mutators() {
 
 #[cfg(feature = "jikesrvm")]
 pub fn resume_mutators() {
-    unimplemented!()
+    unsafe {
+        (JTOC_BASE + UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET).load::<fn()>()();
+    }
 }
 
 #[cfg(not(feature = "jikesrvm"))]
