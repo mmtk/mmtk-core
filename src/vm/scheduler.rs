@@ -10,7 +10,7 @@ use ::vm::JTOC_BASE;
 #[cfg(feature = "jikesrvm")]
 pub fn stop_all_mutators() {
     unsafe {
-        transmute::<usize, fn()>((JTOC_BASE + BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET).as_usize())();
+        (JTOC_BASE + BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET).load::<fn()>()();
     }
 }
 
