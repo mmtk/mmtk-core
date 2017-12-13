@@ -1,6 +1,8 @@
 use std::sync::{Mutex, Condvar};
 use ::vm::scheduler::{stop_all_mutators, resume_mutators};
 
+use std::mem::transmute;
+
 struct RequestSync {
     request_flag: bool,
     request_count: isize,
@@ -8,15 +10,13 @@ struct RequestSync {
 }
 
 pub struct ControllerCollectorContext {
-    thread_id: usize,
     request_sync: Mutex<RequestSync>,
     request_condvar: Condvar,
 }
 
 impl ControllerCollectorContext {
-    pub fn new(thread_id: usize) -> Self {
+    pub fn new() -> Self {
         ControllerCollectorContext {
-            thread_id,
             request_sync: Mutex::new(RequestSync {
                 request_flag: false,
                 request_count: 0,
@@ -36,10 +36,12 @@ impl ControllerCollectorContext {
         }
     }
 
-    fn request(&mut self) {
-        // This will probably blow up later on
-        {
-            let unsafe_handle = self.request_sync.get_mut().unwrap();
+    pub fn request(&self) {
+        // Required to "punch through" the Mutex. May invoke undefined behaviour. :(
+        // NOTE: Strictly speaking we can remove this entire block while maintaining correctness.
+        #[allow(mutable_transmutes)]
+        unsafe {
+            let unsafe_handle = transmute::<&Self, &mut Self>(self).request_sync.get_mut().unwrap();
             if unsafe_handle.request_flag {
                 return;
             }
@@ -53,12 +55,12 @@ impl ControllerCollectorContext {
         }
     }
 
-    fn clear_request(&mut self) {
+    pub fn clear_request(&self) {
         let mut guard = self.request_sync.lock().unwrap();
         guard.request_flag = false;
     }
 
-    fn wait_for_request(&mut self) {
+    fn wait_for_request(&self) {
         let mut guard = self.request_sync.lock().unwrap();
         guard.last_request_count += 1;
         while guard.last_request_count == guard.request_count {

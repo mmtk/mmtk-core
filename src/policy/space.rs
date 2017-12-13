@@ -5,5 +5,5 @@ pub trait Space {
 
     fn init(&self, heap_size: usize);
 
-    fn acquire(&self, size: usize) -> Address;
+    fn acquire(&self, thread_id: usize, size: usize) -> Address;
 }

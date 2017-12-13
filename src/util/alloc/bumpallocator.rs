@@ -53,7 +53,7 @@ impl<'a,T> Allocator<'a,T> for BumpAllocator<'a,T> where T: Space {
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start: Address = self.space.acquire(block_size);
+        let acquired_start: Address = self.space.acquire(self.thread_id, block_size);
         if acquired_start.is_zero() {
             acquired_start
         } else {

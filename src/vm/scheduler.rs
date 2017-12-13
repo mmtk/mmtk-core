@@ -1,5 +1,5 @@
 #[cfg(feature = "jikesrvm")]
-use std::mem::transmute;
+use ::util::Address;
 
 #[cfg(feature = "jikesrvm")]
 use ::vm::jtoc::*;
@@ -28,5 +28,19 @@ pub fn resume_mutators() {
 
 #[cfg(not(feature = "jikesrvm"))]
 pub fn resume_mutators() {
+    unimplemented!()
+}
+
+#[cfg(feature = "jikesrvm")]
+#[cfg(target_arch = "x86")]
+pub fn block_for_gc(thread_id: usize) {
+    unsafe {
+        //asm!("mov eax, $0" : : "0"(thread_id) : "eax" : "intel");
+        (JTOC_BASE + BLOCK_FOR_GC_METHOD_JTOC_OFFSET).load::<fn()>()();
+    }
+}
+
+#[cfg(not(feature = "jikesrvm"))]
+pub fn block_for_gc() {
     unimplemented!()
 }

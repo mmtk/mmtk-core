@@ -1,3 +1,5 @@
+#![feature(asm)]
+
 extern crate libc;
 #[macro_use]
 extern crate lazy_static;
@@ -18,14 +20,31 @@ use ::vm::JTOC_BASE;
 #[cfg(feature = "jikesrvm")]
 use ::util::address::Address;
 
-type SelectedPlan = ::plan::nogc::NoGC;
-type SelectedMutator<'a> = ::plan::nogc::NoGCMutator<'a>;
+use ::plan::selected_plan;
+
+type SelectedPlan = selected_plan::SelectedPlan;
+type SelectedMutator<'a> = selected_plan::SelectedMutator<'a>;
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
 pub extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     unsafe { JTOC_BASE = Address::from_mut_ptr(jtoc); }
-    SelectedPlan::gc_init(heap_size);
+    selected_plan::PLAN.gc_init(heap_size);
+
+    let res: usize;
+    unsafe {
+        let call_addr = (::vm::JTOC_BASE + ::vm::jtoc::TEST_METHOD_JTOC_OFFSET).load::<fn()>();
+        let rvm_thread
+        = Address::from_usize(((::vm::JTOC_BASE + ::vm::jtoc::THREAD_BY_SLOT_FIELD_JTOC_OFFSET)
+            .load::<usize>() + 4)).load::<usize>();
+
+        asm!("mov eax, 45" : : : "eax" : "intel");
+        asm!("mov esi, ecx" : : "{ecx}"(rvm_thread) : "esi" : "intel");
+        asm!("call ebx" : : "{ebx}"(call_addr) : "eax" : "intel");
+        asm!("mov $0, eax" : "=r"(res) : : : "intel");
+    }
+
+    println!("{}", res);
 }
 
 #[no_mangle]
@@ -39,12 +58,12 @@ pub extern fn gc_init(heap_size: usize) {
     if cfg!(feature = "jikesrvm") {
         panic!("Should be calling jikesrvm_gc_init instead");
     }
-    SelectedPlan::gc_init(heap_size);
+    selected_plan::PLAN.gc_init(heap_size);
 }
 
 #[no_mangle]
 pub extern fn bind_mutator(thread_id: usize) -> *mut c_void {
-    SelectedPlan::bind_mutator(thread_id)
+    SelectedPlan::bind_mutator(&selected_plan::PLAN, thread_id)
 }
 
 #[no_mangle]
