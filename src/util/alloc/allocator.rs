@@ -1,6 +1,3 @@
-use std::sync::Mutex;
-
-use ::util::heap::MonotonePageResource;
 use ::util::address::Address;
 
 use ::policy::space::Space;

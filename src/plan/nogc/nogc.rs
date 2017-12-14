@@ -1,6 +1,4 @@
-use std::sync::Mutex;
-use ::util::heap::MonotonePageResource;
-use ::util::heap::PageResource;
+use std::thread;
 
 use ::util::alloc::bumpallocator::BumpAllocator;
 use ::util::alloc::allocator::Allocator;
