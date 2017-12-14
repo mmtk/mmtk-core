@@ -56,6 +56,6 @@ pub fn block_for_gc(thread_id: usize) {
 }
 
 #[cfg(not(feature = "jikesrvm"))]
-pub fn block_for_gc() {
+pub fn block_for_gc(thread_id: usize) {
     unimplemented!()
 }
