@@ -35,8 +35,13 @@ pub fn resume_mutators() {
 #[cfg(target_arch = "x86")]
 pub fn block_for_gc(thread_id: usize) {
     unsafe {
-        //asm!("mov eax, $0" : : "0"(thread_id) : "eax" : "intel");
-        (JTOC_BASE + BLOCK_FOR_GC_METHOD_JTOC_OFFSET).load::<fn()>()();
+        let call_addr = (JTOC_BASE + BLOCK_FOR_GC_METHOD_JTOC_OFFSET).load::<fn()>();
+        let rvm_thread
+        = Address::from_usize(((JTOC_BASE + THREAD_BY_SLOT_FIELD_JTOC_OFFSET)
+            .load::<usize>() + 4 * thread_id)).load::<usize>();
+
+        asm!("mov esi, ecx" : : "{ecx}"(rvm_thread) : "esi" : "intel");
+        asm!("call ebx" : : "{ebx}"(call_addr) : "eax" : "intel");
     }
 }
 

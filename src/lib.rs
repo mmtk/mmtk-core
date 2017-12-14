@@ -21,9 +21,7 @@ use ::vm::JTOC_BASE;
 use ::util::address::Address;
 
 use ::plan::selected_plan;
-
-type SelectedPlan = selected_plan::SelectedPlan;
-type SelectedMutator<'a> = selected_plan::SelectedMutator<'a>;
+use selected_plan::{SelectedPlan, SelectedMutator};
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
@@ -42,6 +40,7 @@ pub extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
         asm!("mov esi, ecx" : : "{ecx}"(rvm_thread) : "esi" : "intel");
         asm!("call ebx" : : "{ebx}"(call_addr) : "eax" : "intel");
         asm!("mov $0, eax" : "=r"(res) : : : "intel");
+        asm!("sub sp, 4" : : : : "intel");
     }
 
     println!("{}", res);
