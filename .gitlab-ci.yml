@@ -4,6 +4,5 @@ stages:
 test:
   stage: test
   script:
-    - rustup override set nightly
     - ./build.py
     - cargo test
