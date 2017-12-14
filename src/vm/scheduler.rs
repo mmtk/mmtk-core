@@ -10,13 +10,12 @@ use ::vm::JTOC_BASE;
 #[cfg(feature = "jikesrvm")]
 const BOOT_THREAD: usize = 1;
 
-// FIXME: Remove requirement for trailing commas
 // FIXME: This seems... fragile. See what happens if you change the order of calls
 //        in `jikesrvm_gc_init`, or if you add println! statements inbetween.
 #[cfg(feature = "jikesrvm")]
 #[cfg(target_arch = "x86")]
 macro_rules! jtoc_call {
-    ($offset:ident, $thread_id:expr, $($arg:ident),*) => (unsafe {
+    ($offset:ident, $thread_id:expr $(, $arg:ident)*) => (unsafe {
         let ret: usize;
         let call_addr = (JTOC_BASE + $offset).load::<fn()>();
         let rvm_thread
@@ -62,7 +61,7 @@ pub fn test(input: usize) -> usize {
 
 #[cfg(feature = "jikesrvm")]
 pub fn test1() -> usize {
-    jtoc_call!(TEST1_METHOD_JTOC_OFFSET, BOOT_THREAD,)
+    jtoc_call!(TEST1_METHOD_JTOC_OFFSET, BOOT_THREAD)
 }
 
 #[cfg(feature = "jikesrvm")]
@@ -72,7 +71,7 @@ pub fn test2(input1: usize, input2: usize) -> usize {
 
 #[cfg(feature = "jikesrvm")]
 pub fn stop_all_mutators() {
-    jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD,);
+    jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD);
 }
 
 #[cfg(not(feature = "jikesrvm"))]
@@ -82,7 +81,7 @@ pub fn stop_all_mutators() {
 
 #[cfg(feature = "jikesrvm")]
 pub fn resume_mutators() {
-    jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD,);
+    jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD);
 }
 
 #[cfg(not(feature = "jikesrvm"))]
@@ -93,7 +92,7 @@ pub fn resume_mutators() {
 #[cfg(feature = "jikesrvm")]
 #[cfg(target_arch = "x86")]
 pub fn block_for_gc(thread_id: usize) {
-    jtoc_call!(BLOCK_FOR_GC_METHOD_JTOC_OFFSET, thread_id,);
+    jtoc_call!(BLOCK_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
 }
 
 #[cfg(not(feature = "jikesrvm"))]
