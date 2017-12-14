@@ -10,28 +10,69 @@ use ::vm::JTOC_BASE;
 #[cfg(feature = "jikesrvm")]
 const BOOT_THREAD: usize = 1;
 
+// FIXME: Remove requirement for trailing commas
+// FIXME: This seems... fragile. See what happens if you change the order of calls
+//        in `jikesrvm_gc_init`, or if you add println! statements inbetween.
 #[cfg(feature = "jikesrvm")]
+#[cfg(target_arch = "x86")]
 macro_rules! jtoc_call {
-    ($offset:ident, $thread_id:expr) => (unsafe {
+    ($offset:ident, $thread_id:expr, $($arg:ident),*) => (unsafe {
+        let ret: usize;
         let call_addr = (JTOC_BASE + $offset).load::<fn()>();
         let rvm_thread
         = Address::from_usize(((JTOC_BASE + THREAD_BY_SLOT_FIELD_JTOC_OFFSET)
             .load::<usize>() + 4 * $thread_id)).load::<usize>();
 
+        jtoc_args!($($arg),*);
+
         asm!("mov esi, ebx" : : "{ebx}"(rvm_thread) : "esi" : "intel");
-        //asm!("mov r14, ebx" : : "{ebx}"(JTOC_BASE.as_usize()) : "r14" : "intel");
         asm!("call ebx" : : "{ebx}"(call_addr) : "eax" : "intel");
+
+        asm!("mov $0, eax" : "=r"(ret) : : : "intel");
+        ret
     });
 }
 
 #[cfg(feature = "jikesrvm")]
-pub fn test1() {
-    jtoc_call!(TEST1_METHOD_JTOC_OFFSET, BOOT_THREAD);
+#[cfg(target_arch = "x86")]
+macro_rules! jtoc_args {
+    () => ();
+
+    ($arg1:ident) => (unsafe {
+        asm!("push eax" : : "{eax}"($arg1) : : "intel");
+    });
+
+    ($arg1:ident, $arg2:ident) => (unsafe {
+        jtoc_args!($arg1);
+        asm!("push edx" : : "{edx}"($arg2) : : "intel");
+    });
+
+    ($arg1:ident, $arg2:ident, $($arg:ident),+) => (unsafe {
+        jtoc_args!($arg1, $arg2);
+        $(
+            asm!("push ebx" : : "{ebx}"($arg) : : "intel");
+        )*
+    });
+}
+
+#[cfg(feature = "jikesrvm")]
+pub fn test(input: usize) -> usize {
+    jtoc_call!(TEST_METHOD_JTOC_OFFSET, BOOT_THREAD, input)
+}
+
+#[cfg(feature = "jikesrvm")]
+pub fn test1() -> usize {
+    jtoc_call!(TEST1_METHOD_JTOC_OFFSET, BOOT_THREAD,)
+}
+
+#[cfg(feature = "jikesrvm")]
+pub fn test2(input1: usize, input2: usize) -> usize {
+    jtoc_call!(TEST2_METHOD_JTOC_OFFSET, BOOT_THREAD, input1, input2)
 }
 
 #[cfg(feature = "jikesrvm")]
 pub fn stop_all_mutators() {
-    jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD);
+    jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD,);
 }
 
 #[cfg(not(feature = "jikesrvm"))]
@@ -41,7 +82,7 @@ pub fn stop_all_mutators() {
 
 #[cfg(feature = "jikesrvm")]
 pub fn resume_mutators() {
-    jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD);
+    jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD,);
 }
 
 #[cfg(not(feature = "jikesrvm"))]
@@ -52,7 +93,7 @@ pub fn resume_mutators() {
 #[cfg(feature = "jikesrvm")]
 #[cfg(target_arch = "x86")]
 pub fn block_for_gc(thread_id: usize) {
-    jtoc_call!(BLOCK_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
+    jtoc_call!(BLOCK_FOR_GC_METHOD_JTOC_OFFSET, thread_id,);
 }
 
 #[cfg(not(feature = "jikesrvm"))]

@@ -31,8 +31,10 @@ impl ControllerCollectorContext {
             self.wait_for_request();
             stop_all_mutators();
             self.clear_request();
+            println!("Doing collection");
             // Do collection
             resume_mutators();
+            println!("Finished!");
         }
     }
 

@@ -28,7 +28,9 @@ impl Space for ImmortalSpace {
 
         if ret.is_zero() && cfg!(feature = "jikesrvm") {
             selected_plan::PLAN.control_collector_context.request();
+            println!("Blocking for GC");
             block_for_gc(thread_id);
+            println!("GC completed");
         }
 
         ret
