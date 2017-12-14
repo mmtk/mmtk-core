@@ -28,22 +28,7 @@ use selected_plan::{SelectedPlan, SelectedMutator};
 pub extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     unsafe { JTOC_BASE = Address::from_mut_ptr(jtoc); }
     selected_plan::PLAN.gc_init(heap_size);
-
-    let res: usize;
-    unsafe {
-        let call_addr = (::vm::JTOC_BASE + ::vm::jtoc::TEST_METHOD_JTOC_OFFSET).load::<fn()>();
-        let rvm_thread
-        = Address::from_usize(((::vm::JTOC_BASE + ::vm::jtoc::THREAD_BY_SLOT_FIELD_JTOC_OFFSET)
-            .load::<usize>() + 4)).load::<usize>();
-
-        asm!("mov eax, 45" : : : "eax" : "intel");
-        asm!("mov esi, ecx" : : "{ecx}"(rvm_thread) : "esi" : "intel");
-        asm!("call ebx" : : "{ebx}"(call_addr) : "eax" : "intel");
-        asm!("mov $0, eax" : "=r"(res) : : : "intel");
-        asm!("sub sp, 4" : : : : "intel");
-    }
-
-    println!("{}", res);
+    ::vm::scheduler::test1();
 }
 
 #[no_mangle]
