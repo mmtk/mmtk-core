@@ -5,3 +5,5 @@ pub mod controllercollectorcontext;
 
 pub use self::plan::Plan;
 pub use self::transitive_closure::TransitiveClosure;
+
+pub use self::nogc as selected_plan;

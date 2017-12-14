@@ -1,3 +1,5 @@
+#![feature(asm)]
+
 extern crate libc;
 #[macro_use]
 extern crate lazy_static;
@@ -18,14 +20,15 @@ use ::vm::JTOC_BASE;
 #[cfg(feature = "jikesrvm")]
 use ::util::address::Address;
 
-type SelectedPlan = ::plan::nogc::NoGC;
-type SelectedMutator<'a> = ::plan::nogc::NoGCMutator<'a>;
+use ::plan::selected_plan;
+use selected_plan::{SelectedPlan, SelectedMutator};
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
 pub extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     unsafe { JTOC_BASE = Address::from_mut_ptr(jtoc); }
-    SelectedPlan::gc_init(heap_size);
+    selected_plan::PLAN.gc_init(heap_size);
+    ::vm::scheduler::test1();
 }
 
 #[no_mangle]
@@ -39,12 +42,12 @@ pub extern fn gc_init(heap_size: usize) {
     if cfg!(feature = "jikesrvm") {
         panic!("Should be calling jikesrvm_gc_init instead");
     }
-    SelectedPlan::gc_init(heap_size);
+    selected_plan::PLAN.gc_init(heap_size);
 }
 
 #[no_mangle]
 pub extern fn bind_mutator(thread_id: usize) -> *mut c_void {
-    SelectedPlan::bind_mutator(thread_id)
+    SelectedPlan::bind_mutator(&selected_plan::PLAN, thread_id)
 }
 
 #[no_mangle]
