@@ -33,6 +33,9 @@ impl Plan for NoGC {
 
     fn gc_init(&self, heap_size: usize) {
         self.space.init(heap_size);
+        thread::spawn(|| {
+            PLAN.control_collector_context.run();
+        });
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {

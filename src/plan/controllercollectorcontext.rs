@@ -26,7 +26,7 @@ impl ControllerCollectorContext {
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&self) {
         loop {
             self.wait_for_request();
             stop_all_mutators();
