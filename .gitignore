@@ -6,3 +6,4 @@ mmtk.iml
 *.dylib
 *.so
 src/vm/jtoc.rs
+bench-exe
