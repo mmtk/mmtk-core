@@ -10,8 +10,8 @@ use ::vm::JTOC_BASE;
 #[cfg(feature = "jikesrvm")]
 const BOOT_THREAD: usize = 1;
 
-// FIXME: This seems... fragile. See what happens if you change the order of calls
-//        in `jikesrvm_gc_init`, or if you add println! statements inbetween.
+// FIXME: This macro does not work reliably work unless wrapped
+//        in a function with an `#[inline(never)]` pragma
 #[cfg(feature = "jikesrvm")]
 #[cfg(target_arch = "x86")]
 macro_rules! jtoc_call {
