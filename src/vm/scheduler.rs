@@ -55,27 +55,30 @@ macro_rules! jtoc_args {
 }
 
 #[cfg(feature = "jikesrvm")]
+#[inline(never)]
 pub fn test(input: usize) -> usize {
     jtoc_call!(TEST_METHOD_JTOC_OFFSET, BOOT_THREAD, input)
 }
 
 #[cfg(feature = "jikesrvm")]
+#[inline(never)]
 pub fn test1() -> usize {
     jtoc_call!(TEST1_METHOD_JTOC_OFFSET, BOOT_THREAD)
 }
 
 #[cfg(feature = "jikesrvm")]
+#[inline(never)]
 pub fn test2(input1: usize, input2: usize) -> usize {
     jtoc_call!(TEST2_METHOD_JTOC_OFFSET, BOOT_THREAD, input1, input2)
 }
 
 #[cfg(feature = "jikesrvm")]
+#[inline(never)]
 pub fn stop_all_mutators() {
     jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD);
 }
 
 #[cfg(not(feature = "jikesrvm"))]
-#[inline(never)]
 pub fn stop_all_mutators() {
     unimplemented!()
 }

@@ -28,6 +28,7 @@ use selected_plan::{SelectedPlan, SelectedMutator};
 pub extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     unsafe { JTOC_BASE = Address::from_mut_ptr(jtoc); }
     selected_plan::PLAN.gc_init(heap_size);
+    ::vm::scheduler::test1();
     println!("{}", ::vm::scheduler::test(44));
     println!("{}", ::vm::scheduler::test2(45, 67));
     ::vm::scheduler::test1();
