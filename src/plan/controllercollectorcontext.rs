@@ -3,6 +3,9 @@ use ::vm::scheduler::{stop_all_mutators, resume_mutators};
 
 use std::mem::transmute;
 
+use std::thread::sleep;
+use std::time::Duration;
+
 struct RequestSync {
     request_flag: bool,
     request_count: isize,
@@ -33,6 +36,7 @@ impl ControllerCollectorContext {
             self.clear_request();
             println!("Doing collection");
             // Do collection
+            sleep(Duration::from_millis(1000));
             resume_mutators();
             println!("Finished!");
         }

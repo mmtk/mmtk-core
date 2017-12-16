@@ -75,11 +75,13 @@ pub fn stop_all_mutators() {
 }
 
 #[cfg(not(feature = "jikesrvm"))]
+#[inline(never)]
 pub fn stop_all_mutators() {
     unimplemented!()
 }
 
 #[cfg(feature = "jikesrvm")]
+#[inline(never)]
 pub fn resume_mutators() {
     jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD);
 }
@@ -90,7 +92,7 @@ pub fn resume_mutators() {
 }
 
 #[cfg(feature = "jikesrvm")]
-#[cfg(target_arch = "x86")]
+#[inline(never)]
 pub fn block_for_gc(thread_id: usize) {
     jtoc_call!(BLOCK_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
 }
