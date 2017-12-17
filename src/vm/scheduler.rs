@@ -38,18 +38,18 @@ macro_rules! jtoc_args {
     () => ();
 
     ($arg1:ident) => (unsafe {
-        asm!("push eax" : : "{eax}"($arg1) : : "intel");
+        asm!("push eax" : : "{eax}"($arg1) : "memory" : "intel");
     });
 
     ($arg1:ident, $arg2:ident) => (unsafe {
         jtoc_args!($arg1);
-        asm!("push edx" : : "{edx}"($arg2) : : "intel");
+        asm!("push edx" : : "{edx}"($arg2) : "memory" : "intel");
     });
 
     ($arg1:ident, $arg2:ident, $($arg:ident),+) => (unsafe {
         jtoc_args!($arg1, $arg2);
         $(
-            asm!("push ebx" : : "{ebx}"($arg) : : "intel");
+            asm!("push ebx" : : "{ebx}"($arg) : "memory" : "intel");
         )*
     });
 }
@@ -70,6 +70,12 @@ pub fn test1() -> usize {
 #[inline(never)]
 pub fn test2(input1: usize, input2: usize) -> usize {
     jtoc_call!(TEST2_METHOD_JTOC_OFFSET, BOOT_THREAD, input1, input2)
+}
+
+#[cfg(feature = "jikesrvm")]
+#[inline(never)]
+pub fn test3(input1: usize, input2: usize, input3: usize, input4: usize) -> usize {
+    jtoc_call!(TEST3_METHOD_JTOC_OFFSET, BOOT_THREAD, input1, input2, input3, input4)
 }
 
 #[cfg(feature = "jikesrvm")]
