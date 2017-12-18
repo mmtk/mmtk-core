@@ -1,14 +1,12 @@
-use ::policy::immortalspace::ImmortalSpace;
-use ::util::alloc::bumpallocator::BumpAllocator;
+use ::plan::semispace::ssmutator::SSMutator;
 
-use ::plan::controllercollectorcontext::ControllerCollectorContext;
+use ::plan::controller_collector_context::ControllerCollectorContext;
 
 use ::plan::Plan;
 use ::policy::copyspace::CopySpace;
-use ::plan::phase::Phase;
+use ::plan::Phase;
 use libc::c_void;
 
-pub type SSMutator<'a> = BumpAllocator<'a,ImmortalSpace>;
 pub type SelectedMutator<'a> = SSMutator<'a>;
 pub type SelectedPlan = SemiSpace;
 
@@ -38,7 +36,7 @@ impl Plan for SemiSpace {
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
-        unimplemented!();
+        Box::into_raw(Box::new(SSMutator::new(thread_id, self.tospace()))) as *mut c_void
     }
 
     fn do_collection(&self) {
@@ -47,30 +45,27 @@ impl Plan for SemiSpace {
 }
 
 impl SemiSpace {
-    pub fn tospace(&mut self) -> &mut CopySpace {
+    pub fn tospace(&self) -> &CopySpace {
         if self.hi {
-            &mut self.copyspace1
+            &self.copyspace1
         } else {
-            &mut self.copyspace0
+            &self.copyspace0
         }
     }
 
-    pub fn fromspace(&mut self) -> &mut CopySpace {
+    pub fn fromspace(&self) -> &CopySpace {
         if self.hi {
-            &mut self.copyspace0
+            &self.copyspace0
         } else {
-            &mut self.copyspace1
+            &self.copyspace1
         }
     }
 
     pub fn collection_phase(&mut self, phase: Phase) {
-        match phase {
-            Phase::Prepare => {
-                self.hi = !self.hi;
-                self.copyspace0.prepare(self.hi);
-                self.copyspace1.prepare(!self.hi);
-            }
-            _ => { unimplemented!() }
+        if let Phase::Prepare = phase {
+            self.hi = !self.hi;
+            self.copyspace0.prepare(self.hi);
+            self.copyspace1.prepare(!self.hi);
         }
     }
 }

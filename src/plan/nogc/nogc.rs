@@ -9,7 +9,7 @@ use ::policy::space::Space;
 use ::policy::immortalspace::ImmortalSpace;
 
 use ::plan::Plan;
-use ::plan::controllercollectorcontext::ControllerCollectorContext;
+use ::plan::controller_collector_context::ControllerCollectorContext;
 
 lazy_static! {
     pub static ref PLAN: NoGC = NoGC::new();
