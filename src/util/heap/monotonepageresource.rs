@@ -46,6 +46,14 @@ impl PageResource for MonotonePageResource {
             old_cursor
         }
     }
+
+    fn get_start(&self) -> Address {
+        unsafe { Address::from_usize(self.mmap_start) }
+    }
+
+    fn get_extend(&self) -> usize {
+        self.mmap_len
+    }
 }
 
 impl Drop for MonotonePageResource {

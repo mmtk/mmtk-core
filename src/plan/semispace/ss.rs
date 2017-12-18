@@ -19,11 +19,11 @@ impl Plan for SemiSpace {
     }
 
     fn gc_init(&self, heap_size: usize) {
-        panic!("Not implemented");
+        unimplemented!();
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
-        panic!("Not implemented");
+        unimplemented!();
     }
 }
 

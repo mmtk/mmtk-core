@@ -11,21 +11,21 @@ const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct BumpAllocator<'a,T: 'a> where T: Space {
+pub struct BumpAllocator<'a, T: 'a> where T: Space {
     thread_id: usize,
     cursor: Address,
     limit: Address,
     space: &'a T,
 }
 
-impl<'a,T> BumpAllocator<'a,T> where T: Space {
+impl<'a, T> BumpAllocator<'a, T> where T: Space {
     pub fn set_limit(&mut self, cursor: Address, limit: Address) {
         self.cursor = cursor;
         self.limit = limit;
     }
 }
 
-impl<'a,T> Allocator<'a,T> for BumpAllocator<'a,T> where T: Space {
+impl<'a, T> Allocator<'a, T> for BumpAllocator<'a, T> where T: Space {
     fn new(thread_id: usize, space: &'a T) -> Self {
         BumpAllocator {
             thread_id,

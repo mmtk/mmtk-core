@@ -7,6 +7,7 @@ use ::util::address::Address;
 use ::vm::scheduler::block_for_gc;
 
 use ::plan::selected_plan;
+use ::util::ObjectReference;
 
 pub struct ImmortalSpace {
     pr: Mutex<MonotonePageResource>,
@@ -34,5 +35,12 @@ impl Space for ImmortalSpace {
         }
 
         ret
+    }
+
+    fn in_space(&self, object: ObjectReference) -> bool {
+        let page_resource = self.pr.lock().unwrap();
+        let page_start = page_resource.get_start().as_usize();
+        let page_extend = page_resource.get_extend();
+        object.value() >= page_start && object.value() < page_start + page_extend
     }
 }
