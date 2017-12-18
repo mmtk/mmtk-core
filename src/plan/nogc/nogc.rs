@@ -1,3 +1,5 @@
+use std::thread;
+
 use ::util::alloc::bumpallocator::BumpAllocator;
 use ::util::alloc::allocator::Allocator;
 
@@ -31,6 +33,12 @@ impl Plan for NoGC {
 
     fn gc_init(&self, heap_size: usize) {
         self.space.init(heap_size);
+
+        if !cfg!(feature = "jikesrvm") {
+            thread::spawn(|| {
+                PLAN.control_collector_context.run(0);
+            });
+        }
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
