@@ -80,23 +80,23 @@ pub fn test3(input1: usize, input2: usize, input3: usize, input4: usize) -> usiz
 
 #[cfg(feature = "jikesrvm")]
 #[inline(never)]
-pub fn stop_all_mutators() {
-    jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD);
+pub fn stop_all_mutators(thread_id: usize) {
+    jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
 }
 
 #[cfg(not(feature = "jikesrvm"))]
-pub fn stop_all_mutators() {
+pub fn stop_all_mutators(thread_id: usize) {
     unimplemented!()
 }
 
 #[cfg(feature = "jikesrvm")]
 #[inline(never)]
-pub fn resume_mutators() {
-    jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, BOOT_THREAD);
+pub fn resume_mutators(thread_id: usize) {
+    jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
 }
 
 #[cfg(not(feature = "jikesrvm"))]
-pub fn resume_mutators() {
+pub fn resume_mutators(thread_id: usize) {
     unimplemented!()
 }
 

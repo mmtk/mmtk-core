@@ -7,6 +7,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 struct RequestSync {
+    thread_id: usize,
     request_flag: bool,
     request_count: isize,
     last_request_count: isize,
@@ -21,6 +22,7 @@ impl ControllerCollectorContext {
     pub fn new() -> Self {
         ControllerCollectorContext {
             request_sync: Mutex::new(RequestSync {
+                thread_id: 0,
                 request_flag: false,
                 request_count: 0,
                 last_request_count: -1,
@@ -29,15 +31,18 @@ impl ControllerCollectorContext {
         }
     }
 
-    pub fn run(&self) {
+    pub fn run(&self, thread_id: usize) {
+        {
+            self.request_sync.lock().unwrap().thread_id = thread_id;
+        }
         loop {
             self.wait_for_request();
-            stop_all_mutators();
+            stop_all_mutators(thread_id);
             self.clear_request();
             println!("Doing collection");
             // Do collection
             sleep(Duration::from_millis(1000));
-            resume_mutators();
+            resume_mutators(thread_id);
             println!("Finished!");
         }
     }

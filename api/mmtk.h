@@ -12,3 +12,5 @@ extern void* alloc_slow(MMTk_Mutator mutator, size_t size,
 
 // JikesRVM specific
 extern void jikesrvm_gc_init(void* jtoc, size_t heap_size);
+
+extern void start_control_collector(size_t thread_id);

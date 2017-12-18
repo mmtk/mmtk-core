@@ -42,6 +42,18 @@ pub extern fn jikesrvm_gc_init(_jtoc: *mut c_void, _heap_size: usize) {
 }
 
 #[no_mangle]
+#[cfg(feature = "jikesrvm")]
+pub extern fn start_control_collector(thread_id: usize) {
+    selected_plan::PLAN.control_collector_context.run(thread_id);
+}
+
+#[no_mangle]
+#[cfg(not(feature = "jikesrvm"))]
+pub extern fn start_control_collector(rvm_thread: *mut c_void) {
+    panic!("Cannot call start_control_collector when not building for JikesRVM");
+}
+
+#[no_mangle]
 pub extern fn gc_init(heap_size: usize) {
     if cfg!(feature = "jikesrvm") {
         panic!("Should be calling jikesrvm_gc_init instead");
