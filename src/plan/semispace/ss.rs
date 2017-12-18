@@ -1,6 +1,6 @@
 use ::plan::Plan;
 use ::policy::copyspace::CopySpace;
-
+use ::plan::phase::Phase;
 use libc::c_void;
 
 pub struct SemiSpace {
@@ -13,8 +13,8 @@ impl Plan for SemiSpace {
     fn new() -> Self {
         SemiSpace {
             hi: false,
-            copyspace0: CopySpace {},
-            copyspace1: CopySpace {},
+            copyspace0: CopySpace::new(false),
+            copyspace1: CopySpace::new(true),
         }
     }
 
@@ -28,18 +28,30 @@ impl Plan for SemiSpace {
 }
 
 impl SemiSpace {
-    fn tospace(&mut self) -> &mut CopySpace {
+    pub fn tospace(&mut self) -> &mut CopySpace {
         if self.hi {
             &mut self.copyspace1
         } else {
             &mut self.copyspace0
         }
     }
-    fn fromspace(&mut self) -> &mut CopySpace {
+
+    pub fn fromspace(&mut self) -> &mut CopySpace {
         if self.hi {
             &mut self.copyspace0
         } else {
             &mut self.copyspace1
+        }
+    }
+
+    pub fn collection_phase(&mut self, phase: Phase) {
+        match phase {
+            Phase::Prepare => {
+                self.hi = !self.hi;
+                self.copyspace0.prepare(self.hi);
+                self.copyspace1.prepare(!self.hi);
+            }
+            _ => { unimplemented!() }
         }
     }
 }

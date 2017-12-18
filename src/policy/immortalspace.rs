@@ -14,12 +14,6 @@ pub struct ImmortalSpace {
 }
 
 impl Space for ImmortalSpace {
-    fn new() -> Self {
-        ImmortalSpace {
-            pr: Mutex::new(MonotonePageResource::new()),
-        }
-    }
-
     fn init(&self, heap_size: usize) {
         self.pr.lock().unwrap().init(heap_size);
     }
@@ -42,5 +36,13 @@ impl Space for ImmortalSpace {
         let page_start = page_resource.get_start().as_usize();
         let page_extend = page_resource.get_extend();
         object.value() >= page_start && object.value() < page_start + page_extend
+    }
+}
+
+impl ImmortalSpace {
+    pub fn new() -> Self {
+        ImmortalSpace {
+            pr: Mutex::new(MonotonePageResource::new()),
+        }
     }
 }
