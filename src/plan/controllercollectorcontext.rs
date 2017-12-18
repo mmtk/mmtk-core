@@ -6,6 +6,9 @@ use std::mem::transmute;
 use std::thread::sleep;
 use std::time::Duration;
 
+use ::plan::plan::Plan;
+use ::plan::selected_plan;
+
 struct RequestSync {
     thread_id: usize,
     request_flag: bool,
@@ -40,8 +43,9 @@ impl ControllerCollectorContext {
             stop_all_mutators(thread_id);
             self.clear_request();
             println!("Doing collection");
-            // Do collection
-            sleep(Duration::from_millis(1000));
+
+            selected_plan::PLAN.do_collection();
+
             resume_mutators(thread_id);
             println!("Finished!");
         }

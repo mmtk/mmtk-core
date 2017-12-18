@@ -38,4 +38,9 @@ impl Plan for NoGC {
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
         Box::into_raw(Box::new(NoGCMutator::new(thread_id, &self.space))) as *mut c_void
     }
+
+    fn do_collection(&self) {
+        // Copyright Yi Lin, 2017
+        panic!("GC triggered while GC is disabled");
+    }
 }
