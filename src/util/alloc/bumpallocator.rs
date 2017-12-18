@@ -23,6 +23,16 @@ impl<'a, T> BumpAllocator<'a, T> where T: Space {
         self.cursor = cursor;
         self.limit = limit;
     }
+
+    fn reset(&mut self) {
+        self.cursor = unsafe { Address::zero() };
+        self.limit = unsafe { Address::zero() };
+    }
+
+    pub fn rebind(&mut self, space: &'a T) {
+        self.reset();
+        self.space = space;
+    }
 }
 
 impl<'a, T> Allocator<'a, T> for BumpAllocator<'a, T> where T: Space {
