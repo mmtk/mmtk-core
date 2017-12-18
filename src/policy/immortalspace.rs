@@ -21,6 +21,7 @@ impl Space for ImmortalSpace {
     fn acquire(&self, thread_id: usize, size: usize) -> Address {
         let ret: Address = self.pr.lock().unwrap().get_new_pages(size);
 
+        // XXX: Remove second predicate once non-JikesRVM GC is implemented
         if ret.is_zero() && cfg!(feature = "jikesrvm") {
             selected_plan::PLAN.control_collector_context.request();
             println!("Blocking for GC");
