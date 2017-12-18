@@ -1,5 +1,3 @@
-use std::thread;
-
 use ::util::alloc::bumpallocator::BumpAllocator;
 use ::util::alloc::allocator::Allocator;
 

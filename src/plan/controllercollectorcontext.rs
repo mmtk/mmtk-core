@@ -3,9 +3,6 @@ use ::vm::scheduler::{stop_all_mutators, resume_mutators};
 
 use std::mem::transmute;
 
-use std::thread::sleep;
-use std::time::Duration;
-
 use ::plan::plan::Plan;
 use ::plan::selected_plan;
 

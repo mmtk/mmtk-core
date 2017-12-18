@@ -37,21 +37,21 @@ macro_rules! jtoc_call {
 macro_rules! jtoc_args {
     () => ();
 
-    ($arg1:ident) => (unsafe {
+    ($arg1:ident) => (
         asm!("push eax" : : "{eax}"($arg1) : "memory" : "intel");
-    });
+    );
 
-    ($arg1:ident, $arg2:ident) => (unsafe {
+    ($arg1:ident, $arg2:ident) => (
         jtoc_args!($arg1);
         asm!("push edx" : : "{edx}"($arg2) : "memory" : "intel");
-    });
+    );
 
-    ($arg1:ident, $arg2:ident, $($arg:ident),+) => (unsafe {
+    ($arg1:ident, $arg2:ident, $($arg:ident),+) => (
         jtoc_args!($arg1, $arg2);
         $(
             asm!("push ebx" : : "{ebx}"($arg) : "memory" : "intel");
         )*
-    });
+    );
 }
 
 #[cfg(feature = "jikesrvm")]
