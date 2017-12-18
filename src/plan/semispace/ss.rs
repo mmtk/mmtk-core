@@ -5,7 +5,7 @@ use ::plan::controllercollectorcontext::ControllerCollectorContext;
 
 use ::plan::Plan;
 use ::policy::copyspace::CopySpace;
-
+use ::plan::phase::Phase;
 use libc::c_void;
 
 pub type SSMutator<'a> = BumpAllocator<'a,ImmortalSpace>;
@@ -28,17 +28,17 @@ impl Plan for SemiSpace {
         SemiSpace {
             control_collector_context: ControllerCollectorContext::new(),
             hi: false,
-            copyspace0: CopySpace {},
-            copyspace1: CopySpace {},
+            copyspace0: CopySpace::new(false),
+            copyspace1: CopySpace::new(true),
         }
     }
 
     fn gc_init(&self, heap_size: usize) {
-        panic!("Not implemented");
+        unimplemented!();
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
-        panic!("Not implemented");
+        unimplemented!();
     }
 
     fn do_collection(&self) {
@@ -47,18 +47,30 @@ impl Plan for SemiSpace {
 }
 
 impl SemiSpace {
-    fn tospace(&mut self) -> &mut CopySpace {
+    pub fn tospace(&mut self) -> &mut CopySpace {
         if self.hi {
             &mut self.copyspace1
         } else {
             &mut self.copyspace0
         }
     }
-    fn fromspace(&mut self) -> &mut CopySpace {
+
+    pub fn fromspace(&mut self) -> &mut CopySpace {
         if self.hi {
             &mut self.copyspace0
         } else {
             &mut self.copyspace1
+        }
+    }
+
+    pub fn collection_phase(&mut self, phase: Phase) {
+        match phase {
+            Phase::Prepare => {
+                self.hi = !self.hi;
+                self.copyspace0.prepare(self.hi);
+                self.copyspace1.prepare(!self.hi);
+            }
+            _ => { unimplemented!() }
         }
     }
 }

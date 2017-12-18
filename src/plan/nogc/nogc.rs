@@ -14,7 +14,7 @@ use ::plan::controllercollectorcontext::ControllerCollectorContext;
 lazy_static! {
     pub static ref PLAN: NoGC = NoGC::new();
 }
-pub type NoGCMutator<'a> = BumpAllocator<'a,ImmortalSpace>;
+pub type NoGCMutator<'a> = BumpAllocator<'a, ImmortalSpace>;
 pub type SelectedMutator<'a> = NoGCMutator<'a>;
 pub type SelectedPlan = NoGC;
 

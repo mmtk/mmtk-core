@@ -55,7 +55,7 @@ impl ControllerCollectorContext {
         // Required to "punch through" the Mutex. May invoke undefined behaviour. :(
         // NOTE: Strictly speaking we can remove this entire block while maintaining correctness.
         #[allow(mutable_transmutes)]
-        unsafe {
+            unsafe {
             let unsafe_handle = transmute::<&Self, &mut Self>(self).request_sync.get_mut().unwrap();
             if unsafe_handle.request_flag {
                 return;
