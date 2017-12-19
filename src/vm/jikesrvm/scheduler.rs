@@ -1,18 +1,12 @@
-#[cfg(feature = "jikesrvm")]
 use ::util::Address;
 
-#[cfg(feature = "jikesrvm")]
-use ::vm::jtoc::*;
+use super::jtoc::*;
+use super::JTOC_BASE;
 
-#[cfg(feature = "jikesrvm")]
-use ::vm::JTOC_BASE;
-
-#[cfg(feature = "jikesrvm")]
 const BOOT_THREAD: usize = 1;
 
 // FIXME: This macro does not work reliably work unless wrapped
 //        in a function with an `#[inline(never)]` pragma
-#[cfg(feature = "jikesrvm")]
 #[cfg(target_arch = "x86")]
 macro_rules! jtoc_call {
     ($offset:ident, $thread_id:expr $(, $arg:ident)*) => (unsafe {
@@ -32,7 +26,6 @@ macro_rules! jtoc_call {
     });
 }
 
-#[cfg(feature = "jikesrvm")]
 #[cfg(target_arch = "x86")]
 macro_rules! jtoc_args {
     () => ();
@@ -54,59 +47,37 @@ macro_rules! jtoc_args {
     );
 }
 
-#[cfg(feature = "jikesrvm")]
 #[inline(never)]
 pub fn test(input: usize) -> usize {
     jtoc_call!(TEST_METHOD_JTOC_OFFSET, BOOT_THREAD, input)
 }
 
-#[cfg(feature = "jikesrvm")]
 #[inline(never)]
 pub fn test1() -> usize {
     jtoc_call!(TEST1_METHOD_JTOC_OFFSET, BOOT_THREAD)
 }
 
-#[cfg(feature = "jikesrvm")]
 #[inline(never)]
 pub fn test2(input1: usize, input2: usize) -> usize {
     jtoc_call!(TEST2_METHOD_JTOC_OFFSET, BOOT_THREAD, input1, input2)
 }
 
-#[cfg(feature = "jikesrvm")]
 #[inline(never)]
 pub fn test3(input1: usize, input2: usize, input3: usize, input4: usize) -> usize {
     jtoc_call!(TEST3_METHOD_JTOC_OFFSET, BOOT_THREAD, input1, input2, input3, input4)
 }
 
-#[cfg(feature = "jikesrvm")]
 #[inline(never)]
 pub fn stop_all_mutators(thread_id: usize) {
     jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
 }
 
-#[cfg(not(feature = "jikesrvm"))]
-pub fn stop_all_mutators(thread_id: usize) {
-    unimplemented!()
-}
-
-#[cfg(feature = "jikesrvm")]
 #[inline(never)]
 pub fn resume_mutators(thread_id: usize) {
     jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
 }
 
-#[cfg(not(feature = "jikesrvm"))]
-pub fn resume_mutators(thread_id: usize) {
-    unimplemented!()
-}
-
-#[cfg(feature = "jikesrvm")]
 #[inline(never)]
 pub fn block_for_gc(thread_id: usize) {
     jtoc_call!(BLOCK_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
-}
-
-#[cfg(not(feature = "jikesrvm"))]
-pub fn block_for_gc(thread_id: usize) {
-    unimplemented!()
 }

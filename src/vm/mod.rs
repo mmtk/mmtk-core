@@ -1,11 +1,11 @@
-pub mod scanning;
-pub mod scheduler;
+#[cfg(feature = "jikesrvm")]
+mod jikesrvm;
 
 #[cfg(feature = "jikesrvm")]
-use ::util::address::Address;
+pub use self::jikesrvm::*;
 
-#[cfg(feature = "jikesrvm")]
-pub static mut JTOC_BASE: Address = Address(0);
+#[cfg(not(feature = "jikesrvm"))]
+mod openjdk;
 
-#[cfg(feature = "jikesrvm")]
-pub mod jtoc;
+#[cfg(not(feature = "jikesrvm"))]
+pub use self::openjdk::*;

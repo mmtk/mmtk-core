@@ -86,7 +86,7 @@ pub fn alloc_slow(mutator: *mut c_void, size: usize,
 #[inline(never)]
 pub extern fn alloc_large(_mutator: *mut c_void, _size: usize,
                           _align: usize, _offset: isize) -> *mut c_void {
-    panic!("Not implemented");
+    unimplemented!();
 }
 
 #[no_mangle]

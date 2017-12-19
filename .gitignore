@@ -7,3 +7,4 @@ mmtk.iml
 *.so
 src/vm/jtoc.rs
 bench-exe
+jtoc.rs
