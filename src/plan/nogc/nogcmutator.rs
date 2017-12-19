@@ -1,28 +1,25 @@
-use ::policy::copyspace::CopySpace;
+use ::policy::immortalspace::ImmortalSpace;
 use ::util::alloc::bumpallocator::BumpAllocator;
 use ::plan::mutator_context::MutatorContext;
 use ::plan::Phase;
-use ::plan::semispace;
 use ::util::Address;
 use ::util::alloc::allocator::Allocator;
 
 #[repr(C)]
-pub struct SSMutator<'a> {
+pub struct NoGCMutator<'a> {
     // CopyLocal
-    ss: BumpAllocator<'a, CopySpace>
+    ss: BumpAllocator<'a, ImmortalSpace>
 }
 
-impl<'a> MutatorContext<'a, CopySpace> for SSMutator<'a> {
-    fn new(thread_id: usize, space: &'a CopySpace) -> Self {
-        SSMutator {
+impl<'a> MutatorContext<'a, ImmortalSpace> for NoGCMutator<'a> {
+    fn new(thread_id: usize, space: &'a ImmortalSpace) -> Self {
+        NoGCMutator {
             ss: BumpAllocator::new(thread_id, space)
         }
     }
 
     fn collection_phase(&mut self, phase: Phase, primary: bool) {
-        if let Phase::Prepare = phase {
-            self.ss.rebind(semispace::PLAN.tospace());
-        }
+        unimplemented!();
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {

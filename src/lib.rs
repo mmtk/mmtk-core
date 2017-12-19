@@ -11,8 +11,9 @@ mod plan;
 
 use std::ptr::null_mut;
 use libc::c_void;
+
 use plan::plan::Plan;
-use util::alloc::allocator::Allocator;
+use ::plan::mutator_context::MutatorContext;
 
 #[cfg(feature = "jikesrvm")]
 use ::vm::JTOC_BASE;

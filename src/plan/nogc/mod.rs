@@ -1,7 +1,8 @@
 mod nogc;
+mod nogcmutator;
 
 pub use self::nogc::NoGC;
-pub use self::nogc::NoGCMutator;
+pub use self::nogcmutator::NoGCMutator;
 pub use self::nogc::PLAN;
 
 pub use self::nogc::SelectedPlan;

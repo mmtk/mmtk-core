@@ -1,5 +1,8 @@
-use ::plan::semispace::ssmutator::SSMutator;
+use super::super::plan::default;
 
+use ::policy::space::Space;
+
+use ::plan::semispace::ssmutator::SSMutator;
 use ::plan::controller_collector_context::ControllerCollectorContext;
 
 use ::plan::Plan;
@@ -32,11 +35,12 @@ impl Plan for SemiSpace {
     }
 
     fn gc_init(&self, heap_size: usize) {
-        unimplemented!();
+        self.copyspace0.init(heap_size/2);
+        default::gc_init(&self.copyspace1, heap_size/2);
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
-        Box::into_raw(Box::new(SSMutator::new(thread_id, self.tospace()))) as *mut c_void
+        default::bind_mutator::<SSMutator, CopySpace>(thread_id, self.fromspace())
     }
 
     fn do_collection(&self) {

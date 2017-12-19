@@ -1,28 +1,37 @@
+use super::space::default;
+
+use std::sync::Mutex;
+
+use ::util::heap::PageResource;
+use ::util::heap::MonotonePageResource;
+
 use ::policy::space::Space;
 use ::util::{Address, ObjectReference};
 
 pub struct CopySpace {
-    from_space: bool
+    pr: Mutex<MonotonePageResource>,
+    from_space: bool,
 }
 
 impl Space for CopySpace {
     fn init(&self, heap_size: usize) {
-        unimplemented!()
+        default::init(&self.pr, heap_size);
     }
 
     fn acquire(&self, thread_id: usize, size: usize) -> Address {
-        unimplemented!()
+        default::acquire(&self.pr, thread_id, size)
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
-        unimplemented!()
+        default::in_space(&self.pr, object)
     }
 }
 
 impl CopySpace {
     pub fn new(from_space: bool) -> Self {
         CopySpace {
-            from_space
+            pr: Mutex::new(MonotonePageResource::new()),
+            from_space,
         }
     }
 
