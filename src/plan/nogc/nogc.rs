@@ -36,7 +36,6 @@ impl Plan for NoGC {
     }
 
     fn do_collection(&self) {
-        // Copyright Yi Lin, 2017
-        panic!("GC triggered while GC is disabled");
+        panic!("GC triggered in NoGC plan");
     }
 }
