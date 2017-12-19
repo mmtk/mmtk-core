@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef void* MMTk_Mutator;
 
 extern void gc_init(size_t heap_size);
@@ -14,3 +18,7 @@ extern void* alloc_slow(MMTk_Mutator mutator, size_t size,
 extern void jikesrvm_gc_init(void* jtoc, size_t heap_size);
 
 extern void start_control_collector(size_t thread_id);
+
+#ifdef __cplusplus
+}
+#endif
