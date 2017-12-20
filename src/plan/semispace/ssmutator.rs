@@ -12,13 +12,7 @@ pub struct SSMutator<'a> {
     ss: BumpAllocator<'a, CopySpace>
 }
 
-impl<'a> MutatorContext<'a, CopySpace> for SSMutator<'a> {
-    fn new(thread_id: usize, space: &'a CopySpace) -> Self {
-        SSMutator {
-            ss: BumpAllocator::new(thread_id, space)
-        }
-    }
-
+impl<'a> MutatorContext for SSMutator<'a> {
     fn collection_phase(&mut self, phase: Phase, primary: bool) {
         if let Phase::Prepare = phase {
             self.ss.rebind(semispace::PLAN.tospace());
@@ -31,5 +25,13 @@ impl<'a> MutatorContext<'a, CopySpace> for SSMutator<'a> {
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
         self.ss.alloc_slow(size, align, offset)
+    }
+}
+
+impl<'a> SSMutator<'a> {
+    pub fn new(thread_id: usize, space: &'a CopySpace) -> Self {
+        SSMutator {
+            ss: BumpAllocator::new(thread_id, space)
+        }
     }
 }

@@ -11,13 +11,7 @@ pub struct NoGCMutator<'a> {
     ss: BumpAllocator<'a, ImmortalSpace>
 }
 
-impl<'a> MutatorContext<'a, ImmortalSpace> for NoGCMutator<'a> {
-    fn new(thread_id: usize, space: &'a ImmortalSpace) -> Self {
-        NoGCMutator {
-            ss: BumpAllocator::new(thread_id, space)
-        }
-    }
-
+impl<'a> MutatorContext for NoGCMutator<'a> {
     fn collection_phase(&mut self, phase: Phase, primary: bool) {
         unimplemented!();
     }
@@ -28,5 +22,13 @@ impl<'a> MutatorContext<'a, ImmortalSpace> for NoGCMutator<'a> {
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
         self.ss.alloc_slow(size, align, offset)
+    }
+}
+
+impl<'a> NoGCMutator<'a> {
+    pub fn new(thread_id: usize, space: &'a ImmortalSpace) -> Self {
+        NoGCMutator {
+            ss: BumpAllocator::new(thread_id, space)
+        }
     }
 }

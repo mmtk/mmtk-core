@@ -26,7 +26,7 @@ pub mod default {
         }
     }
 
-    pub fn bind_mutator<'a, M: MutatorContext<'a, S>, S: Space>(thread_id: usize, space: &'a S) -> *mut c_void {
-        Box::into_raw(Box::new(M::new(thread_id, space))) as *mut c_void
+    pub fn bind_mutator<T: MutatorContext>(ctx: T) -> *mut c_void {
+        Box::into_raw(Box::new(ctx)) as *mut c_void
     }
 }

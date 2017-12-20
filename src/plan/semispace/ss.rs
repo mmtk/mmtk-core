@@ -40,7 +40,7 @@ impl Plan for SemiSpace {
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
-        default::bind_mutator::<SSMutator, CopySpace>(thread_id, self.fromspace())
+        default::bind_mutator(SSMutator::new(thread_id, self.fromspace()))
     }
 
     fn do_collection(&self) {

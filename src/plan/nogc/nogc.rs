@@ -32,7 +32,7 @@ impl Plan for NoGC {
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
-        default::bind_mutator::<NoGCMutator, ImmortalSpace>(thread_id, &self.space)
+        default::bind_mutator(NoGCMutator::new(thread_id, &self.space))
     }
 
     fn do_collection(&self) {
