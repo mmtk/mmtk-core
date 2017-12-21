@@ -36,7 +36,7 @@ impl Plan for SemiSpace {
 
     fn gc_init(&self, heap_size: usize) {
         self.copyspace0.init(heap_size/2);
-        default::gc_init(&self.copyspace1, heap_size/2);
+        self.copyspace1.init(heap_size/2);
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
