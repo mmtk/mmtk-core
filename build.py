@@ -30,15 +30,15 @@ if system == "Darwin":
 elif system == "Linux":
     LIBRARY_PATH = "LD_LIBRARY_PATH"
 
-exec_and_redirect(["cargo", "+nightly", "build"])
-exec_and_redirect(["cargo", "+nightly", "build", "--release"])
+exec_and_redirect(["cargo", "build"])
+exec_and_redirect(["cargo", "build", "--release"])
 shutil.copyfile("target/release/libmmtk{}".format(SUFFIX),
                 "./libmmtk{}".format(SUFFIX))
 
 if system == "Linux":
-    exec_and_redirect(["cargo", "+nightly", "build", "--target=i686-unknown-linux-gnu"])
+    exec_and_redirect(["cargo", "build", "--target=i686-unknown-linux-gnu"])
     exec_and_redirect(
-        ["cargo", "+nightly", "build", "--release", "--target=i686-unknown-linux-gnu"])
+        ["cargo", "build", "--release", "--target=i686-unknown-linux-gnu"])
 
     shutil.copyfile("target/i686-unknown-linux-gnu/release/libmmtk{}".format(SUFFIX),
                     "./libmmtk_32{}".format(SUFFIX))
