@@ -18,8 +18,8 @@ impl<'a> CollectorContext for SSCollector<'a> {
         self.id = id;
     }
 
-    fn alloc_copy(&self, original: ObjectReference, bytes: usize, align: usize, offset: usize, allocator: usize) -> Address {
-        self.ss.alloc(bytes, align, offset)
+    fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: usize, allocator: usize) -> Address {
+        self.ss.alloc(bytes, align, offset as isize)
     }
 
     fn run(&self) {
