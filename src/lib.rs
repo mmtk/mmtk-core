@@ -32,7 +32,7 @@ pub extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     ::vm::scheduler::test1();
     println!("{}", ::vm::scheduler::test(44));
     println!("{}", ::vm::scheduler::test2(45, 67));
-    ::vm::scheduler::test1();
+    //::vm::scheduler::test1();
     println!("{}", ::vm::scheduler::test3(21, 34, 9, 8));
 }
 

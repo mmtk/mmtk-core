@@ -18,10 +18,10 @@ macro_rules! jtoc_call {
 
         jtoc_args!($($arg),*);
 
-        asm!("mov esi, ebx" : : "{ebx}"(rvm_thread) : "esi" : "intel");
-        asm!("call ebx" : : "{ebx}"(call_addr) : "eax" : "intel");
+        asm!("mov esi, ecx\n\
+              call ebx\n\
+              mov $0, eax" : "=r"(ret) : "{ecx}"(rvm_thread), "{ebx}"(call_addr) : "eax", "ebx", "ecx", "edx", "esi", "memory" : "intel");
 
-        asm!("mov $0, eax" : "=r"(ret) : : : "intel");
         ret
     });
 }
@@ -31,53 +31,53 @@ macro_rules! jtoc_args {
     () => ();
 
     ($arg1:ident) => (
-        asm!("push eax" : : "{eax}"($arg1) : "memory" : "intel");
+        asm!("push eax" : : "{eax}"($arg1) : "sp", "memory" : "intel");
     );
 
     ($arg1:ident, $arg2:ident) => (
         jtoc_args!($arg1);
-        asm!("push edx" : : "{edx}"($arg2) : "memory" : "intel");
+        asm!("push edx" : : "{edx}"($arg2) : "sp", "memory" : "intel");
     );
 
     ($arg1:ident, $arg2:ident, $($arg:ident),+) => (
         jtoc_args!($arg1, $arg2);
         $(
-            asm!("push ebx" : : "{ebx}"($arg) : "memory" : "intel");
+            asm!("push ebx" : : "{ebx}"($arg) : "sp", "memory" : "intel");
         )*
     );
 }
 
-#[inline(never)]
+#[inline(always)]
 pub fn test(input: usize) -> usize {
     jtoc_call!(TEST_METHOD_JTOC_OFFSET, BOOT_THREAD, input)
 }
 
-#[inline(never)]
+#[inline(always)]
 pub fn test1() -> usize {
     jtoc_call!(TEST1_METHOD_JTOC_OFFSET, BOOT_THREAD)
 }
 
-#[inline(never)]
+#[inline(always)]
 pub fn test2(input1: usize, input2: usize) -> usize {
     jtoc_call!(TEST2_METHOD_JTOC_OFFSET, BOOT_THREAD, input1, input2)
 }
 
-#[inline(never)]
+#[inline(always)]
 pub fn test3(input1: usize, input2: usize, input3: usize, input4: usize) -> usize {
     jtoc_call!(TEST3_METHOD_JTOC_OFFSET, BOOT_THREAD, input1, input2, input3, input4)
 }
 
-#[inline(never)]
+#[inline(always)]
 pub fn stop_all_mutators(thread_id: usize) {
     jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
 }
 
-#[inline(never)]
+#[inline(always)]
 pub fn resume_mutators(thread_id: usize) {
     jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
 }
 
-#[inline(never)]
+#[inline(always)]
 pub fn block_for_gc(thread_id: usize) {
     jtoc_call!(BLOCK_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
 }

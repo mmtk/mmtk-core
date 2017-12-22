@@ -1,5 +1,8 @@
 use super::super::plan::default;
 
+use std::thread::sleep;
+use std::time;
+
 use ::policy::space::Space;
 
 use ::plan::semispace::ssmutator::SSMutator;
@@ -45,6 +48,7 @@ impl Plan for SemiSpace {
 
     fn do_collection(&self) {
         println!("Collecting garbage, trust me...");
+        sleep(time::Duration::from_millis(2000));
     }
 }
 
