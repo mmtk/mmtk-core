@@ -8,6 +8,7 @@ use ::plan::controller_collector_context::ControllerCollectorContext;
 use ::plan::Plan;
 use ::policy::copyspace::CopySpace;
 use ::plan::Phase;
+use ::plan::trace::Trace;
 use libc::c_void;
 
 pub type SelectedMutator<'a> = SSMutator<'a>;
@@ -22,6 +23,7 @@ pub struct SemiSpace {
     hi: bool,
     copyspace0: CopySpace,
     copyspace1: CopySpace,
+    ss_trace: Trace
 }
 
 impl Plan for SemiSpace {
@@ -31,6 +33,7 @@ impl Plan for SemiSpace {
             hi: false,
             copyspace0: CopySpace::new(false),
             copyspace1: CopySpace::new(true),
+            ss_trace: Trace::new()
         }
     }
 
