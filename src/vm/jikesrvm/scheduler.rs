@@ -5,8 +5,7 @@ use super::JTOC_BASE;
 
 const BOOT_THREAD: usize = 1;
 
-// FIXME: This macro does not work reliably work unless wrapped
-//        in a function with an `#[inline(never)]` pragma
+// TODO: #1 is fixed, but we need more guarantees that this won't gratuitously break
 #[cfg(target_arch = "x86")]
 macro_rules! jtoc_call {
     ($offset:ident, $thread_id:expr $(, $arg:ident)*) => (unsafe {
