@@ -7,8 +7,8 @@ use ::util::alloc::allocator::Allocator;
 
 #[repr(C)]
 pub struct NoGCMutator<'a> {
-    // CopyLocal
-    ss: BumpAllocator<'a, ImmortalSpace>
+    // ImmortalLocal
+    nogc: BumpAllocator<'a, ImmortalSpace>
 }
 
 impl<'a> MutatorContext for NoGCMutator<'a> {
@@ -17,18 +17,18 @@ impl<'a> MutatorContext for NoGCMutator<'a> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        self.ss.alloc(size, align, offset)
+        self.nogc.alloc(size, align, offset)
     }
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        self.ss.alloc_slow(size, align, offset)
+        self.nogc.alloc_slow(size, align, offset)
     }
 }
 
 impl<'a> NoGCMutator<'a> {
     pub fn new(thread_id: usize, space: &'a ImmortalSpace) -> Self {
         NoGCMutator {
-            ss: BumpAllocator::new(thread_id, space)
+            nogc: BumpAllocator::new(thread_id, space)
         }
     }
 }

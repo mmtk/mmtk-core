@@ -11,6 +11,7 @@ lazy_static! {
 }
 
 use super::NoGCMutator;
+
 pub type SelectedMutator<'a> = NoGCMutator<'a>;
 pub type SelectedPlan = NoGC;
 

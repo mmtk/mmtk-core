@@ -1,5 +1,5 @@
-pub enum Phase{
+pub enum Phase {
     Prepare,
     Closure,
-    Release
+    Release,
 }
