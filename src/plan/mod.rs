@@ -11,4 +11,7 @@ pub use self::transitive_closure::TransitiveClosure;
 pub use self::phase::Phase;
 pub use self::mutator_context::MutatorContext;
 
+#[cfg(feature = "nogc")]
+pub use self::nogc as selected_plan;
+#[cfg(feature = "semispace")]
 pub use self::semispace as selected_plan;
