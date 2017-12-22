@@ -5,6 +5,7 @@ pub mod transitive_closure;
 pub mod controller_collector_context;
 mod phase;
 pub mod mutator_context;
+pub mod collector_context;
 
 pub use self::plan::Plan;
 pub use self::transitive_closure::TransitiveClosure;
