@@ -8,7 +8,7 @@ struct SSTraceLocal<'a> {
 }
 
 impl<'a> TransitiveClosure for SSTraceLocal<'a> {
-    fn process_edge(&mut self, source: ObjectReference, slot: Address) {
+    fn process_edge(&mut self, slot: Address) {
         unimplemented!()
     }
 
@@ -17,11 +17,11 @@ impl<'a> TransitiveClosure for SSTraceLocal<'a> {
     }
 }
 
-impl<'a> SSTraceLocal<'a>{
-    fn process_roots(&mut self){
+impl<'a> SSTraceLocal<'a> {
+    fn process_roots(&mut self) {
         unimplemented!()
     }
-    fn process_root_edge(&mut self){
+    fn process_root_edge(&mut self) {
         unimplemented!()
     }
 }
