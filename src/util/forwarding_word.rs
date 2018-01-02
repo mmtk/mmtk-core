@@ -15,24 +15,24 @@ const FORWARDING_BITS: usize = 2;
 fn attempt_to_forward<T: ObjectModel>(object: ObjectReference) -> usize {
     let mut old_value: usize = 0;
     old_value = T::prepare_available_bits(object);
-    if old_value & FORWARDING_MASK as u8 != FORWARDING_NOT_TRIGGERED_YET {
+    if (old_value as u8) & FORWARDING_MASK != FORWARDING_NOT_TRIGGERED_YET {
         return old_value;
     }
     while !T::attempt_available_bits(object, old_value, old_value | BEING_FORWARDED as usize) {
         old_value = T::prepare_available_bits(object);
-        if old_value & FORWARDING_MASK as u8 != FORWARDING_NOT_TRIGGERED_YET {
+        if (old_value as u8) & FORWARDING_MASK != FORWARDING_NOT_TRIGGERED_YET {
             return old_value;
         }
     }
     return old_value;
 }
 
-fn spin_and_get_forward_object<T: ObjectModel>(object: ObjectReference, status_word: usize) {
+fn spin_and_get_forward_object<T: ObjectModel>(object: ObjectReference, status_word: usize) -> ObjectReference {
     let mut status_word = status_word;
-    while status_word & FORWARDING_MASK as usize == BEING_FORWARDED {
+    while (status_word as u8) & FORWARDING_MASK == BEING_FORWARDED {
         status_word = T::read_available_bits_word(object);
     }
-    if status_word as u8 & FORWARDING_MASK == FORWARDED {
+    if (status_word as u8) & FORWARDING_MASK == FORWARDED {
         unsafe { Address::from_usize(status_word & (!FORWARDING_MASK) as usize).to_object_reference() }
     } else { object }
 }

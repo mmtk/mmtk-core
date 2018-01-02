@@ -22,7 +22,7 @@ pub trait ObjectModel {
     fn write_available_byte(object: ObjectReference, val: i8);
     fn read_available_byte(object: ObjectReference) -> i8;
     fn write_available_bits_word(object: ObjectReference, val: usize);
-    fn read_available_bits_word(object: ObjectReference);
+    fn read_available_bits_word(object: ObjectReference) -> usize;
     // Offset
     fn GC_HEADER_OFFSET() -> isize;
     fn object_start_ref(object: ObjectReference) -> Address;
