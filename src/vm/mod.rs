@@ -1,3 +1,5 @@
+mod object_model;
+
 #[cfg(feature = "jikesrvm")]
 mod jikesrvm;
 
