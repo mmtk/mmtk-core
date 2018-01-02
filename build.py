@@ -4,11 +4,16 @@ import platform
 import subprocess
 import shutil
 import os
+import sys
 
 plan_dir = os.path.abspath(os.path.join(__file__, "..", "src", "plan"))
 PLANS = next(os.walk(plan_dir))[1]
 
 os.chdir(os.path.abspath(os.path.join(__file__, "..")))
+
+extra_features = ""
+if len(sys.argv) > 1:
+    extra_features = sys.argv[1]
 
 
 def exec_and_redirect(args, env=None):
@@ -36,7 +41,10 @@ elif system == "Linux":
     LIBRARY_PATH = "LD_LIBRARY_PATH"
 
 for plan in PLANS:
-    cmd = ["cargo", "build", "--no-default-features", "--features", plan]
+    cmd = ["cargo",
+           "build",
+           "--no-default-features",
+           "--features", " ".join([plan, extra_features])]
     exec_and_redirect(cmd)
     exec_and_redirect(cmd + ["--release"])
     shutil.copyfile("target/release/libmmtk{}".format(SUFFIX),
