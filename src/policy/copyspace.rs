@@ -7,6 +7,7 @@ use ::util::heap::MonotonePageResource;
 
 use ::policy::space::Space;
 use ::util::{Address, ObjectReference};
+use ::plan::TransitiveClosure;
 
 pub struct CopySpace {
     pr: Mutex<MonotonePageResource>,
@@ -37,5 +38,9 @@ impl CopySpace {
 
     pub fn prepare(&mut self, from_space: bool) {
         self.from_space = from_space;
+    }
+
+    pub fn trace_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference) -> ObjectReference {
+        unimplemented!()
     }
 }

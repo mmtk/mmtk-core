@@ -1,6 +1,9 @@
 use ::plan::TransitiveClosure;
 use ::util::{Address, ObjectReference};
 use std::collections::VecDeque;
+use ::policy::space::Space;
+
+use ::plan::selected_plan::PLAN;
 
 struct SSTraceLocal<'a> {
     root_locations: &'a mut VecDeque<Address>,
@@ -18,10 +21,31 @@ impl<'a> TransitiveClosure for SSTraceLocal<'a> {
 }
 
 impl<'a> SSTraceLocal<'a> {
+    // FIXME: refactor this out to TraceLocal
     fn process_roots(&mut self) {
-        unimplemented!()
+        while let Some(slot) = self.root_locations.pop_front() {
+            self.process_root_edge(slot, true);
+        }
     }
-    fn process_root_edge(&mut self) {
+    fn process_root_edge(&mut self, slot: Address, untraced: bool) {
+        let object: ObjectReference = if untraced {
+            unsafe { slot.load() }
+        } else {
+            unimplemented!()
+        };
+        let new_object = self.trace_object(object);
+        // FIXME: overwriteReferenceDuringTrace
+    }
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+        if PLAN.copyspace0.in_space(object) {
+            return PLAN.copyspace0.trace_object(self, object);
+        }
+        if PLAN.copyspace1.in_space(object) {
+            return PLAN.copyspace0.trace_object(self, object);
+        }
         unimplemented!()
     }
 }

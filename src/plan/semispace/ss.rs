@@ -24,8 +24,8 @@ lazy_static! {
 pub struct SemiSpace {
     pub control_collector_context: ControllerCollectorContext,
     hi: bool,
-    copyspace0: CopySpace,
-    copyspace1: CopySpace,
+    pub copyspace0: CopySpace,
+    pub copyspace1: CopySpace,
     ss_trace: Trace
 }
 
