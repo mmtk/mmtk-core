@@ -1,7 +1,7 @@
 use ::util::{Address, ObjectReference};
 
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/vm/ObjectModel.java
-trait ObjectModel {
+pub trait ObjectModel {
     fn copy(from: ObjectReference, allocator: usize) -> ObjectReference;
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address;
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference;

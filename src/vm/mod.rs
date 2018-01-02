@@ -1,4 +1,5 @@
 mod object_model;
+pub use self::object_model::ObjectModel;
 
 #[cfg(feature = "jikesrvm")]
 mod jikesrvm;
