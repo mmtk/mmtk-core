@@ -19,8 +19,8 @@ pub trait ObjectModel {
     fn get_array_length(object: ObjectReference) -> usize;
     fn attempt_available_bits(object: ObjectReference, old: usize, new: usize) -> bool;
     fn prepare_available_bits(object: ObjectReference) -> usize;
-    fn write_available_byte(object: ObjectReference, val: i8);
-    fn read_available_byte(object: ObjectReference) -> i8;
+    fn write_available_byte(object: ObjectReference, val: u8);
+    fn read_available_byte(object: ObjectReference) -> u8;
     fn write_available_bits_word(object: ObjectReference, val: usize);
     fn read_available_bits_word(object: ObjectReference) -> usize;
     // Offset
