@@ -3,6 +3,7 @@ use ::util::{Address, ObjectReference};
 use std::collections::VecDeque;
 use ::policy::space::Space;
 
+use super::ss;
 use ::plan::selected_plan::PLAN;
 
 struct SSTraceLocal<'a> {
@@ -41,10 +42,10 @@ impl<'a> SSTraceLocal<'a> {
             return object;
         }
         if PLAN.copyspace0.in_space(object) {
-            return PLAN.copyspace0.trace_object(self, object);
+            return PLAN.copyspace0.trace_object(self, object, ss::ALLOC_SS);
         }
         if PLAN.copyspace1.in_space(object) {
-            return PLAN.copyspace0.trace_object(self, object);
+            return PLAN.copyspace1.trace_object(self, object, ss::ALLOC_SS);
         }
         unimplemented!()
     }

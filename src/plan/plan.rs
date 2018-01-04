@@ -7,6 +7,10 @@ pub trait Plan {
     fn do_collection(&self);
 }
 
+pub enum Allocator {
+    Default
+}
+
 pub mod default {
     use std::thread;
     use libc::c_void;

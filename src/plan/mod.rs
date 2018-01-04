@@ -10,6 +10,7 @@ pub use self::plan::Plan;
 pub use self::transitive_closure::TransitiveClosure;
 pub use self::phase::Phase;
 pub use self::mutator_context::MutatorContext;
+pub use self::plan::Allocator;
 
 #[cfg(feature = "nogc")]
 pub mod nogc;

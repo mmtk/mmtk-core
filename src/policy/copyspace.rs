@@ -8,6 +8,10 @@ use ::util::heap::MonotonePageResource;
 use ::policy::space::Space;
 use ::util::{Address, ObjectReference};
 use ::plan::TransitiveClosure;
+use ::util::forwarding_word as ForwardingWord;
+use ::vm::ObjectModel;
+use ::vm::VMObjectModel;
+use ::plan::Allocator;
 
 pub struct CopySpace {
     pr: Mutex<MonotonePageResource>,
@@ -40,7 +44,27 @@ impl CopySpace {
         self.from_space = from_space;
     }
 
-    pub fn trace_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference) -> ObjectReference {
-        unimplemented!()
+    pub fn trace_object<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        allocator: Allocator,
+    ) -> ObjectReference
+    {
+        if !self.from_space {
+            return object;
+        }
+        let mut forwarding_word = ForwardingWord::attempt_to_forward(object);
+        if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_word) {
+            while ForwardingWord::state_is_being_forwarded(forwarding_word) {
+                forwarding_word = VMObjectModel::read_available_bits_word(object);
+            }
+            return ForwardingWord::extract_forwarding_pointer(forwarding_word);
+        } else {
+            let new_object = VMObjectModel::copy(object, allocator);
+            ForwardingWord::set_forwarding_pointer(object, new_object);
+            trace.process_node(new_object);
+            return new_object;
+        }
     }
 }
