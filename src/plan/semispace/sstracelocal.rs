@@ -1,4 +1,4 @@
-use ::plan::TransitiveClosure;
+use ::plan::{TransitiveClosure, TraceLocal};
 use ::util::{Address, ObjectReference};
 use std::collections::VecDeque;
 use ::policy::space::Space;
@@ -21,8 +21,7 @@ impl<'a> TransitiveClosure for SSTraceLocal<'a> {
     }
 }
 
-impl<'a> SSTraceLocal<'a> {
-    // FIXME: refactor this out to TraceLocal
+impl<'a> TraceLocal for SSTraceLocal<'a> {
     fn process_roots(&mut self) {
         while let Some(slot) = self.root_locations.pop_front() {
             self.process_root_edge(slot, true);

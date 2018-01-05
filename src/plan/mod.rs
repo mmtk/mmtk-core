@@ -1,4 +1,5 @@
 pub mod plan;
+pub mod tracelocal;
 pub mod transitive_closure;
 pub mod controller_collector_context;
 mod phase;
@@ -11,6 +12,7 @@ pub use self::transitive_closure::TransitiveClosure;
 pub use self::phase::Phase;
 pub use self::mutator_context::MutatorContext;
 pub use self::plan::Allocator;
+pub use self::tracelocal::TraceLocal;
 
 #[cfg(feature = "nogc")]
 pub mod nogc;
