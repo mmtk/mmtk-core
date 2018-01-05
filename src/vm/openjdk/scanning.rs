@@ -5,7 +5,7 @@ use ::util::ObjectReference;
 pub struct OpenJDKScanning {}
 
 impl Scanning for OpenJDKScanning {
-    fn scan_object<T: TransitiveClosure>(trace: T, object: ObjectReference) {
+    fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference) {
         unimplemented!()
     }
 
@@ -17,23 +17,23 @@ impl Scanning for OpenJDKScanning {
         unimplemented!()
     }
 
-    fn compute_static_roots<T: TraceLocal>(trace: T) {
+    fn compute_static_roots<T: TraceLocal>(trace: &mut T) {
         unimplemented!()
     }
 
-    fn compute_global_roots<T: TraceLocal>(trace: T) {
+    fn compute_global_roots<T: TraceLocal>(trace: &mut T) {
         unimplemented!()
     }
 
-    fn compute_thread_roots<T: TraceLocal>(trace: T) {
+    fn compute_thread_roots<T: TraceLocal>(trace: &mut T) {
         unimplemented!()
     }
 
-    fn compute_new_thread_roots<T: TraceLocal>(trace: T) {
+    fn compute_new_thread_roots<T: TraceLocal>(trace: &mut T) {
         unimplemented!()
     }
 
-    fn compute_bootimage_roots<T: TraceLocal>(trace: T) {
+    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T) {
         unimplemented!()
     }
 

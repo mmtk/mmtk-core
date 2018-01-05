@@ -4,7 +4,7 @@ use ::plan::mutator_context::MutatorContext;
 use ::plan::Phase;
 use ::plan::semispace;
 use ::util::Address;
-use ::util::alloc::allocator::Allocator;
+use ::util::alloc::Allocator;
 
 #[repr(C)]
 pub struct SSMutator<'a> {

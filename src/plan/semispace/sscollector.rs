@@ -4,13 +4,18 @@ use ::util::{Address, ObjectReference};
 use ::plan::Phase;
 use ::policy::copyspace::CopySpace;
 use ::plan::semispace;
-use util::alloc::allocator::Allocator;
+use ::util::alloc::Allocator;
+use ::vm::VMScanning;
+use ::vm::Scanning;
+
+use super::sstracelocal::SSTraceLocal;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector<'a> {
     id: usize,
     // CopyLocal
     ss: BumpAllocator<'a, CopySpace>,
+    trace: SSTraceLocal,
 }
 
 impl<'a> CollectorContext for SSCollector<'a> {
@@ -27,8 +32,19 @@ impl<'a> CollectorContext for SSCollector<'a> {
     }
 
     fn collection_phase(&mut self, phase: Phase, primary: bool) {
-        if let Phase::Prepare = phase {
-            self.ss.rebind(semispace::PLAN.tospace());
+        match phase {
+            Phase::Prepare => { self.ss.rebind(semispace::PLAN.tospace()) }
+            Phase::StackRoots => {
+                VMScanning::compute_thread_roots(&mut self.trace);
+            }
+            Phase::Roots => {
+                VMScanning::compute_global_roots(&mut self.trace);
+                VMScanning::compute_static_roots(&mut self.trace);
+                if super::ss::SCAN_BOOT_IMAGE {
+                    VMScanning::compute_bootimage_roots(&mut self.trace);
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -38,6 +54,7 @@ impl<'a> SSCollector<'a> {
         SSCollector {
             id: 0,
             ss: BumpAllocator::new(thread_id, space),
+            trace: SSTraceLocal::new(),
         }
     }
 

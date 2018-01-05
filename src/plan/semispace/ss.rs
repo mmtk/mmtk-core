@@ -19,6 +19,7 @@ pub type SelectedMutator<'a> = SSMutator<'a>;
 pub type SelectedPlan = SemiSpace;
 
 pub const ALLOC_SS: Allocator = Allocator::Default;
+pub const SCAN_BOOT_IMAGE: bool = true;
 
 lazy_static! {
     pub static ref PLAN: SemiSpace = SemiSpace::new();

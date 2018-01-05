@@ -6,12 +6,12 @@ use ::policy::space::Space;
 use super::ss;
 use ::plan::selected_plan::PLAN;
 
-struct SSTraceLocal<'a> {
-    root_locations: &'a mut VecDeque<Address>,
-    values: &'a mut VecDeque<ObjectReference>,
+pub struct SSTraceLocal {
+    root_locations: VecDeque<Address>,
+    values: VecDeque<ObjectReference>,
 }
 
-impl<'a> TransitiveClosure for SSTraceLocal<'a> {
+impl TransitiveClosure for SSTraceLocal {
     fn process_edge(&mut self, slot: Address) {
         unimplemented!()
     }
@@ -21,7 +21,7 @@ impl<'a> TransitiveClosure for SSTraceLocal<'a> {
     }
 }
 
-impl<'a> TraceLocal for SSTraceLocal<'a> {
+impl TraceLocal for SSTraceLocal {
     fn process_roots(&mut self) {
         while let Some(slot) = self.root_locations.pop_front() {
             self.process_root_edge(slot, true);
@@ -47,5 +47,14 @@ impl<'a> TraceLocal for SSTraceLocal<'a> {
             return PLAN.copyspace1.trace_object(self, object, ss::ALLOC_SS);
         }
         unimplemented!()
+    }
+}
+
+impl SSTraceLocal {
+    pub fn new() -> Self {
+        SSTraceLocal {
+            root_locations: VecDeque::new(),
+            values: VecDeque::new(),
+        }
     }
 }

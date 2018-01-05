@@ -1,7 +1,7 @@
 use ::util::address::Address;
 
 use ::util::alloc::allocator::align_allocation;
-use ::util::alloc::allocator::Allocator;
+use ::util::alloc::Allocator;
 
 use ::policy::space::Space;
 
