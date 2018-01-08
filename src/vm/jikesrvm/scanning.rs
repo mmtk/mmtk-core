@@ -26,11 +26,11 @@ impl Scanning for JikesRVMScanning {
     }
 
     fn compute_thread_roots<T: TraceLocal>(trace: &mut T) {
-        unimplemented!()
+        Self::compute_thread_roots(trace, false)
     }
 
     fn compute_new_thread_roots<T: TraceLocal>(trace: &mut T) {
-        unimplemented!()
+        Self::compute_thread_roots(trace, true)
     }
 
     fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T) {
@@ -38,6 +38,12 @@ impl Scanning for JikesRVMScanning {
     }
 
     fn supports_return_barrier() -> bool {
+        unimplemented!()
+    }
+}
+
+impl JikesRVMScanning {
+    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, new_roots_sufficient: bool) {
         unimplemented!()
     }
 }
