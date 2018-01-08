@@ -10,10 +10,10 @@ mod jikesrvm;
 pub use self::jikesrvm::*;
 
 #[cfg(feature = "jikesrvm")]
-pub use self::jikesrvm::object_model::JikesRVMObjectModel as VMObjectModel;
+pub use self::jikesrvm::object_model::VMObjectModel as VMObjectModel;
 
 #[cfg(feature = "jikesrvm")]
-pub use self::jikesrvm::scanning::JikesRVMScanning as VMScanning;
+pub use self::jikesrvm::scanning::VMScanning as VMScanning;
 
 #[cfg(not(feature = "jikesrvm"))]
 mod openjdk;
@@ -22,7 +22,7 @@ mod openjdk;
 pub use self::openjdk::*;
 
 #[cfg(not(feature = "jikesrvm"))]
-pub use self::openjdk::object_model::OpenJDKObjectModel as VMObjectModel;
+pub use self::openjdk::object_model::VMObjectModel as VMObjectModel;
 
 #[cfg(not(feature = "jikesrvm"))]
-pub use self::openjdk::scanning::OpenJDKScanning as VMScanning;
+pub use self::openjdk::scanning::VMScanning as VMScanning;

@@ -2,9 +2,9 @@ use ::vm::Scanning;
 use ::plan::{TransitiveClosure, TraceLocal};
 use ::util::ObjectReference;
 
-pub struct OpenJDKScanning {}
+pub struct VMScanning {}
 
-impl Scanning for OpenJDKScanning {
+impl Scanning for VMScanning {
     fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference) {
         unimplemented!()
     }

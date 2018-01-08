@@ -2,9 +2,9 @@ use ::vm::object_model::ObjectModel;
 use ::util::{Address, ObjectReference};
 use ::plan::Allocator;
 
-pub struct OpenJDKObjectModel {}
+pub struct VMObjectModel {}
 
-impl ObjectModel for OpenJDKObjectModel {
+impl ObjectModel for VMObjectModel {
     fn copy(from: ObjectReference, allocator: Allocator) -> ObjectReference {
         unimplemented!()
     }

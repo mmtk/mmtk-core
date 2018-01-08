@@ -2,9 +2,9 @@ use ::vm::object_model::ObjectModel;
 use ::util::{Address, ObjectReference};
 use ::plan::Allocator;
 
-pub struct JikesRVMObjectModel {}
+pub struct VMObjectModel {}
 
-impl ObjectModel for JikesRVMObjectModel {
+impl ObjectModel for VMObjectModel {
     fn copy(from: ObjectReference, allocator: Allocator) -> ObjectReference {
         unimplemented!()
     }
