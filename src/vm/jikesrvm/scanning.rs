@@ -67,7 +67,7 @@ impl Scanning for VMScanning {
     }
 }
 
-impl JikesRVMScanning {
+impl VMScanning {
     fn compute_thread_roots<T: TraceLocal>(trace: &mut T, new_roots_sufficient: bool) {
         unimplemented!()
     }
