@@ -2,6 +2,7 @@ use ::plan::{TransitiveClosure, TraceLocal};
 use ::util::{Address, ObjectReference};
 use std::collections::VecDeque;
 use ::policy::space::Space;
+use ::vm::VMScanning;
 
 use super::ss;
 use ::plan::selected_plan::PLAN;
@@ -13,7 +14,9 @@ pub struct SSTraceLocal {
 
 impl TransitiveClosure for SSTraceLocal {
     fn process_edge(&mut self, slot: Address) {
-        unimplemented!()
+        let object: ObjectReference = unsafe { slot.load() };
+        let new_object = self.trace_object(object);
+        // FIXME: overwriteReferenceDuringTrace
     }
 
     fn process_node(&mut self, object: ObjectReference) {
@@ -47,6 +50,24 @@ impl TraceLocal for SSTraceLocal {
             return PLAN.copyspace1.trace_object(self, object, ss::ALLOC_SS);
         }
         unimplemented!()
+    }
+    fn complete_trace(&mut self) {
+        if !self.root_locations.is_empty() {
+            self.process_roots();
+        }
+        while let Some(object) = self.values.pop_front() {
+            VMScanning::scan_object(&mut self, object);
+        }
+        while !self.values.is_empty() {
+            while let Some(object) = self.values.pop_front() {
+                VMScanning::scan_object(&mut self, object);
+            }
+        }
+    }
+
+    fn release(&mut self) {
+        self.values.clear();
+        self.root_locations.clear();
     }
 }
 

@@ -44,6 +44,8 @@ impl<'a> CollectorContext for SSCollector<'a> {
                     VMScanning::compute_bootimage_roots(&mut self.trace);
                 }
             }
+            Phase::Closure => { self.trace.complete_trace() }
+            Phase::Release => { self.trace.release() }
             _ => {}
         }
     }
