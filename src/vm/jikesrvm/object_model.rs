@@ -1,6 +1,7 @@
 use ::vm::object_model::ObjectModel;
 use ::util::{Address, ObjectReference};
 use ::plan::Allocator;
+use std::mem::size_of;
 
 pub struct VMObjectModel {}
 
@@ -58,7 +59,8 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_array_length(object: ObjectReference) -> usize {
-        unimplemented!()
+        let len_ptr = object.to_address().as_usize() - size_of::<isize>();
+        unsafe { *(len_ptr as *const usize) }
     }
 
     fn attempt_available_bits(object: ObjectReference, old: usize, new: usize) -> bool {
