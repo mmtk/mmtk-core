@@ -4,6 +4,10 @@ extern crate libc;
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+extern crate log;
+extern crate env_logger;
+
 pub mod util;
 pub mod vm;
 mod policy;
@@ -27,6 +31,7 @@ use selected_plan::{SelectedPlan, SelectedMutator};
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
 pub extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
+    env_logger::init();
     unsafe { JTOC_BASE = Address::from_mut_ptr(jtoc); }
     selected_plan::PLAN.gc_init(heap_size);
     ::vm::scheduler::test1();
@@ -59,6 +64,7 @@ pub extern fn gc_init(heap_size: usize) {
     if cfg!(feature = "jikesrvm") {
         panic!("Should be calling jikesrvm_gc_init instead");
     }
+    env_logger::init();
     selected_plan::PLAN.gc_init(heap_size);
 }
 

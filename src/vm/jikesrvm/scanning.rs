@@ -16,7 +16,9 @@ const THREAD_PLACEHOLDER: usize = 1;
 impl Scanning for VMScanning {
     fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference) {
         // FIXME: pass the correct collector thread id
+        debug!("jtoc_call");
         let elt0_ptr: usize = jtoc_call!(GET_OFFSET_ARRAY_METHOD_JTOC_OFFSET, THREAD_PLACEHOLDER, object);
+        debug!("elt0_ptr: {}", elt0_ptr);
         if elt0_ptr == 0 {
             // object is a REFARRAY
             let length = VMObjectModel::get_array_length(object);
