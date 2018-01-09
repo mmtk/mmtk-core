@@ -12,10 +12,10 @@ pub struct VirtualTransitiveClosure {}
 
 impl TransitiveClosure for VirtualTransitiveClosure {
     fn process_edge(&mut self, slot: Address) {
-        println!("process_edge(slot: {:#?})", slot);
+        trace!("process_edge(slot: {:#?})", slot);
     }
 
     fn process_node(&mut self, object: ObjectReference) {
-        println!("process_node(object: {:#?})", object);
+        trace!("process_node(object: {:#?})", object);
     }
 }

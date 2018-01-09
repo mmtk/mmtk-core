@@ -31,14 +31,13 @@ use selected_plan::{SelectedPlan, SelectedMutator};
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
 pub extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
-    env_logger::init();
+    env_logger::init().unwrap();
     unsafe { JTOC_BASE = Address::from_mut_ptr(jtoc); }
     selected_plan::PLAN.gc_init(heap_size);
     ::vm::scheduler::test1();
-    println!("{}", ::vm::scheduler::test(44));
-    println!("{}", ::vm::scheduler::test2(45, 67));
-    //::vm::scheduler::test1();
-    println!("{}", ::vm::scheduler::test3(21, 34, 9, 8));
+    info!("{}", ::vm::scheduler::test(44));
+    info!("{}", ::vm::scheduler::test2(45, 67));
+    info!("{}", ::vm::scheduler::test3(21, 34, 9, 8));
 }
 
 #[no_mangle]
@@ -64,7 +63,7 @@ pub extern fn gc_init(heap_size: usize) {
     if cfg!(feature = "jikesrvm") {
         panic!("Should be calling jikesrvm_gc_init instead");
     }
-    env_logger::init();
+    env_logger::init().unwrap();
     selected_plan::PLAN.gc_init(heap_size);
 }
 
