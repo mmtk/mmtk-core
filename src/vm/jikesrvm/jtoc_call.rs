@@ -11,9 +11,8 @@ macro_rules! jtoc_call {
 
         jtoc_args!($($arg),*);
 
-        asm!("mov esi, ecx\n\
-              call ebx\n\
-              mov $0, eax" : "=r"(ret) : "{ecx}"(rvm_thread), "{ebx}"(call_addr) : "eax", "ebx", "ecx", "edx", "esi", "memory" : "intel");
+        asm!("call ebx" : "={eax}"(ret) : "{esi}"(rvm_thread),
+             "{ebx}"(call_addr) : "eax", "ebx", "ecx", "edx", "esi", "memory" : "intel");
 
         ret
     });
