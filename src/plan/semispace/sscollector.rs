@@ -7,6 +7,7 @@ use ::plan::semispace;
 use ::util::alloc::Allocator;
 use ::vm::VMScanning;
 use ::vm::Scanning;
+use ::plan::TraceLocal;
 
 use super::sstracelocal::SSTraceLocal;
 

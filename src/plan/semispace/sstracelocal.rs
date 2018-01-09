@@ -3,6 +3,7 @@ use ::util::{Address, ObjectReference};
 use std::collections::VecDeque;
 use ::policy::space::Space;
 use ::vm::VMScanning;
+use ::vm::Scanning;
 
 use super::ss;
 use ::plan::selected_plan::PLAN;
@@ -56,11 +57,11 @@ impl TraceLocal for SSTraceLocal {
             self.process_roots();
         }
         while let Some(object) = self.values.pop_front() {
-            VMScanning::scan_object(&mut self, object);
+            VMScanning::scan_object(self, object);
         }
         while !self.values.is_empty() {
             while let Some(object) = self.values.pop_front() {
-                VMScanning::scan_object(&mut self, object);
+                VMScanning::scan_object(self, object);
             }
         }
     }
