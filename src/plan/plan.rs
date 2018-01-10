@@ -1,10 +1,12 @@
 use libc::c_void;
+use ::util::ObjectReference;
 
 pub trait Plan {
     fn new() -> Self;
     fn gc_init(&self, heap_size: usize);
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void;
     fn do_collection(&self);
+    fn will_never_move(&self, object: ObjectReference) -> bool;
 }
 
 pub enum Allocator {

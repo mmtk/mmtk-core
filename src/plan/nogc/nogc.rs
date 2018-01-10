@@ -39,4 +39,8 @@ impl Plan for NoGC {
     fn do_collection(&self) {
         panic!("GC triggered in NoGC plan");
     }
+
+    fn will_never_move(&self, object: ObjectReference) -> bool {
+        true
+    }
 }

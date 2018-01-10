@@ -8,7 +8,7 @@ use ::plan::mutator_context::MutatorContext;
 use ::vm::JTOC_BASE;
 
 #[cfg(feature = "jikesrvm")]
-use ::util::address::Address;
+use ::util::{Address, ObjectReference};
 
 use ::plan::selected_plan;
 use self::selected_plan::{SelectedPlan, SelectedMutator};
@@ -88,3 +88,8 @@ pub extern fn mmtk_malloc(size: usize) -> *mut c_void {
 
 #[no_mangle]
 pub extern fn mmtk_free(_ptr: *const c_void) {}
+
+#[no_mangle]
+pub extern fn will_never_move(object: ObjectReference) -> bool {
+    selected_plan::PLAN.will_never_move(object)
+}

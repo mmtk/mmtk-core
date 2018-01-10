@@ -13,6 +13,7 @@ use ::plan::Allocator;
 use ::policy::copyspace::CopySpace;
 use ::plan::Phase;
 use ::plan::trace::Trace;
+use ::util::ObjectReference;
 use libc::c_void;
 
 pub type SelectedMutator<'a> = SSMutator<'a>;
@@ -56,6 +57,14 @@ impl Plan for SemiSpace {
     fn do_collection(&self) {
         println!("Collecting garbage, trust me...");
         sleep(time::Duration::from_millis(2000));
+    }
+
+    fn will_never_move(&self, object: ObjectReference) -> bool {
+        if self.tospace().in_space(object) || self.fromspace().in_space(object) {
+            return false;
+        }
+        // FIXME: los, immortal, vm_space, non_moving, small_code, large_code
+        false
     }
 }
 
