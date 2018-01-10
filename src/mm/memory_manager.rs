@@ -7,7 +7,6 @@ use ::plan::mutator_context::MutatorContext;
 #[cfg(feature = "jikesrvm")]
 use ::vm::JTOC_BASE;
 
-#[cfg(feature = "jikesrvm")]
 use ::util::{Address, ObjectReference};
 
 use ::plan::selected_plan;
