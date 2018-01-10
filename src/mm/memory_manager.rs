@@ -7,7 +7,6 @@ use ::plan::mutator_context::MutatorContext;
 #[cfg(feature = "jikesrvm")]
 use ::vm::JTOC_BASE;
 
-#[cfg(feature = "jikesrvm")]
 use ::util::{Address, ObjectReference};
 
 use ::plan::selected_plan;
@@ -92,4 +91,19 @@ pub extern fn mmtk_free(_ptr: *const c_void) {}
 #[no_mangle]
 pub extern fn will_never_move(object: ObjectReference) -> bool {
     selected_plan::PLAN.will_never_move(object)
+}
+
+#[no_mangle]
+pub extern fn report_delayed_root_edge(trace_local: *mut c_void, addr: *mut c_void) {
+
+}
+
+#[no_mangle]
+pub extern fn will_not_move_in_current_collection(trace_local: *mut c_void, obj: *mut c_void) -> bool {
+    return false;
+}
+
+#[no_mangle]
+pub extern fn process_interior_edge(trace_local: *mut c_void, target: *mut c_void, slot: *mut c_void, root: bool) {
+
 }
