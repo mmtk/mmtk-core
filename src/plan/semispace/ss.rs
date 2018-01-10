@@ -5,7 +5,9 @@ use std::time;
 
 use ::policy::space::Space;
 
-use ::plan::semispace::ssmutator::SSMutator;
+use super::SSMutator;
+use super::SSTraceLocal;
+
 use ::plan::controller_collector_context::ControllerCollectorContext;
 
 use ::plan::Plan;
@@ -17,6 +19,7 @@ use ::util::ObjectReference;
 use libc::c_void;
 
 pub type SelectedMutator<'a> = SSMutator<'a>;
+pub type SelectedTraceLocal = SSTraceLocal;
 pub type SelectedPlan = SemiSpace;
 
 pub const ALLOC_SS: Allocator = Allocator::Default;

@@ -4,6 +4,8 @@ use libc::c_void;
 use plan::plan::Plan;
 use ::plan::mutator_context::MutatorContext;
 
+use ::plan::tracelocal::TraceLocal;
+
 #[cfg(feature = "jikesrvm")]
 use ::vm::JTOC_BASE;
 
@@ -95,6 +97,8 @@ pub extern fn will_never_move(object: ObjectReference) -> bool {
 
 #[no_mangle]
 pub extern fn report_delayed_root_edge(trace_local: *mut c_void, addr: *mut c_void) {
+    let local = unsafe { &mut *(trace_local as *mut selected_plan::SelectedTraceLocal) };
+    local.process_root_edge(unsafe { Address::from_usize(addr as usize) }, true);
     unimplemented!();
 }
 
