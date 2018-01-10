@@ -14,6 +14,8 @@ use ::util::{Address, ObjectReference};
 use ::plan::selected_plan;
 use self::selected_plan::{SelectedPlan, SelectedMutator};
 
+use ::plan::Allocator;
+
 use env_logger;
 
 #[no_mangle]
@@ -62,29 +64,29 @@ pub extern fn bind_mutator(thread_id: usize) -> *mut c_void {
 
 #[no_mangle]
 pub fn alloc(mutator: *mut c_void, size: usize,
-             align: usize, offset: isize) -> *mut c_void {
+             align: usize, offset: isize, allocator: Allocator) -> *mut c_void {
     let local = unsafe { &mut *(mutator as *mut SelectedMutator) };
-    local.alloc(size, align, offset).as_usize() as *mut c_void
+    local.alloc(size, align, offset, allocator).as_usize() as *mut c_void
 }
 
 #[no_mangle]
 #[inline(never)]
 pub fn alloc_slow(mutator: *mut c_void, size: usize,
-                  align: usize, offset: isize) -> *mut c_void {
+                  align: usize, offset: isize, allocator: Allocator) -> *mut c_void {
     let local = unsafe { &mut *(mutator as *mut SelectedMutator) };
-    local.alloc_slow(size, align, offset).as_usize() as *mut c_void
+    local.alloc_slow(size, align, offset, allocator).as_usize() as *mut c_void
 }
 
 #[no_mangle]
 #[inline(never)]
 pub extern fn alloc_large(_mutator: *mut c_void, _size: usize,
-                          _align: usize, _offset: isize) -> *mut c_void {
+                          _align: usize, _offset: isize, _allocator: Allocator) -> *mut c_void {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern fn mmtk_malloc(size: usize) -> *mut c_void {
-    alloc(null_mut(), size, 1, 0)
+    alloc(null_mut(), size, 1, 0, Allocator::Default)
 }
 
 #[no_mangle]

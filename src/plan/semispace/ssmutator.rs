@@ -5,6 +5,7 @@ use ::plan::Phase;
 use ::plan::semispace;
 use ::util::Address;
 use ::util::alloc::Allocator;
+use ::plan::Allocator as AllocationType;
 
 #[repr(C)]
 pub struct SSMutator<'a> {
@@ -19,11 +20,11 @@ impl<'a> MutatorContext for SSMutator<'a> {
         }
     }
 
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         self.ss.alloc(size, align, offset)
     }
 
-    fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         self.ss.alloc_slow(size, align, offset)
     }
 }
