@@ -95,15 +95,15 @@ pub extern fn will_never_move(object: ObjectReference) -> bool {
 
 #[no_mangle]
 pub extern fn report_delayed_root_edge(trace_local: *mut c_void, addr: *mut c_void) {
-
+    unimplemented!();
 }
 
 #[no_mangle]
 pub extern fn will_not_move_in_current_collection(trace_local: *mut c_void, obj: *mut c_void) -> bool {
-    return false;
+    unimplemented!();
 }
 
 #[no_mangle]
 pub extern fn process_interior_edge(trace_local: *mut c_void, target: *mut c_void, slot: *mut c_void, root: bool) {
-
+    unimplemented!();
 }
