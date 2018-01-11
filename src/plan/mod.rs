@@ -6,11 +6,13 @@ mod phase;
 mod trace;
 pub mod mutator_context;
 pub mod collector_context;
+pub mod parallel_collector;
 
 pub use self::plan::Plan;
 pub use self::transitive_closure::TransitiveClosure;
 pub use self::phase::Phase;
 pub use self::mutator_context::MutatorContext;
+pub use self::collector_context::CollectorContext;
 pub use self::plan::Allocator;
 pub use self::tracelocal::TraceLocal;
 

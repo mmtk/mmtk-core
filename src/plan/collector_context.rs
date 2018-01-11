@@ -8,6 +8,6 @@ pub trait CollectorContext {
     fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: usize) -> Address;
     /// Entry point for the collector context.
     fn run(&self);
-    /// Perform a (local, i.e.per-collector) collection phase.
+    /// Perform a (local, i.e. per-collector) collection phase.
     fn collection_phase(&mut self, phase: Phase, primary: bool);
 }
