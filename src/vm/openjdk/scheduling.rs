@@ -9,3 +9,7 @@ pub fn resume_mutators(thread_id: usize) {
 pub fn block_for_gc(thread_id: usize) {
     unimplemented!();
 }
+
+pub fn spawn_collector_thread<T: ParallelCollector>(ctx: &mut T) {
+    unimplemented!();
+}

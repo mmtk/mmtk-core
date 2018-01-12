@@ -29,7 +29,7 @@ impl<'a> MutatorContext for NoGCMutator<'a> {
 impl<'a> NoGCMutator<'a> {
     pub fn new(thread_id: usize, space: &'a ImmortalSpace) -> Self {
         NoGCMutator {
-            nogc: BumpAllocator::new(thread_id, space)
+            nogc: BumpAllocator::new(thread_id, Some(space)),
         }
     }
 }

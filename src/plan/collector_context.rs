@@ -2,6 +2,7 @@ use ::util::{Address, ObjectReference};
 use ::plan::Phase;
 
 pub trait CollectorContext {
+    fn new() -> Self;
     /// Notify that the collector context is registered and ready to execute.
     fn init(&mut self, id: usize);
     /// Allocate space for copying an object.

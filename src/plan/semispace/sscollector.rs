@@ -13,13 +13,21 @@ use super::sstracelocal::SSTraceLocal;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector<'a> {
-    id: usize,
+    pub id: usize,
     // CopyLocal
-    ss: BumpAllocator<'a, CopySpace>,
+    pub ss: BumpAllocator<'a, CopySpace>,
     trace: SSTraceLocal,
 }
 
 impl<'a> CollectorContext for SSCollector<'a> {
+    fn new() -> Self {
+        SSCollector {
+            id: 0,
+            ss: BumpAllocator::new(0,None),
+            trace: SSTraceLocal::new(),
+        }
+    }
+
     fn init(&mut self, id: usize) {
         self.id = id;
     }
@@ -34,7 +42,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
 
     fn collection_phase(&mut self, phase: Phase, primary: bool) {
         match phase {
-            Phase::Prepare => { self.ss.rebind(semispace::PLAN.tospace()) }
+            Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
             Phase::StackRoots => {
                 VMScanning::compute_thread_roots(&mut self.trace);
             }
@@ -53,14 +61,6 @@ impl<'a> CollectorContext for SSCollector<'a> {
 }
 
 impl<'a> SSCollector<'a> {
-    pub fn new(thread_id: usize, space: &'a CopySpace) -> Self {
-        SSCollector {
-            id: 0,
-            ss: BumpAllocator::new(thread_id, space),
-            trace: SSTraceLocal::new(),
-        }
-    }
-
     /// Perform a single garbage collection
     fn collect(&self) {
         unimplemented!()

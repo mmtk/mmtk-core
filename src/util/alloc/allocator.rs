@@ -14,7 +14,7 @@ pub fn align_allocation(region: Address, align: usize, offset: isize) -> Address
 }
 
 pub trait Allocator<'a, T> where T: Space {
-    fn new(thread_id: usize, space: &'a T) -> Self;
+    fn get_space(&self) -> Option<&'a T>;
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 

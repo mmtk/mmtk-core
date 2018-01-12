@@ -2,10 +2,10 @@ use ::vm::Scanning;
 use ::plan::{TransitiveClosure, TraceLocal};
 use ::util::{ObjectReference, Address};
 use ::vm::jikesrvm::jtoc::*;
-use ::vm::JTOC_BASE;
-use ::vm::unboxed_size_constants::LOG_BYTES_IN_ADDRESS;
-use ::vm::VMObjectModel;
-use ::vm::object_model::ObjectModel;
+use super::JTOC_BASE;
+use super::unboxed_size_constants::LOG_BYTES_IN_ADDRESS;
+use super::super::VMObjectModel;
+use super::super::ObjectModel;
 use std::mem::size_of;
 use std::slice;
 

@@ -2,6 +2,8 @@ use std::vec::Vec;
 use std::sync::{Mutex, Condvar};
 
 use super::ParallelCollector;
+use ::vm::Scheduling;
+use ::vm::VMScheduling;
 
 pub struct ParallelCollectorGroup<C: ParallelCollector> {
     name: String,
@@ -24,13 +26,18 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
     }
 
     fn init_group(&mut self, size: usize) {
-        let inner = self.sync.get_mut().unwrap();
-        inner.trigger_count = 1;
+        {
+            let inner = self.sync.get_mut().unwrap();
+            inner.trigger_count = 1;
+        }
         self.contexts = Vec::<C>::with_capacity(size);
         for i in 0 .. size - 1 {
-            //self.contexts.push();
+            self.contexts.push(C::new());
+            //self.contexts[i].set_group(&self);
+            unimplemented!();
+            self.contexts[i].set_worker_ordinal(i);
+            VMScheduling::spawn_collector_thread(&mut self.contexts[i]);
         }
-        unimplemented!();
     }
 
     fn trigger_cycle(&self) {
@@ -59,7 +66,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         }
     }
 
-    fn park(&self, context: C) {
+    fn park(&self, context: &mut C) {
         // if (VM.VERIFY_ASSERTIONS) VM.assertions._assert(isMember(context));
         let mut inner = self.sync.lock().unwrap();
         context.increment_last_trigger_count();
