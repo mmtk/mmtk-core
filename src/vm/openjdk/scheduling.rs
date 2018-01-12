@@ -1,15 +1,22 @@
-pub fn stop_all_mutators(thread_id: usize) {
-    unimplemented!();
-}
+use super::super::Scheduling;
+use ::plan::ParallelCollector;
 
-pub fn resume_mutators(thread_id: usize) {
-    unimplemented!();
-}
+pub struct VMScheduling {}
 
-pub fn block_for_gc(thread_id: usize) {
-    unimplemented!();
-}
+impl Scheduling for VMScheduling {
+    fn stop_all_mutators(thread_id: usize) {
+        unimplemented!();
+    }
 
-pub fn spawn_collector_thread<T: ParallelCollector>(ctx: &mut T) {
-    unimplemented!();
+    fn resume_mutators(thread_id: usize) {
+        unimplemented!();
+    }
+
+    fn block_for_gc(thread_id: usize) {
+        unimplemented!();
+    }
+
+    fn spawn_collector_thread<T: ParallelCollector>(ctx: &mut T) {
+        unimplemented!();
+    }
 }

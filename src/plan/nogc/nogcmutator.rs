@@ -1,5 +1,5 @@
 use ::policy::immortalspace::ImmortalSpace;
-use ::util::alloc::bumpallocator::BumpAllocator;
+use ::util::alloc::BumpAllocator;
 use ::plan::mutator_context::MutatorContext;
 use ::plan::Phase;
 use ::util::Address;

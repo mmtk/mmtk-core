@@ -33,4 +33,4 @@ pub use self::openjdk::object_model::VMObjectModel as VMObjectModel;
 pub use self::openjdk::scanning::VMScanning as VMScanning;
 
 #[cfg(not(feature = "jikesrvm"))]
-pub use self::openjdk::scanning::VMScheduling as VMScheduling;
+pub use self::openjdk::scheduling::VMScheduling as VMScheduling;

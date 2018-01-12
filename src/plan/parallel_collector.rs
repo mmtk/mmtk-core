@@ -1,6 +1,5 @@
 use super::ParallelCollectorGroup;
 use super::CollectorContext;
-use super::Phase;
 use super::TraceLocal;
 
 pub trait ParallelCollector: CollectorContext + Sized {
