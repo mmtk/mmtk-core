@@ -5,7 +5,6 @@ use super::TraceLocal;
 
 pub trait ParallelCollector: CollectorContext + Sized {
     fn collect(&self);
-    fn collection_phase(&self, phase_id: Phase, primary: bool);
     fn get_current_trace<T: TraceLocal>(&self) -> T;
     fn parallel_worker_count(&self) -> usize;
     fn parallel_worker_ordinal(&self) -> usize;

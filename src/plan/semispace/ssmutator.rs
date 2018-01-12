@@ -1,5 +1,5 @@
 use ::policy::copyspace::CopySpace;
-use ::util::alloc::bumpallocator::BumpAllocator;
+use ::util::alloc::BumpAllocator;
 use ::plan::mutator_context::MutatorContext;
 use ::plan::Phase;
 use ::plan::semispace;

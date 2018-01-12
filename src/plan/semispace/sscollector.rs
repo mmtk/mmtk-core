@@ -1,13 +1,18 @@
-use ::plan::collector_context::CollectorContext;
-use ::util::alloc::bumpallocator::BumpAllocator;
-use ::util::{Address, ObjectReference};
-use ::plan::Phase;
-use ::policy::copyspace::CopySpace;
+use ::plan::CollectorContext;
+use ::plan::ParallelCollector;
+use ::plan::ParallelCollectorGroup;
 use ::plan::semispace;
+use ::plan::Phase;
+use ::plan::TraceLocal;
+
 use ::util::alloc::Allocator;
+use ::util::alloc::BumpAllocator;
+use ::util::{Address, ObjectReference};
+
+use ::policy::copyspace::CopySpace;
+
 use ::vm::VMScanning;
 use ::vm::Scanning;
-use ::plan::TraceLocal;
 
 use super::sstracelocal::SSTraceLocal;
 
@@ -60,10 +65,38 @@ impl<'a> CollectorContext for SSCollector<'a> {
     }
 }
 
-impl<'a> SSCollector<'a> {
-    /// Perform a single garbage collection
+impl<'a> ParallelCollector for SSCollector<'a> {
     fn collect(&self) {
-        unimplemented!()
+        unimplemented!();
+    }
+    fn get_current_trace<T: TraceLocal>(&self) -> T {
+        unimplemented!();
+    }
+    fn parallel_worker_count(&self) -> usize {
+        unimplemented!();
+    }
+    fn parallel_worker_ordinal(&self) -> usize {
+        unimplemented!();
+    }
+    fn rendezvous(&self) -> usize {
+        unimplemented!();
+    }
+
+    fn get_last_trigger_count(&self) -> usize {
+        unimplemented!();
+    }
+    fn set_last_trigger_count(&mut self, val: usize) {
+        unimplemented!();
+    }
+    fn increment_last_trigger_count(&mut self) {
+        unimplemented!();
+    }
+
+    fn set_group(&mut self, group: &ParallelCollectorGroup<Self>) {
+        unimplemented!();
+    }
+    fn set_worker_ordinal(&mut self, ordinal: usize) {
+        unimplemented!();
     }
 }
 
