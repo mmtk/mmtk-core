@@ -22,6 +22,9 @@ pub struct SSCollector<'a> {
     // CopyLocal
     pub ss: BumpAllocator<'a, CopySpace>,
     trace: SSTraceLocal,
+
+    last_trigger_count: usize,
+    worker_ordinal: usize,
 }
 
 impl<'a> CollectorContext for SSCollector<'a> {
@@ -30,6 +33,9 @@ impl<'a> CollectorContext for SSCollector<'a> {
             id: 0,
             ss: BumpAllocator::new(0,None),
             trace: SSTraceLocal::new(),
+
+            last_trigger_count: 0,
+            worker_ordinal: 0,
         }
     }
 
@@ -70,33 +76,32 @@ impl<'a> ParallelCollector for SSCollector<'a> {
         unimplemented!();
     }
     fn get_current_trace<T: TraceLocal>(&self) -> T {
-        unimplemented!();
+        unimplemented!()
     }
     fn parallel_worker_count(&self) -> usize {
         unimplemented!();
     }
     fn parallel_worker_ordinal(&self) -> usize {
-        unimplemented!();
+        self.worker_ordinal
     }
     fn rendezvous(&self) -> usize {
         unimplemented!();
     }
 
     fn get_last_trigger_count(&self) -> usize {
-        unimplemented!();
+        self.last_trigger_count
     }
     fn set_last_trigger_count(&mut self, val: usize) {
-        unimplemented!();
+        self.last_trigger_count = val;
     }
     fn increment_last_trigger_count(&mut self) {
-        unimplemented!();
+        self.last_trigger_count += 1;
     }
 
     fn set_group(&mut self, group: &ParallelCollectorGroup<Self>) {
         unimplemented!();
     }
     fn set_worker_ordinal(&mut self, ordinal: usize) {
-        unimplemented!();
+        self.worker_ordinal = ordinal;
     }
 }
-
