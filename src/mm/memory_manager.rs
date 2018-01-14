@@ -1,33 +1,22 @@
-#![cfg_attr(feature = "jikesrvm", feature(asm))]
-
-extern crate libc;
-#[macro_use]
-extern crate lazy_static;
-
-#[macro_use]
-extern crate log;
-extern crate env_logger;
-
-pub mod util;
-pub mod vm;
-mod policy;
-mod plan;
-mod mm;
-
 use std::ptr::null_mut;
 use libc::c_void;
 
 use plan::plan::Plan;
 use ::plan::mutator_context::MutatorContext;
 
-#[cfg(feature = "jikesrvm")]
-use ::vm::JTOC_BASE;
+use ::plan::tracelocal::TraceLocal;
 
 #[cfg(feature = "jikesrvm")]
-use ::util::address::Address;
+use ::vm::jikesrvm::JTOC_BASE;
+
+use ::util::{Address, ObjectReference};
 
 use ::plan::selected_plan;
-use selected_plan::{SelectedPlan, SelectedMutator};
+use self::selected_plan::{SelectedPlan, SelectedMutator};
+
+use ::plan::Allocator;
+
+use env_logger;
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
@@ -35,10 +24,10 @@ pub extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     env_logger::init().unwrap();
     unsafe { JTOC_BASE = Address::from_mut_ptr(jtoc); }
     selected_plan::PLAN.gc_init(heap_size);
-    ::vm::scheduler::test1();
-    info!("{}", ::vm::scheduler::test(44));
-    info!("{}", ::vm::scheduler::test2(45, 67));
-    info!("{}", ::vm::scheduler::test3(21, 34, 9, 8));
+    ::vm::JikesRVM::test1();
+    info!("{}", ::vm::JikesRVM::test(44));
+    info!("{}", ::vm::JikesRVM::test2(45, 67));
+    info!("{}", ::vm::JikesRVM::test3(21, 34, 9, 8));
 }
 
 #[no_mangle]
@@ -75,35 +64,52 @@ pub extern fn bind_mutator(thread_id: usize) -> *mut c_void {
 
 #[no_mangle]
 pub fn alloc(mutator: *mut c_void, size: usize,
-             align: usize, offset: isize) -> *mut c_void {
+             align: usize, offset: isize, allocator: Allocator) -> *mut c_void {
     let local = unsafe { &mut *(mutator as *mut SelectedMutator) };
-    local.alloc(size, align, offset).as_usize() as *mut c_void
+    local.alloc(size, align, offset, allocator).as_usize() as *mut c_void
 }
 
 #[no_mangle]
 #[inline(never)]
 pub fn alloc_slow(mutator: *mut c_void, size: usize,
-                  align: usize, offset: isize) -> *mut c_void {
+                  align: usize, offset: isize, allocator: Allocator) -> *mut c_void {
     let local = unsafe { &mut *(mutator as *mut SelectedMutator) };
-    local.alloc_slow(size, align, offset).as_usize() as *mut c_void
+    local.alloc_slow(size, align, offset, allocator).as_usize() as *mut c_void
 }
 
 #[no_mangle]
 #[inline(never)]
 pub extern fn alloc_large(_mutator: *mut c_void, _size: usize,
-                          _align: usize, _offset: isize) -> *mut c_void {
+                          _align: usize, _offset: isize, _allocator: Allocator) -> *mut c_void {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern fn mmtk_malloc(size: usize) -> *mut c_void {
-    alloc(null_mut(), size, 1, 0)
+    alloc(null_mut(), size, 1, 0, Allocator::Default)
 }
 
 #[no_mangle]
 pub extern fn mmtk_free(_ptr: *const c_void) {}
 
 #[no_mangle]
-pub extern fn broken_code() {}
+pub extern fn will_never_move(object: ObjectReference) -> bool {
+    selected_plan::PLAN.will_never_move(object)
+}
 
-pub use mm::memory_manager::*;
+#[no_mangle]
+pub extern fn report_delayed_root_edge(trace_local: *mut c_void, addr: *mut c_void) {
+    let local = unsafe { &mut *(trace_local as *mut selected_plan::SelectedTraceLocal) };
+    local.process_root_edge(unsafe { Address::from_usize(addr as usize) }, true);
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern fn will_not_move_in_current_collection(trace_local: *mut c_void, obj: *mut c_void) -> bool {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern fn process_interior_edge(trace_local: *mut c_void, target: *mut c_void, slot: *mut c_void, root: bool) {
+    unimplemented!();
+}

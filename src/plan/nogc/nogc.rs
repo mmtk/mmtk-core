@@ -3,6 +3,7 @@ use super::super::plan::default;
 use ::policy::immortalspace::ImmortalSpace;
 use ::plan::Plan;
 use ::plan::controller_collector_context::ControllerCollectorContext;
+use ::util::ObjectReference;
 
 use libc::c_void;
 
@@ -10,9 +11,11 @@ lazy_static! {
     pub static ref PLAN: NoGC = NoGC::new();
 }
 
+use super::NoGCTraceLocal;
 use super::NoGCMutator;
 
 pub type SelectedMutator<'a> = NoGCMutator<'a>;
+pub type SelectedTraceLocal = NoGCTraceLocal;
 pub type SelectedPlan = NoGC;
 
 pub struct NoGC {
@@ -38,5 +41,9 @@ impl Plan for NoGC {
 
     fn do_collection(&self) {
         panic!("GC triggered in NoGC plan");
+    }
+
+    fn will_never_move(&self, object: ObjectReference) -> bool {
+        true
     }
 }

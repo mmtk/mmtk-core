@@ -1,9 +1,10 @@
 use ::policy::immortalspace::ImmortalSpace;
-use ::util::alloc::bumpallocator::BumpAllocator;
+use ::util::alloc::BumpAllocator;
 use ::plan::mutator_context::MutatorContext;
 use ::plan::Phase;
 use ::util::Address;
 use ::util::alloc::Allocator;
+use ::plan::Allocator as AllocationType;
 
 #[repr(C)]
 pub struct NoGCMutator<'a> {
@@ -16,11 +17,11 @@ impl<'a> MutatorContext for NoGCMutator<'a> {
         unimplemented!();
     }
 
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         self.nogc.alloc(size, align, offset)
     }
 
-    fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         self.nogc.alloc_slow(size, align, offset)
     }
 }
@@ -28,7 +29,7 @@ impl<'a> MutatorContext for NoGCMutator<'a> {
 impl<'a> NoGCMutator<'a> {
     pub fn new(thread_id: usize, space: &'a ImmortalSpace) -> Self {
         NoGCMutator {
-            nogc: BumpAllocator::new(thread_id, space)
+            nogc: BumpAllocator::new(thread_id, Some(space)),
         }
     }
 }

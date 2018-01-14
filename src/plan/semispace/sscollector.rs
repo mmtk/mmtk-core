@@ -1,25 +1,44 @@
-use ::plan::collector_context::CollectorContext;
-use ::util::alloc::bumpallocator::BumpAllocator;
-use ::util::{Address, ObjectReference};
-use ::plan::Phase;
-use ::policy::copyspace::CopySpace;
+use ::plan::CollectorContext;
+use ::plan::ParallelCollector;
+use ::plan::ParallelCollectorGroup;
 use ::plan::semispace;
+use ::plan::Phase;
+use ::plan::TraceLocal;
+
 use ::util::alloc::Allocator;
+use ::util::alloc::BumpAllocator;
+use ::util::{Address, ObjectReference};
+
+use ::policy::copyspace::CopySpace;
+
 use ::vm::VMScanning;
 use ::vm::Scanning;
-use ::plan::TraceLocal;
 
 use super::sstracelocal::SSTraceLocal;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector<'a> {
-    id: usize,
+    pub id: usize,
     // CopyLocal
-    ss: BumpAllocator<'a, CopySpace>,
+    pub ss: BumpAllocator<'a, CopySpace>,
     trace: SSTraceLocal,
+
+    last_trigger_count: usize,
+    worker_ordinal: usize,
 }
 
 impl<'a> CollectorContext for SSCollector<'a> {
+    fn new() -> Self {
+        SSCollector {
+            id: 0,
+            ss: BumpAllocator::new(0,None),
+            trace: SSTraceLocal::new(),
+
+            last_trigger_count: 0,
+            worker_ordinal: 0,
+        }
+    }
+
     fn init(&mut self, id: usize) {
         self.id = id;
     }
@@ -34,7 +53,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
 
     fn collection_phase(&mut self, phase: Phase, primary: bool) {
         match phase {
-            Phase::Prepare => { self.ss.rebind(semispace::PLAN.tospace()) }
+            Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
             Phase::StackRoots => {
                 VMScanning::compute_thread_roots(&mut self.trace);
             }
@@ -52,18 +71,37 @@ impl<'a> CollectorContext for SSCollector<'a> {
     }
 }
 
-impl<'a> SSCollector<'a> {
-    pub fn new(thread_id: usize, space: &'a CopySpace) -> Self {
-        SSCollector {
-            id: 0,
-            ss: BumpAllocator::new(thread_id, space),
-            trace: SSTraceLocal::new(),
-        }
-    }
-
-    /// Perform a single garbage collection
+impl<'a> ParallelCollector for SSCollector<'a> {
     fn collect(&self) {
+        unimplemented!();
+    }
+    fn get_current_trace<T: TraceLocal>(&self) -> T {
         unimplemented!()
     }
-}
+    fn parallel_worker_count(&self) -> usize {
+        unimplemented!();
+    }
+    fn parallel_worker_ordinal(&self) -> usize {
+        self.worker_ordinal
+    }
+    fn rendezvous(&self) -> usize {
+        unimplemented!();
+    }
 
+    fn get_last_trigger_count(&self) -> usize {
+        self.last_trigger_count
+    }
+    fn set_last_trigger_count(&mut self, val: usize) {
+        self.last_trigger_count = val;
+    }
+    fn increment_last_trigger_count(&mut self) {
+        self.last_trigger_count += 1;
+    }
+
+    fn set_group(&mut self, group: &ParallelCollectorGroup<Self>) {
+        unimplemented!();
+    }
+    fn set_worker_ordinal(&mut self, ordinal: usize) {
+        self.worker_ordinal = ordinal;
+    }
+}

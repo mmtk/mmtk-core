@@ -1,5 +1,6 @@
 use std::sync::{Mutex, Condvar};
-use ::vm::scheduler::{stop_all_mutators, resume_mutators};
+use ::vm::Scheduling;
+use ::vm::VMScheduling;
 
 use std::mem::transmute;
 
@@ -37,13 +38,13 @@ impl ControllerCollectorContext {
         }
         loop {
             self.wait_for_request();
-            stop_all_mutators(thread_id);
+            VMScheduling::stop_all_mutators(thread_id);
             self.clear_request();
             println!("Doing collection");
 
             selected_plan::PLAN.do_collection();
 
-            resume_mutators(thread_id);
+            VMScheduling::resume_mutators(thread_id);
             println!("Finished!");
         }
     }

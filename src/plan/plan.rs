@@ -1,14 +1,27 @@
 use libc::c_void;
+use ::util::ObjectReference;
 
 pub trait Plan {
     fn new() -> Self;
     fn gc_init(&self, heap_size: usize);
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void;
     fn do_collection(&self);
+    fn will_never_move(&self, object: ObjectReference) -> bool;
 }
 
+#[repr(i32)]
 pub enum Allocator {
-    Default
+    Default = 0,
+    NonReference = 1,
+    NonMoving = 2,
+    Immortal = 3,
+    Los = 4,
+    PrimitiveLos = 5,
+    GcSpy = 6,
+    Code = 7,
+    LargeCode = 8,
+    Allocators = 9,
+    DefaultSite = -1,
 }
 
 pub mod default {

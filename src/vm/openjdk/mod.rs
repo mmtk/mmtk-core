@@ -1,3 +1,3 @@
 pub mod scanning;
-pub mod scheduler;
+pub mod scheduling;
 pub mod object_model;
