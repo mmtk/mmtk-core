@@ -113,3 +113,6 @@ pub extern fn will_not_move_in_current_collection(trace_local: *mut c_void, obj:
 pub extern fn process_interior_edge(trace_local: *mut c_void, target: *mut c_void, slot: *mut c_void, root: bool) {
     unimplemented!();
 }
+
+#[no_mangle]
+pub extern fn broken_code() {}
