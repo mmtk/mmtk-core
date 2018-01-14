@@ -18,17 +18,24 @@ impl TraceLocal for NoGCTraceLocal {
     fn process_roots(&mut self) {
         unimplemented!();
     }
+
     fn process_root_edge(&mut self, slot: Address, untraced: bool) {
         unimplemented!();
     }
+
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         unimplemented!();
     }
+
     fn complete_trace(&mut self) {
         unimplemented!();
     }
 
     fn release(&mut self) {
         unimplemented!();
+    }
+
+    fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, root: bool) {
+        unimplemented!()
     }
 }
