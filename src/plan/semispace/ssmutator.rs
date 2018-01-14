@@ -9,7 +9,6 @@ use ::plan::Allocator as AllocationType;
 
 #[repr(C)]
 pub struct SSMutator<'a> {
-    thread_id: usize,
     // CopyLocal
     ss: BumpAllocator<'a, CopySpace>
 }
@@ -33,7 +32,6 @@ impl<'a> MutatorContext for SSMutator<'a> {
 impl<'a> SSMutator<'a> {
     pub fn new(thread_id: usize, space: &'a CopySpace) -> Self {
         SSMutator {
-            thread_id,
             ss: BumpAllocator::new(thread_id, Some(space)),
         }
     }

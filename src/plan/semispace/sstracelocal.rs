@@ -17,7 +17,9 @@ impl TransitiveClosure for SSTraceLocal {
     fn process_edge(&mut self, slot: Address) {
         let object: ObjectReference = unsafe { slot.load() };
         let new_object = self.trace_object(object);
-        // FIXME: overwriteReferenceDuringTrace
+        if self.overwrite_reference_during_trace() {
+            unsafe { slot.store(new_object) };
+        }
     }
 
     fn process_node(&mut self, object: ObjectReference) {
@@ -31,6 +33,7 @@ impl TraceLocal for SSTraceLocal {
             self.process_root_edge(slot, true);
         }
     }
+
     fn process_root_edge(&mut self, slot: Address, untraced: bool) {
         let object: ObjectReference = if untraced {
             unsafe { slot.load() }
@@ -38,8 +41,15 @@ impl TraceLocal for SSTraceLocal {
             unimplemented!()
         };
         let new_object = self.trace_object(object);
-        // FIXME: overwriteReferenceDuringTrace
+        if self.overwrite_reference_during_trace() {
+            if untraced {
+                unsafe { slot.store(new_object) };
+            } else {
+                unimplemented!();
+            }
+        }
     }
+
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
@@ -52,6 +62,7 @@ impl TraceLocal for SSTraceLocal {
         }
         unimplemented!()
     }
+
     fn complete_trace(&mut self) {
         if !self.root_locations.is_empty() {
             self.process_roots();
@@ -69,6 +80,15 @@ impl TraceLocal for SSTraceLocal {
     fn release(&mut self) {
         self.values.clear();
         self.root_locations.clear();
+    }
+
+    fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, root: bool) {
+        let interior_ref: Address = unsafe { slot.load() };
+        let offset = interior_ref - target.to_address();
+        let new_target = self.trace_object(target);
+        if self.overwrite_reference_during_trace() {
+            unsafe { slot.store(new_target.to_address() + offset) };
+        }
     }
 }
 
