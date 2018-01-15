@@ -25,6 +25,7 @@ pub struct SSCollector<'a> {
 
     last_trigger_count: usize,
     worker_ordinal: usize,
+    group: Option<&'a ParallelCollectorGroup<SSCollector<'a>>>,
 }
 
 impl<'a> CollectorContext for SSCollector<'a> {
@@ -36,6 +37,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
 
             last_trigger_count: 0,
             worker_ordinal: 0,
+            group: None,
         }
     }
 
@@ -98,8 +100,8 @@ impl<'a> ParallelCollector for SSCollector<'a> {
         self.last_trigger_count += 1;
     }
 
-    fn set_group(&mut self, group: &ParallelCollectorGroup<Self>) {
-        unimplemented!();
+    fn set_group(&mut self, group: *const ParallelCollectorGroup<Self>) {
+        self.group = Some ( unsafe {&*group} );
     }
     fn set_worker_ordinal(&mut self, ordinal: usize) {
         self.worker_ordinal = ordinal;

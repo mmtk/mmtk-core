@@ -33,8 +33,11 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         self.contexts = Vec::<C>::with_capacity(size);
         for i in 0 .. size - 1 {
             self.contexts.push(C::new());
-            //self.contexts[i].set_group(&self);
-            unimplemented!();
+            // XXX: Borrow-checker fighting. I _believe_ this is unavoidable
+            //      because we have a circular dependency here, but I'd very
+            //      much like to be wrong.
+            let self_ptr = self as *const Self;
+            self.contexts[i].set_group(self_ptr);
             self.contexts[i].set_worker_ordinal(i);
             VMScheduling::spawn_collector_thread(&mut self.contexts[i]);
         }
