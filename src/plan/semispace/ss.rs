@@ -64,11 +64,6 @@ impl<'a> Plan for SemiSpace<'a> {
         default::bind_mutator(SSMutator::new(thread_id, self.fromspace(), &self.versatile_space))
     }
 
-    fn do_collection(&self) {
-        println!("Collecting garbage, trust me...");
-        sleep(time::Duration::from_millis(2000));
-    }
-
     fn will_never_move(&self, object: ObjectReference) -> bool {
         if self.tospace().in_space(object) || self.fromspace().in_space(object) {
             return false;
