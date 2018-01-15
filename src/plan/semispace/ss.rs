@@ -14,6 +14,7 @@ use ::plan::controller_collector_context::ControllerCollectorContext;
 use ::plan::Plan;
 use ::plan::Allocator;
 use ::policy::copyspace::CopySpace;
+use ::policy::immortalspace::ImmortalSpace;
 use ::plan::Phase;
 use ::plan::trace::Trace;
 use ::util::ObjectReference;
@@ -37,6 +38,7 @@ pub struct SemiSpace<'a> {
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
     ss_trace: Trace,
+    versatile_space: ImmortalSpace,
 }
 
 impl<'a> Plan for SemiSpace<'a> {
@@ -47,16 +49,18 @@ impl<'a> Plan for SemiSpace<'a> {
             copyspace0: CopySpace::new(false),
             copyspace1: CopySpace::new(true),
             ss_trace: Trace::new(),
+            versatile_space: ImmortalSpace::new(),
         }
     }
 
     fn gc_init(&self, heap_size: usize) {
         default::gc_init(&self.copyspace0, heap_size / 2);
         self.copyspace1.init(heap_size / 2);
+        self.versatile_space.init(heap_size);
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
-        default::bind_mutator(SSMutator::new(thread_id, self.fromspace()))
+        default::bind_mutator(SSMutator::new(thread_id, self.fromspace(), &self.versatile_space))
     }
 
     fn do_collection(&self) {
@@ -68,7 +72,12 @@ impl<'a> Plan for SemiSpace<'a> {
         if self.tospace().in_space(object) || self.fromspace().in_space(object) {
             return false;
         }
-        // FIXME: los, immortal, vm_space, non_moving, small_code, large_code
+
+        if self.versatile_space.in_space(object) {
+            return true;
+        }
+
+        // this preserves correctness over efficiency
         false
     }
 }
