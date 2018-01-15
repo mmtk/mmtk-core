@@ -41,10 +41,6 @@ impl<'a> Plan for NoGC<'a> {
         default::bind_mutator(NoGCMutator::new(thread_id, &self.space))
     }
 
-    fn do_collection(&self) {
-        panic!("GC triggered in NoGC plan");
-    }
-
     fn will_never_move(&self, object: ObjectReference) -> bool {
         true
     }

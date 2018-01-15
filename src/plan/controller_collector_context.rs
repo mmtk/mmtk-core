@@ -48,7 +48,9 @@ impl<'a> ControllerCollectorContext<'a> {
             self.clear_request();
             println!("Doing collection");
 
-            selected_plan::PLAN.do_collection();
+            self.workers.trigger_cycle();
+
+            self.workers.wait_for_cycle();
 
             VMScheduling::resume_mutators(thread_id);
             println!("Finished!");
@@ -59,7 +61,7 @@ impl<'a> ControllerCollectorContext<'a> {
         // Required to "punch through" the Mutex. May invoke undefined behaviour. :(
         // NOTE: Strictly speaking we can remove this entire block while maintaining correctness.
         #[allow(mutable_transmutes)]
-            unsafe {
+        unsafe {
             let unsafe_handle = transmute::<&Self, &mut Self>(self).request_sync.get_mut().unwrap();
             if unsafe_handle.request_flag {
                 return;
