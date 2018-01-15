@@ -21,11 +21,11 @@ struct ParallelCollectorGroupSync {
 }
 
 impl<C: ParallelCollector> ParallelCollectorGroup<C> {
-    fn active_worker_count(&self) -> usize {
+    pub fn active_worker_count(&self) -> usize {
         self.contexts.len()
     }
 
-    fn init_group(&mut self, size: usize) {
+    pub fn init_group(&mut self, size: usize) {
         {
             let inner = self.sync.get_mut().unwrap();
             inner.trigger_count = 1;
@@ -43,14 +43,14 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         }
     }
 
-    fn trigger_cycle(&self) {
+    pub fn trigger_cycle(&self) {
         let mut inner = self.sync.lock().unwrap();
         inner.trigger_count += 1;
         inner.contexts_parked = 0;
         self.condvar.notify_all();
     }
 
-    fn abort_cycle(&self) {
+    pub fn abort_cycle(&self) {
         let mut inner = self.sync.lock().unwrap();
         if inner.contexts_parked < self.contexts.len() {
             inner.aborted = true;
@@ -58,18 +58,18 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
     }
 
     // TODO: Can we get away without this lock?
-    fn is_aborted(&self) -> bool {
+    pub fn is_aborted(&self) -> bool {
         self.sync.lock().unwrap().aborted
     }
 
-    fn wait_for_cycle(&self) {
+    pub fn wait_for_cycle(&self) {
         let mut inner = self.sync.lock().unwrap();
         while inner.contexts_parked < self.contexts.len() {
             inner = self.condvar.wait(inner).unwrap();
         }
     }
 
-    fn park(&self, context: &mut C) {
+    pub fn park(&self, context: &mut C) {
         // if (VM.VERIFY_ASSERTIONS) VM.assertions._assert(isMember(context));
         let mut inner = self.sync.lock().unwrap();
         context.increment_last_trigger_count();
@@ -87,7 +87,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
 
     // TODO: is_member?
 
-    fn rendezvous(&self) -> usize {
+    pub fn rendezvous(&self) -> usize {
         let mut inner = self.sync.lock().unwrap();
         let i = inner.current_rendezvous_counter;
         let me = inner.rendezvous_counter[i];
