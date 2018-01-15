@@ -54,9 +54,10 @@ impl<'a> Plan for SemiSpace<'a> {
     }
 
     fn gc_init(&self, heap_size: usize) {
-        default::gc_init(&self.copyspace0, heap_size / 2);
-        self.copyspace1.init(heap_size / 2);
-        self.versatile_space.init(heap_size);
+        // FIXME
+        default::gc_init(&self.copyspace0, heap_size / 3);
+        self.copyspace1.init(heap_size / 3);
+        self.versatile_space.init(heap_size / 3);
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
