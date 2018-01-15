@@ -81,13 +81,13 @@ impl<'a> ParallelCollector for SSCollector<'a> {
         unimplemented!()
     }
     fn parallel_worker_count(&self) -> usize {
-        unimplemented!();
+        self.group.unwrap().active_worker_count()
     }
     fn parallel_worker_ordinal(&self) -> usize {
         self.worker_ordinal
     }
     fn rendezvous(&self) -> usize {
-        unimplemented!();
+        self.group.unwrap().rendezvous()
     }
 
     fn get_last_trigger_count(&self) -> usize {
