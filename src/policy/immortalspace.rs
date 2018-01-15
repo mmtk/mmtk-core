@@ -8,9 +8,16 @@ use ::util::address::Address;
 
 use ::util::ObjectReference;
 
+use ::vm::ObjectModel;
+use ::vm::VMObjectModel;
+use ::plan::TransitiveClosure;
+
 pub struct ImmortalSpace {
     pr: Mutex<MonotonePageResource>,
 }
+
+const GC_MARK_BIT_MASK: i8 = 1;
+const MARK_STATE: i8 = 0;
 
 impl Space for ImmortalSpace {
     fn init(&self, heap_size: usize) {
@@ -31,5 +38,34 @@ impl ImmortalSpace {
         ImmortalSpace {
             pr: Mutex::new(MonotonePageResource::new()),
         }
+    }
+
+    fn test_and_mark(object: ObjectReference, value: i8) -> bool {
+        let mut old_value = VMObjectModel::prepare_available_bits(object);
+        let mut mark_bit = (old_value as i8) & GC_MARK_BIT_MASK;
+        if mark_bit == value {
+            return false;
+        }
+        while !VMObjectModel::attempt_available_bits(object,
+                                                     old_value,
+                                                     ((old_value as i8) ^ GC_MARK_BIT_MASK) as usize) {
+            old_value = VMObjectModel::prepare_available_bits(object);
+            mark_bit = (old_value as i8) & GC_MARK_BIT_MASK;
+            if mark_bit == value {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    pub fn trace_object<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+    ) -> ObjectReference {
+        if ImmortalSpace::test_and_mark(object, MARK_STATE) {
+            trace.process_edge(object.to_address());
+        }
+        return object;
     }
 }

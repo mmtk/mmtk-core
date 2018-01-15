@@ -3,9 +3,11 @@ use super::CollectorContext;
 use super::TraceLocal;
 
 pub trait ParallelCollector: CollectorContext + Sized {
+    type T: TraceLocal;
+
     fn park(&mut self);
     fn collect(&self);
-    fn get_current_trace<T: TraceLocal>(&self) -> T;
+    fn get_current_trace(&mut self) -> &mut Self::T;
     fn parallel_worker_count(&self) -> usize;
     fn parallel_worker_ordinal(&self) -> usize;
     fn rendezvous(&self) -> usize;

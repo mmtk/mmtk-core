@@ -35,18 +35,10 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn process_root_edge(&mut self, slot: Address, untraced: bool) {
-        let object: ObjectReference = if untraced {
-            unsafe { slot.load() }
-        } else {
-            unimplemented!()
-        };
+        let object: ObjectReference = unsafe { slot.load() };
         let new_object = self.trace_object(object);
         if self.overwrite_reference_during_trace() {
-            if untraced {
-                unsafe { slot.store(new_object) };
-            } else {
-                unimplemented!();
-            }
+            unsafe { slot.store(new_object) };
         }
     }
 
@@ -60,7 +52,10 @@ impl TraceLocal for SSTraceLocal {
         if PLAN.copyspace1.in_space(object) {
             return PLAN.copyspace1.trace_object(self, object, ss::ALLOC_SS);
         }
-        unimplemented!()
+        if PLAN.versatile_space.in_space(object){
+            return PLAN.versatile_space.trace_object(self, object);
+        }
+        panic!("No special case for space in trace_object");
     }
 
     fn complete_trace(&mut self) {
