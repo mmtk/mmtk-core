@@ -46,10 +46,11 @@ impl<'a> CollectorContext for NoGCCollector<'a> {
 }
 
 impl<'a> ParallelCollector for NoGCCollector<'a> {
+    type T = NoGCTraceLocal;
     fn collect(&self) {
         unimplemented!();
     }
-    fn get_current_trace<T: TraceLocal>(&self) -> T {
+    fn get_current_trace(&mut self) -> &mut NoGCTraceLocal {
         unimplemented!()
     }
     fn parallel_worker_count(&self) -> usize {

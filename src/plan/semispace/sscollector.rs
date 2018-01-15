@@ -74,11 +74,13 @@ impl<'a> CollectorContext for SSCollector<'a> {
 }
 
 impl<'a> ParallelCollector for SSCollector<'a> {
+    type T = SSTraceLocal;
+
     fn collect(&self) {
         unimplemented!();
     }
-    fn get_current_trace<T: TraceLocal>(&self) -> T {
-        unimplemented!()
+    fn get_current_trace(&mut self) -> &mut SSTraceLocal {
+        &mut self.trace
     }
     fn parallel_worker_count(&self) -> usize {
         self.group.unwrap().active_worker_count()
