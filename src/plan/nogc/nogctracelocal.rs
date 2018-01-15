@@ -39,3 +39,9 @@ impl TraceLocal for NoGCTraceLocal {
         unimplemented!()
     }
 }
+
+impl NoGCTraceLocal {
+    pub fn new() -> Self {
+        Self {}
+    }
+}

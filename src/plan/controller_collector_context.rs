@@ -1,3 +1,5 @@
+use super::ParallelCollectorGroup;
+
 use std::sync::{Mutex, Condvar};
 use ::vm::Scheduling;
 use ::vm::VMScheduling;
@@ -14,12 +16,14 @@ struct RequestSync {
     last_request_count: isize,
 }
 
-pub struct ControllerCollectorContext {
+pub struct ControllerCollectorContext<'a> {
     request_sync: Mutex<RequestSync>,
     request_condvar: Condvar,
+
+    workers: ParallelCollectorGroup<selected_plan::SelectedCollector<'a>>,
 }
 
-impl ControllerCollectorContext {
+impl<'a> ControllerCollectorContext<'a> {
     pub fn new() -> Self {
         ControllerCollectorContext {
             request_sync: Mutex::new(RequestSync {
@@ -29,6 +33,8 @@ impl ControllerCollectorContext {
                 last_request_count: -1,
             }),
             request_condvar: Condvar::new(),
+
+            workers: ParallelCollectorGroup::<selected_plan::SelectedCollector>::new(),
         }
     }
 

@@ -6,7 +6,7 @@ use ::vm::Scheduling;
 use ::vm::VMScheduling;
 
 pub struct ParallelCollectorGroup<C: ParallelCollector> {
-    name: String,
+    //name: String,
     contexts: Vec<C>,
     sync: Mutex<ParallelCollectorGroupSync>,
     condvar: Condvar,
@@ -21,6 +21,20 @@ struct ParallelCollectorGroupSync {
 }
 
 impl<C: ParallelCollector> ParallelCollectorGroup<C> {
+    pub fn new() -> Self {
+        Self {
+            contexts: Vec::<C>::new(),
+            sync: Mutex::new(ParallelCollectorGroupSync {
+                trigger_count: 0,
+                contexts_parked: 0,
+                aborted: false,
+                rendezvous_counter: [0, 0],
+                current_rendezvous_counter: 0,
+            }),
+            condvar: Condvar::new(),
+        }
+    }
+
     pub fn active_worker_count(&self) -> usize {
         self.contexts.len()
     }

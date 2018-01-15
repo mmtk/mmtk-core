@@ -7,6 +7,7 @@ use ::policy::space::Space;
 
 use super::SSMutator;
 use super::SSTraceLocal;
+use super::SSCollector;
 
 use ::plan::controller_collector_context::ControllerCollectorContext;
 
@@ -20,24 +21,25 @@ use libc::c_void;
 
 pub type SelectedMutator<'a> = SSMutator<'a>;
 pub type SelectedTraceLocal = SSTraceLocal;
-pub type SelectedPlan = SemiSpace;
+pub type SelectedPlan<'a> = SemiSpace<'a>;
+pub type SelectedCollector<'a> = SSCollector<'a>;
 
 pub const ALLOC_SS: Allocator = Allocator::Default;
 pub const SCAN_BOOT_IMAGE: bool = true;
 
 lazy_static! {
-    pub static ref PLAN: SemiSpace = SemiSpace::new();
+    pub static ref PLAN: SemiSpace<'static> = SemiSpace::new();
 }
 
-pub struct SemiSpace {
-    pub control_collector_context: ControllerCollectorContext,
+pub struct SemiSpace<'a> {
+    pub control_collector_context: ControllerCollectorContext<'a>,
     hi: bool,
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
     ss_trace: Trace,
 }
 
-impl Plan for SemiSpace {
+impl<'a> Plan for SemiSpace<'a> {
     fn new() -> Self {
         SemiSpace {
             control_collector_context: ControllerCollectorContext::new(),
@@ -71,7 +73,7 @@ impl Plan for SemiSpace {
     }
 }
 
-impl SemiSpace {
+impl<'a> SemiSpace<'a> {
     pub fn tospace(&self) -> &CopySpace {
         if self.hi {
             &self.copyspace1

@@ -8,22 +8,24 @@ use ::util::ObjectReference;
 use libc::c_void;
 
 lazy_static! {
-    pub static ref PLAN: NoGC = NoGC::new();
+    pub static ref PLAN: NoGC<'static> = NoGC::new();
 }
 
 use super::NoGCTraceLocal;
 use super::NoGCMutator;
+use super::NoGCCollector;
 
 pub type SelectedMutator<'a> = NoGCMutator<'a>;
 pub type SelectedTraceLocal = NoGCTraceLocal;
-pub type SelectedPlan = NoGC;
+pub type SelectedPlan<'a> = NoGC<'a>;
+pub type SelectedCollector<'a> = NoGCCollector<'a>;
 
-pub struct NoGC {
-    pub control_collector_context: ControllerCollectorContext,
+pub struct NoGC<'a> {
+    pub control_collector_context: ControllerCollectorContext<'a>,
     space: ImmortalSpace,
 }
 
-impl Plan for NoGC {
+impl<'a> Plan for NoGC<'a> {
     fn new() -> Self {
         NoGC {
             control_collector_context: ControllerCollectorContext::new(),
