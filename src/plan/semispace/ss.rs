@@ -38,7 +38,7 @@ pub struct SemiSpace<'a> {
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
     ss_trace: Trace,
-    versatile_space: ImmortalSpace,
+    pub versatile_space: ImmortalSpace,
 }
 
 impl<'a> Plan for SemiSpace<'a> {
