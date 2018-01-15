@@ -1,8 +1,5 @@
 use super::super::plan::default;
 
-use std::thread::sleep;
-use std::time;
-
 use ::policy::space::Space;
 
 use super::SSMutator;

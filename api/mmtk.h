@@ -41,6 +41,8 @@ extern void jikesrvm_gc_init(void* jtoc, size_t heap_size);
 
 extern void start_control_collector(size_t thread_id);
 
+extern void start_worker(size_t thread_id, void* worker);
+
 #ifdef __cplusplus
 }
 #endif

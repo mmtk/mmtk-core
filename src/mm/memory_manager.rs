@@ -1,10 +1,10 @@
 use std::ptr::null_mut;
 use libc::c_void;
 
-use plan::plan::Plan;
-use ::plan::mutator_context::MutatorContext;
-
-use ::plan::tracelocal::TraceLocal;
+use plan::Plan;
+use ::plan::MutatorContext;
+use ::plan::TraceLocal;
+use ::plan::CollectorContext;
 
 #[cfg(feature = "jikesrvm")]
 use ::vm::jikesrvm::JTOC_BASE;
@@ -116,3 +116,9 @@ pub extern fn process_interior_edge(trace_local: *mut c_void, target: *mut c_voi
 
 #[no_mangle]
 pub extern fn broken_code() {}
+
+#[no_mangle]
+pub extern fn start_worker(thread_id: usize, worker: *mut c_void) {
+    let worker_instance = unsafe { &mut *(worker as *mut selected_plan::SelectedCollector) };
+    worker_instance.run(thread_id);
+}

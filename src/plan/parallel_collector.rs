@@ -3,6 +3,7 @@ use super::CollectorContext;
 use super::TraceLocal;
 
 pub trait ParallelCollector: CollectorContext + Sized {
+    fn park(&mut self);
     fn collect(&self);
     fn get_current_trace<T: TraceLocal>(&self) -> T;
     fn parallel_worker_count(&self) -> usize;

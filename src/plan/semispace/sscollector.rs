@@ -49,8 +49,12 @@ impl<'a> CollectorContext for SSCollector<'a> {
         self.ss.alloc(bytes, align, offset)
     }
 
-    fn run(&self) {
-        self.collect();
+    fn run(&mut self, thread_id: usize) {
+        self.id = thread_id;
+        loop {
+            self.park();
+            self.collect();
+        }
     }
 
     fn collection_phase(&mut self, phase: Phase, primary: bool) {
@@ -74,6 +78,9 @@ impl<'a> CollectorContext for SSCollector<'a> {
 }
 
 impl<'a> ParallelCollector for SSCollector<'a> {
+    fn park(&mut self) {
+        self.group.unwrap().park(self);
+    }
     fn collect(&self) {
         unimplemented!();
     }

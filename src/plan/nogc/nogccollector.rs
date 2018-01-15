@@ -36,7 +36,8 @@ impl<'a> CollectorContext for NoGCCollector<'a> {
         unimplemented!();
     }
 
-    fn run(&self) {
+    fn run(&mut self, thread_id: usize) {
+        self.park();
         self.collect();
     }
 
@@ -46,6 +47,9 @@ impl<'a> CollectorContext for NoGCCollector<'a> {
 }
 
 impl<'a> ParallelCollector for NoGCCollector<'a> {
+    fn park(&mut self) {
+        self.group.unwrap().park(self);
+    }
     fn collect(&self) {
         unimplemented!();
     }
