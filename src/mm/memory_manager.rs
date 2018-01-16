@@ -122,3 +122,15 @@ pub extern fn start_worker(thread_id: usize, worker: *mut c_void) {
     let worker_instance = unsafe { &mut *(worker as *mut selected_plan::SelectedCollector) };
     worker_instance.run(thread_id);
 }
+
+#[no_mangle]
+#[cfg(feature = "jikesrvm")]
+pub extern fn enable_collection() {
+    unimplemented!();
+}
+
+#[no_mangle]
+#[cfg(not(feature = "jikesrvm"))]
+pub extern fn enable_collection() {
+    panic!("Cannot call enable_collection when not building for JikesRVM");
+}
