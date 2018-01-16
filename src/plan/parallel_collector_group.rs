@@ -39,7 +39,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         self.contexts.len()
     }
 
-    pub fn init_group(&mut self, size: usize) {
+    pub fn init_group(&mut self, thread_id: usize, size: usize) {
         {
             let inner = self.sync.get_mut().unwrap();
             inner.trigger_count = 1;
@@ -53,7 +53,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
             let self_ptr = self as *const Self;
             self.contexts[i].set_group(self_ptr);
             self.contexts[i].set_worker_ordinal(i);
-            VMScheduling::spawn_worker_thread( &mut self.contexts[i] as *mut C);
+            VMScheduling::spawn_worker_thread( thread_id, &mut self.contexts[i] as *mut C);
         }
     }
 

@@ -129,7 +129,7 @@ pub extern fn start_worker(thread_id: usize, worker: *mut c_void) {
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
-pub extern fn enable_collection(size: usize) {
+pub extern fn enable_collection(thread_id: usize, size: usize) {
     unsafe {
         // XXX: We break thread-safety during initialization, since we have no
         //      other threads with access prior to being launched by `init_group`
@@ -137,9 +137,9 @@ pub extern fn enable_collection(size: usize) {
         #[allow(mutable_transmutes)]
         transmute::<&ParallelCollectorGroup<SelectedCollector>,
             &mut ParallelCollectorGroup<SelectedCollector>>
-                (&selected_plan::PLAN.control_collector_context.workers).init_group(size);
+                (&selected_plan::PLAN.control_collector_context.workers).init_group(thread_id, size);
     }
-    VMScheduling::spawn_worker_thread::<SelectedCollector>(null_mut()); // spawn controller thread
+    VMScheduling::spawn_worker_thread::<SelectedCollector>(thread_id, null_mut()); // spawn controller thread
 }
 
 #[no_mangle]

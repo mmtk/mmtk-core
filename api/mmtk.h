@@ -39,7 +39,7 @@ extern void process_interior_edge(MMTk_TraceLocal trace_local, void* target,
  */
 extern void jikesrvm_gc_init(void* jtoc, size_t heap_size);
 
-extern void enable_collection(size_t size);
+extern void enable_collection(size_t thread_id, size_t size);
 
 extern void start_control_collector(size_t thread_id);
 
