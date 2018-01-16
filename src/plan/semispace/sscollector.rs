@@ -79,7 +79,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
 
 impl<'a> ParallelCollector for SSCollector<'a> {
     type T = SSTraceLocal;
-    
+
     fn park(&mut self) {
         self.group.unwrap().park(self);
     }

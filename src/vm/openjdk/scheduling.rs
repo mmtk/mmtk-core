@@ -16,7 +16,7 @@ impl Scheduling for VMScheduling {
         unimplemented!();
     }
 
-    fn spawn_collector_thread<T: ParallelCollector>(ctx: &mut T) {
+    fn spawn_worker_thread<T: ParallelCollector>(thread_id: usize, ctx: &mut T) {
         unimplemented!();
     }
 }

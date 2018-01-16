@@ -27,7 +27,7 @@ impl Scheduling for VMScheduling {
     }
 
     #[inline(always)]
-    fn spawn_collector_thread<T: ParallelCollector>(ctx: &mut T) {
-        unimplemented!();
+    fn spawn_worker_thread<T: ParallelCollector>(thread_id: usize, ctx: &mut T) {
+        jtoc_call!(SPAWN_COLLECTOR_THREAD_METHOD_JTOC_OFFSET, thread_id, ctx as *mut T);
     }
 }
