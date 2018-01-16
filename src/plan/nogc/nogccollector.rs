@@ -53,7 +53,7 @@ impl<'a> ParallelCollector for NoGCCollector<'a> {
         self.group.unwrap().park(self);
     }
     fn collect(&self) {
-        unimplemented!();
+        panic!("GC triggered in NoGC plan");
     }
     fn get_current_trace(&mut self) -> &mut NoGCTraceLocal {
         unimplemented!()
