@@ -53,7 +53,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
             let self_ptr = self as *const Self;
             self.contexts[i].set_group(self_ptr);
             self.contexts[i].set_worker_ordinal(i);
-            VMScheduling::spawn_worker_thread(1, &mut self.contexts[i]); // FIXME
+            VMScheduling::spawn_worker_thread( &mut self.contexts[i] as *mut C);
         }
     }
 

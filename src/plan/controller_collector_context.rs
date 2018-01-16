@@ -20,7 +20,7 @@ pub struct ControllerCollectorContext<'a> {
     request_sync: Mutex<RequestSync>,
     request_condvar: Condvar,
 
-    workers: ParallelCollectorGroup<selected_plan::SelectedCollector<'a>>,
+    pub workers: ParallelCollectorGroup<selected_plan::SelectedCollector<'a>>,
 }
 
 impl<'a> ControllerCollectorContext<'a> {

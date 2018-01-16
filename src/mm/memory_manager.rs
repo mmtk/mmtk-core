@@ -1,10 +1,14 @@
 use std::ptr::null_mut;
+use std::mem::transmute;
 use libc::c_void;
 
 use plan::Plan;
 use ::plan::MutatorContext;
 use ::plan::TraceLocal;
 use ::plan::CollectorContext;
+use ::plan::ParallelCollectorGroup;
+
+use ::vm::{Scheduling, VMScheduling};
 
 #[cfg(feature = "jikesrvm")]
 use ::vm::jikesrvm::JTOC_BASE;
@@ -12,7 +16,7 @@ use ::vm::jikesrvm::JTOC_BASE;
 use ::util::{Address, ObjectReference};
 
 use ::plan::selected_plan;
-use self::selected_plan::{SelectedPlan, SelectedMutator};
+use self::selected_plan::{SelectedPlan, SelectedMutator, SelectedCollector};
 
 use ::plan::Allocator;
 
@@ -125,12 +129,21 @@ pub extern fn start_worker(thread_id: usize, worker: *mut c_void) {
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
-pub extern fn enable_collection() {
-    unimplemented!();
+pub extern fn enable_collection(size: usize) {
+    unsafe {
+        // XXX: We break thread-safety during initialization, since we have no
+        //      other threads with access prior to being launched by `init_group`
+        //      itself. Again, the fact that this is technically UB is worrying.
+        #[allow(mutable_transmutes)]
+        transmute::<&ParallelCollectorGroup<SelectedCollector>,
+            &mut ParallelCollectorGroup<SelectedCollector>>
+                (&selected_plan::PLAN.control_collector_context.workers).init_group(size);
+    }
+    VMScheduling::spawn_worker_thread::<SelectedCollector>(null_mut()); // spawn controller thread
 }
 
 #[no_mangle]
 #[cfg(not(feature = "jikesrvm"))]
-pub extern fn enable_collection() {
+pub extern fn enable_collection(size: usize) {
     panic!("Cannot call enable_collection when not building for JikesRVM");
 }
