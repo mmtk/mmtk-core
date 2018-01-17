@@ -56,7 +56,7 @@ impl<'a> ParallelCollector for NoGCCollector<'a> {
         panic!("GC triggered in NoGC plan");
     }
     fn get_current_trace(&mut self) -> &mut NoGCTraceLocal {
-        unimplemented!()
+        &mut self.trace
     }
     fn parallel_worker_count(&self) -> usize {
         self.group.unwrap().active_worker_count()
