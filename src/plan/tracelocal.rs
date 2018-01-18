@@ -11,4 +11,9 @@ pub trait TraceLocal: TransitiveClosure {
     fn overwrite_reference_during_trace(&self) -> bool {
         true
     }
+
+    fn report_delayed_root_edge(&mut self, slot: Address);
+    fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool {
+        return false;
+    }
 }

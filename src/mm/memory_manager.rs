@@ -67,17 +67,17 @@ pub extern fn bind_mutator(thread_id: usize) -> *mut c_void {
 }
 
 #[no_mangle]
-pub fn alloc(mutator: *mut c_void, size: usize,
+pub unsafe fn alloc(mutator: *mut c_void, size: usize,
              align: usize, offset: isize, allocator: Allocator) -> *mut c_void {
-    let local = unsafe { &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT) };
+    let local = &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT);
     local.alloc(size, align, offset, allocator).as_usize() as *mut c_void
 }
 
 #[no_mangle]
 #[inline(never)]
-pub fn alloc_slow(mutator: *mut c_void, size: usize,
+pub unsafe fn alloc_slow(mutator: *mut c_void, size: usize,
                   align: usize, offset: isize, allocator: Allocator) -> *mut c_void {
-    let local = unsafe { &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT) };
+    let local = &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT);
     local.alloc_slow(size, align, offset, allocator).as_usize() as *mut c_void
 }
 
@@ -89,7 +89,7 @@ pub extern fn alloc_large(_mutator: *mut c_void, _size: usize,
 }
 
 #[no_mangle]
-pub extern fn mmtk_malloc(size: usize) -> *mut c_void {
+pub unsafe extern fn mmtk_malloc(size: usize) -> *mut c_void {
     alloc(null_mut(), size, 1, 0, Allocator::Default)
 }
 
@@ -102,20 +102,22 @@ pub extern fn will_never_move(object: ObjectReference) -> bool {
 }
 
 #[no_mangle]
-pub extern fn report_delayed_root_edge(trace_local: *mut c_void, addr: *mut c_void) {
-    let local = unsafe { &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT) };
-    local.process_root_edge(unsafe { Address::from_usize(addr as usize) }, true);
-    unimplemented!();
+pub unsafe extern fn report_delayed_root_edge(trace_local: *mut c_void, addr: *mut c_void) {
+    let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
+    local.report_delayed_root_edge(Address::from_usize(addr as usize));
 }
 
 #[no_mangle]
-pub extern fn will_not_move_in_current_collection(trace_local: *mut c_void, obj: *mut c_void) -> bool {
-    unimplemented!();
+pub unsafe extern fn will_not_move_in_current_collection(trace_local: *mut c_void, obj: *mut c_void) -> bool {
+    let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
+    local.will_not_move_in_current_collection(Address::from_usize(obj as usize).to_object_reference())
 }
 
 #[no_mangle]
-pub extern fn process_interior_edge(trace_local: *mut c_void, target: *mut c_void, slot: *mut c_void, root: bool) {
-    unimplemented!();
+pub unsafe extern fn process_interior_edge(trace_local: *mut c_void, target: *mut c_void, slot: *mut c_void, root: bool) {
+    let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
+    local.process_interior_edge(Address::from_usize(target as usize).to_object_reference(),
+                                Address::from_usize(slot as usize), root);
 }
 
 #[no_mangle]

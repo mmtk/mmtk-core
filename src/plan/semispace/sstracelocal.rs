@@ -85,6 +85,9 @@ impl TraceLocal for SSTraceLocal {
             unsafe { slot.store(new_target.to_address() + offset) };
         }
     }
+    fn report_delayed_root_edge(&mut self, slot: Address) {
+        self.root_locations.push_front(slot);
+    }
 }
 
 impl SSTraceLocal {
