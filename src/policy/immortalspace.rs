@@ -8,9 +8,9 @@ use ::util::address::Address;
 
 use ::util::ObjectReference;
 
-use ::vm::ObjectModel;
-use ::vm::VMObjectModel;
+use ::vm::{ObjectModel, VMObjectModel};
 use ::plan::TransitiveClosure;
+use ::util::header_byte;
 
 pub struct ImmortalSpace {
     pr: Mutex<MonotonePageResource>,
@@ -67,5 +67,14 @@ impl ImmortalSpace {
             trace.process_edge(object.to_address());
         }
         return object;
+    }
+
+    pub fn initialize_header(object: ObjectReference) {
+        let old_value = VMObjectModel::read_available_byte(object);
+        let mut new_value = (old_value & GC_MARK_BIT_MASK as u8) | MARK_STATE as u8;
+        if header_byte::NEEDS_UNLOGGED_BIT {
+            new_value = new_value | header_byte::UNLOGGED_BIT;
+        }
+        VMObjectModel::write_available_byte(object, new_value);
     }
 }
