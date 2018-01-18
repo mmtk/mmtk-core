@@ -38,6 +38,9 @@ impl TraceLocal for NoGCTraceLocal {
     fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, root: bool) {
         unimplemented!()
     }
+    fn report_delayed_root_edge(&mut self, slot: Address) {
+        unimplemented!()
+    }
 }
 
 impl NoGCTraceLocal {
