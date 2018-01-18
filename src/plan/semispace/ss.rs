@@ -18,11 +18,7 @@ use ::plan::trace::Trace;
 use ::util::ObjectReference;
 use libc::c_void;
 
-pub type SelectedMutator<'a> = SSMutator<'a>;
-pub type SelectedTraceLocal = SSTraceLocal;
 pub type SelectedPlan<'a> = SemiSpace<'a>;
-pub type SelectedCollector<'a> = SSCollector<'a>;
-pub type SelectedConstraints = SSConstraints;
 
 pub const ALLOC_SS: Allocator = Allocator::Default;
 pub const SCAN_BOOT_IMAGE: bool = true;
@@ -41,6 +37,11 @@ pub struct SemiSpace<'a> {
 }
 
 impl<'a> Plan for SemiSpace<'a> {
+    type MutatorT = SSMutator<'a>;
+    type TraceLocalT = SSTraceLocal;
+    type CollectorT = SSCollector<'a>;
+    type ConstraintsT = SSConstraints;
+
     fn new() -> Self {
         SemiSpace {
             control_collector_context: ControllerCollectorContext::new(),
@@ -60,7 +61,7 @@ impl<'a> Plan for SemiSpace<'a> {
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
-        default::bind_mutator(SSMutator::new(thread_id, self.fromspace(), &self.versatile_space))
+        default::bind_mutator(Self::MutatorT::new(thread_id, self.fromspace(), &self.versatile_space))
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {

@@ -16,11 +16,7 @@ use super::NoGCMutator;
 use super::NoGCCollector;
 use super::NoGCConstraints;
 
-pub type SelectedMutator<'a> = NoGCMutator<'a>;
-pub type SelectedTraceLocal = NoGCTraceLocal;
 pub type SelectedPlan<'a> = NoGC<'a>;
-pub type SelectedCollector<'a> = NoGCCollector<'a>;
-pub type SelectedConstraints = NoGCConstraints;
 
 pub struct NoGC<'a> {
     pub control_collector_context: ControllerCollectorContext<'a>,
@@ -28,6 +24,11 @@ pub struct NoGC<'a> {
 }
 
 impl<'a> Plan for NoGC<'a> {
+    type MutatorT = NoGCMutator<'a>;
+    type TraceLocalT = NoGCTraceLocal;
+    type CollectorT = NoGCCollector<'a>;
+    type ConstraintsT = NoGCConstraints;
+
     fn new() -> Self {
         NoGC {
             control_collector_context: ControllerCollectorContext::new(),

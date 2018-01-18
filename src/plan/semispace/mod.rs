@@ -12,7 +12,3 @@ pub use self::sscollector::SSCollector;
 pub use self::ssconstraints::SSConstraints;
 
 pub use self::ss::SelectedPlan;
-pub use self::ss::SelectedMutator;
-pub use self::ss::SelectedTraceLocal;
-pub use self::ss::SelectedCollector;
-pub use self::ss::SelectedConstraints;

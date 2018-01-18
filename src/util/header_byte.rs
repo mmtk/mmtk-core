@@ -1,1 +1,1 @@
-pub const TOTAL_BITSS: usize = 8;
+pub const TOTAL_BITS: usize = 8;

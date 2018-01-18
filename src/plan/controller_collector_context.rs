@@ -7,7 +7,7 @@ use ::vm::VMScheduling;
 use std::mem::transmute;
 
 use ::plan::plan::Plan;
-use ::plan::selected_plan;
+use ::plan::selected_plan::SelectedPlan;
 
 struct RequestSync {
     thread_id: usize,
@@ -20,7 +20,7 @@ pub struct ControllerCollectorContext<'a> {
     request_sync: Mutex<RequestSync>,
     request_condvar: Condvar,
 
-    pub workers: ParallelCollectorGroup<selected_plan::SelectedCollector<'a>>,
+    pub workers: ParallelCollectorGroup<<SelectedPlan<'a> as Plan>::CollectorT>,
 }
 
 impl<'a> ControllerCollectorContext<'a> {
@@ -34,7 +34,7 @@ impl<'a> ControllerCollectorContext<'a> {
             }),
             request_condvar: Condvar::new(),
 
-            workers: ParallelCollectorGroup::<selected_plan::SelectedCollector>::new(),
+            workers: ParallelCollectorGroup::<<SelectedPlan<'a> as Plan>::CollectorT>::new(),
         }
     }
 

@@ -16,7 +16,7 @@ use ::vm::jikesrvm::JTOC_BASE;
 use ::util::{Address, ObjectReference};
 
 use ::plan::selected_plan;
-use self::selected_plan::{SelectedPlan, SelectedMutator, SelectedCollector};
+use self::selected_plan::SelectedPlan;
 
 use ::plan::Allocator;
 
@@ -69,7 +69,7 @@ pub extern fn bind_mutator(thread_id: usize) -> *mut c_void {
 #[no_mangle]
 pub fn alloc(mutator: *mut c_void, size: usize,
              align: usize, offset: isize, allocator: Allocator) -> *mut c_void {
-    let local = unsafe { &mut *(mutator as *mut SelectedMutator) };
+    let local = unsafe { &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT) };
     local.alloc(size, align, offset, allocator).as_usize() as *mut c_void
 }
 
@@ -77,7 +77,7 @@ pub fn alloc(mutator: *mut c_void, size: usize,
 #[inline(never)]
 pub fn alloc_slow(mutator: *mut c_void, size: usize,
                   align: usize, offset: isize, allocator: Allocator) -> *mut c_void {
-    let local = unsafe { &mut *(mutator as *mut SelectedMutator) };
+    let local = unsafe { &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT) };
     local.alloc_slow(size, align, offset, allocator).as_usize() as *mut c_void
 }
 
@@ -103,7 +103,7 @@ pub extern fn will_never_move(object: ObjectReference) -> bool {
 
 #[no_mangle]
 pub extern fn report_delayed_root_edge(trace_local: *mut c_void, addr: *mut c_void) {
-    let local = unsafe { &mut *(trace_local as *mut selected_plan::SelectedTraceLocal) };
+    let local = unsafe { &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT) };
     local.process_root_edge(unsafe { Address::from_usize(addr as usize) }, true);
     unimplemented!();
 }
@@ -123,7 +123,7 @@ pub extern fn broken_code() {}
 
 #[no_mangle]
 pub extern fn start_worker(thread_id: usize, worker: *mut c_void) {
-    let worker_instance = unsafe { &mut *(worker as *mut selected_plan::SelectedCollector) };
+    let worker_instance = unsafe { &mut *(worker as *mut <SelectedPlan as Plan>::CollectorT) };
     worker_instance.run(thread_id);
 }
 
@@ -135,11 +135,11 @@ pub extern fn enable_collection(thread_id: usize, size: usize) {
         //      other threads with access prior to being launched by `init_group`
         //      itself. Again, the fact that this is technically UB is worrying.
         #[allow(mutable_transmutes)]
-        transmute::<&ParallelCollectorGroup<SelectedCollector>,
-            &mut ParallelCollectorGroup<SelectedCollector>>
+        transmute::<&ParallelCollectorGroup<SelectedPlan::CollectorT>,
+            &mut ParallelCollectorGroup<SelectedPlan::CollectorT>>
                 (&selected_plan::PLAN.control_collector_context.workers).init_group(thread_id, size);
     }
-    VMScheduling::spawn_worker_thread::<SelectedCollector>(thread_id, null_mut()); // spawn controller thread
+    VMScheduling::spawn_worker_thread::<SelectedPlan::CollectorT>(thread_id, null_mut()); // spawn controller thread
 }
 
 #[no_mangle]

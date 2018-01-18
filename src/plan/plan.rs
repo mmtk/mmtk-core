@@ -2,6 +2,11 @@ use libc::c_void;
 use ::util::ObjectReference;
 
 pub trait Plan {
+    type MutatorT;
+    type TraceLocalT;
+    type CollectorT;
+    type ConstraintsT;
+
     fn new() -> Self;
     fn gc_init(&self, heap_size: usize);
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void;
