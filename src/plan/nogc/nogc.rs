@@ -14,11 +14,13 @@ lazy_static! {
 use super::NoGCTraceLocal;
 use super::NoGCMutator;
 use super::NoGCCollector;
+use super::NoGCConstraints;
 
 pub type SelectedMutator<'a> = NoGCMutator<'a>;
 pub type SelectedTraceLocal = NoGCTraceLocal;
 pub type SelectedPlan<'a> = NoGC<'a>;
 pub type SelectedCollector<'a> = NoGCCollector<'a>;
+pub type SelectedConstraints = NoGCConstraints;
 
 pub struct NoGC<'a> {
     pub control_collector_context: ControllerCollectorContext<'a>,

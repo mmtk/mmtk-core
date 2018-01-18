@@ -5,6 +5,7 @@ use ::policy::space::Space;
 use super::SSMutator;
 use super::SSTraceLocal;
 use super::SSCollector;
+use super::SSConstraints;
 
 use ::plan::controller_collector_context::ControllerCollectorContext;
 
@@ -21,6 +22,7 @@ pub type SelectedMutator<'a> = SSMutator<'a>;
 pub type SelectedTraceLocal = SSTraceLocal;
 pub type SelectedPlan<'a> = SemiSpace<'a>;
 pub type SelectedCollector<'a> = SSCollector<'a>;
+pub type SelectedConstraints = SSConstraints;
 
 pub const ALLOC_SS: Allocator = Allocator::Default;
 pub const SCAN_BOOT_IMAGE: bool = true;

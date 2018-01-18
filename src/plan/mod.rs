@@ -7,6 +7,7 @@ mod trace;
 pub mod mutator_context;
 pub mod collector_context;
 pub mod parallel_collector;
+pub mod plan_constraints;
 mod parallel_collector_group;
 
 pub use self::plan::Plan;
