@@ -14,7 +14,6 @@ lazy_static! {
 use super::NoGCTraceLocal;
 use super::NoGCMutator;
 use super::NoGCCollector;
-use super::NoGCConstraints;
 
 pub type SelectedPlan<'a> = NoGC<'a>;
 
@@ -27,7 +26,6 @@ impl<'a> Plan for NoGC<'a> {
     type MutatorT = NoGCMutator<'a>;
     type TraceLocalT = NoGCTraceLocal;
     type CollectorT = NoGCCollector<'a>;
-    type ConstraintsT = NoGCConstraints;
 
     fn new() -> Self {
         NoGC {

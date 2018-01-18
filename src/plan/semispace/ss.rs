@@ -5,7 +5,6 @@ use ::policy::space::Space;
 use super::SSMutator;
 use super::SSTraceLocal;
 use super::SSCollector;
-use super::SSConstraints;
 
 use ::plan::controller_collector_context::ControllerCollectorContext;
 
@@ -40,7 +39,6 @@ impl<'a> Plan for SemiSpace<'a> {
     type MutatorT = SSMutator<'a>;
     type TraceLocalT = SSTraceLocal;
     type CollectorT = SSCollector<'a>;
-    type ConstraintsT = SSConstraints;
 
     fn new() -> Self {
         SemiSpace {

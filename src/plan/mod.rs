@@ -19,7 +19,6 @@ pub use self::plan::Allocator;
 pub use self::tracelocal::TraceLocal;
 pub use self::parallel_collector::ParallelCollector;
 pub use self::parallel_collector_group::ParallelCollectorGroup;
-pub use self::plan_constraints::PlanConstraints;
 
 #[cfg(feature = "nogc")]
 pub mod nogc;
@@ -32,3 +31,5 @@ pub mod semispace;
 
 #[cfg(feature = "semispace")]
 pub use self::semispace as selected_plan;
+
+pub use self::selected_plan::SelectedConstraints;

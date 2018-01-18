@@ -1,21 +1,6 @@
-use ::plan::plan_constraints::PlanConstraints;
+pub use ::plan::plan_constraints::NEEDS_LOG_BIT_IN_HEADER;
 
-pub struct SSConstraints {}
-
-impl PlanConstraints for SSConstraints {
-    fn moves_objects() -> bool {
-        true
-    }
-
-    fn gc_header_bits() -> usize {
-        2
-    }
-
-    fn gc_header_words() -> usize {
-        0
-    }
-
-    fn num_specialized_scans() -> usize {
-        1
-    }
-}
+pub const MOVES_OBJECTS: bool = true;
+pub const GC_HEADER_BITS: usize = 2;
+pub const GC_HEADER_WORDS: usize = 0;
+pub const NUM_SPECIALIZED_SCANS: usize = 1;

@@ -1,21 +1,4 @@
-use ::plan::plan_constraints::PlanConstraints;
+pub use ::plan::plan_constraints::*;
 
-pub struct NoGCConstraints {}
-
-impl PlanConstraints for NoGCConstraints {
-    fn moves_objects() -> bool {
-        false
-    }
-
-    fn gc_header_bits() -> usize {
-        0
-    }
-
-    fn gc_header_words() -> usize {
-        0
-    }
-
-    fn num_specialized_scans() -> usize {
-        0
-    }
-}
+pub const GC_HEADER_BITS: usize = 0;
+pub const GC_HEADER_WORDS: usize = 0;
