@@ -135,11 +135,11 @@ pub extern fn enable_collection(thread_id: usize, size: usize) {
         //      other threads with access prior to being launched by `init_group`
         //      itself. Again, the fact that this is technically UB is worrying.
         #[allow(mutable_transmutes)]
-        transmute::<&ParallelCollectorGroup<SelectedPlan::CollectorT>,
-            &mut ParallelCollectorGroup<SelectedPlan::CollectorT>>
+        transmute::<&ParallelCollectorGroup<<SelectedPlan as Plan>::CollectorT>,
+            &mut ParallelCollectorGroup<<SelectedPlan as Plan>::CollectorT>>
                 (&selected_plan::PLAN.control_collector_context.workers).init_group(thread_id, size);
     }
-    VMScheduling::spawn_worker_thread::<SelectedPlan::CollectorT>(thread_id, null_mut()); // spawn controller thread
+    VMScheduling::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(thread_id, null_mut()); // spawn controller thread
 }
 
 #[no_mangle]
