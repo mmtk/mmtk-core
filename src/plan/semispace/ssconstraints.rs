@@ -1,4 +1,4 @@
-pub use ::plan::plan_constraints::NEEDS_LOG_BIT_IN_HEADER;
+pub use ::plan::plan_constraints::{NEEDS_LOG_BIT_IN_HEADER, NEEDS_LOG_BIT_IN_HEADER_NUM};
 
 pub const MOVES_OBJECTS: bool = true;
 pub const GC_HEADER_BITS: usize = 2;
