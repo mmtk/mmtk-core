@@ -1,11 +1,12 @@
 use libc::c_void;
 use ::util::ObjectReference;
+use ::plan::{MutatorContext, CollectorContext, TraceLocal, PlanConstraints};
 
 pub trait Plan {
-    type MutatorT;
-    type TraceLocalT;
-    type CollectorT;
-    type ConstraintsT;
+    type MutatorT: MutatorContext;
+    type TraceLocalT: TraceLocal;
+    type CollectorT: CollectorContext;
+    type ConstraintsT: PlanConstraints;
 
     fn new() -> Self;
     fn gc_init(&self, heap_size: usize);
