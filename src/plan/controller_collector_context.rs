@@ -1,17 +1,16 @@
 use super::ParallelCollectorGroup;
 
 use std::sync::{Mutex, Condvar};
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use ::vm::Scheduling;
 use ::vm::VMScheduling;
-
-use std::mem::transmute;
 
 use ::plan::plan::Plan;
 use ::plan::selected_plan::SelectedPlan;
 
 struct RequestSync {
     thread_id: usize,
-    request_flag: bool,
     request_count: isize,
     last_request_count: isize,
 }
@@ -21,6 +20,7 @@ pub struct ControllerCollectorContext<'a> {
     request_condvar: Condvar,
 
     pub workers: ParallelCollectorGroup<<SelectedPlan<'a> as Plan>::CollectorT>,
+    request_flag: AtomicBool,
 }
 
 impl<'a> ControllerCollectorContext<'a> {
@@ -28,13 +28,13 @@ impl<'a> ControllerCollectorContext<'a> {
         ControllerCollectorContext {
             request_sync: Mutex::new(RequestSync {
                 thread_id: 0,
-                request_flag: false,
                 request_count: 0,
                 last_request_count: -1,
             }),
             request_condvar: Condvar::new(),
 
             workers: ParallelCollectorGroup::<<SelectedPlan<'a> as Plan>::CollectorT>::new(),
+            request_flag: AtomicBool::new(false),
         }
     }
 
@@ -58,19 +58,13 @@ impl<'a> ControllerCollectorContext<'a> {
     }
 
     pub fn request(&self) {
-        // Required to "punch through" the Mutex. May invoke undefined behaviour. :(
-        // NOTE: Strictly speaking we can remove this entire block while maintaining correctness.
-        #[allow(mutable_transmutes)]
-        unsafe {
-            let unsafe_handle = transmute::<&Self, &mut Self>(self).request_sync.get_mut().unwrap();
-            if unsafe_handle.request_flag {
-                return;
-            }
+        if self.request_flag.load(Ordering::Relaxed) {
+            return;
         }
 
         let mut guard = self.request_sync.lock().unwrap();
-        if !guard.request_flag {
-            guard.request_flag = true;
+        if !self.request_flag.load(Ordering::Relaxed) {
+            self.request_flag.store(true, Ordering::Relaxed);
             guard.request_count += 1;
             self.request_condvar.notify_all();
         }
@@ -78,7 +72,8 @@ impl<'a> ControllerCollectorContext<'a> {
 
     pub fn clear_request(&self) {
         let mut guard = self.request_sync.lock().unwrap();
-        guard.request_flag = false;
+        self.request_flag.store(false, Ordering::Relaxed);
+        drop(guard);
     }
 
     fn wait_for_request(&self) {
