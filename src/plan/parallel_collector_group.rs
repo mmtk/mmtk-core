@@ -1,6 +1,8 @@
 use std::vec::Vec;
 use std::sync::{Mutex, Condvar};
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use super::ParallelCollector;
 use ::vm::Scheduling;
 use ::vm::VMScheduling;
@@ -10,12 +12,13 @@ pub struct ParallelCollectorGroup<C: ParallelCollector> {
     contexts: Vec<C>,
     sync: Mutex<ParallelCollectorGroupSync>,
     condvar: Condvar,
+
+    aborted: AtomicBool,
 }
 
 struct ParallelCollectorGroupSync {
     trigger_count: usize,
     contexts_parked: usize,
-    aborted: bool,
     rendezvous_counter: [usize; 2],
     current_rendezvous_counter: usize,
 }
@@ -27,11 +30,12 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
             sync: Mutex::new(ParallelCollectorGroupSync {
                 trigger_count: 0,
                 contexts_parked: 0,
-                aborted: false,
                 rendezvous_counter: [0, 0],
                 current_rendezvous_counter: 0,
             }),
             condvar: Condvar::new(),
+
+            aborted: AtomicBool::new(false),
         }
     }
 
@@ -67,13 +71,12 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
     pub fn abort_cycle(&self) {
         let mut inner = self.sync.lock().unwrap();
         if inner.contexts_parked < self.contexts.len() {
-            inner.aborted = true;
+            self.aborted.store(true, Ordering::Relaxed);
         }
     }
 
-    // TODO: Can we get away without this lock?
     pub fn is_aborted(&self) -> bool {
-        self.sync.lock().unwrap().aborted
+        self.aborted.load(Ordering::Relaxed)
     }
 
     pub fn wait_for_cycle(&self) {
@@ -90,7 +93,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         if context.get_last_trigger_count() == inner.trigger_count {
             inner.contexts_parked += 1;
             if inner.contexts_parked == inner.trigger_count {
-                inner.aborted = false;
+                self.aborted.store(false, Ordering::Relaxed);
             }
             self.condvar.notify_all();
             while context.get_last_trigger_count() == inner.trigger_count {
