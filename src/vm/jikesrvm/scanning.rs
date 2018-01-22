@@ -1,6 +1,6 @@
 use ::vm::Scanning;
 use ::plan::{TransitiveClosure, TraceLocal};
-use ::util::{ObjectReference, Address};
+use ::util::{ObjectReference, Address, SynchronizedCounter};
 use ::vm::jikesrvm::jtoc::*;
 use super::JTOC_BASE;
 use super::unboxed_size_constants::LOG_BYTES_IN_ADDRESS;
@@ -8,6 +8,8 @@ use super::super::VMObjectModel;
 use super::super::ObjectModel;
 use std::mem::size_of;
 use std::slice;
+
+static COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
 pub struct VMScanning {}
 
@@ -71,6 +73,11 @@ impl Scanning for VMScanning {
 
 impl VMScanning {
     fn compute_thread_roots<T: TraceLocal>(trace: &mut T, new_roots_sufficient: bool) {
-        unimplemented!()
+        //let process_code_locations = MOVES_CODE;
+
+        loop {
+            let thread_index = COUNTER.increment();
+            unimplemented!()
+        }
     }
 }

@@ -42,6 +42,7 @@ elif system == "Linux":
 
 for plan in PLANS:
     cmd = ["cargo",
+           "+nightly",
            "build",
            "--no-default-features",
            "--features", " ".join([plan, extra_features])]

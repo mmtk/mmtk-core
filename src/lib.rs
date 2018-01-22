@@ -1,4 +1,5 @@
 #![cfg_attr(feature = "jikesrvm", feature(asm))]
+#![feature(const_fn)]
 
 extern crate libc;
 #[macro_use]

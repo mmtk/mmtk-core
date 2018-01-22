@@ -6,6 +6,12 @@ pub struct SynchronizedCounter {
 }
 
 impl SynchronizedCounter {
+    pub const fn new(init: usize) -> Self {
+        Self {
+            count: AtomicUsize::new(init),
+        }
+    }
+
     pub fn reset(&self) -> usize {
         self.count.swap(0, Ordering::Relaxed)
     }
