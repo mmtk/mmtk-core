@@ -1,5 +1,4 @@
 use std::ptr::null_mut;
-use std::mem::transmute;
 use libc::c_void;
 
 use plan::Plan;
@@ -131,16 +130,8 @@ pub extern fn start_worker(thread_id: usize, worker: *mut c_void) {
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
-pub extern fn enable_collection(thread_id: usize, size: usize) {
-    unsafe {
-        // XXX: We break thread-safety during initialization, since we have no
-        //      other threads with access prior to being launched by `init_group`
-        //      itself. Again, the fact that this is technically UB is worrying.
-        #[allow(mutable_transmutes)]
-        transmute::<&ParallelCollectorGroup<<SelectedPlan as Plan>::CollectorT>,
-            &mut ParallelCollectorGroup<<SelectedPlan as Plan>::CollectorT>>
-                (&selected_plan::PLAN.control_collector_context.workers).init_group(thread_id, size);
-    }
+pub unsafe extern fn enable_collection(thread_id: usize, size: usize) {
+    (&mut *selected_plan::PLAN.control_collector_context.workers.get()).init_group(thread_id, size);
     VMScheduling::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(thread_id, null_mut()); // spawn controller thread
 }
 
