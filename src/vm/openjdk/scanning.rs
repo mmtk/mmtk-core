@@ -5,7 +5,7 @@ use ::util::ObjectReference;
 pub struct VMScanning {}
 
 impl Scanning for VMScanning {
-    fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference) {
+    fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, thread_id: usize) {
         unimplemented!()
     }
 
@@ -25,11 +25,11 @@ impl Scanning for VMScanning {
         unimplemented!()
     }
 
-    fn compute_thread_roots<T: TraceLocal>(trace: &mut T) {
+    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
         unimplemented!()
     }
 
-    fn compute_new_thread_roots<T: TraceLocal>(trace: &mut T) {
+    fn compute_new_thread_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
         unimplemented!()
     }
 

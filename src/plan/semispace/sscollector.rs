@@ -43,6 +43,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
 
     fn init(&mut self, id: usize) {
         self.id = id;
+        self.trace.init(id);
     }
 
     fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: usize) -> Address {
@@ -61,7 +62,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
         match phase {
             Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
             Phase::StackRoots => {
-                VMScanning::compute_thread_roots(&mut self.trace);
+                VMScanning::compute_thread_roots(&mut self.trace, self.id);
             }
             Phase::Roots => {
                 VMScanning::compute_global_roots(&mut self.trace);

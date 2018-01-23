@@ -9,6 +9,7 @@ use super::ss;
 use ::plan::selected_plan::PLAN;
 
 pub struct SSTraceLocal {
+    thread_id: usize,
     root_locations: VecDeque<Address>,
     values: VecDeque<ObjectReference>,
 }
@@ -59,15 +60,17 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn complete_trace(&mut self) {
+        let id = self.thread_id;
+
         if !self.root_locations.is_empty() {
             self.process_roots();
         }
         while let Some(object) = self.values.pop_front() {
-            VMScanning::scan_object(self, object);
+            VMScanning::scan_object(self, object, id);
         }
         while !self.values.is_empty() {
             while let Some(object) = self.values.pop_front() {
-                VMScanning::scan_object(self, object);
+                VMScanning::scan_object(self, object, id);
             }
         }
     }
@@ -93,8 +96,13 @@ impl TraceLocal for SSTraceLocal {
 impl SSTraceLocal {
     pub fn new() -> Self {
         SSTraceLocal {
+            thread_id: 0,
             root_locations: VecDeque::new(),
             values: VecDeque::new(),
         }
+    }
+
+    pub fn init(&mut self, thread_id: usize) {
+        self.thread_id = thread_id;
     }
 }
