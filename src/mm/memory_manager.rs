@@ -23,9 +23,10 @@ use env_logger;
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
-pub extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
+pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     env_logger::init().unwrap();
-    unsafe { JTOC_BASE = Address::from_mut_ptr(jtoc); }
+    JTOC_BASE = Address::from_mut_ptr(jtoc);
+    ::vm::jikesrvm::scan_statics::set_ref_slot_size(1);
     selected_plan::PLAN.gc_init(heap_size);
     ::vm::JikesRVM::test1();
     info!("{}", ::vm::JikesRVM::test(44));
@@ -123,8 +124,8 @@ pub unsafe extern fn process_interior_edge(trace_local: *mut c_void, target: *mu
 pub extern fn broken_code() {}
 
 #[no_mangle]
-pub extern fn start_worker(thread_id: usize, worker: *mut c_void) {
-    let worker_instance = unsafe { &mut *(worker as *mut <SelectedPlan as Plan>::CollectorT) };
+pub unsafe extern fn start_worker(thread_id: usize, worker: *mut c_void) {
+    let worker_instance = &mut *(worker as *mut <SelectedPlan as Plan>::CollectorT);
     worker_instance.run(thread_id);
 }
 

@@ -17,7 +17,7 @@ impl Scanning for VMScanning {
         unimplemented!()
     }
 
-    fn compute_static_roots<T: TraceLocal>(trace: &mut T) {
+    fn compute_static_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
         unimplemented!()
     }
 

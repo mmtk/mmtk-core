@@ -31,3 +31,12 @@ impl Scheduling for VMScheduling {
         jtoc_call!(SPAWN_COLLECTOR_THREAD_METHOD_JTOC_OFFSET, thread_id, ctx);
     }
 }
+
+impl VMScheduling {
+    #[inline(always)]
+    pub unsafe fn thread_from_id(thread_id: usize) -> Address {
+        Address::from_usize(Address::from_usize((JTOC_BASE + THREADS_FIELD_JTOC_OFFSET)
+            .load::< usize > ()
+                + 4 * thread_id).load::< usize > ())
+    }
+}

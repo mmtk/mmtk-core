@@ -66,7 +66,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
             }
             Phase::Roots => {
                 VMScanning::compute_global_roots(&mut self.trace);
-                VMScanning::compute_static_roots(&mut self.trace);
+                VMScanning::compute_static_roots(&mut self.trace, self.id);
                 if super::ss::SCAN_BOOT_IMAGE {
                     VMScanning::compute_bootimage_roots(&mut self.trace);
                 }

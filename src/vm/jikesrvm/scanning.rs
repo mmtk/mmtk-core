@@ -6,6 +6,7 @@ use super::JTOC_BASE;
 use super::unboxed_size_constants::LOG_BYTES_IN_ADDRESS;
 use super::super::VMObjectModel;
 use super::super::ObjectModel;
+use super::scheduling::VMScheduling;
 use std::mem::size_of;
 use std::slice;
 
@@ -16,7 +17,8 @@ pub struct VMScanning {}
 impl Scanning for VMScanning {
     fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, thread_id: usize) {
         debug!("jtoc_call");
-        let elt0_ptr: usize = jtoc_call!(GET_OFFSET_ARRAY_METHOD_JTOC_OFFSET, thread_id, object);
+        let obj_ptr = object.value();
+        let elt0_ptr: usize = jtoc_call!(GET_OFFSET_ARRAY_METHOD_JTOC_OFFSET, thread_id, obj_ptr);
         debug!("elt0_ptr: {}", elt0_ptr);
         if elt0_ptr == 0 {
             // object is a REFARRAY
@@ -50,8 +52,8 @@ impl Scanning for VMScanning {
         <SelectedPlan as Plan>::MutatorT::flush_remembered_sets();
     }
 
-    fn compute_static_roots<T: TraceLocal>(trace: &mut T) {
-        unimplemented!()
+    fn compute_static_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
+        super::scan_statics::scan_statics(trace, thread_id);
     }
 
     fn compute_global_roots<T: TraceLocal>(trace: &mut T) {
@@ -91,11 +93,7 @@ impl VMScanning {
                     break;
                 }
 
-                let thread =
-                    Address::from_usize(
-                        Address::from_usize((JTOC_BASE + THREADS_FIELD_JTOC_OFFSET)
-                            .load::<usize>()
-                                + 4 * thread_index).load::<usize>());
+                let thread = VMScheduling::thread_from_id(thread_id);
 
                 if thread.is_zero() {
                     continue;

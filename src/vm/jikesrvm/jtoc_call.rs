@@ -3,11 +3,11 @@
 #[macro_export]
 macro_rules! jtoc_call {
     ($offset:ident, $thread_id:expr $(, $arg:ident)*) => (unsafe {
+        use ::vm::jikesrvm::scheduling::VMScheduling as _VMScheduling;
+
         let ret: usize;
         let call_addr = (JTOC_BASE + $offset).load::<fn()>();
-        let rvm_thread
-        = Address::from_usize(((JTOC_BASE + THREAD_BY_SLOT_FIELD_JTOC_OFFSET)
-            .load::<usize>() + 4 * $thread_id)).load::<usize>();
+        let rvm_thread = _VMScheduling::thread_from_id($thread_id).as_usize();
 
         jtoc_args!($($arg),*);
 
