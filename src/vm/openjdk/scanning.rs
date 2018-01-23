@@ -13,7 +13,7 @@ impl Scanning for VMScanning {
         unimplemented!()
     }
 
-    fn notify_initial_thread_scan_complete(partial_scan: bool) {
+    fn notify_initial_thread_scan_complete(partial_scan: bool, thread_id: usize) {
         unimplemented!()
     }
 

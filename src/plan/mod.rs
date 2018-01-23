@@ -32,4 +32,5 @@ pub mod semispace;
 #[cfg(feature = "semispace")]
 pub use self::semispace as selected_plan;
 
+pub use self::selected_plan::SelectedPlan;
 pub use self::selected_plan::SelectedConstraints;

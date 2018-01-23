@@ -1,5 +1,5 @@
 use ::vm::Scanning;
-use ::plan::{TransitiveClosure, TraceLocal};
+use ::plan::{TransitiveClosure, TraceLocal, MutatorContext, Plan, SelectedPlan};
 use ::util::{ObjectReference, Address, SynchronizedCounter};
 use ::vm::jikesrvm::jtoc::*;
 use super::JTOC_BASE;
@@ -36,11 +36,18 @@ impl Scanning for VMScanning {
     }
 
     fn reset_thread_counter() {
-        unimplemented!()
+        COUNTER.reset();
     }
 
-    fn notify_initial_thread_scan_complete(partial_scan: bool) {
-        unimplemented!()
+    fn notify_initial_thread_scan_complete(partial_scan: bool, thread_id: usize) {
+        if !partial_scan {
+            jtoc_call!(SNIP_OBSOLETE_COMPILED_METHODS_METHOD_JTOC_OFFSET, thread_id);
+        }
+
+        // FIXME: This should really be called on a specific mutator,
+        //        but since we're not dealing with write barriers for
+        //        now we'll ignore it.
+        <SelectedPlan as Plan>::MutatorT::flush_remembered_sets();
     }
 
     fn compute_static_roots<T: TraceLocal>(trace: &mut T) {
@@ -64,7 +71,8 @@ impl Scanning for VMScanning {
     }
 
     fn supports_return_barrier() -> bool {
-        unimplemented!()
+        // FIXME: Really?
+        cfg!(target_arch = "x86")
     }
 }
 
