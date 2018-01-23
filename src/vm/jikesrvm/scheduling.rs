@@ -36,7 +36,12 @@ impl VMScheduling {
     #[inline(always)]
     pub unsafe fn thread_from_id(thread_id: usize) -> Address {
         Address::from_usize(Address::from_usize((JTOC_BASE + THREAD_BY_SLOT_FIELD_JTOC_OFFSET)
-            .load::< usize > ()
-                + 4 * thread_id).load::< usize > ())
+            .load::<usize>() + 4 * thread_id).load::<usize>())
+    }
+
+    #[inline(always)]
+    pub unsafe fn thread_from_index(thread_index: usize) -> Address {
+        Address::from_usize(Address::from_usize((JTOC_BASE + THREADS_FIELD_JTOC_OFFSET)
+            .load::<usize>() + 4 * thread_id).load::<usize>())
     }
 }

@@ -93,7 +93,7 @@ impl VMScanning {
                     break;
                 }
 
-                let thread = VMScheduling::thread_from_id(thread_id);
+                let thread = VMScheduling::thread_from_index(thread_index);
 
                 if thread.is_zero() {
                     continue;
