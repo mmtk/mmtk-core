@@ -19,7 +19,7 @@ impl Scanning for VMScanning {
         debug!("jtoc_call");
         let obj_ptr = object.value();
         let elt0_ptr: usize = unsafe {
-            jtoc_call!(GET_OFFSET_ARRAY_METHOD_JTOC_OFFSET, thread_id, obj_ptr)
+            jtoc_call!(GET_OFFSET_ARRAY_METHOD_OFFSET, thread_id, obj_ptr)
         };
         debug!("elt0_ptr: {}", elt0_ptr);
         if elt0_ptr == 0 {
@@ -46,7 +46,7 @@ impl Scanning for VMScanning {
     fn notify_initial_thread_scan_complete(partial_scan: bool, thread_id: usize) {
         if !partial_scan {
             unsafe {
-                jtoc_call!(SNIP_OBSOLETE_COMPILED_METHODS_METHOD_JTOC_OFFSET, thread_id);
+                jtoc_call!(SNIP_OBSOLETE_COMPILED_METHODS_METHOD_OFFSET, thread_id);
             }
         }
 
@@ -64,15 +64,15 @@ impl Scanning for VMScanning {
         unsafe {
             let thread = VMScheduling::thread_from_id(thread_id);
             let system_thread = Address::from_usize(
-                (thread + SYSTEM_THREAD_FIELD_JTOC_OFFSET).load::<usize>());
-            let cc = &*((system_thread + WORKER_INSTANCE_FIELD_JTOC_OFFSET)
+                (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
+            let cc = &*((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
                 .load::<*const <SelectedPlan as Plan>::CollectorT>());
 
-            let jni_functions = JTOC_BASE + JNI_FUNCTIONS_FIELD_JTOC_OFFSET;
-            let jni_function_table_usize = (jni_functions + JNI_FUNCTIONS_FIELD_JTOC_OFFSET).load::<usize>();
+            let jni_functions = JTOC_BASE + JNI_FUNCTIONS_FIELD_OFFSET;
+            let jni_function_table_usize = (jni_functions + JNI_FUNCTIONS_FIELD_OFFSET).load::<usize>();
             let jni_function_table = Address::from_usize(jni_function_table_usize);
             let threads = cc.parallel_worker_count();
-            let mut size = jikesrvm_instance_call!(jni_function_table, FUNCTION_TABLE_LENGTH_METHOD_JTOC_OFFSET,
+            let mut size = jikesrvm_instance_call!(jni_function_table, FUNCTION_TABLE_LENGTH_METHOD_OFFSET,
                 thread_id, jni_function_table_usize);
             let mut chunk_size = size / threads;
 
@@ -85,7 +85,7 @@ impl Scanning for VMScanning {
 
             for i in start .. end {
                 let function_address_slot = jni_functions + (i * 4);
-                if jtoc_call!(IMPLEMENTED_IN_JAVA_METHOD_JTOC_OFFSET, thread_id, i) != 0 {
+                if jtoc_call!(IMPLEMENTED_IN_JAVA_METHOD_OFFSET, thread_id, i) != 0 {
                     trace.process_root_edge(function_address_slot, true);
                 } else {
                     // Function implemented as a C function, must not be
@@ -94,7 +94,7 @@ impl Scanning for VMScanning {
             }
 
             let linkage_triplets = Address::from_usize(
-                (JTOC_BASE + LINKAGE_TRIPLETS_FIELD_JTOC_OFFSET).load::<usize>());
+                (JTOC_BASE + LINKAGE_TRIPLETS_FIELD_OFFSET).load::<usize>());
             if !linkage_triplets.is_zero() {
                 for i in start .. end {
                     trace.process_root_edge(linkage_triplets + i * 4, true);
@@ -102,7 +102,7 @@ impl Scanning for VMScanning {
             }
 
             let jni_global_refs = Address::from_usize(
-                (JTOC_BASE + JNI_GLOBAL_REFS_FIELD2_JTOC_OFFSET).load::<usize>());
+                (JTOC_BASE + JNI_GLOBAL_REFS_FIELD2_OFFSET).load::<usize>());
             size = (jni_global_refs - 4).load::<usize>();
             chunk_size = size / threads;
             start = cc.parallel_worker_ordinal() * chunk_size;
@@ -140,10 +140,10 @@ impl VMScanning {
     fn compute_thread_roots<T: TraceLocal>(trace: &mut T, new_roots_sufficient: bool, thread_id: usize) {
         unsafe {
             let process_code_locations =
-                (JTOC_BASE + MOVES_CODE_FIELD_JTOC_OFFSET).load::<bool>();
+                (JTOC_BASE + MOVES_CODE_FIELD_OFFSET).load::<bool>();
 
             let num_threads =
-                (JTOC_BASE + NUM_THREADS_FIELD_JTOC_OFFSET).load::<usize>();
+                (JTOC_BASE + NUM_THREADS_FIELD_OFFSET).load::<usize>();
 
             loop {
                 let thread_index = COUNTER.increment();
@@ -157,13 +157,13 @@ impl VMScanning {
                     continue;
                 }
 
-                if (thread + IS_COLLECTOR_FIELD_JTOC_OFFSET).load::<bool>() {
+                if (thread + IS_COLLECTOR_FIELD_OFFSET).load::<bool>() {
                     continue;
                 }
 
                 let trace_ptr = trace as *mut T;
                 let thread_usize = thread.as_usize();
-                jtoc_call!(SCAN_THREAD_METHOD_JTOC_OFFSET, thread_id, thread_usize, trace_ptr,
+                jtoc_call!(SCAN_THREAD_METHOD_OFFSET, thread_id, thread_usize, trace_ptr,
                     new_roots_sufficient);
             }
         }

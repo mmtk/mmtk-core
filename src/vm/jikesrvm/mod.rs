@@ -23,28 +23,28 @@ impl JikesRVM {
     #[inline(always)]
     pub fn test(input: usize) -> usize {
         unsafe {
-            jtoc_call!(TEST_METHOD_JTOC_OFFSET, BOOT_THREAD, input)
+            jtoc_call!(TEST_METHOD_OFFSET, BOOT_THREAD, input)
         }
     }
 
     #[inline(always)]
     pub fn test1() -> usize {
         unsafe {
-            jtoc_call!(TEST1_METHOD_JTOC_OFFSET, BOOT_THREAD)
+            jtoc_call!(TEST1_METHOD_OFFSET, BOOT_THREAD)
         }
     }
 
     #[inline(always)]
     pub fn test2(input1: usize, input2: usize) -> usize {
         unsafe {
-            jtoc_call!(TEST2_METHOD_JTOC_OFFSET, BOOT_THREAD, input1, input2)
+            jtoc_call!(TEST2_METHOD_OFFSET, BOOT_THREAD, input1, input2)
         }
     }
 
     #[inline(always)]
     pub fn test3(input1: usize, input2: usize, input3: usize, input4: usize) -> usize {
         unsafe {
-            jtoc_call!(TEST3_METHOD_JTOC_OFFSET, BOOT_THREAD, input1, input2, input3, input4)
+            jtoc_call!(TEST3_METHOD_OFFSET, BOOT_THREAD, input1, input2, input3, input4)
         }
     }
 }

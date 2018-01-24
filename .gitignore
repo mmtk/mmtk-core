@@ -5,6 +5,6 @@ Cargo.lock
 mmtk.iml
 *.dylib
 *.so
-src/vm/jtoc.rs
+src/vm/entrypoint.rs
 bench-exe
-jtoc.rs
+entrypoint.rs
