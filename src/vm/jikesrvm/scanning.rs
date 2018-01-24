@@ -69,8 +69,31 @@ impl Scanning for VMScanning {
                 .load::<*const <SelectedPlan as Plan>::CollectorT>());
 
             let jni_functions = JTOC_BASE + JNI_FUNCTIONS_FIELD_JTOC_OFFSET;
+            let jni_function_table_usize = (jni_functions + JNI_FUNCTIONS_FIELD_JTOC_OFFSET).load::<usize>();
+            let jni_function_table = Address::from_usize(jni_function_table_usize);
             let threads = cc.parallel_worker_count();
-            //let size = jtoc_call!();
+            let size = jikesrvm_instance_call!(jni_function_table, FUNCTION_TABLE_LENGTH_METHOD_JTOC_OFFSET,
+                thread_id, jni_function_table_usize);
+            let chunk_size = size / threads;
+
+            let start = cc.parallel_worker_ordinal() * chunk_size;
+            let end = if cc.parallel_worker_ordinal() + 1 == threads {
+                size
+            } else {
+                threads * chunk_size
+            };
+
+            for i in start .. end {
+                let function_address_slot = jni_functions + (i * 4);
+                if jtoc_call!(IMPLEMENTED_IN_JAVA_METHOD_JTOC_OFFSET, thread_id, i) != 0 {
+                    trace.process_root_edge(function_address_slot, true);
+                } else {
+                    // Function implemented as a C function, must not be
+                    // scanned.
+                }
+            }
+
+            unimplemented!()
         }
     }
 

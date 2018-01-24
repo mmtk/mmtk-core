@@ -49,7 +49,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
             inner.trigger_count = 1;
         }
         self.contexts = Vec::<C>::with_capacity(size);
-        for i in 0 .. size - 1 {
+        for i in 0 .. size {
             self.contexts.push(C::new());
             // XXX: Borrow-checker fighting. I _believe_ this is unavoidable
             //      because we have a circular dependency here, but I'd very
@@ -58,7 +58,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
             self.contexts[i].set_group(self_ptr);
             self.contexts[i].set_worker_ordinal(i);
             unsafe {
-                VMScheduling::spawn_worker_thread( thread_id, &mut self.contexts[i] as *mut C);
+                VMScheduling::spawn_worker_thread(thread_id, &mut self.contexts[i] as *mut C);
             }
         }
     }
