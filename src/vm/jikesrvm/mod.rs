@@ -1,7 +1,7 @@
-use self::jtoc::*;
+use self::entrypoint::*;
 pub use self::scheduling::BOOT_THREAD;
 
-mod jtoc;
+mod entrypoint;
 
 #[macro_use]
 mod jtoc_call;

@@ -1,7 +1,7 @@
 use ::vm::Scanning;
 use ::plan::{TransitiveClosure, TraceLocal, MutatorContext, Plan, SelectedPlan, ParallelCollector};
 use ::util::{ObjectReference, Address, SynchronizedCounter};
-use ::vm::jikesrvm::jtoc::*;
+use ::vm::jikesrvm::entrypoint::*;
 use super::JTOC_BASE;
 use super::unboxed_size_constants::LOG_BYTES_IN_ADDRESS;
 use super::super::VMObjectModel;

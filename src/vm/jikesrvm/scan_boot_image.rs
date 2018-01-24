@@ -1,7 +1,7 @@
 use ::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use super::jtoc::*;
+use super::entrypoint::*;
 use super::JTOC_BASE;
 use ::plan::{TraceLocal, Plan, SelectedPlan, ParallelCollector};
 
@@ -23,19 +23,19 @@ static REFS: AtomicUsize = AtomicUsize::new(0);
 
 pub fn scan_boot_image<T: TraceLocal>(trace: &mut T, thread_id: usize) {
     unsafe {
-        let boot_record = Address::from_usize((JTOC_BASE + THE_BOOT_RECORD_FIELD_JTOC_OFFSET)
+        let boot_record = Address::from_usize((JTOC_BASE + THE_BOOT_RECORD_FIELD_OFFSET)
             .load::<usize>());
-        let map_start = Address::from_usize((boot_record + BOOT_IMAGE_R_MAP_START_JTOC_OFFSET)
+        let map_start = Address::from_usize((boot_record + BOOT_IMAGE_R_MAP_START_OFFSET)
             .load::<usize>());
-        let map_end = Address::from_usize((boot_record + BOOT_IMAGE_R_MAP_END_JTOC_OFFSET)
+        let map_end = Address::from_usize((boot_record + BOOT_IMAGE_R_MAP_END_OFFSET)
             .load::<usize>());
-        let image_start = Address::from_usize((boot_record + BOOT_IMAGE_DATA_START_FIELD_JTOC_OFFSET)
+        let image_start = Address::from_usize((boot_record + BOOT_IMAGE_DATA_START_FIELD_OFFSET)
             .load::<usize>());
 
         let thread = VMScheduling::thread_from_id(thread_id);
         let system_thread = Address::from_usize(
-            (thread + SYSTEM_THREAD_FIELD_JTOC_OFFSET).load::<usize>());
-        let collector = &*((system_thread + WORKER_INSTANCE_FIELD_JTOC_OFFSET)
+            (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
+        let collector = &*((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
             .load::<*const <SelectedPlan as Plan>::CollectorT>());
 
         let stride = collector.parallel_worker_count() << LOG_CHUNK_BYTES;

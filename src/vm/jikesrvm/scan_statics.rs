@@ -1,4 +1,4 @@
-use super::jtoc::*;
+use super::entrypoint::*;
 use super::JTOC_BASE;
 use super::scheduling::VMScheduling;
 use ::util::Address;

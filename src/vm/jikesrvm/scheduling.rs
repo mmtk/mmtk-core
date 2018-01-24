@@ -3,7 +3,7 @@ use super::super::Scheduling;
 use ::util::Address;
 use ::plan::ParallelCollector;
 
-use super::jtoc::*;
+use super::entrypoint::*;
 use super::JTOC_BASE;
 
 pub const BOOT_THREAD: usize = 1;
