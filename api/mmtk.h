@@ -7,8 +7,6 @@ extern "C" {
 typedef void* MMTk_Mutator;
 typedef void* MMTk_TraceLocal;
 
-extern void gc_init(size_t heap_size);
-
 /**
  * Allocation
  */
@@ -19,7 +17,6 @@ extern void* alloc(MMTk_Mutator mutator, size_t size,
 
 extern void* alloc_slow(MMTk_Mutator mutator, size_t size,
     size_t align, ssize_t offset, int allocator);
-
 
 /**
  * Tracing
@@ -36,6 +33,7 @@ extern void process_interior_edge(MMTk_TraceLocal trace_local, void* target,
 /**
  * Misc
  */
+extern void gc_init(size_t heap_size);
 extern bool will_never_move(void* object);
 
 /**

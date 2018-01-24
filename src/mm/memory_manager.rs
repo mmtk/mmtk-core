@@ -82,13 +82,6 @@ pub unsafe fn alloc_slow(mutator: *mut c_void, size: usize,
 }
 
 #[no_mangle]
-#[inline(never)]
-pub extern fn alloc_large(_mutator: *mut c_void, _size: usize,
-                          _align: usize, _offset: isize, _allocator: Allocator) -> *mut c_void {
-    unimplemented!();
-}
-
-#[no_mangle]
 pub unsafe extern fn mmtk_malloc(size: usize) -> *mut c_void {
     alloc(null_mut(), size, 1, 0, Allocator::Default)
 }
