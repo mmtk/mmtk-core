@@ -9,6 +9,6 @@ pub trait Scanning {
     fn compute_global_roots<T: TraceLocal>(trace: &mut T, thread_id: usize);
     fn compute_thread_roots<T: TraceLocal>(trace: &mut T, thread_id: usize);
     fn compute_new_thread_roots<T: TraceLocal>(trace: &mut T, thread_id: usize);
-    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T);
+    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T, thread_id: usize);
     fn supports_return_barrier() -> bool;
 }

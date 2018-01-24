@@ -33,7 +33,7 @@ impl Scanning for VMScanning {
         unimplemented!()
     }
 
-    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T) {
+    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
         unimplemented!()
     }
 

@@ -11,6 +11,7 @@ pub mod scheduling;
 pub mod object_model;
 pub mod unboxed_size_constants;
 pub mod scan_statics;
+pub mod scan_boot_image;
 
 use ::util::address::Address;
 

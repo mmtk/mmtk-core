@@ -126,8 +126,8 @@ impl Scanning for VMScanning {
         Self::compute_thread_roots(trace, true, thread_id)
     }
 
-    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T) {
-        unimplemented!()
+    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
+        super::scan_boot_image::scan_boot_image(trace, thread_id);
     }
 
     fn supports_return_barrier() -> bool {
