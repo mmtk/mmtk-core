@@ -8,7 +8,7 @@ static mut REF_SLOT_SIZE: usize = 0;
 static mut CHUNK_SIZE_MASK: usize = 0;
 
 pub unsafe fn set_ref_slot_size(thread_id: usize) {
-    REF_SLOT_SIZE = jtoc_call!(GET_REFERENCE_SLOT_SIZE_METHOD_JTOC_OFFSET, thread_id);
+    REF_SLOT_SIZE = jtoc_call!(GET_REFERENCE_SLOT_SIZE_METHOD_OFFSET, thread_id);
     CHUNK_SIZE_MASK = 0xFFFFFFFF - (REF_SLOT_SIZE - 1);
 }
 
@@ -18,12 +18,12 @@ pub fn scan_statics<T: TraceLocal>(trace: &mut T, thread_id: usize) {
 
         let thread = VMScheduling::thread_from_id(thread_id);
         let system_thread = Address::from_usize(
-            (thread + SYSTEM_THREAD_FIELD_JTOC_OFFSET).load::<usize>());
-        let cc = &*((system_thread + WORKER_INSTANCE_FIELD_JTOC_OFFSET)
+            (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
+        let cc = &*((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
             .load::<*const <SelectedPlan as Plan>::CollectorT>());
 
         let number_of_collectors: usize = cc.parallel_worker_count();
-        let number_of_references: usize = jtoc_call!(GET_NUMBER_OF_REFERENCE_SLOTS_METHOD_JTOC_OFFSET,
+        let number_of_references: usize = jtoc_call!(GET_NUMBER_OF_REFERENCE_SLOTS_METHOD_OFFSET,
             thread_id);
         let chunk_size: usize = (number_of_references / number_of_collectors) & CHUNK_SIZE_MASK;
         let thread_ordinal = cc.parallel_worker_ordinal();
