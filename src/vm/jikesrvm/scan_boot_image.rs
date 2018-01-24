@@ -54,6 +54,71 @@ pub fn scan_boot_image<T: TraceLocal>(trace: &mut T, thread_id: usize) {
 
 fn process_chunk<T: TraceLocal>(chunk_start: Address, image_start: Address,
                                 map_start: Address, map_end: Address, trace: &mut T) {
-    unimplemented!();
+    let mut value: usize;
+    let mut offset: usize = 0;
+    let mut cursor: Address = chunk_start;
+    unsafe {
+        while { value = cursor.load::<u8>() as usize; value != 0 } {
+            /* establish the offset */
+            if (value & LONGENCODING_MASK) != 0 {
+                offset = decode_long_encoding(cursor);
+                cursor += LONGENCODING_OFFSET_BYTES;
+            } else {
+                offset += value & 0xfc;
+                cursor += 1isize;
+            }
+            /* figure out the length of the run, if any */
+            let mut runlength: usize = 0;
+            if (value & RUN_MASK) != 0 {
+                runlength = cursor.load::<usize>();
+                cursor += 1isize;
+            }
+            /* enqueue the specified slot or slots */
+            debug_assert!(is_address_aligned(Address::from_usize(offset)));
+            let mut slot: Address = image_start + offset;
+            if cfg!(feature = "debug") {
+                REFS.fetch_add(1, Ordering::Relaxed);
+            }
+
+            if !FILTER || slot.load::<usize>() > map_end.as_usize() {
+                if cfg!(feature = "debug") {
+                    ROOTS.fetch_add(1, Ordering::Relaxed);
+                }
+                trace.process_root_edge(slot, false);
+            }
+            if runlength != 0 {
+                for i in 0..runlength {
+                    offset += 4;
+                    slot = image_start + offset;
+                    debug_assert!(is_address_aligned(slot));
+                    if cfg!(feature = "debug") {
+                        REFS.fetch_add(1, Ordering::Relaxed);
+                    }
+                    if !FILTER || slot.load::<usize>() > map_end.as_usize() {
+                        if cfg!(feature = "debug") {
+                            ROOTS.fetch_add(1, Ordering::Relaxed);
+                        }
+                        // TODO: check_reference(slot) ?
+                        trace.process_root_edge(slot, false);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn decode_long_encoding(cursor: Address) -> usize {
+    unsafe {
+        let mut value: usize;
+        value = cursor.load::<u8>() as usize & 0x000000fc;
+        value |= (((cursor + 1isize).load::<u8>() as usize) << 8) & 0x0000ff00;
+        value |= (((cursor + 2isize).load::<u8>() as usize) << 16) & 0x00ff0000;
+        value |= (((cursor + 3isize).load::<u8>() as usize) << 24) & 0xff000000;
+        value
+    }
+}
+
+fn is_address_aligned(offset: Address) -> bool {
+    offset.as_usize() % 4 == 0
 }
 
