@@ -1,25 +1,41 @@
-// TODO: #1 is fixed, but we need more guarantees that this won't gratuitously break
 #[cfg(target_arch = "x86")]
 #[macro_export]
 macro_rules! jtoc_call {
-    ($offset:ident, $thread_id:expr $(, $arg:ident)*) => (unsafe {
+    ($offset:ident, $thread_id:expr $(, $arg:ident)*) => ({
+        let call_addr = (JTOC_BASE + $offset).load::<fn()>();
+        jikesrvm_call!(call_addr, $thread_id $(, $arg)*)
+    });
+}
+
+#[cfg(target_arch = "x86")]
+#[macro_export]
+macro_rules! jikesrvm_instance_call {
+    ($obj:expr, $offset:expr, $thread_id:expr $(, $arg:ident)*) => ({
+        let call_addr = ($obj + $offset).load::<fn()>();
+        jikesrvm_call!(call_addr, $thread_id $(, $arg)*)
+    });
+}
+
+#[cfg(target_arch = "x86")]
+#[macro_export]
+macro_rules! jikesrvm_call {
+    ($call_addr:expr, $thread_id:expr $(, $arg:ident)*) => ({
         use ::vm::jikesrvm::scheduling::VMScheduling as _VMScheduling;
 
         let ret: usize;
-        let call_addr = (JTOC_BASE + $offset).load::<fn()>();
         let rvm_thread = _VMScheduling::thread_from_id($thread_id).as_usize();
 
-        jtoc_args!($($arg),*);
+        jikesrvm_call_args!($($arg),*);
 
         asm!("call ebx" : "={eax}"(ret) : "{esi}"(rvm_thread),
-             "{ebx}"(call_addr) : "eax", "ebx", "ecx", "edx", "esi", "memory" : "intel");
+             "{ebx}"($call_addr) : "eax", "ebx", "ecx", "edx", "esi", "memory" : "intel");
 
         ret
     });
 }
 
 #[cfg(target_arch = "x86")]
-macro_rules! jtoc_args {
+macro_rules! jikesrvm_call_args {
     () => ();
 
     ($arg1:ident) => (
@@ -27,12 +43,12 @@ macro_rules! jtoc_args {
     );
 
     ($arg1:ident, $arg2:ident) => (
-        jtoc_args!($arg1);
+        jikesrvm_call_args!($arg1);
         asm!("push edx" : : "{edx}"($arg2) : "sp", "memory" : "intel");
     );
 
     ($arg1:ident, $arg2:ident, $($arg:ident),+) => (
-        jtoc_args!($arg1, $arg2);
+        jikesrvm_call_args!($arg1, $arg2);
         $(
             asm!("push ebx" : : "{ebx}"($arg) : "sp", "memory" : "intel");
         )*

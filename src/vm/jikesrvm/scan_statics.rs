@@ -41,7 +41,7 @@ pub fn scan_statics<T: TraceLocal>(trace: &mut T, thread_id: usize) {
         };
 
         let mut slot = start;
-        while (slot < end) {
+        while slot < end {
             let slot_offset = slot * 4;
             // TODO: check_reference?
             trace.process_root_edge(slots + slot_offset, true);

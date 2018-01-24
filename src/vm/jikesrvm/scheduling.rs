@@ -13,21 +13,27 @@ pub struct VMScheduling {}
 impl Scheduling for VMScheduling {
     #[inline(always)]
     fn stop_all_mutators(thread_id: usize) {
-        jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
+        unsafe {
+            jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
+        }
     }
 
     #[inline(always)]
     fn resume_mutators(thread_id: usize) {
-        jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
+        unsafe {
+            jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
+        }
     }
 
     #[inline(always)]
     fn block_for_gc(thread_id: usize) {
-        jtoc_call!(BLOCK_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
+        unsafe {
+            jtoc_call!(BLOCK_FOR_GC_METHOD_JTOC_OFFSET, thread_id);
+        }
     }
 
     #[inline(always)]
-    fn spawn_worker_thread<T: ParallelCollector>(thread_id: usize, ctx: *mut T) {
+    unsafe fn spawn_worker_thread<T: ParallelCollector>(thread_id: usize, ctx: *mut T) {
         jtoc_call!(SPAWN_COLLECTOR_THREAD_METHOD_JTOC_OFFSET, thread_id, ctx);
     }
 }

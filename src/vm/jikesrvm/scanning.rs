@@ -1,5 +1,5 @@
 use ::vm::Scanning;
-use ::plan::{TransitiveClosure, TraceLocal, MutatorContext, Plan, SelectedPlan};
+use ::plan::{TransitiveClosure, TraceLocal, MutatorContext, Plan, SelectedPlan, ParallelCollector};
 use ::util::{ObjectReference, Address, SynchronizedCounter};
 use ::vm::jikesrvm::jtoc::*;
 use super::JTOC_BASE;
@@ -18,7 +18,9 @@ impl Scanning for VMScanning {
     fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, thread_id: usize) {
         debug!("jtoc_call");
         let obj_ptr = object.value();
-        let elt0_ptr: usize = jtoc_call!(GET_OFFSET_ARRAY_METHOD_JTOC_OFFSET, thread_id, obj_ptr);
+        let elt0_ptr: usize = unsafe {
+            jtoc_call!(GET_OFFSET_ARRAY_METHOD_JTOC_OFFSET, thread_id, obj_ptr)
+        };
         debug!("elt0_ptr: {}", elt0_ptr);
         if elt0_ptr == 0 {
             // object is a REFARRAY
@@ -43,7 +45,9 @@ impl Scanning for VMScanning {
 
     fn notify_initial_thread_scan_complete(partial_scan: bool, thread_id: usize) {
         if !partial_scan {
-            jtoc_call!(SNIP_OBSOLETE_COMPILED_METHODS_METHOD_JTOC_OFFSET, thread_id);
+            unsafe {
+                jtoc_call!(SNIP_OBSOLETE_COMPILED_METHODS_METHOD_JTOC_OFFSET, thread_id);
+            }
         }
 
         // FIXME: This should really be called on a specific mutator,
@@ -56,8 +60,18 @@ impl Scanning for VMScanning {
         super::scan_statics::scan_statics(trace, thread_id);
     }
 
-    fn compute_global_roots<T: TraceLocal>(trace: &mut T) {
-        unimplemented!()
+    fn compute_global_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
+        unsafe {
+            let thread = VMScheduling::thread_from_id(thread_id);
+            let system_thread = Address::from_usize(
+                (thread + SYSTEM_THREAD_FIELD_JTOC_OFFSET).load::<usize>());
+            let cc = &*((system_thread + WORKER_INSTANCE_FIELD_JTOC_OFFSET)
+                .load::<*const <SelectedPlan as Plan>::CollectorT>());
+
+            let jni_functions = JTOC_BASE + JNI_FUNCTIONS_FIELD_JTOC_OFFSET;
+            let threads = cc.parallel_worker_count();
+            //let size = jtoc_call!();
+        }
     }
 
     fn compute_thread_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
