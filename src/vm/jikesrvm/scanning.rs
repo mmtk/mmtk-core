@@ -72,12 +72,12 @@ impl Scanning for VMScanning {
             let jni_function_table_usize = (jni_functions + JNI_FUNCTIONS_FIELD_JTOC_OFFSET).load::<usize>();
             let jni_function_table = Address::from_usize(jni_function_table_usize);
             let threads = cc.parallel_worker_count();
-            let size = jikesrvm_instance_call!(jni_function_table, FUNCTION_TABLE_LENGTH_METHOD_JTOC_OFFSET,
+            let mut size = jikesrvm_instance_call!(jni_function_table, FUNCTION_TABLE_LENGTH_METHOD_JTOC_OFFSET,
                 thread_id, jni_function_table_usize);
-            let chunk_size = size / threads;
+            let mut chunk_size = size / threads;
 
-            let start = cc.parallel_worker_ordinal() * chunk_size;
-            let end = if cc.parallel_worker_ordinal() + 1 == threads {
+            let mut start = cc.parallel_worker_ordinal() * chunk_size;
+            let mut end = if cc.parallel_worker_ordinal() + 1 == threads {
                 size
             } else {
                 threads * chunk_size
@@ -93,7 +93,28 @@ impl Scanning for VMScanning {
                 }
             }
 
-            unimplemented!()
+            let linkage_triplets = Address::from_usize(
+                (JTOC_BASE + LINKAGE_TRIPLETS_FIELD_JTOC_OFFSET).load::<usize>());
+            if !linkage_triplets.is_zero() {
+                for i in start .. end {
+                    trace.process_root_edge(linkage_triplets + i * 4, true);
+                }
+            }
+
+            let jni_global_refs = Address::from_usize(
+                (JTOC_BASE + JNI_GLOBAL_REFS_FIELD2_JTOC_OFFSET).load::<usize>());
+            size = (jni_global_refs - 4).load::<usize>();
+            chunk_size = size / threads;
+            start = cc.parallel_worker_ordinal() * chunk_size;
+            end = if cc.parallel_worker_ordinal() + 1 == threads {
+                size
+            } else {
+                threads * chunk_size
+            };
+
+            for i in start .. end {
+                trace.process_root_edge(jni_global_refs + 4 * i, true);
+            }
         }
     }
 
