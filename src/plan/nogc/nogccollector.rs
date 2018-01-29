@@ -88,7 +88,7 @@ impl<'a> ParallelCollector for NoGCCollector<'a> {
     fn set_group(&mut self, group: *const ParallelCollectorGroup<Self>) {
         self.group = Some ( unsafe {&*group} );
     }
-    
+
     fn set_worker_ordinal(&mut self, ordinal: usize) {
         self.worker_ordinal = ordinal;
     }

@@ -44,6 +44,10 @@ impl CopySpace {
         self.from_space = from_space;
     }
 
+    pub fn release(&self) {
+        unimplemented!()
+    }
+
     pub fn trace_object<T: TransitiveClosure>(
         &self,
         trace: &mut T,

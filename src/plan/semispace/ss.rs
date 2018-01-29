@@ -94,10 +94,39 @@ impl<'a> SemiSpace<'a> {
     }
 
     pub fn collection_phase(&mut self, phase: Phase) {
-        if let Phase::Prepare = phase {
-            self.hi = !self.hi;
-            self.copyspace0.prepare(self.hi);
-            self.copyspace1.prepare(!self.hi);
+        match phase {
+            Phase::SetCollectionKind => {
+                unimplemented!()
+            }
+            Phase::Initiate => {
+                unimplemented!()
+            }
+            Phase::PrepareStacks => {
+                unimplemented!()
+            }
+            Phase::Prepare => {
+                self.hi = !self.hi;
+                self.copyspace0.prepare(self.hi);
+                self.copyspace1.prepare(!self.hi);
+            }
+            Phase::StackRoots => {
+                unimplemented!()
+            }
+            Phase::Roots => {
+                unimplemented!()
+            }
+            Phase::Closure => {
+                self.ss_trace.prepare();
+            }
+            Phase::Release => {
+                self.fromspace().release();
+            }
+            Phase::Complete => {
+                unimplemented!()
+            }
+            _ => {
+                panic!("Global phase not handled!")
+            }
         }
     }
 }

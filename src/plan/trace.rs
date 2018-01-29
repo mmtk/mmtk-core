@@ -13,4 +13,8 @@ impl Trace {
             root_locations: VecDeque::new(),
         }
     }
+
+    pub fn prepare(&mut self) {
+        unimplemented!()
+    }
 }

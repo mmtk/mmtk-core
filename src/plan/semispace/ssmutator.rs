@@ -17,8 +17,22 @@ pub struct SSMutator<'a> {
 
 impl<'a> MutatorContext for SSMutator<'a> {
     fn collection_phase(&mut self, phase: Phase, primary: bool) {
-        if let Phase::Prepare = phase {
-            self.ss.rebind(Some(semispace::PLAN.tospace()));
+        match phase {
+            Phase::Prepare => {
+                self.ss.rebind(Some(semispace::PLAN.tospace()));
+            }
+            Phase::PrepareStacks => {
+                // FIXME
+            }
+            Phase::Prepare => {
+                // FIXME
+            }
+            Phase::Release => {
+                // FIXME
+            }
+            _ => {
+                panic!("Per-mutator phase not handled!")
+            }
         }
     }
 

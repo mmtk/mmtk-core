@@ -32,7 +32,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
     fn new() -> Self {
         SSCollector {
             id: 0,
-            ss: BumpAllocator::new(0,None),
+            ss: BumpAllocator::new(0, None),
             trace: SSTraceLocal::new(),
 
             last_trigger_count: 0,
@@ -71,9 +71,30 @@ impl<'a> CollectorContext for SSCollector<'a> {
                     VMScanning::compute_bootimage_roots(&mut self.trace, self.id);
                 }
             }
+            Phase::SoftRefs => {
+                // FIXME
+            }
+            Phase::WeakRefs => {
+                // FIXME
+            }
+            Phase::Finalizable => {
+                // FIXME
+            }
+            Phase::PhantomRefs => {
+                // FIXME
+            }
+            Phase::ForwardRefs => {
+                // FIXME
+            }
+            Phase::ForwardFinalizable => {
+                // FIXME
+            }
+            Phase::Complete => {
+                unimplemented!()
+            }
             Phase::Closure => { self.trace.complete_trace() }
             Phase::Release => { self.trace.release() }
-            _ => {}
+            _ => { panic!("Per-collector phase not handled") }
         }
     }
 }
@@ -119,7 +140,7 @@ impl<'a> ParallelCollector for SSCollector<'a> {
     }
 
     fn set_group(&mut self, group: *const ParallelCollectorGroup<Self>) {
-        self.group = Some ( unsafe {&*group} );
+        self.group = Some(unsafe { &*group });
     }
 
     fn set_worker_ordinal(&mut self, ordinal: usize) {

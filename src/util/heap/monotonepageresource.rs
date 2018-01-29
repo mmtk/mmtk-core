@@ -64,3 +64,9 @@ impl Drop for MonotonePageResource {
         }
     }
 }
+
+impl MonotonePageResource {
+    pub fn reset(&mut self) {
+        unimplemented!()
+    }
+}
