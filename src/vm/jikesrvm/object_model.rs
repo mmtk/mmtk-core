@@ -59,8 +59,8 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_array_length(object: ObjectReference) -> usize {
-        let len_ptr = object.to_address().as_usize() - size_of::<isize>();
-        unsafe { *(len_ptr as *const usize) }
+        let len_addr = object.to_address() - size_of::<isize>();
+        unsafe { len_addr.load::<usize>() }
     }
 
     fn attempt_available_bits(object: ObjectReference, old: usize, new: usize) -> bool {
