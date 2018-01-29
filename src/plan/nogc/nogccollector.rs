@@ -42,7 +42,7 @@ impl<'a> CollectorContext for NoGCCollector<'a> {
     }
 
     fn collection_phase(&mut self, phase: Phase, primary: bool) {
-        unimplemented!();
+        panic!("GC triggered in NoGC plan");
     }
 }
 
@@ -52,18 +52,23 @@ impl<'a> ParallelCollector for NoGCCollector<'a> {
     fn park(&mut self) {
         self.group.unwrap().park(self);
     }
+
     fn collect(&self) {
         panic!("GC triggered in NoGC plan");
     }
+
     fn get_current_trace(&mut self) -> &mut NoGCTraceLocal {
         &mut self.trace
     }
+
     fn parallel_worker_count(&self) -> usize {
         self.group.unwrap().active_worker_count()
     }
+
     fn parallel_worker_ordinal(&self) -> usize {
         self.worker_ordinal
     }
+
     fn rendezvous(&self) -> usize {
         self.group.unwrap().rendezvous()
     }
@@ -71,9 +76,11 @@ impl<'a> ParallelCollector for NoGCCollector<'a> {
     fn get_last_trigger_count(&self) -> usize {
         self.last_trigger_count
     }
+
     fn set_last_trigger_count(&mut self, val: usize) {
         self.last_trigger_count = val;
     }
+
     fn increment_last_trigger_count(&mut self) {
         self.last_trigger_count += 1;
     }
@@ -81,6 +88,7 @@ impl<'a> ParallelCollector for NoGCCollector<'a> {
     fn set_group(&mut self, group: *const ParallelCollectorGroup<Self>) {
         self.group = Some ( unsafe {&*group} );
     }
+    
     fn set_worker_ordinal(&mut self, ordinal: usize) {
         self.worker_ordinal = ordinal;
     }
