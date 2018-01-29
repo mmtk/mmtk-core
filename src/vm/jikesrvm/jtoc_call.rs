@@ -27,8 +27,8 @@ macro_rules! jikesrvm_call {
 
         jikesrvm_call_args!($($arg),*);
 
-        asm!("call ebx" : "={eax}"(ret) : "{esi}"(rvm_thread),
-             "{ebx}"($call_addr) : "eax", "ebx", "ecx", "edx", "esi", "memory" : "intel");
+        asm!("call *%ebx" : "={eax}"(ret) : "{esi}"(rvm_thread),
+             "{ebx}"($call_addr) : "eax", "ebx", "ecx", "edx", "esi", "memory");
 
         ret
     });
@@ -39,18 +39,18 @@ macro_rules! jikesrvm_call_args {
     () => ();
 
     ($arg1:ident) => (
-        asm!("push eax" : : "{eax}"($arg1) : "sp", "memory" : "intel");
+        asm!("push %eax" : : "{eax}"($arg1) : "sp", "memory");
     );
 
     ($arg1:ident, $arg2:ident) => (
         jikesrvm_call_args!($arg1);
-        asm!("push edx" : : "{edx}"($arg2) : "sp", "memory" : "intel");
+        asm!("push %edx" : : "{edx}"($arg2) : "sp", "memory");
     );
 
     ($arg1:ident, $arg2:ident, $($arg:ident),+) => (
         jikesrvm_call_args!($arg1, $arg2);
         $(
-            asm!("push ebx" : : "{ebx}"($arg) : "sp", "memory" : "intel");
+            asm!("push %ebx" : : "{ebx}"($arg) : "sp", "memory");
         )*
     );
 }
