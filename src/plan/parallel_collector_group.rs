@@ -71,7 +71,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
     }
 
     pub fn abort_cycle(&self) {
-        let mut inner = self.sync.lock().unwrap();
+        let inner = self.sync.lock().unwrap();
         if inner.contexts_parked < self.contexts.len() {
             self.aborted.store(true, Ordering::Relaxed);
         }
@@ -113,7 +113,10 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         inner.rendezvous_counter[i] += 1;
         if me == self.contexts.len() - 1 {
             inner.current_rendezvous_counter ^= 1;
-            inner.rendezvous_counter[inner.current_rendezvous_counter] = 0;
+            {
+                let index = inner.current_rendezvous_counter;
+                inner.rendezvous_counter[index] = 0;
+            }
             self.condvar.notify_all();
         } else {
             while inner.rendezvous_counter[i] < self.contexts.len() {

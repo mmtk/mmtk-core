@@ -79,7 +79,7 @@ impl<'a> ControllerCollectorContext<'a> {
     }
 
     pub fn clear_request(&self) {
-        let mut guard = self.request_sync.lock().unwrap();
+        let guard = self.request_sync.lock().unwrap();
         self.request_flag.store(false, Ordering::Relaxed);
         drop(guard);
     }
