@@ -26,7 +26,6 @@ use env_logger;
 pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     env_logger::init().unwrap();
     JTOC_BASE = Address::from_mut_ptr(jtoc);
-    ::vm::jikesrvm::scan_statics::set_ref_slot_size(1);
     selected_plan::PLAN.gc_init(heap_size);
     ::vm::JikesRVM::test1();
     info!("{}", ::vm::JikesRVM::test(44));

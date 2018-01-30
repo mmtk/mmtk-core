@@ -7,13 +7,12 @@ use ::plan::{TraceLocal, SelectedPlan, Plan, ParallelCollector};
 use super::active_plan::VMActivePlan;
 use super::super::ActivePlan;
 
-static mut REF_SLOT_SIZE: usize = 0;
-static mut CHUNK_SIZE_MASK: usize = 0;
+#[cfg(target_arch = "x86")]
+const REF_SLOT_SIZE: usize = 1;
+#[cfg(target_arch = "x86_64")]
+const REF_SLOT_SIZE: usize = 2;
 
-pub unsafe fn set_ref_slot_size(thread_id: usize) {
-    REF_SLOT_SIZE = jtoc_call!(GET_REFERENCE_SLOT_SIZE_METHOD_OFFSET, thread_id);
-    CHUNK_SIZE_MASK = 0xFFFFFFFF - (REF_SLOT_SIZE - 1);
-}
+const CHUNK_SIZE_MASK: usize = 0xFFFFFFFF - (REF_SLOT_SIZE - 1);
 
 pub fn scan_statics<T: TraceLocal>(trace: &mut T, thread_id: usize) {
     unsafe {
