@@ -8,10 +8,12 @@ pub trait Plan {
     type CollectorT: ParallelCollector;
 
     fn new() -> Self;
-    fn gc_init(&self, heap_size: usize);
+    // unsafe because this can only be called once by the init thread
+    unsafe fn gc_init(&self, heap_size: usize);
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void;
     fn will_never_move(&self, object: ObjectReference) -> bool;
-    fn collection_phase(&mut self, phase: &phase::Phase);
+    // unsafe because only the controller thread can call this
+    unsafe fn collection_phase(&self, phase: &phase::Phase);
 }
 
 pub enum GcStatus {

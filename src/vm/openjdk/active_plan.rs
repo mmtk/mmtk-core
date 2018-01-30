@@ -8,7 +8,7 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         unimplemented!()
     }
 
-    fn collector(thread_id: usize) -> &'a <SelectedPlan<'a> as Plan>::CollectorT {
+    fn collector(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::CollectorT {
         unimplemented!()
     }
 
@@ -16,7 +16,7 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         unimplemented!()
     }
 
-    fn mutator(thread_id: usize) -> &'a <SelectedPlan<'a> as Plan>::MutatorT {
+    fn mutator(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::MutatorT {
         unimplemented!()
     }
 
@@ -28,7 +28,7 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         unimplemented!()
     }
 
-    fn get_next_mutator(thread_id: usize) -> Option<&'a <SelectedPlan<'a> as Plan>::MutatorT> {
+    fn get_next_mutator() -> Option<&'a mut <SelectedPlan<'a> as Plan>::MutatorT> {
         unimplemented!()
     }
 }

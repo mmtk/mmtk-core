@@ -44,17 +44,19 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        let plan_unsync = unsafe { &*PLAN.unsync.get() };
+
         if object.is_null() {
             return object;
         }
-        if PLAN.copyspace0.in_space(object) {
-            return PLAN.copyspace0.trace_object(self, object, ss::ALLOC_SS);
+        if plan_unsync.copyspace0.in_space(object) {
+            return plan_unsync.copyspace0.trace_object(self, object, ss::ALLOC_SS);
         }
-        if PLAN.copyspace1.in_space(object) {
-            return PLAN.copyspace1.trace_object(self, object, ss::ALLOC_SS);
+        if plan_unsync.copyspace1.in_space(object) {
+            return plan_unsync.copyspace1.trace_object(self, object, ss::ALLOC_SS);
         }
-        if PLAN.versatile_space.in_space(object){
-            return PLAN.versatile_space.trace_object(self, object);
+        if plan_unsync.versatile_space.in_space(object){
+            return plan_unsync.versatile_space.trace_object(self, object);
         }
         panic!("No special case for space in trace_object");
     }

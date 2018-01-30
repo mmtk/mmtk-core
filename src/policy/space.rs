@@ -28,7 +28,6 @@ pub mod default {
     pub fn acquire<T: PageResource>(pr: &Mutex<T>, thread_id: usize, size: usize) -> Address {
         let ret: Address = pr.lock().unwrap().get_new_pages(size);
 
-        // XXX: Remove second predicate once non-JikesRVM GC is implemented
         if ret.is_zero() {
             selected_plan::PLAN.control_collector_context.request();
             println!("Blocking for GC");

@@ -4,7 +4,6 @@ use ::policy::immortalspace::ImmortalSpace;
 use ::plan::controller_collector_context::ControllerCollectorContext;
 use ::plan::{Plan, Phase};
 use ::util::ObjectReference;
-use ::plan::phase::Phase;
 
 use libc::c_void;
 
@@ -35,7 +34,7 @@ impl<'a> Plan for NoGC<'a> {
         }
     }
 
-    fn gc_init(&self, heap_size: usize) {
+    unsafe fn gc_init(&self, heap_size: usize) {
         default::gc_init(&self.space, heap_size);
     }
 
@@ -47,7 +46,7 @@ impl<'a> Plan for NoGC<'a> {
         true
     }
 
-    fn collection_phase(&mut self, phase: &Phase) {
+    unsafe fn collection_phase(&self, phase: &Phase) {
         unimplemented!()
     }
 }

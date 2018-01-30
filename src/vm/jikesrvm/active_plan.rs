@@ -10,12 +10,12 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         &::plan::selected_plan::PLAN
     }
 
-    fn collector(thread_id: usize) -> &'a <SelectedPlan<'a> as Plan>::CollectorT {
+    fn collector(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::CollectorT {
         unsafe {
             let thread = super::scheduling::VMScheduling::thread_from_id(thread_id);
             let system_thread = Address::from_usize(
                 (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
-            let cc = &*((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
+            let cc = &mut *((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
                 .load::<*const <SelectedPlan as Plan>::CollectorT>());
 
             cc
@@ -26,7 +26,7 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         unimplemented!()
     }
 
-    fn mutator(thread_id: usize) -> &'a <SelectedPlan<'a> as Plan>::MutatorT {
+    fn mutator(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::MutatorT {
         unimplemented!()
     }
 
@@ -38,7 +38,7 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         unimplemented!()
     }
 
-    fn get_next_mutator(thread_id: usize) -> Option<&'a <SelectedPlan<'a> as Plan>::MutatorT> {
+    fn get_next_mutator() -> Option<&'a mut <SelectedPlan<'a> as Plan>::MutatorT> {
         unimplemented!()
     }
 }

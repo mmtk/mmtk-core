@@ -53,7 +53,7 @@ pub extern fn start_control_collector(rvm_thread: *mut c_void) {
 }
 
 #[no_mangle]
-pub extern fn gc_init(heap_size: usize) {
+pub unsafe extern fn gc_init(heap_size: usize) {
     if cfg!(feature = "jikesrvm") {
         panic!("Should be calling jikesrvm_gc_init instead");
     }

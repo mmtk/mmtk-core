@@ -15,7 +15,9 @@ use ::policy::immortalspace::ImmortalSpace;
 use ::plan::Phase;
 use ::plan::trace::Trace;
 use ::util::ObjectReference;
+
 use libc::c_void;
+use std::cell::UnsafeCell;
 
 pub type SelectedPlan<'a> = SemiSpace<'a>;
 
@@ -28,12 +30,18 @@ lazy_static! {
 
 pub struct SemiSpace<'a> {
     pub control_collector_context: ControllerCollectorContext<'a>,
-    hi: bool,
+    pub unsync: UnsafeCell<SemiSpaceUnsync>,
+}
+
+pub struct SemiSpaceUnsync {
+    pub hi: bool,
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
-    ss_trace: Trace,
+    pub ss_trace: Trace,
     pub versatile_space: ImmortalSpace,
 }
+
+unsafe impl<'a> Sync for SemiSpace<'a> {}
 
 impl<'a> Plan for SemiSpace<'a> {
     type MutatorT = SSMutator<'a>;
@@ -43,31 +51,37 @@ impl<'a> Plan for SemiSpace<'a> {
     fn new() -> Self {
         SemiSpace {
             control_collector_context: ControllerCollectorContext::new(),
-            hi: false,
-            copyspace0: CopySpace::new(false),
-            copyspace1: CopySpace::new(true),
-            ss_trace: Trace::new(),
-            versatile_space: ImmortalSpace::new(),
+            unsync: UnsafeCell::new(SemiSpaceUnsync {
+                hi: false,
+                copyspace0: CopySpace::new(false),
+                copyspace1: CopySpace::new(true),
+                ss_trace: Trace::new(),
+                versatile_space: ImmortalSpace::new(),
+            }),
         }
     }
 
-    fn gc_init(&self, heap_size: usize) {
+    unsafe fn gc_init(&self, heap_size: usize) {
+        let unsync = &mut *self.unsync.get();
         // FIXME
-        default::gc_init(&self.copyspace0, heap_size / 3);
-        self.copyspace1.init(heap_size / 3);
-        self.versatile_space.init(heap_size / 3);
+        default::gc_init(&unsync.copyspace0, heap_size / 3);
+        unsync.copyspace1.init(heap_size / 3);
+        unsync.versatile_space.init(heap_size / 3);
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
-        default::bind_mutator(Self::MutatorT::new(thread_id, self.fromspace(), &self.versatile_space))
+        let unsync = unsafe { &*self.unsync.get() };
+        default::bind_mutator(Self::MutatorT::new(thread_id, self.fromspace(), &unsync.versatile_space))
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {
+        let unsync = unsafe { &*self.unsync.get() };
+
         if self.tospace().in_space(object) || self.fromspace().in_space(object) {
             return false;
         }
 
-        if self.versatile_space.in_space(object) {
+        if unsync.versatile_space.in_space(object) {
             return true;
         }
 
@@ -75,7 +89,9 @@ impl<'a> Plan for SemiSpace<'a> {
         false
     }
 
-    fn collection_phase(&mut self, phase: &Phase) {
+    unsafe fn collection_phase(&self, phase: &Phase) {
+        let unsync = &mut *self.unsync.get();
+
         match phase {
             &Phase::SetCollectionKind => {
                 unimplemented!()
@@ -87,9 +103,9 @@ impl<'a> Plan for SemiSpace<'a> {
                 unimplemented!()
             }
             &Phase::Prepare => {
-                self.hi = !self.hi;
-                self.copyspace0.prepare(self.hi);
-                self.copyspace1.prepare(!self.hi);
+                unsync.hi = !unsync.hi;
+                unsync.copyspace0.prepare(unsync.hi);
+                unsync.copyspace1.prepare(!unsync.hi);
             }
             &Phase::StackRoots => {
                 unimplemented!()
@@ -98,7 +114,7 @@ impl<'a> Plan for SemiSpace<'a> {
                 unimplemented!()
             }
             &Phase::Closure => {
-                self.ss_trace.prepare();
+                unsync.ss_trace.prepare();
             }
             &Phase::Release => {
                 self.fromspace().release();
@@ -115,18 +131,22 @@ impl<'a> Plan for SemiSpace<'a> {
 
 impl<'a> SemiSpace<'a> {
     pub fn tospace(&self) -> &CopySpace {
-        if self.hi {
-            &self.copyspace1
+        let unsync = unsafe { &*self.unsync.get() };
+
+        if unsync.hi {
+            &unsync.copyspace1
         } else {
-            &self.copyspace0
+            &unsync.copyspace0
         }
     }
 
     pub fn fromspace(&self) -> &CopySpace {
-        if self.hi {
-            &self.copyspace0
+        let unsync = unsafe { &*self.unsync.get() };
+
+        if unsync.hi {
+            &unsync.copyspace0
         } else {
-            &self.copyspace1
+            &unsync.copyspace1
         }
     }
 }

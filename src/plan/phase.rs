@@ -91,14 +91,15 @@ pub fn process_phase_stack(thread_id: usize, resume: bool) {
         match schedule {
             Schedule::Global => {
                 if primary {
-                    plan.collection_phase(&phase)
+                    // XXX: Or is the whole thing unsafe?
+                    unsafe { plan.collection_phase(&phase) }
                 }
             }
             Schedule::Collector => {
                 collector.collection_phase(&phase, primary)
             }
             Schedule::Mutator => {
-                while let Some(mutator) = VMActivePlan::get_next_mutator(thread_id) {
+                while let Some(mutator) = VMActivePlan::get_next_mutator() {
                     mutator.collection_phase(&phase, primary);
                 }
             }
