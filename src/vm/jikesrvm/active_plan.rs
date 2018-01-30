@@ -4,31 +4,31 @@ use ::plan::Plan;
 pub struct VMActivePlan<> {}
 
 impl<T: Plan> ActivePlan<T> for VMActivePlan {
-    fn global() -> T {
+    fn global(thread_id: usize) -> T {
         unimplemented!()
     }
 
-    fn collector() -> T::CollectorT {
+    fn collector(thread_id: usize) -> T::CollectorT {
         unimplemented!()
     }
 
-    fn is_mutator() -> bool {
+    fn is_mutator(thread_id: usize) -> bool {
         unimplemented!()
     }
 
-    fn mutator() -> T::MutatorT {
+    fn mutator(thread_id: usize) -> T::MutatorT {
         unimplemented!()
     }
 
-    fn collector_count() -> usize {
+    fn collector_count(thread_id: usize) -> usize {
         unimplemented!()
     }
 
-    fn reset_mutator_iterator() {
+    fn reset_mutator_iterator(thread_id: usize) {
         unimplemented!()
     }
 
-    fn get_next_mutator() {
+    fn get_next_mutator(thread_id: usize) {
         unimplemented!()
     }
 }
