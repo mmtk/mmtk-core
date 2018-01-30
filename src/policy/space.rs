@@ -29,7 +29,7 @@ pub mod default {
         let ret: Address = pr.lock().unwrap().get_new_pages(size);
 
         // XXX: Remove second predicate once non-JikesRVM GC is implemented
-        if ret.is_zero() && cfg!(feature = "jikesrvm") {
+        if ret.is_zero() {
             selected_plan::PLAN.control_collector_context.request();
             println!("Blocking for GC");
             VMScheduling::block_for_gc(thread_id);

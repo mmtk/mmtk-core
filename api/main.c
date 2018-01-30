@@ -6,7 +6,7 @@ int main(int argc, char* argv[]){
 
     MMTk_Mutator handle = bind_mutator(0);
     
-    for (int i=0;i<10000;i++){
+    for (int i=0;i<4;i++){
         int arr_size = 10000;
         int* my_arr = alloc(handle, sizeof(int)*arr_size, 8, -4, 0);
         if (!my_arr){
