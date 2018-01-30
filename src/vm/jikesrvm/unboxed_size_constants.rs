@@ -1,3 +1,5 @@
+pub const LOG_BITS_IN_BYTE: usize = 3;
+
 #[cfg(target_pointer_width = "32")]
 pub const LOG_BYTES_IN_ADDRESS: usize = 2;
 #[cfg(target_pointer_width = "64")]
