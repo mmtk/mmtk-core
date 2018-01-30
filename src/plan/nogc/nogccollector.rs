@@ -41,7 +41,7 @@ impl<'a> CollectorContext for NoGCCollector<'a> {
         self.collect();
     }
 
-    fn collection_phase(&mut self, phase: Phase, primary: bool) {
+    fn collection_phase(&mut self, phase: &Phase, primary: bool) {
         panic!("GC triggered in NoGC plan");
     }
 }

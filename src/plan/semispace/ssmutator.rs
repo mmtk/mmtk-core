@@ -16,18 +16,18 @@ pub struct SSMutator<'a> {
 }
 
 impl<'a> MutatorContext for SSMutator<'a> {
-    fn collection_phase(&mut self, phase: Phase, primary: bool) {
+    fn collection_phase(&mut self, phase: &Phase, primary: bool) {
         match phase {
-            Phase::Prepare => {
+            &Phase::Prepare => {
                 self.ss.rebind(Some(semispace::PLAN.tospace()));
             }
-            Phase::PrepareStacks => {
+            &Phase::PrepareStacks => {
                 // FIXME
             }
-            Phase::Prepare => {
+            &Phase::Prepare => {
                 // FIXME
             }
-            Phase::Release => {
+            &Phase::Release => {
                 // FIXME
             }
             _ => {

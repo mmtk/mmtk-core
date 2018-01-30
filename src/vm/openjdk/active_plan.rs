@@ -28,7 +28,7 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         unimplemented!()
     }
 
-    fn get_next_mutator(thread_id: usize) {
+    fn get_next_mutator(thread_id: usize) -> Option<&'a <SelectedPlan<'a> as Plan>::MutatorT> {
         unimplemented!()
     }
 }

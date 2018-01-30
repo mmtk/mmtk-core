@@ -11,8 +11,16 @@ pub trait Plan {
     fn gc_init(&self, heap_size: usize);
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void;
     fn will_never_move(&self, object: ObjectReference) -> bool;
-    fn collection_phase(&mut self, phase: Phase);
+    fn collection_phase(&mut self, phase: &phase::Phase);
 }
+
+pub enum GcStatus {
+    NotInGC,
+    GcPrepare,
+    GcProper,
+}
+
+static mut GC_STATUS: GcStatus = GcStatus::NotInGC;
 
 #[repr(i32)]
 pub enum Allocator {
@@ -144,4 +152,9 @@ lazy_static! {
         (phase::Schedule::Complex, SANITY_BUILD_PHASE.clone()),
         (phase::Schedule::Complex, SANITY_CHECK_PHASE.clone())
     ]);
+}
+
+pub fn set_gc_status(s: GcStatus) {
+    // FIXME
+    unsafe { GC_STATUS = s };
 }

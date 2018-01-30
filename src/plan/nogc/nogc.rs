@@ -4,6 +4,7 @@ use ::policy::immortalspace::ImmortalSpace;
 use ::plan::controller_collector_context::ControllerCollectorContext;
 use ::plan::{Plan, Phase};
 use ::util::ObjectReference;
+use ::plan::phase::Phase;
 
 use libc::c_void;
 
@@ -46,7 +47,7 @@ impl<'a> Plan for NoGC<'a> {
         true
     }
 
-    fn collection_phase(&mut self, phase: Phase) {
+    fn collection_phase(&mut self, phase: &Phase) {
         unimplemented!()
     }
 }

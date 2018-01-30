@@ -58,42 +58,42 @@ impl<'a> CollectorContext for SSCollector<'a> {
         }
     }
 
-    fn collection_phase(&mut self, phase: Phase, primary: bool) {
+    fn collection_phase(&mut self, phase: &Phase, primary: bool) {
         match phase {
-            Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
-            Phase::StackRoots => {
+            &Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
+            &Phase::StackRoots => {
                 VMScanning::compute_thread_roots(&mut self.trace, self.id);
             }
-            Phase::Roots => {
+            &Phase::Roots => {
                 VMScanning::compute_global_roots(&mut self.trace, self.id);
                 VMScanning::compute_static_roots(&mut self.trace, self.id);
                 if super::ss::SCAN_BOOT_IMAGE {
                     VMScanning::compute_bootimage_roots(&mut self.trace, self.id);
                 }
             }
-            Phase::SoftRefs => {
+            &Phase::SoftRefs => {
                 // FIXME
             }
-            Phase::WeakRefs => {
+            &Phase::WeakRefs => {
                 // FIXME
             }
-            Phase::Finalizable => {
+            &Phase::Finalizable => {
                 // FIXME
             }
-            Phase::PhantomRefs => {
+            &Phase::PhantomRefs => {
                 // FIXME
             }
-            Phase::ForwardRefs => {
+            &Phase::ForwardRefs => {
                 // FIXME
             }
-            Phase::ForwardFinalizable => {
+            &Phase::ForwardFinalizable => {
                 // FIXME
             }
-            Phase::Complete => {
+            &Phase::Complete => {
                 unimplemented!()
             }
-            Phase::Closure => { self.trace.complete_trace() }
-            Phase::Release => { self.trace.release() }
+            &Phase::Closure => { self.trace.complete_trace() }
+            &Phase::Release => { self.trace.release() }
             _ => { panic!("Per-collector phase not handled") }
         }
     }
@@ -108,7 +108,7 @@ impl<'a> ParallelCollector for SSCollector<'a> {
 
     fn collect(&self) {
         // FIXME use reference instead of cloning everything
-        phase::begin_new_phase_stack((phase::Schedule::Complex, ::plan::plan::COLLECTION.clone()))
+        phase::begin_new_phase_stack(self.id, (phase::Schedule::Complex, ::plan::plan::COLLECTION.clone()))
     }
 
     fn get_current_trace(&mut self) -> &mut SSTraceLocal {

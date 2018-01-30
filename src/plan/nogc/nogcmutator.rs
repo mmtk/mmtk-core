@@ -13,7 +13,7 @@ pub struct NoGCMutator<'a> {
 }
 
 impl<'a> MutatorContext for NoGCMutator<'a> {
-    fn collection_phase(&mut self, phase: Phase, primary: bool) {
+    fn collection_phase(&mut self, phase: &Phase, primary: bool) {
         unimplemented!();
     }
 

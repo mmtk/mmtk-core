@@ -75,35 +75,35 @@ impl<'a> Plan for SemiSpace<'a> {
         false
     }
 
-    fn collection_phase(&mut self, phase: Phase) {
+    fn collection_phase(&mut self, phase: &Phase) {
         match phase {
-            Phase::SetCollectionKind => {
+            &Phase::SetCollectionKind => {
                 unimplemented!()
             }
-            Phase::Initiate => {
+            &Phase::Initiate => {
                 unimplemented!()
             }
-            Phase::PrepareStacks => {
+            &Phase::PrepareStacks => {
                 unimplemented!()
             }
-            Phase::Prepare => {
+            &Phase::Prepare => {
                 self.hi = !self.hi;
                 self.copyspace0.prepare(self.hi);
                 self.copyspace1.prepare(!self.hi);
             }
-            Phase::StackRoots => {
+            &Phase::StackRoots => {
                 unimplemented!()
             }
-            Phase::Roots => {
+            &Phase::Roots => {
                 unimplemented!()
             }
-            Phase::Closure => {
+            &Phase::Closure => {
                 self.ss_trace.prepare();
             }
-            Phase::Release => {
+            &Phase::Release => {
                 self.fromspace().release();
             }
-            Phase::Complete => {
+            &Phase::Complete => {
                 unimplemented!()
             }
             _ => {
