@@ -108,15 +108,15 @@ fn process_phase_stack(thread_id: usize, resume: bool) {
         match schedule {
             Schedule::Global => {
                 if primary {
-                    unsafe { plan.collection_phase(&phase) }
+                    unsafe { plan.collection_phase(thread_id, &phase) }
                 }
             }
             Schedule::Collector => {
-                collector.collection_phase(&phase, primary)
+                collector.collection_phase(thread_id, &phase, primary)
             }
             Schedule::Mutator => {
                 while let Some(mutator) = VMActivePlan::get_next_mutator() {
-                    mutator.collection_phase(&phase, primary);
+                    mutator.collection_phase(thread_id, &phase, primary);
                 }
             }
             Schedule::Concurrent => {

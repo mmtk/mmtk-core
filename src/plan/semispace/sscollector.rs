@@ -58,7 +58,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
         }
     }
 
-    fn collection_phase(&mut self, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
         match phase {
             &Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
             &Phase::StackRoots => {

@@ -46,7 +46,5 @@ impl<'a> Plan for NoGC<'a> {
         true
     }
 
-    unsafe fn collection_phase(&self, phase: &Phase) {
-        unimplemented!()
-    }
+    unsafe fn collection_phase(&self, thread_id: usize, phase: &Phase) {}
 }

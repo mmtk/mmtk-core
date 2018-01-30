@@ -1,6 +1,7 @@
 use libc::c_void;
 use ::util::ObjectReference;
 use super::{MutatorContext, CollectorContext, ParallelCollector, TraceLocal, phase, Phase};
+use std::sync::atomic::{self, AtomicBool};
 
 pub trait Plan {
     type MutatorT: MutatorContext;
@@ -12,10 +13,11 @@ pub trait Plan {
     unsafe fn gc_init(&self, heap_size: usize);
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void;
     fn will_never_move(&self, object: ObjectReference) -> bool;
-    // unsafe because only the controller thread can call this
-    unsafe fn collection_phase(&self, phase: &phase::Phase);
+    // unsafe because only the primary collector thread can call this
+    unsafe fn collection_phase(&self, thread_id: usize, phase: &phase::Phase);
 }
 
+#[derive(PartialEq)]
 pub enum GcStatus {
     NotInGC,
     GcPrepare,
@@ -23,6 +25,8 @@ pub enum GcStatus {
 }
 
 static mut GC_STATUS: GcStatus = GcStatus::NotInGC;
+pub static STACKS_PREPARED: AtomicBool = AtomicBool::new(false);
+
 
 #[repr(i32)]
 pub enum Allocator {
@@ -159,4 +163,16 @@ lazy_static! {
 pub fn set_gc_status(s: GcStatus) {
     // FIXME
     unsafe { GC_STATUS = s };
+}
+
+pub fn stacks_prepared() -> bool {
+    STACKS_PREPARED.load(atomic::Ordering::Relaxed)
+}
+
+pub fn gc_in_progress() -> bool {
+    unsafe { GC_STATUS != GcStatus::NotInGC }
+}
+
+pub fn gc_in_progress_proper() -> bool {
+    unsafe { GC_STATUS == GcStatus::GcProper }
 }

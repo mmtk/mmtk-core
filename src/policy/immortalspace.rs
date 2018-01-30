@@ -14,10 +14,10 @@ use ::util::header_byte;
 
 pub struct ImmortalSpace {
     pr: Mutex<MonotonePageResource>,
+    mark_state: i8,
 }
 
 const GC_MARK_BIT_MASK: i8 = 1;
-const MARK_STATE: i8 = 0;
 
 impl Space for ImmortalSpace {
     fn init(&self, heap_size: usize) {
@@ -37,6 +37,7 @@ impl ImmortalSpace {
     pub fn new() -> Self {
         ImmortalSpace {
             pr: Mutex::new(MonotonePageResource::new()),
+            mark_state: 0,
         }
     }
 
@@ -63,18 +64,24 @@ impl ImmortalSpace {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
-        if ImmortalSpace::test_and_mark(object, MARK_STATE) {
+        if ImmortalSpace::test_and_mark(object, self.mark_state) {
             trace.process_edge(object.to_address());
         }
         return object;
     }
 
-    pub fn initialize_header(object: ObjectReference) {
+    pub fn initialize_header(&self, object: ObjectReference) {
         let old_value = VMObjectModel::read_available_byte(object);
-        let mut new_value = (old_value & GC_MARK_BIT_MASK as u8) | MARK_STATE as u8;
+        let mut new_value = (old_value & GC_MARK_BIT_MASK as u8) | self.mark_state as u8;
         if header_byte::NEEDS_UNLOGGED_BIT {
             new_value = new_value | header_byte::UNLOGGED_BIT;
         }
         VMObjectModel::write_available_byte(object, new_value);
     }
+
+    pub fn prepare(&mut self) {
+        self.mark_state = GC_MARK_BIT_MASK - self.mark_state;
+    }
+
+    pub fn release(&mut self) {}
 }

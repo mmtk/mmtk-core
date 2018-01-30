@@ -8,6 +8,7 @@ use super::SSCollector;
 
 use ::plan::controller_collector_context::ControllerCollectorContext;
 
+use ::plan::plan;
 use ::plan::Plan;
 use ::plan::Allocator;
 use ::policy::copyspace::CopySpace;
@@ -18,6 +19,9 @@ use ::util::ObjectReference;
 
 use libc::c_void;
 use std::cell::UnsafeCell;
+use std::sync::atomic::{self, AtomicBool};
+
+use ::vm::{Scanning, VMScanning};
 
 pub type SelectedPlan<'a> = SemiSpace<'a>;
 
@@ -89,38 +93,43 @@ impl<'a> Plan for SemiSpace<'a> {
         false
     }
 
-    unsafe fn collection_phase(&self, phase: &Phase) {
+    unsafe fn collection_phase(&self, thread_id: usize, phase: &Phase) {
         let unsync = &mut *self.unsync.get();
 
         match phase {
             &Phase::SetCollectionKind => {
-                unimplemented!()
+                // FIXME
             }
             &Phase::Initiate => {
-                unimplemented!()
+                plan::set_gc_status(plan::GcStatus::GcPrepare);
             }
             &Phase::PrepareStacks => {
-                unimplemented!()
+                plan::STACKS_PREPARED.store(true, atomic::Ordering::Relaxed);
             }
             &Phase::Prepare => {
                 unsync.hi = !unsync.hi;
                 unsync.copyspace0.prepare(unsync.hi);
                 unsync.copyspace1.prepare(!unsync.hi);
+                unsync.ss_trace.prepare();
+                unsync.versatile_space.prepare();
             }
             &Phase::StackRoots => {
-                unimplemented!()
+                VMScanning::notify_initial_thread_scan_complete(false, thread_id);
+                plan::set_gc_status(plan::GcStatus::GcProper);
             }
             &Phase::Roots => {
-                unimplemented!()
+                VMScanning::reset_thread_counter();
+                plan::set_gc_status(plan::GcStatus::GcProper);
             }
             &Phase::Closure => {
                 unsync.ss_trace.prepare();
             }
             &Phase::Release => {
                 self.fromspace().release();
+                unsync.versatile_space.release();
             }
             &Phase::Complete => {
-                unimplemented!()
+                plan::set_gc_status(plan::GcStatus::NotInGC);
             }
             _ => {
                 panic!("Global phase not handled!")

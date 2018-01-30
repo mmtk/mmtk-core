@@ -10,5 +10,5 @@ pub trait CollectorContext {
     /// Entry point for the collector context.
     fn run(&mut self, thread_id: usize);
     /// Perform a (local, i.e. per-collector) collection phase.
-    fn collection_phase(&mut self, phase: &Phase, primary: bool);
+    fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool);
 }
