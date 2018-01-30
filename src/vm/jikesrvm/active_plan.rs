@@ -1,8 +1,11 @@
 use ::vm::ActivePlan;
 use ::plan::{Plan, SelectedPlan};
-use ::util::Address;
+use ::util::{Address, SynchronizedCounter};
 use super::entrypoint::*;
 use super::scheduling::VMScheduling;
+use super::JTOC_BASE;
+
+static MUTATOR_COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
 pub struct VMActivePlan<> {}
 
@@ -36,10 +39,26 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
     }
 
     fn reset_mutator_iterator() {
-        unimplemented!()
+        MUTATOR_COUNTER.reset();
     }
 
     fn get_next_mutator() -> Option<&'a mut <SelectedPlan<'a> as Plan>::MutatorT> {
-        unimplemented!()
+        loop {
+            let idx = MUTATOR_COUNTER.increment();
+            let num_threads = unsafe { (JTOC_BASE + NUM_THREADS_FIELD_OFFSET).load::<usize>() };
+            if idx >= num_threads {
+                return None;
+            } else {
+                let t = unsafe { VMScheduling::thread_from_index(idx) };
+                let active_mutator_context = unsafe { (t + ACTIVE_MUTATOR_CONTEXT_FIELD_OFFSET)
+                    .load::<bool>() };
+                if active_mutator_context {
+                    let ret = unsafe {
+                        &mut *(t.as_usize() as *mut <SelectedPlan<'a> as Plan>::MutatorT)
+                    };
+                    return Some(ret);
+                }
+            }
+        }
     }
 }
