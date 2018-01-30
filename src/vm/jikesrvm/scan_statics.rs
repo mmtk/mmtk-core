@@ -4,6 +4,9 @@ use super::scheduling::VMScheduling;
 use ::util::Address;
 use ::plan::{TraceLocal, SelectedPlan, Plan, ParallelCollector};
 
+use super::active_plan::VMActivePlan;
+use super::super::ActivePlan;
+
 static mut REF_SLOT_SIZE: usize = 0;
 static mut CHUNK_SIZE_MASK: usize = 0;
 
@@ -15,12 +18,7 @@ pub unsafe fn set_ref_slot_size(thread_id: usize) {
 pub fn scan_statics<T: TraceLocal>(trace: &mut T, thread_id: usize) {
     unsafe {
         let slots = JTOC_BASE;
-
-        let thread = VMScheduling::thread_from_id(thread_id);
-        let system_thread = Address::from_usize(
-            (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
-        let cc = &*((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
-            .load::<*const <SelectedPlan as Plan>::CollectorT>());
+        let cc = VMActivePlan::collector(thread_id);
 
         let number_of_collectors: usize = cc.parallel_worker_count();
         let number_of_references: usize = jtoc_call!(GET_NUMBER_OF_REFERENCE_SLOTS_METHOD_OFFSET,

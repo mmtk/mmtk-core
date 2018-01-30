@@ -1,14 +1,14 @@
-use ::vm::ActivePlan;
-use ::plan::Plan;
+use ::plan::{Plan, SelectedPlan};
+use super::super::ActivePlan;
 
 pub struct VMActivePlan<> {}
 
-impl<T: Plan> ActivePlan<T> for VMActivePlan {
-    fn global(thread_id: usize) -> T {
+impl<'a> ActivePlan<'a> for VMActivePlan {
+    fn global() -> &'static SelectedPlan<'static> {
         unimplemented!()
     }
 
-    fn collector(thread_id: usize) -> T::CollectorT {
+    fn collector(thread_id: usize) -> &'a <SelectedPlan<'a> as Plan>::CollectorT {
         unimplemented!()
     }
 
@@ -16,7 +16,7 @@ impl<T: Plan> ActivePlan<T> for VMActivePlan {
         unimplemented!()
     }
 
-    fn mutator(thread_id: usize) -> T::MutatorT {
+    fn mutator(thread_id: usize) -> &'a <SelectedPlan<'a> as Plan>::MutatorT {
         unimplemented!()
     }
 

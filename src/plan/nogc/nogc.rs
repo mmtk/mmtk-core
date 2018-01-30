@@ -1,8 +1,8 @@
 use super::super::plan::default;
 
 use ::policy::immortalspace::ImmortalSpace;
-use ::plan::Plan;
 use ::plan::controller_collector_context::ControllerCollectorContext;
+use ::plan::{Plan, Phase};
 use ::util::ObjectReference;
 
 use libc::c_void;

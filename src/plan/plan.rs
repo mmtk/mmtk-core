@@ -1,7 +1,6 @@
 use libc::c_void;
 use ::util::ObjectReference;
-use ::plan::{MutatorContext, CollectorContext, ParallelCollector, TraceLocal};
-use ::plan::phase;
+use super::{MutatorContext, CollectorContext, ParallelCollector, TraceLocal, phase, Phase};
 
 pub trait Plan {
     type MutatorT: MutatorContext;
