@@ -4,8 +4,8 @@ use ::util::{ObjectReference, Address, SynchronizedCounter};
 use ::vm::jikesrvm::entrypoint::*;
 use super::JTOC_BASE;
 use super::unboxed_size_constants::LOG_BYTES_IN_ADDRESS;
-use super::super::VMObjectModel;
-use super::super::ObjectModel;
+use super::super::{ObjectModel, VMObjectModel};
+use super::super::{ActivePlan, VMActivePlan};
 use super::scheduling::VMScheduling;
 use std::mem::size_of;
 use std::slice;
@@ -62,11 +62,7 @@ impl Scanning for VMScanning {
 
     fn compute_global_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
         unsafe {
-            let thread = VMScheduling::thread_from_id(thread_id);
-            let system_thread = Address::from_usize(
-                (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
-            let cc = &*((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
-                .load::<*const <SelectedPlan as Plan>::CollectorT>());
+            let cc = VMActivePlan::collector(thread_id);
 
             let jni_functions = JTOC_BASE + JNI_FUNCTIONS_FIELD_OFFSET;
             let jni_function_table_usize = (jni_functions + JNI_FUNCTIONS_FIELD_OFFSET).load::<usize>();
