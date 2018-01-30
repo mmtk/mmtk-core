@@ -67,7 +67,7 @@ impl<'a> Plan for SemiSpace<'a> {
 
     unsafe fn gc_init(&self, heap_size: usize) {
         let unsync = &mut *self.unsync.get();
-        // FIXME
+        // FIXME correctly initialize spaces based on options
         default::gc_init(&unsync.copyspace0, heap_size / 3);
         unsync.copyspace1.init(heap_size / 3);
         unsync.versatile_space.init(heap_size / 3);
@@ -98,7 +98,7 @@ impl<'a> Plan for SemiSpace<'a> {
 
         match phase {
             &Phase::SetCollectionKind => {
-                // FIXME
+                // FIXME emergency collection, etc.
             }
             &Phase::Initiate => {
                 plan::set_gc_status(plan::GcStatus::GcPrepare);

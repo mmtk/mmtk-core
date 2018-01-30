@@ -7,6 +7,7 @@ use ::plan::semispace;
 use ::util::Address;
 use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
+use ::plan::plan;
 
 #[repr(C)]
 pub struct SSMutator<'a> {
@@ -19,17 +20,17 @@ impl<'a> MutatorContext for SSMutator<'a> {
     fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
         match phase {
             &Phase::Prepare => {
+                // rebing the allocation bump pointer to the appropriate semispace
                 self.ss.rebind(Some(semispace::PLAN.tospace()));
             }
             &Phase::PrepareStacks => {
-                // FIXME
+                if !plan::stacks_prepared() {
+                    unimplemented!("VM.collection.prepareMutator");
+                }
+                self.flush_remembered_sets();
             }
-            &Phase::Prepare => {
-                // FIXME
-            }
-            &Phase::Release => {
-                // FIXME
-            }
+            &Phase::Prepare => {}
+            &Phase::Release => {}
             _ => {
                 panic!("Per-mutator phase not handled!")
             }
