@@ -7,9 +7,9 @@ use ::plan::{TraceLocal, SelectedPlan, Plan, ParallelCollector};
 use super::active_plan::VMActivePlan;
 use super::super::ActivePlan;
 
-#[cfg(target_arch = "x86")]
+#[cfg(target_pointer_width = "32")]
 const REF_SLOT_SIZE: usize = 1;
-#[cfg(target_arch = "x86_64")]
+#[cfg(target_pointer_width = "64")]
 const REF_SLOT_SIZE: usize = 2;
 
 const CHUNK_SIZE_MASK: usize = 0xFFFFFFFF - (REF_SLOT_SIZE - 1);
