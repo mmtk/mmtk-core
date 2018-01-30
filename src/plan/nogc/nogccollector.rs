@@ -44,6 +44,10 @@ impl<'a> CollectorContext for NoGCCollector<'a> {
     fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
         panic!("GC triggered in NoGC plan");
     }
+
+    fn get_id(&self) -> usize {
+        self.id
+    }
 }
 
 impl<'a> ParallelCollector for NoGCCollector<'a> {

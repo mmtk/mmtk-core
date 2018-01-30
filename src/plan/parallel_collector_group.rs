@@ -49,7 +49,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
             inner.trigger_count = 1;
         }
         self.contexts = Vec::<C>::with_capacity(size);
-        for i in 0 .. size {
+        for i in 0..size {
             self.contexts.push(C::new());
             // XXX: Borrow-checker fighting. I _believe_ this is unavoidable
             //      because we have a circular dependency here, but I'd very
@@ -104,7 +104,13 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         }
     }
 
-    // TODO: is_member?
+    pub fn is_member(&self, context: &C) -> bool {
+        if let Some(i) = self.contexts.iter().position(|ref c| c.get_id() == context.get_id()) {
+            true
+        } else {
+            false
+        }
+    }
 
     pub fn rendezvous(&self) -> usize {
         let mut inner = self.sync.lock().unwrap();

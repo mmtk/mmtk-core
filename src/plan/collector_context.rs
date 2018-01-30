@@ -11,4 +11,6 @@ pub trait CollectorContext {
     fn run(&mut self, thread_id: usize);
     /// Perform a (local, i.e. per-collector) collection phase.
     fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool);
+    /// Unique identifier for this collector context.
+    fn get_id(&self) -> usize;
 }

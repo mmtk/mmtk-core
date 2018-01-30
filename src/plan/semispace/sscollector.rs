@@ -97,6 +97,10 @@ impl<'a> CollectorContext for SSCollector<'a> {
             _ => { panic!("Per-collector phase not handled") }
         }
     }
+
+    fn get_id(&self) -> usize {
+        self.id
+    }
 }
 
 impl<'a> ParallelCollector for SSCollector<'a> {
