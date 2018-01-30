@@ -74,26 +74,8 @@ impl<'a> Plan for SemiSpace<'a> {
         // this preserves correctness over efficiency
         false
     }
-}
 
-impl<'a> SemiSpace<'a> {
-    pub fn tospace(&self) -> &CopySpace {
-        if self.hi {
-            &self.copyspace1
-        } else {
-            &self.copyspace0
-        }
-    }
-
-    pub fn fromspace(&self) -> &CopySpace {
-        if self.hi {
-            &self.copyspace0
-        } else {
-            &self.copyspace1
-        }
-    }
-
-    pub fn collection_phase(&mut self, phase: Phase) {
+    fn collection_phase(&mut self, phase: Phase) {
         match phase {
             Phase::SetCollectionKind => {
                 unimplemented!()
@@ -127,6 +109,24 @@ impl<'a> SemiSpace<'a> {
             _ => {
                 panic!("Global phase not handled!")
             }
+        }
+    }
+}
+
+impl<'a> SemiSpace<'a> {
+    pub fn tospace(&self) -> &CopySpace {
+        if self.hi {
+            &self.copyspace1
+        } else {
+            &self.copyspace0
+        }
+    }
+
+    pub fn fromspace(&self) -> &CopySpace {
+        if self.hi {
+            &self.copyspace0
+        } else {
+            &self.copyspace1
         }
     }
 }

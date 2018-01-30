@@ -12,6 +12,7 @@ pub trait Plan {
     fn gc_init(&self, heap_size: usize);
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void;
     fn will_never_move(&self, object: ObjectReference) -> bool;
+    fn collection_phase(&mut self, phase: Phase);
 }
 
 #[repr(i32)]

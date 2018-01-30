@@ -45,4 +45,8 @@ impl<'a> Plan for NoGC<'a> {
     fn will_never_move(&self, object: ObjectReference) -> bool {
         true
     }
+
+    fn collection_phase(&mut self, phase: Phase) {
+        unimplemented!()
+    }
 }
