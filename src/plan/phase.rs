@@ -52,8 +52,10 @@ pub enum Phase {
     Empty,
 }
 
+// FIXME: It's probably unsafe to call most of these functions, because thread_id
+
 pub fn begin_new_phase_stack(thread_id: usize, scheduled_phase: (Schedule, Phase)) {
-    let order = VMActivePlan::collector(thread_id).rendezvous();
+    let order = unsafe { VMActivePlan::collector(thread_id).rendezvous() };
 
     if order == 0 {
         push_scheduled_phase(scheduled_phase);
@@ -68,7 +70,7 @@ pub fn continue_phase_stack(thread_id: usize) {
 
 pub fn process_phase_stack(thread_id: usize, resume: bool) {
     let plan = VMActivePlan::global();
-    let collector = VMActivePlan::collector(thread_id);
+    let collector = unsafe { VMActivePlan::collector(thread_id) };
     let order = collector.rendezvous();
     let primary = order == 0;
     if primary && resume {
@@ -91,7 +93,6 @@ pub fn process_phase_stack(thread_id: usize, resume: bool) {
         match schedule {
             Schedule::Global => {
                 if primary {
-                    // XXX: Or is the whole thing unsafe?
                     unsafe { plan.collection_phase(&phase) }
                 }
             }

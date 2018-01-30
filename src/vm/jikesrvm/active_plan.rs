@@ -11,34 +11,31 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         &::plan::selected_plan::PLAN
     }
 
-    fn collector(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::CollectorT {
-        unsafe {
-            let thread = super::scheduling::VMScheduling::thread_from_id(thread_id);
-            let system_thread = Address::from_usize(
-                (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
-            let cc = &mut *((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
-                .load::<*mut <SelectedPlan as Plan>::CollectorT>());
+    unsafe fn collector(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::CollectorT {
+        let thread = VMScheduling::thread_from_id(thread_id);
+        let system_thread = Address::from_usize(
+            (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
+        let cc = &mut *((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
+            .load::<*mut <SelectedPlan as Plan>::CollectorT>());
 
-            cc
-        }
+        cc
     }
 
-    fn is_mutator(thread_id: usize) -> bool {
-        unsafe {
-            let thread = VMScheduling::thread_from_id(thread_id);
-            !(thread + IS_COLLECTOR_FIELD_OFFSET).load::<bool>()
-        }
+    unsafe fn is_mutator(thread_id: usize) -> bool {
+        let thread = VMScheduling::thread_from_id(thread_id);
+        !(thread + IS_COLLECTOR_FIELD_OFFSET).load::<bool>()
     }
 
-    fn mutator(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::MutatorT {
+    unsafe fn mutator(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::MutatorT {
+        &mut *(VMScheduling::thread_from_id(thread_id).as_usize()
+            as *mut <SelectedPlan<'a> as Plan>::MutatorT)
+    }
+
+    fn collector_count() -> usize {
         unimplemented!()
     }
 
-    fn collector_count(thread_id: usize) -> usize {
-        unimplemented!()
-    }
-
-    fn reset_mutator_iterator(thread_id: usize) {
+    fn reset_mutator_iterator() {
         unimplemented!()
     }
 

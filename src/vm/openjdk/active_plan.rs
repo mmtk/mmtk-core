@@ -8,23 +8,23 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         unimplemented!()
     }
 
-    fn collector(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::CollectorT {
+    unsafe fn collector(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::CollectorT {
         unimplemented!()
     }
 
-    fn is_mutator(thread_id: usize) -> bool {
+    unsafe fn is_mutator(thread_id: usize) -> bool {
         unimplemented!()
     }
 
-    fn mutator(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::MutatorT {
+    unsafe fn mutator(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::MutatorT {
         unimplemented!()
     }
 
-    fn collector_count(thread_id: usize) -> usize {
+    fn collector_count() -> usize {
         unimplemented!()
     }
 
-    fn reset_mutator_iterator(thread_id: usize) {
+    fn reset_mutator_iterator() {
         unimplemented!()
     }
 
