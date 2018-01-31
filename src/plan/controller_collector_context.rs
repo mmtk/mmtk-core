@@ -51,17 +51,22 @@ impl<'a> ControllerCollectorContext<'a> {
         let workers = unsafe { &*self.workers.get() };
 
         loop {
+            debug!("[STWController: Waiting for request...]");
             self.wait_for_request();
+            debug!("[STWController: Request recieved.]");
+            debug!("[STWController: Stopping the world...]");
             VMScheduling::stop_all_mutators(thread_id);
+
             self.clear_request();
             println!("Doing collection");
 
+            debug!("[STWController: Triggering worker threads...]");
             workers.trigger_cycle();
 
             workers.wait_for_cycle();
-
+            debug!("[STWController: Worker threads complete!]");
+            debug!("[STWController: Resuming mutators...]");
             VMScheduling::resume_mutators(thread_id);
-            println!("Finished!");
         }
     }
 
