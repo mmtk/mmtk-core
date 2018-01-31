@@ -12,6 +12,7 @@ doctest = false
 libc = "0.2"
 lazy_static = "1.0"
 log = {version = "0.4.1", features = ["max_level_trace", "release_max_level_off"] }
+crossbeam-deque = "0.1"
 
 [features]
 default = ["nogc"]

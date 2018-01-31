@@ -1,17 +1,19 @@
 use ::plan::{TransitiveClosure, TraceLocal};
+use ::plan::trace::Trace;
 use ::util::{Address, ObjectReference};
 use std::collections::VecDeque;
 use ::policy::space::Space;
 use ::vm::VMScanning;
 use ::vm::Scanning;
+use crossbeam_deque::{Deque, Steal, Stealer};
 
 use super::ss;
 use ::plan::selected_plan::PLAN;
 
 pub struct SSTraceLocal {
     thread_id: usize,
-    root_locations: VecDeque<Address>,
-    values: VecDeque<ObjectReference>,
+    root_locations: Stealer<Address>,
+    values: Stealer<ObjectReference>,
 }
 
 impl TransitiveClosure for SSTraceLocal {
@@ -24,14 +26,20 @@ impl TransitiveClosure for SSTraceLocal {
     }
 
     fn process_node(&mut self, object: ObjectReference) {
-        self.values.push_back(object);
+        // FIXME
+        // self.values.push_back(object);
+        unimplemented!()
     }
 }
 
 impl TraceLocal for SSTraceLocal {
     fn process_roots(&mut self) {
-        while let Some(slot) = self.root_locations.pop_front() {
-            self.process_root_edge(slot, true);
+        loop {
+            match self.root_locations.steal() {
+                Steal::Empty => break,
+                Steal::Data(slot) => self.process_root_edge(slot, true),
+                Steal::Retry => {}
+            }
         }
     }
 
@@ -55,7 +63,7 @@ impl TraceLocal for SSTraceLocal {
         if plan_unsync.copyspace1.in_space(object) {
             return plan_unsync.copyspace1.trace_object(self, object, ss::ALLOC_SS);
         }
-        if plan_unsync.versatile_space.in_space(object){
+        if plan_unsync.versatile_space.in_space(object) {
             return plan_unsync.versatile_space.trace_object(self, object);
         }
         panic!("No special case for space in trace_object");
@@ -67,19 +75,17 @@ impl TraceLocal for SSTraceLocal {
         if !self.root_locations.is_empty() {
             self.process_roots();
         }
-        while let Some(object) = self.values.pop_front() {
-            VMScanning::scan_object(self, object, id);
-        }
-        while !self.values.is_empty() {
-            while let Some(object) = self.values.pop_front() {
-                VMScanning::scan_object(self, object, id);
+
+        loop {
+            match self.values.steal() {
+                Steal::Empty => break,
+                Steal::Data(object) => VMScanning::scan_object(self, object, id),
+                Steal::Retry => {}
             }
         }
     }
 
     fn release(&mut self) {
-        self.values.clear();
-        self.root_locations.clear();
     }
 
     fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, root: bool) {
@@ -90,17 +96,20 @@ impl TraceLocal for SSTraceLocal {
             unsafe { slot.store(new_target.to_address() + offset) };
         }
     }
+
     fn report_delayed_root_edge(&mut self, slot: Address) {
-        self.root_locations.push_front(slot);
+        // FIXME
+        // self.root_locations.push_front(slot);
+        unimplemented!()
     }
 }
 
 impl SSTraceLocal {
-    pub fn new() -> Self {
+    pub fn new(ss_trace: &Trace) -> Self {
         SSTraceLocal {
             thread_id: 0,
-            root_locations: VecDeque::new(),
-            values: VecDeque::new(),
+            root_locations: ss_trace.root_locations.stealer(),
+            values: ss_trace.values.stealer(),
         }
     }
 

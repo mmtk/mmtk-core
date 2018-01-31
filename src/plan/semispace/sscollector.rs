@@ -14,6 +14,8 @@ use ::policy::copyspace::CopySpace;
 use ::vm::VMScanning;
 use ::vm::Scanning;
 
+use ::plan::selected_plan::PLAN;
+
 use super::sstracelocal::SSTraceLocal;
 
 /// per-collector thread behavior and state for the SS plan
@@ -33,7 +35,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
         SSCollector {
             id: 0,
             ss: BumpAllocator::new(0, None),
-            trace: SSTraceLocal::new(),
+            trace: SSTraceLocal::new(PLAN.get_sstrace()),
 
             last_trigger_count: 0,
             worker_ordinal: 0,

@@ -14,6 +14,7 @@ use ::plan::Allocator;
 use ::policy::copyspace::CopySpace;
 use ::policy::immortalspace::ImmortalSpace;
 use ::plan::Phase;
+use ::plan::trace::Trace;
 use ::util::ObjectReference;
 
 use libc::c_void;
@@ -34,6 +35,7 @@ lazy_static! {
 pub struct SemiSpace<'a> {
     pub control_collector_context: ControllerCollectorContext<'a>,
     pub unsync: UnsafeCell<SemiSpaceUnsync>,
+    pub ss_trace: Trace,
 }
 
 pub struct SemiSpaceUnsync {
@@ -59,6 +61,7 @@ impl<'a> Plan for SemiSpace<'a> {
                 copyspace1: CopySpace::new(true),
                 versatile_space: ImmortalSpace::new(),
             }),
+            ss_trace: Trace::new(),
         }
     }
 
@@ -117,8 +120,7 @@ impl<'a> Plan for SemiSpace<'a> {
                 VMScanning::reset_thread_counter();
                 plan::set_gc_status(plan::GcStatus::GcProper);
             }
-            &Phase::Closure => {
-            }
+            &Phase::Closure => {}
             &Phase::Release => {
                 self.fromspace().release();
                 unsync.versatile_space.release();
@@ -152,5 +154,9 @@ impl<'a> SemiSpace<'a> {
         } else {
             &unsync.copyspace1
         }
+    }
+
+    pub fn get_sstrace(&self) -> &Trace {
+        &self.ss_trace
     }
 }
