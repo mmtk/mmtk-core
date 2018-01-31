@@ -37,7 +37,7 @@ impl ObjectModel for VMObjectModel {
         unimplemented!()
     }
 
-    fn get_object_from_start_address(start: Address) -> ObjectReference {
+    unsafe fn get_object_from_start_address(start: Address) -> ObjectReference {
         unimplemented!()
     }
 

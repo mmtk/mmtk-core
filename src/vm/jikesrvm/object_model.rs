@@ -1,5 +1,8 @@
-use super::java_header_constants::*;
+use super::java_header_constants::{ADDRESS_BASED_HASHING, GC_HEADER_OFFSET, DYNAMIC_HASH_OFFSET,
+    HASH_STATE_MASK, HASH_STATE_HASHED_AND_MOVED, ARRAY_BASE_OFFSET, ARRAY_LENGTH_OFFSET,
+    HASHCODE_BYTES};
 use super::java_header::*;
+use super::memory_manager_constants::*;
 
 use ::vm::object_model::ObjectModel;
 use ::util::{Address, ObjectReference};
@@ -42,8 +45,15 @@ impl ObjectModel for VMObjectModel {
         unimplemented!()
     }
 
-    fn get_object_from_start_address(start: Address) -> ObjectReference {
-        unimplemented!()
+    unsafe fn get_object_from_start_address(start: Address) -> ObjectReference {
+        let mut _start = start;
+
+        /* Skip over any alignment fill */
+        while _start.load::<usize>() == ALIGNMENT_VALUE {
+            _start += size_of::<usize>();
+        }
+
+        (_start + OBJECT_REF_OFFSET).to_object_reference()
     }
 
     fn get_object_end_address(object: ObjectReference) -> Address {
@@ -67,32 +77,44 @@ impl ObjectModel for VMObjectModel {
         unsafe { len_addr.load::<usize>() }
     }
 
+    // XXX: What are the ordering requirements, anyway?
     fn attempt_available_bits(object: ObjectReference, old: usize, new: usize) -> bool {
         let loc = unsafe {
             &*((object.to_address() + STATUS_OFFSET).as_usize() as *mut AtomicUsize)
         };
-        // XXX: What are the ordering requirements, anyway?
         loc.compare_and_swap(old, new, Ordering::SeqCst) == old
     }
 
     fn prepare_available_bits(object: ObjectReference) -> usize {
-        unimplemented!()
+        let loc = unsafe {
+            &*((object.to_address() + STATUS_OFFSET).as_usize() as *mut AtomicUsize)
+        };
+        loc.load(Ordering::SeqCst)
     }
 
+    // XXX: Supposedly none of the 4 methods below need to use atomic loads/stores
     fn write_available_byte(object: ObjectReference, val: u8) {
-        unimplemented!()
+        unsafe {
+            (object.to_address() + AVAILABLE_BITS_OFFSET).store::<u8>(val);
+        }
     }
 
     fn read_available_byte(object: ObjectReference) -> u8 {
-        unimplemented!()
+        unsafe {
+            (object.to_address() + AVAILABLE_BITS_OFFSET).load::<u8>()
+        }
     }
 
     fn write_available_bits_word(object: ObjectReference, val: usize) {
-        unimplemented!()
+        unsafe {
+            (object.to_address() + AVAILABLE_BITS_OFFSET).store::<usize>(val);
+        }
     }
 
     fn read_available_bits_word(object: ObjectReference) -> usize {
-        unimplemented!()
+        unsafe {
+            (object.to_address() + AVAILABLE_BITS_OFFSET).load::<usize>()
+        }
     }
 
     fn GC_HEADER_OFFSET() -> isize {
@@ -100,7 +122,17 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn object_start_ref(object: ObjectReference) -> Address {
-        unimplemented!()
+        if MOVES_OBJECTS {
+            if ADDRESS_BASED_HASHING && !DYNAMIC_HASH_OFFSET {
+                let hash_state = unsafe {
+                    (object.to_address() + STATUS_OFFSET).load::<usize>() & HASH_STATE_MASK
+                };
+                if hash_state == HASH_STATE_HASHED_AND_MOVED {
+                    return object.to_address() - (OBJECT_REF_OFFSET + HASHCODE_BYTES);
+                }
+            }
+        }
+        object.to_address() - OBJECT_REF_OFFSET
     }
 
     fn ref_to_address(object: ObjectReference) -> Address {
@@ -120,7 +152,7 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn array_base_offset_trapdoor<T>(o: T) -> isize {
-        unimplemented!()
+        panic!("This should (?) never be called")
     }
 
     fn get_array_length_offset() -> isize {

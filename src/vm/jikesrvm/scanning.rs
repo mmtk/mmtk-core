@@ -1,3 +1,5 @@
+use super::memory_manager_constants::*;
+
 use ::vm::Scanning;
 use ::plan::{TransitiveClosure, TraceLocal, MutatorContext, Plan, SelectedPlan, ParallelCollector};
 use ::util::{ObjectReference, Address, SynchronizedCounter};
@@ -135,8 +137,7 @@ impl Scanning for VMScanning {
 impl VMScanning {
     fn compute_thread_roots<T: TraceLocal>(trace: &mut T, new_roots_sufficient: bool, thread_id: usize) {
         unsafe {
-            let process_code_locations =
-                (JTOC_BASE + MOVES_CODE_FIELD_OFFSET).load::<bool>();
+            let process_code_locations = MOVES_CODE;
 
             let num_threads =
                 (JTOC_BASE + NUM_THREADS_FIELD_OFFSET).load::<usize>();
