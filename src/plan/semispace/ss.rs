@@ -14,7 +14,6 @@ use ::plan::Allocator;
 use ::policy::copyspace::CopySpace;
 use ::policy::immortalspace::ImmortalSpace;
 use ::plan::Phase;
-use ::plan::trace::Trace;
 use ::util::ObjectReference;
 
 use libc::c_void;
@@ -41,7 +40,6 @@ pub struct SemiSpaceUnsync {
     pub hi: bool,
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
-    pub ss_trace: Trace,
     pub versatile_space: ImmortalSpace,
 }
 
@@ -59,7 +57,6 @@ impl<'a> Plan for SemiSpace<'a> {
                 hi: false,
                 copyspace0: CopySpace::new(false),
                 copyspace1: CopySpace::new(true),
-                ss_trace: Trace::new(),
                 versatile_space: ImmortalSpace::new(),
             }),
         }
@@ -110,7 +107,6 @@ impl<'a> Plan for SemiSpace<'a> {
                 unsync.hi = !unsync.hi;
                 unsync.copyspace0.prepare(unsync.hi);
                 unsync.copyspace1.prepare(!unsync.hi);
-                unsync.ss_trace.prepare();
                 unsync.versatile_space.prepare();
             }
             &Phase::StackRoots => {
@@ -122,7 +118,6 @@ impl<'a> Plan for SemiSpace<'a> {
                 plan::set_gc_status(plan::GcStatus::GcProper);
             }
             &Phase::Closure => {
-                unsync.ss_trace.prepare();
             }
             &Phase::Release => {
                 self.fromspace().release();
