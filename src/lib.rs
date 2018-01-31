@@ -10,6 +10,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 
+#[macro_use]
 pub mod util;
 pub mod vm;
 mod policy;
