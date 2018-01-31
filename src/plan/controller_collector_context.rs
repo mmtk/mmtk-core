@@ -58,7 +58,6 @@ impl<'a> ControllerCollectorContext<'a> {
             VMScheduling::stop_all_mutators(thread_id);
 
             self.clear_request();
-            println!("Doing collection");
 
             debug!("[STWController: Triggering worker threads...]");
             workers.trigger_cycle();

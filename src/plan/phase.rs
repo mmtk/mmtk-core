@@ -7,6 +7,7 @@ use std::sync::atomic;
 
 #[derive(Clone)]
 #[derive(PartialEq)]
+#[derive(Debug)]
 pub enum Schedule {
     Global,
     Collector,
@@ -19,6 +20,7 @@ pub enum Schedule {
 
 #[derive(Clone)]
 #[derive(PartialEq)]
+#[derive(Debug)]
 pub enum Phase {
     // Phases
     SetCollectionKind,
@@ -51,7 +53,8 @@ pub enum Phase {
     SanityCheckTable,
     SanityRelease,
     // Complex phases
-    Complex(Vec<(Schedule, Phase)>),
+    Complex(Vec<(Schedule, Phase)>, usize),
+    // associated cursor
     // No phases are left
     Empty,
 }
@@ -107,14 +110,17 @@ fn process_phase_stack(thread_id: usize, resume: bool) {
         // FIXME timer
         match schedule {
             Schedule::Global => {
+                debug!("Execute {:?} as Global...", phase);
                 if primary {
                     unsafe { plan.collection_phase(thread_id, &phase) }
                 }
             }
             Schedule::Collector => {
+                debug!("Execute {:?} as Collector...", phase);
                 collector.collection_phase(thread_id, &phase, primary)
             }
             Schedule::Mutator => {
+                debug!("Execute {:?} as Mutator...", phase);
                 while let Some(mutator) = VMActivePlan::get_next_mutator() {
                     mutator.collection_phase(thread_id, &phase, primary);
                 }
@@ -156,10 +162,9 @@ fn get_current_phase(is_even_phase: bool) -> (Schedule, Phase) {
 fn get_next_phase() -> (Schedule, Phase) {
     let mut stack = PHASE_STACK.lock().unwrap();
     while !stack.is_empty() {
-        let (schedule, phase) = stack.pop().unwrap();
+        let (schedule, mut phase) = stack.pop().unwrap();
         match schedule {
-            Schedule::Placeholder => {
-            }
+            Schedule::Placeholder => {}
             Schedule::Global => {
                 return (schedule, phase);
             }
@@ -173,21 +178,22 @@ fn get_next_phase() -> (Schedule, Phase) {
                 unimplemented!()
             }
             Schedule::Complex => {
-                let cursor = COMPLEX_PHASE_CURSOR.load(atomic::Ordering::Relaxed);
-                COMPLEX_PHASE_CURSOR.store(cursor + 1, atomic::Ordering::Relaxed);
-                let mut internal_phase = None;
+                let mut internal_phase = (Schedule::Empty, Phase::Empty);
                 // FIXME start complex timer
-                if let Phase::Complex(ref v) = phase {
-                    if let Some(p) = v.get(cursor) {
-                        internal_phase = Some(p.clone());
+                if let Phase::Complex(ref v, ref mut cursor) = phase {
+                    trace!("Complex phase: {:?} with cursor: {:?}", v, cursor);
+                    if *cursor < v.len() {
+                        internal_phase = v[*cursor].clone();
+                        *cursor += 1;
+                    } else {
+                        trace!("Finished processing phase");
                     }
                 } else {
                     panic!("Complex schedule should be paired with complex phase");
                 }
-                if let Some(p) = internal_phase {
-                    // Haven't finished, put it back
-                    push_scheduled_phase((schedule, phase));
-                    push_scheduled_phase(p);
+                if internal_phase.1 != Phase::Empty {
+                    stack.push((schedule, phase));
+                    stack.push(internal_phase);
                 }
                 // FIXME stop complex timer
             }
