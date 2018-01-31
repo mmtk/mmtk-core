@@ -1,4 +1,4 @@
-use super::super::Scheduling;
+use super::super::Collection;
 
 use ::util::Address;
 use ::plan::ParallelCollector;
@@ -8,9 +8,9 @@ use super::JTOC_BASE;
 
 pub const BOOT_THREAD: usize = 1;
 
-pub struct VMScheduling {}
+pub struct VMCollection {}
 
-impl Scheduling for VMScheduling {
+impl Collection for VMCollection {
     #[inline(always)]
     fn stop_all_mutators(thread_id: usize) {
         unsafe {
@@ -38,7 +38,7 @@ impl Scheduling for VMScheduling {
     }
 }
 
-impl VMScheduling {
+impl VMCollection {
     #[inline(always)]
     pub unsafe fn thread_from_id(thread_id: usize) -> Address {
         Address::from_usize(Address::from_usize((JTOC_BASE + THREAD_BY_SLOT_FIELD_OFFSET)

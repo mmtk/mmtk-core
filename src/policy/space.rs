@@ -16,8 +16,7 @@ pub mod default {
     use ::util::ObjectReference;
     use ::util::heap::PageResource;
 
-    use ::vm::Scheduling;
-    use ::vm::VMScheduling;
+    use ::vm::{Collection, VMCollection};
 
     use std::sync::Mutex;
 
@@ -31,7 +30,7 @@ pub mod default {
         if ret.is_zero() {
             selected_plan::PLAN.control_collector_context.request();
             println!("Blocking for GC");
-            VMScheduling::block_for_gc(thread_id);
+            VMCollection::block_for_gc(thread_id);
             println!("GC completed");
         }
 

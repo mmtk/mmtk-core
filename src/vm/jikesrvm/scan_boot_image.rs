@@ -5,7 +5,7 @@ use super::entrypoint::*;
 use super::JTOC_BASE;
 use ::plan::{TraceLocal, Plan, SelectedPlan, ParallelCollector};
 
-use super::scheduling::VMScheduling;
+use super::collection::VMCollection;
 use super::super::{ActivePlan, VMActivePlan};
 
 const DEBUG: bool = false;

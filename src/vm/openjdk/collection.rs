@@ -1,9 +1,9 @@
-use super::super::Scheduling;
+use super::super::Collection;
 use ::plan::ParallelCollector;
 
-pub struct VMScheduling {}
+pub struct VMCollection {}
 
-impl Scheduling for VMScheduling {
+impl Collection for VMCollection {
     fn stop_all_mutators(thread_id: usize) {
         unimplemented!();
     }

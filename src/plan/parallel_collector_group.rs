@@ -4,8 +4,7 @@ use std::sync::{Mutex, Condvar};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::ParallelCollector;
-use ::vm::Scheduling;
-use ::vm::VMScheduling;
+use ::vm::{VMCollection, Collection};
 
 pub struct ParallelCollectorGroup<C: ParallelCollector> {
     //name: String,
@@ -58,7 +57,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
             self.contexts[i].set_group(self_ptr);
             self.contexts[i].set_worker_ordinal(i);
             unsafe {
-                VMScheduling::spawn_worker_thread(thread_id, &mut self.contexts[i] as *mut C);
+                VMCollection::spawn_worker_thread(thread_id, &mut self.contexts[i] as *mut C);
             }
         }
     }

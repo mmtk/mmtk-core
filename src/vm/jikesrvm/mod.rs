@@ -1,5 +1,5 @@
 use self::entrypoint::*;
-pub use self::scheduling::BOOT_THREAD;
+pub use self::collection::BOOT_THREAD;
 
 mod entrypoint;
 
@@ -7,7 +7,7 @@ mod entrypoint;
 mod jtoc_call;
 
 pub mod scanning;
-pub mod scheduling;
+pub mod collection;
 pub mod object_model;
 pub mod unboxed_size_constants;
 pub mod java_header;

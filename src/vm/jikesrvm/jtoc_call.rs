@@ -20,10 +20,10 @@ macro_rules! jikesrvm_instance_call {
 #[macro_export]
 macro_rules! jikesrvm_call {
     ($call_addr:expr, $thread_id:expr $(, $arg:ident)*) => ({
-        use ::vm::jikesrvm::scheduling::VMScheduling as _VMScheduling;
+        use ::vm::jikesrvm::collection::VMCollection as _VMCollection;
 
         let ret: usize;
-        let rvm_thread = _VMScheduling::thread_from_id($thread_id).as_usize();
+        let rvm_thread = _VMCollection::thread_from_id($thread_id).as_usize();
 
         jikesrvm_call_args!($($arg),*);
 

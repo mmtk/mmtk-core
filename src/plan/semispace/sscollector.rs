@@ -11,8 +11,7 @@ use ::util::{Address, ObjectReference};
 
 use ::policy::copyspace::CopySpace;
 
-use ::vm::VMScanning;
-use ::vm::Scanning;
+use ::vm::{Scanning, VMScanning};
 
 use ::plan::selected_plan::PLAN;
 

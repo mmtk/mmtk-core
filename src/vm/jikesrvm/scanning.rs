@@ -8,7 +8,7 @@ use super::JTOC_BASE;
 use super::unboxed_size_constants::LOG_BYTES_IN_ADDRESS;
 use super::super::{ObjectModel, VMObjectModel};
 use super::super::{ActivePlan, VMActivePlan};
-use super::scheduling::VMScheduling;
+use super::collection::VMCollection;
 use std::mem::size_of;
 use std::slice;
 
@@ -148,7 +148,7 @@ impl VMScanning {
                     break;
                 }
 
-                let thread = VMScheduling::thread_from_index(thread_index);
+                let thread = VMCollection::thread_from_index(thread_index);
 
                 if thread.is_zero() {
                     continue;

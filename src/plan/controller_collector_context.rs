@@ -4,8 +4,7 @@ use std::cell::UnsafeCell;
 use std::sync::{Mutex, Condvar};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use ::vm::Scheduling;
-use ::vm::VMScheduling;
+use ::vm::{Collection, VMCollection};
 
 use ::plan::{Plan, ParallelCollector};
 use ::plan::selected_plan::SelectedPlan;
@@ -55,7 +54,7 @@ impl<'a> ControllerCollectorContext<'a> {
             self.wait_for_request();
             debug!("[STWController: Request recieved.]");
             debug!("[STWController: Stopping the world...]");
-            VMScheduling::stop_all_mutators(thread_id);
+            VMCollection::stop_all_mutators(thread_id);
 
             self.clear_request();
 
@@ -65,7 +64,7 @@ impl<'a> ControllerCollectorContext<'a> {
             workers.wait_for_cycle();
             debug!("[STWController: Worker threads complete!]");
             debug!("[STWController: Resuming mutators...]");
-            VMScheduling::resume_mutators(thread_id);
+            VMCollection::resume_mutators(thread_id);
         }
     }
 

@@ -7,7 +7,7 @@ use ::plan::TraceLocal;
 use ::plan::CollectorContext;
 use ::plan::ParallelCollectorGroup;
 
-use ::vm::{Scheduling, VMScheduling};
+use ::vm::{Collection, VMCollection};
 
 #[cfg(feature = "jikesrvm")]
 use ::vm::jikesrvm::JTOC_BASE;
@@ -123,7 +123,7 @@ pub unsafe extern fn start_worker(thread_id: usize, worker: *mut c_void) {
 #[cfg(feature = "jikesrvm")]
 pub unsafe extern fn enable_collection(thread_id: usize, size: usize) {
     (&mut *selected_plan::PLAN.control_collector_context.workers.get()).init_group(thread_id, size);
-    VMScheduling::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(thread_id, null_mut()); // spawn controller thread
+    VMCollection::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(thread_id, null_mut()); // spawn controller thread
 }
 
 #[no_mangle]

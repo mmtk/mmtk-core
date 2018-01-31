@@ -1,10 +1,10 @@
 mod object_model;
 mod scanning;
-mod scheduling;
+mod collection;
 mod active_plan;
 pub use self::object_model::ObjectModel;
 pub use self::scanning::Scanning;
-pub use self::scheduling::Scheduling;
+pub use self::collection::Collection;
 pub use self::active_plan::ActivePlan;
 
 #[cfg(feature = "jikesrvm")]
@@ -17,7 +17,7 @@ pub use self::jikesrvm::object_model::VMObjectModel as VMObjectModel;
 pub use self::jikesrvm::scanning::VMScanning as VMScanning;
 
 #[cfg(feature = "jikesrvm")]
-pub use self::jikesrvm::scheduling::VMScheduling as VMScheduling;
+pub use self::jikesrvm::collection::VMCollection as VMCollection;
 
 #[cfg(feature = "jikesrvm")]
 pub use self::jikesrvm::active_plan::VMActivePlan as VMActivePlan;
@@ -38,7 +38,7 @@ pub use self::openjdk::object_model::VMObjectModel as VMObjectModel;
 pub use self::openjdk::scanning::VMScanning as VMScanning;
 
 #[cfg(not(feature = "jikesrvm"))]
-pub use self::openjdk::scheduling::VMScheduling as VMScheduling;
+pub use self::openjdk::collection::VMCollection as VMCollection;
 
 #[cfg(not(feature = "jikesrvm"))]
 pub use self::openjdk::active_plan::VMActivePlan as VMActivePlan;

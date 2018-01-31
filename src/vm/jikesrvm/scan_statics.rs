@@ -1,6 +1,6 @@
 use super::entrypoint::*;
 use super::JTOC_BASE;
-use super::scheduling::VMScheduling;
+use super::collection::VMCollection;
 use ::util::Address;
 use ::plan::{TraceLocal, SelectedPlan, Plan, ParallelCollector};
 
