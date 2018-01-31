@@ -1,5 +1,8 @@
-use super::java_header_constants::*;
+use super::java_header_constants::{ADDRESS_BASED_HASHING, GC_HEADER_OFFSET, DYNAMIC_HASH_OFFSET,
+    HASH_STATE_MASK, HASH_STATE_HASHED_AND_MOVED, ARRAY_BASE_OFFSET, ARRAY_LENGTH_OFFSET,
+    HASHCODE_BYTES};
 use super::java_header::*;
+use super::memory_manager_constants::*;
 
 use ::vm::object_model::ObjectModel;
 use ::util::{Address, ObjectReference};
@@ -42,8 +45,15 @@ impl ObjectModel for VMObjectModel {
         unimplemented!()
     }
 
-    fn get_object_from_start_address(start: Address) -> ObjectReference {
-        unimplemented!()
+    unsafe fn get_object_from_start_address(start: Address) -> ObjectReference {
+        let mut _start = start;
+
+        /* Skip over any alignment fill */
+        while _start.load::<usize>() == ALIGNMENT_VALUE {
+            _start += size_of::<usize>();
+        }
+
+        (_start + OBJECT_REF_OFFSET).to_object_reference()
     }
 
     fn get_object_end_address(object: ObjectReference) -> Address {
@@ -112,7 +122,17 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn object_start_ref(object: ObjectReference) -> Address {
-        unimplemented!()
+        if MOVES_OBJECTS {
+            if ADDRESS_BASED_HASHING && !DYNAMIC_HASH_OFFSET {
+                let hash_state = unsafe {
+                    (object.to_address() + STATUS_OFFSET).load::<usize>() & HASH_STATE_MASK
+                };
+                if hash_state == HASH_STATE_HASHED_AND_MOVED {
+                    return object.to_address() - (OBJECT_REF_OFFSET + HASHCODE_BYTES);
+                }
+            }
+        }
+        object.to_address() - OBJECT_REF_OFFSET
     }
 
     fn ref_to_address(object: ObjectReference) -> Address {

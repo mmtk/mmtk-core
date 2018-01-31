@@ -11,7 +11,7 @@ pub trait ObjectModel {
     fn get_align_offset_when_copied(object: ObjectReference) -> usize;
     fn get_current_size(object: ObjectReference) -> usize;
     fn get_next_object(object: ObjectReference) -> ObjectReference;
-    fn get_object_from_start_address(start: Address) -> ObjectReference;
+    unsafe fn get_object_from_start_address(start: Address) -> ObjectReference;
     fn get_object_end_address(object: ObjectReference) -> Address;
     // FIXME: determine lifetime, returns byte[]
     fn get_type_descriptor(reference: ObjectReference) -> &'static [i8];
