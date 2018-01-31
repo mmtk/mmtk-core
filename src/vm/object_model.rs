@@ -32,4 +32,5 @@ pub trait ObjectModel {
     fn dump_object(object: ObjectReference);
     fn get_array_base_offset() -> isize;
     fn array_base_offset_trapdoor<T>(o: T) -> isize;
+    fn get_array_length_offset() -> isize;
 }

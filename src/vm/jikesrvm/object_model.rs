@@ -1,7 +1,11 @@
+use super::java_header_constants::*;
+use super::java_header::*;
+
 use ::vm::object_model::ObjectModel;
 use ::util::{Address, ObjectReference};
 use ::plan::Allocator;
 use std::mem::size_of;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct VMObjectModel {}
 
@@ -59,12 +63,16 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_array_length(object: ObjectReference) -> usize {
-        let len_addr = object.to_address() - size_of::<isize>();
+        let len_addr = object.to_address() + Self::get_array_length_offset();
         unsafe { len_addr.load::<usize>() }
     }
 
     fn attempt_available_bits(object: ObjectReference, old: usize, new: usize) -> bool {
-        unimplemented!()
+        let loc = unsafe {
+            &*((object.to_address() + STATUS_OFFSET).as_usize() as *mut AtomicUsize)
+        };
+        // XXX: What are the ordering requirements, anyway?
+        loc.compare_and_swap(old, new, Ordering::SeqCst) == old
     }
 
     fn prepare_available_bits(object: ObjectReference) -> usize {
@@ -88,7 +96,7 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn GC_HEADER_OFFSET() -> isize {
-        unimplemented!()
+        GC_HEADER_OFFSET
     }
 
     fn object_start_ref(object: ObjectReference) -> Address {
@@ -96,7 +104,7 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn ref_to_address(object: ObjectReference) -> Address {
-        unimplemented!()
+        object.to_address() + TIB_OFFSET
     }
 
     fn is_acyclic(typeref: ObjectReference) -> bool {
@@ -108,10 +116,14 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_array_base_offset() -> isize {
-        unimplemented!()
+        ARRAY_BASE_OFFSET
     }
 
     fn array_base_offset_trapdoor<T>(o: T) -> isize {
         unimplemented!()
+    }
+
+    fn get_array_length_offset() -> isize {
+        ARRAY_LENGTH_OFFSET
     }
 }

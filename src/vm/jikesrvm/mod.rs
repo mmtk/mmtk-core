@@ -10,6 +10,7 @@ pub mod scanning;
 pub mod scheduling;
 pub mod object_model;
 pub mod unboxed_size_constants;
+pub mod java_header;
 pub mod java_size_constants;
 pub mod java_header_constants;
 pub mod memory_manager_constants;

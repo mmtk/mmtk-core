@@ -2,7 +2,7 @@
 // I am so, so sorry
 #[macro_export]
 macro_rules! if_then_else_zero_usize {
-    ($cond:expr, $then_expr:expr) => ((!($cond as usize) + 1usize) & $then_expr);
+    ($cond:expr, $then_expr:expr) => ((-!($cond as isize) as usize) & $then_expr);
 }
 
 #[macro_export]

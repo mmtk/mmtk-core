@@ -112,4 +112,8 @@ impl ObjectModel for VMObjectModel {
     fn array_base_offset_trapdoor<T>(o: T) -> isize {
         unimplemented!()
     }
+
+    fn get_array_length_offset() -> isize {
+        unimplemented!()
+    }
 }
