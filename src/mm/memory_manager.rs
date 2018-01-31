@@ -19,12 +19,10 @@ use self::selected_plan::SelectedPlan;
 
 use ::plan::Allocator;
 
-use env_logger;
-
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
 pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
-    env_logger::init().unwrap();
+    ::util::logger::init().unwrap();
     JTOC_BASE = Address::from_mut_ptr(jtoc);
     selected_plan::PLAN.gc_init(heap_size);
     ::vm::JikesRVM::test1();
@@ -56,7 +54,7 @@ pub unsafe extern fn gc_init(heap_size: usize) {
     if cfg!(feature = "jikesrvm") {
         panic!("Should be calling jikesrvm_gc_init instead");
     }
-    env_logger::init().unwrap();
+    ::util::logger::init().unwrap();
     selected_plan::PLAN.gc_init(heap_size);
 }
 

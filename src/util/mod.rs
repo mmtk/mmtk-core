@@ -3,6 +3,7 @@ pub mod heap;
 pub mod address;
 pub mod forwarding_word;
 pub mod header_byte;
+pub mod logger;
 mod synchronized_counter;
 
 pub use self::address::Address;
