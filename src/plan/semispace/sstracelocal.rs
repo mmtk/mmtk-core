@@ -12,8 +12,8 @@ use ::plan::selected_plan::PLAN;
 
 pub struct SSTraceLocal {
     thread_id: usize,
-    root_locations: Stealer<Address>,
-    values: Stealer<ObjectReference>,
+    root_locations: Deque<Address>,
+    values: Deque<ObjectReference>,
 }
 
 impl TransitiveClosure for SSTraceLocal {
@@ -26,20 +26,22 @@ impl TransitiveClosure for SSTraceLocal {
     }
 
     fn process_node(&mut self, object: ObjectReference) {
-        // FIXME
-        // self.values.push_back(object);
-        unimplemented!()
+        self.values.push(object);
     }
 }
 
 impl TraceLocal for SSTraceLocal {
     fn process_roots(&mut self) {
         loop {
-            match self.root_locations.steal() {
-                Steal::Empty => break,
-                Steal::Data(slot) => self.process_root_edge(slot, true),
-                Steal::Retry => {}
-            }
+            let slot = {
+                if !self.root_locations.is_empty() {
+                    self.root_locations.pop().unwrap()
+                } else {
+                    // FIXME stealing
+                    unimplemented!()
+                }
+            };
+            self.process_root_edge(slot, true)
         }
     }
 
@@ -77,16 +79,19 @@ impl TraceLocal for SSTraceLocal {
         }
 
         loop {
-            match self.values.steal() {
-                Steal::Empty => break,
-                Steal::Data(object) => VMScanning::scan_object(self, object, id),
-                Steal::Retry => {}
-            }
+            let object = {
+                if !self.values.is_empty() {
+                    self.values.pop().unwrap()
+                } else {
+                    // FIXME stealing
+                    unimplemented!()
+                }
+            };
+            VMScanning::scan_object(self, object, id);
         }
     }
 
-    fn release(&mut self) {
-    }
+    fn release(&mut self) {}
 
     fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, root: bool) {
         let interior_ref: Address = unsafe { slot.load() };
@@ -98,9 +103,7 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn report_delayed_root_edge(&mut self, slot: Address) {
-        // FIXME
-        // self.root_locations.push_front(slot);
-        unimplemented!()
+        self.root_locations.push(slot);
     }
 }
 
@@ -108,8 +111,8 @@ impl SSTraceLocal {
     pub fn new(ss_trace: &Trace) -> Self {
         SSTraceLocal {
             thread_id: 0,
-            root_locations: ss_trace.root_locations.stealer(),
-            values: ss_trace.values.stealer(),
+            root_locations: Deque::new(),
+            values: Deque::new(),
         }
     }
 
