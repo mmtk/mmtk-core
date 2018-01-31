@@ -12,7 +12,7 @@ const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 #[repr(C)]
 #[derive(Debug)]
 pub struct BumpAllocator<'a, T: 'a> where T: Space {
-    thread_id: usize,
+    pub thread_id: usize,
     cursor: Address,
     limit: Address,
     space: Option<&'a T>,

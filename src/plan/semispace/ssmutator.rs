@@ -8,6 +8,7 @@ use ::util::Address;
 use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
 use ::plan::plan;
+use ::vm::{Collection, VMCollection};
 
 #[repr(C)]
 pub struct SSMutator<'a> {
@@ -25,7 +26,7 @@ impl<'a> MutatorContext for SSMutator<'a> {
             }
             &Phase::PrepareStacks => {
                 if !plan::stacks_prepared() {
-                    unimplemented!("VM.collection.prepareMutator");
+                    VMCollection::prepare_mutator(self.ss.thread_id, self);
                 }
                 self.flush_remembered_sets();
             }

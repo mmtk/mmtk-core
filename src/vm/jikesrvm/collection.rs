@@ -1,7 +1,7 @@
 use super::super::Collection;
 
 use ::util::Address;
-use ::plan::ParallelCollector;
+use ::plan::{MutatorContext, ParallelCollector};
 
 use super::entrypoint::*;
 use super::JTOC_BASE;
@@ -35,6 +35,10 @@ impl Collection for VMCollection {
     #[inline(always)]
     unsafe fn spawn_worker_thread<T: ParallelCollector>(thread_id: usize, ctx: *mut T) {
         jtoc_call!(SPAWN_COLLECTOR_THREAD_METHOD_OFFSET, thread_id, ctx);
+    }
+
+    fn prepare_mutator<T: MutatorContext>(thread_id: usize, m: &T) {
+        unimplemented!()
     }
 }
 
