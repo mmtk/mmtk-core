@@ -37,8 +37,10 @@ impl<'a> CollectorContext for NoGCCollector<'a> {
     }
 
     fn run(&mut self, thread_id: usize) {
-        self.park();
-        self.collect();
+        loop {
+            self.park();
+            self.collect();
+        }
     }
 
     fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {

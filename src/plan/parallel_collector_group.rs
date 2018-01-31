@@ -84,11 +84,13 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
     pub fn wait_for_cycle(&self) {
         let mut inner = self.sync.lock().unwrap();
         while inner.contexts_parked < self.contexts.len() {
+            debug!("Inside wait_for_cycle loop, with {}/{} contexts parked", inner.contexts_parked, self.contexts.len());
             inner = self.condvar.wait(inner).unwrap();
         }
     }
 
     pub fn park(&self, context: &mut C) {
+        debug!("Parking context");
         // if (VM.VERIFY_ASSERTIONS) VM.assertions._assert(isMember(context));
         let mut inner = self.sync.lock().unwrap();
         context.increment_last_trigger_count();
