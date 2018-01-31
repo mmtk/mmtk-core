@@ -8,8 +8,9 @@ use ::plan::Allocator as AllocationType;
 
 #[repr(C)]
 pub struct NoGCMutator<'a> {
+    thread_id: usize,
     // ImmortalLocal
-    nogc: BumpAllocator<'a, ImmortalSpace>
+    nogc: BumpAllocator<'a, ImmortalSpace>,
 }
 
 impl<'a> MutatorContext for NoGCMutator<'a> {
@@ -29,6 +30,7 @@ impl<'a> MutatorContext for NoGCMutator<'a> {
 impl<'a> NoGCMutator<'a> {
     pub fn new(thread_id: usize, space: &'a ImmortalSpace) -> Self {
         NoGCMutator {
+            thread_id,
             nogc: BumpAllocator::new(thread_id, Some(space)),
         }
     }
