@@ -11,7 +11,6 @@ use ::plan::plan;
 
 #[repr(C)]
 pub struct SSMutator<'a> {
-    thread_id: usize,
     // CopyLocal
     ss: BumpAllocator<'a, CopySpace>,
     vs: BumpAllocator<'a, ImmortalSpace>,
@@ -56,7 +55,6 @@ impl<'a> MutatorContext for SSMutator<'a> {
 impl<'a> SSMutator<'a> {
     pub fn new(thread_id: usize, space: &'a CopySpace, versatile_space: &'a ImmortalSpace) -> Self {
         SSMutator {
-            thread_id,
             ss: BumpAllocator::new(thread_id, Some(space)),
             vs: BumpAllocator::new(thread_id, Some(versatile_space)),
         }
