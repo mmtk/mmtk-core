@@ -25,32 +25,40 @@ macro_rules! jikesrvm_call {
         let ret: usize;
         let rvm_thread = _VMCollection::thread_from_id($thread_id).as_usize();
 
-        jikesrvm_call_args!($($arg),*);
+        $(
+            asm!("push %ebx" : : "{ebx}"($arg) : "sp", "memory");
+        )*
 
-        asm!("call *%ebx" : "={eax}"(ret) : "{esi}"(rvm_thread),
-             "{ebx}"($call_addr) : "eax", "ebx", "ecx", "edx", "esi", "memory");
+        let call_addr = $call_addr;
+        jikesrvm_call_helper!(ret, rvm_thread, call_addr $(, $arg)*);
 
         ret
     });
 }
 
 #[cfg(target_arch = "x86")]
-macro_rules! jikesrvm_call_args {
-    () => ();
-
-    ($arg1:ident) => (
-        asm!("push %eax" : : "{eax}"($arg1) : "sp", "memory");
+macro_rules! jikesrvm_call_helper {
+    ($ret:ident, $rvm_thread:ident, $call_addr:ident) => (
+        asm!("call *%ebx"
+             : "={eax}"($ret)
+             : "{esi}"($rvm_thread), "{ebx}"($call_addr)
+             : "ebx", "ecx", "edx", "esi", "memory"
+             : "volatile");
     );
 
-    ($arg1:ident, $arg2:ident) => (
-        jikesrvm_call_args!($arg1);
-        asm!("push %edx" : : "{edx}"($arg2) : "sp", "memory");
+    ($ret:ident, $rvm_thread:ident, $call_addr:ident, $arg1:ident) => (
+        asm!("call *%ebx"
+             : "={eax}"($ret)
+             : "{esi}"($rvm_thread), "{ebx}"($call_addr), "{eax}"($arg1)
+             : "ebx", "ecx", "edx", "esi", "memory"
+             : "volatile");
     );
 
-    ($arg1:ident, $arg2:ident, $($arg:ident),+) => (
-        jikesrvm_call_args!($arg1, $arg2);
-        $(
-            asm!("push %ebx" : : "{ebx}"($arg) : "sp", "memory");
-        )*
+    ($ret:ident, $rvm_thread:ident, $call_addr:ident, $arg1:ident, $arg2:ident $(, $arg:ident)*) => (
+        asm!("call *%ebx"
+             : "={eax}"($ret)
+             : "{esi}"($rvm_thread), "{ebx}"($call_addr), "{eax}"($arg1), "{edx}"($arg2)
+             : "ebx", "ecx", "edx", "esi", "memory"
+             : "volatile");
     );
 }

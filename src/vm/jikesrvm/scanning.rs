@@ -162,7 +162,7 @@ impl VMScanning {
 
                 let trace_ptr = trace as *mut T;
                 let thread_usize = thread.as_usize();
-                debug!("Calling JikesRVM to compute thread roots");
+                debug!("Calling JikesRVM to compute thread roots, thread_usize={:x}", thread_usize);
                 jtoc_call!(SCAN_THREAD_METHOD_OFFSET, thread_id, thread_usize, trace_ptr,
                     process_code_locations, new_roots_sufficient);
                 debug!("Returned from JikesRVM thread roots");
