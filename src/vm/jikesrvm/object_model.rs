@@ -77,19 +77,19 @@ impl ObjectModel for VMObjectModel {
         unsafe { len_addr.load::<usize>() }
     }
 
-    // XXX: What are the ordering requirements, anyway?
     fn attempt_available_bits(object: ObjectReference, old: usize, new: usize) -> bool {
         let loc = unsafe {
             &*((object.to_address() + STATUS_OFFSET).as_usize() as *mut AtomicUsize)
         };
-        loc.compare_and_swap(old, new, Ordering::SeqCst) == old
+        // XXX: Relaxed in OK on failure, right??
+        loc.compare_exchange(old, new, Ordering::Release, Ordering::Relaxed).is_ok()
     }
 
     fn prepare_available_bits(object: ObjectReference) -> usize {
         let loc = unsafe {
             &*((object.to_address() + STATUS_OFFSET).as_usize() as *mut AtomicUsize)
         };
-        loc.load(Ordering::SeqCst)
+        loc.load(Ordering::Acquire)
     }
 
     // XXX: Supposedly none of the 4 methods below need to use atomic loads/stores
