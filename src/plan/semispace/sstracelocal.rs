@@ -119,9 +119,13 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn report_delayed_root_edge(&mut self, slot: Address) {
+        trace!("report_delayed_root_edge {:?} local len: {:?}", slot, self.root_locations.len());
         if self.root_locations.len() >= PUSH_BACK_THRESHOLD {
+            trace!("self.root_locations_pool.1.send({:?})", slot);
             self.root_locations_pool.1.send(slot).unwrap();
+            trace!("self.root_locations_pool.1.sent");
         } else {
+            trace!("self.root_locations.push({:?})", slot);
             self.root_locations.push(slot);
         }
     }

@@ -99,6 +99,7 @@ pub unsafe extern fn report_delayed_root_edge(trace_local: *mut c_void, addr: *m
 
 #[no_mangle]
 pub unsafe extern fn will_not_move_in_current_collection(trace_local: *mut c_void, obj: *mut c_void) -> bool {
+    trace!("will_not_move_in_current_collection({:?}, {:?})", trace_local, obj);
     let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
     local.will_not_move_in_current_collection(Address::from_usize(obj as usize).to_object_reference())
 }
