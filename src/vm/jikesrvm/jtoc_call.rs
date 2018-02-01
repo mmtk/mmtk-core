@@ -7,10 +7,12 @@ macro_rules! jtoc_call {
     });
 }
 
+// FIXME: $offset is relative to the **TIB**, not the object itself
 #[cfg(target_arch = "x86")]
 #[macro_export]
 macro_rules! jikesrvm_instance_call {
     ($obj:expr, $offset:expr, $thread_id:expr $(, $arg:ident)*) => ({
+        unimplemented!();
         let call_addr = ($obj + $offset).load::<fn()>();
         jikesrvm_call!(call_addr, $thread_id $(, $arg)*)
     });
