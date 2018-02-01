@@ -55,7 +55,9 @@ impl Scanning for VMScanning {
         // FIXME: This should really be called on a specific mutator,
         //        but since we're not dealing with write barriers for
         //        now we'll ignore it.
-        // <SelectedPlan as Plan>::MutatorT::flush_remembered_sets();
+        unsafe {
+            VMActivePlan::mutator(thread_id).flush_remembered_sets();
+        }
     }
 
     fn compute_static_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
