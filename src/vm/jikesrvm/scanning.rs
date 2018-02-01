@@ -18,7 +18,7 @@ pub struct VMScanning {}
 
 impl Scanning for VMScanning {
     fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, thread_id: usize) {
-        debug!("jtoc_call");
+        trace!("VMScanning::jtoc_call(, {:?}, {:?})", object, thread_id);
         let obj_ptr = object.value();
         let elt0_ptr: usize = unsafe {
             jtoc_call!(GET_OFFSET_ARRAY_METHOD_OFFSET, thread_id, obj_ptr)
