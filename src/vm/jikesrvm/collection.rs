@@ -10,6 +10,7 @@ pub const BOOT_THREAD: usize = 1;
 
 pub struct VMCollection {}
 
+// FIXME: Shouldn't these all be unsafe because of thread_id?
 impl Collection for VMCollection {
     #[inline(always)]
     fn stop_all_mutators(thread_id: usize) {
@@ -38,7 +39,10 @@ impl Collection for VMCollection {
     }
 
     fn prepare_mutator<T: MutatorContext>(thread_id: usize, m: &T) {
-        unimplemented!()
+        unsafe {
+            let mutator_thread = Self::thread_from_id(m.get_thread_id()).as_usize();
+            jtoc_call!(PREPARE_MUTATOR_METHOD_OFFSET, thread_id, mutator_thread);
+        }
     }
 }
 

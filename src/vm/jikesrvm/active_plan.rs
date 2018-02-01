@@ -30,8 +30,9 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
     }
 
     unsafe fn mutator(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::MutatorT {
-        &mut *(VMCollection::thread_from_id(thread_id).as_usize()
-            as *mut <SelectedPlan<'a> as Plan>::MutatorT)
+        let thread = VMCollection::thread_from_id(thread_id);
+        let mutator = (thread + MMTK_HANDLE_FIELD_OFFSET).load::<usize>();
+        &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)
     }
 
     fn collector_count() -> usize {
@@ -53,10 +54,12 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
                 let active_mutator_context = unsafe { (t + ACTIVE_MUTATOR_CONTEXT_FIELD_OFFSET)
                     .load::<bool>() };
                 if active_mutator_context {
-                    let ret = unsafe {
-                        &mut *(t.as_usize() as *mut <SelectedPlan<'a> as Plan>::MutatorT)
-                    };
-                    return Some(ret);
+                    unsafe {
+                        let mutator = (t + MMTK_HANDLE_FIELD_OFFSET).load::<usize>();
+                        let ret =
+                            &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT);
+                        return Some(ret);
+                    }
                 }
             }
         }

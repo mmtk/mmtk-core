@@ -24,6 +24,9 @@ impl<'a> MutatorContext for NoGCMutator<'a> {
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         self.nogc.alloc_slow(size, align, offset)
     }
+    fn get_thread_id(&self) -> usize {
+        self.nogc.thread_id
+    }
 }
 
 impl<'a> NoGCMutator<'a> {

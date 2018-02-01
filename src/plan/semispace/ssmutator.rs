@@ -21,7 +21,7 @@ impl<'a> MutatorContext for SSMutator<'a> {
     fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
         match phase {
             &Phase::Prepare => {
-                // rebing the allocation bump pointer to the appropriate semispace
+                // rebind the allocation bump pointer to the appropriate semispace
                 self.ss.rebind(Some(semispace::PLAN.tospace()));
             }
             &Phase::PrepareStacks => {
@@ -50,6 +50,10 @@ impl<'a> MutatorContext for SSMutator<'a> {
             AllocationType::Default => { self.ss.alloc_slow(size, align, offset) }
             _ => { self.vs.alloc_slow(size, align, offset) }
         }
+    }
+    fn get_thread_id(&self) -> usize {
+        debug_assert!(self.ss.thread_id == self.vs.thread_id);
+        self.ss.thread_id
     }
 }
 
