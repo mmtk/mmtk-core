@@ -1,6 +1,8 @@
 use ::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use super::unboxed_size_constants::*;
+use super::java_size_constants::*;
 use super::entrypoint::*;
 use super::JTOC_BASE;
 use ::plan::{TraceLocal, Plan, SelectedPlan, ParallelCollector};
@@ -15,7 +17,7 @@ const LOG_CHUNK_BYTES: usize = 12;
 const CHUNK_BYTES: usize = 1 << LOG_CHUNK_BYTES;
 const LONGENCODING_MASK: usize = 0x1;
 const RUN_MASK: usize = 0x2;
-const MAX_RUN: usize = (1 << 8) - 1;
+const MAX_RUN: usize = (1 << BITS_IN_BYTE) - 1;
 const LONGENCODING_OFFSET_BYTES: usize = 4;
 const GUARD_REGION: usize = LONGENCODING_OFFSET_BYTES + 1; /* long offset + run encoding */
 
@@ -108,14 +110,14 @@ fn decode_long_encoding(cursor: Address) -> usize {
     unsafe {
         let mut value: usize;
         value = cursor.load::<u8>() as usize & 0x000000fc;
-        value |= (((cursor + 1isize).load::<u8>() as usize) << 8) & 0x0000ff00;
-        value |= (((cursor + 2isize).load::<u8>() as usize) << 16) & 0x00ff0000;
-        value |= (((cursor + 3isize).load::<u8>() as usize) << 24) & 0xff000000;
+        value |= (((cursor + 1isize).load::<u8>() as usize) << BITS_IN_BYTE) & 0x0000ff00;
+        value |= (((cursor + 2isize).load::<u8>() as usize) << (2 * BITS_IN_BYTE)) & 0x00ff0000;
+        value |= (((cursor + 3isize).load::<u8>() as usize) << (3 * BITS_IN_BYTE)) & 0xff000000;
         value
     }
 }
 
 fn is_address_aligned(offset: Address) -> bool {
-    offset.as_usize() % 4 == 0
+    offset.as_usize() % BYTES_IN_ADDRESS == 0
 }
 
