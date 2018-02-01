@@ -91,7 +91,6 @@ impl<'a> CollectorContext for SSCollector<'a> {
                 // FIXME
             }
             &Phase::Complete => {
-                unimplemented!()
             }
             &Phase::Closure => { self.trace.complete_trace() }
             &Phase::Release => { self.trace.release() }
