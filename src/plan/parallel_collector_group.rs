@@ -90,7 +90,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
 
     pub fn park(&self, context: &mut C) {
         debug!("Parking context");
-        // if (VM.VERIFY_ASSERTIONS) VM.assertions._assert(isMember(context));
+        // FIXME if (VM.VERIFY_ASSERTIONS) VM.assertions._assert(isMember(context));
         let mut inner = self.sync.lock().unwrap();
         context.increment_last_trigger_count();
         if context.get_last_trigger_count() == inner.trigger_count {

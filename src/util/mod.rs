@@ -5,6 +5,7 @@ pub mod forwarding_word;
 pub mod header_byte;
 pub mod logger;
 pub mod constants;
+pub mod global_pool;
 #[macro_use]
 pub mod macros;
 mod synchronized_counter;
