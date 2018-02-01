@@ -67,22 +67,17 @@ impl Scanning for VMScanning {
 
     fn compute_global_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
         unsafe {
-            trace!("1.1");
             let cc = VMActivePlan::collector(thread_id);
 
-            trace!("1.2");
             let jni_functions = JTOC_BASE + JNI_FUNCTIONS_FIELD_OFFSET;
             let jni_function_table = Address::from_usize(
                 (jni_functions + JNI_FUNCTIONS_FIELD_OFFSET).load::<usize>());
             let threads = cc.parallel_worker_count();
-            trace!("1.3");
             let jni_function_table_data = Address::from_usize(
                 (jni_function_table + FUNCTION_TABLE_DATA_FIELD_OFFSET).load::<usize>());
             let mut size = (jni_function_table_data + ARRAY_LENGTH_OFFSET).load::<usize>();
-            trace!("1.4");
             let mut chunk_size = size / threads;
 
-            trace!("1.5");
             let mut start = cc.parallel_worker_ordinal() * chunk_size;
             let mut end = if cc.parallel_worker_ordinal() + 1 == threads {
                 size
@@ -90,19 +85,15 @@ impl Scanning for VMScanning {
                 threads * chunk_size
             };
 
-            trace!("1.6");
             for i in start .. end {
                 let function_address_slot = jni_functions + (i * 4);
-                trace!("1.7");
                 if jtoc_call!(IMPLEMENTED_IN_JAVA_METHOD_OFFSET, thread_id, i) != 0 {
                     trace.process_root_edge(function_address_slot, true);
                 } else {
                     // Function implemented as a C function, must not be
                     // scanned.
                 }
-                trace!("1.8");
             }
-            trace!("1.9");
 
             let linkage_triplets = Address::from_usize(
                 (JTOC_BASE + LINKAGE_TRIPLETS_FIELD_OFFSET).load::<usize>());
@@ -112,7 +103,6 @@ impl Scanning for VMScanning {
                 }
             }
 
-            trace!("1.10");
             let jni_global_refs = Address::from_usize(
                 (JTOC_BASE + JNI_GLOBAL_REFS_FIELD2_OFFSET).load::<usize>());
             size = (jni_global_refs - 4).load::<usize>();
@@ -123,12 +113,10 @@ impl Scanning for VMScanning {
             } else {
                 threads * chunk_size
             };
-            trace!("1.11");
 
             for i in start .. end {
                 trace.process_root_edge(jni_global_refs + 4 * i, true);
             }
-            trace!("1.12");
         }
     }
 
