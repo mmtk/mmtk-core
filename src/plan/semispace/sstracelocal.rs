@@ -125,6 +125,12 @@ impl TraceLocal for SSTraceLocal {
             self.root_locations.push(slot);
         }
     }
+
+    fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool {
+        let unsync = unsafe { &(*PLAN.unsync.get()) };
+        (unsync.hi && !unsync.copyspace0.in_space(obj)) ||
+            (!unsync.hi && !unsync.copyspace1.in_space(obj))
+    }
 }
 
 impl SSTraceLocal {

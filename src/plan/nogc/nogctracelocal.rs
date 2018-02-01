@@ -41,6 +41,10 @@ impl TraceLocal for NoGCTraceLocal {
     fn report_delayed_root_edge(&mut self, slot: Address) {
         unimplemented!()
     }
+
+    fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool {
+        true
+    }
 }
 
 impl NoGCTraceLocal {
