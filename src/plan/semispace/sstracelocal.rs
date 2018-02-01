@@ -1,19 +1,23 @@
 use ::plan::{TransitiveClosure, TraceLocal};
 use ::plan::trace::Trace;
 use ::util::{Address, ObjectReference};
-use std::collections::VecDeque;
 use ::policy::space::Space;
 use ::vm::VMScanning;
 use ::vm::Scanning;
-use crossbeam_deque::{Deque, Steal, Stealer};
+use std::sync::mpsc::Sender;
+use crossbeam_deque::{Steal, Stealer};
 
 use super::ss;
 use ::plan::selected_plan::PLAN;
 
+const PUSH_BACK_THRESHOLD: usize = 50;
+
 pub struct SSTraceLocal {
     thread_id: usize,
-    root_locations: Deque<Address>,
-    values: Deque<ObjectReference>,
+    values: Vec<ObjectReference>,
+    values_pool: (Stealer<ObjectReference>, Sender<ObjectReference>),
+    root_locations: Vec<Address>,
+    root_locations_pool: (Stealer<Address>, Sender<Address>),
 }
 
 impl TransitiveClosure for SSTraceLocal {
@@ -26,7 +30,11 @@ impl TransitiveClosure for SSTraceLocal {
     }
 
     fn process_node(&mut self, object: ObjectReference) {
-        self.values.push(object);
+        if self.values.len() >= PUSH_BACK_THRESHOLD {
+            self.values_pool.1.send(object).unwrap();
+        } else {
+            self.values.push(object);
+        }
     }
 }
 
@@ -37,8 +45,12 @@ impl TraceLocal for SSTraceLocal {
                 if !self.root_locations.is_empty() {
                     self.root_locations.pop().unwrap()
                 } else {
-                    // FIXME stealing
-                    unimplemented!()
+                    let work = self.root_locations_pool.0.steal();
+                    match work {
+                        Steal::Data(s) => s,
+                        Steal::Empty => return,
+                        Steal::Retry => continue
+                    }
                 }
             };
             self.process_root_edge(slot, true)
@@ -74,17 +86,19 @@ impl TraceLocal for SSTraceLocal {
     fn complete_trace(&mut self) {
         let id = self.thread_id;
 
-        if !self.root_locations.is_empty() {
-            self.process_roots();
-        }
+        self.process_roots();
 
         loop {
             let object = {
                 if !self.values.is_empty() {
                     self.values.pop().unwrap()
                 } else {
-                    // FIXME stealing
-                    unimplemented!()
+                    let work = self.values_pool.0.steal();
+                    match work {
+                        Steal::Data(o) => o,
+                        Steal::Empty => return,
+                        Steal::Retry => continue
+                    }
                 }
             };
             VMScanning::scan_object(self, object, id);
@@ -103,7 +117,11 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn report_delayed_root_edge(&mut self, slot: Address) {
-        self.root_locations.push(slot);
+        if self.root_locations.len() >= PUSH_BACK_THRESHOLD {
+            self.root_locations_pool.1.send(slot).unwrap();
+        } else {
+            self.root_locations.push(slot);
+        }
     }
 }
 
@@ -111,8 +129,10 @@ impl SSTraceLocal {
     pub fn new(ss_trace: &Trace) -> Self {
         SSTraceLocal {
             thread_id: 0,
-            root_locations: Deque::new(),
-            values: Deque::new(),
+            values: Vec::new(),
+            values_pool: PLAN.ss_trace.get_value_pool(),
+            root_locations: Vec::new(),
+            root_locations_pool: PLAN.ss_trace.get_root_location_pool(),
         }
     }
 
