@@ -63,7 +63,9 @@ impl<'a> CollectorContext for SSCollector<'a> {
         match phase {
             &Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
             &Phase::StackRoots => {
+                debug!("Computing thread roots");
                 VMScanning::compute_thread_roots(&mut self.trace, self.id);
+                debug!("Thread roots complete");
             }
             &Phase::Roots => {
                 VMScanning::compute_global_roots(&mut self.trace, self.id);
