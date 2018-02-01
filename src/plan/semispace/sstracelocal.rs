@@ -86,8 +86,10 @@ impl TraceLocal for SSTraceLocal {
     fn complete_trace(&mut self) {
         let id = self.thread_id;
 
+        // TODO Global empty or local empty
+        // if !self.root_locations.is_empty() {
         self.process_roots();
-
+        // }
         loop {
             let object = {
                 if !self.values.is_empty() {
