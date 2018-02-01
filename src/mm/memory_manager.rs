@@ -93,10 +93,10 @@ pub extern fn will_never_move(object: ObjectReference) -> bool {
 
 #[no_mangle]
 pub unsafe extern fn report_delayed_root_edge(trace_local: *mut c_void, addr: *mut c_void) {
-    debug!("JikesRVM called report_delayed_root_edge with trace_local={:?}", trace_local);
+    trace!("JikesRVM called report_delayed_root_edge with trace_local={:?}", trace_local);
     let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
     local.report_delayed_root_edge(Address::from_usize(addr as usize));
-    debug!("report_delayed_root_edge returned with trace_local={:?}", trace_local);
+    trace!("report_delayed_root_edge returned with trace_local={:?}", trace_local);
 }
 
 #[no_mangle]
@@ -104,17 +104,17 @@ pub unsafe extern fn will_not_move_in_current_collection(trace_local: *mut c_voi
     trace!("will_not_move_in_current_collection({:?}, {:?})", trace_local, obj);
     let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
     let ret = local.will_not_move_in_current_collection(Address::from_usize(obj as usize).to_object_reference());
-    debug!("will_not_move_in_current_collection returned with trace_local={:?}", trace_local);
+    trace!("will_not_move_in_current_collection returned with trace_local={:?}", trace_local);
     ret
 }
 
 #[no_mangle]
 pub unsafe extern fn process_interior_edge(trace_local: *mut c_void, target: *mut c_void, slot: *mut c_void, root: bool) {
-    debug!("JikesRVM called process_interior_edge with trace_local={:?}", trace_local);
+    trace!("JikesRVM called process_interior_edge with trace_local={:?}", trace_local);
     let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
     local.process_interior_edge(Address::from_usize(target as usize).to_object_reference(),
                                 Address::from_usize(slot as usize), root);
-    debug!("process_interior_root_edge returned with trace_local={:?}", trace_local);
+    trace!("process_interior_root_edge returned with trace_local={:?}", trace_local);
 
 }
 

@@ -12,8 +12,8 @@ pub struct Trace {
 impl Trace {
     pub fn new() -> Self {
         Trace {
-            values: global_pool::new(),
-            root_locations: global_pool::new(),
+            values: global_pool::new("Values"),
+            root_locations: global_pool::new("RootLocations"),
         }
     }
 
