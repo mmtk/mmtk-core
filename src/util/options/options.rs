@@ -3,6 +3,8 @@ use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::mem::discriminant;
 
+use self::CLIOptionType::*;
+
 extern crate num_cpus;
 
 /*
@@ -71,9 +73,9 @@ unsafe impl Sync for UnsafeOptionsWrapper {}
 impl UnsafeOptionsWrapper {
 
     unsafe fn register(&self) {
-        self.push("Threads", CLIOptionType::IntOption(num_cpus::get()));
-        self.push("ProtectOnRelease", CLIOptionType::BoolOption(false));
-        self.push("EagerCompleteSweep", CLIOptionType::BoolOption(false));
+        self.push("Threads", IntOption(num_cpus::get()));
+        self.push("ProtectOnRelease", BoolOption(false));
+        self.push("EagerCompleteSweep", BoolOption(false));
     }
 
     unsafe fn push(&self, name: &str, value: CLIOptionType){
@@ -86,6 +88,19 @@ impl UnsafeOptionsWrapper {
         }
     }
 
+    unsafe fn validate(name: &str, value: &CLIOptionType) -> bool {
+        match name {
+            "Threads" => {
+                if let &IntOption(v) = value {
+                    return v > 1
+                }
+            }
+            _ =>  {
+                return true
+            }
+        }
+        false
+    }
 
     unsafe fn process(&self, name: &str, value: &str) -> bool {
 
@@ -93,45 +108,40 @@ impl UnsafeOptionsWrapper {
 
         if let Some(o) = option {
             match o {
-                &CLIOptionType::BoolOption(b) => {
+                &BoolOption(b) => {
                     match value {
                         "true" => {
-                            self.push(name, CLIOptionType::BoolOption(true));
+                            self.push(name, BoolOption(true));
                             return true
                         }
                         "false" => {
-                            self.push(name, CLIOptionType::BoolOption(false));
+                            self.push(name, BoolOption(false));
                             return true
                         }
                         _ => return false
                     }
-                },
+                }
+                &IntOption(i) => {
+                    match value.parse() {
+                        Ok(v) => {
+                            let new_value = IntOption(v);
+                            if UnsafeOptionsWrapper::validate(name,&new_value) {
+                                self.push(name, new_value);
+                                return true
+                            }
+                            return false
+                        }
+                        Err(e) => {
+                            return false
+                        }
+                    }
+                }
                 _ => return false
             }
         } else {
             return false
         }
-        // Check that the type matches the given option
-        //if !(discriminant(option) == )
-    }
 
-    unsafe fn validate(name: &str, value: &CLIOptionType) -> bool {
-        match name {
-            "Threads" => {
-                if let &CLIOptionType::IntOption(v) = value {
-                    return v > 1
-                }
-            }
-            _ =>  {
-                return true
-                // Check that the string exists
-
-                // Check that the type matches :)
-                //(mem::discriminant(&Foo::A("bar")) == mem::discriminant(&Foo::A("baz")));
-                //discriminant()
-            }
-        }
-        false
     }
 
 }
