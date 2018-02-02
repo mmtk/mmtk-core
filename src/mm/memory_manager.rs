@@ -1,5 +1,9 @@
 use std::ptr::null_mut;
 use libc::c_void;
+use libc::c_char;
+
+use std::ffi::CStr;
+use std::str;
 
 use plan::Plan;
 use ::plan::MutatorContext;
@@ -13,6 +17,7 @@ use ::vm::{Collection, VMCollection};
 use ::vm::jikesrvm::JTOC_BASE;
 
 use ::util::{Address, ObjectReference};
+use util::options::options::OptionMap;
 
 use ::plan::selected_plan;
 use self::selected_plan::SelectedPlan;
@@ -22,6 +27,10 @@ use ::plan::Allocator;
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
 pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
+    let option = &OptionMap;
+    unsafe {
+        option.register();
+    }
     ::util::logger::init().unwrap();
     JTOC_BASE = Address::from_mut_ptr(jtoc);
     selected_plan::PLAN.gc_init(heap_size);
@@ -138,4 +147,14 @@ pub unsafe extern fn enable_collection(thread_id: usize, size: usize) {
 #[cfg(not(feature = "jikesrvm"))]
 pub extern fn enable_collection(size: usize) {
     panic!("Cannot call enable_collection when not building for JikesRVM");
+}
+
+#[no_mangle]
+pub extern fn process(name: *const c_char, value: *const c_char) -> bool {
+    let name_str: &CStr = unsafe { CStr::from_ptr(name) };
+    let value_str: &CStr = unsafe { CStr::from_ptr(value) };
+    let option = &OptionMap;
+    unsafe {
+        option.process(name_str.to_str().unwrap(), value_str.to_str().unwrap())
+    }
 }

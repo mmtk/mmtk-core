@@ -72,14 +72,18 @@ unsafe impl Sync for UnsafeOptionsWrapper {}
 
 impl UnsafeOptionsWrapper {
 
-    unsafe fn register(&self) {
-        self.push("Threads", IntOption(num_cpus::get()));
-        self.push("ProtectOnRelease", BoolOption(false));
-        self.push("EagerCompleteSweep", BoolOption(false));
+    pub unsafe fn register(&self) {
+        self.push("threads", IntOption(num_cpus::get()));
+        self.push("protectOnRelease", BoolOption(false));
+        self.push("eagerCompleteSweep", BoolOption(false));
     }
 
     unsafe fn push(&self, name: &str, value: CLIOptionType){
         (&mut *self.inner_map.get()).insert(String::from(name), value);
+    }
+
+    unsafe fn len(&self) -> usize{
+        (&mut *self.inner_map.get()).len()
     }
 
     fn get(&self, name: &str) -> Option<&CLIOptionType> {
@@ -90,7 +94,7 @@ impl UnsafeOptionsWrapper {
 
     unsafe fn validate(name: &str, value: &CLIOptionType) -> bool {
         match name {
-            "Threads" => {
+            "threads" => {
                 if let &IntOption(v) = value {
                     return v > 1
                 }
@@ -102,10 +106,8 @@ impl UnsafeOptionsWrapper {
         false
     }
 
-    unsafe fn process(&self, name: &str, value: &str) -> bool {
-
+    pub unsafe fn process(&self, name: &str, value: &str) -> bool {
         let option = self.get(name);
-
         if let Some(o) = option {
             match o {
                 &BoolOption(b) => {
