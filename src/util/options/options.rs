@@ -74,7 +74,8 @@ impl UnsafeOptionsWrapper {
 
     pub unsafe fn register(&self) {
         self.push("threads", IntOption(num_cpus::get()));
-        self.push("protectOnRelease", BoolOption(false));
+        self.push("useShortStackScans", BoolOption(false));
+        self.push("useReturnBarrier", BoolOption(false));
         self.push("eagerCompleteSweep", BoolOption(false));
     }
 
@@ -96,7 +97,7 @@ impl UnsafeOptionsWrapper {
         match name {
             "threads" => {
                 if let &IntOption(v) = value {
-                    return v > 1
+                    return v > 0
                 }
             }
             _ =>  {
