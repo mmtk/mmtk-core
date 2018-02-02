@@ -64,7 +64,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
             &Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
             &Phase::StackRoots => {
                 trace!("Computing thread roots");
-                // FIXME VMScanning::compute_thread_roots(&mut self.trace, self.id);
+                VMScanning::compute_thread_roots(&mut self.trace, self.id);
                 trace!("Thread roots complete");
             }
             &Phase::Roots => {
