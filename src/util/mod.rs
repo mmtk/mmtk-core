@@ -1,5 +1,6 @@
 pub mod alloc;
 pub mod heap;
+pub mod options;
 pub mod address;
 pub mod forwarding_word;
 pub mod header_byte;
