@@ -80,6 +80,7 @@ impl TraceLocal for SSTraceLocal {
         if plan_unsync.versatile_space.in_space(object) {
             return plan_unsync.versatile_space.trace_object(self, object);
         }
+        // FIXME: Check if object is in vmSpace etc.
         panic!("No special case for space in trace_object");
     }
 

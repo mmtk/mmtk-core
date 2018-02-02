@@ -1,4 +1,5 @@
 use super::memory_manager_constants::*;
+use super::java_header_constants::*;
 
 use ::vm::Scanning;
 use ::plan::{TransitiveClosure, TraceLocal, MutatorContext, Plan, SelectedPlan, ParallelCollector};
@@ -69,11 +70,12 @@ impl Scanning for VMScanning {
             let cc = VMActivePlan::collector(thread_id);
 
             let jni_functions = JTOC_BASE + JNI_FUNCTIONS_FIELD_OFFSET;
-            let jni_function_table_usize = (jni_functions + JNI_FUNCTIONS_FIELD_OFFSET).load::<usize>();
-            let jni_function_table = Address::from_usize(jni_function_table_usize);
+            let jni_function_table = Address::from_usize(
+                (jni_functions + JNI_FUNCTIONS_FIELD_OFFSET).load::<usize>());
             let threads = cc.parallel_worker_count();
-            let mut size = jikesrvm_instance_call!(jni_function_table, FUNCTION_TABLE_LENGTH_METHOD_OFFSET,
-                thread_id, jni_function_table_usize);
+            let jni_function_table_data = Address::from_usize(
+                (jni_function_table + FUNCTION_TABLE_DATA_FIELD_OFFSET).load::<usize>());
+            let mut size = (jni_function_table_data + ARRAY_LENGTH_OFFSET).load::<usize>();
             let mut chunk_size = size / threads;
 
             let mut start = cc.parallel_worker_ordinal() * chunk_size;

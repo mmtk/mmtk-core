@@ -1,5 +1,6 @@
 use log::{self, Log, Record, Level, Metadata, SetLoggerError, LevelFilter};
 use std::env;
+use std::thread;
 
 /// Adapted from SimpleLogger in crate `log`
 struct MMTkLogger;
@@ -13,7 +14,12 @@ impl Log for MMTkLogger {
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            println!("[{}:{}:{}] {}", record.level(), record.file().unwrap(), record.line().unwrap(), record.args());
+            println!("{:?}[{}:{}:{}] {}",
+                     thread::current().id(),
+                     record.level(),
+                     record.file().unwrap(),
+                     record.line().unwrap(),
+                     record.args());
         }
     }
 

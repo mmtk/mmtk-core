@@ -63,15 +63,20 @@ impl<'a> CollectorContext for SSCollector<'a> {
         match phase {
             &Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
             &Phase::StackRoots => {
-                debug!("Computing thread roots");
+                trace!("Computing thread roots");
                 VMScanning::compute_thread_roots(&mut self.trace, self.id);
-                debug!("Thread roots complete");
+                trace!("Thread roots complete");
             }
             &Phase::Roots => {
+                trace!("Computing global roots");
                 VMScanning::compute_global_roots(&mut self.trace, self.id);
+                trace!("Computing static roots");
                 VMScanning::compute_static_roots(&mut self.trace, self.id);
+                trace!("Finished static roots");
                 if super::ss::SCAN_BOOT_IMAGE {
+                    trace!("Scanning boot image");
                     VMScanning::compute_bootimage_roots(&mut self.trace, self.id);
+                    trace!("Finished boot image");
                 }
             }
             &Phase::SoftRefs => {
