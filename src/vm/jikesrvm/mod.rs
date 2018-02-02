@@ -15,6 +15,7 @@ pub mod java_size_constants;
 pub mod java_header_constants;
 pub mod memory_manager_constants;
 pub mod misc_header_constants;
+pub mod tib_layout_constants;
 pub mod scan_statics;
 pub mod scan_boot_image;
 pub mod active_plan;
