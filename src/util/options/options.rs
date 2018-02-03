@@ -2,10 +2,9 @@ use ::util::Address;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::mem::discriminant;
+use num_cpus;
 
 use self::CLIOptionType::*;
-
-extern crate num_cpus;
 
 /*
 // Boolean Options
