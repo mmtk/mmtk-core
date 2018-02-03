@@ -53,6 +53,9 @@ extern void start_worker(size_t thread_id, void* worker);
  */
  
 extern int used_bytes();
+extern void* starting_heap_address();
+extern void* last_heap_address();
+extern void iterator();
 
 
 #ifdef __cplusplus
