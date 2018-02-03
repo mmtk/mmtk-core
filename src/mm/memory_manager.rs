@@ -17,7 +17,7 @@ use ::vm::{Collection, VMCollection};
 use ::vm::jikesrvm::JTOC_BASE;
 
 use ::util::{Address, ObjectReference};
-use util::options::options::OptionMap;
+use util::options::option_closure::OptionMap;
 
 use ::plan::selected_plan;
 use self::selected_plan::SelectedPlan;
@@ -27,10 +27,6 @@ use ::plan::Allocator;
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
 pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
-    let option = &OptionMap;
-    unsafe {
-        option.register();
-    }
     ::util::logger::init().unwrap();
     JTOC_BASE = Address::from_mut_ptr(jtoc);
     selected_plan::PLAN.gc_init(heap_size);
