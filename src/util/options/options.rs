@@ -56,7 +56,7 @@ enum NurseryZeroingOptions {
 */
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EnumParseError(());
+pub struct EnumParseError(&'static str);
 
 impl fmt::Display for EnumParseError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
@@ -66,7 +66,7 @@ impl fmt::Display for EnumParseError {
 
 impl Error for EnumParseError {
     fn description(&self) -> &str {
-        "invalid enum string"
+        self.0
     }
 }
 
@@ -87,7 +87,7 @@ impl FromStr for NurseryZeroingOptions {
             "Nontemporal" => Ok(NurseryZeroingOptions::Nontemporal),
             "Concurrent" => Ok(NurseryZeroingOptions::Concurrent),
             "Adaptive" => Ok(NurseryZeroingOptions::Adaptive),
-            _ => Err(EnumParseError(()))
+            _ => Err(EnumParseError("Failed to parse NurseryZeroingOptions"))
         }
     }
 }
