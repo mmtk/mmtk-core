@@ -53,6 +53,7 @@ impl CopySpace {
         trace: &mut T,
         object: ObjectReference,
         allocator: Allocator,
+        thread_id: usize,
     ) -> ObjectReference
     {
         if !self.from_space {
@@ -65,7 +66,7 @@ impl CopySpace {
             }
             return ForwardingWord::extract_forwarding_pointer(forwarding_word);
         } else {
-            let new_object = VMObjectModel::copy(object, allocator);
+            let new_object = VMObjectModel::copy(object, allocator, thread_id);
             ForwardingWord::set_forwarding_pointer(object, new_object);
             trace.process_node(new_object);
             return new_object;

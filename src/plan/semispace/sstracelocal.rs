@@ -66,16 +66,17 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        let thread_id = self.thread_id;
         let plan_unsync = unsafe { &*PLAN.unsync.get() };
 
         if object.is_null() {
             return object;
         }
         if plan_unsync.copyspace0.in_space(object) {
-            return plan_unsync.copyspace0.trace_object(self, object, ss::ALLOC_SS);
+            return plan_unsync.copyspace0.trace_object(self, object, ss::ALLOC_SS, thread_id);
         }
         if plan_unsync.copyspace1.in_space(object) {
-            return plan_unsync.copyspace1.trace_object(self, object, ss::ALLOC_SS);
+            return plan_unsync.copyspace1.trace_object(self, object, ss::ALLOC_SS, thread_id);
         }
         if plan_unsync.versatile_space.in_space(object) {
             return plan_unsync.versatile_space.trace_object(self, object);

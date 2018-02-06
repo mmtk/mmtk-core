@@ -13,11 +13,14 @@ use super::java_size_constants::{BYTES_IN_INT, BYTES_IN_DOUBLE};
 use super::class_loader_constants::*;
 use super::JTOC_BASE;
 
+use super::super::ActivePlan;
+use super::active_plan::VMActivePlan;
+
 use ::vm::object_model::ObjectModel;
 use ::util::{Address, ObjectReference};
 use ::util::alloc::allocator::fill_alignment_gap;
 use ::util::constants::*;
-use ::plan::Allocator;
+use ::plan::{Allocator, CollectorContext};
 use std::mem::size_of;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -37,8 +40,18 @@ pub struct VMObjectModel {}
 
 impl ObjectModel for VMObjectModel {
     #[inline(always)]
-    fn copy(from: ObjectReference, allocator: Allocator) -> ObjectReference {
-        unimplemented!()
+    fn copy(from: ObjectReference, allocator: Allocator, thread_id: usize) -> ObjectReference {
+        unsafe {
+            let tib = Address::from_usize(from.to_address().load::<usize>());
+            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
+                .load::<usize>());
+
+            if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
+                Self::copy_array(from, tib, rvm_type, allocator, thread_id)
+            } else {
+                Self::copy_scalar(from, tib, rvm_type, allocator, thread_id)
+            }
+        }
     }
 
     #[inline(always)]
@@ -104,7 +117,7 @@ impl ObjectModel for VMObjectModel {
         }
     }
 
-    fn get_align_offset_when_copied(object: ObjectReference) -> usize {
+    fn get_align_offset_when_copied(object: ObjectReference) -> isize {
         unsafe {
             let tib = Address::from_usize(object.to_address().load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
@@ -169,7 +182,7 @@ impl ObjectModel for VMObjectModel {
             }
             object.to_address()
                 + Address::from_usize(size).align_up(BYTES_IN_INT).as_usize()
-                - OBJECT_REF_OFFSET
+                + (-OBJECT_REF_OFFSET)
         }
     }
 
@@ -256,11 +269,11 @@ impl ObjectModel for VMObjectModel {
                     (object.to_address() + STATUS_OFFSET).load::<usize>() & HASH_STATE_MASK
                 };
                 if hash_state == HASH_STATE_HASHED_AND_MOVED {
-                    return object.to_address() - (OBJECT_REF_OFFSET + HASHCODE_BYTES);
+                    return object.to_address() + (-(OBJECT_REF_OFFSET + HASHCODE_BYTES as isize));
                 }
             }
         }
-        object.to_address() - OBJECT_REF_OFFSET
+        object.to_address() + (-OBJECT_REF_OFFSET)
     }
 
     fn ref_to_address(object: ObjectReference) -> Address {
@@ -307,31 +320,76 @@ impl ObjectModel for VMObjectModel {
 
 impl VMObjectModel {
     #[inline(always)]
+    fn copy_scalar(from: ObjectReference, tib: Address, rvm_type: Address,
+                   immut_allocator: Allocator, thread_id: usize) -> ObjectReference {
+        let bytes = Self::bytes_required_when_copied_class(from, rvm_type);
+        let align = Self::get_alignment_class(rvm_type);
+        let offset = Self::get_offset_for_alignment_class(from, rvm_type);
+        let context = unsafe { VMActivePlan::collector(thread_id) };
+        let allocator = context.copy_check_allocator(from, bytes, align, immut_allocator);
+        let region = context.alloc_copy(from, bytes, align, offset, allocator);
+
+        let to_obj = Self::move_object(region, from, unsafe {Address::zero().to_object_reference()},
+                                       bytes, rvm_type);
+        context.post_copy(to_obj, tib, bytes, allocator);
+        to_obj
+    }
+
+    #[inline(always)]
+    fn copy_array(from: ObjectReference, tib: Address, rvm_type: Address,
+                  allocator: Allocator, thread_id: usize) -> ObjectReference {
+        unimplemented!()
+    }
+
+    #[inline(always)]
     fn bytes_required_when_copied(object: ObjectReference, rvm_type: Address) -> usize {
         unsafe {
-            let is_class = (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>();
-            let mut size = if is_class {
-                (rvm_type + INSTANCE_SIZE_FIELD_OFFSET).load::<usize>()
+            if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
+                Self::bytes_required_when_copied_class(object, rvm_type)
             } else {
-                let num_elements = Self::get_array_length(object);
-                ARRAY_HEADER_SIZE
-                    + (num_elements << (rvm_type + LOG_ELEMENT_SIZE_FIELD_OFFSET).load::<usize>())
-            };
-
-            if ADDRESS_BASED_HASHING {
-                let hash_state = (object.to_address() + STATUS_OFFSET).load::<usize>()
-                    & HASH_STATE_MASK;
-                if hash_state != HASH_STATE_UNHASHED {
-                    size += HASHCODE_BYTES;
-                }
-            }
-
-            if is_class {
-                size
-            } else {
-                Address::from_usize(size).align_up(BYTES_IN_INT).as_usize()
+                Self::bytes_required_when_copied_array(object, rvm_type)
             }
         }
+    }
+
+    #[inline(always)]
+    fn bytes_required_when_copied_class(object: ObjectReference, rvm_type: Address) -> usize {
+        let mut size = unsafe { (rvm_type + INSTANCE_SIZE_FIELD_OFFSET).load::<usize>() };
+
+        if ADDRESS_BASED_HASHING {
+            let hash_state = unsafe {
+                (object.to_address() + STATUS_OFFSET).load::<usize>()
+                    & HASH_STATE_MASK
+                };
+            if hash_state != HASH_STATE_UNHASHED {
+                size += HASHCODE_BYTES;
+            }
+        }
+
+        size
+    }
+
+    #[inline(always)]
+    fn bytes_required_when_copied_array(object: ObjectReference, rvm_type: Address) -> usize {
+        let mut size = {
+            let num_elements = Self::get_array_length(object);
+            unsafe {
+                ARRAY_HEADER_SIZE + (num_elements << (rvm_type + LOG_ELEMENT_SIZE_FIELD_OFFSET)
+                    .load::<usize>())
+            }
+        };
+
+        if ADDRESS_BASED_HASHING {
+            let hash_state = unsafe {
+                (object.to_address() + STATUS_OFFSET).load::<usize>()
+                    & HASH_STATE_MASK
+            };
+            if hash_state != HASH_STATE_UNHASHED {
+                size += HASHCODE_BYTES;
+            }
+        }
+
+        unsafe { Address::from_usize(size).align_up(BYTES_IN_INT).as_usize() }
     }
 
     #[inline(always)]
@@ -394,17 +452,17 @@ impl VMObjectModel {
                     }
                 } else if !DYNAMIC_HASH_OFFSET && hash_state == HASH_STATE_HASHED_AND_MOVED {
                     // Simple operation (no hash state change), but one word larger header
-                    obj_ref_offset += HASHCODE_BYTES;
+                    obj_ref_offset += (HASHCODE_BYTES as isize);
                 }
             }
         }
 
         if !to_obj.to_address().is_zero() {
-            to_address = to_obj.to_address() - obj_ref_offset;
+            to_address = to_obj.to_address() + (-obj_ref_offset);
         }
 
         // Low memory word of source object
-        let from_address = from_obj.to_address() - obj_ref_offset;
+        let from_address = from_obj.to_address() + (-obj_ref_offset);
 
         // Do the copy
         unsafe { Self::aligned_32_copy(to_address, from_address, copy_bytes); }
@@ -420,8 +478,8 @@ impl VMObjectModel {
             unsafe {
                 let hash_code = from_obj.value() >> LOG_BYTES_IN_ADDRESS;
                 if DYNAMIC_HASH_OFFSET {
-                    (to_obj.to_address() + num_bytes - OBJECT_REF_OFFSET - HASHCODE_BYTES)
-                        .store::<usize>(hash_code);
+                    (to_obj.to_address() + num_bytes + (-OBJECT_REF_OFFSET)
+                        + (-(HASHCODE_BYTES as isize))).store::<usize>(hash_code);
                 } else {
                     (to_obj.to_address() + HASHCODE_OFFSET)
                         .store::<usize>((hash_code << 1) | ALIGNMENT_MASK);
@@ -470,7 +528,7 @@ impl VMObjectModel {
     }
 
     #[inline(always)]
-    fn get_offset_for_alignment_array(object: ObjectReference, rvm_type: Address) -> usize {
+    fn get_offset_for_alignment_array(object: ObjectReference, rvm_type: Address) -> isize {
         let mut offset = OBJECT_REF_OFFSET;
 
         if ADDRESS_BASED_HASHING && !DYNAMIC_HASH_OFFSET {
@@ -478,7 +536,7 @@ impl VMObjectModel {
                 (object.to_address() + STATUS_OFFSET).load::<usize>() & HASH_STATE_MASK
             };
             if hash_state != HASH_STATE_UNHASHED {
-                offset += HASHCODE_BYTES;
+                offset += HASHCODE_BYTES as isize;
             }
         }
 
@@ -486,15 +544,15 @@ impl VMObjectModel {
     }
 
     #[inline(always)]
-    fn get_offset_for_alignment_class(object: ObjectReference, rvm_type: Address) -> usize {
-        let mut offset = SCALAR_HEADER_SIZE;
+    fn get_offset_for_alignment_class(object: ObjectReference, rvm_type: Address) -> isize {
+        let mut offset = SCALAR_HEADER_SIZE as isize;
 
         if ADDRESS_BASED_HASHING && !DYNAMIC_HASH_OFFSET {
             let hash_state = unsafe {
                 (object.to_address() + STATUS_OFFSET).load::<usize>() & HASH_STATE_MASK
             };
             if hash_state != HASH_STATE_UNHASHED {
-                offset += HASHCODE_BYTES;
+                offset += HASHCODE_BYTES as isize;
             }
         }
 

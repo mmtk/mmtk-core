@@ -5,7 +5,7 @@ use ::plan::Allocator;
 pub struct VMObjectModel {}
 
 impl ObjectModel for VMObjectModel {
-    fn copy(from: ObjectReference, allocator: Allocator) -> ObjectReference {
+    fn copy(from: ObjectReference, allocator: Allocator, thread_id: usize) -> ObjectReference {
         unimplemented!()
     }
 
@@ -25,7 +25,7 @@ impl ObjectModel for VMObjectModel {
         unimplemented!()
     }
 
-    fn get_align_offset_when_copied(object: ObjectReference) -> usize {
+    fn get_align_offset_when_copied(object: ObjectReference) -> isize {
         unimplemented!()
     }
 

@@ -4,10 +4,12 @@ use ::plan::ParallelCollectorGroup;
 use ::plan::semispace;
 use ::plan::{phase, Phase};
 use ::plan::TraceLocal;
+use ::plan::Allocator as AllocationType;
 
 use ::util::alloc::Allocator;
 use ::util::alloc::BumpAllocator;
 use ::util::{Address, ObjectReference};
+use ::util::forwarding_word::clear_forwarding_bits;
 
 use ::policy::copyspace::CopySpace;
 
@@ -47,7 +49,8 @@ impl<'a> CollectorContext for SSCollector<'a> {
         self.trace.init(id);
     }
 
-    fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: usize) -> Address {
+    fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize,
+                  allocator: AllocationType) -> Address {
         self.ss.alloc(bytes, align, offset)
     }
 
@@ -107,6 +110,17 @@ impl<'a> CollectorContext for SSCollector<'a> {
 
     fn get_id(&self) -> usize {
         self.id
+    }
+
+    fn post_copy(&self, object: ObjectReference, rvm_type: Address, bytes: usize, allocator: ::plan::Allocator) {
+        clear_forwarding_bits(object);
+        match allocator {
+            ::plan::Allocator::Los => {
+                let unsync = unsafe { &mut *(super::ss::PLAN.unsync.get()) };
+                unsync.versatile_space.initialize_header(object); // FIXME: has anotehr parameter: false
+            },
+            _ => (),
+        }
     }
 }
 

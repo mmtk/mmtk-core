@@ -4,6 +4,7 @@ use super::super::ParallelCollector;
 use super::super::CollectorContext;
 use super::super::TraceLocal;
 use super::super::Phase;
+use super::super::Allocator;
 
 use ::util::{Address, ObjectReference};
 
@@ -32,7 +33,7 @@ impl<'a> CollectorContext for NoGCCollector<'a> {
         self.id = id;
     }
 
-    fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: usize) -> Address {
+    fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: Allocator) -> Address {
         unimplemented!();
     }
 

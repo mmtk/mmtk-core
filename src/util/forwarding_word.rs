@@ -40,8 +40,8 @@ pub fn spin_and_get_forwarded_object(object: ObjectReference, status_word: usize
     } else { object }
 }
 
-pub fn forward_object(object: ObjectReference, allocator: Allocator) -> ObjectReference {
-    let new_object = VMObjectModel::copy(object, allocator);
+pub fn forward_object(object: ObjectReference, allocator: Allocator, thread_id: usize) -> ObjectReference {
+    let new_object = VMObjectModel::copy(object, allocator, thread_id);
     VMObjectModel::write_available_bits_word(object, new_object.to_address().as_usize() & FORWARDED as usize);
     new_object
 }

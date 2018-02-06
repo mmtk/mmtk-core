@@ -29,6 +29,7 @@ pub static STACKS_PREPARED: AtomicBool = AtomicBool::new(false);
 
 
 #[repr(i32)]
+#[derive(Clone, Copy)]
 pub enum Allocator {
     Default = 0,
     NonReference = 1,

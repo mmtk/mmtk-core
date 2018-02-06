@@ -46,6 +46,18 @@ pub fn fill_alignment_gap(immut_start: Address, end: Address) {
     }
 }
 
+#[inline(always)]
+pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: usize) -> usize {
+    debug_assert!(size == size & (known_alignment - 1));
+    debug_assert!(known_alignment >= MIN_ALIGNMENT);
+
+    if MAX_ALIGNMENT <= MIN_ALIGNMENT || alignment <= known_alignment {
+        return size;
+    } else {
+        return size + alignment - known_alignment;
+    }
+}
+
 pub trait Allocator<'a, T> where T: Space {
     fn get_space(&self) -> Option<&'a T>;
 
