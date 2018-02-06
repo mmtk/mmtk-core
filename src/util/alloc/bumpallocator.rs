@@ -1,6 +1,6 @@
 use ::util::address::Address;
+use super::allocator::{align_allocation, fill_alignment_gap};
 
-use ::util::alloc::allocator::align_allocation;
 use ::util::alloc::Allocator;
 
 use ::policy::space::Space;
@@ -47,6 +47,7 @@ impl<'a, T> Allocator<'a, T> for BumpAllocator<'a, T> where T: Space {
         if new_cursor > self.limit {
             self.alloc_slow(size, align, offset)
         } else {
+            fill_alignment_gap(self.cursor, result);
             self.cursor = new_cursor;
             result
         }
