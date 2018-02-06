@@ -1,5 +1,5 @@
 mod bumpallocator;
-mod allocator;
+pub mod allocator;
 
 pub use self::allocator::Allocator;
 pub use self::bumpallocator::BumpAllocator;

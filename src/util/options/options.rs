@@ -2,6 +2,8 @@ use std::str::FromStr;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use num_cpus;
+use std::fmt;
+use std::error::Error;
 
 use libc::c_void;
 
@@ -53,6 +55,43 @@ enum NurseryZeroingOptions {
 }
 */
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnumParseError(&'static str);
+
+impl fmt::Display for EnumParseError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.write_str(self.description())
+    }
+}
+
+impl Error for EnumParseError {
+    fn description(&self) -> &str {
+        self.0
+    }
+}
+
+#[derive(Copy, Clone)]
+pub enum NurseryZeroingOptions {
+    Temporal,
+    Nontemporal,
+    Concurrent,
+    Adaptive,
+}
+
+impl FromStr for NurseryZeroingOptions {
+    type Err = EnumParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Temporal" => Ok(NurseryZeroingOptions::Temporal),
+            "Nontemporal" => Ok(NurseryZeroingOptions::Nontemporal),
+            "Concurrent" => Ok(NurseryZeroingOptions::Concurrent),
+            "Adaptive" => Ok(NurseryZeroingOptions::Adaptive),
+            _ => Err(EnumParseError("Failed to parse NurseryZeroingOptions"))
+        }
+    }
+}
+
 pub struct UnsafeOptionsWrapper {
     inner_map: UnsafeCell<Options>
 }
@@ -71,54 +110,26 @@ impl UnsafeOptionsWrapper {
     }
 }
 
-pub trait CLIOption<T: Default> {
+pub trait CLIOption<T> {
     fn new(default: T, validator: Option<fn(T) -> bool>) -> Self;
     fn get(&self) -> T;
     fn set(&mut self, value: &str) -> bool;
 }
 
-pub struct IntOption {
-    value: usize,
-    validator: Option<fn(usize) -> bool>,
+pub struct GenericOption<T> {
+    value: T,
+    validator: Option<fn(T) -> bool>,
 }
 
-impl CLIOption<usize> for IntOption {
-    fn new(default: usize, validator: Option<fn(usize) -> bool>) -> Self {
-        Self {
+impl<T> CLIOption<T> for GenericOption<T> where T: FromStr + Copy {
+    fn new(default: T, validator: Option<fn(T) -> bool>) -> Self {
+        GenericOption {
             value: default,
             validator,
         }
     }
 
-    fn get(&self) -> usize {
-        self.value
-    }
-
-    fn set(&mut self, value: &str) -> bool {
-        if let Ok(dval) = value.parse() {
-            let succ = self.validator.unwrap_or(|_| true)(dval);
-            if succ { self.value = dval; }
-            succ
-        } else {
-            false
-        }
-    }
-}
-
-pub struct BoolOption {
-    value: bool,
-    validator: Option<fn(bool) -> bool>,
-}
-
-impl CLIOption<bool> for BoolOption {
-    fn new(default: bool, validator: Option<fn(bool) -> bool>) -> Self {
-        Self {
-            value: default,
-            validator,
-        }
-    }
-
-    fn get(&self) -> bool {
+    fn get(&self) -> T {
         self.value
     }
 
@@ -134,10 +145,11 @@ impl CLIOption<bool> for BoolOption {
 }
 
 pub struct Options {
-    pub threads: IntOption,
-    pub use_short_stack_scans: BoolOption,
-    pub use_return_barrier: BoolOption,
-    pub eager_complete_sweep: BoolOption,
+    pub threads: GenericOption<usize>,
+    pub use_short_stack_scans: GenericOption<bool>,
+    pub use_return_barrier: GenericOption<bool>,
+    pub eager_complete_sweep: GenericOption<bool>,
+    pub nursery_zeroing: GenericOption<NurseryZeroingOptions>,
 }
 
 impl Options {
@@ -148,6 +160,7 @@ impl Options {
             "useShortStackScans" => self.use_short_stack_scans.set(val),
             "useReturnBarrier" => self.use_return_barrier.set(val),
             "eagerCompleteSweep" => self.eager_complete_sweep.set(val),
+            "nurseryZeroing" => self.nursery_zeroing.set(val),
             _ => panic!("Invalid Options key")
         };
         if result {
@@ -162,9 +175,10 @@ impl Options {
 lazy_static! {
     pub static ref OptionMap: UnsafeOptionsWrapper = UnsafeOptionsWrapper { inner_map: UnsafeCell::new(
         Options {
-            threads: IntOption::new(num_cpus::get(), Some(|v| v > 0)),
-            use_short_stack_scans: BoolOption::new(false, None),
-            use_return_barrier: BoolOption::new(false, None),
-            eager_complete_sweep: BoolOption::new(false, None),
+            threads: GenericOption::new(num_cpus::get(), Some(|v| v > 0)),
+            use_short_stack_scans: GenericOption::new(false, None),
+            use_return_barrier: GenericOption::new(false, None),
+            eager_complete_sweep: GenericOption::new(false, None),
+            nursery_zeroing: GenericOption::new(NurseryZeroingOptions::Temporal, None)
         })};
 }
