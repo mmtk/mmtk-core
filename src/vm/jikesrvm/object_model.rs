@@ -337,8 +337,19 @@ impl VMObjectModel {
 
     #[inline(always)]
     fn copy_array(from: ObjectReference, tib: Address, rvm_type: Address,
-                  allocator: Allocator, thread_id: usize) -> ObjectReference {
-        unimplemented!()
+                  immut_allocator: Allocator, thread_id: usize) -> ObjectReference {
+        let bytes = Self::bytes_required_when_copied_array(from, rvm_type);
+        let align = Self::get_alignment_array(rvm_type);
+        let offset = Self::get_offset_for_alignment_array(from, rvm_type);
+        let context = unsafe { VMActivePlan::collector(thread_id) };
+        let allocator = context.copy_check_allocator(from, bytes, align, immut_allocator);
+        let region = context.alloc_copy(from, bytes, align, offset, allocator);
+
+        let to_obj = Self::move_object(region, from, unsafe {Address::zero().to_object_reference()},
+                                       bytes, rvm_type);
+        context.post_copy(to_obj, tib, bytes, allocator);
+        // XXX: Do not sync icache/dcache because we do not support PowerPC
+        to_obj
     }
 
     #[inline(always)]
