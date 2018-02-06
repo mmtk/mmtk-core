@@ -1,11 +1,13 @@
 use super::java_header_constants::{ADDRESS_BASED_HASHING, GC_HEADER_OFFSET, DYNAMIC_HASH_OFFSET,
     HASH_STATE_MASK, HASH_STATE_HASHED_AND_MOVED, ARRAY_BASE_OFFSET, ARRAY_LENGTH_OFFSET,
-    HASHCODE_BYTES};
+    HASHCODE_BYTES, HASH_STATE_UNHASHED};
 use super::java_header::*;
 use super::memory_manager_constants::*;
 use super::tib_layout_constants::*;
 use super::entrypoint::*;
 use super::unboxed_size_constants::*;
+use super::java_size_constants::{BYTES_IN_INT, BYTES_IN_DOUBLE};
+use super::class_loader_constants::*;
 use super::JTOC_BASE;
 
 use ::vm::object_model::ObjectModel;
@@ -27,19 +29,91 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference {
-        unimplemented!()
+        let mut res = to;
+        if ADDRESS_BASED_HASHING && !DYNAMIC_HASH_OFFSET {
+            unsafe {
+                let hash_state = (from.to_address() + STATUS_OFFSET).load::<usize>()
+                    & HASH_STATE_MASK;
+                if hash_state != HASH_STATE_UNHASHED {
+                    res += HASHCODE_BYTES;
+                }
+            }
+        }
+
+        unsafe { (to + OBJECT_REF_OFFSET).to_object_reference() }
     }
 
     fn get_size_when_copied(object: ObjectReference) -> usize {
-        unimplemented!()
+        unsafe {
+            let tib = Address::from_usize(object.to_address().load::<usize>());
+            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
+                .load::<usize>());
+
+            let is_class = (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>();
+            let mut size = if is_class {
+                (rvm_type + INSTANCE_SIZE_FIELD_OFFSET).load::<usize>()
+            } else {
+                let num_elements = Self::get_array_length(object);
+                ARRAY_HEADER_SIZE
+                    + (num_elements << (rvm_type + LOG_ELEMENT_SIZE_FIELD_OFFSET).load::<usize>())
+            };
+
+            if ADDRESS_BASED_HASHING {
+                let hash_state = (object.to_address() + STATUS_OFFSET).load::<usize>()
+                    & HASH_STATE_MASK;
+                if hash_state != HASH_STATE_UNHASHED {
+                    size += HASHCODE_BYTES;
+                }
+            }
+
+            if is_class {
+                size
+            } else {
+                Address::from_usize(size).align_up(BYTES_IN_INT).as_usize()
+            }
+        }
     }
 
     fn get_align_when_copied(object: ObjectReference) -> usize {
-        unimplemented!()
+        unsafe {
+            let tib = Address::from_usize(object.to_address().load::<usize>());
+            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
+                .load::<usize>());
+
+            if (rvm_type + IS_ARRAY_TYPE_FIELD_OFFSET).load::<bool>() {
+                (rvm_type + RVM_ARRAY_ALIGNMENT_OFFSET).load::<usize>()
+            } else {
+                if BYTES_IN_ADDRESS == BYTES_IN_DOUBLE {
+                    BYTES_IN_ADDRESS
+                } else {
+                    (rvm_type + RVM_CLASS_ALIGNMENT_OFFSET).load::<usize>()
+                }
+            }
+        }
     }
 
     fn get_align_offset_when_copied(object: ObjectReference) -> usize {
-        unimplemented!()
+        unsafe {
+            let tib = Address::from_usize(object.to_address().load::<usize>());
+            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
+                .load::<usize>());
+
+            let mut offset = if (rvm_type + IS_ARRAY_TYPE_FIELD_OFFSET).load::<bool>() {
+                OBJECT_REF_OFFSET
+            } else {
+                SCALAR_HEADER_SIZE
+            };
+
+            if ADDRESS_BASED_HASHING && !DYNAMIC_HASH_OFFSET {
+                let hash_state = (object.to_address() + STATUS_OFFSET).load::<usize>()
+                    & HASH_STATE_MASK;
+                if hash_state != HASH_STATE_UNHASHED {
+                    offset += HASHCODE_BYTES;
+                }
+            }
+
+            offset
+        }
     }
 
     fn get_current_size(object: ObjectReference) -> usize {
@@ -48,7 +122,8 @@ impl ObjectModel for VMObjectModel {
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
-            let mut size = if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
+            let is_class = (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>();
+            let mut size = if is_class {
                 (rvm_type + INSTANCE_SIZE_FIELD_OFFSET).load::<usize>()
             } else {
                 let num_elements = Self::get_array_length(object);
@@ -58,7 +133,7 @@ impl ObjectModel for VMObjectModel {
 
             if MOVES_OBJECTS {
                 if ADDRESS_BASED_HASHING {
-                    let hash_state = (object.value() as isize + STATUS_OFFSET) as usize
+                    let hash_state = (object.to_address() + STATUS_OFFSET).load::<usize>()
                         & HASH_STATE_MASK;
                     if hash_state == HASH_STATE_HASHED_AND_MOVED {
                         size += HASHCODE_BYTES;
@@ -66,7 +141,11 @@ impl ObjectModel for VMObjectModel {
                 }
             }
 
-            size
+            if is_class {
+                size
+            } else {
+                Address::from_usize(size).align_up(BYTES_IN_INT).as_usize()
+            }
         }
     }
 
@@ -103,7 +182,7 @@ impl ObjectModel for VMObjectModel {
             };
 
             if ADDRESS_BASED_HASHING && DYNAMIC_HASH_OFFSET {
-                let hash_state = (object.value() as isize + STATUS_OFFSET) as usize
+                let hash_state = (object.to_address() + STATUS_OFFSET).load::<usize>()
                     & HASH_STATE_MASK;
                 if hash_state == HASH_STATE_HASHED_AND_MOVED {
                     size += HASHCODE_BYTES;
@@ -208,7 +287,23 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn is_acyclic(typeref: ObjectReference) -> bool {
-        unimplemented!()
+        unsafe {
+            let tib = Address::from_usize(typeref.to_address().load::<usize>());
+            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
+                .load::<usize>());
+
+            let is_array = (rvm_type + IS_ARRAY_TYPE_FIELD_OFFSET).load::<bool>();
+            let is_class = (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>();
+            if !is_array && !is_class {
+                true
+            } else if is_array {
+                (rvm_type + RVM_ARRAY_ACYCLIC_OFFSET).load::<bool>()
+            } else {
+                let modifiers = (rvm_type + RVM_CLASS_MODIFIERS_OFFSET).load::<u16>();
+                (modifiers & ACC_FINAL != 0)
+                    && (rvm_type + RVM_CLASS_ACYCLIC_OFFSET).load::<bool>()
+            }
+        }
     }
 
     fn dump_object(object: ObjectReference) {
