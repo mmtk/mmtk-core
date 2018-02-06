@@ -6,6 +6,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use super::ParallelCollector;
 use ::vm::{VMCollection, Collection};
 
+use ::util::options::options::OptionMap;
+use util::options::options::CLIOption;
+
 pub struct ParallelCollectorGroup<C: ParallelCollector> {
     //name: String,
     contexts: Vec<C>,
@@ -42,11 +45,12 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         self.contexts.len()
     }
 
-    pub fn init_group(&mut self, thread_id: usize, size: usize) {
+    pub fn init_group(&mut self, thread_id: usize) {
         {
             let inner = self.sync.get_mut().unwrap();
             inner.trigger_count = 1;
         }
+        let size = OptionMap.get().threads.get();
         self.contexts = Vec::<C>::with_capacity(size);
         for i in 0..size {
             self.contexts.push(C::new());

@@ -131,8 +131,8 @@ pub unsafe extern fn start_worker(thread_id: usize, worker: *mut c_void) {
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
-pub unsafe extern fn enable_collection(thread_id: usize, size: usize) {
-    (&mut *selected_plan::PLAN.control_collector_context.workers.get()).init_group(thread_id, size);
+pub unsafe extern fn enable_collection(thread_id: usize) {
+    (&mut *selected_plan::PLAN.control_collector_context.workers.get()).init_group(thread_id);
     VMCollection::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(thread_id, null_mut()); // spawn controller thread
 }
 
