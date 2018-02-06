@@ -42,7 +42,7 @@ extern bool process(char* name, char* value);
  */
 extern void jikesrvm_gc_init(void* jtoc, size_t heap_size);
 
-extern void enable_collection(size_t thread_id, size_t size);
+extern void enable_collection(size_t thread_id);
 
 extern void start_control_collector(size_t thread_id);
 
@@ -51,7 +51,7 @@ extern void start_worker(size_t thread_id, void* worker);
 /**
  * openJdk-specific
  */
- 
+
 extern int used_bytes();
 extern void* starting_heap_address();
 extern void* last_heap_address();
