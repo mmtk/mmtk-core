@@ -20,3 +20,4 @@ mod plan;
 mod mm;
 
 pub use mm::memory_manager::*;
+pub use mm::test::*;
