@@ -1,4 +1,4 @@
-use libc::{mmap, PROT_READ, PROT_WRITE, PROT_EXEC, MAP_PRIVATE, MAP_ANON, c_void, munmap};
+use libc::{mmap, PROT_READ, PROT_WRITE, PROT_EXEC, MAP_PRIVATE, MAP_ANON, c_void, munmap, MAP_FAILED};
 use ::util::address::Address;
 use std::ptr::null_mut;
 
@@ -29,6 +29,11 @@ impl PageResource for MonotonePageResource {
             mmap(null_mut(), heap_size + SPACE_ALIGN, PROT_READ | PROT_WRITE | PROT_EXEC,
                  MAP_PRIVATE | MAP_ANON, -1, 0)
         };
+
+        if mmap_start == MAP_FAILED {
+            panic!("Failed to mmap");
+        }
+        info!("mmapped start: {:?}, len: {}", mmap_start, heap_size + SPACE_ALIGN);
         self.heap_cursor = Address::from_ptr::<c_void>(mmap_start)
             .align_up(SPACE_ALIGN);
         self.heap_limit = self.heap_cursor + heap_size;
@@ -37,12 +42,15 @@ impl PageResource for MonotonePageResource {
     }
 
     fn get_new_pages(&mut self, size: usize) -> Address {
+        trace!("Trying to get new pages of size {}", size);
         let old_cursor = self.heap_cursor;
         let new_cursor = self.heap_cursor + size;
         if new_cursor > self.heap_limit {
+            trace!("{} exceeds the limit {}", new_cursor, self.heap_limit);
             unsafe { Address::zero() }
         } else {
             self.heap_cursor = new_cursor;
+            trace!("cursor sets to be {}", self.heap_cursor);
             old_cursor
         }
     }
