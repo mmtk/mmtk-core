@@ -18,10 +18,12 @@ impl<'a> MutatorContext for NoGCMutator<'a> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
+        trace!("MutatorContext.alloc({}, {}, {}, {:?})", size, align, offset, allocator);
         self.nogc.alloc(size, align, offset)
     }
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
+        trace!("MutatorContext.alloc_slow({}, {}, {}, {:?})", size, align, offset, allocator);
         self.nogc.alloc_slow(size, align, offset)
     }
     fn get_thread_id(&self) -> usize {

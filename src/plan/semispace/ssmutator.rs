@@ -39,6 +39,7 @@ impl<'a> MutatorContext for SSMutator<'a> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
+        trace!("MutatorContext.alloc({}, {}, {}, {:?})", size, align, offset, allocator);
         match allocator {
             AllocationType::Default => { self.ss.alloc(size, align, offset) }
             _ => { self.vs.alloc(size, align, offset) }
@@ -46,6 +47,7 @@ impl<'a> MutatorContext for SSMutator<'a> {
     }
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
+        trace!("MutatorContext.alloc_slow({}, {}, {}, {:?})", size, align, offset, allocator);
         match allocator {
             AllocationType::Default => { self.ss.alloc_slow(size, align, offset) }
             _ => { self.vs.alloc_slow(size, align, offset) }
