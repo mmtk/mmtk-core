@@ -1,6 +1,6 @@
 use super::memory_manager_constants;
 use super::memory_manager_constants::*;
-use super::unboxed_size_constants::*;
+use super::super::unboxed_size_constants::*;
 use super::java_size_constants::*;
 use super::misc_header_constants::*;
 

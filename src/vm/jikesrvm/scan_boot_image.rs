@@ -1,7 +1,7 @@
 use ::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use super::unboxed_size_constants::*;
+use super::super::unboxed_size_constants::*;
 use super::java_size_constants::*;
 use super::entrypoint::*;
 use super::JTOC_BASE;

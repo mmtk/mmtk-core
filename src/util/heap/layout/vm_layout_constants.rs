@@ -1,4 +1,9 @@
 use ::util::Address;
+use ::util::constants::*;
+use super::heap_parameters::*;
+
+///////// FIXME ////////////
+use super::super::vmrequest::{HEAP_LAYOUT_32BIT, HEAP_LAYOUT_64BIT};
 
 macro_rules! chunk_align {
     ($addr:expr, $down:expr) => (unsafe{Address::from_usize(
@@ -28,7 +33,7 @@ pub const LOG_BYTES_IN_CHUNK: usize = 22;
 pub const BYTES_IN_CHUNK: usize = 1 << LOG_BYTES_IN_CHUNK;
 
 /** Coarsest unit of address space allocation, in pages */
-pub const PAGES_IN_CHUNK: usize = 1 << (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE);
+pub const PAGES_IN_CHUNK: usize = 1 << (LOG_BYTES_IN_CHUNK as usize - LOG_BYTES_IN_PAGE as usize);
 
 /** log_2 of the maximum number of chunks we need to track.  Only used in 32-bit layout.*/
 pub const LOG_MAX_CHUNKS: usize = LOG_ADDRESS_SPACE - LOG_BYTES_IN_CHUNK;
@@ -48,8 +53,9 @@ pub const LOG_SPACE_EXTENT: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT, LOG_S
  */
 pub const MAX_SPACE_EXTENT: usize = 1 << LOG_SPACE_EXTENT;
 
+///////////////////// FIXME /////////////////////
 /** Lowest virtual address used by the virtual machine */
-pub const HEAP_START: Address = chunk_align!(VM.HEAP_START, true);
+/*pub const HEAP_START: Address = chunk_align!(VM.HEAP_START, true);
 
 /** Highest virtual address used by the virtual machine */
 pub const HEAP_END: Address = chunk_align!(VM.HEAP_END, false);
@@ -69,13 +75,13 @@ pub const AVAILABLE_START: Address = chunk_align!(VM.AVAILABLE_START, false);
 pub const AVAILABLE_END: Address = chunk_align!(VM.AVAILABLE_END, true);
 
 /** Size of the address space available to the MMTk heap. */
-pub const AVAILABLE_BYTES: usize = AVAILABLE_END - AVAILABLE_START;
+pub const AVAILABLE_BYTES: usize = AVAILABLE_END - AVAILABLE_START;*/
 
 /** Granularity at which we map and unmap virtual address space in the heap */
 pub const LOG_MMAP_CHUNK_BYTES: usize = 20;
 
 /** log_2 of the number of pages in a 64-bit space */
-pub const LOG_PAGES_IN_SPACE64: usize = HeapParameters.LOG_SPACE_SIZE_64 - LOG_BYTES_IN_PAGE;
+pub const LOG_PAGES_IN_SPACE64: usize = LOG_SPACE_SIZE_64 as usize - LOG_BYTES_IN_PAGE as usize;
 
 /** The number of pages in a 64-bit space */
 pub const PAGES_IN_SPACE64: usize = 1 << LOG_PAGES_IN_SPACE64;
@@ -95,7 +101,7 @@ pub const PAGES_IN_SPACE64: usize = 1 << LOG_PAGES_IN_SPACE64;
  * Number of bits to shift a space index into/out of a virtual address.
  */
 /* In a 32-bit model, use a dummy value so that the compiler doesn't barf. */
-pub const SPACE_SHIFT_64: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT, HeapParameters.LOG_SPACE_SIZE_64, 0);
+pub const SPACE_SHIFT_64: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT, LOG_SPACE_SIZE_64, 0);
 
 /**
  * Bitwise mask to isolate a space index in a virtual address.
@@ -106,11 +112,12 @@ pub const SPACE_SHIFT_64: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT, HeapPar
 pub const SPACE_MASK_64: usize = if_then_else_zero_usize!(HEAP_LAYOUT_64BIT,
     ((1 << LOG_MAX_SPACES) - 1) << SPACE_SHIFT_64);
 
-/**
+/*
  * Size of each space in the 64-bit memory layout
  *
  * We can't express this constant in a 32-bit environment, hence the
  * conditional definition.
  */
-pub const SPACE_SIZE_64: usize = if_then_else_usize!(VM.HEAP_LAYOUT_64BIT,
-    1 << HeapParameters.LOG_SPACE_SIZE_64, MAX_SPACE_EXTENT);
+// FIXME: When Compiling for 32 bits this expression makes no sense
+//pub const SPACE_SIZE_64: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT,
+//    1 << LOG_SPACE_SIZE_64, MAX_SPACE_EXTENT);

@@ -1,16 +1,14 @@
 use ::util::Address;
 use ::util::constants::*;
 use super::layout::heap_parameters::*;
-//use super::layout::vm_layout_constants::*;
+use super::layout::vm_layout_constants::*;
 
 ////////// FIXME //////////////
 #[cfg(target_pointer_width = "32")]
-const HEAP_LAYOUT_32BIT: bool = false;
+pub const HEAP_LAYOUT_32BIT: bool = true;
 #[cfg(target_pointer_width = "64")]
-const HEAP_LAYOUT_32BIT: bool = false;
-const HEAP_LAYOUT_64BIT: bool = !HEAP_LAYOUT_32BIT;
-const LOG_SPACE_EXTENT: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT, LOG_SPACE_SIZE_64, 31);
-const MAX_SPACE_EXTENT: usize = 1 << LOG_SPACE_EXTENT;
+pub const HEAP_LAYOUT_32BIT: bool = false;
+pub const HEAP_LAYOUT_64BIT: bool = !HEAP_LAYOUT_32BIT;
 
 pub enum VMRequest {
     RequestDiscontiguous,

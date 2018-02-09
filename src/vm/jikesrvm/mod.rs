@@ -9,7 +9,6 @@ mod jtoc_call;
 pub mod scanning;
 pub mod collection;
 pub mod object_model;
-pub mod unboxed_size_constants;
 pub mod java_header;
 pub mod java_size_constants;
 pub mod java_header_constants;

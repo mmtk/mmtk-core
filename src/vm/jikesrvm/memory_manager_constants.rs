@@ -1,4 +1,4 @@
-use super::unboxed_size_constants::*;
+use super::super::unboxed_size_constants::*;
 use ::plan::selected_plan::SelectedConstraints;
 
 /** {@code true} if the selected plan needs support for linearly scanning the heap */

@@ -6,7 +6,7 @@ use ::plan::{TransitiveClosure, TraceLocal, MutatorContext, Plan, SelectedPlan, 
 use ::util::{ObjectReference, Address, SynchronizedCounter};
 use ::vm::jikesrvm::entrypoint::*;
 use super::JTOC_BASE;
-use super::unboxed_size_constants::LOG_BYTES_IN_ADDRESS;
+use super::super::unboxed_size_constants::LOG_BYTES_IN_ADDRESS;
 use super::super::{ObjectModel, VMObjectModel};
 use super::super::{ActivePlan, VMActivePlan};
 use super::collection::VMCollection;
@@ -53,9 +53,6 @@ impl Scanning for VMScanning {
             }
         }
 
-        // FIXME: This should really be called on a specific mutator,
-        //        but since we're not dealing with write barriers for
-        //        now we'll ignore it.
         unsafe {
             VMActivePlan::mutator(thread_id).flush_remembered_sets();
         }
