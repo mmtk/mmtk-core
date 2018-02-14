@@ -12,7 +12,7 @@ pub extern fn test_stack_alignment() {
 #[cfg(feature = "jikesrvm")]
 pub extern fn test_stack_alignment1(a: usize, b: usize, c: usize, d: usize, e: usize) -> usize {
     info!("Entering stack alignment test");
-    info!("a:{} , b:{}, c:{}, d:{}, e:{}",
+    info!("a:{}, b:{}, c:{}, d:{}, e:{}",
            a, b, c, d, e);
     unsafe {
         asm!("movaps %xmm1, (%esp)" : : : "sp", "%xmm1", "memory");
