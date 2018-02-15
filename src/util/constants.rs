@@ -1,4 +1,5 @@
 use ::vm::unboxed_size_constants;
+use ::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION;
 
 /**
    * Modes.
@@ -33,15 +34,11 @@ pub const LOG_CARD_META_SIZE: usize = 2;// each card consumes four bytes of meta
 pub const LOG_CARD_UNITS: usize = 10;  // number of units tracked per card
 pub const LOG_CARD_GRAIN: usize = 0;   // track at byte grain, save shifting
 pub const LOG_CARD_BYTES: usize = LOG_CARD_UNITS + LOG_CARD_GRAIN;
-// FIXME
-//pub const LOG_CARD_META_BYTES: usize = EmbeddedMetaData.LOG_BYTES_IN_REGION - LOG_CARD_BYTES + LOG_CARD_META_SIZE;
-//pub const LOG_CARD_META_PAGES: usize = LOG_CARD_META_BYTES - VM.LOG_BYTES_IN_PAGE;
-/*pub const CARD_META_PAGES_PER_REGION: usize = if SUPPORT_CARD_SCANNING {
-    1 << LOG_CARD_META_PAGES
-} else {
-    0
-};
-pub const CARD_MASK: usize = (1 << LOG_CARD_BYTES) - 1;*/
+pub const LOG_CARD_META_BYTES: usize = LOG_BYTES_IN_REGION - LOG_CARD_BYTES + LOG_CARD_META_SIZE;
+pub const LOG_CARD_META_PAGES: usize = LOG_CARD_META_BYTES - LOG_BYTES_IN_PAGE as usize;
+pub const CARD_META_PAGES_PER_REGION: usize = if_then_else_usize!(SUPPORT_CARD_SCANNING,
+    1 << LOG_CARD_META_PAGES, 0);
+pub const CARD_MASK: usize = (1 << LOG_CARD_BYTES) - 1;
 
 /**
  * Lazy sweeping - controlled from here because PlanConstraints needs to
