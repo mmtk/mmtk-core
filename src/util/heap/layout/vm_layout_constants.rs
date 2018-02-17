@@ -5,10 +5,11 @@ use super::heap_parameters::*;
 ///////// FIXME ////////////
 use super::super::vmrequest::{HEAP_LAYOUT_32BIT, HEAP_LAYOUT_64BIT};
 
+#[macro_export]
 macro_rules! chunk_align {
-    ($addr:expr, $down:expr) => (unsafe{Address::from_usize(
-        if_then_else_usize!($down, $addr, $addr + BYTES_IN_CHUNK - 1)
-            .as_usize() % BYTES_IN_CHUNK)});
+    ($addr:expr, $down:expr) => (
+        if_then_else_usize!($down, $addr, $addr + BYTES_IN_CHUNK - 1) % BYTES_IN_CHUNK
+    );
 }
 
 /**

@@ -1,6 +1,7 @@
 #[macro_use]
 pub mod macros;
 pub mod alloc;
+#[macro_use]
 pub mod heap;
 pub mod options;
 pub mod address;
