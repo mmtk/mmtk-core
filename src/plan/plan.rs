@@ -51,10 +51,12 @@ pub mod default {
     use ::policy::space::Space;
     use ::plan::mutator_context::MutatorContext;
 
+    use ::util::heap::PageResource;
+
     use super::super::selected_plan::PLAN;
 
-    pub fn gc_init<T: Space>(space: &T, heap_size: usize) {
-        space.init(heap_size);
+    pub fn gc_init<'a, PR: PageResource<'a, T>, T: Space<'a, PR>>(space: &mut T) {
+        space.init();
 
         if !cfg!(feature = "jikesrvm") {
             thread::spawn(|| {

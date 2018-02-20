@@ -13,6 +13,8 @@ use ::util::forwarding_word::clear_forwarding_bits;
 
 use ::policy::copyspace::CopySpace;
 
+use ::util::heap::{PageResource, MonotonePageResource};
+
 use ::vm::{Scanning, VMScanning};
 
 use ::plan::selected_plan::PLAN;
@@ -23,7 +25,7 @@ use super::sstracelocal::SSTraceLocal;
 pub struct SSCollector<'a> {
     pub id: usize,
     // CopyLocal
-    pub ss: BumpAllocator<'a, CopySpace>,
+    pub ss: BumpAllocator<'a, CopySpace<'a>, MonotonePageResource<'a, CopySpace<'a>>>,
     trace: SSTraceLocal,
 
     last_trigger_count: usize,

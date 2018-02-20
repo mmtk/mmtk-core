@@ -1,11 +1,9 @@
-use super::space::default;
-
 use std::sync::Mutex;
 
 use ::util::heap::PageResource;
 use ::util::heap::MonotonePageResource;
 
-use ::policy::space::Space;
+use ::policy::space::{Space, CommonSpace};
 use ::util::{Address, ObjectReference};
 use ::plan::TransitiveClosure;
 use ::util::forwarding_word as ForwardingWord;
@@ -13,29 +11,25 @@ use ::vm::ObjectModel;
 use ::vm::VMObjectModel;
 use ::plan::Allocator;
 
-pub struct CopySpace {
-    pr: Mutex<MonotonePageResource>,
+pub struct CopySpace<'a> {
+    common: CommonSpace<'a, CopySpace<'a>, MonotonePageResource<'a, CopySpace<'a>>>,
     from_space: bool,
 }
 
-impl Space for CopySpace {
-    fn init(&self, heap_size: usize) {
-        default::init(&self.pr, heap_size);
+impl<'a> Space<'a, MonotonePageResource<'a, CopySpace<'a>>> for CopySpace<'a> {
+    fn common(&self) -> &CommonSpace<CopySpace<'a>, MonotonePageResource<'a, CopySpace<'a>>> {
+        &self.common
     }
 
-    fn acquire(&self, thread_id: usize, size: usize) -> Address {
-        default::acquire(&self.pr, thread_id, size)
-    }
-
-    fn in_space(&self, object: ObjectReference) -> bool {
-        default::in_space(&self.pr, object)
+    fn common_mut(&mut self) -> &mut CommonSpace<CopySpace<'a>, MonotonePageResource<'a, CopySpace<'a>>> {
+        &mut self.common
     }
 }
 
-impl CopySpace {
+impl<'a> CopySpace<'a> {
     pub fn new(from_space: bool) -> Self {
         CopySpace {
-            pr: Mutex::new(MonotonePageResource::new()),
+            common: unimplemented!(),
             from_space,
         }
     }

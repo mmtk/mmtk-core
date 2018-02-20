@@ -12,7 +12,11 @@ pub const HEAP_LAYOUT_64BIT: bool = !HEAP_LAYOUT_32BIT;
 
 pub enum VMRequest {
     RequestDiscontiguous,
-    RequestFixed, // XXX: Never used?
+    RequestFixed {
+        start: Address,
+        extent: usize,
+        top: bool,
+    },
     RequestExtent {
         extent: usize,
         top: bool,

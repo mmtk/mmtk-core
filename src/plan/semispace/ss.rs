@@ -17,6 +17,8 @@ use ::plan::Phase;
 use ::plan::trace::Trace;
 use ::util::ObjectReference;
 
+use ::util::heap::VMRequest;
+
 use libc::c_void;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool};
@@ -34,15 +36,15 @@ lazy_static! {
 
 pub struct SemiSpace<'a> {
     pub control_collector_context: ControllerCollectorContext<'a>,
-    pub unsync: UnsafeCell<SemiSpaceUnsync>,
+    pub unsync: UnsafeCell<SemiSpaceUnsync<'a>>,
     pub ss_trace: Trace,
 }
 
-pub struct SemiSpaceUnsync {
+pub struct SemiSpaceUnsync<'a> {
     pub hi: bool,
-    pub copyspace0: CopySpace,
-    pub copyspace1: CopySpace,
-    pub versatile_space: ImmortalSpace,
+    pub copyspace0: CopySpace<'a>,
+    pub copyspace1: CopySpace<'a>,
+    pub versatile_space: ImmortalSpace<'a>,
 }
 
 unsafe impl<'a> Sync for SemiSpace<'a> {}
@@ -59,7 +61,11 @@ impl<'a> Plan for SemiSpace<'a> {
                 hi: false,
                 copyspace0: CopySpace::new(false),
                 copyspace1: CopySpace::new(true),
-                versatile_space: ImmortalSpace::new(),
+                versatile_space: ImmortalSpace::new("versatile_space", true,
+                                                    VMRequest::RequestFraction{
+                                                        frac: 0.3,
+                                                        top:false,
+                                                    }),
             }),
             ss_trace: Trace::new(),
         }
@@ -68,9 +74,9 @@ impl<'a> Plan for SemiSpace<'a> {
     unsafe fn gc_init(&self, heap_size: usize) {
         let unsync = &mut *self.unsync.get();
         // FIXME correctly initialize spaces based on options
-        default::gc_init(&unsync.copyspace0, heap_size / 3);
-        unsync.copyspace1.init(heap_size / 3);
-        unsync.versatile_space.init(heap_size / 3);
+        default::gc_init(&mut unsync.copyspace0);
+        unsync.copyspace1.init();
+        unsync.versatile_space.init();
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {

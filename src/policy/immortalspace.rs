@@ -1,42 +1,37 @@
-use super::space::default;
-
 use std::sync::Mutex;
 
-use ::policy::space::Space;
-use ::util::heap::{PageResource, MonotonePageResource};
+use ::policy::space::{Space, CommonSpace};
+use ::util::heap::{PageResource, MonotonePageResource, VMRequest};
 use ::util::address::Address;
 
 use ::util::ObjectReference;
+use ::util::constants::CARD_META_PAGES_PER_REGION;
 
 use ::vm::{ObjectModel, VMObjectModel};
 use ::plan::TransitiveClosure;
 use ::util::header_byte;
 
-pub struct ImmortalSpace {
-    pr: Mutex<MonotonePageResource>,
+pub struct ImmortalSpace<'a> {
+    common: CommonSpace<'a, ImmortalSpace<'a>, MonotonePageResource<'a, ImmortalSpace<'a>>>,
     mark_state: i8,
 }
 
 const GC_MARK_BIT_MASK: i8 = 1;
+const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
-impl Space for ImmortalSpace {
-    fn init(&self, heap_size: usize) {
-        default::init(&self.pr, heap_size);
+impl<'a> Space<'a, MonotonePageResource<'a, ImmortalSpace<'a>>> for ImmortalSpace<'a> {
+    fn common(&self) -> &CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>> {
+        &self.common
     }
-
-    fn acquire(&self, thread_id: usize, size: usize) -> Address {
-        default::acquire(&self.pr, thread_id, size)
-    }
-
-    fn in_space(&self, object: ObjectReference) -> bool {
-        default::in_space(&self.pr, object)
+    fn common_mut(&mut self) -> &mut CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>> {
+        &mut self.common
     }
 }
 
-impl ImmortalSpace {
-    pub fn new() -> Self {
+impl<'a> ImmortalSpace<'a> {
+    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest) -> Self {
         ImmortalSpace {
-            pr: Mutex::new(MonotonePageResource::new()),
+            common: CommonSpace::new(name, false, true, zeroed, vmrequest),
             mark_state: 0,
         }
     }

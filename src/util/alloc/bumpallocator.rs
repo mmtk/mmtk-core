@@ -2,6 +2,9 @@ use ::util::address::Address;
 use super::allocator::{align_allocation, fill_alignment_gap};
 
 use ::util::alloc::Allocator;
+use ::util::heap::PageResource;
+
+use std::marker::PhantomData;
 
 use ::policy::space::Space;
 
@@ -11,14 +14,15 @@ const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct BumpAllocator<'a, T: 'a> where T: Space {
+pub struct BumpAllocator<'a, T: 'a, PR: PageResource<'a, T>> where T: Space<'a, PR> {
     pub thread_id: usize,
     cursor: Address,
     limit: Address,
     space: Option<&'a T>,
+    _placeholder: PhantomData<PR>
 }
 
-impl<'a, T> BumpAllocator<'a, T> where T: Space {
+impl<'a, T, PR: PageResource<'a, T>> BumpAllocator<'a, T, PR> where T: Space<'a, PR> {
     pub fn set_limit(&mut self, cursor: Address, limit: Address) {
         self.cursor = cursor;
         self.limit = limit;
@@ -35,7 +39,7 @@ impl<'a, T> BumpAllocator<'a, T> where T: Space {
     }
 }
 
-impl<'a, T> Allocator<'a, T> for BumpAllocator<'a, T> where T: Space {
+impl<'a, T, PR: PageResource<'a, T>> Allocator<'a, T, PR> for BumpAllocator<'a, T, PR> where T: Space<'a, PR> {
     fn get_space(&self) -> Option<&'a T> {
         self.space
     }
@@ -71,13 +75,14 @@ impl<'a, T> Allocator<'a, T> for BumpAllocator<'a, T> where T: Space {
     }
 }
 
-impl<'a, T> BumpAllocator<'a, T> where T: Space {
+impl<'a, T, PR: PageResource<'a, T>> BumpAllocator<'a, T, PR> where T: Space<'a, PR> {
     pub fn new(thread_id: usize, space: Option<&'a T>) -> Self {
         BumpAllocator {
             thread_id,
             cursor: unsafe { Address::zero() },
             limit: unsafe { Address::zero() },
             space,
+            _placeholder: PhantomData,
         }
     }
 }

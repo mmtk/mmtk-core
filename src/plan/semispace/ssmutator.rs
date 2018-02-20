@@ -9,12 +9,13 @@ use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
 use ::plan::plan;
 use ::vm::{Collection, VMCollection};
+use ::util::heap::{PageResource, MonotonePageResource};
 
 #[repr(C)]
 pub struct SSMutator<'a> {
     // CopyLocal
-    ss: BumpAllocator<'a, CopySpace>,
-    vs: BumpAllocator<'a, ImmortalSpace>,
+    ss: BumpAllocator<'a, CopySpace<'a>, MonotonePageResource<'a, CopySpace<'a>>>,
+    vs: BumpAllocator<'a, ImmortalSpace<'a>, MonotonePageResource<'a, ImmortalSpace<'a>>>,
 }
 
 impl<'a> MutatorContext for SSMutator<'a> {
