@@ -79,11 +79,13 @@ impl Scanning for VMScanning {
             let mut chunk_size = size / threads;
             trace!("chunk_size: {:?}", chunk_size);
             let mut start = cc.parallel_worker_ordinal() * chunk_size;
+            trace!("start: {:?}", start);
             let mut end = if cc.parallel_worker_ordinal() + 1 == threads {
                 size
             } else {
                 threads * chunk_size
             };
+            trace!("end: {:?}", end);
 
             for i in start..end {
                 let function_address_slot = jni_function_table_data + (i * 4);
@@ -106,18 +108,22 @@ impl Scanning for VMScanning {
 
             let jni_global_refs = Address::from_usize(
                 (JTOC_BASE + JNI_GLOBAL_REFS_FIELD2_OFFSET).load::<usize>());
+            trace!("jni_global_refs address: {:?}", jni_global_refs);
             size = (jni_global_refs - 4).load::<usize>();
             trace!("jni_global_refs size: {:?}", size);
             chunk_size = size / threads;
+            trace!("chunk_size: {:?}", chunk_size);
             start = cc.parallel_worker_ordinal() * chunk_size;
+            trace!("start: {:?}", start);
             end = if cc.parallel_worker_ordinal() + 1 == threads {
                 size
             } else {
                 threads * chunk_size
             };
+            trace!("end: {:?}", end);
 
             for i in start..end {
-                trace.process_root_edge(jni_global_refs + 4 * i, true);
+                trace.process_root_edge(jni_global_refs + (i << LOG_BYTES_IN_ADDRESS), true);
             }
         }
     }
