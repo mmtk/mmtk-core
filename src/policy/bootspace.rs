@@ -63,7 +63,7 @@ impl BootSpace {
         object: ObjectReference,
     ) -> ObjectReference {
         if BootSpace::test_and_mark(object, self.mark_state) {
-            trace.process_edge(object.to_address());
+            trace.process_node(object);
         }
         return object;
     }

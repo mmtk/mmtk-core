@@ -65,7 +65,7 @@ impl ImmortalSpace {
         object: ObjectReference,
     ) -> ObjectReference {
         if ImmortalSpace::test_and_mark(object, self.mark_state) {
-            trace.process_edge(object.to_address());
+            trace.process_node(object);
         }
         return object;
     }
