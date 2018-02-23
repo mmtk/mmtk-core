@@ -75,8 +75,9 @@ impl Scanning for VMScanning {
                 (jni_function_table + FUNCTION_TABLE_DATA_FIELD_OFFSET).load::<usize>());
             trace!("jni_function_table_data: {:?}", jni_function_table_data);
             let mut size = (jni_function_table_data + ARRAY_LENGTH_OFFSET).load::<usize>();
+            trace!("size: {:?}", size);
             let mut chunk_size = size / threads;
-
+            trace!("chunk_size: {:?}", chunk_size);
             let mut start = cc.parallel_worker_ordinal() * chunk_size;
             let mut end = if cc.parallel_worker_ordinal() + 1 == threads {
                 size
@@ -84,8 +85,8 @@ impl Scanning for VMScanning {
                 threads * chunk_size
             };
 
-            for i in start .. end {
-                let function_address_slot = jni_functions + (i * 4);
+            for i in start..end {
+                let function_address_slot = jni_function_table_data + (i * 4);
                 if jtoc_call!(IMPLEMENTED_IN_JAVA_METHOD_OFFSET, thread_id, i) != 0 {
                     trace!("function implemented in java {:?}", function_address_slot);
                     trace.process_root_edge(function_address_slot, true);
@@ -98,7 +99,7 @@ impl Scanning for VMScanning {
             let linkage_triplets = Address::from_usize(
                 (JTOC_BASE + LINKAGE_TRIPLETS_FIELD_OFFSET).load::<usize>());
             if !linkage_triplets.is_zero() {
-                for i in start .. end {
+                for i in start..end {
                     trace.process_root_edge(linkage_triplets + i * 4, true);
                 }
             }
@@ -106,6 +107,7 @@ impl Scanning for VMScanning {
             let jni_global_refs = Address::from_usize(
                 (JTOC_BASE + JNI_GLOBAL_REFS_FIELD2_OFFSET).load::<usize>());
             size = (jni_global_refs - 4).load::<usize>();
+            trace!("jni_global_refs size: {:?}", size);
             chunk_size = size / threads;
             start = cc.parallel_worker_ordinal() * chunk_size;
             end = if cc.parallel_worker_ordinal() + 1 == threads {
@@ -114,7 +116,7 @@ impl Scanning for VMScanning {
                 threads * chunk_size
             };
 
-            for i in start .. end {
+            for i in start..end {
                 trace.process_root_edge(jni_global_refs + 4 * i, true);
             }
         }
