@@ -5,6 +5,8 @@ use libc::c_char;
 use std::ffi::CStr;
 use std::str;
 
+use std::sync::atomic::Ordering;
+
 use plan::Plan;
 use ::plan::MutatorContext;
 use ::plan::TraceLocal;
@@ -61,6 +63,7 @@ pub unsafe extern fn gc_init(heap_size: usize) {
     }
     ::util::logger::init().unwrap();
     selected_plan::PLAN.gc_init(heap_size);
+    ::plan::plan::INITIALIZED.store(true, Ordering::SeqCst);
 }
 
 #[no_mangle]
@@ -134,6 +137,7 @@ pub unsafe extern fn start_worker(thread_id: usize, worker: *mut c_void) {
 pub unsafe extern fn enable_collection(thread_id: usize) {
     (&mut *selected_plan::PLAN.control_collector_context.workers.get()).init_group(thread_id);
     VMCollection::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(thread_id, null_mut()); // spawn controller thread
+    ::plan::plan::INITIALIZED.store(true, Ordering::SeqCst);
 }
 
 #[no_mangle]

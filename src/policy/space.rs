@@ -5,6 +5,7 @@ use ::vm::{ActivePlan, VMActivePlan, Collection, VMCollection};
 use ::util::heap::{VMRequest, PageResource};
 use ::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END, AVAILABLE_BYTES};
 
+use ::plan::Plan;
 use ::plan::selected_plan::PLAN;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -15,19 +16,23 @@ use std::marker::PhantomData;
 
 pub trait Space<PR: PageResource<Self>>: Sized + 'static {
     fn init(&mut self) {
-        self.common_mut().pr.as_ref().unwrap().bind_space(
-            unsafe{&*(self as *const Self)});
-            // ^ Borrow-checker fighting so that we can have a cyclic reference
+        // Borrow-checker fighting so that we can have a cyclic reference
+        let me = unsafe { &*(self as *const Self) };
+
+        self.common_mut().pr.as_mut().unwrap().bind_space(me);
     }
 
     fn acquire(&self, thread_id: usize, pages: usize) -> Address {
         let allow_poll = unsafe { VMActivePlan::is_mutator(thread_id) }
-            && PLAN::is_initialized();
+            && PLAN.is_initialized();
 
         let pr = self.common().pr.as_ref().unwrap();
         let pages_reserved = pr.reserve_pages(pages);
 
-        if allow_poll && VMActivePlan::global().poll(false) {
+        // FIXME: Possibly unnecessary borrow-checker fighting
+        let me = unsafe { &*(self as *const Self) };
+
+        if allow_poll && VMActivePlan::global().poll(false, me) {
             pr.clear_request(pages_reserved);
             VMCollection::block_for_gc(thread_id);
             unsafe { Address::zero() }
@@ -39,7 +44,7 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
                     panic!("Physical allocation failed when polling not allowed!");
                 }
 
-                let gc_performed = VMActivePlan::global().poll(true);
+                let gc_performed = VMActivePlan::global().poll(true, me);
                 debug_assert!(gc_performed, "GC not performed when forced.");
                 pr.clear_request(pages_reserved);
                 VMCollection::block_for_gc(thread_id);
@@ -145,8 +150,8 @@ impl<S: Space<PR>, PR: PageResource<S>> CommonSpace<S, PR> {
             }
         }
 
-        if HEAP_CURSOR > HEAP_LIMIT {
-            unsafe {
+        unsafe {
+            if HEAP_CURSOR > HEAP_LIMIT {
                 panic!("Out of virtual address space allocating \"{}\" at {} ({} > {})", name,
                        HEAP_CURSOR - extent, HEAP_CURSOR, HEAP_LIMIT);
             }

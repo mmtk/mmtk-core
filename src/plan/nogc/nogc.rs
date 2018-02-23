@@ -4,7 +4,9 @@ use ::policy::immortalspace::ImmortalSpace;
 use ::plan::controller_collector_context::ControllerCollectorContext;
 use ::plan::{Plan, Phase};
 use ::util::ObjectReference;
+use ::util::heap::VMRequest;
 
+use std::cell::UnsafeCell;
 use libc::c_void;
 
 lazy_static! {
@@ -32,7 +34,12 @@ impl Plan for NoGC {
     fn new() -> Self {
         NoGC {
             control_collector_context: ControllerCollectorContext::new(),
-            space: UnsafeCell::new(ImmortalSpace::new()),
+            space: UnsafeCell::new(ImmortalSpace::new("nogc_space", true,
+                                                      VMRequest::RequestFraction {
+                                                          frac: 1.0,
+                                                          top:  false,
+                                                      }
+            )),
         }
     }
 

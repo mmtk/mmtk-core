@@ -1,7 +1,10 @@
 use libc::c_void;
 use ::util::ObjectReference;
 use super::{MutatorContext, CollectorContext, ParallelCollector, TraceLocal, phase, Phase};
-use std::sync::atomic::{self, AtomicBool};
+use std::sync::atomic::{self, AtomicBool, Ordering};
+
+use ::policy::space::Space;
+use ::util::heap::PageResource;
 
 pub trait Plan {
     type MutatorT: MutatorContext;
@@ -15,6 +18,14 @@ pub trait Plan {
     fn will_never_move(&self, object: ObjectReference) -> bool;
     // unsafe because only the primary collector thread can call this
     unsafe fn collection_phase(&self, thread_id: usize, phase: &phase::Phase);
+
+    fn is_initialized(&self) -> bool {
+        INITIALIZED.load(Ordering::SeqCst)
+    }
+
+    fn poll<PR: PageResource<S>, S: Space<PR>>(&self, space_full: bool, space: &'static S) -> bool {
+        unimplemented!()
+    }
 }
 
 #[derive(PartialEq)]
@@ -24,6 +35,7 @@ pub enum GcStatus {
     GcProper,
 }
 
+pub static INITIALIZED: AtomicBool = AtomicBool::new(false);
 static mut GC_STATUS: GcStatus = GcStatus::NotInGC;
 pub static STACKS_PREPARED: AtomicBool = AtomicBool::new(false);
 
@@ -169,7 +181,7 @@ pub fn set_gc_status(s: GcStatus) {
 }
 
 pub fn stacks_prepared() -> bool {
-    STACKS_PREPARED.load(atomic::Ordering::Relaxed)
+    STACKS_PREPARED.load(Ordering::SeqCst)
 }
 
 pub fn gc_in_progress() -> bool {

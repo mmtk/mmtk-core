@@ -64,7 +64,7 @@ impl Plan for SemiSpace {
                 versatile_space: ImmortalSpace::new("versatile_space", true,
                                                     VMRequest::RequestFraction{
                                                         frac: 0.3,
-                                                        top:false,
+                                                        top:  false,
                                                     }),
             }),
             ss_trace: Trace::new(),
