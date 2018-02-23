@@ -66,15 +66,12 @@ impl Scanning for VMScanning {
         unsafe {
             let cc = VMActivePlan::collector(thread_id);
 
-            let jni_functions = JTOC_BASE + JNI_FUNCTIONS_FIELD_OFFSET;
-            let jni_function_table = Address::from_usize(
-                (jni_functions + JNI_FUNCTIONS_FIELD_OFFSET).load::<usize>());
-            trace!("jni_function_table: {:?}", jni_function_table);
+            let jni_functions = Address::from_usize((JTOC_BASE + JNI_FUNCTIONS_FIELD_OFFSET).load::<usize>());
+            trace!("jni_functions: {:?}", jni_functions);
+
             let threads = cc.parallel_worker_count();
-            let jni_function_table_data = Address::from_usize(
-                (jni_function_table + FUNCTION_TABLE_DATA_FIELD_OFFSET).load::<usize>());
-            trace!("jni_function_table_data: {:?}", jni_function_table_data);
-            let mut size = (jni_function_table_data + ARRAY_LENGTH_OFFSET).load::<usize>();
+            // @Intrinsic JNIFunctions.length()
+            let mut size = (jni_functions + ARRAY_LENGTH_OFFSET).load::<usize>();
             trace!("size: {:?}", size);
             let mut chunk_size = size / threads;
             trace!("chunk_size: {:?}", chunk_size);
@@ -88,7 +85,7 @@ impl Scanning for VMScanning {
             trace!("end: {:?}", end);
 
             for i in start..end {
-                let function_address_slot = jni_function_table_data + (i * 4);
+                let function_address_slot = jni_functions + (i << LOG_BYTES_IN_ADDRESS);
                 if jtoc_call!(IMPLEMENTED_IN_JAVA_METHOD_OFFSET, thread_id, i) != 0 {
                     trace!("function implemented in java {:?}", function_address_slot);
                     trace.process_root_edge(function_address_slot, true);
