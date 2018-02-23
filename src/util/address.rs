@@ -239,7 +239,7 @@ impl ObjectReference {
     /// is this object reference null reference?
     #[inline(always)]
     pub fn is_null(&self) -> bool {
-        self.0 != 0
+        self.0 == 0
     }
 
     /// returns the ObjectReference
