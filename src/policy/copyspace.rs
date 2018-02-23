@@ -11,22 +11,22 @@ use ::vm::ObjectModel;
 use ::vm::VMObjectModel;
 use ::plan::Allocator;
 
-pub struct CopySpace<'a> {
-    common: CommonSpace<'a, CopySpace<'a>, MonotonePageResource<'a, CopySpace<'a>>>,
+pub struct CopySpace {
+    common: CommonSpace<CopySpace, MonotonePageResource<CopySpace>>,
     from_space: bool,
 }
 
-impl<'a> Space<'a, MonotonePageResource<'a, CopySpace<'a>>> for CopySpace<'a> {
-    fn common(&self) -> &CommonSpace<CopySpace<'a>, MonotonePageResource<'a, CopySpace<'a>>> {
+impl Space<MonotonePageResource<CopySpace>> for CopySpace {
+    fn common(&self) -> &CommonSpace<CopySpace, MonotonePageResource<CopySpace>> {
         &self.common
     }
 
-    fn common_mut(&mut self) -> &mut CommonSpace<CopySpace<'a>, MonotonePageResource<'a, CopySpace<'a>>> {
+    fn common_mut(&mut self) -> &mut CommonSpace<CopySpace, MonotonePageResource<CopySpace>> {
         &mut self.common
     }
 }
 
-impl<'a> CopySpace<'a> {
+impl CopySpace {
     pub fn new(from_space: bool) -> Self {
         CopySpace {
             common: unimplemented!(),

@@ -55,7 +55,7 @@ pub mod default {
 
     use super::super::selected_plan::PLAN;
 
-    pub fn gc_init<'a, PR: PageResource<'a, T>, T: Space<'a, PR>>(space: &mut T) {
+    pub fn gc_init<PR: PageResource<S>, S: Space<PR>>(space: &mut S) {
         space.init();
 
         if !cfg!(feature = "jikesrvm") {
@@ -65,7 +65,7 @@ pub mod default {
         }
     }
 
-    pub fn bind_mutator<T: MutatorContext>(ctx: T) -> *mut c_void {
+    pub fn bind_mutator<M: MutatorContext>(ctx: M) -> *mut c_void {
         Box::into_raw(Box::new(ctx)) as *mut c_void
     }
 }

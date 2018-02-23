@@ -12,13 +12,13 @@ use ::vm::{Collection, VMCollection};
 use ::util::heap::{PageResource, MonotonePageResource};
 
 #[repr(C)]
-pub struct SSMutator<'a> {
+pub struct SSMutator {
     // CopyLocal
-    ss: BumpAllocator<'a, CopySpace<'a>, MonotonePageResource<'a, CopySpace<'a>>>,
-    vs: BumpAllocator<'a, ImmortalSpace<'a>, MonotonePageResource<'a, ImmortalSpace<'a>>>,
+    ss: BumpAllocator<CopySpace, MonotonePageResource<CopySpace>>,
+    vs: BumpAllocator<ImmortalSpace, MonotonePageResource<ImmortalSpace>>,
 }
 
-impl<'a> MutatorContext for SSMutator<'a> {
+impl MutatorContext for SSMutator {
     fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
         match phase {
             &Phase::Prepare => {
@@ -60,8 +60,8 @@ impl<'a> MutatorContext for SSMutator<'a> {
     }
 }
 
-impl<'a> SSMutator<'a> {
-    pub fn new(thread_id: usize, space: &'a CopySpace, versatile_space: &'a ImmortalSpace) -> Self {
+impl SSMutator {
+    pub fn new(thread_id: usize, space: &'static CopySpace, versatile_space: &'static ImmortalSpace) -> Self {
         SSMutator {
             ss: BumpAllocator::new(thread_id, Some(space)),
             vs: BumpAllocator::new(thread_id, Some(versatile_space)),

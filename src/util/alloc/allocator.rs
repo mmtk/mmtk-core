@@ -59,8 +59,8 @@ pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: 
     }
 }
 
-pub trait Allocator<'a, T, PR: PageResource<'a, T>> where T: Space<'a, PR> {
-    fn get_space(&self) -> Option<&'a T>;
+pub trait Allocator<S: Space<PR>, PR: PageResource<S>> {
+    fn get_space(&self) -> Option<&'static S>;
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 

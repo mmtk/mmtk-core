@@ -8,38 +8,40 @@ use ::util::ObjectReference;
 use libc::c_void;
 
 lazy_static! {
-    pub static ref PLAN: NoGC<'static> = NoGC::new();
+    pub static ref PLAN: NoGC = NoGC::new();
 }
 
 use super::NoGCTraceLocal;
 use super::NoGCMutator;
 use super::NoGCCollector;
 
-pub type SelectedPlan<'a> = NoGC<'a>;
+pub type SelectedPlan = NoGC;
 
-pub struct NoGC<'a> {
-    pub control_collector_context: ControllerCollectorContext<'a>,
-    space: ImmortalSpace,
+pub struct NoGC {
+    pub control_collector_context: ControllerCollectorContext,
+    space: UnsafeCell<ImmortalSpace>,
 }
 
-impl<'a> Plan for NoGC<'a> {
-    type MutatorT = NoGCMutator<'a>;
+unsafe impl Sync for NoGC {}
+
+impl Plan for NoGC {
+    type MutatorT = NoGCMutator;
     type TraceLocalT = NoGCTraceLocal;
-    type CollectorT = NoGCCollector<'a>;
+    type CollectorT = NoGCCollector;
 
     fn new() -> Self {
         NoGC {
             control_collector_context: ControllerCollectorContext::new(),
-            space: ImmortalSpace::new(),
+            space: UnsafeCell::new(ImmortalSpace::new()),
         }
     }
 
     unsafe fn gc_init(&self, heap_size: usize) {
-        default::gc_init(&self.space, heap_size);
+        default::gc_init(unsafe { &mut *(self.space.get()) });
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
-        default::bind_mutator(NoGCMutator::new(thread_id, &self.space))
+        default::bind_mutator(NoGCMutator::new(thread_id, unsafe { &*(self.space.get()) }))
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {

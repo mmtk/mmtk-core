@@ -15,17 +15,17 @@ struct RequestSync {
     last_request_count: isize,
 }
 
-pub struct ControllerCollectorContext<'a> {
+pub struct ControllerCollectorContext {
     request_sync: Mutex<RequestSync>,
     request_condvar: Condvar,
 
-    pub workers: UnsafeCell<ParallelCollectorGroup<<SelectedPlan<'a> as Plan>::CollectorT>>,
+    pub workers: UnsafeCell<ParallelCollectorGroup<<SelectedPlan as Plan>::CollectorT>>,
     request_flag: AtomicBool,
 }
 
-unsafe impl<'a> Sync for ControllerCollectorContext<'a> {}
+unsafe impl Sync for ControllerCollectorContext {}
 
-impl<'a> ControllerCollectorContext<'a> {
+impl ControllerCollectorContext {
     pub fn new() -> Self {
         ControllerCollectorContext {
             request_sync: Mutex::new(RequestSync {
@@ -35,7 +35,7 @@ impl<'a> ControllerCollectorContext<'a> {
             }),
             request_condvar: Condvar::new(),
 
-            workers: UnsafeCell::new(ParallelCollectorGroup::<<SelectedPlan<'a> as Plan>::CollectorT>::new()),
+            workers: UnsafeCell::new(ParallelCollectorGroup::<<SelectedPlan as Plan>::CollectorT>::new()),
             request_flag: AtomicBool::new(false),
         }
     }

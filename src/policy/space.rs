@@ -11,7 +11,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ::util::constants::LOG_BYTES_IN_MBYTE;
 
-pub trait Space<'a, PR: PageResource<'a, Self>> {
+use std::marker::PhantomData;
+
+pub trait Space<PR: PageResource<Self>>: Sized + 'static {
     fn init(&mut self) {
         self.common_mut().pr.as_ref().unwrap().bind_space(
             unsafe{&*(self as *const Self)});
@@ -58,7 +60,7 @@ pub trait Space<'a, PR: PageResource<'a, Self>> {
     fn common_mut(&mut self) -> &mut CommonSpace<Self, PR>;
 }
 
-pub struct CommonSpace<'a, S: Space<'a, PR>, PR: PageResource<'a, S>> {
+pub struct CommonSpace<S: Space<PR>, PR: PageResource<S>> {
     name: &'static str,
     name_length: usize,
     descriptor: usize,
@@ -74,6 +76,8 @@ pub struct CommonSpace<'a, S: Space<'a, PR>, PR: PageResource<'a, S>> {
     pub start: Address,
     pub extent: usize,
     head_discontiguous_region: Address,
+
+    _placeholder: PhantomData<S>,
 }
 
 static mut SPACE_COUNT: usize = 0;
@@ -82,7 +86,7 @@ static mut HEAP_LIMIT: Address = HEAP_END;
 
 const DEBUG: bool = false;
 
-impl<'a, S: Space<'a, PR>, PR: PageResource<'a, S>> CommonSpace<'a, S, PR> {
+impl<S: Space<PR>, PR: PageResource<S>> CommonSpace<S, PR> {
     pub fn new(name: &'static str, movable: bool, immortal: bool, zeroed: bool,
                vmrequest: VMRequest) -> Self {
         let mut rtn = CommonSpace {
@@ -99,6 +103,7 @@ impl<'a, S: Space<'a, PR>, PR: PageResource<'a, S>> CommonSpace<'a, S, PR> {
             start: unsafe{Address::zero()},
             extent: 0,
             head_discontiguous_region: unsafe{Address::zero()},
+            _placeholder: PhantomData,
         };
 
         if vmrequest.is_discontiguous() {
@@ -164,7 +169,7 @@ impl<'a, S: Space<'a, PR>, PR: PageResource<'a, S>> CommonSpace<'a, S, PR> {
 }
 
 fn get_frac_available(frac: f32) -> usize {
-    let bytes = frac * AVAILABLE_BYTES;
+    let bytes = (frac * AVAILABLE_BYTES as f32) as usize;
     let mb = bytes >> LOG_BYTES_IN_MBYTE;
     let rtn = mb << LOG_BYTES_IN_MBYTE;
     chunk_align!(rtn, false)

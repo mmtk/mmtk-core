@@ -11,15 +11,15 @@ use ::vm::{ObjectModel, VMObjectModel};
 use ::plan::TransitiveClosure;
 use ::util::header_byte;
 
-pub struct ImmortalSpace<'a> {
-    common: CommonSpace<'a, ImmortalSpace<'a>, MonotonePageResource<'a, ImmortalSpace<'a>>>,
+pub struct ImmortalSpace {
+    common: CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>>,
     mark_state: i8,
 }
 
 const GC_MARK_BIT_MASK: i8 = 1;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
-impl<'a> Space<'a, MonotonePageResource<'a, ImmortalSpace<'a>>> for ImmortalSpace<'a> {
+impl Space<MonotonePageResource<ImmortalSpace>> for ImmortalSpace {
     fn common(&self) -> &CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>> {
         &self.common
     }
@@ -28,7 +28,7 @@ impl<'a> Space<'a, MonotonePageResource<'a, ImmortalSpace<'a>>> for ImmortalSpac
     }
 }
 
-impl<'a> ImmortalSpace<'a> {
+impl ImmortalSpace {
     pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest) -> Self {
         ImmortalSpace {
             common: CommonSpace::new(name, false, true, zeroed, vmrequest),

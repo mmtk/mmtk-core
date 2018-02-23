@@ -1,7 +1,7 @@
 use ::util::address::Address;
 use ::policy::space::Space;
 
-pub trait PageResource<'a, S: Space<'a, Self>> {
+pub trait PageResource<S: Space<Self>>: Sized {
     /// Allocate pages from this resource.
     /// Simply bump the cursor, and fail if we hit the sentinel.
     /// Return The start of the first page if successful, zero on failure.
@@ -34,5 +34,5 @@ pub trait PageResource<'a, S: Space<'a, Self>> {
     fn cumulative_committed_pages() -> usize;
 
 
-    fn bind_space(&mut self, space: &'a S);
+    fn bind_space(&mut self, space: &'static S);
 }

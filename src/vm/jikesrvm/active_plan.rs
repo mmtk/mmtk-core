@@ -9,12 +9,13 @@ static MUTATOR_COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
 pub struct VMActivePlan<> {}
 
-impl<'a> ActivePlan<'a> for VMActivePlan {
-    fn global() -> &'static SelectedPlan<'static> {
+impl ActivePlan for VMActivePlan {
+    fn global() -> &'static SelectedPlan {
         &::plan::selected_plan::PLAN
     }
 
-    unsafe fn collector(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::CollectorT {
+    // XXX: Are they actually static
+    unsafe fn collector(thread_id: usize) -> &'static mut <SelectedPlan as Plan>::CollectorT {
         let thread = VMCollection::thread_from_id(thread_id);
         let system_thread = Address::from_usize(
             (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
@@ -29,7 +30,8 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         !(thread + IS_COLLECTOR_FIELD_OFFSET).load::<bool>()
     }
 
-    unsafe fn mutator(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::MutatorT {
+    // XXX: Are they actually static
+    unsafe fn mutator(thread_id: usize) -> &'static mut <SelectedPlan as Plan>::MutatorT {
         let thread = VMCollection::thread_from_id(thread_id);
         let mutator = (thread + MMTK_HANDLE_FIELD_OFFSET).load::<usize>();
         &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)
@@ -43,7 +45,7 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         MUTATOR_COUNTER.reset();
     }
 
-    fn get_next_mutator() -> Option<&'a mut <SelectedPlan<'a> as Plan>::MutatorT> {
+    fn get_next_mutator() -> Option<&'static mut <SelectedPlan as Plan>::MutatorT> {
         loop {
             let idx = MUTATOR_COUNTER.increment();
             let num_threads = unsafe { (JTOC_BASE + NUM_THREADS_FIELD_OFFSET).load::<usize>() };

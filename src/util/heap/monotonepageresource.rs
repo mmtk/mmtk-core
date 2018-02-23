@@ -9,11 +9,11 @@ use super::PageResource;
 const SPACE_ALIGN: usize = 1 << 19;
 
 #[derive(Debug)]
-pub struct MonotonePageResource<'a, S: Space<'a, MonotonePageResource<'a, S>>> {
+pub struct MonotonePageResource<S: Space<MonotonePageResource<S>>> where S: 'static {
     reserved: usize,
     committed: usize,
     growable: bool,
-    space: Option<&'a S>,
+    space: Option<&'static S>,
 
     /** Pointer to the next block to be allocated. */
     cursor: Address,
@@ -38,7 +38,7 @@ pub enum MonotonePageResourceConditional {
     Discontiguous,
 }
 
-impl<'a, S: Space<'a, MonotonePageResource<'a, S>>> PageResource<'a, Space<'a, MonotonePageResource<'a, S>>> for MonotonePageResource<'a, S> {
+impl<S: Space<MonotonePageResource<S>>> PageResource<S> for MonotonePageResource<S> {
     fn reserve_pages(&self, pages: usize) -> usize {
         unimplemented!()
     }
@@ -93,7 +93,7 @@ impl<'a, S: Space<'a, MonotonePageResource<'a, S>>> PageResource<'a, Space<'a, M
     }
 }
 
-impl<'a, S: Space<'a, MonotonePageResource<'a, S>>> Drop for MonotonePageResource<'a, S> {
+impl<S: Space<MonotonePageResource<S>>> Drop for MonotonePageResource<S> {
     fn drop(&mut self) {
         unimplemented!()
         /*let unmap_result = unsafe { munmap(self.mmap_start as *mut c_void, self.mmap_len) };
@@ -103,7 +103,7 @@ impl<'a, S: Space<'a, MonotonePageResource<'a, S>>> Drop for MonotonePageResourc
     }
 }
 
-impl<'a, S: Space<'a, MonotonePageResource<'a, S>>> MonotonePageResource<'a, S> {
+impl<S: Space<MonotonePageResource<S>>> MonotonePageResource<S> {
     pub fn new_contiguous(start: Address, bytes: usize,
                           meta_data_pages_per_region: usize) -> Self {
         let sentinel = start + bytes;
