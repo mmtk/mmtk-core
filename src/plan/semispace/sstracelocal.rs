@@ -22,6 +22,7 @@ pub struct SSTraceLocal {
 
 impl TransitiveClosure for SSTraceLocal {
     fn process_edge(&mut self, slot: Address) {
+        trace!("process_edge({:?})", slot);
         let object: ObjectReference = unsafe { slot.load() };
         let new_object = self.trace_object(object);
         if self.overwrite_reference_during_trace() {
@@ -30,6 +31,7 @@ impl TransitiveClosure for SSTraceLocal {
     }
 
     fn process_node(&mut self, object: ObjectReference) {
+        trace!("process_node({:?})", object);
         if self.values.len() >= PUSH_BACK_THRESHOLD {
             self.values_pool.1.send(object).unwrap();
         } else {
@@ -58,6 +60,7 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn process_root_edge(&mut self, slot: Address, untraced: bool) {
+        trace!("process_root_edge({:?}, {:?})", slot, untraced);
         let object: ObjectReference = unsafe { slot.load() };
         let new_object = self.trace_object(object);
         if self.overwrite_reference_during_trace() {
@@ -66,6 +69,7 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        trace!("trace_object({:?})", object.to_address());
         let thread_id = self.thread_id;
         let plan_unsync = unsafe { &*PLAN.unsync.get() };
 
@@ -81,7 +85,13 @@ impl TraceLocal for SSTraceLocal {
         if plan_unsync.versatile_space.in_space(object) {
             return plan_unsync.versatile_space.trace_object(self, object);
         }
-        // FIXME: Check if object is in vmSpace etc.
+        if plan_unsync.boot_space.in_space(object) {
+            return plan_unsync.boot_space.trace_object(self, object);
+        }
+        unsafe {
+            // No special case for space in trace_object
+            asm!("int $$3" : : :);
+        }
         panic!("No special case for space in trace_object");
     }
 
