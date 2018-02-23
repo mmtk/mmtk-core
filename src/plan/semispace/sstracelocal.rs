@@ -88,6 +88,7 @@ impl TraceLocal for SSTraceLocal {
         if plan_unsync.boot_space.in_space(object) {
             return plan_unsync.boot_space.trace_object(self, object);
         }
+
         unsafe {
             // No special case for space in trace_object
             asm!("int $$3" : : :);
