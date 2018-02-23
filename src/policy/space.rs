@@ -4,6 +4,7 @@ use ::util::ObjectReference;
 use ::vm::{ActivePlan, VMActivePlan, Collection, VMCollection};
 use ::util::heap::{VMRequest, PageResource};
 use ::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END, AVAILABLE_BYTES};
+use ::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END};
 
 use ::plan::Plan;
 use ::plan::selected_plan::PLAN;
@@ -15,12 +16,7 @@ use ::util::constants::LOG_BYTES_IN_MBYTE;
 use std::marker::PhantomData;
 
 pub trait Space<PR: PageResource<Self>>: Sized + 'static {
-    fn init(&mut self) {
-        // Borrow-checker fighting so that we can have a cyclic reference
-        let me = unsafe { &*(self as *const Self) };
-
-        self.common_mut().pr.as_mut().unwrap().bind_space(me);
-    }
+    fn init(&mut self);
 
     fn acquire(&self, thread_id: usize, pages: usize) -> Address {
         let allow_poll = unsafe { VMActivePlan::is_mutator(thread_id) }
@@ -70,7 +66,7 @@ pub struct CommonSpace<S: Space<PR>, PR: PageResource<S>> {
     name_length: usize,
     descriptor: usize,
     index: usize,
-    vmrequest: VMRequest,
+    pub vmrequest: VMRequest,
 
     immortal: bool,
     movable: bool,
@@ -174,8 +170,14 @@ impl<S: Space<PR>, PR: PageResource<S>> CommonSpace<S, PR> {
 }
 
 fn get_frac_available(frac: f32) -> usize {
+    trace!("AVAILABLE_START={}", AVAILABLE_START);
+    trace!("AVAILABLE_END={}", AVAILABLE_END);
     let bytes = (frac * AVAILABLE_BYTES as f32) as usize;
+    trace!("bytes={}*{}={}", frac, AVAILABLE_BYTES, bytes);
     let mb = bytes >> LOG_BYTES_IN_MBYTE;
     let rtn = mb << LOG_BYTES_IN_MBYTE;
-    chunk_align!(rtn, false)
+    trace!("rtn={}", rtn);
+    let aligned_rtn = chunk_align!(rtn, false);
+    trace!("aligned_rtn={}", aligned_rtn);
+    aligned_rtn
 }

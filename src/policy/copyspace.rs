@@ -2,6 +2,8 @@ use std::sync::Mutex;
 
 use ::util::heap::PageResource;
 use ::util::heap::MonotonePageResource;
+use ::util::heap::VMRequest;
+use ::util::constants::CARD_META_PAGES_PER_REGION;
 
 use ::policy::space::{Space, CommonSpace};
 use ::util::{Address, ObjectReference};
@@ -10,6 +12,8 @@ use ::util::forwarding_word as ForwardingWord;
 use ::vm::ObjectModel;
 use ::vm::VMObjectModel;
 use ::plan::Allocator;
+
+const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 pub struct CopySpace {
     common: CommonSpace<CopySpace, MonotonePageResource<CopySpace>>,
@@ -24,12 +28,27 @@ impl Space<MonotonePageResource<CopySpace>> for CopySpace {
     fn common_mut(&mut self) -> &mut CommonSpace<CopySpace, MonotonePageResource<CopySpace>> {
         &mut self.common
     }
+    fn init(&mut self) {
+        // Borrow-checker fighting so that we can have a cyclic reference
+        let me = unsafe { &*(self as *const Self) };
+
+        let common_mut = self.common_mut();
+        if common_mut.vmrequest.is_discontiguous() {
+            common_mut.pr = Some(MonotonePageResource::new_discontiguous(
+                META_DATA_PAGES_PER_REGION));
+        } else {
+            common_mut.pr = Some(MonotonePageResource::new_contiguous(common_mut.start,
+                                                                      common_mut.extent,
+                                                                      META_DATA_PAGES_PER_REGION));
+        }
+        common_mut.pr.as_mut().unwrap().bind_space(me);
+    }
 }
 
 impl CopySpace {
-    pub fn new(from_space: bool) -> Self {
+    pub fn new(name: &'static str, from_space: bool, zeroed: bool, vmrequest: VMRequest) -> Self {
         CopySpace {
-            common: unimplemented!(),
+            common: CommonSpace::new(name, true, false, zeroed, vmrequest),
             from_space,
         }
     }

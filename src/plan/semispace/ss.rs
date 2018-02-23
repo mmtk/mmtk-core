@@ -59,10 +59,18 @@ impl Plan for SemiSpace {
             control_collector_context: ControllerCollectorContext::new(),
             unsync: UnsafeCell::new(SemiSpaceUnsync {
                 hi: false,
-                copyspace0: CopySpace::new(false),
-                copyspace1: CopySpace::new(true),
+                copyspace0: CopySpace::new("copyspace0", false, true,
+                                           VMRequest::RequestFraction {
+                                               frac: 0.3,
+                                               top: false,
+                                           }),
+                copyspace1: CopySpace::new("copyspace1", true, true,
+                                           VMRequest::RequestFraction {
+                                               frac: 0.3,
+                                               top: false,
+                                           }),
                 versatile_space: ImmortalSpace::new("versatile_space", true,
-                                                    VMRequest::RequestFraction{
+                                                    VMRequest::RequestFraction {
                                                         frac: 0.3,
                                                         top:  false,
                                                     }),

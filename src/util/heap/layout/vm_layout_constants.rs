@@ -8,9 +8,10 @@ use super::super::vmrequest::{HEAP_LAYOUT_32BIT, HEAP_LAYOUT_64BIT};
 #[macro_export]
 macro_rules! chunk_align {
     ($addr:expr, $down:expr) => (
-        if_then_else_usize!($down, $addr, $addr +
-            ::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK - 1) %
-                ::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK
+        (if_then_else_usize!($down, $addr, $addr +
+            ::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK - 1) >>
+                ::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK)
+                    << ::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK
     );
 }
 
@@ -79,8 +80,7 @@ pub const AVAILABLE_START: Address = unsafe{Address::from_usize(
 pub const AVAILABLE_END: Address = unsafe{Address::from_usize(chunk_align!(0xb0000000, true))};
 
 /** Size of the address space available to the MMTk heap. */
-pub const AVAILABLE_BYTES: usize = ((AVAILABLE_END.as_usize() as isize)
-    - (AVAILABLE_START.as_usize() as isize)) as usize;
+pub const AVAILABLE_BYTES: usize = AVAILABLE_END.as_usize() - AVAILABLE_START.as_usize();
 
 /** Granularity at which we map and unmap virtual address space in the heap */
 pub const LOG_MMAP_CHUNK_BYTES: usize = 20;
