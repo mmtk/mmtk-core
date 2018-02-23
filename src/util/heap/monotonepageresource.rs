@@ -1,8 +1,15 @@
-use ::util::address::Address;
 use std::ptr::null_mut;
+use std::sync::Mutex;
+use std::sync::atomic::AtomicUsize;
+use std::marker::PhantomData;
+
+use ::util::address::Address;
 use ::policy::space::Space;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
 use super::layout::vm_layout_constants::BYTES_IN_CHUNK;
+
+use ::util::heap::pageresource::CommonPageResource;
+use ::util::alloc::embedded_meta_data::*;
 
 use super::PageResource;
 
@@ -10,10 +17,7 @@ const SPACE_ALIGN: usize = 1 << 19;
 
 #[derive(Debug)]
 pub struct MonotonePageResource<S: Space<MonotonePageResource<S>>> where S: 'static {
-    reserved: usize,
-    committed: usize,
-    growable: bool,
-    space: Option<&'static S>,
+    common: CommonPageResource<MonotonePageResource<S>, S>,
 
     /** Pointer to the next block to be allocated. */
     cursor: Address,
@@ -39,67 +43,93 @@ pub enum MonotonePageResourceConditional {
 }
 
 impl<S: Space<MonotonePageResource<S>>> PageResource<S> for MonotonePageResource<S> {
-    fn reserve_pages(&self, pages: usize) -> usize {
-        unimplemented!()
+    fn common(&self) -> &CommonPageResource<Self, S> {
+        &self.common
     }
 
-    fn clear_request(&self, reserved_pages: usize) {
-        unimplemented!()
-    }
-
-    fn update_zeroing_approach(&self, nontemporal: bool, concurrent: bool) {
-        unimplemented!()
-    }
-
-    fn skip_concurrent_zeroing(&self) {
-        unimplemented!()
-    }
-
-    fn trigger_concurrent_zeroing(&self) {
-        unimplemented!()
-    }
-
-    fn concurrent_zeroing(&self) {
-        unimplemented!()
+    fn common_mut(&mut self) -> &mut CommonPageResource<Self, S> {
+        &mut self.common
     }
 
     fn alloc_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool) -> Address {
         unimplemented!()
-    }
+        /*let mut new_chunk = false;
+        let guard = self.common().lock.lock().unwrap();
+        let mut rtn = self.cursor;
 
-    fn adjust_for_metadata(&self, pages: usize) {
-        unimplemented!()
-    }
+        if cfg!("debug") {
+            /*
+             * Cursor should always be zero, or somewhere in the current chunk.  If we have just
+             * allocated exactly enough pages to exhaust the current chunk, then cursor can point
+             * to the next chunk.
+             */
+            if self.current_chunk > self.cursor
+                || (chunk_align!(self.cursor, true).as_usize() != self.current_chunk.as_usize()
+                    && chunk_align!(self.cursor, true) != self.current_chunk + BYTES_IN_CHUNK) {
+                log_chunk_fields("MonotonePageResource.alloc_pages:fail");
+            }
+            assert!(self.current_chunk <= self.cursor);
+            assert!(self.cursor.is_zero() ||
+                chunk_align!(self.cursor.as_usize(), true) == self.current_chunk.as_usize() ||
+                chunk_align!(self.cursor, true).as_usize() == (self.current_chunk + BYTES_IN_CHUNK)
+                    .as_usize());
+        }
 
-    fn commit_pages(&self, reserved_pages: usize, actual_pages: usize) {
-        unimplemented!()
-    }
+        if self.meta_data_pages_per_region != 0 {
+            /* adjust allocation for metadata */
+            let region_start = get_region_start(self.cursor + pages_to_bytes(required_pages));
+            let region_delta = region_start - self.cursor;
+            if (regionDelta.sGE(Offset.zero())) {
+                /* start new region, so adjust pages and return address accordingly */
+                requiredPages += Conversions.bytesToPages(regionDelta) + metaDataPagesPerRegion;
+                rtn = regionStart.plus(Conversions.pagesToBytes(metaDataPagesPerRegion));
+            }
+        }
+        Extent bytes = Conversions.pagesToBytes(requiredPages);
+        Address tmp = cursor.plus(bytes);
 
-    fn reserved_pages(&self) -> usize {
-        unimplemented!()
-    }
+        if (!contiguous && tmp.GT(sentinel)) {
+            /* we're out of virtual memory within our discontiguous region, so ask for more */
+            int requiredChunks = Space.requiredChunks(requiredPages);
+            currentChunk = space.growDiscontiguousSpace(requiredChunks); // Returns zero on failure
+            cursor = currentChunk;
+            sentinel = cursor.plus(currentChunk.isZero() ? 0 : requiredChunks << VMLayoutConstants.LOG_BYTES_IN_CHUNK);
+            rtn = cursor;
+            tmp = cursor.plus(bytes);
+            newChunk = true;
+        }
+        if (VM.VERIFY_ASSERTIONS)
+        VM.assertions._assert(rtn.GE(cursor) && rtn.LT(cursor.plus(bytes)));
+        if (tmp.GT(sentinel)) {
+            unlock();
+            return Address.zero();
+        } else {
+            Address old = cursor;
+            cursor = tmp;
 
-    fn committed_pages(&self) -> usize {
-        unimplemented!()
-    }
-
-    fn cumulative_committed_pages() -> usize {
-        unimplemented!()
-    }
-
-
-    fn bind_space(&mut self, space: &'static S) {
-        self.space = Some(space);
-    }
-}
-
-impl<S: Space<MonotonePageResource<S>>> Drop for MonotonePageResource<S> {
-    fn drop(&mut self) {
-        unimplemented!()
-        /*let unmap_result = unsafe { munmap(self.mmap_start as *mut c_void, self.mmap_len) };
-        if unmap_result != 0 {
-            panic!("Failed to unmap {:?}", self);
+            /* In a contiguous space we can bump along into the next chunk, so preserve the currentChunk invariant */
+            if (contiguous && Conversions.chunkAlign(cursor, true).NE(currentChunk)) {
+                currentChunk = Conversions.chunkAlign(cursor, true);
+            }
+            commitPages(reservedPages, requiredPages);
+            space.growSpace(old, bytes, newChunk);
+            unlock();
+            HeapLayout.mmapper.ensureMapped(old, requiredPages);
+            if (zeroed) {
+                if (!zeroConcurrent) {
+                    VM.memory.zero(zeroNT, old, bytes);
+                } else {
+                    while (cursor.GT(zeroingCursor));
+                }
+            }
+            VM.events.tracePageAcquired(space, rtn, requiredPages);
+            return rtn;
         }*/
+    }
+
+    fn adjust_for_metadata(&self, pages: usize) -> usize {
+        pages + ((pages + PAGES_IN_REGION - 1) >> LOG_PAGES_IN_REGION)
+            * self.meta_data_pages_per_region
     }
 }
 
@@ -109,10 +139,15 @@ impl<S: Space<MonotonePageResource<S>>> MonotonePageResource<S> {
         let sentinel = start + bytes;
 
         MonotonePageResource {
-            reserved: 0,
-            committed: 0,
-            growable: HEAP_LAYOUT_64BIT,
-            space: None,
+            common: CommonPageResource {
+                reserved: AtomicUsize::new(0),
+                committed: AtomicUsize::new(0),
+                lock: Mutex::new(()),
+                contiguous: false,
+                growable: HEAP_LAYOUT_64BIT,
+                space: None,
+                _placeholder: PhantomData,
+            },
 
             cursor: start,
             current_chunk: unsafe{Address::from_usize(chunk_align!(start.as_usize(), true))},
@@ -128,10 +163,15 @@ impl<S: Space<MonotonePageResource<S>>> MonotonePageResource<S> {
 
     pub fn new_discontiguous(meta_data_pages_per_region: usize) -> Self {
         MonotonePageResource {
-            reserved: 0,
-            committed: 0,
-            growable: true,
-            space: None,
+            common: CommonPageResource {
+                reserved: AtomicUsize::new(0),
+                committed: AtomicUsize::new(0),
+                lock: Mutex::new(()),
+                contiguous: false,
+                growable: true,
+                space: None,
+                _placeholder: PhantomData,
+            },
 
             cursor: unsafe { Address::zero() },
             current_chunk: unsafe { Address::zero() },
