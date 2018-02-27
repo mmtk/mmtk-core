@@ -1,9 +1,4 @@
-use super::space::default;
-
-use std::sync::Mutex;
-
 use ::policy::space::Space;
-use ::util::heap::{PageResource, MonotonePageResource};
 use ::util::address::Address;
 
 use ::util::ObjectReference;
@@ -12,31 +7,34 @@ use ::vm::{ObjectModel, VMObjectModel};
 use ::plan::TransitiveClosure;
 use ::util::header_byte;
 
-pub struct ImmortalSpace {
-    pr: Mutex<MonotonePageResource>,
+pub struct BootSpace {
+    start: usize,
+    end: usize,
     mark_state: i8,
 }
 
 const GC_MARK_BIT_MASK: i8 = 1;
 
-impl Space for ImmortalSpace {
-    fn init(&self, heap_size: usize) {
-        default::init(&self.pr, heap_size);
+impl Space for BootSpace {
+    fn init(&self, heap_size: usize){
+
     }
 
     fn acquire(&self, thread_id: usize, size: usize) -> Address {
-        default::acquire(&self.pr, thread_id, size)
+        unimplemented!()
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
-        default::in_space(&self.pr, object)
+        let addr = object.to_address().as_usize();
+        addr >= self.start && addr <= self.end
     }
 }
 
-impl ImmortalSpace {
+impl BootSpace {
     pub fn new() -> Self {
-        ImmortalSpace {
-            pr: Mutex::new(MonotonePageResource::new()),
+        BootSpace {
+            start: 0x60000000,
+            end: 0x67ffffff,
             mark_state: 0,
         }
     }
@@ -64,7 +62,7 @@ impl ImmortalSpace {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
-        if ImmortalSpace::test_and_mark(object, self.mark_state) {
+        if BootSpace::test_and_mark(object, self.mark_state) {
             trace.process_node(object);
         }
         return object;

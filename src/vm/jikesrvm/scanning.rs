@@ -66,25 +66,28 @@ impl Scanning for VMScanning {
         unsafe {
             let cc = VMActivePlan::collector(thread_id);
 
-            let jni_functions = JTOC_BASE + JNI_FUNCTIONS_FIELD_OFFSET;
-            let jni_function_table = Address::from_usize(
-                (jni_functions + JNI_FUNCTIONS_FIELD_OFFSET).load::<usize>());
-            let threads = cc.parallel_worker_count();
-            let jni_function_table_data = Address::from_usize(
-                (jni_function_table + FUNCTION_TABLE_DATA_FIELD_OFFSET).load::<usize>());
-            let mut size = (jni_function_table_data + ARRAY_LENGTH_OFFSET).load::<usize>();
-            let mut chunk_size = size / threads;
+            let jni_functions = Address::from_usize((JTOC_BASE + JNI_FUNCTIONS_FIELD_OFFSET).load::<usize>());
+            trace!("jni_functions: {:?}", jni_functions);
 
+            let threads = cc.parallel_worker_count();
+            // @Intrinsic JNIFunctions.length()
+            let mut size = (jni_functions + ARRAY_LENGTH_OFFSET).load::<usize>();
+            trace!("size: {:?}", size);
+            let mut chunk_size = size / threads;
+            trace!("chunk_size: {:?}", chunk_size);
             let mut start = cc.parallel_worker_ordinal() * chunk_size;
+            trace!("start: {:?}", start);
             let mut end = if cc.parallel_worker_ordinal() + 1 == threads {
                 size
             } else {
                 threads * chunk_size
             };
+            trace!("end: {:?}", end);
 
-            for i in start .. end {
-                let function_address_slot = jni_functions + (i * 4);
+            for i in start..end {
+                let function_address_slot = jni_functions + (i << LOG_BYTES_IN_ADDRESS);
                 if jtoc_call!(IMPLEMENTED_IN_JAVA_METHOD_OFFSET, thread_id, i) != 0 {
+                    trace!("function implemented in java {:?}", function_address_slot);
                     trace.process_root_edge(function_address_slot, true);
                 } else {
                     // Function implemented as a C function, must not be
@@ -95,24 +98,29 @@ impl Scanning for VMScanning {
             let linkage_triplets = Address::from_usize(
                 (JTOC_BASE + LINKAGE_TRIPLETS_FIELD_OFFSET).load::<usize>());
             if !linkage_triplets.is_zero() {
-                for i in start .. end {
+                for i in start..end {
                     trace.process_root_edge(linkage_triplets + i * 4, true);
                 }
             }
 
             let jni_global_refs = Address::from_usize(
                 (JTOC_BASE + JNI_GLOBAL_REFS_FIELD2_OFFSET).load::<usize>());
+            trace!("jni_global_refs address: {:?}", jni_global_refs);
             size = (jni_global_refs - 4).load::<usize>();
+            trace!("jni_global_refs size: {:?}", size);
             chunk_size = size / threads;
+            trace!("chunk_size: {:?}", chunk_size);
             start = cc.parallel_worker_ordinal() * chunk_size;
+            trace!("start: {:?}", start);
             end = if cc.parallel_worker_ordinal() + 1 == threads {
                 size
             } else {
                 threads * chunk_size
             };
+            trace!("end: {:?}", end);
 
-            for i in start .. end {
-                trace.process_root_edge(jni_global_refs + 4 * i, true);
+            for i in start..end {
+                trace.process_root_edge(jni_global_refs + (i << LOG_BYTES_IN_ADDRESS), true);
             }
         }
     }

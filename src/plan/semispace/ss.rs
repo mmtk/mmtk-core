@@ -11,6 +11,7 @@ use ::plan::controller_collector_context::ControllerCollectorContext;
 use ::plan::plan;
 use ::plan::Plan;
 use ::plan::Allocator;
+use ::policy::bootspace::BootSpace;
 use ::policy::copyspace::CopySpace;
 use ::policy::immortalspace::ImmortalSpace;
 use ::plan::Phase;
@@ -43,6 +44,7 @@ pub struct SemiSpaceUnsync {
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
+    pub boot_space: BootSpace,
 }
 
 unsafe impl<'a> Sync for SemiSpace<'a> {}
@@ -60,6 +62,7 @@ impl<'a> Plan for SemiSpace<'a> {
                 copyspace0: CopySpace::new(false),
                 copyspace1: CopySpace::new(true),
                 versatile_space: ImmortalSpace::new(),
+                boot_space: BootSpace::new()
             }),
             ss_trace: Trace::new(),
         }
