@@ -1,9 +1,10 @@
 use ::util::Address;
 use ::util::ObjectReference;
+use ::util::conversions::*;
 
 use ::vm::{ActivePlan, VMActivePlan, Collection, VMCollection};
 use ::util::heap::{VMRequest, PageResource};
-use ::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END, AVAILABLE_BYTES};
+use ::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END, AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use ::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END};
 
 use ::plan::Plan;
@@ -33,8 +34,7 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
             VMCollection::block_for_gc(thread_id);
             unsafe { Address::zero() }
         } else {
-            let rtn = pr.get_new_pages(pages_reserved,
-                                       pages, self.common().zeroed);
+            let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, thread_id);
             if rtn.is_zero() {
                 if !allow_poll {
                     panic!("Physical allocation failed when polling not allowed!");
@@ -56,27 +56,51 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
             && object.value() < self.common().start.as_usize() + self.common().extent
     }
 
+    fn grow_discontiguous_space(&self, chunks: usize) -> Address {
+        // FIXME
+        let new_head: Address = unimplemented!(); /*HeapLayout.vmMap. allocate_contiguous_chunks(self.common().descriptor,
+                                                                        self, chunks,
+                                                                        self.common().head_discontiguous_region);*/
+        if new_head.is_zero() {
+            return unsafe{Address::zero()};
+        }
+
+        self.common_mut().head_discontiguous_region = new_head;
+        new_head
+    }
+
+    /**
+     * This hook is called by page resources each time a space grows.  The space may
+     * tap into the hook to monitor heap growth.  The call is made from within the
+     * page resources' critical region, immediately before yielding the lock.
+     *
+     * @param start The start of the newly allocated space
+     * @param bytes The size of the newly allocated space
+     * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
+     */
+    fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {}
+
     fn common(&self) -> &CommonSpace<Self, PR>;
 
-    fn common_mut(&mut self) -> &mut CommonSpace<Self, PR>;
+    fn common_mut(&self) -> &mut CommonSpace<Self, PR>;
 }
 
 pub struct CommonSpace<S: Space<PR>, PR: PageResource<S>> {
-    name: &'static str,
+    pub name: &'static str,
     name_length: usize,
-    descriptor: usize,
+    pub descriptor: usize,
     index: usize,
     pub vmrequest: VMRequest,
 
     immortal: bool,
     movable: bool,
-    contiguous: bool,
+    pub contiguous: bool,
     pub zeroed: bool,
 
     pub pr: Option<PR>,
     pub start: Address,
     pub extent: usize,
-    head_discontiguous_region: Address,
+    pub head_discontiguous_region: Address,
 
     _placeholder: PhantomData<S>,
 }
@@ -122,14 +146,14 @@ impl<S: Space<PR>, PR: PageResource<S>> CommonSpace<S, PR> {
             _                                                             => unreachable!(),
         };
 
-        if extent != chunk_align!(extent, false) {
+        if extent != raw_chunk_align(extent, false) {
             panic!("{} requested non-aligned extent: {} bytes", name, extent);
         }
 
         let start: Address;
         if let VMRequest::RequestFixed{start: _start, extent: _, top: _} = vmrequest {
             start = _start;
-            if start.as_usize() != chunk_align!(start.as_usize(), false) {
+            if start.as_usize() != chunk_align(start, false).as_usize() {
                 panic!("{} starting on non-aligned boundary: {} bytes", name, start.as_usize());
             }
         } else if top {
@@ -177,7 +201,12 @@ fn get_frac_available(frac: f32) -> usize {
     let mb = bytes >> LOG_BYTES_IN_MBYTE;
     let rtn = mb << LOG_BYTES_IN_MBYTE;
     trace!("rtn={}", rtn);
-    let aligned_rtn = chunk_align!(rtn, false);
+    let aligned_rtn = raw_chunk_align(rtn, false);
     trace!("aligned_rtn={}", aligned_rtn);
     aligned_rtn
+}
+
+pub fn required_chunks(pages: usize) -> usize {
+    let extent = raw_chunk_align(pages_to_bytes(pages), false);
+    extent >> LOG_BYTES_IN_CHUNK
 }

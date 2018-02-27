@@ -13,20 +13,22 @@ use ::vm::ObjectModel;
 use ::vm::VMObjectModel;
 use ::plan::Allocator;
 
+use std::cell::UnsafeCell;
+
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 pub struct CopySpace {
-    common: CommonSpace<CopySpace, MonotonePageResource<CopySpace>>,
+    common: UnsafeCell<CommonSpace<CopySpace, MonotonePageResource<CopySpace>>>,
     from_space: bool,
 }
 
 impl Space<MonotonePageResource<CopySpace>> for CopySpace {
     fn common(&self) -> &CommonSpace<CopySpace, MonotonePageResource<CopySpace>> {
-        &self.common
+        unsafe{&*self.common.get()}
     }
 
-    fn common_mut(&mut self) -> &mut CommonSpace<CopySpace, MonotonePageResource<CopySpace>> {
-        &mut self.common
+    fn common_mut(&self) -> &mut CommonSpace<CopySpace, MonotonePageResource<CopySpace>> {
+        unsafe{&mut *self.common.get()}
     }
     fn init(&mut self) {
         // Borrow-checker fighting so that we can have a cyclic reference
@@ -48,7 +50,7 @@ impl Space<MonotonePageResource<CopySpace>> for CopySpace {
 impl CopySpace {
     pub fn new(name: &'static str, from_space: bool, zeroed: bool, vmrequest: VMRequest) -> Self {
         CopySpace {
-            common: CommonSpace::new(name, true, false, zeroed, vmrequest),
+            common: UnsafeCell::new(CommonSpace::new(name, true, false, zeroed, vmrequest)),
             from_space,
         }
     }

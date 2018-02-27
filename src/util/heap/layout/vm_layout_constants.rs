@@ -5,16 +5,6 @@ use super::heap_parameters::*;
 ///////// FIXME ////////////
 use super::super::vmrequest::{HEAP_LAYOUT_32BIT, HEAP_LAYOUT_64BIT};
 
-#[macro_export]
-macro_rules! chunk_align {
-    ($addr:expr, $down:expr) => (
-        (if_then_else_usize!($down, $addr, $addr +
-            ::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK - 1) >>
-                ::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK)
-                    << ::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK
-    );
-}
-
 /**
  * Enable messages in the BootImageWriter log file
  */

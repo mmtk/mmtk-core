@@ -12,8 +12,8 @@ pub trait PageResource<S: Space<Self>>: Sized {
     /// Allocate pages from this resource.
     /// Simply bump the cursor, and fail if we hit the sentinel.
     /// Return The start of the first page if successful, zero on failure.
-    fn get_new_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool) -> Address {
-        self.alloc_pages(reserved_pages, required_pages, zeroed)
+    fn get_new_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, thread_id: usize) -> Address {
+        self.alloc_pages(reserved_pages, required_pages, zeroed, thread_id)
     }
 
     // XXX: In the original code reserve_pages & clear_request explicitly
@@ -45,7 +45,7 @@ pub trait PageResource<S: Space<Self>>: Sized {
         panic!("This PageResource does not implement concurrent zeroing")
     }
 
-    fn alloc_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool) -> Address;
+    fn alloc_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, thread_id: usize) -> Address;
 
     fn adjust_for_metadata(&self, pages: usize) -> usize;
 
@@ -58,10 +58,8 @@ pub trait PageResource<S: Space<Self>>: Sized {
     *
     * This *MUST* be called by each PageResource during the
     * allocPages, and the caller must hold the lock.
-    * (^ This is statically verified by the presence of the `guard` parameter)
     */
-    fn commit_pages(&mut self, reserved_pages: usize, actual_pages: usize, thread_id: usize,
-                    guard: MutexGuard<()>) {
+    fn commit_pages(&self, reserved_pages: usize, actual_pages: usize, thread_id: usize) {
         let delta = actual_pages - reserved_pages;
         self.common().reserved.store(self.common().reserved.load(Ordering::Relaxed) + delta,
                                      Ordering::Relaxed);
@@ -70,7 +68,6 @@ pub trait PageResource<S: Space<Self>>: Sized {
         if unsafe{VMActivePlan::is_mutator(thread_id)} {
             Self::add_to_committed(actual_pages);
         }
-        drop(guard);
     }
 
     fn reserved_pages(&self) -> usize {
@@ -104,7 +101,6 @@ pub struct CommonPageResource<PR: PageResource<S>, S: Space<PR>> {
     pub reserved: AtomicUsize,
     pub committed: AtomicUsize,
 
-    pub lock: Mutex<()>,
     pub contiguous: bool,
     pub growable: bool,
     pub space: Option<&'static S>,

@@ -11,20 +11,24 @@ use ::vm::{ObjectModel, VMObjectModel};
 use ::plan::TransitiveClosure;
 use ::util::header_byte;
 
+use std::cell::UnsafeCell;
+
 pub struct ImmortalSpace {
-    common: CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>>,
+    common: UnsafeCell<CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>>>,
     mark_state: i8,
 }
+
+unsafe impl Sync for ImmortalSpace {}
 
 const GC_MARK_BIT_MASK: i8 = 1;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 impl Space<MonotonePageResource<ImmortalSpace>> for ImmortalSpace {
     fn common(&self) -> &CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>> {
-        &self.common
+        unsafe{&*self.common.get()}
     }
-    fn common_mut(&mut self) -> &mut CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>> {
-        &mut self.common
+    fn common_mut(&self) -> &mut CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>> {
+        unsafe{&mut *self.common.get()}
     }
     fn init(&mut self) {
         // Borrow-checker fighting so that we can have a cyclic reference
@@ -46,7 +50,7 @@ impl Space<MonotonePageResource<ImmortalSpace>> for ImmortalSpace {
 impl ImmortalSpace {
     pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest) -> Self {
         ImmortalSpace {
-            common: CommonSpace::new(name, false, true, zeroed, vmrequest),
+            common: UnsafeCell::new(CommonSpace::new(name, false, true, zeroed, vmrequest)),
             mark_state: 0,
         }
     }
