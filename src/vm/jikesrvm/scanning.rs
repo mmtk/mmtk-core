@@ -1,5 +1,6 @@
 use super::memory_manager_constants::*;
 use super::java_header_constants::*;
+use super::scan_sanity;
 
 use ::vm::Scanning;
 use ::plan::{TransitiveClosure, TraceLocal, MutatorContext, Plan, SelectedPlan, ParallelCollector};
@@ -63,6 +64,11 @@ impl Scanning for VMScanning {
     }
 
     fn compute_global_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
+        if cfg!(feature = "sanity") {
+            scan_sanity::scan_boot_image_sanity(trace, thread_id);
+            return;
+        }
+
         unsafe {
             let cc = VMActivePlan::collector(thread_id);
 
