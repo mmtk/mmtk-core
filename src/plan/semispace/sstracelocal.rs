@@ -74,25 +74,26 @@ impl TraceLocal for SSTraceLocal {
         let plan_unsync = unsafe { &*PLAN.unsync.get() };
 
         if object.is_null() {
+            trace!("trace_object: object is null");
             return object;
         }
         if plan_unsync.copyspace0.in_space(object) {
+            trace!("trace_object: object in copyspace0");
             return plan_unsync.copyspace0.trace_object(self, object, ss::ALLOC_SS, thread_id);
         }
         if plan_unsync.copyspace1.in_space(object) {
+            trace!("trace_object: object in copyspace1");
             return plan_unsync.copyspace1.trace_object(self, object, ss::ALLOC_SS, thread_id);
         }
         if plan_unsync.versatile_space.in_space(object) {
+            trace!("trace_object: object in versatile_space");
             return plan_unsync.versatile_space.trace_object(self, object);
         }
         if plan_unsync.boot_space.in_space(object) {
+            trace!("trace_object: object in boot space");
             return plan_unsync.boot_space.trace_object(self, object);
         }
 
-        unsafe {
-            // No special case for space in trace_object
-            asm!("int $$3" : : :);
-        }
         panic!("No special case for space in trace_object");
     }
 

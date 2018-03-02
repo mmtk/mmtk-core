@@ -38,14 +38,19 @@ pub fn scan_boot_image<T: TraceLocal>(trace: &mut T, thread_id: usize) {
         let collector = VMActivePlan::collector(thread_id);
 
         let stride = collector.parallel_worker_count() << LOG_CHUNK_BYTES;
+        trace!("stride={}", stride);
         let start = collector.parallel_worker_ordinal() << LOG_CHUNK_BYTES;
+        trace!("start={}", start);
         let mut cursor = map_start + start;
+        trace!("cursor={:x}", cursor);
 
         ROOTS.store(0, Ordering::Relaxed);
         ROOTS.store(0, Ordering::Relaxed);
 
         while cursor < map_end {
+            trace!("Processing chunk at {:x}", cursor);
             process_chunk(cursor, image_start, map_start, map_end, trace);
+            trace!("Chunk processed successfully");
             cursor += stride;
         }
     }
@@ -69,7 +74,7 @@ fn process_chunk<T: TraceLocal>(chunk_start: Address, image_start: Address,
             /* figure out the length of the run, if any */
             let mut runlength: usize = 0;
             if (value & RUN_MASK) != 0 {
-                runlength = cursor.load::<usize>();
+                runlength = cursor.load::<u8>() as usize;
                 cursor += 1isize;
             }
             /* enqueue the specified slot or slots */
@@ -87,7 +92,7 @@ fn process_chunk<T: TraceLocal>(chunk_start: Address, image_start: Address,
             }
             if runlength != 0 {
                 for i in 0..runlength {
-                    offset += 4;
+                    offset += BYTES_IN_ADDRESS;
                     slot = image_start + offset;
                     debug_assert!(is_address_aligned(slot));
                     if cfg!(feature = "debug") {
