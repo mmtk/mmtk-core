@@ -78,7 +78,7 @@ impl<'a> Plan for SemiSpace<'a> {
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
-        default::bind_mutator(Self::MutatorT::new(thread_id, self.fromspace(), &unsync.versatile_space))
+        default::bind_mutator(Self::MutatorT::new(thread_id, self.tospace(), &unsync.versatile_space))
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {
