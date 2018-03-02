@@ -125,6 +125,7 @@ pub unsafe extern fn process_interior_edge(trace_local: *mut c_void, target: *mu
 #[no_mangle]
 pub unsafe extern fn start_worker(thread_id: usize, worker: *mut c_void) {
     let worker_instance = &mut *(worker as *mut <SelectedPlan as Plan>::CollectorT);
+    worker_instance.init(thread_id);
     worker_instance.run(thread_id);
 }
 
