@@ -48,7 +48,9 @@ pub fn fill_alignment_gap(immut_start: Address, end: Address) {
 
 #[inline(always)]
 pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: usize) -> usize {
-    debug_assert!(size == size & (known_alignment - 1));
+    trace!("size={}, alignment={}, known_alignment={}, MIN_ALIGNMENT={}", size, alignment,
+           known_alignment, MIN_ALIGNMENT);
+    debug_assert!(size == size & !(known_alignment - 1));
     debug_assert!(known_alignment >= MIN_ALIGNMENT);
 
     if MAX_ALIGNMENT <= MIN_ALIGNMENT || alignment <= known_alignment {
