@@ -41,14 +41,20 @@ pub struct VMObjectModel {}
 impl ObjectModel for VMObjectModel {
     #[inline(always)]
     fn copy(from: ObjectReference, allocator: Allocator, thread_id: usize) -> ObjectReference {
+        trace!("ObjectModel.copy");
         unsafe {
-            let tib = Address::from_usize((from.to_address() - 8).load::<usize>());
+            trace!("getting tib");
+            let tib = Address::from_usize((from.to_address() + TIB_OFFSET).load::<usize>());
+            trace!("getting type, tib={:?}", tib);
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
+            trace!("Is it a class?");
             if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
+                trace!("... yes");
                 Self::copy_array(from, tib, rvm_type, allocator, thread_id)
             } else {
+                trace!("... no");
                 Self::copy_scalar(from, tib, rvm_type, allocator, thread_id)
             }
         }
@@ -56,8 +62,9 @@ impl ObjectModel for VMObjectModel {
 
     #[inline(always)]
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address {
+        trace!("ObjectModel.copy_to");
         unsafe {
-            let tib = Address::from_usize((from.to_address() - 8).load::<usize>());
+            let tib = Address::from_usize((from.to_address() + TIB_OFFSET).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
             let mut bytes: usize = 0;
@@ -79,6 +86,7 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference {
+        trace!("ObjectModel.get_reference_when_copied");
         let mut res = to;
         if ADDRESS_BASED_HASHING && !DYNAMIC_HASH_OFFSET {
             unsafe {
@@ -94,8 +102,9 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_size_when_copied(object: ObjectReference) -> usize {
+        trace!("ObjectModel.get_size_when_copied");
         unsafe {
-            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
+            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -104,8 +113,9 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_align_when_copied(object: ObjectReference) -> usize {
+        trace!("ObjectModel.get_align_when_copied");
         unsafe {
-            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
+            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -118,8 +128,9 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_align_offset_when_copied(object: ObjectReference) -> isize {
+        trace!("ObjectModel.get_align_offset_when_copied");
         unsafe {
-            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
+            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -132,8 +143,9 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_current_size(object: ObjectReference) -> usize {
+        trace!("ObjectModel.get_current_size");
         unsafe {
-            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
+            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -142,6 +154,7 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_next_object(object: ObjectReference) -> ObjectReference {
+        trace!("ObjectModel.get_next_object");
         unsafe {
             // XXX: It can't be this simple..
             Self::get_object_from_start_address(Self::get_object_end_address(object))
@@ -149,6 +162,7 @@ impl ObjectModel for VMObjectModel {
     }
 
     unsafe fn get_object_from_start_address(start: Address) -> ObjectReference {
+        trace!("ObjectModel.get_object_from_start_address");
         let mut _start = start;
 
         /* Skip over any alignment fill */
@@ -160,8 +174,9 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_object_end_address(object: ObjectReference) -> Address {
+        trace!("ObjectModel.get_object_end_address");
         unsafe {
-            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
+            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -191,8 +206,9 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn is_array(object: ObjectReference) -> bool {
+        trace!("ObjectModel.is_array");
         unsafe {
-            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
+            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
             (rvm_type + IS_ARRAY_TYPE_FIELD_OFFSET).load::<bool>()
@@ -200,6 +216,7 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn is_primitive_array(object: ObjectReference) -> bool {
+        trace!("ObjectModel.is_primitive_array");
         unsafe {
             // XXX: Is it OK to compare references like this?
             object.value() == (JTOC_BASE + LONG_ARRAY_FIELD_OFFSET).load::<usize>()
@@ -213,11 +230,13 @@ impl ObjectModel for VMObjectModel {
 
     #[inline(always)]
     fn get_array_length(object: ObjectReference) -> usize {
+        trace!("ObjectModel.get_array_length");
         let len_addr = object.to_address() + Self::get_array_length_offset();
         unsafe { len_addr.load::<usize>() }
     }
 
     fn attempt_available_bits(object: ObjectReference, old: usize, new: usize) -> bool {
+        trace!("ObjectModel.attempt_available_bits");
         let loc = unsafe {
             &*((object.to_address() + STATUS_OFFSET).as_usize() as *mut AtomicUsize)
         };
@@ -226,6 +245,7 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn prepare_available_bits(object: ObjectReference) -> usize {
+        trace!("ObjectModel.prepare_available_bits");
         let loc = unsafe {
             &*((object.to_address() + STATUS_OFFSET).as_usize() as *mut AtomicUsize)
         };
@@ -234,24 +254,28 @@ impl ObjectModel for VMObjectModel {
 
     // XXX: Supposedly none of the 4 methods below need to use atomic loads/stores
     fn write_available_byte(object: ObjectReference, val: u8) {
+        trace!("ObjectModel.write_available_byte");
         unsafe {
             (object.to_address() + AVAILABLE_BITS_OFFSET).store::<u8>(val);
         }
     }
 
     fn read_available_byte(object: ObjectReference) -> u8 {
+        trace!("ObjectModel.read_available_byte");
         unsafe {
             (object.to_address() + AVAILABLE_BITS_OFFSET).load::<u8>()
         }
     }
 
     fn write_available_bits_word(object: ObjectReference, val: usize) {
+        trace!("ObjectModel.write_available_bits_word");
         unsafe {
             (object.to_address() + AVAILABLE_BITS_OFFSET).store::<usize>(val);
         }
     }
 
     fn read_available_bits_word(object: ObjectReference) -> usize {
+        trace!("ObjectModel.read_available_bits_word");
         unsafe {
             (object.to_address() + AVAILABLE_BITS_OFFSET).load::<usize>()
         }
@@ -263,6 +287,7 @@ impl ObjectModel for VMObjectModel {
 
     #[inline(always)]
     fn object_start_ref(object: ObjectReference) -> Address {
+        trace!("ObjectModel.object_start_ref");
         if MOVES_OBJECTS {
             if ADDRESS_BASED_HASHING && !DYNAMIC_HASH_OFFSET {
                 let hash_state = unsafe {
@@ -282,8 +307,9 @@ impl ObjectModel for VMObjectModel {
 
     #[inline(always)]
     fn is_acyclic(typeref: ObjectReference) -> bool {
+        trace!("ObjectModel.is_acyclic");
         unsafe {
-            let tib = Address::from_usize((typeref.to_address() - 8).load::<usize>());
+            let tib = Address::from_usize((typeref.to_address() + TIB_OFFSET).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -322,6 +348,7 @@ impl VMObjectModel {
     #[inline(always)]
     fn copy_scalar(from: ObjectReference, tib: Address, rvm_type: Address,
                    immut_allocator: Allocator, thread_id: usize) -> ObjectReference {
+        trace!("VMObjectModel.copy_scalar");
         let bytes = Self::bytes_required_when_copied_class(from, rvm_type);
         let align = Self::get_alignment_class(rvm_type);
         let offset = Self::get_offset_for_alignment_class(from, rvm_type);
@@ -338,6 +365,7 @@ impl VMObjectModel {
     #[inline(always)]
     fn copy_array(from: ObjectReference, tib: Address, rvm_type: Address,
                   immut_allocator: Allocator, thread_id: usize) -> ObjectReference {
+        trace!("VMObjectModel.copy_array");
         let bytes = Self::bytes_required_when_copied_array(from, rvm_type);
         let align = Self::get_alignment_array(rvm_type);
         let offset = Self::get_offset_for_alignment_array(from, rvm_type);
@@ -354,6 +382,7 @@ impl VMObjectModel {
 
     #[inline(always)]
     fn bytes_required_when_copied(object: ObjectReference, rvm_type: Address) -> usize {
+        trace!("VMObjectModel.bytes_required_when_copied");
         unsafe {
             if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
                 Self::bytes_required_when_copied_class(object, rvm_type)
@@ -384,6 +413,7 @@ impl VMObjectModel {
 
     #[inline(always)]
     fn bytes_required_when_copied_array(object: ObjectReference, rvm_type: Address) -> usize {
+        trace!("VMObjectModel.bytes_required_when_copied_array");
         let mut size = {
             let num_elements = Self::get_array_length(object);
             unsafe {
@@ -407,6 +437,7 @@ impl VMObjectModel {
 
     #[inline(always)]
     fn bytes_used(object: ObjectReference, rvm_type: Address) -> usize {
+        trace!("VMObjectModel.bytes_used");
         unsafe {
             let is_class = (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>();
             let mut size = if is_class {
@@ -438,6 +469,7 @@ impl VMObjectModel {
     #[inline(always)]
     fn move_object(immut_to_address: Address, from_obj: ObjectReference, immut_to_obj: ObjectReference,
                    num_bytes: usize, rvm_type: Address) -> ObjectReference {
+        trace!("VMObjectModel.move_object");
         let mut to_address = immut_to_address;
         let mut to_obj = immut_to_obj;
         debug_assert!(to_address.is_zero() || to_obj.to_address().is_zero());
@@ -507,6 +539,7 @@ impl VMObjectModel {
 
     #[inline(always)]
     unsafe fn aligned_32_copy(dst: Address, src: Address, copy_bytes: usize) {
+        trace!("VMObjectModel.aligned_32_copy");
         //debug_assert!(copy_bytes >= 0);
         debug_assert!(copy_bytes & BYTES_IN_INT - 1 == 0);
         debug_assert!(src.as_usize() & (BYTES_IN_INT - 1) == 0);
@@ -528,11 +561,13 @@ impl VMObjectModel {
 
     #[inline(always)]
     fn get_alignment_array(rvm_type: Address) -> usize {
+        trace!("VMObjectModel.get_alignment_array");
         unsafe { (rvm_type + RVM_ARRAY_ALIGNMENT_OFFSET).load::<usize>() }
     }
 
     #[inline(always)]
     fn get_alignment_class(rvm_type: Address) -> usize {
+        trace!("VMObjectModel.get_alignment_class");
         if BYTES_IN_ADDRESS == BYTES_IN_DOUBLE {
             BYTES_IN_ADDRESS
         } else {
@@ -542,6 +577,7 @@ impl VMObjectModel {
 
     #[inline(always)]
     fn get_offset_for_alignment_array(object: ObjectReference, rvm_type: Address) -> isize {
+        trace!("VMObjectModel.get_offset_for_alignment_array");
         let mut offset = OBJECT_REF_OFFSET;
 
         if ADDRESS_BASED_HASHING && !DYNAMIC_HASH_OFFSET {
@@ -558,6 +594,7 @@ impl VMObjectModel {
 
     #[inline(always)]
     fn get_offset_for_alignment_class(object: ObjectReference, rvm_type: Address) -> isize {
+        trace!("VMObjectModel.get_offset_for_alignment_class");
         let mut offset = SCALAR_HEADER_SIZE as isize;
 
         if ADDRESS_BASED_HASHING && !DYNAMIC_HASH_OFFSET {
