@@ -11,7 +11,7 @@ macro_rules! jtoc_call {
 #[macro_export]
 macro_rules! jikesrvm_instance_call {
     ($obj:expr, $offset:expr, $thread_id:expr $(, $arg:ident)*) => ({
-        let tib = Address::from_usize(($obj).load::<usize>());
+        let tib = Address::from_usize(($obj - 8).load::<usize>());
         let call_addr = (tib + $offset).load::<fn()>();
         jikesrvm_call!(call_addr, $thread_id $(, $arg)*)
     });

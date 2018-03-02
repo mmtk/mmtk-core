@@ -42,7 +42,7 @@ impl ObjectModel for VMObjectModel {
     #[inline(always)]
     fn copy(from: ObjectReference, allocator: Allocator, thread_id: usize) -> ObjectReference {
         unsafe {
-            let tib = Address::from_usize(from.to_address().load::<usize>());
+            let tib = Address::from_usize((from.to_address() - 8).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -57,7 +57,7 @@ impl ObjectModel for VMObjectModel {
     #[inline(always)]
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address {
         unsafe {
-            let tib = Address::from_usize(from.to_address().load::<usize>());
+            let tib = Address::from_usize((from.to_address() - 8).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
             let mut bytes: usize = 0;
@@ -95,7 +95,7 @@ impl ObjectModel for VMObjectModel {
 
     fn get_size_when_copied(object: ObjectReference) -> usize {
         unsafe {
-            let tib = Address::from_usize(object.to_address().load::<usize>());
+            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -105,7 +105,7 @@ impl ObjectModel for VMObjectModel {
 
     fn get_align_when_copied(object: ObjectReference) -> usize {
         unsafe {
-            let tib = Address::from_usize(object.to_address().load::<usize>());
+            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -119,7 +119,7 @@ impl ObjectModel for VMObjectModel {
 
     fn get_align_offset_when_copied(object: ObjectReference) -> isize {
         unsafe {
-            let tib = Address::from_usize(object.to_address().load::<usize>());
+            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -133,7 +133,7 @@ impl ObjectModel for VMObjectModel {
 
     fn get_current_size(object: ObjectReference) -> usize {
         unsafe {
-            let tib = Address::from_usize(object.to_address().load::<usize>());
+            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -161,7 +161,7 @@ impl ObjectModel for VMObjectModel {
 
     fn get_object_end_address(object: ObjectReference) -> Address {
         unsafe {
-            let tib = Address::from_usize(object.to_address().load::<usize>());
+            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -192,7 +192,7 @@ impl ObjectModel for VMObjectModel {
 
     fn is_array(object: ObjectReference) -> bool {
         unsafe {
-            let tib = Address::from_usize(object.to_address().load::<usize>());
+            let tib = Address::from_usize((object.to_address() - 8).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
             (rvm_type + IS_ARRAY_TYPE_FIELD_OFFSET).load::<bool>()
@@ -283,7 +283,7 @@ impl ObjectModel for VMObjectModel {
     #[inline(always)]
     fn is_acyclic(typeref: ObjectReference) -> bool {
         unsafe {
-            let tib = Address::from_usize(typeref.to_address().load::<usize>());
+            let tib = Address::from_usize((typeref.to_address() - 8).load::<usize>());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
 
@@ -366,6 +366,7 @@ impl VMObjectModel {
     #[inline(always)]
     fn bytes_required_when_copied_class(object: ObjectReference, rvm_type: Address) -> usize {
         let mut size = unsafe { (rvm_type + INSTANCE_SIZE_FIELD_OFFSET).load::<usize>() };
+        trace!("bytes_required_when_copied_class: instance size={}", size);
 
         if ADDRESS_BASED_HASHING {
             let hash_state = unsafe {
@@ -377,6 +378,7 @@ impl VMObjectModel {
             }
         }
 
+        trace!("bytes_required_when_copied_class: returned size={}", size);
         size
     }
 
