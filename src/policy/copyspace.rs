@@ -56,6 +56,7 @@ impl CopySpace {
         thread_id: usize,
     ) -> ObjectReference
     {
+        trace!("copyspace.trace_object(, {:?}, {:?}, {:?})", object, allocator, thread_id);
         if !self.from_space {
             return object;
         }
@@ -69,6 +70,7 @@ impl CopySpace {
             let new_object = VMObjectModel::copy(object, allocator, thread_id);
             ForwardingWord::set_forwarding_pointer(object, new_object);
             trace.process_node(new_object);
+            trace!("Copying [{:?} -> {:?}]", object, new_object);
             return new_object;
         }
     }
