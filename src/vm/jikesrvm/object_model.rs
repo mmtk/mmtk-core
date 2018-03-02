@@ -52,10 +52,10 @@ impl ObjectModel for VMObjectModel {
             trace!("Is it a class?");
             if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
                 trace!("... yes");
-                Self::copy_array(from, tib, rvm_type, allocator, thread_id)
+                Self::copy_scalar(from, tib, rvm_type, allocator, thread_id)
             } else {
                 trace!("... no");
-                Self::copy_scalar(from, tib, rvm_type, allocator, thread_id)
+                Self::copy_array(from, tib, rvm_type, allocator, thread_id)
             }
         }
     }
@@ -417,8 +417,10 @@ impl VMObjectModel {
         let mut size = {
             let num_elements = Self::get_array_length(object);
             unsafe {
-                ARRAY_HEADER_SIZE + (num_elements << (rvm_type + LOG_ELEMENT_SIZE_FIELD_OFFSET)
-                    .load::<usize>())
+                let log_element_size = (rvm_type + LOG_ELEMENT_SIZE_FIELD_OFFSET)
+                    .load::<usize>();
+                trace!("log_element_size={}", log_element_size);
+                ARRAY_HEADER_SIZE + (num_elements << log_element_size)
             }
         };
 
