@@ -14,7 +14,11 @@ use ::util::heap::pageresource::CommonPageResource;
 use ::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use ::util::alloc::embedded_meta_data::*;
 
+use super::layout::Mmapper;
+use super::layout::heap_layout::MMAPPER;
+
 use super::PageResource;
+use std::sync::atomic::Ordering;
 
 const SPACE_ALIGN: usize = 1 << 19;
 
@@ -124,8 +128,8 @@ impl<S: Space<MonotonePageResource<S>>> PageResource<S> for MonotonePageResource
             }
             self.commit_pages(reserved_pages, required_pages, thread_id);
             self.common().space.unwrap().grow_space(old, bytes, new_chunk);
-            // FIXME
-            //HeapLayout.mmapper.ensureMapped(old, required_pages);
+
+            MMAPPER.ensure_mapped(old, required_pages);
 
             // FIXME: Zeroing
             /*
@@ -211,7 +215,10 @@ impl<S: Space<MonotonePageResource<S>>> MonotonePageResource<S> {
         }
     }
 
-    pub fn reset(&mut self) {
-        unimplemented!()
+    pub fn reset(&self) {
+        let guard = self.sync.lock().unwrap();
+        self.common().reserved.store(0, Ordering::Relaxed);
+        self.common().committed.store(0, Ordering::Relaxed);
+        drop(guard);
     }
 }
