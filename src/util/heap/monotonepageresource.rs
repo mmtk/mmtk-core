@@ -161,7 +161,7 @@ impl<S: Space<MonotonePageResource<S>>> MonotonePageResource<S> {
             common: CommonPageResource {
                 reserved: AtomicUsize::new(0),
                 committed: AtomicUsize::new(0),
-                contiguous: false,
+                contiguous: true,
                 growable: HEAP_LAYOUT_64BIT,
                 space: None,
                 _placeholder: PhantomData,
