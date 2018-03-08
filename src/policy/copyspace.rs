@@ -44,8 +44,9 @@ impl CopySpace {
         self.from_space = from_space;
     }
 
-    pub fn release(&self) {
-        unimplemented!()
+    pub fn release(&mut self) {
+        self.pr.lock().unwrap().reset();
+        self.from_space = false;
     }
 
     pub fn trace_object<T: TransitiveClosure>(

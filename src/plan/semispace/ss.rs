@@ -125,7 +125,11 @@ impl<'a> Plan for SemiSpace<'a> {
             }
             &Phase::Closure => {}
             &Phase::Release => {
-                self.fromspace().release();
+                if unsync.hi {
+                    unsync.copyspace0.release();
+                } else {
+                    unsync.copyspace1.release();
+                }
                 unsync.versatile_space.release();
             }
             &Phase::Complete => {

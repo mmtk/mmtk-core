@@ -75,6 +75,8 @@ impl Drop for MonotonePageResource {
 
 impl MonotonePageResource {
     pub fn reset(&mut self) {
-        unimplemented!()
+        trace!("Reset MonotonePageResource");
+        self.heap_cursor = unsafe {Address::from_usize(self.mmap_start)
+            .align_up(SPACE_ALIGN)};
     }
 }
