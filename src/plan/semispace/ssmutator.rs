@@ -20,10 +20,6 @@ pub struct SSMutator<'a> {
 impl<'a> MutatorContext for SSMutator<'a> {
     fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
         match phase {
-            &Phase::Prepare => {
-                // rebind the allocation bump pointer to the appropriate semispace
-                self.ss.rebind(Some(semispace::PLAN.tospace()));
-            }
             &Phase::PrepareStacks => {
                 if !plan::stacks_prepared() {
                     VMCollection::prepare_mutator(self.ss.thread_id, self);
@@ -31,7 +27,10 @@ impl<'a> MutatorContext for SSMutator<'a> {
                 self.flush_remembered_sets();
             }
             &Phase::Prepare => {}
-            &Phase::Release => {}
+            &Phase::Release => {
+                // rebind the allocation bump pointer to the appropriate semispace
+                self.ss.rebind(Some(semispace::PLAN.tospace()));
+            }
             _ => {
                 panic!("Per-mutator phase not handled!")
             }

@@ -110,7 +110,8 @@ impl<'a> Plan for SemiSpace<'a> {
                 plan::STACKS_PREPARED.store(true, atomic::Ordering::Relaxed);
             }
             &Phase::Prepare => {
-                unsync.hi = !unsync.hi;
+                unsync.hi = !unsync.hi; // flip the semi-spaces
+                // prepare each of the collected regions
                 unsync.copyspace0.prepare(unsync.hi);
                 unsync.copyspace1.prepare(!unsync.hi);
                 unsync.versatile_space.prepare();
@@ -125,6 +126,7 @@ impl<'a> Plan for SemiSpace<'a> {
             }
             &Phase::Closure => {}
             &Phase::Release => {
+                // release the collected region
                 if unsync.hi {
                     unsync.copyspace0.release();
                 } else {
