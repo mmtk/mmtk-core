@@ -65,17 +65,17 @@ impl Plan for SemiSpace {
                 vm_space: create_vm_space(),
                 copyspace0: CopySpace::new("copyspace0", false, true,
                                            VMRequest::RequestFraction {
-                                               frac: 0.3,
+                                               frac: 1.0/3.0,
                                                top: false,
                                            }),
                 copyspace1: CopySpace::new("copyspace1", true, true,
                                            VMRequest::RequestFraction {
-                                               frac: 0.3,
+                                               frac: 1.0/3.0,
                                                top: false,
                                            }),
                 versatile_space: ImmortalSpace::new("versatile_space", true,
                                                     VMRequest::RequestFraction {
-                                                        frac: 0.3,
+                                                        frac: 1.0/3.0,
                                                         top:  false,
                                                     }),
                 total_pages: 0,
@@ -86,7 +86,7 @@ impl Plan for SemiSpace {
 
     unsafe fn gc_init(&self, heap_size: usize) {
         let unsync = &mut *self.unsync.get();
-        unsync.total_pages = bytes_to_pages((0.9 * heap_size as f64) as usize);
+        unsync.total_pages = bytes_to_pages(heap_size);
         unsync.vm_space.init();
         unsync.copyspace0.init();
         unsync.copyspace1.init();
@@ -101,7 +101,7 @@ impl Plan for SemiSpace {
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
-        Box::into_raw(Box::new(SSMutator::new(thread_id, self.fromspace(),
+        Box::into_raw(Box::new(SSMutator::new(thread_id, self.tospace(),
                                               &unsync.versatile_space))) as *mut c_void
     }
 
@@ -163,6 +163,11 @@ impl Plan for SemiSpace {
 
     fn get_total_pages(&self) -> usize {
         unsafe{(&*self.unsync.get()).total_pages}
+    }
+
+    fn get_collection_reserve(&self) -> usize {
+        let unsync = unsafe{&*self.unsync.get()};
+        self.tospace().reserved_pages()
     }
 
     fn get_pages_used(&self) -> usize {

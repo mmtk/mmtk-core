@@ -107,6 +107,8 @@ pub trait Plan {
     fn collection_required<PR: PageResource<S>, S: Space<PR>>(&self, space_full: bool, space: &'static S) -> bool {
         // FIXME
         let stress_force_gc = false;
+        trace!("self.get_pages_reserved()={}, self.get_total_pages()={}",
+               self.get_pages_reserved(), self.get_total_pages());
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
 
         space_full || stress_force_gc || heap_full
