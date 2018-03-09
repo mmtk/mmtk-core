@@ -8,9 +8,36 @@ use ::util::heap::PageResource;
 use ::util::options::options::{OptionMap, CLIOption};
 
 use super::controller_collector_context::ControllerCollectorContext;
+use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use util::constants::LOG_BYTES_IN_MBYTE;
+use util::heap::VMRequest;
+use policy::immortalspace::ImmortalSpace;
+#[cfg(feature = "jikesrvm")]
+use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_END;
+#[cfg(feature = "jikesrvm")]
+use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
+use util::Address;
 
 lazy_static! {
     pub static ref CONTROL_COLLECTOR_CONTEXT: ControllerCollectorContext = ControllerCollectorContext::new();
+}
+
+// FIXME: Move somewhere more appropriate
+#[cfg(feature = "jikesrvm")]
+pub fn create_vm_space() -> ImmortalSpace {
+    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
+    debug_assert!(boot_segment_bytes > 0);
+
+    let boot_segment_mb = unsafe{Address::from_usize(boot_segment_bytes)}
+        .align_up(BYTES_IN_CHUNK).as_usize() >> LOG_BYTES_IN_MBYTE;
+
+    ImmortalSpace::new("boot", false, VMRequest::fixed_size(boot_segment_mb))
+}
+
+#[cfg(not(feature = "jikesrvm"))]
+pub fn create_vm_space() -> ImmortalSpace {
+    // FIXME: Does OpenJDK care?
+    ImmortalSpace::new("boot", false, VMRequest::fixed_size(0))
 }
 
 pub trait Plan {

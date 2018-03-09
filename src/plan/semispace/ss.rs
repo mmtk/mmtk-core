@@ -24,6 +24,7 @@ use std::sync::atomic::{self, AtomicBool};
 use ::vm::{Scanning, VMScanning};
 use std::thread;
 use util::conversions::bytes_to_pages;
+use plan::plan::create_vm_space;
 
 pub type SelectedPlan = SemiSpace;
 
@@ -41,6 +42,7 @@ pub struct SemiSpace {
 
 pub struct SemiSpaceUnsync {
     pub hi: bool,
+    vm_space: ImmortalSpace,
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
@@ -59,7 +61,8 @@ impl Plan for SemiSpace {
     fn new() -> Self {
         SemiSpace {
             unsync: UnsafeCell::new(SemiSpaceUnsync {
-                hi: false,
+                hi: true,
+                vm_space: create_vm_space(),
                 copyspace0: CopySpace::new("copyspace0", false, true,
                                            VMRequest::RequestFraction {
                                                frac: 0.3,
@@ -84,7 +87,7 @@ impl Plan for SemiSpace {
     unsafe fn gc_init(&self, heap_size: usize) {
         let unsync = &mut *self.unsync.get();
         unsync.total_pages = bytes_to_pages((0.9 * heap_size as f64) as usize);
-        // FIXME correctly initialize spaces based on options
+        unsync.vm_space.init();
         unsync.copyspace0.init();
         unsync.copyspace1.init();
         unsync.versatile_space.init();

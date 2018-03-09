@@ -46,6 +46,7 @@ impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        trace!("alloc");
         let result = align_allocation(self.cursor, align, offset);
         let new_cursor = result + size;
 
@@ -62,6 +63,7 @@ impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR
     }
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        trace!("alloc_slow");
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
         let acquired_start: Address = self.space.unwrap().acquire(self.thread_id,
                                                                   bytes_to_pages(block_size));

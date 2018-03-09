@@ -9,6 +9,8 @@ use std::cell::UnsafeCell;
 use std::thread;
 use libc::c_void;
 
+use std::mem::uninitialized;
+
 lazy_static! {
     pub static ref PLAN: NoGC = NoGC::new();
 }
@@ -17,6 +19,7 @@ use super::NoGCTraceLocal;
 use super::NoGCMutator;
 use super::NoGCCollector;
 use util::conversions::bytes_to_pages;
+use plan::plan::create_vm_space;
 
 pub type SelectedPlan = NoGC;
 
@@ -28,6 +31,7 @@ pub struct NoGC {
 unsafe impl Sync for NoGC {}
 
 pub struct NoGCUnsync {
+    vm_space: ImmortalSpace,
     pub space: ImmortalSpace,
     pub total_pages: usize,
 }
@@ -41,6 +45,7 @@ impl Plan for NoGC {
         NoGC {
             control_collector_context: ControllerCollectorContext::new(),
             unsync: UnsafeCell::new(NoGCUnsync {
+                vm_space: create_vm_space(),
                 space: ImmortalSpace::new("nogc_space", true,
                                           VMRequest::RequestFraction {
                                               frac: 1.0,
@@ -56,6 +61,7 @@ impl Plan for NoGC {
         let unsync = &mut *self.unsync.get();
         unsync.total_pages = bytes_to_pages(heap_size);
         // FIXME correctly initialize spaces based on options
+        unsync.vm_space.init();
         unsync.space.init();
 
         if !cfg!(feature = "jikesrvm") {
