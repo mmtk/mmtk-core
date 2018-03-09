@@ -21,7 +21,7 @@ const PROTECTED: u8 = 2;
 const MMAP_NUM_CHUNKS: usize = if_then_else_usize!(LOG_BYTES_IN_ADDRESS_SPACE == 32,
                                                   1 << (LOG_BYTES_IN_ADDRESS_SPACE as usize - LOG_MMAP_CHUNK_BYTES),
                                                   1 << (33 - LOG_MMAP_CHUNK_BYTES));
-pub const VERBOSE: bool = false;
+pub const VERBOSE: bool = true;
 
 pub struct ByteMapMmapper {
     lock: Mutex<()>,
@@ -42,6 +42,7 @@ impl Mmapper for ByteMapMmapper {
     }
 
     fn ensure_mapped(&self, start: Address, pages: usize) {
+        trace!("Calling ensure_mapped with start={:?} and {} pages", start, pages);
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
 
@@ -55,17 +56,16 @@ impl Mmapper for ByteMapMmapper {
 //          trace!(mmapStart);
             // might have become MAPPED here
             if self.mapped[chunk].load(Ordering::Relaxed) == UNMAPPED {
-                unsafe {
+                let mmap_ret = unsafe {
                     mmap(mmap_start.as_usize() as *mut c_void, MMAP_CHUNK_BYTES,
                          PROT_READ | PROT_WRITE | PROT_EXEC,
-                         MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
-                }
-                let errno = unsafe{*__errno_location()} as usize;
+                         MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0)
+                } as usize;
 
-                if errno != 0 {
+                if mmap_ret != mmap_start.as_usize() {
                     drop(guard);
-                    panic!("ensureMapped failed with errno {} on address {}\
-                           Can't get more space with mmap()", errno, mmap_start);
+                    panic!("ensureMapped failed on address {}\n\
+                           Can't get more space with mmap()", mmap_start);
                 } else {
                     if VERBOSE {
                         trace!("mmap succeeded at chunk {}  {} with len = {}", chunk,
@@ -76,7 +76,7 @@ impl Mmapper for ByteMapMmapper {
 
             if self.mapped[chunk].load(Ordering::Relaxed) == PROTECTED {
                 if unsafe { mprotect(mmap_start.as_usize() as *mut c_void, MMAP_CHUNK_BYTES,
-                            PROT_READ | PROT_WRITE | PROT_EXEC) != 0 } {
+                                     PROT_READ | PROT_WRITE | PROT_EXEC) != 0 } {
                     drop(guard);
                     panic!("Mmapper.ensureMapped (unprotect) failed");
                 } else {

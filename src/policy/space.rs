@@ -80,6 +80,14 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
      */
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {}
 
+    fn reserved_pages(&self) -> usize {
+        self.common().pr.as_ref().unwrap().reserved_pages()
+    }
+
+    fn get_name(&self) -> &'static str {
+        self.common().name
+    }
+
     fn common(&self) -> &CommonSpace<Self, PR>;
 
     fn common_mut(&self) -> &mut CommonSpace<Self, PR>;

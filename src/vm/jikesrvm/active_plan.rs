@@ -10,10 +10,6 @@ static MUTATOR_COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 pub struct VMActivePlan<> {}
 
 impl ActivePlan for VMActivePlan {
-    fn global() -> &'static SelectedPlan {
-        &::plan::selected_plan::PLAN
-    }
-
     // XXX: Are they actually static
     unsafe fn collector(thread_id: usize) -> &'static mut <SelectedPlan as Plan>::CollectorT {
         let thread = VMCollection::thread_from_id(thread_id);

@@ -7,6 +7,7 @@ use ::util::heap::PageResource;
 use std::marker::PhantomData;
 
 use ::policy::space::Space;
+use util::conversions::bytes_to_pages;
 
 const BYTES_IN_PAGE: usize = 1 << 12;
 const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
@@ -62,7 +63,8 @@ impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start: Address = self.space.unwrap().acquire(self.thread_id, block_size);
+        let acquired_start: Address = self.space.unwrap().acquire(self.thread_id,
+                                                                  bytes_to_pages(block_size));
         if acquired_start.is_zero() {
             trace!("Failed to acquire a new block");
             acquired_start

@@ -5,6 +5,13 @@ use std::sync::atomic::{self, AtomicBool, Ordering};
 
 use ::policy::space::Space;
 use ::util::heap::PageResource;
+use ::util::options::options::{OptionMap, CLIOption};
+
+use super::controller_collector_context::ControllerCollectorContext;
+
+lazy_static! {
+    pub static ref CONTROL_COLLECTOR_CONTEXT: ControllerCollectorContext = ControllerCollectorContext::new();
+}
 
 pub trait Plan {
     type MutatorT: MutatorContext;
@@ -24,8 +31,71 @@ pub trait Plan {
     }
 
     fn poll<PR: PageResource<S>, S: Space<PR>>(&self, space_full: bool, space: &'static S) -> bool {
-        unimplemented!()
+        if self.collection_required(space_full, space) {
+            // FIXME
+            /*if space == META_DATA_SPACE {
+                /* In general we must not trigger a GC on metadata allocation since
+                 * this is not, in general, in a GC safe point.  Instead we initiate
+                 * an asynchronous GC, which will occur at the next safe point.
+                 */
+                self.log_poll(space, "Asynchronous collection requested");
+                self.common().control_collector_context.request();
+                return false;
+            }*/
+            self.log_poll(space, "Triggering collection");
+            CONTROL_COLLECTOR_CONTEXT.request();
+            return true;
+        }
+
+        // FIXME
+        /*if self.concurrent_collection_required() {
+            // FIXME
+            /*if space == self.common().meta_data_space {
+                self.log_poll(space, "Triggering async concurrent collection");
+                Self::trigger_internal_collection_request();
+                return false;
+            } else {*/
+            self.log_poll(space, "Triggering concurrent collection");
+            Self::trigger_internal_collection_request();
+            return true;
+        }*/
+
+        return false;
     }
+
+    fn log_poll<PR: PageResource<S>, S: Space<PR>>(&self, space: &'static S, message: &'static str) {
+        if OptionMap.get().verbose.get() >= 5 {
+            println!("  [POLL] {}: {}", space.get_name(), message);
+        }
+    }
+
+    /**
+     * This method controls the triggering of a GC. It is called periodically
+     * during allocation. Returns <code>true</code> to trigger a collection.
+     *
+     * @param spaceFull Space request failed, must recover pages within 'space'.
+     * @param space TODO
+     * @return <code>true</code> if a collection is requested by the plan.
+     */
+    fn collection_required<PR: PageResource<S>, S: Space<PR>>(&self, space_full: bool, space: &'static S) -> bool {
+        // FIXME
+        let stress_force_gc = false;
+        let heap_full = self.get_pages_reserved() > self.get_total_pages();
+
+        space_full || stress_force_gc || heap_full
+    }
+
+    fn get_pages_reserved(&self) -> usize {
+        self.get_pages_used() + self.get_collection_reserve()
+    }
+
+    fn get_total_pages(&self) -> usize;
+
+    fn get_collection_reserve(&self) -> usize {
+        0
+    }
+
+    fn get_pages_used(&self) -> usize;
 }
 
 #[derive(PartialEq)]
@@ -54,32 +124,6 @@ pub enum Allocator {
     LargeCode = 8,
     Allocators = 9,
     DefaultSite = -1,
-}
-
-pub mod default {
-    use std::thread;
-    use libc::c_void;
-
-    use ::policy::space::Space;
-    use ::plan::mutator_context::MutatorContext;
-
-    use ::util::heap::PageResource;
-
-    use super::super::selected_plan::PLAN;
-
-    pub fn gc_init<PR: PageResource<S>, S: Space<PR>>(space: &mut S) {
-        space.init();
-
-        if !cfg!(feature = "jikesrvm") {
-            thread::spawn(|| {
-                PLAN.control_collector_context.run(0);
-            });
-        }
-    }
-
-    pub fn bind_mutator<M: MutatorContext>(ctx: M) -> *mut c_void {
-        Box::into_raw(Box::new(ctx)) as *mut c_void
-    }
 }
 
 lazy_static! {

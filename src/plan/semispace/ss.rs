@@ -1,5 +1,3 @@
-use super::super::plan::default;
-
 use ::policy::space::Space;
 
 use super::SSMutator;
@@ -24,6 +22,8 @@ use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool};
 
 use ::vm::{Scanning, VMScanning};
+use std::thread;
+use util::conversions::bytes_to_pages;
 
 pub type SelectedPlan = SemiSpace;
 
@@ -35,7 +35,6 @@ lazy_static! {
 }
 
 pub struct SemiSpace {
-    pub control_collector_context: ControllerCollectorContext,
     pub unsync: UnsafeCell<SemiSpaceUnsync>,
     pub ss_trace: Trace,
 }
@@ -45,6 +44,9 @@ pub struct SemiSpaceUnsync {
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
+
+    // FIXME: This should be inside HeapGrowthManager
+    total_pages: usize,
 }
 
 unsafe impl Sync for SemiSpace {}
@@ -56,7 +58,6 @@ impl Plan for SemiSpace {
 
     fn new() -> Self {
         SemiSpace {
-            control_collector_context: ControllerCollectorContext::new(),
             unsync: UnsafeCell::new(SemiSpaceUnsync {
                 hi: false,
                 copyspace0: CopySpace::new("copyspace0", false, true,
@@ -74,6 +75,7 @@ impl Plan for SemiSpace {
                                                         frac: 0.3,
                                                         top:  false,
                                                     }),
+                total_pages: 0,
             }),
             ss_trace: Trace::new(),
         }
@@ -81,15 +83,23 @@ impl Plan for SemiSpace {
 
     unsafe fn gc_init(&self, heap_size: usize) {
         let unsync = &mut *self.unsync.get();
+        unsync.total_pages = bytes_to_pages((0.9 * heap_size as f64) as usize);
         // FIXME correctly initialize spaces based on options
-        default::gc_init(&mut unsync.copyspace0);
+        unsync.copyspace0.init();
         unsync.copyspace1.init();
         unsync.versatile_space.init();
+
+        if !cfg!(feature = "jikesrvm") {
+            thread::spawn(|| {
+                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(0)
+            });
+        }
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
-        default::bind_mutator(SSMutator::new(thread_id, self.fromspace(), &unsync.versatile_space))
+        Box::into_raw(Box::new(SSMutator::new(thread_id, self.fromspace(),
+                                              &unsync.versatile_space))) as *mut c_void
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {
@@ -146,6 +156,15 @@ impl Plan for SemiSpace {
                 panic!("Global phase not handled!")
             }
         }
+    }
+
+    fn get_total_pages(&self) -> usize {
+        unsafe{(&*self.unsync.get()).total_pages}
+    }
+
+    fn get_pages_used(&self) -> usize {
+        let unsync = unsafe{&*self.unsync.get()};
+        self.tospace().reserved_pages() + unsync.versatile_space.reserved_pages()
     }
 }
 

@@ -92,15 +92,17 @@ impl<S: Space<MonotonePageResource<S>>> PageResource<S> for MonotonePageResource
         if self.meta_data_pages_per_region != 0 {
             /* adjust allocation for metadata */
             let region_start = Self::get_region_start(sync.cursor + pages_to_bytes(required_pages));
-            let region_delta = region_start - sync.cursor;
+            let region_delta = region_start.as_usize() as isize - sync.cursor.as_usize() as isize;
             if region_delta >= 0 {
                 /* start new region, so adjust pages and return address accordingly */
-                required_pages += bytes_to_pages(region_delta) + self.meta_data_pages_per_region;
+                required_pages += bytes_to_pages(region_delta as usize) + self.meta_data_pages_per_region;
                 rtn = region_start + pages_to_bytes(self.meta_data_pages_per_region);
             }
         }
         let bytes = pages_to_bytes(required_pages);
+        trace!("bytes={}", bytes);
         let mut tmp = sync.cursor + bytes;
+        trace!("tmp={:?}", tmp);
 
         if !self.common().contiguous && tmp > sync.sentinel {
             /* we're out of virtual memory within our discontiguous region, so ask for more */
@@ -117,6 +119,7 @@ impl<S: Space<MonotonePageResource<S>>> PageResource<S> for MonotonePageResource
 
         debug_assert!(rtn >= sync.cursor && rtn < sync.cursor + bytes);
         if tmp > sync.sentinel {
+            trace!("tmp={:?} > sync.sentinel={:?}", tmp, sync.sentinel);
             return unsafe{Address::zero()};
         } else {
             let old = sync.cursor;
