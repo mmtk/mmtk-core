@@ -34,7 +34,7 @@ pub fn create_vm_space() -> ImmortalSpace {
     ImmortalSpace::new("boot", false, VMRequest::fixed_size(boot_segment_mb))
 }
 
-#[cfg(not(feature = "jikesrvm"))]
+#[cfg(feature = "openjdk")]
 pub fn create_vm_space() -> ImmortalSpace {
     // FIXME: Does OpenJDK care?
     ImmortalSpace::new("boot", false, VMRequest::fixed_size(0))
