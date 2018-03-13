@@ -26,20 +26,20 @@ pub use self::jikesrvm::active_plan::VMActivePlan as VMActivePlan;
 #[cfg(feature = "jikesrvm")]
 pub use self::jikesrvm::JikesRVM;
 
-#[cfg(not(feature = "jikesrvm"))]
+#[cfg(feature = "openjdk")]
 mod openjdk;
 
-#[cfg(not(feature = "jikesrvm"))]
+#[cfg(feature = "openjdk")]
 pub use self::openjdk::*;
 
-#[cfg(not(feature = "jikesrvm"))]
+#[cfg(feature = "openjdk")]
 pub use self::openjdk::object_model::VMObjectModel as VMObjectModel;
 
-#[cfg(not(feature = "jikesrvm"))]
+#[cfg(feature = "openjdk")]
 pub use self::openjdk::scanning::VMScanning as VMScanning;
 
-#[cfg(not(feature = "jikesrvm"))]
+#[cfg(feature = "openjdk")]
 pub use self::openjdk::collection::VMCollection as VMCollection;
 
-#[cfg(not(feature = "jikesrvm"))]
+#[cfg(feature = "openjdk")]
 pub use self::openjdk::active_plan::VMActivePlan as VMActivePlan;

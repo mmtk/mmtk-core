@@ -49,7 +49,7 @@ extern void start_control_collector(size_t thread_id);
 extern void start_worker(size_t thread_id, void* worker);
 
 /**
- * openJdk-specific
+ * OpenJDK-specific
  */
 
 extern int used_bytes();

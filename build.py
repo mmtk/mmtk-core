@@ -45,7 +45,7 @@ for plan in PLANS:
            "+nightly",
            "build",
            "--no-default-features",
-           "--features", " ".join([plan, extra_features])]
+           "--features", " ".join([plan, "openjdk", extra_features])]
     exec_and_redirect(cmd)
     exec_and_redirect(cmd + ["--release"])
     shutil.copyfile("target/release/libmmtk{}".format(SUFFIX),

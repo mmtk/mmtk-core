@@ -16,7 +16,8 @@ crossbeam-deque = "0.1"
 num_cpus = "1.8.0"
 
 [features]
-default = ["nogc"]
+default = ["nogc", "openjdk"]
 nogc = []
 semispace = []
 jikesrvm = []
+openjdk = []

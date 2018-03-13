@@ -26,6 +26,9 @@ use ::plan::selected_plan;
 use self::selected_plan::SelectedPlan;
 
 use ::plan::Allocator;
+use util::constants::LOG_BYTES_IN_PAGE;
+use util::heap::layout::vm_layout_constants::HEAP_START;
+use util::heap::layout::vm_layout_constants::HEAP_END;
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
@@ -155,4 +158,40 @@ pub extern fn process(name: *const c_char, value: *const c_char) -> bool {
     unsafe {
         option.process(name_str.to_str().unwrap(), value_str.to_str().unwrap())
     }
+}
+
+#[no_mangle]
+#[cfg(feature = "openjdk")]
+pub extern fn used_bytes() -> usize {
+    selected_plan::PLAN.get_pages_used() << LOG_BYTES_IN_PAGE
+}
+
+#[no_mangle]
+#[cfg(not(feature = "openjdk"))]
+pub extern fn used_bytes() -> usize {
+    panic!("Cannot call used_bytes when not building for OpenJDK");
+}
+
+#[no_mangle]
+#[cfg(feature = "openjdk")]
+pub extern fn starting_heap_address() -> *mut c_void {
+    HEAP_START.as_usize() as *mut c_void
+}
+
+#[no_mangle]
+#[cfg(not(feature = "openjdk"))]
+pub extern fn starting_heap_address() -> *mut c_void {
+    panic!("Cannot call starting_heap_address when not building for OpenJDK");
+}
+
+#[no_mangle]
+#[cfg(feature = "openjdk")]
+pub extern fn last_heap_address() -> *mut c_void {
+    HEAP_END.as_usize() as *mut c_void
+}
+
+#[no_mangle]
+#[cfg(not(feature = "openjdk"))]
+pub extern fn last_heap_address() -> *mut c_void {
+    panic!("Cannot call last_heap_address when not building for OpenJDK");
 }
