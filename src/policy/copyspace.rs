@@ -1,11 +1,11 @@
-use super::space::default;
-
 use std::sync::Mutex;
 
 use ::util::heap::PageResource;
 use ::util::heap::MonotonePageResource;
+use ::util::heap::VMRequest;
+use ::util::constants::CARD_META_PAGES_PER_REGION;
 
-use ::policy::space::Space;
+use ::policy::space::{Space, CommonSpace};
 use ::util::{Address, ObjectReference};
 use ::plan::TransitiveClosure;
 use ::util::forwarding_word as ForwardingWord;
@@ -13,29 +13,44 @@ use ::vm::ObjectModel;
 use ::vm::VMObjectModel;
 use ::plan::Allocator;
 
+use std::cell::UnsafeCell;
+
+const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
+
 pub struct CopySpace {
-    pr: Mutex<MonotonePageResource>,
+    common: UnsafeCell<CommonSpace<CopySpace, MonotonePageResource<CopySpace>>>,
     from_space: bool,
 }
 
-impl Space for CopySpace {
-    fn init(&self, heap_size: usize) {
-        default::init(&self.pr, heap_size);
+impl Space<MonotonePageResource<CopySpace>> for CopySpace {
+    fn common(&self) -> &CommonSpace<CopySpace, MonotonePageResource<CopySpace>> {
+        unsafe{&*self.common.get()}
     }
 
-    fn acquire(&self, thread_id: usize, size: usize) -> Address {
-        default::acquire(&self.pr, thread_id, size)
+    fn common_mut(&self) -> &mut CommonSpace<CopySpace, MonotonePageResource<CopySpace>> {
+        unsafe{&mut *self.common.get()}
     }
+    fn init(&mut self) {
+        // Borrow-checker fighting so that we can have a cyclic reference
+        let me = unsafe { &*(self as *const Self) };
 
-    fn in_space(&self, object: ObjectReference) -> bool {
-        default::in_space(&self.pr, object)
+        let common_mut = self.common_mut();
+        if common_mut.vmrequest.is_discontiguous() {
+            common_mut.pr = Some(MonotonePageResource::new_discontiguous(
+                META_DATA_PAGES_PER_REGION));
+        } else {
+            common_mut.pr = Some(MonotonePageResource::new_contiguous(common_mut.start,
+                                                                      common_mut.extent,
+                                                                      META_DATA_PAGES_PER_REGION));
+        }
+        common_mut.pr.as_mut().unwrap().bind_space(me);
     }
 }
 
 impl CopySpace {
-    pub fn new(from_space: bool) -> Self {
+    pub fn new(name: &'static str, from_space: bool, zeroed: bool, vmrequest: VMRequest) -> Self {
         CopySpace {
-            pr: Mutex::new(MonotonePageResource::new()),
+            common: UnsafeCell::new(CommonSpace::new(name, true, false, zeroed, vmrequest)),
             from_space,
         }
     }
@@ -45,7 +60,7 @@ impl CopySpace {
     }
 
     pub fn release(&mut self) {
-        self.pr.lock().unwrap().reset();
+        self.common().pr.as_ref().unwrap().reset();
         self.from_space = false;
     }
 

@@ -7,12 +7,17 @@ use super::layout::vm_layout_constants::*;
 #[cfg(target_pointer_width = "32")]
 pub const HEAP_LAYOUT_32BIT: bool = true;
 #[cfg(target_pointer_width = "64")]
-pub const HEAP_LAYOUT_32BIT: bool = false;
+pub const HEAP_LAYOUT_32BIT: bool = true; // FIXME SERIOUSLY
 pub const HEAP_LAYOUT_64BIT: bool = !HEAP_LAYOUT_32BIT;
 
+#[derive(Clone, Copy)]
 pub enum VMRequest {
     RequestDiscontiguous,
-    RequestFixed, // XXX: Never used?
+    RequestFixed {
+        start: Address,
+        extent: usize,
+        top: bool,
+    },
     RequestExtent {
         extent: usize,
         top: bool,

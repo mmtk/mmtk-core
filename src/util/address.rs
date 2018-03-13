@@ -107,7 +107,7 @@ impl Address {
     /// creates an arbitrary Address
     /// It is unsafe and the user needs to be aware that they may create an invalid address.
     #[inline(always)]
-    pub unsafe fn from_usize(raw: usize) -> Address {
+    pub const unsafe fn from_usize(raw: usize) -> Address {
         Address(raw)
     }
 
@@ -169,7 +169,7 @@ impl Address {
 
     /// converts the Address to a pointer-sized integer
     #[inline(always)]
-    pub fn as_usize(&self) -> usize {
+    pub const fn as_usize(&self) -> usize {
         self.0
     }
 }

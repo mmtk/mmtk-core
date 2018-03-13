@@ -13,6 +13,8 @@ use ::util::forwarding_word::clear_forwarding_bits;
 
 use ::policy::copyspace::CopySpace;
 
+use ::util::heap::{PageResource, MonotonePageResource};
+
 use ::vm::{Scanning, VMScanning};
 
 use ::plan::selected_plan::PLAN;
@@ -20,18 +22,18 @@ use ::plan::selected_plan::PLAN;
 use super::sstracelocal::SSTraceLocal;
 
 /// per-collector thread behavior and state for the SS plan
-pub struct SSCollector<'a> {
+pub struct SSCollector {
     pub id: usize,
     // CopyLocal
-    pub ss: BumpAllocator<'a, CopySpace>,
+    pub ss: BumpAllocator<CopySpace, MonotonePageResource<CopySpace>>,
     trace: SSTraceLocal,
 
     last_trigger_count: usize,
     worker_ordinal: usize,
-    group: Option<&'a ParallelCollectorGroup<SSCollector<'a>>>,
+    group: Option<&'static ParallelCollectorGroup<SSCollector>>,
 }
 
-impl<'a> CollectorContext for SSCollector<'a> {
+impl CollectorContext for SSCollector {
     fn new() -> Self {
         SSCollector {
             id: 0,
@@ -124,7 +126,7 @@ impl<'a> CollectorContext for SSCollector<'a> {
     }
 }
 
-impl<'a> ParallelCollector for SSCollector<'a> {
+impl ParallelCollector for SSCollector {
     type T = SSTraceLocal;
 
     fn park(&mut self) {

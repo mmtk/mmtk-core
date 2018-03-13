@@ -1,5 +1,3 @@
-use super::super::plan::default;
-
 use ::policy::space::Space;
 
 use super::SSMutator;
@@ -11,58 +9,76 @@ use ::plan::controller_collector_context::ControllerCollectorContext;
 use ::plan::plan;
 use ::plan::Plan;
 use ::plan::Allocator;
-use ::policy::bootspace::BootSpace;
 use ::policy::copyspace::CopySpace;
 use ::policy::immortalspace::ImmortalSpace;
 use ::plan::Phase;
 use ::plan::trace::Trace;
 use ::util::ObjectReference;
 
+use ::util::heap::VMRequest;
+
 use libc::c_void;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool};
 
 use ::vm::{Scanning, VMScanning};
+use std::thread;
+use util::conversions::bytes_to_pages;
+use plan::plan::create_vm_space;
 
-pub type SelectedPlan<'a> = SemiSpace<'a>;
+pub type SelectedPlan = SemiSpace;
 
 pub const ALLOC_SS: Allocator = Allocator::Default;
 pub const SCAN_BOOT_IMAGE: bool = true;
 
 lazy_static! {
-    pub static ref PLAN: SemiSpace<'static> = SemiSpace::new();
+    pub static ref PLAN: SemiSpace = SemiSpace::new();
 }
 
-pub struct SemiSpace<'a> {
-    pub control_collector_context: ControllerCollectorContext<'a>,
+pub struct SemiSpace {
     pub unsync: UnsafeCell<SemiSpaceUnsync>,
     pub ss_trace: Trace,
 }
 
 pub struct SemiSpaceUnsync {
     pub hi: bool,
+    pub vm_space: ImmortalSpace,
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
-    pub boot_space: BootSpace,
+
+    // FIXME: This should be inside HeapGrowthManager
+    total_pages: usize,
 }
 
-unsafe impl<'a> Sync for SemiSpace<'a> {}
+unsafe impl Sync for SemiSpace {}
 
-impl<'a> Plan for SemiSpace<'a> {
-    type MutatorT = SSMutator<'a>;
+impl Plan for SemiSpace {
+    type MutatorT = SSMutator;
     type TraceLocalT = SSTraceLocal;
-    type CollectorT = SSCollector<'a>;
+    type CollectorT = SSCollector;
 
     fn new() -> Self {
         SemiSpace {
-            control_collector_context: ControllerCollectorContext::new(),
             unsync: UnsafeCell::new(SemiSpaceUnsync {
-                hi: false,
-                copyspace0: CopySpace::new(false),
-                copyspace1: CopySpace::new(true),
-                versatile_space: ImmortalSpace::new(),
-                boot_space: BootSpace::new()
+                hi: true,
+                vm_space: create_vm_space(),
+                copyspace0: CopySpace::new("copyspace0", false, true,
+                                           VMRequest::RequestFraction {
+                                               frac: 1.0/3.0,
+                                               top: false,
+                                           }),
+                copyspace1: CopySpace::new("copyspace1", true, true,
+                                           VMRequest::RequestFraction {
+                                               frac: 1.0/3.0,
+                                               top: false,
+                                           }),
+                versatile_space: ImmortalSpace::new("versatile_space", true,
+                                                    VMRequest::RequestFraction {
+                                                        frac: 1.0/3.0,
+                                                        top:  false,
+                                                    }),
+                total_pages: 0,
             }),
             ss_trace: Trace::new(),
         }
@@ -70,15 +86,23 @@ impl<'a> Plan for SemiSpace<'a> {
 
     unsafe fn gc_init(&self, heap_size: usize) {
         let unsync = &mut *self.unsync.get();
-        // FIXME correctly initialize spaces based on options
-        default::gc_init(&unsync.copyspace0, heap_size / 3);
-        unsync.copyspace1.init(heap_size / 3);
-        unsync.versatile_space.init(heap_size / 3);
+        unsync.total_pages = bytes_to_pages(heap_size);
+        unsync.vm_space.init();
+        unsync.copyspace0.init();
+        unsync.copyspace1.init();
+        unsync.versatile_space.init();
+
+        if !cfg!(feature = "jikesrvm") {
+            thread::spawn(|| {
+                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(0)
+            });
+        }
     }
 
     fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
-        default::bind_mutator(Self::MutatorT::new(thread_id, self.tospace(), &unsync.versatile_space))
+        Box::into_raw(Box::new(SSMutator::new(thread_id, self.tospace(),
+                                              &unsync.versatile_space))) as *mut c_void
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {
@@ -142,10 +166,24 @@ impl<'a> Plan for SemiSpace<'a> {
             }
         }
     }
+
+    fn get_total_pages(&self) -> usize {
+        unsafe{(&*self.unsync.get()).total_pages}
+    }
+
+    fn get_collection_reserve(&self) -> usize {
+        let unsync = unsafe{&*self.unsync.get()};
+        self.tospace().reserved_pages()
+    }
+
+    fn get_pages_used(&self) -> usize {
+        let unsync = unsafe{&*self.unsync.get()};
+        self.tospace().reserved_pages() + unsync.versatile_space.reserved_pages()
+    }
 }
 
-impl<'a> SemiSpace<'a> {
-    pub fn tospace(&self) -> &CopySpace {
+impl SemiSpace {
+    pub fn tospace(&self) -> &'static CopySpace {
         let unsync = unsafe { &*self.unsync.get() };
 
         if unsync.hi {
@@ -155,7 +193,7 @@ impl<'a> SemiSpace<'a> {
         }
     }
 
-    pub fn fromspace(&self) -> &CopySpace {
+    pub fn fromspace(&self) -> &'static CopySpace {
         let unsync = unsafe { &*self.unsync.get() };
 
         if unsync.hi {

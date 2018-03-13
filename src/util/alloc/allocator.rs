@@ -3,6 +3,7 @@ use ::util::address::Address;
 use ::policy::space::Space;
 
 use ::util::constants::*;
+use ::util::heap::PageResource;
 
 // FIXME: Put this somewhere more appropriate
 pub const ALIGNMENT_VALUE: usize = 0xdeadbeef;
@@ -60,8 +61,8 @@ pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: 
     }
 }
 
-pub trait Allocator<'a, T> where T: Space {
-    fn get_space(&self) -> Option<&'a T>;
+pub trait Allocator<S: Space<PR>, PR: PageResource<S>> {
+    fn get_space(&self) -> Option<&'static S>;
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 

@@ -5,14 +5,15 @@ use ::plan::Phase;
 use ::util::Address;
 use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
+use ::util::heap::MonotonePageResource;
 
 #[repr(C)]
-pub struct NoGCMutator<'a> {
+pub struct NoGCMutator {
     // ImmortalLocal
-    nogc: BumpAllocator<'a, ImmortalSpace>
+    nogc: BumpAllocator<ImmortalSpace, MonotonePageResource<ImmortalSpace>>
 }
 
-impl<'a> MutatorContext for NoGCMutator<'a> {
+impl MutatorContext for NoGCMutator {
     fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
         unimplemented!();
     }
@@ -31,8 +32,8 @@ impl<'a> MutatorContext for NoGCMutator<'a> {
     }
 }
 
-impl<'a> NoGCMutator<'a> {
-    pub fn new(thread_id: usize, space: &'a ImmortalSpace) -> Self {
+impl NoGCMutator {
+    pub fn new(thread_id: usize, space: &'static ImmortalSpace) -> Self {
         NoGCMutator {
             nogc: BumpAllocator::new(thread_id, Some(space)),
         }

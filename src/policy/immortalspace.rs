@@ -1,42 +1,56 @@
-use super::space::default;
-
 use std::sync::Mutex;
 
-use ::policy::space::Space;
-use ::util::heap::{PageResource, MonotonePageResource};
+use ::policy::space::{Space, CommonSpace};
+use ::util::heap::{PageResource, MonotonePageResource, VMRequest};
 use ::util::address::Address;
 
 use ::util::ObjectReference;
+use ::util::constants::CARD_META_PAGES_PER_REGION;
 
 use ::vm::{ObjectModel, VMObjectModel};
 use ::plan::TransitiveClosure;
 use ::util::header_byte;
 
+use std::cell::UnsafeCell;
+
 pub struct ImmortalSpace {
-    pr: Mutex<MonotonePageResource>,
+    common: UnsafeCell<CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>>>,
     mark_state: i8,
 }
 
+unsafe impl Sync for ImmortalSpace {}
+
 const GC_MARK_BIT_MASK: i8 = 1;
+const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
-impl Space for ImmortalSpace {
-    fn init(&self, heap_size: usize) {
-        default::init(&self.pr, heap_size);
+impl Space<MonotonePageResource<ImmortalSpace>> for ImmortalSpace {
+    fn common(&self) -> &CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>> {
+        unsafe{&*self.common.get()}
     }
-
-    fn acquire(&self, thread_id: usize, size: usize) -> Address {
-        default::acquire(&self.pr, thread_id, size)
+    fn common_mut(&self) -> &mut CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>> {
+        unsafe{&mut *self.common.get()}
     }
+    fn init(&mut self) {
+        // Borrow-checker fighting so that we can have a cyclic reference
+        let me = unsafe { &*(self as *const Self) };
 
-    fn in_space(&self, object: ObjectReference) -> bool {
-        default::in_space(&self.pr, object)
+        let common_mut = self.common_mut();
+        if common_mut.vmrequest.is_discontiguous() {
+            common_mut.pr = Some(MonotonePageResource::new_discontiguous(
+                META_DATA_PAGES_PER_REGION));
+        } else {
+            common_mut.pr = Some(MonotonePageResource::new_contiguous(common_mut.start,
+                                                                      common_mut.extent,
+                                                                      META_DATA_PAGES_PER_REGION));
+        }
+        common_mut.pr.as_mut().unwrap().bind_space(me);
     }
 }
 
 impl ImmortalSpace {
-    pub fn new() -> Self {
+    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest) -> Self {
         ImmortalSpace {
-            pr: Mutex::new(MonotonePageResource::new()),
+            common: UnsafeCell::new(CommonSpace::new(name, false, true, zeroed, vmrequest)),
             mark_state: 0,
         }
     }

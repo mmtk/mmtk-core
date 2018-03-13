@@ -1,7 +1,44 @@
 use libc::c_void;
 use ::util::ObjectReference;
 use super::{MutatorContext, CollectorContext, ParallelCollector, TraceLocal, phase, Phase};
-use std::sync::atomic::{self, AtomicBool};
+use std::sync::atomic::{self, AtomicBool, Ordering};
+
+use ::policy::space::Space;
+use ::util::heap::PageResource;
+use ::util::options::options::{OptionMap, CLIOption};
+
+use super::controller_collector_context::ControllerCollectorContext;
+use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use util::constants::LOG_BYTES_IN_MBYTE;
+use util::heap::VMRequest;
+use policy::immortalspace::ImmortalSpace;
+#[cfg(feature = "jikesrvm")]
+use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_END;
+#[cfg(feature = "jikesrvm")]
+use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
+use util::Address;
+
+lazy_static! {
+    pub static ref CONTROL_COLLECTOR_CONTEXT: ControllerCollectorContext = ControllerCollectorContext::new();
+}
+
+// FIXME: Move somewhere more appropriate
+#[cfg(feature = "jikesrvm")]
+pub fn create_vm_space() -> ImmortalSpace {
+    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
+    debug_assert!(boot_segment_bytes > 0);
+
+    let boot_segment_mb = unsafe{Address::from_usize(boot_segment_bytes)}
+        .align_up(BYTES_IN_CHUNK).as_usize() >> LOG_BYTES_IN_MBYTE;
+
+    ImmortalSpace::new("boot", false, VMRequest::fixed_size(boot_segment_mb))
+}
+
+#[cfg(not(feature = "jikesrvm"))]
+pub fn create_vm_space() -> ImmortalSpace {
+    // FIXME: Does OpenJDK care?
+    ImmortalSpace::new("boot", false, VMRequest::fixed_size(0))
+}
 
 pub trait Plan {
     type MutatorT: MutatorContext;
@@ -15,6 +52,79 @@ pub trait Plan {
     fn will_never_move(&self, object: ObjectReference) -> bool;
     // unsafe because only the primary collector thread can call this
     unsafe fn collection_phase(&self, thread_id: usize, phase: &phase::Phase);
+
+    fn is_initialized(&self) -> bool {
+        INITIALIZED.load(Ordering::SeqCst)
+    }
+
+    fn poll<PR: PageResource<S>, S: Space<PR>>(&self, space_full: bool, space: &'static S) -> bool {
+        if self.collection_required(space_full, space) {
+            // FIXME
+            /*if space == META_DATA_SPACE {
+                /* In general we must not trigger a GC on metadata allocation since
+                 * this is not, in general, in a GC safe point.  Instead we initiate
+                 * an asynchronous GC, which will occur at the next safe point.
+                 */
+                self.log_poll(space, "Asynchronous collection requested");
+                self.common().control_collector_context.request();
+                return false;
+            }*/
+            self.log_poll(space, "Triggering collection");
+            CONTROL_COLLECTOR_CONTEXT.request();
+            return true;
+        }
+
+        // FIXME
+        /*if self.concurrent_collection_required() {
+            // FIXME
+            /*if space == self.common().meta_data_space {
+                self.log_poll(space, "Triggering async concurrent collection");
+                Self::trigger_internal_collection_request();
+                return false;
+            } else {*/
+            self.log_poll(space, "Triggering concurrent collection");
+            Self::trigger_internal_collection_request();
+            return true;
+        }*/
+
+        return false;
+    }
+
+    fn log_poll<PR: PageResource<S>, S: Space<PR>>(&self, space: &'static S, message: &'static str) {
+        if OptionMap.get().verbose.get() >= 5 {
+            println!("  [POLL] {}: {}", space.get_name(), message);
+        }
+    }
+
+    /**
+     * This method controls the triggering of a GC. It is called periodically
+     * during allocation. Returns <code>true</code> to trigger a collection.
+     *
+     * @param spaceFull Space request failed, must recover pages within 'space'.
+     * @param space TODO
+     * @return <code>true</code> if a collection is requested by the plan.
+     */
+    fn collection_required<PR: PageResource<S>, S: Space<PR>>(&self, space_full: bool, space: &'static S) -> bool {
+        // FIXME
+        let stress_force_gc = false;
+        trace!("self.get_pages_reserved()={}, self.get_total_pages()={}",
+               self.get_pages_reserved(), self.get_total_pages());
+        let heap_full = self.get_pages_reserved() > self.get_total_pages();
+
+        space_full || stress_force_gc || heap_full
+    }
+
+    fn get_pages_reserved(&self) -> usize {
+        self.get_pages_used() + self.get_collection_reserve()
+    }
+
+    fn get_total_pages(&self) -> usize;
+
+    fn get_collection_reserve(&self) -> usize {
+        0
+    }
+
+    fn get_pages_used(&self) -> usize;
 }
 
 #[derive(PartialEq)]
@@ -24,6 +134,7 @@ pub enum GcStatus {
     GcProper,
 }
 
+pub static INITIALIZED: AtomicBool = AtomicBool::new(false);
 static mut GC_STATUS: GcStatus = GcStatus::NotInGC;
 pub static STACKS_PREPARED: AtomicBool = AtomicBool::new(false);
 
@@ -42,30 +153,6 @@ pub enum Allocator {
     LargeCode = 8,
     Allocators = 9,
     DefaultSite = -1,
-}
-
-pub mod default {
-    use std::thread;
-    use libc::c_void;
-
-    use ::policy::space::Space;
-    use ::plan::mutator_context::MutatorContext;
-
-    use super::super::selected_plan::PLAN;
-
-    pub fn gc_init<T: Space>(space: &T, heap_size: usize) {
-        space.init(heap_size);
-
-        if !cfg!(feature = "jikesrvm") {
-            thread::spawn(|| {
-                PLAN.control_collector_context.run(0);
-            });
-        }
-    }
-
-    pub fn bind_mutator<T: MutatorContext>(ctx: T) -> *mut c_void {
-        Box::into_raw(Box::new(ctx)) as *mut c_void
-    }
 }
 
 lazy_static! {
@@ -167,7 +254,7 @@ pub fn set_gc_status(s: GcStatus) {
 }
 
 pub fn stacks_prepared() -> bool {
-    STACKS_PREPARED.load(atomic::Ordering::Relaxed)
+    STACKS_PREPARED.load(Ordering::SeqCst)
 }
 
 pub fn gc_in_progress() -> bool {

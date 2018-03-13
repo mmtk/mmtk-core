@@ -5,11 +5,14 @@ use libc::c_char;
 use std::ffi::CStr;
 use std::str;
 
+use std::sync::atomic::Ordering;
+
 use plan::Plan;
 use ::plan::MutatorContext;
 use ::plan::TraceLocal;
 use ::plan::CollectorContext;
 use ::plan::ParallelCollectorGroup;
+use ::plan::plan::CONTROL_COLLECTOR_CONTEXT;
 
 use ::vm::{Collection, VMCollection};
 
@@ -44,7 +47,7 @@ pub extern fn jikesrvm_gc_init(_jtoc: *mut c_void, _heap_size: usize) {
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
 pub extern fn start_control_collector(thread_id: usize) {
-    selected_plan::PLAN.control_collector_context.run(thread_id);
+    CONTROL_COLLECTOR_CONTEXT.run(thread_id);
 }
 
 #[no_mangle]
@@ -60,6 +63,7 @@ pub unsafe extern fn gc_init(heap_size: usize) {
     }
     ::util::logger::init().unwrap();
     selected_plan::PLAN.gc_init(heap_size);
+    ::plan::plan::INITIALIZED.store(true, Ordering::SeqCst);
 }
 
 #[no_mangle]
@@ -132,8 +136,9 @@ pub unsafe extern fn start_worker(thread_id: usize, worker: *mut c_void) {
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
 pub unsafe extern fn enable_collection(thread_id: usize) {
-    (&mut *selected_plan::PLAN.control_collector_context.workers.get()).init_group(thread_id);
+    (&mut *CONTROL_COLLECTOR_CONTEXT.workers.get()).init_group(thread_id);
     VMCollection::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(thread_id, null_mut()); // spawn controller thread
+    ::plan::plan::INITIALIZED.store(true, Ordering::SeqCst);
 }
 
 #[no_mangle]

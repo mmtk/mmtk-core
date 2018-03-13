@@ -150,6 +150,7 @@ pub struct Options {
     pub use_return_barrier: GenericOption<bool>,
     pub eager_complete_sweep: GenericOption<bool>,
     pub nursery_zeroing: GenericOption<NurseryZeroingOptions>,
+    pub verbose: GenericOption<usize>,
 }
 
 impl Options {
@@ -161,6 +162,7 @@ impl Options {
             "useReturnBarrier" => self.use_return_barrier.set(val),
             "eagerCompleteSweep" => self.eager_complete_sweep.set(val),
             "nurseryZeroing" => self.nursery_zeroing.set(val),
+            "verbose" => self.verbose.set(val),
             _ => panic!("Invalid Options key")
         };
         if result {
@@ -179,6 +181,7 @@ lazy_static! {
             use_short_stack_scans: GenericOption::new(false, None),
             use_return_barrier: GenericOption::new(false, None),
             eager_complete_sweep: GenericOption::new(false, None),
-            nursery_zeroing: GenericOption::new(NurseryZeroingOptions::Temporal, None)
+            nursery_zeroing: GenericOption::new(NurseryZeroingOptions::Temporal, None),
+            verbose: GenericOption::new(0, None),
         })};
 }

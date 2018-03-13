@@ -3,20 +3,17 @@ use super::super::ActivePlan;
 
 pub struct VMActivePlan<> {}
 
-impl<'a> ActivePlan<'a> for VMActivePlan {
-    fn global() -> &'static SelectedPlan<'static> {
-        unimplemented!()
-    }
-
-    unsafe fn collector(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::CollectorT {
+impl ActivePlan for VMActivePlan {
+    unsafe fn collector(thread_id: usize) -> &'static mut <SelectedPlan as Plan>::CollectorT {
         unimplemented!()
     }
 
     unsafe fn is_mutator(thread_id: usize) -> bool {
-        unimplemented!()
+        // FIXME
+        true
     }
 
-    unsafe fn mutator(thread_id: usize) -> &'a mut <SelectedPlan<'a> as Plan>::MutatorT {
+    unsafe fn mutator(thread_id: usize) -> &'static mut <SelectedPlan as Plan>::MutatorT {
         unimplemented!()
     }
 
@@ -28,7 +25,7 @@ impl<'a> ActivePlan<'a> for VMActivePlan {
         unimplemented!()
     }
 
-    fn get_next_mutator() -> Option<&'a mut <SelectedPlan<'a> as Plan>::MutatorT> {
+    fn get_next_mutator() -> Option<&'static mut <SelectedPlan as Plan>::MutatorT> {
         unimplemented!()
     }
 }

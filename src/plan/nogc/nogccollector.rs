@@ -8,16 +8,16 @@ use super::super::Allocator;
 
 use ::util::{Address, ObjectReference};
 
-pub struct NoGCCollector<'a> {
+pub struct NoGCCollector {
     pub id: usize,
     trace: NoGCTraceLocal,
 
     last_trigger_count: usize,
     worker_ordinal: usize,
-    group: Option<&'a ParallelCollectorGroup<NoGCCollector<'a>>>,
+    group: Option<&'static ParallelCollectorGroup<NoGCCollector>>,
 }
 
-impl<'a> CollectorContext for NoGCCollector<'a> {
+impl<'a> CollectorContext for NoGCCollector {
     fn new() -> Self {
         NoGCCollector {
             id: 0,
@@ -53,7 +53,7 @@ impl<'a> CollectorContext for NoGCCollector<'a> {
     }
 }
 
-impl<'a> ParallelCollector for NoGCCollector<'a> {
+impl ParallelCollector for NoGCCollector {
     type T = NoGCTraceLocal;
 
     fn park(&mut self) {
