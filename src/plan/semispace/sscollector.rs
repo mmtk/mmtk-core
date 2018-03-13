@@ -48,6 +48,7 @@ impl CollectorContext for SSCollector {
 
     fn init(&mut self, id: usize) {
         self.id = id;
+        self.ss.thread_id = id;
         self.trace.init(id);
     }
 

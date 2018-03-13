@@ -20,20 +20,27 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
     fn init(&mut self);
 
     fn acquire(&self, thread_id: usize, pages: usize) -> Address {
+        trace!("Space.acquire, thread_id={}", thread_id);
+        debug_assert!(thread_id != 0);
         let allow_poll = unsafe { VMActivePlan::is_mutator(thread_id) }
             && PLAN.is_initialized();
 
+        trace!("Reserving pages");
         let pr = self.common().pr.as_ref().unwrap();
         let pages_reserved = pr.reserve_pages(pages);
+        trace!("Pages reserved");
 
         // FIXME: Possibly unnecessary borrow-checker fighting
         let me = unsafe { &*(self as *const Self) };
 
+        trace!("Polling ..");
         if allow_poll && VMActivePlan::global().poll(false, me) {
+            trace!("Collection required");
             pr.clear_request(pages_reserved);
             VMCollection::block_for_gc(thread_id);
             unsafe { Address::zero() }
         } else {
+            trace!("Collection not required");
             let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, thread_id);
             if rtn.is_zero() {
                 if !allow_poll {
