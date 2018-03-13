@@ -11,7 +11,7 @@ macro_rules! jtoc_call {
 #[macro_export]
 macro_rules! jikesrvm_instance_call {
     ($obj:expr, $offset:expr, $thread_id:expr $(, $arg:ident)*) => ({
-        let tib = Address::from_usize(($obj).load::<usize>());
+        let tib = Address::from_usize(($obj + ::vm::jikesrvm::java_header::TIB_OFFSET).load::<usize>());
         let call_addr = (tib + $offset).load::<fn()>();
         jikesrvm_call!(call_addr, $thread_id $(, $arg)*)
     });
@@ -22,6 +22,7 @@ macro_rules! jikesrvm_instance_call {
 macro_rules! jikesrvm_call {
     ($call_addr:expr, $thread_id:expr $(, $arg:ident)*) => ({
         use ::vm::jikesrvm::collection::VMCollection as _VMCollection;
+        debug_assert!($thread_id != 0);
 
         let ret: usize;
         let rvm_thread = _VMCollection::thread_from_id($thread_id).as_usize();

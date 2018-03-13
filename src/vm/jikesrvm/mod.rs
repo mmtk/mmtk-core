@@ -21,6 +21,7 @@ pub mod scan_boot_image;
 pub mod active_plan;
 pub mod heap_layout_constants;
 pub mod boot_image_size;
+pub mod scan_sanity;
 
 use ::util::address::Address;
 

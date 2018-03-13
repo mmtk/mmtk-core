@@ -33,10 +33,9 @@ pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     ::util::logger::init().unwrap();
     JTOC_BASE = Address::from_mut_ptr(jtoc);
     selected_plan::PLAN.gc_init(heap_size);
-    ::vm::JikesRVM::test1();
-    info!("{}", ::vm::JikesRVM::test(44));
-    info!("{}", ::vm::JikesRVM::test2(45, 67));
-    info!("{}", ::vm::JikesRVM::test3(21, 34, 9, 8));
+    debug_assert!(54 == ::vm::JikesRVM::test(44));
+    debug_assert!(112 == ::vm::JikesRVM::test2(45, 67));
+    debug_assert!(731 == ::vm::JikesRVM::test3(21, 34, 9, 8));
 }
 
 #[no_mangle]
@@ -130,6 +129,7 @@ pub unsafe extern fn process_interior_edge(trace_local: *mut c_void, target: *mu
 #[no_mangle]
 pub unsafe extern fn start_worker(thread_id: usize, worker: *mut c_void) {
     let worker_instance = &mut *(worker as *mut <SelectedPlan as Plan>::CollectorT);
+    worker_instance.init(thread_id);
     worker_instance.run(thread_id);
 }
 

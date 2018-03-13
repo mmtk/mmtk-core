@@ -1,56 +1,40 @@
-use std::sync::Mutex;
-
-use ::policy::space::{Space, CommonSpace};
-use ::util::heap::{PageResource, MonotonePageResource, VMRequest};
+use ::policy::space::Space;
 use ::util::address::Address;
 
 use ::util::ObjectReference;
-use ::util::constants::CARD_META_PAGES_PER_REGION;
 
 use ::vm::{ObjectModel, VMObjectModel};
 use ::plan::TransitiveClosure;
 use ::util::header_byte;
 
-use std::cell::UnsafeCell;
-
-pub struct ImmortalSpace {
-    common: UnsafeCell<CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>>>,
+pub struct BootSpace {
+    start: usize,
+    end: usize,
     mark_state: i8,
 }
 
-unsafe impl Sync for ImmortalSpace {}
-
 const GC_MARK_BIT_MASK: i8 = 1;
-const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
-impl Space<MonotonePageResource<ImmortalSpace>> for ImmortalSpace {
-    fn common(&self) -> &CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>> {
-        unsafe{&*self.common.get()}
-    }
-    fn common_mut(&self) -> &mut CommonSpace<ImmortalSpace, MonotonePageResource<ImmortalSpace>> {
-        unsafe{&mut *self.common.get()}
-    }
-    fn init(&mut self) {
-        // Borrow-checker fighting so that we can have a cyclic reference
-        let me = unsafe { &*(self as *const Self) };
+impl Space for BootSpace {
+    fn init(&self, heap_size: usize){
 
-        let common_mut = self.common_mut();
-        if common_mut.vmrequest.is_discontiguous() {
-            common_mut.pr = Some(MonotonePageResource::new_discontiguous(
-                META_DATA_PAGES_PER_REGION));
-        } else {
-            common_mut.pr = Some(MonotonePageResource::new_contiguous(common_mut.start,
-                                                                      common_mut.extent,
-                                                                      META_DATA_PAGES_PER_REGION));
-        }
-        common_mut.pr.as_mut().unwrap().bind_space(me);
+    }
+
+    fn acquire(&self, thread_id: usize, size: usize) -> Address {
+        unimplemented!()
+    }
+
+    fn in_space(&self, object: ObjectReference) -> bool {
+        let addr = object.to_address().as_usize();
+        addr >= self.start && addr <= self.end
     }
 }
 
-impl ImmortalSpace {
-    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest) -> Self {
-        ImmortalSpace {
-            common: UnsafeCell::new(CommonSpace::new(name, false, true, zeroed, vmrequest)),
+impl BootSpace {
+    pub fn new() -> Self {
+        BootSpace {
+            start: 0x60000000,
+            end: 0x67ffffff,
             mark_state: 0,
         }
     }
@@ -78,7 +62,7 @@ impl ImmortalSpace {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
-        if ImmortalSpace::test_and_mark(object, self.mark_state) {
+        if BootSpace::test_and_mark(object, self.mark_state) {
             trace.process_node(object);
         }
         return object;

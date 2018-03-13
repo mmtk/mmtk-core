@@ -36,13 +36,13 @@ pub fn spin_and_get_forwarded_object(object: ObjectReference, status_word: usize
         status_word = VMObjectModel::read_available_bits_word(object);
     }
     if (status_word as u8) & FORWARDING_MASK == FORWARDED {
-        unsafe { Address::from_usize(status_word & (!FORWARDING_MASK) as usize).to_object_reference() }
+        unsafe { Address::from_usize(status_word & !(FORWARDING_MASK as usize)).to_object_reference() }
     } else { object }
 }
 
 pub fn forward_object(object: ObjectReference, allocator: Allocator, thread_id: usize) -> ObjectReference {
     let new_object = VMObjectModel::copy(object, allocator, thread_id);
-    VMObjectModel::write_available_bits_word(object, new_object.to_address().as_usize() & FORWARDED as usize);
+    VMObjectModel::write_available_bits_word(object, new_object.to_address().as_usize() | FORWARDED as usize);
     new_object
 }
 
@@ -67,7 +67,7 @@ pub fn state_is_being_forwarded(header: usize) -> bool {
 }
 
 pub fn clear_forwarding_bits(object: ObjectReference) {
-    VMObjectModel::write_available_byte(object, (VMObjectModel::read_available_byte(object) as u8) & !FORWARDING_MASK)
+    VMObjectModel::write_available_byte(object, VMObjectModel::read_available_byte(object) & !FORWARDING_MASK);
 }
 
 pub fn extract_forwarding_pointer(forwarding_word: usize) -> ObjectReference {

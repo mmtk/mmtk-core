@@ -42,7 +42,7 @@ pub struct SemiSpace {
 
 pub struct SemiSpaceUnsync {
     pub hi: bool,
-    vm_space: ImmortalSpace,
+    pub vm_space: ImmortalSpace,
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
