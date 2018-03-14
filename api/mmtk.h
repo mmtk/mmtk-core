@@ -58,7 +58,7 @@ extern void* last_heap_address();
 extern void iterator();
 
 
-extern int size_t max_capacity(); // (It is the total_space - capacity_of_to_space in Semispace )  
+extern size_t max_capacity(); // (It is the total_space - capacity_of_to_space in Semispace )  
 extern size_t _noaccess_prefix();  
 extern size_t _alignment();  
 extern bool   executable(); 
