@@ -18,10 +18,15 @@ static COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
 pub struct VMScanning {}
 
+const DUMP_REF: bool = true;
+
 impl Scanning for VMScanning {
     fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, thread_id: usize) {
-        trace!("VMScanning::jtoc_call(, {:?}, {:?})", object, thread_id);
         let obj_ptr = object.value();
+        if DUMP_REF {
+            unsafe { jtoc_call!(DUMP_REF_METHOD_OFFSET, thread_id, obj_ptr); }
+        }
+        trace!("VMScanning::jtoc_call(, {:?}, {:?})", object, thread_id);
         let elt0_ptr: usize = unsafe {
             jtoc_call!(GET_OFFSET_ARRAY_METHOD_OFFSET, thread_id, obj_ptr)
         };

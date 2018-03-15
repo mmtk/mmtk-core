@@ -211,14 +211,14 @@ impl fmt::LowerHex for Address {
 /// allows Display format the Address (as upper-case hex value with 0x prefix)
 impl fmt::Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "0x{:X}", self.0)
+        write!(f, "{:#x}", self.0)
     }
 }
 
 /// allows Debug format the Address (as upper-case hex value with 0x prefix)
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "0x{:X}", self.0)
+        write!(f, "{:#x}", self.0)
     }
 }
 
@@ -277,13 +277,13 @@ impl fmt::LowerHex for ObjectReference {
 /// allows Display format the Address (as upper-case hex value with 0x prefix)
 impl fmt::Display for ObjectReference {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "0x{:X}", self.0)
+        write!(f, "{:#x}", self.0)
     }
 }
 
 /// allows Debug format the Address (as upper-case hex value with 0x prefix)
 impl fmt::Debug for ObjectReference {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "0x{:X}", self.0)
+        write!(f, "{:#x}", self.0)
     }
 }
