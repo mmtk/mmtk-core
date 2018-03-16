@@ -21,7 +21,7 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
 
     fn acquire(&self, thread_id: usize, pages: usize) -> Address {
         trace!("Space.acquire, thread_id={}", thread_id);
-        debug_assert!(thread_id != 0);
+        // debug_assert!(thread_id != 0);
         let allow_poll = unsafe { VMActivePlan::is_mutator(thread_id) }
             && PLAN.is_initialized();
 
