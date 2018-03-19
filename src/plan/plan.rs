@@ -19,7 +19,7 @@ use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
 use util::Address;
 use util::heap::pageresource::cumulative_committed_pages;
 
-pub const EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
+pub static EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
 
 lazy_static! {
     pub static ref CONTROL_COLLECTOR_CONTEXT: ControllerCollectorContext = ControllerCollectorContext::new();
@@ -147,6 +147,24 @@ pub trait Plan {
         } else {
             false
         }
+    }
+
+    fn is_user_triggered_collection() -> bool {
+        // FIXME
+        false
+    }
+
+    fn is_internal_triggered_collection() -> bool {
+        // FIXME
+        false
+    }
+
+    fn last_collection_was_exhaustive(&self) -> bool {
+        true
+    }
+
+    fn force_full_heap_collection(&self) {
+
     }
 }
 

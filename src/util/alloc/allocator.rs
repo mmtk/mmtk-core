@@ -2,7 +2,7 @@ use ::util::address::Address;
 
 use ::policy::space::Space;
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use ::util::constants::*;
@@ -24,6 +24,7 @@ pub const LOG_MAX_ALIGNMENT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_
 pub const MAX_ALIGNMENT: usize = 1 << LOG_MAX_ALIGNMENT;
 
 static ALLOCATION_SUCCESS: AtomicBool = AtomicBool::new(false);
+static COLLECTION_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
 lazy_static! {
     static ref OOM_LOCK: Mutex<()> = Mutex::new(());
 }
@@ -74,6 +75,18 @@ pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: 
     }
 }
 
+pub fn determine_collection_attempts() -> usize {
+    if !ALLOCATION_SUCCESS.load(Ordering::Relaxed) {
+        COLLECTION_ATTEMPTS.store(COLLECTION_ATTEMPTS.load(Ordering::Relaxed) + 1,
+                                  Ordering::Relaxed);
+    } else {
+        ALLOCATION_SUCCESS.store(false, Ordering::Relaxed);
+        COLLECTION_ATTEMPTS.store(1, Ordering::Relaxed);
+    }
+
+    COLLECTION_ATTEMPTS.load(Ordering::Relaxed)
+}
+
 pub trait Allocator<S: Space<PR>, PR: PageResource<S>> {
     fn get_thread_id(&self) -> usize;
 
@@ -114,15 +127,17 @@ pub trait Allocator<S: Space<PR>, PR: PageResource<S>> {
             }
 
             if emergency_collection {
+                trace!("Emergency collection");
                 // Report allocation success to assist OutOfMemory handling.
                 let guard = OOM_LOCK.lock().unwrap();
                 let fail_with_oom = !ALLOCATION_SUCCESS.load(Ordering::Relaxed);
                 // This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)
                 ALLOCATION_SUCCESS.store(true, Ordering::Relaxed);
                 drop(guard);
+                trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
                     VMCollection::out_of_memory();
-                    panic!("Not reached");
+                    trace!("Not reached");
                 }
             }
 
@@ -142,6 +157,7 @@ pub trait Allocator<S: Space<PR>, PR: PageResource<S>> {
              * an OOM.
              */
             emergency_collection = <SelectedPlan as Plan>::is_emergency_collection();
+            trace!("Got emergency collection as {}", emergency_collection);
         }
     }
 

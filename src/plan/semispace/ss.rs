@@ -14,17 +14,19 @@ use ::policy::immortalspace::ImmortalSpace;
 use ::plan::Phase;
 use ::plan::trace::Trace;
 use ::util::ObjectReference;
+use ::util::alloc::allocator::determine_collection_attempts;
 
 use ::util::heap::VMRequest;
 
 use libc::c_void;
 use std::cell::UnsafeCell;
-use std::sync::atomic::{self, AtomicBool};
+use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 
 use ::vm::{Scanning, VMScanning};
 use std::thread;
 use util::conversions::bytes_to_pages;
 use plan::plan::create_vm_space;
+use plan::plan::EMERGENCY_COLLECTION;
 
 pub type SelectedPlan = SemiSpace;
 
@@ -49,6 +51,8 @@ pub struct SemiSpaceUnsync {
 
     // FIXME: This should be inside HeapGrowthManager
     total_pages: usize,
+
+    collection_attempt: usize,
 }
 
 unsafe impl Sync for SemiSpace {}
@@ -79,6 +83,7 @@ impl Plan for SemiSpace {
                                                         top:  false,
                                                     }),
                 total_pages: 0,
+                collection_attempt: 0,
             }),
             ss_trace: Trace::new(),
         }
@@ -125,7 +130,17 @@ impl Plan for SemiSpace {
 
         match phase {
             &Phase::SetCollectionKind => {
-                // FIXME emergency collection, etc.
+                let unsync = unsafe { &mut *self.unsync.get() };
+                unsync.collection_attempt = if <SelectedPlan as Plan>::is_user_triggered_collection() {
+                    1 } else { determine_collection_attempts() };
+
+                let emergency_collection = !<SelectedPlan as Plan>::is_internal_triggered_collection()
+                    && self.last_collection_was_exhaustive() && unsync.collection_attempt > 1;
+                EMERGENCY_COLLECTION.store(emergency_collection, Ordering::Relaxed);
+
+                if emergency_collection {
+                    self.force_full_heap_collection();
+                }
             }
             &Phase::Initiate => {
                 plan::set_gc_status(plan::GcStatus::GcPrepare);
