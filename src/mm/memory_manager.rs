@@ -210,12 +210,12 @@ pub extern fn max_capacity() -> usize {
 
 #[no_mangle]
 #[cfg(feature = "openjdk")]
-extern fn executable() -> bool {
+pub extern fn executable() -> bool {
     true
 }
 
 #[no_mangle]
 #[cfg(not(feature = "openjdk"))]
-extern fn executable() -> bool {
+pub extern fn executable() -> bool {
     panic!("Cannot call executable when not building for OpenJDK")
 }
