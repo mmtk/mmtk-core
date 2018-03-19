@@ -57,9 +57,6 @@ impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR
             self.alloc_slow(size, align, offset)
         } else {
             fill_alignment_gap(self.cursor, result);
-            unsafe {
-                memset(result.as_usize() as *mut c_void, 0, size);
-            }
             self.cursor = new_cursor;
             trace!("Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
                    size, result, self.cursor, self.limit);
@@ -83,6 +80,9 @@ impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR
         } else {
             trace!("Acquired a new block of size {} with start address {}",
                    block_size, acquired_start);
+            unsafe {
+                memset(acquired_start.as_usize() as *mut c_void, 0, block_size);
+            }
             self.set_limit(acquired_start, acquired_start + block_size);
             self.alloc(size, align, offset)
         }
