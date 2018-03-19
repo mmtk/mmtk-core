@@ -2,8 +2,16 @@ use ::util::address::Address;
 
 use ::policy::space::Space;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
+
 use ::util::constants::*;
 use ::util::heap::PageResource;
+use ::vm::{ActivePlan, VMActivePlan, Collection, VMCollection};
+use ::plan::MutatorContext;
+use ::plan::selected_plan::PLAN;
+use ::plan::selected_plan::SelectedPlan;
+use ::plan::Plan;
 
 // FIXME: Put this somewhere more appropriate
 pub const ALIGNMENT_VALUE: usize = 0xdeadbeef;
@@ -14,6 +22,11 @@ pub const LOG_MAX_ALIGNMENT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_
 #[cfg(target_arch = "x86_64")]
 pub const LOG_MAX_ALIGNMENT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
 pub const MAX_ALIGNMENT: usize = 1 << LOG_MAX_ALIGNMENT;
+
+static ALLOCATION_SUCCESS: AtomicBool = AtomicBool::new(false);
+lazy_static! {
+    static ref OOM_LOCK: Mutex<()> = Mutex::new(());
+}
 
 #[inline(always)]
 pub fn align_allocation(region: Address, align: usize, offset: isize) -> Address {
@@ -62,9 +75,75 @@ pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: 
 }
 
 pub trait Allocator<S: Space<PR>, PR: PageResource<S>> {
+    fn get_thread_id(&self) -> usize;
+
     fn get_space(&self) -> Option<&'static S>;
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address;
+
+    #[inline(always)]
+    fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        let thread_id = self.get_thread_id();
+        let tmp = self.get_space();
+        let space = tmp.as_ref().unwrap();
+
+        // Information about the previous collection.
+        let mut emergency_collection = false;
+        loop {
+            // Try to allocate using the slow path
+            let result = self.alloc_slow_once(size, align, offset);
+
+            if unsafe{!VMActivePlan::is_mutator(thread_id)} {
+                debug_assert!(!result.is_zero());
+                return result;
+            }
+
+            if !result.is_zero() {
+                // Report allocation success to assist OutOfMemory handling.
+                if !ALLOCATION_SUCCESS.load(Ordering::Relaxed) {
+                    // XXX: Can we replace this with:
+                    // ALLOCATION_SUCCESS.store(1, Ordering::SeqCst);
+                    // (and get rid of the lock)
+                    let guard = OOM_LOCK.lock().unwrap();
+                    ALLOCATION_SUCCESS.store(true, Ordering::Relaxed);
+                    drop(guard);
+                }
+                return result;
+            }
+
+            if emergency_collection {
+                // Report allocation success to assist OutOfMemory handling.
+                let guard = OOM_LOCK.lock().unwrap();
+                let fail_with_oom = !ALLOCATION_SUCCESS.load(Ordering::Relaxed);
+                // This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)
+                ALLOCATION_SUCCESS.store(true, Ordering::Relaxed);
+                drop(guard);
+                if fail_with_oom {
+                    VMCollection::out_of_memory();
+                    panic!("Not reached");
+                }
+            }
+
+            /* This is in case a GC occurs, and our mutator context is stale.
+             * In some VMs the scheduler can change the affinity between the
+             * current thread and the mutator context. This is possible for
+             * VMs that dynamically multiplex Java threads onto multiple mutator
+             * contexts. */
+            // FIXME: No good way to do this
+            //current = unsafe {
+            //    VMActivePlan::mutator(thread_id).get_allocator_from_space(space)
+            //};
+
+            /*
+             * Record whether last collection was an Emergency collection.
+             * If so, we make one more attempt to allocate before we signal
+             * an OOM.
+             */
+            emergency_collection = <SelectedPlan as Plan>::is_emergency_collection();
+        }
+    }
+
+    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address;
 }

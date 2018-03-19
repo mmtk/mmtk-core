@@ -6,6 +6,8 @@ use ::util::heap::PageResource;
 
 use std::marker::PhantomData;
 
+use libc::{memset, c_void};
+
 use ::policy::space::Space;
 use util::conversions::bytes_to_pages;
 
@@ -55,6 +57,9 @@ impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR
             self.alloc_slow(size, align, offset)
         } else {
             fill_alignment_gap(self.cursor, result);
+            unsafe {
+                memset(result.as_usize() as *mut c_void, 0, size);
+            }
             self.cursor = new_cursor;
             trace!("Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
                    size, result, self.cursor, self.limit);
@@ -63,6 +68,11 @@ impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR
     }
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        // TODO: internalLimit etc.
+        self.alloc_slow_inline(size, align, offset)
+    }
+
+    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc_slow");
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
         let acquired_start: Address = self.space.unwrap().acquire(self.thread_id,
@@ -76,6 +86,10 @@ impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR
             self.set_limit(acquired_start, acquired_start + block_size);
             self.alloc(size, align, offset)
         }
+    }
+
+    fn get_thread_id(&self) -> usize {
+        self.thread_id
     }
 }
 

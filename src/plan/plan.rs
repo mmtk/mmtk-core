@@ -18,6 +18,8 @@ use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_END;
 use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
 use util::Address;
 
+pub const EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
+
 lazy_static! {
     pub static ref CONTROL_COLLECTOR_CONTEXT: ControllerCollectorContext = ControllerCollectorContext::new();
 }
@@ -125,6 +127,10 @@ pub trait Plan {
     }
 
     fn get_pages_used(&self) -> usize;
+
+    fn is_emergency_collection() -> bool {
+        EMERGENCY_COLLECTION.load(Ordering::Relaxed)
+    }
 }
 
 #[derive(PartialEq)]
