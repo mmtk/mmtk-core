@@ -195,3 +195,27 @@ pub extern fn last_heap_address() -> *mut c_void {
 pub extern fn last_heap_address() -> *mut c_void {
     panic!("Cannot call last_heap_address when not building for OpenJDK");
 }
+
+#[no_mangle]
+#[cfg(feature = "openjdk")]
+pub extern fn max_capacity() -> usize {
+    selected_plan::PLAN.get_total_pages() << LOG_BYTES_IN_PAGE
+}
+
+#[no_mangle]
+#[cfg(not(feature = "openjdk"))]
+pub extern fn max_capacity() -> usize {
+    panic!("Cannot call max_capacity when not building for OpenJDK");
+}
+
+#[no_mangle]
+#[cfg(feature = "openjdk")]
+extern fn executable() -> bool {
+    true
+}
+
+#[no_mangle]
+#[cfg(not(feature = "openjdk"))]
+extern fn executable() -> bool {
+    panic!("Cannot call executable when not building for OpenJDK")
+}
