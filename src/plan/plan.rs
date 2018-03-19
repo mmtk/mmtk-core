@@ -1,7 +1,7 @@
 use libc::c_void;
 use ::util::ObjectReference;
 use super::{MutatorContext, CollectorContext, ParallelCollector, TraceLocal, phase, Phase};
-use std::sync::atomic::{self, AtomicBool, Ordering};
+use std::sync::atomic::{self, AtomicUsize, AtomicBool, Ordering};
 
 use ::policy::space::Space;
 use ::util::heap::PageResource;
@@ -17,6 +17,7 @@ use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_END;
 #[cfg(feature = "jikesrvm")]
 use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
 use util::Address;
+use util::heap::pageresource::cumulative_committed_pages;
 
 pub const EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
 
@@ -107,8 +108,7 @@ pub trait Plan {
      * @return <code>true</code> if a collection is requested by the plan.
      */
     fn collection_required<PR: PageResource<S>, S: Space<PR>>(&self, space_full: bool, space: &'static S) -> bool {
-        // FIXME
-        let stress_force_gc = false;
+        let stress_force_gc = self.stress_test_gc_required();
         trace!("self.get_pages_reserved()={}, self.get_total_pages()={}",
                self.get_pages_reserved(), self.get_total_pages());
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
@@ -131,6 +131,23 @@ pub trait Plan {
     fn is_emergency_collection() -> bool {
         EMERGENCY_COLLECTION.load(Ordering::Relaxed)
     }
+
+    #[inline]
+    fn stress_test_gc_required(&self) -> bool {
+        let pages = cumulative_committed_pages();
+        trace!("pages={}", pages);
+
+        if INITIALIZED.load(Ordering::Relaxed)
+            && (pages ^ LAST_STRESS_PAGES.load(Ordering::Relaxed)
+            > OptionMap.get().stress_factor.get()) {
+
+            LAST_STRESS_PAGES.store(pages, Ordering::Relaxed);
+            trace!("Doing stress GC");
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -142,6 +159,7 @@ pub enum GcStatus {
 
 pub static INITIALIZED: AtomicBool = AtomicBool::new(false);
 static mut GC_STATUS: GcStatus = GcStatus::NotInGC;
+static LAST_STRESS_PAGES: AtomicUsize = AtomicUsize::new(0);
 pub static STACKS_PREPARED: AtomicBool = AtomicBool::new(false);
 
 

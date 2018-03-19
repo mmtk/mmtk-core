@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use num_cpus;
 use std::fmt;
 use std::error::Error;
+use ::util::constants::LOG_BYTES_IN_PAGE;
 
 use libc::c_void;
 
@@ -151,6 +152,7 @@ pub struct Options {
     pub eager_complete_sweep: GenericOption<bool>,
     pub nursery_zeroing: GenericOption<NurseryZeroingOptions>,
     pub verbose: GenericOption<usize>,
+    pub stress_factor: GenericOption<usize>,
 }
 
 impl Options {
@@ -163,6 +165,7 @@ impl Options {
             "eagerCompleteSweep" => self.eager_complete_sweep.set(val),
             "nurseryZeroing" => self.nursery_zeroing.set(val),
             "verbose" => self.verbose.set(val),
+            "stressFactor" => self.stress_factor.set(val),
             _ => panic!("Invalid Options key")
         };
         if result {
@@ -183,5 +186,6 @@ lazy_static! {
             eager_complete_sweep: GenericOption::new(false, None),
             nursery_zeroing: GenericOption::new(NurseryZeroingOptions::Temporal, None),
             verbose: GenericOption::new(0, None),
+            stress_factor: GenericOption::new(usize::max_value() >> LOG_BYTES_IN_PAGE, None),
         })};
 }

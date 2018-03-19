@@ -82,10 +82,6 @@ pub trait PageResource<S: Space<Self>>: Sized {
         CUMULATIVE_COMMITTED.fetch_add(pages, Ordering::Relaxed);
     }
 
-    fn cumulative_committed_pages() -> usize {
-        CUMULATIVE_COMMITTED.load(Ordering::Relaxed)
-    }
-
 
     fn bind_space(&mut self, space: &'static S) {
         self.common_mut().space = Some(space);
@@ -94,6 +90,10 @@ pub trait PageResource<S: Space<Self>>: Sized {
     fn common(&self) -> &CommonPageResource<Self, S>;
 
     fn common_mut(&mut self) -> &mut CommonPageResource<Self, S>;
+}
+
+pub fn cumulative_committed_pages() -> usize {
+    CUMULATIVE_COMMITTED.load(Ordering::Relaxed)
 }
 
 #[derive(Debug)]
