@@ -18,7 +18,7 @@ static COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
 pub struct VMScanning {}
 
-const DUMP_REF: bool = true;
+const DUMP_REF: bool = false;
 
 impl Scanning for VMScanning {
     fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, thread_id: usize) {
