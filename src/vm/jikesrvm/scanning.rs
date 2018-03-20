@@ -30,7 +30,7 @@ impl Scanning for VMScanning {
         let elt0_ptr: usize = unsafe {
             jtoc_call!(GET_OFFSET_ARRAY_METHOD_OFFSET, thread_id, obj_ptr)
         };
-        debug!("elt0_ptr: {}", elt0_ptr);
+        trace!("elt0_ptr: {}", elt0_ptr);
         if elt0_ptr == 0 {
             // object is a REFARRAY
             let length = VMObjectModel::get_array_length(object);
