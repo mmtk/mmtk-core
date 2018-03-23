@@ -198,13 +198,13 @@ pub extern fn last_heap_address() -> *mut c_void {
 
 #[no_mangle]
 #[cfg(feature = "openjdk")]
-pub extern fn max_capacity() -> usize {
+pub extern fn openjdk_max_capacity() -> usize {
     selected_plan::PLAN.get_total_pages() << LOG_BYTES_IN_PAGE
 }
 
 #[no_mangle]
 #[cfg(not(feature = "openjdk"))]
-pub extern fn max_capacity() -> usize {
+pub extern fn openjdk_max_capacity() -> usize {
     panic!("Cannot call max_capacity when not building for OpenJDK");
 }
 

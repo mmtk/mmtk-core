@@ -51,7 +51,7 @@ extern void start_worker(size_t thread_id, void* worker);
 /**
  * OpenJDK-specific
  */
-extern int used_bytes();
+extern size_t used_bytes();
 extern void* starting_heap_address();
 extern void* last_heap_address();
 extern void iterator(); // ???
@@ -59,12 +59,12 @@ extern void iterator(); // ???
 
 // (It is the total_space - capacity_of_to_space in Semispace )
 // PZ: It shouldn't be ...?
-extern size_t max_capacity();
+extern size_t openjdk_max_capacity();
 extern size_t _noaccess_prefix();  // ???
 extern size_t _alignment();        // ???
-extern bool   executable(); 
+extern bool   executable();
 
-//  Last_gc_time();  
+//  Last_gc_time();
 
 
 #ifdef __cplusplus
