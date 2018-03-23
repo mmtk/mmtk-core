@@ -59,7 +59,7 @@ impl Mmapper for ByteMapMmapper {
                 let mmap_ret = unsafe {
                     mmap(mmap_start.as_usize() as *mut c_void, MMAP_CHUNK_BYTES,
                          PROT_READ | PROT_WRITE | PROT_EXEC,
-                         MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0)
+                         MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0)
                 } as usize;
 
                 if mmap_ret != mmap_start.as_usize() {
