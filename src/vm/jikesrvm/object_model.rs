@@ -270,14 +270,14 @@ impl ObjectModel for VMObjectModel {
     fn write_available_bits_word(object: ObjectReference, val: usize) {
         trace!("ObjectModel.write_available_bits_word");
         unsafe {
-            (object.to_address() + AVAILABLE_BITS_OFFSET).store::<usize>(val);
+            (object.to_address() + STATUS_OFFSET).store::<usize>(val);
         }
     }
 
     fn read_available_bits_word(object: ObjectReference) -> usize {
         trace!("ObjectModel.read_available_bits_word");
         unsafe {
-            (object.to_address() + AVAILABLE_BITS_OFFSET).load::<usize>()
+            (object.to_address() + STATUS_OFFSET).load::<usize>()
         }
     }
 
