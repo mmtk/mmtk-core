@@ -86,7 +86,7 @@ impl ObjectModel for VMObjectModel {
     }
 
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference {
-        trace!("ObjectModel.get_reference_when_copied");
+        trace!("ObjectModel.get_reference_when_copied_to");
         let mut res = to;
         if ADDRESS_BASED_HASHING && !DYNAMIC_HASH_OFFSET {
             unsafe {
@@ -98,7 +98,7 @@ impl ObjectModel for VMObjectModel {
             }
         }
 
-        unsafe { (to + OBJECT_REF_OFFSET).to_object_reference() }
+        unsafe { (res + OBJECT_REF_OFFSET).to_object_reference() }
     }
 
     fn get_size_when_copied(object: ObjectReference) -> usize {
