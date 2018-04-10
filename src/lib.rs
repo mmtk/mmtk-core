@@ -5,6 +5,11 @@
 #![feature(const_min_value)]
 #![feature(integer_atomics)]
 
+#![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
+#![allow(unused)]
+#![allow(unreachable_code)]
+
 extern crate libc;
 #[macro_use]
 extern crate lazy_static;

@@ -15,8 +15,17 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use ::util::constants::LOG_BYTES_IN_MBYTE;
 
 use std::marker::PhantomData;
+use std::fmt::Debug;
+use std::mem::transmute;
 
-pub trait Space<PR: PageResource<Self>>: Sized + 'static {
+// UNSAFE: The type should be annoted with '#[repr(C)]', and the first field
+// should be (indirectly) of type 'This' and 'mut CommonSpace<PR>'
+pub unsafe trait Space: Sized + Debug + 'static {
+    type PR: PageResource<Space = Self::This>;
+    type This: Space<PR = Self::PR, This = Self::This>;
+    fn this(&self)->&Self::This { unsafe {transmute(self)} }
+    fn this_mut(&mut self)->&mut Self::This { unsafe {transmute(self)} }
+
     fn init(&mut self);
 
     fn acquire(&self, thread_id: usize, pages: usize) -> Address {
@@ -34,7 +43,8 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
         let me = unsafe { &*(self as *const Self) };
 
         trace!("Polling ..");
-        if allow_poll && VMActivePlan::global().poll(false, me) {
+
+        if allow_poll && VMActivePlan::global().poll::<Self::PR>(false, me.this()) {
             trace!("Collection required");
             pr.clear_request(pages_reserved);
             VMCollection::block_for_gc(thread_id);
@@ -47,7 +57,7 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
                     panic!("Physical allocation failed when polling not allowed!");
                 }
 
-                let gc_performed = VMActivePlan::global().poll(true, me);
+                let gc_performed = VMActivePlan::global().poll::<Self::PR>(true, me.this());
                 debug_assert!(gc_performed, "GC not performed when forced.");
                 pr.clear_request(pages_reserved);
                 VMCollection::block_for_gc(thread_id);
@@ -95,12 +105,14 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
         self.common().name
     }
 
-    fn common(&self) -> &CommonSpace<Self, PR>;
+    fn common(&self) -> &CommonSpace<Self::PR> { unsafe {transmute(self)} }
 
-    fn common_mut(&self) -> &mut CommonSpace<Self, PR>;
+    #[allow(mutable_transmutes)]
+    fn common_mut(&self) -> &mut CommonSpace<Self::PR>  { unsafe {transmute(self)} }
 }
 
-pub struct CommonSpace<S: Space<PR>, PR: PageResource<S>> {
+#[derive(Debug)]
+pub struct CommonSpace<PR: PageResource> {
     pub name: &'static str,
     name_length: usize,
     pub descriptor: usize,
@@ -116,8 +128,6 @@ pub struct CommonSpace<S: Space<PR>, PR: PageResource<S>> {
     pub start: Address,
     pub extent: usize,
     pub head_discontiguous_region: Address,
-
-    _placeholder: PhantomData<S>,
 }
 
 static mut SPACE_COUNT: usize = 0;
@@ -126,7 +136,7 @@ static mut HEAP_LIMIT: Address = HEAP_END;
 
 const DEBUG: bool = false;
 
-impl<S: Space<PR>, PR: PageResource<S>> CommonSpace<S, PR> {
+impl<PR: PageResource> CommonSpace<PR> {
     pub fn new(name: &'static str, movable: bool, immortal: bool, zeroed: bool,
                vmrequest: VMRequest) -> Self {
         let mut rtn = CommonSpace {
@@ -143,7 +153,6 @@ impl<S: Space<PR>, PR: PageResource<S>> CommonSpace<S, PR> {
             start: unsafe{Address::zero()},
             extent: 0,
             head_discontiguous_region: unsafe{Address::zero()},
-            _placeholder: PhantomData,
         };
 
         if vmrequest.is_discontiguous() {

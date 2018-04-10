@@ -10,7 +10,7 @@ pub const HEAP_LAYOUT_32BIT: bool = true;
 pub const HEAP_LAYOUT_32BIT: bool = true; // FIXME SERIOUSLY
 pub const HEAP_LAYOUT_64BIT: bool = !HEAP_LAYOUT_32BIT;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum VMRequest {
     RequestDiscontiguous,
     RequestFixed {

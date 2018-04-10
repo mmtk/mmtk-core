@@ -5,10 +5,16 @@ use ::vm::{ActivePlan, VMActivePlan};
 use std::marker::PhantomData;
 use std::sync::{Mutex, MutexGuard};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::mem::transmute;
+use std::fmt::Debug;
 
 static CUMULATIVE_COMMITTED: AtomicUsize = AtomicUsize::new(0);
 
-pub trait PageResource<S: Space<Self>>: Sized {
+// UNSAFE: The type should be annoted with '#[repr(C)]', and the first field
+// should be (indirectly) of type and 'CommonPageResource<Self>'
+pub unsafe trait PageResource: Sized + 'static + Debug {
+    type Space: Space<PR = Self, This = Self::Space>;
+
     /// Allocate pages from this resource.
     /// Simply bump the cursor, and fail if we hit the sentinel.
     /// Return The start of the first page if successful, zero on failure.
@@ -83,13 +89,13 @@ pub trait PageResource<S: Space<Self>>: Sized {
     }
 
 
-    fn bind_space(&mut self, space: &'static S) {
+    fn bind_space(&mut self, space: &'static Self::Space) {
         self.common_mut().space = Some(space);
     }
 
-    fn common(&self) -> &CommonPageResource<Self, S>;
+    fn common(&self) -> &CommonPageResource<Self> { unsafe { transmute(self)} }
 
-    fn common_mut(&mut self) -> &mut CommonPageResource<Self, S>;
+    fn common_mut(&mut self) -> &mut CommonPageResource<Self>  { unsafe { transmute(self)} }
 }
 
 pub fn cumulative_committed_pages() -> usize {
@@ -97,13 +103,11 @@ pub fn cumulative_committed_pages() -> usize {
 }
 
 #[derive(Debug)]
-pub struct CommonPageResource<PR: PageResource<S>, S: Space<PR>> {
+pub struct CommonPageResource<PR: PageResource> {
     pub reserved: AtomicUsize,
     pub committed: AtomicUsize,
 
     pub contiguous: bool,
     pub growable: bool,
-    pub space: Option<&'static S>,
-
-    pub _placeholder: PhantomData<PR>,
+    pub space: Option<&'static PR::Space>,
 }

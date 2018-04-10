@@ -17,15 +17,14 @@ const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct BumpAllocator<S: Space<PR>, PR: PageResource<S>> where S: 'static {
+pub struct BumpAllocator<PR: PageResource> {
     pub thread_id: usize,
     cursor: Address,
     limit: Address,
-    space: Option<&'static S>,
-    _placeholder: PhantomData<PR>
+    space: Option<&'static PR::Space>
 }
 
-impl<S: Space<PR>, PR: PageResource<S>> BumpAllocator<S, PR> {
+impl<PR: PageResource> BumpAllocator<PR> {
     pub fn set_limit(&mut self, cursor: Address, limit: Address) {
         self.cursor = cursor;
         self.limit = limit;
@@ -36,14 +35,14 @@ impl<S: Space<PR>, PR: PageResource<S>> BumpAllocator<S, PR> {
         self.limit = unsafe { Address::zero() };
     }
 
-    pub fn rebind(&mut self, space: Option<&'static S>) {
+    pub fn rebind(&mut self, space: Option<&'static PR::Space>) {
         self.reset();
         self.space = space;
     }
 }
 
-impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR> {
-    fn get_space(&self) -> Option<&'static S> {
+impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
+    fn get_space(&self) -> Option<&'static PR::Space> {
         self.space
     }
 
@@ -93,14 +92,13 @@ impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR
     }
 }
 
-impl<S: Space<PR>, PR: PageResource<S>> BumpAllocator<S, PR> {
-    pub fn new(thread_id: usize, space: Option<&'static S>) -> Self {
+impl<PR: PageResource> BumpAllocator<PR> {
+    pub fn new(thread_id: usize, space: Option<&'static PR::Space>) -> Self {
         BumpAllocator {
             thread_id,
             cursor: unsafe { Address::zero() },
             limit: unsafe { Address::zero() },
             space,
-            _placeholder: PhantomData,
         }
     }
 }

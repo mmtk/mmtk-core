@@ -10,7 +10,7 @@ use ::util::heap::MonotonePageResource;
 #[repr(C)]
 pub struct NoGCMutator {
     // ImmortalLocal
-    nogc: BumpAllocator<ImmortalSpace, MonotonePageResource<ImmortalSpace>>
+    nogc: BumpAllocator<MonotonePageResource<ImmortalSpace>>
 }
 
 impl MutatorContext for NoGCMutator {

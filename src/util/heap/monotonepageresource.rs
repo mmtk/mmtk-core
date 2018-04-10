@@ -23,8 +23,9 @@ use std::sync::atomic::Ordering;
 const SPACE_ALIGN: usize = 1 << 19;
 
 #[derive(Debug)]
-pub struct MonotonePageResource<S: Space<MonotonePageResource<S>>> where S: 'static {
-    common: CommonPageResource<MonotonePageResource<S>, S>,
+#[repr(C)]
+pub struct MonotonePageResource<S: Space<PR = MonotonePageResource<S>>> {
+    common: CommonPageResource<MonotonePageResource<S>>,
 
     /** Number of pages to reserve at the start of every allocation */
     meta_data_pages_per_region: usize,
@@ -53,15 +54,8 @@ pub enum MonotonePageResourceConditional {
     },
     Discontiguous,
 }
-
-impl<S: Space<MonotonePageResource<S>>> PageResource<S> for MonotonePageResource<S> {
-    fn common(&self) -> &CommonPageResource<Self, S> {
-        &self.common
-    }
-
-    fn common_mut(&mut self) -> &mut CommonPageResource<Self, S> {
-        &mut self.common
-    }
+unsafe impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResource<S> {
+    type Space = S::This;
 
     fn alloc_pages(&self, reserved_pages: usize, immut_required_pages: usize, zeroed: bool,
                    thread_id: usize) -> Address {
@@ -155,7 +149,7 @@ impl<S: Space<MonotonePageResource<S>>> PageResource<S> for MonotonePageResource
     }
 }
 
-impl<S: Space<MonotonePageResource<S>>> MonotonePageResource<S> {
+impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
     pub fn new_contiguous(start: Address, bytes: usize,
                           meta_data_pages_per_region: usize) -> Self {
         let sentinel = start + bytes;
@@ -167,7 +161,6 @@ impl<S: Space<MonotonePageResource<S>>> MonotonePageResource<S> {
                 contiguous: true,
                 growable: HEAP_LAYOUT_64BIT,
                 space: None,
-                _placeholder: PhantomData,
             },
 
             meta_data_pages_per_region,
@@ -192,7 +185,6 @@ impl<S: Space<MonotonePageResource<S>>> MonotonePageResource<S> {
                 contiguous: false,
                 growable: true,
                 space: None,
-                _placeholder: PhantomData,
             },
 
             meta_data_pages_per_region,

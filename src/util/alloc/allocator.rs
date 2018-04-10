@@ -87,10 +87,10 @@ pub fn determine_collection_attempts() -> usize {
     COLLECTION_ATTEMPTS.load(Ordering::Relaxed)
 }
 
-pub trait Allocator<S: Space<PR>, PR: PageResource<S>> {
+pub trait Allocator<PR: PageResource> {
     fn get_thread_id(&self) -> usize;
 
-    fn get_space(&self) -> Option<&'static S>;
+    fn get_space(&self) -> Option<&'static PR::Space>;
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 
