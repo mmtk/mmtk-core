@@ -2,7 +2,6 @@ mod object_model;
 mod scanning;
 mod collection;
 mod active_plan;
-pub mod config;
 pub mod unboxed_size_constants;
 pub use self::object_model::ObjectModel;
 pub use self::scanning::Scanning;
