@@ -25,7 +25,7 @@ use super::sstracelocal::SSTraceLocal;
 pub struct SSCollector {
     pub id: usize,
     // CopyLocal
-    pub ss: BumpAllocator<CopySpace, MonotonePageResource<CopySpace>>,
+    pub ss: BumpAllocator<MonotonePageResource<CopySpace>>,
     trace: SSTraceLocal,
 
     last_trigger_count: usize,

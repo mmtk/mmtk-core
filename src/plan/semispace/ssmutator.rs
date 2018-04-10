@@ -14,8 +14,8 @@ use ::util::heap::{PageResource, MonotonePageResource};
 #[repr(C)]
 pub struct SSMutator {
     // CopyLocal
-    ss: BumpAllocator<CopySpace, MonotonePageResource<CopySpace>>,
-    vs: BumpAllocator<ImmortalSpace, MonotonePageResource<ImmortalSpace>>,
+    ss: BumpAllocator<MonotonePageResource<CopySpace>>,
+    vs: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
 }
 
 impl MutatorContext for SSMutator {
