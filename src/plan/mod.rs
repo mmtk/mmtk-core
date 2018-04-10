@@ -20,13 +20,11 @@ pub use self::tracelocal::TraceLocal;
 pub use self::parallel_collector::ParallelCollector;
 pub use self::parallel_collector_group::ParallelCollectorGroup;
 
-#[cfg(feature = "nogc")]
 pub mod nogc;
 
 #[cfg(feature = "nogc")]
 pub use self::nogc as selected_plan;
 
-#[cfg(feature = "semispace")]
 pub mod semispace;
 
 #[cfg(feature = "semispace")]

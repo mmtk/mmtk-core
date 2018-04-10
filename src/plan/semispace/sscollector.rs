@@ -17,7 +17,7 @@ use ::util::heap::{PageResource, MonotonePageResource};
 
 use ::vm::{Scanning, VMScanning};
 
-use ::plan::selected_plan::PLAN;
+use super::ss::PLAN;
 
 use super::sstracelocal::SSTraceLocal;
 

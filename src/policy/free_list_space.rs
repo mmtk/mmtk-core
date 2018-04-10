@@ -35,13 +35,6 @@ use std::{
             AFreeListSpace<PR, This> {
         type PR = PR;
         type This = This;
-        fn common(&self) -> &CommonSpace<PR> {
-            unsafe{&*self.common.get()}
-        }
-
-        fn common_mut(&self) -> &mut CommonSpace<PR> {
-            unsafe{&mut *self.common.get()}
-        }
         fn init(&mut self) { unimplemented!() }
     }
 
