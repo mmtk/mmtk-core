@@ -18,15 +18,20 @@ use std::cell::UnsafeCell;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 #[derive(Debug)]
-#[repr(C)]
 pub struct CopySpace {
     common: UnsafeCell<CommonSpace<MonotonePageResource<CopySpace>>>,
     from_space: bool,
 }
 
-unsafe impl Space for CopySpace {
+impl Space for CopySpace {
     type PR = MonotonePageResource<CopySpace>;
-    type This = Self;
+
+    fn common(&self) -> &CommonSpace<Self::PR> {
+        unsafe {&*self.common.get()}
+    }
+    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<Self::PR> {
+        &mut *self.common.get()
+    }
 
     fn init(&mut self) {
         // Borrow-checker fighting so that we can have a cyclic reference

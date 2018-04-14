@@ -13,7 +13,7 @@ static CUMULATIVE_COMMITTED: AtomicUsize = AtomicUsize::new(0);
 // UNSAFE: The type should be annoted with '#[repr(C)]', and the first field
 // should be (indirectly) of type and 'CommonPageResource<Self>'
 pub unsafe trait PageResource: Sized + 'static + Debug {
-    type Space: Space<PR = Self, This = Self::Space>;
+    type Space: Space<PR = Self>;
 
     /// Allocate pages from this resource.
     /// Simply bump the cursor, and fail if we hit the sentinel.
@@ -93,9 +93,8 @@ pub unsafe trait PageResource: Sized + 'static + Debug {
         self.common_mut().space = Some(space);
     }
 
-    fn common(&self) -> &CommonPageResource<Self> { unsafe { transmute(self)} }
-
-    fn common_mut(&mut self) -> &mut CommonPageResource<Self>  { unsafe { transmute(self)} }
+    fn common(&self) -> &CommonPageResource<Self>;
+    fn common_mut(&mut self) -> &mut CommonPageResource<Self>;
 }
 
 pub fn cumulative_committed_pages() -> usize {

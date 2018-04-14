@@ -18,15 +18,29 @@ use std::marker::PhantomData;
 use std::fmt::Debug;
 use std::mem::transmute;
 
-// UNSAFE: The type should be annoted with '#[repr(C)]', and the first field
-// should be (indirectly) of type 'This' and 'mut CommonSpace<PR>'
-pub unsafe trait Space: Sized + Debug + 'static {
-    type PR: PageResource<Space = Self::This>;
-    type This: Space<PR = Self::PR, This = Self::This>;
-    fn this(&self)->&Self::This { unsafe {transmute(self)} }
-    fn this_mut(&mut self)->&mut Self::This { unsafe {transmute(self)} }
+pub trait Space: Sized + Debug + 'static {
+    type PR: PageResource<Space = Self>;
 
     fn init(&mut self);
+
+    fn in_space(&self, object: ObjectReference) -> bool {
+        object.value() >= self.common().start.as_usize()
+            && object.value() < self.common().start.as_usize() + self.common().extent
+    }
+
+    // UNSAFE: potential data race as this mutates 'common'
+    unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
+        // FIXME
+        let new_head: Address = unimplemented!(); /*HeapLayout.vmMap. allocate_contiguous_chunks(self.common().descriptor,
+                                                                        self, chunks,
+                                                                        self.common().head_discontiguous_region);*/
+        if new_head.is_zero() {
+            return unsafe{Address::zero()};
+        }
+
+        self.unsafe_common_mut().head_discontiguous_region = new_head;
+        new_head
+    }
 
     fn acquire(&self, thread_id: usize, pages: usize) -> Address {
         trace!("Space.acquire, thread_id={}", thread_id);
@@ -44,7 +58,7 @@ pub unsafe trait Space: Sized + Debug + 'static {
 
         trace!("Polling ..");
 
-        if allow_poll && VMActivePlan::global().poll::<Self::PR>(false, me.this()) {
+        if allow_poll && VMActivePlan::global().poll::<Self::PR>(false, me) {
             trace!("Collection required");
             pr.clear_request(pages_reserved);
             VMCollection::block_for_gc(thread_id);
@@ -57,7 +71,7 @@ pub unsafe trait Space: Sized + Debug + 'static {
                     panic!("Physical allocation failed when polling not allowed!");
                 }
 
-                let gc_performed = VMActivePlan::global().poll::<Self::PR>(true, me.this());
+                let gc_performed = VMActivePlan::global().poll::<Self::PR>(true, me);
                 debug_assert!(gc_performed, "GC not performed when forced.");
                 pr.clear_request(pages_reserved);
                 VMCollection::block_for_gc(thread_id);
@@ -67,25 +81,6 @@ pub unsafe trait Space: Sized + Debug + 'static {
             }
         }
     }
-
-    fn in_space(&self, object: ObjectReference) -> bool {
-        object.value() >= self.common().start.as_usize()
-            && object.value() < self.common().start.as_usize() + self.common().extent
-    }
-
-    fn grow_discontiguous_space(&self, chunks: usize) -> Address {
-        // FIXME
-        let new_head: Address = unimplemented!(); /*HeapLayout.vmMap. allocate_contiguous_chunks(self.common().descriptor,
-                                                                        self, chunks,
-                                                                        self.common().head_discontiguous_region);*/
-        if new_head.is_zero() {
-            return unsafe{Address::zero()};
-        }
-
-        self.common_mut().head_discontiguous_region = new_head;
-        new_head
-    }
-
     /**
      * This hook is called by page resources each time a space grows.  The space may
      * tap into the hook to monitor heap growth.  The call is made from within the
@@ -105,10 +100,15 @@ pub unsafe trait Space: Sized + Debug + 'static {
         self.common().name
     }
 
-    fn common(&self) -> &CommonSpace<Self::PR> { unsafe {transmute(self)} }
+    fn common(&self) -> &CommonSpace<Self::PR>;
+    fn common_mut(&mut self) -> &mut CommonSpace<Self::PR> {
+        // SAFE: Reference is exclusive
+        unsafe {self.unsafe_common_mut()}
+    }
 
-    #[allow(mutable_transmutes)]
-    fn common_mut(&self) -> &mut CommonSpace<Self::PR>  { unsafe {transmute(self)} }
+    // UNSAFE: This get's a mutable reference from self
+    // (i.e. make sure their are no concurrent accesses through self when calling this)_
+    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<Self::PR>;
 }
 
 #[derive(Debug)]

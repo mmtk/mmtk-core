@@ -55,7 +55,14 @@ pub enum MonotonePageResourceConditional {
     Discontiguous,
 }
 unsafe impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResource<S> {
-    type Space = S::This;
+    type Space = S;
+
+    fn common(&self) -> &CommonPageResource<Self> {
+        &self.common
+    }
+    fn common_mut(&mut self) -> &mut CommonPageResource<Self> {
+        &mut self.common
+    }
 
     fn alloc_pages(&self, reserved_pages: usize, immut_required_pages: usize, zeroed: bool,
                    thread_id: usize) -> Address {
@@ -101,8 +108,9 @@ unsafe impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePag
         if !self.common().contiguous && tmp > sync.sentinel {
             /* we're out of virtual memory within our discontiguous region, so ask for more */
             let required_chunks = required_chunks(required_pages);
-            sync.current_chunk = self.common().space.unwrap()
-                .grow_discontiguous_space(required_chunks); // Returns zero on failure
+            sync.current_chunk = unsafe {
+                self.common().space.unwrap().grow_discontiguous_space(required_chunks)
+            }; // Returns zero on failure
             sync.cursor = sync.current_chunk;
             sync.sentinel = sync.cursor + if sync.current_chunk.is_zero() { 0 } else {
                 required_chunks << LOG_BYTES_IN_CHUNK };

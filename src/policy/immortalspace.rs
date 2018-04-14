@@ -14,7 +14,6 @@ use ::util::header_byte;
 use std::cell::UnsafeCell;
 
 #[derive(Debug)]
-#[repr(C)]
 pub struct ImmortalSpace {
     common: UnsafeCell<CommonSpace<MonotonePageResource<ImmortalSpace>>>,
     mark_state: i8,
@@ -25,9 +24,15 @@ unsafe impl Sync for ImmortalSpace {}
 const GC_MARK_BIT_MASK: i8 = 1;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
-unsafe impl Space for ImmortalSpace {
+impl Space for ImmortalSpace {
     type PR = MonotonePageResource<ImmortalSpace>;
-    type This = Self;
+
+    fn common(&self) -> &CommonSpace<Self::PR> {
+        unsafe {&*self.common.get()}
+    }
+    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<Self::PR> {
+        &mut *self.common.get()
+    }
 
     fn init(&mut self) {
         // Borrow-checker fighting so that we can have a cyclic reference
