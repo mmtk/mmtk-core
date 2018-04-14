@@ -17,7 +17,7 @@ use ::util::heap::{PageResource, MonotonePageResource};
 
 use ::vm::{Scanning, VMScanning};
 
-use super::ss::PLAN;
+use ::plan::selected_plan::PLAN;
 
 use super::sstracelocal::SSTraceLocal;
 
@@ -120,7 +120,7 @@ impl CollectorContext for SSCollector {
         match allocator {
             ::plan::Allocator::Los => {
                 let unsync = unsafe { &mut *(super::ss::PLAN.unsync.get()) };
-                unsync.versatile_space.initialize_header(object); // FIXME: has another parameter: false
+                unsync.versatile_space.initialize_header(object); // FIXME: has anotehr parameter: false
             },
             _ => (),
         }
