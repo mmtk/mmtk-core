@@ -5,6 +5,11 @@
 #![feature(const_min_value)]
 #![feature(integer_atomics)]
 
+#[macro_use]
+extern crate custom_derive;
+#[macro_use]
+extern crate enum_derive;
+
 extern crate libc;
 #[macro_use]
 extern crate lazy_static;
