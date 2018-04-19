@@ -166,6 +166,13 @@ pub extern fn used_bytes() -> usize {
     selected_plan::PLAN.get_pages_used() << LOG_BYTES_IN_PAGE
 }
 
+
+#[no_mangle]
+pub extern fn free_bytes() -> usize {
+    selected_plan::PLAN.get_free_pages() << LOG_BYTES_IN_PAGE
+}
+
+
 #[no_mangle]
 #[cfg(not(feature = "openjdk"))]
 pub extern fn used_bytes() -> usize {

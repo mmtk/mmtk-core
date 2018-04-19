@@ -132,6 +132,8 @@ pub trait Plan {
         EMERGENCY_COLLECTION.load(Ordering::Relaxed)
     }
 
+    fn get_free_pages(&self) -> usize { self.get_total_pages() + self.get_pages_used() }
+
     #[inline]
     fn stress_test_gc_required(&self) -> bool {
         let pages = cumulative_committed_pages();
