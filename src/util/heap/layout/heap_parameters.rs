@@ -1,6 +1,6 @@
 /**
-   * log_2 of the maximum number of spaces a Plan can support.
-   */
+ * log_2 of the maximum number of spaces a Plan can support.
+ */
 pub const LOG_MAX_SPACES: usize = 4;
 
 /**

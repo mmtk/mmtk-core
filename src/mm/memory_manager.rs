@@ -20,7 +20,7 @@ use ::vm::{Collection, VMCollection};
 use ::vm::jikesrvm::JTOC_BASE;
 
 use ::util::{Address, ObjectReference};
-use ::util::options::options::OptionMap;
+use ::util::options::OPTION_MAP;
 
 use ::plan::selected_plan;
 use self::selected_plan::SelectedPlan;
@@ -154,7 +154,7 @@ pub extern fn enable_collection(size: usize) {
 pub extern fn process(name: *const c_char, value: *const c_char) -> bool {
     let name_str: &CStr = unsafe { CStr::from_ptr(name) };
     let value_str: &CStr = unsafe { CStr::from_ptr(value) };
-    let option = &OptionMap;
+    let option = &OPTION_MAP;
     unsafe {
         option.process(name_str.to_str().unwrap(), value_str.to_str().unwrap())
     }
