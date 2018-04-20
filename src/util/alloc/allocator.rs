@@ -30,12 +30,54 @@ lazy_static! {
 }
 
 #[inline(always)]
-pub fn align_allocation(region: Address, align: usize, offset: isize) -> Address {
+pub fn align_allocation_no_fill(
+    region: Address,
+    alignment: usize,
+    offset: isize,
+) -> Address {
+    return align_allocation(
+        region,
+        alignment,
+        offset,
+        MIN_ALIGNMENT,
+        false,
+    );
+}
+
+#[inline(always)]
+pub fn align_allocation(
+    region: Address,
+    alignment: usize,
+    offset: isize,
+    known_alignment: usize,
+    fillalignmentgap: bool,
+) -> Address {
+    debug_assert!(known_alignment >= MIN_ALIGNMENT);
+    debug_assert!(MIN_ALIGNMENT >= BYTES_IN_INT);
+    debug_assert!(!(fillalignmentgap && region.is_zero()));
+    debug_assert!(alignment <= MAX_ALIGNMENT);
+    debug_assert!(offset >= 0);
+    debug_assert!((
+        (region.as_usize() as isize) & ((MIN_ALIGNMENT - 1) as isize)
+    ) == 0);
+    debug_assert!((alignment & (MIN_ALIGNMENT - 1)) == 0);
+    debug_assert!((offset & (MIN_ALIGNMENT - 1) as isize) == 0);
+
+    // No alignment ever required.
+    if alignment <= known_alignment || MAX_ALIGNMENT <= MIN_ALIGNMENT {
+        return region;
+    }
+
+    // May require an alignment
     let region_isize = region.as_usize() as isize;
 
-    let mask = (align - 1) as isize; // fromIntSignExtend
+    let mask = (alignment - 1) as isize; // fromIntSignExtend
     let neg_off = -offset; // fromIntSignExtend
     let delta = (neg_off - region_isize) & mask;
+
+    if fillalignmentgap && (ALIGNMENT_VALUE != 0) {
+        fill_alignment_gap(region, region + delta);
+    }
 
     region + delta
 }
@@ -108,7 +150,7 @@ pub trait Allocator<S: Space<PR>, PR: PageResource<S>> {
             // Try to allocate using the slow path
             let result = self.alloc_slow_once(size, align, offset);
 
-            if unsafe{!VMActivePlan::is_mutator(thread_id)} {
+            if unsafe { !VMActivePlan::is_mutator(thread_id) } {
                 debug_assert!(!result.is_zero());
                 return result;
             }

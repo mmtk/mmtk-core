@@ -1,8 +1,9 @@
 use ::util::address::Address;
-use super::allocator::{align_allocation, fill_alignment_gap};
+use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
 
 use ::util::alloc::Allocator;
 use ::util::heap::PageResource;
+use ::util::alloc::linear_scan::LinearScan;
 
 use std::marker::PhantomData;
 
@@ -10,10 +11,16 @@ use libc::{memset, c_void};
 
 use ::policy::space::Space;
 use util::conversions::bytes_to_pages;
+use ::util::constants::BYTES_IN_ADDRESS;
+
 
 const BYTES_IN_PAGE: usize = 1 << 12;
 const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
 const BLOCK_MASK: usize = BLOCK_SIZE - 1;
+
+const REGION_LIMIT_OFFSET: isize = 0;
+const NEXT_REGION_OFFSET: isize = REGION_LIMIT_OFFSET + BYTES_IN_ADDRESS as isize;
+const DATA_END_OFFSET: isize = NEXT_REGION_OFFSET + BYTES_IN_ADDRESS as isize;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -22,7 +29,7 @@ pub struct BumpAllocator<S: Space<PR>, PR: PageResource<S>> where S: 'static {
     cursor: Address,
     limit: Address,
     space: Option<&'static S>,
-    _placeholder: PhantomData<PR>
+    _placeholder: PhantomData<PR>,
 }
 
 impl<S: Space<PR>, PR: PageResource<S>> BumpAllocator<S, PR> {
@@ -40,6 +47,8 @@ impl<S: Space<PR>, PR: PageResource<S>> BumpAllocator<S, PR> {
         self.reset();
         self.space = space;
     }
+
+    fn scan_region<T: LinearScan>(scanner: T, start: Address) {}
 }
 
 impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR> {
@@ -49,7 +58,7 @@ impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc");
-        let result = align_allocation(self.cursor, align, offset);
+        let result = align_allocation_no_fill(self.cursor, align, offset);
         let new_cursor = result + size;
 
         if new_cursor > self.limit {

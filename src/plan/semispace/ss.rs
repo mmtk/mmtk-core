@@ -130,7 +130,7 @@ impl Plan for SemiSpace {
 
         match phase {
             &Phase::SetCollectionKind => {
-                let unsync = unsafe { &mut *self.unsync.get() };
+                let unsync = &mut *self.unsync.get();
                 unsync.collection_attempt = if <SelectedPlan as Plan>::is_user_triggered_collection() {
                     1 } else { determine_collection_attempts() };
 
