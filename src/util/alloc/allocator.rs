@@ -18,10 +18,11 @@ pub const ALIGNMENT_VALUE: usize = 0xdeadbeef;
 pub const LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
 pub const MIN_ALIGNMENT: usize = 1 << LOG_MIN_ALIGNMENT;
 #[cfg(target_arch = "x86")]
-pub const LOG_MAX_ALIGNMENT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
+pub const MAX_ALIGNMENT_SHIFT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
 #[cfg(target_arch = "x86_64")]
-pub const LOG_MAX_ALIGNMENT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
-pub const MAX_ALIGNMENT: usize = 1 << LOG_MAX_ALIGNMENT;
+pub const MAX_ALIGNMENT_SHIFT: usize = 0 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
+
+pub const MAX_ALIGNMENT: usize = MIN_ALIGNMENT << MAX_ALIGNMENT_SHIFT;
 
 static ALLOCATION_SUCCESS: AtomicBool = AtomicBool::new(false);
 static COLLECTION_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
