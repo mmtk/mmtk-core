@@ -1,9 +1,11 @@
-use ::util::address::Address;
-use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
+use ::util::{Address, ObjectReference};
+use super::allocator::{align_allocation_no_fill, fill_alignment_gap, MIN_ALIGNMENT};
 
 use ::util::alloc::Allocator;
 use ::util::heap::PageResource;
 use ::util::alloc::linear_scan::LinearScan;
+
+use ::vm::VMObjectModel;
 
 use std::marker::PhantomData;
 
@@ -48,7 +50,34 @@ impl<S: Space<PR>, PR: PageResource<S>> BumpAllocator<S, PR> {
         self.space = space;
     }
 
-    fn scan_region<T: LinearScan>(scanner: T, start: Address) {}
+    fn scan_region<T: LinearScan>(&self, scanner: T, start: Address, end: Address) {
+        // We are diverging from the original implementation
+        let current_limit = if end.is_zero() { self.cursor } else { end };
+
+        let mut current: ObjectReference = unsafe {
+            VMObjectModel::get_object_from_start_address(start)
+        };
+
+        /* Loop through each object up to the limit */
+        loop {
+            /* Read end address first, as scan may be destructive */
+            let current_object_end: Address = VMObjectModel::get_object_end_address(current);
+            scanner.scan(current);
+            if current_object_end > current_limit {
+                /* We have scanned the last object */
+                break;
+            }
+
+            /* Find the next object from the start address (dealing with alignment gaps, etc.) */
+            let next: ObjectReference = unsafe {
+                VMObjectModel::get_object_from_start_address(current_object_end)
+            };
+            /* Must be monotonically increasing */
+            debug_assert!(next.to_address() > current.to_address());
+
+            current = next;
+        }
+    }
 }
 
 impl<S: Space<PR>, PR: PageResource<S>> Allocator<S, PR> for BumpAllocator<S, PR> {
