@@ -5,6 +5,7 @@ use ::util::alloc::Allocator;
 use ::util::heap::PageResource;
 use ::util::alloc::linear_scan::LinearScan;
 
+use ::vm::ObjectModel;
 use ::vm::VMObjectModel;
 
 use std::marker::PhantomData;

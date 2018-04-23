@@ -1,5 +1,5 @@
 use ::util::ObjectReference;
 
 pub trait LinearScan{
-    fn scan(object: ObjectReference);
+    fn scan(&self, object: ObjectReference);
 }
