@@ -54,7 +54,7 @@ pub enum MonotonePageResourceConditional {
     },
     Discontiguous,
 }
-unsafe impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResource<S> {
+impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResource<S> {
     type Space = S;
 
     fn common(&self) -> &CommonPageResource<Self> {

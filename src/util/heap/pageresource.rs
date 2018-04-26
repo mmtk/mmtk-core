@@ -5,14 +5,11 @@ use ::vm::{ActivePlan, VMActivePlan};
 use std::marker::PhantomData;
 use std::sync::{Mutex, MutexGuard};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::mem::transmute;
 use std::fmt::Debug;
 
 static CUMULATIVE_COMMITTED: AtomicUsize = AtomicUsize::new(0);
 
-// UNSAFE: The type should be annoted with '#[repr(C)]', and the first field
-// should be (indirectly) of type and 'CommonPageResource<Self>'
-pub unsafe trait PageResource: Sized + 'static + Debug {
+pub trait PageResource: Sized + 'static + Debug {
     type Space: Space<PR = Self>;
 
     /// Allocate pages from this resource.

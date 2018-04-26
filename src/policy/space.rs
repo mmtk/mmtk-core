@@ -14,33 +14,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ::util::constants::LOG_BYTES_IN_MBYTE;
 
-use std::marker::PhantomData;
 use std::fmt::Debug;
-use std::mem::transmute;
 
 pub trait Space: Sized + Debug + 'static {
     type PR: PageResource<Space = Self>;
 
     fn init(&mut self);
-
-    fn in_space(&self, object: ObjectReference) -> bool {
-        object.value() >= self.common().start.as_usize()
-            && object.value() < self.common().start.as_usize() + self.common().extent
-    }
-
-    // UNSAFE: potential data race as this mutates 'common'
-    unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
-        // FIXME
-        let new_head: Address = unimplemented!(); /*HeapLayout.vmMap. allocate_contiguous_chunks(self.common().descriptor,
-                                                                        self, chunks,
-                                                                        self.common().head_discontiguous_region);*/
-        if new_head.is_zero() {
-            return unsafe{Address::zero()};
-        }
-
-        self.unsafe_common_mut().head_discontiguous_region = new_head;
-        new_head
-    }
 
     fn acquire(&self, thread_id: usize, pages: usize) -> Address {
         trace!("Space.acquire, thread_id={}", thread_id);
@@ -81,6 +60,26 @@ pub trait Space: Sized + Debug + 'static {
             }
         }
     }
+
+    fn in_space(&self, object: ObjectReference) -> bool {
+        object.value() >= self.common().start.as_usize()
+            && object.value() < self.common().start.as_usize() + self.common().extent
+    }
+
+    // UNSAFE: potential data race as this mutates 'common'
+    unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
+        // FIXME
+        let new_head: Address = unimplemented!(); /*HeapLayout.vmMap. allocate_contiguous_chunks(self.common().descriptor,
+                                                                        self, chunks,
+                                                                        self.common().head_discontiguous_region);*/
+        if new_head.is_zero() {
+            return unsafe{Address::zero()};
+        }
+
+        self.unsafe_common_mut().head_discontiguous_region = new_head;
+        new_head
+    }
+
     /**
      * This hook is called by page resources each time a space grows.  The space may
      * tap into the hook to monitor heap growth.  The call is made from within the
