@@ -23,8 +23,8 @@ use std::sync::atomic::Ordering;
 const SPACE_ALIGN: usize = 1 << 19;
 
 #[derive(Debug)]
-pub struct MonotonePageResource<S: Space<MonotonePageResource<S>>> where S: 'static {
-    common: CommonPageResource<MonotonePageResource<S>, S>,
+pub struct MonotonePageResource<S: Space<PR = MonotonePageResource<S>>> {
+    common: CommonPageResource<MonotonePageResource<S>>,
 
     /** Number of pages to reserve at the start of every allocation */
     meta_data_pages_per_region: usize,
@@ -53,13 +53,13 @@ pub enum MonotonePageResourceConditional {
     },
     Discontiguous,
 }
+impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResource<S> {
+    type Space = S;
 
-impl<S: Space<MonotonePageResource<S>>> PageResource<S> for MonotonePageResource<S> {
-    fn common(&self) -> &CommonPageResource<Self, S> {
+    fn common(&self) -> &CommonPageResource<Self> {
         &self.common
     }
-
-    fn common_mut(&mut self) -> &mut CommonPageResource<Self, S> {
+    fn common_mut(&mut self) -> &mut CommonPageResource<Self> {
         &mut self.common
     }
 
@@ -107,8 +107,9 @@ impl<S: Space<MonotonePageResource<S>>> PageResource<S> for MonotonePageResource
         if !self.common().contiguous && tmp > sync.sentinel {
             /* we're out of virtual memory within our discontiguous region, so ask for more */
             let required_chunks = required_chunks(required_pages);
-            sync.current_chunk = self.common().space.unwrap()
-                .grow_discontiguous_space(required_chunks); // Returns zero on failure
+            sync.current_chunk = unsafe {
+                self.common().space.unwrap().grow_discontiguous_space(required_chunks)
+            }; // Returns zero on failure
             sync.cursor = sync.current_chunk;
             sync.sentinel = sync.cursor + if sync.current_chunk.is_zero() { 0 } else {
                 required_chunks << LOG_BYTES_IN_CHUNK };
@@ -155,7 +156,7 @@ impl<S: Space<MonotonePageResource<S>>> PageResource<S> for MonotonePageResource
     }
 }
 
-impl<S: Space<MonotonePageResource<S>>> MonotonePageResource<S> {
+impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
     pub fn new_contiguous(start: Address, bytes: usize,
                           meta_data_pages_per_region: usize) -> Self {
         let sentinel = start + bytes;
@@ -167,7 +168,6 @@ impl<S: Space<MonotonePageResource<S>>> MonotonePageResource<S> {
                 contiguous: true,
                 growable: HEAP_LAYOUT_64BIT,
                 space: None,
-                _placeholder: PhantomData,
             },
 
             meta_data_pages_per_region,
@@ -192,7 +192,6 @@ impl<S: Space<MonotonePageResource<S>>> MonotonePageResource<S> {
                 contiguous: false,
                 growable: true,
                 space: None,
-                _placeholder: PhantomData,
             },
 
             meta_data_pages_per_region,

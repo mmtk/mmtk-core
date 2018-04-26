@@ -14,9 +14,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ::util::constants::LOG_BYTES_IN_MBYTE;
 
-use std::marker::PhantomData;
+use std::fmt::Debug;
 
-pub trait Space<PR: PageResource<Self>>: Sized + 'static {
+pub trait Space: Sized + Debug + 'static {
+    type PR: PageResource<Space = Self>;
+
     fn init(&mut self);
 
     fn acquire(&self, thread_id: usize, pages: usize) -> Address {
@@ -34,7 +36,8 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
         let me = unsafe { &*(self as *const Self) };
 
         trace!("Polling ..");
-        if allow_poll && VMActivePlan::global().poll(false, me) {
+
+        if allow_poll && VMActivePlan::global().poll::<Self::PR>(false, me) {
             trace!("Collection required");
             pr.clear_request(pages_reserved);
             VMCollection::block_for_gc(thread_id);
@@ -47,7 +50,7 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
                     panic!("Physical allocation failed when polling not allowed!");
                 }
 
-                let gc_performed = VMActivePlan::global().poll(true, me);
+                let gc_performed = VMActivePlan::global().poll::<Self::PR>(true, me);
                 debug_assert!(gc_performed, "GC not performed when forced.");
                 pr.clear_request(pages_reserved);
                 VMCollection::block_for_gc(thread_id);
@@ -63,7 +66,8 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
             && object.value() < self.common().start.as_usize() + self.common().extent
     }
 
-    fn grow_discontiguous_space(&self, chunks: usize) -> Address {
+    // UNSAFE: potential data race as this mutates 'common'
+    unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
         // FIXME
         let new_head: Address = unimplemented!(); /*HeapLayout.vmMap. allocate_contiguous_chunks(self.common().descriptor,
                                                                         self, chunks,
@@ -72,7 +76,7 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
             return unsafe{Address::zero()};
         }
 
-        self.common_mut().head_discontiguous_region = new_head;
+        self.unsafe_common_mut().head_discontiguous_region = new_head;
         new_head
     }
 
@@ -95,12 +99,19 @@ pub trait Space<PR: PageResource<Self>>: Sized + 'static {
         self.common().name
     }
 
-    fn common(&self) -> &CommonSpace<Self, PR>;
+    fn common(&self) -> &CommonSpace<Self::PR>;
+    fn common_mut(&mut self) -> &mut CommonSpace<Self::PR> {
+        // SAFE: Reference is exclusive
+        unsafe {self.unsafe_common_mut()}
+    }
 
-    fn common_mut(&self) -> &mut CommonSpace<Self, PR>;
+    // UNSAFE: This get's a mutable reference from self
+    // (i.e. make sure their are no concurrent accesses through self when calling this)_
+    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<Self::PR>;
 }
 
-pub struct CommonSpace<S: Space<PR>, PR: PageResource<S>> {
+#[derive(Debug)]
+pub struct CommonSpace<PR: PageResource> {
     pub name: &'static str,
     name_length: usize,
     pub descriptor: usize,
@@ -116,8 +127,6 @@ pub struct CommonSpace<S: Space<PR>, PR: PageResource<S>> {
     pub start: Address,
     pub extent: usize,
     pub head_discontiguous_region: Address,
-
-    _placeholder: PhantomData<S>,
 }
 
 static mut SPACE_COUNT: usize = 0;
@@ -126,7 +135,7 @@ static mut HEAP_LIMIT: Address = HEAP_END;
 
 const DEBUG: bool = false;
 
-impl<S: Space<PR>, PR: PageResource<S>> CommonSpace<S, PR> {
+impl<PR: PageResource> CommonSpace<PR> {
     pub fn new(name: &'static str, movable: bool, immortal: bool, zeroed: bool,
                vmrequest: VMRequest) -> Self {
         let mut rtn = CommonSpace {
@@ -143,7 +152,6 @@ impl<S: Space<PR>, PR: PageResource<S>> CommonSpace<S, PR> {
             start: unsafe{Address::zero()},
             extent: 0,
             head_discontiguous_region: unsafe{Address::zero()},
-            _placeholder: PhantomData,
         };
 
         if vmrequest.is_discontiguous() {

@@ -25,7 +25,7 @@ use super::sstracelocal::SSTraceLocal;
 pub struct SSCollector {
     pub id: usize,
     // CopyLocal
-    pub ss: BumpAllocator<CopySpace, MonotonePageResource<CopySpace>>,
+    pub ss: BumpAllocator<MonotonePageResource<CopySpace>>,
     trace: SSTraceLocal,
 
     last_trigger_count: usize,
@@ -120,7 +120,7 @@ impl CollectorContext for SSCollector {
         match allocator {
             ::plan::Allocator::Los => {
                 let unsync = unsafe { &mut *(super::ss::PLAN.unsync.get()) };
-                unsync.versatile_space.initialize_header(object); // FIXME: has another parameter: false
+                unsync.versatile_space.initialize_header(object); // FIXME: has anotehr parameter: false
             },
             _ => (),
         }
