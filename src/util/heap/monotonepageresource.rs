@@ -23,7 +23,6 @@ use std::sync::atomic::Ordering;
 const SPACE_ALIGN: usize = 1 << 19;
 
 #[derive(Debug)]
-#[repr(C)]
 pub struct MonotonePageResource<S: Space<PR = MonotonePageResource<S>>> {
     common: CommonPageResource<MonotonePageResource<S>>,
 
