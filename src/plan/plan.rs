@@ -5,7 +5,7 @@ use std::sync::atomic::{self, AtomicUsize, AtomicBool, Ordering};
 
 use ::policy::space::Space;
 use ::util::heap::PageResource;
-use ::util::options::options::{OptionMap, CLIOption};
+use ::util::options::OPTION_MAP;
 
 use super::controller_collector_context::ControllerCollectorContext;
 use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
@@ -94,7 +94,7 @@ pub trait Plan {
     }
 
     fn log_poll<PR: PageResource>(&self, space: &'static PR::Space, message: &'static str) {
-        if OptionMap.get().verbose.get() >= 5 {
+        if OPTION_MAP.verbose >= 5 {
             println!("  [POLL] {}: {}", space.get_name(), message);
         }
     }
@@ -132,6 +132,8 @@ pub trait Plan {
         EMERGENCY_COLLECTION.load(Ordering::Relaxed)
     }
 
+    fn get_free_pages(&self) -> usize { self.get_total_pages() + self.get_pages_used() }
+
     #[inline]
     fn stress_test_gc_required(&self) -> bool {
         let pages = cumulative_committed_pages();
@@ -139,7 +141,7 @@ pub trait Plan {
 
         if INITIALIZED.load(Ordering::Relaxed)
             && (pages ^ LAST_STRESS_PAGES.load(Ordering::Relaxed)
-            > OptionMap.get().stress_factor.get()) {
+            > OPTION_MAP.stress_factor) {
 
             LAST_STRESS_PAGES.store(pages, Ordering::Relaxed);
             trace!("Doing stress GC");

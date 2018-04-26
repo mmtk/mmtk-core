@@ -18,10 +18,11 @@ pub const ALIGNMENT_VALUE: usize = 0xdeadbeef;
 pub const LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
 pub const MIN_ALIGNMENT: usize = 1 << LOG_MIN_ALIGNMENT;
 #[cfg(target_arch = "x86")]
-pub const LOG_MAX_ALIGNMENT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
+pub const MAX_ALIGNMENT_SHIFT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
 #[cfg(target_arch = "x86_64")]
-pub const LOG_MAX_ALIGNMENT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
-pub const MAX_ALIGNMENT: usize = 1 << LOG_MAX_ALIGNMENT;
+pub const MAX_ALIGNMENT_SHIFT: usize = 0 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
+
+pub const MAX_ALIGNMENT: usize = MIN_ALIGNMENT << MAX_ALIGNMENT_SHIFT;
 
 static ALLOCATION_SUCCESS: AtomicBool = AtomicBool::new(false);
 static COLLECTION_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
@@ -30,12 +31,54 @@ lazy_static! {
 }
 
 #[inline(always)]
-pub fn align_allocation(region: Address, align: usize, offset: isize) -> Address {
+pub fn align_allocation_no_fill(
+    region: Address,
+    alignment: usize,
+    offset: isize,
+) -> Address {
+    return align_allocation(
+        region,
+        alignment,
+        offset,
+        MIN_ALIGNMENT,
+        false,
+    );
+}
+
+#[inline(always)]
+pub fn align_allocation(
+    region: Address,
+    alignment: usize,
+    offset: isize,
+    known_alignment: usize,
+    fillalignmentgap: bool,
+) -> Address {
+    debug_assert!(known_alignment >= MIN_ALIGNMENT);
+    debug_assert!(MIN_ALIGNMENT >= BYTES_IN_INT);
+    debug_assert!(!(fillalignmentgap && region.is_zero()));
+    debug_assert!(alignment <= MAX_ALIGNMENT);
+    debug_assert!(offset >= 0);
+    debug_assert!((
+        (region.as_usize() as isize) & ((MIN_ALIGNMENT - 1) as isize)
+    ) == 0);
+    debug_assert!((alignment & (MIN_ALIGNMENT - 1)) == 0);
+    debug_assert!((offset & (MIN_ALIGNMENT - 1) as isize) == 0);
+
+    // No alignment ever required.
+    if alignment <= known_alignment || MAX_ALIGNMENT <= MIN_ALIGNMENT {
+        return region;
+    }
+
+    // May require an alignment
     let region_isize = region.as_usize() as isize;
 
-    let mask = (align - 1) as isize; // fromIntSignExtend
+    let mask = (alignment - 1) as isize; // fromIntSignExtend
     let neg_off = -offset; // fromIntSignExtend
     let delta = (neg_off - region_isize) & mask;
+
+    if fillalignmentgap && (ALIGNMENT_VALUE != 0) {
+        fill_alignment_gap(region, region + delta);
+    }
 
     region + delta
 }
@@ -108,7 +151,7 @@ pub trait Allocator<PR: PageResource> {
             // Try to allocate using the slow path
             let result = self.alloc_slow_once(size, align, offset);
 
-            if unsafe{!VMActivePlan::is_mutator(thread_id)} {
+            if unsafe { !VMActivePlan::is_mutator(thread_id) } {
                 debug_assert!(!result.is_zero());
                 return result;
             }

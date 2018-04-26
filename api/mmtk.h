@@ -49,6 +49,12 @@ extern void start_control_collector(size_t thread_id);
 extern void start_worker(size_t thread_id, void* worker);
 
 /**
+  * VM Accounting
+  */
+extern size_t free_bytes();
+extern size_t total_bytes();
+
+/**
  * OpenJDK-specific
  */
 extern size_t used_bytes();

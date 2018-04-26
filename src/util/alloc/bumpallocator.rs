@@ -1,8 +1,13 @@
-use ::util::address::Address;
-use super::allocator::{align_allocation, fill_alignment_gap};
+use ::util::{Address, ObjectReference};
+use super::allocator::{align_allocation_no_fill, fill_alignment_gap, MIN_ALIGNMENT};
 
 use ::util::alloc::Allocator;
 use ::util::heap::PageResource;
+use ::util::alloc::linear_scan::LinearScan;
+use ::util::alloc::dump_linear_scan::DumpLinearScan;
+
+use ::vm::ObjectModel;
+use ::vm::VMObjectModel;
 
 use std::marker::PhantomData;
 
@@ -10,10 +15,16 @@ use libc::{memset, c_void};
 
 use ::policy::space::Space;
 use util::conversions::bytes_to_pages;
+use ::util::constants::BYTES_IN_ADDRESS;
+
 
 const BYTES_IN_PAGE: usize = 1 << 12;
 const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
 const BLOCK_MASK: usize = BLOCK_SIZE - 1;
+
+const REGION_LIMIT_OFFSET: isize = 0;
+const NEXT_REGION_OFFSET: isize = REGION_LIMIT_OFFSET + BYTES_IN_ADDRESS as isize;
+const DATA_END_OFFSET: isize = NEXT_REGION_OFFSET + BYTES_IN_ADDRESS as isize;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -39,6 +50,48 @@ impl<PR: PageResource> BumpAllocator<PR> {
         self.reset();
         self.space = space;
     }
+
+    pub fn scan(&self) {
+        unsafe {
+            self.scan_region(DumpLinearScan{},
+                             self.get_space().unwrap().common().start,
+                             Address::zero());
+        }
+    }
+
+    fn scan_region<T: LinearScan>(&self, scanner: T, start: Address, end: Address) {
+        // We are diverging from the original implementation
+        let current_limit = if end.is_zero() { self.cursor } else { end };
+        println!("current_limit: {}", current_limit);
+
+        let mut current: ObjectReference = unsafe {
+            VMObjectModel::get_object_from_start_address(start)
+        };
+
+        println!("start: {}, first object: {}", start, current);
+
+        /* Loop through each object up to the limit */
+        loop {
+            /* Read end address first, as scan may be destructive */
+            let current_object_end: Address = VMObjectModel::get_object_end_address(current);
+            println!("current object: {} end: {}", current, current_object_end);
+            scanner.scan(current);
+            if current_object_end > current_limit {
+                /* We have scanned the last object */
+                break;
+            }
+
+            /* Find the next object from the start address (dealing with alignment gaps, etc.) */
+            let next: ObjectReference = unsafe {
+                VMObjectModel::get_object_from_start_address(current_object_end)
+            };
+            println!("next object: {}", next);
+            /* Must be monotonically increasing */
+            debug_assert!(next.to_address() > current.to_address());
+
+            current = next;
+        }
+    }
 }
 
 impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
@@ -48,7 +101,7 @@ impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc");
-        let result = align_allocation(self.cursor, align, offset);
+        let result = align_allocation_no_fill(self.cursor, align, offset);
         let new_cursor = result + size;
 
         if new_cursor > self.limit {

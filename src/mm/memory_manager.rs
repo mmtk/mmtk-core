@@ -20,7 +20,7 @@ use ::vm::{Collection, VMCollection};
 use ::vm::jikesrvm::JTOC_BASE;
 
 use ::util::{Address, ObjectReference};
-use ::util::options::options::OptionMap;
+use ::util::options::OPTION_MAP;
 
 use ::plan::selected_plan;
 use self::selected_plan::SelectedPlan;
@@ -154,7 +154,7 @@ pub extern fn enable_collection(size: usize) {
 pub extern fn process(name: *const c_char, value: *const c_char) -> bool {
     let name_str: &CStr = unsafe { CStr::from_ptr(name) };
     let value_str: &CStr = unsafe { CStr::from_ptr(value) };
-    let option = &OptionMap;
+    let option = &OPTION_MAP;
     unsafe {
         option.process(name_str.to_str().unwrap(), value_str.to_str().unwrap())
     }
@@ -166,6 +166,13 @@ pub extern fn used_bytes() -> usize {
     selected_plan::PLAN.get_pages_used() << LOG_BYTES_IN_PAGE
 }
 
+
+#[no_mangle]
+pub extern fn free_bytes() -> usize {
+    selected_plan::PLAN.get_free_pages() << LOG_BYTES_IN_PAGE
+}
+
+
 #[no_mangle]
 #[cfg(not(feature = "openjdk"))]
 pub extern fn used_bytes() -> usize {
@@ -173,27 +180,18 @@ pub extern fn used_bytes() -> usize {
 }
 
 #[no_mangle]
-#[cfg(feature = "openjdk")]
 pub extern fn starting_heap_address() -> *mut c_void {
     HEAP_START.as_usize() as *mut c_void
 }
 
 #[no_mangle]
-#[cfg(not(feature = "openjdk"))]
-pub extern fn starting_heap_address() -> *mut c_void {
-    panic!("Cannot call starting_heap_address when not building for OpenJDK");
-}
-
-#[no_mangle]
-#[cfg(feature = "openjdk")]
 pub extern fn last_heap_address() -> *mut c_void {
     HEAP_END.as_usize() as *mut c_void
 }
 
 #[no_mangle]
-#[cfg(not(feature = "openjdk"))]
-pub extern fn last_heap_address() -> *mut c_void {
-    panic!("Cannot call last_heap_address when not building for OpenJDK");
+pub extern fn total_bytes() -> usize {
+    selected_plan::PLAN.get_total_pages() << LOG_BYTES_IN_PAGE
 }
 
 #[no_mangle]

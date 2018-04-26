@@ -8,7 +8,7 @@ use std::sync::mpsc::Sender;
 use crossbeam_deque::{Steal, Stealer};
 
 use super::ss;
-use ::plan::selected_plan::PLAN;
+use ::plan::semispace::PLAN;
 
 const PUSH_BACK_THRESHOLD: usize = 50;
 
