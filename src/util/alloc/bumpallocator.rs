@@ -62,7 +62,6 @@ impl<PR: PageResource> BumpAllocator<PR> {
     fn scan_region<T: LinearScan>(&self, scanner: T, start: Address, end: Address) {
         // We are diverging from the original implementation
         let current_limit = if end.is_zero() { self.cursor } else { end };
-        println!("current_limit: {}", current_limit);
 
         let mut current: ObjectReference = unsafe {
             VMObjectModel::get_object_from_start_address(start)
