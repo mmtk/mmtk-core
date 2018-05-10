@@ -72,7 +72,7 @@ impl ObjectModel for VMObjectModel {
             let copy = from != to;
 
             if copy {
-                let size = Self::bytes_required_when_copied(from, rvm_type);
+                bytes = Self::bytes_required_when_copied(from, rvm_type);
                 Self::move_object(Address::zero(), from, to, bytes, rvm_type);
             } else {
                 bytes = Self::bytes_used(from, rvm_type);
