@@ -16,12 +16,12 @@ use std::cell::UnsafeCell;
 #[derive(Debug)]
 pub struct ImmortalSpace {
     common: UnsafeCell<CommonSpace<MonotonePageResource<ImmortalSpace>>>,
-    mark_state: i8,
+    mark_state: u8,
 }
 
 unsafe impl Sync for ImmortalSpace {}
 
-const GC_MARK_BIT_MASK: i8 = 1;
+const GC_MARK_BIT_MASK: u8 = 1;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 impl Space for ImmortalSpace {
@@ -59,17 +59,17 @@ impl ImmortalSpace {
         }
     }
 
-    fn test_and_mark(object: ObjectReference, value: i8) -> bool {
+    fn test_and_mark(object: ObjectReference, value: u8) -> bool {
         let mut old_value = VMObjectModel::prepare_available_bits(object);
-        let mut mark_bit = (old_value as i8) & GC_MARK_BIT_MASK;
+        let mut mark_bit = (old_value as u8) & GC_MARK_BIT_MASK;
         if mark_bit == value {
             return false;
         }
         while !VMObjectModel::attempt_available_bits(object,
                                                      old_value,
-                                                     ((old_value as i8) ^ GC_MARK_BIT_MASK) as usize) {
+                                                     old_value ^ (GC_MARK_BIT_MASK as usize)) {
             old_value = VMObjectModel::prepare_available_bits(object);
-            mark_bit = (old_value as i8) & GC_MARK_BIT_MASK;
+            mark_bit = (old_value as u8) & GC_MARK_BIT_MASK;
             if mark_bit == value {
                 return false;
             }
@@ -90,7 +90,7 @@ impl ImmortalSpace {
 
     pub fn initialize_header(&self, object: ObjectReference) {
         let old_value = VMObjectModel::read_available_byte(object);
-        let mut new_value = (old_value & GC_MARK_BIT_MASK as u8) | self.mark_state as u8;
+        let mut new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
         if header_byte::NEEDS_UNLOGGED_BIT {
             new_value = new_value | header_byte::UNLOGGED_BIT;
         }
