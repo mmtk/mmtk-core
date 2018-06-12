@@ -154,6 +154,7 @@ impl Plan for SemiSpace {
                 unsync.copyspace0.prepare(unsync.hi);
                 unsync.copyspace1.prepare(!unsync.hi);
                 unsync.versatile_space.prepare();
+                unsync.vm_space.prepare();
             }
             &Phase::StackRoots => {
                 VMScanning::notify_initial_thread_scan_complete(false, thread_id);
@@ -172,6 +173,7 @@ impl Plan for SemiSpace {
                     unsync.copyspace1.release();
                 }
                 unsync.versatile_space.release();
+                unsync.vm_space.release();
             }
             &Phase::Complete => {
                 plan::set_gc_status(plan::GcStatus::NotInGC);
