@@ -20,6 +20,8 @@ use super::layout::heap_layout::MMAPPER;
 use super::PageResource;
 use std::sync::atomic::Ordering;
 
+use libc::{c_void, memset};
+
 const SPACE_ALIGN: usize = 1 << 19;
 
 #[derive(Debug)]
@@ -135,7 +137,10 @@ impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResour
 
             MMAPPER.ensure_mapped(old, required_pages);
 
-            // FIXME: Zeroing
+            // FIXME: concurrent zeroing
+            if zeroed {
+                unsafe {memset(old.to_ptr_mut() as *mut c_void, 0, bytes);}
+            }
             /*
             if zeroed {
                 if !self.zero_concurrent {
