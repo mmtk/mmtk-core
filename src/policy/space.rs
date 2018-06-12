@@ -209,7 +209,7 @@ impl<PR: PageResource> CommonSpace<PR> {
         // HeapLayout.vmMap.insert(start, extent, descriptor, this);
 
         if DEBUG {
-            debug!("{} {} {} {}", name, start, start + extent, extent);
+            println!("{} {} {} {}", name, start, start + extent, extent);
         }
 
         rtn
