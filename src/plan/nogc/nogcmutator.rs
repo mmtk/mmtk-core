@@ -29,7 +29,11 @@ impl MutatorContext for NoGCMutator {
     }
 
     fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
-        unimplemented!()
+        match allocator {
+            AllocationType::Default => {}
+            // FIXME: other allocation types
+            _ => {}
+        }
     }
 
     fn get_thread_id(&self) -> usize {
