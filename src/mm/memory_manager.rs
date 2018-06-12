@@ -90,6 +90,13 @@ pub unsafe fn alloc_slow(mutator: *mut c_void, size: usize,
 }
 
 #[no_mangle]
+pub extern fn post_alloc(mutator: *mut c_void, refer: ObjectReference, type_refer: ObjectReference,
+                         bytes: usize, allocator: Allocator) {
+    let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
+    local.post_alloc(refer, type_refer, bytes, allocator);
+}
+
+#[no_mangle]
 pub unsafe extern fn mmtk_malloc(size: usize) -> *mut c_void {
     alloc(null_mut(), size, 1, 0, Allocator::Default)
 }

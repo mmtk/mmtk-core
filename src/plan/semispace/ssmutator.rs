@@ -4,7 +4,7 @@ use ::util::alloc::BumpAllocator;
 use ::plan::mutator_context::MutatorContext;
 use ::plan::Phase;
 use ::plan::semispace;
-use ::util::Address;
+use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
 use ::plan::plan;
@@ -53,6 +53,11 @@ impl MutatorContext for SSMutator {
             _ => { self.vs.alloc_slow(size, align, offset) }
         }
     }
+
+    fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
+        unimplemented!()
+    }
+
     fn get_thread_id(&self) -> usize {
         debug_assert!(self.ss.thread_id == self.vs.thread_id);
         self.ss.thread_id

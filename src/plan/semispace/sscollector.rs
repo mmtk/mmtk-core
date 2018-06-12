@@ -118,11 +118,10 @@ impl CollectorContext for SSCollector {
     fn post_copy(&self, object: ObjectReference, rvm_type: Address, bytes: usize, allocator: ::plan::Allocator) {
         clear_forwarding_bits(object);
         match allocator {
-            ::plan::Allocator::Los => {
-                let unsync = unsafe { &mut *(super::ss::PLAN.unsync.get()) };
-                unsync.versatile_space.initialize_header(object); // FIXME: has anotehr parameter: false
+            ::plan::Allocator::Default => {},
+            _ => {
+                panic!("Currently we can't copy to other spaces other than copyspace")
             },
-            _ => (),
         }
     }
 }
