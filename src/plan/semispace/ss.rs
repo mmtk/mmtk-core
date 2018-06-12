@@ -65,7 +65,7 @@ impl Plan for SemiSpace {
     fn new() -> Self {
         SemiSpace {
             unsync: UnsafeCell::new(SemiSpaceUnsync {
-                hi: true,
+                hi: false,
                 vm_space: create_vm_space(),
                 copyspace0: CopySpace::new("copyspace0", false, true,
                                            VMRequest::RequestFraction {
