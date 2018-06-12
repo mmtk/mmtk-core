@@ -10,6 +10,7 @@ use ::plan::Allocator as AllocationType;
 use ::plan::plan;
 use ::vm::{Collection, VMCollection};
 use ::util::heap::{PageResource, MonotonePageResource};
+use ::plan::selected_plan::PLAN;
 
 #[repr(C)]
 pub struct SSMutator {
@@ -55,7 +56,14 @@ impl MutatorContext for SSMutator {
     }
 
     fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
-        unimplemented!()
+        match allocator {
+            AllocationType::Default => {}
+            _ => {
+                // FIXME: data race on immortalspace.mark_state !!!
+                let unsync = unsafe { &*PLAN.unsync.get() };
+                unsync.versatile_space.initialize_header(refer);
+            }
+        }
     }
 
     fn get_thread_id(&self) -> usize {
