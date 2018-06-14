@@ -10,7 +10,7 @@ use ::plan::Allocator as AllocationType;
 use ::plan::plan;
 use ::vm::{Collection, VMCollection};
 use ::util::heap::{PageResource, MonotonePageResource};
-use ::plan::selected_plan::PLAN;
+use ::plan::semispace::PLAN;
 
 #[repr(C)]
 pub struct SSMutator {
@@ -60,7 +60,7 @@ impl MutatorContext for SSMutator {
             AllocationType::Default => {}
             _ => {
                 // FIXME: data race on immortalspace.mark_state !!!
-                let unsync = unsafe { &*PLAN.unsync.get() };
+                let unsync = unsafe { &*PLAN.unsync.get()  };
                 unsync.versatile_space.initialize_header(refer);
             }
         }
