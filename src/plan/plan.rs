@@ -168,6 +168,8 @@ pub trait Plan {
     fn force_full_heap_collection(&self) {
 
     }
+
+    fn is_valid_ref(&self, object: ObjectReference) -> bool;
 }
 
 #[derive(PartialEq)]

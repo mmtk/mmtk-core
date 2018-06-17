@@ -92,4 +92,15 @@ impl Plan for NoGC {
         let unsync = unsafe { &*self.unsync.get() };
         unsync.space.reserved_pages()
     }
+
+    fn is_valid_ref(&self, object: ObjectReference) -> bool {
+        let unsync = unsafe { &*self.unsync.get() };
+        if unsync.space.in_space(object) {
+            return true;
+        }
+        if unsync.vm_space.in_space(object) {
+            return true;
+        }
+        return false;
+    }
 }

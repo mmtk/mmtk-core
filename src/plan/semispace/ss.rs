@@ -125,6 +125,21 @@ impl Plan for SemiSpace {
         false
     }
 
+    fn is_valid_ref(&self, object: ObjectReference) -> bool {
+        println!("{}", object);
+        let unsync = unsafe { &*self.unsync.get() };
+        if unsync.versatile_space.in_space(object) {
+            return true;
+        }
+        if unsync.vm_space.in_space(object) {
+            return true;
+        }
+        if self.tospace().in_space(object) {
+            return true;
+        }
+        return false;
+    }
+
     unsafe fn collection_phase(&self, thread_id: usize, phase: &Phase) {
         let unsync = &mut *self.unsync.get();
 
@@ -177,6 +192,7 @@ impl Plan for SemiSpace {
             }
             &Phase::Complete => {
                 plan::set_gc_status(plan::GcStatus::NotInGC);
+                println!("Finished one GC")
             }
             _ => {
                 panic!("Global phase not handled!")

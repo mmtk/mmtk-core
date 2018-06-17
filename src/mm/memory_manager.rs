@@ -110,6 +110,11 @@ pub extern fn will_never_move(object: ObjectReference) -> bool {
 }
 
 #[no_mangle]
+pub unsafe extern fn is_valid_ref(val: ObjectReference) -> bool {
+    selected_plan::PLAN.is_valid_ref(val)
+}
+
+#[no_mangle]
 pub unsafe extern fn report_delayed_root_edge(trace_local: *mut c_void, addr: *mut c_void) {
     trace!("JikesRVM called report_delayed_root_edge with trace_local={:?}", trace_local);
     let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
