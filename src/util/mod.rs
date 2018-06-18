@@ -11,6 +11,7 @@ pub mod header_byte;
 pub mod logger;
 pub mod constants;
 pub mod global_pool;
+pub mod sanity;
 mod synchronized_counter;
 
 pub use self::address::Address;

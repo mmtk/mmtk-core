@@ -15,6 +15,7 @@ use ::plan::Phase;
 use ::plan::trace::Trace;
 use ::util::ObjectReference;
 use ::util::alloc::allocator::determine_collection_attempts;
+use ::util::sanity::sanity_checker::SanityChecker;
 
 use ::util::heap::VMRequest;
 
@@ -48,7 +49,7 @@ pub struct SemiSpaceUnsync {
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
-
+    sanity_checker: SanityChecker,
     // FIXME: This should be inside HeapGrowthManager
     total_pages: usize,
 
@@ -82,6 +83,7 @@ impl Plan for SemiSpace {
                                                         frac: 1.0/3.0,
                                                         top:  false,
                                                     }),
+                sanity_checker: SanityChecker::new(),
                 total_pages: 0,
                 collection_attempt: 0,
             }),
@@ -164,6 +166,10 @@ impl Plan for SemiSpace {
                 plan::STACKS_PREPARED.store(true, atomic::Ordering::Relaxed);
             }
             &Phase::Prepare => {
+                if cfg!(feature = "sanity") {
+                    println!("Pre GC sanity check");
+                    unsync.sanity_checker.check(thread_id);
+                }
                 unsync.hi = !unsync.hi; // flip the semi-spaces
                 // prepare each of the collected regions
                 unsync.copyspace0.prepare(unsync.hi);
@@ -191,6 +197,10 @@ impl Plan for SemiSpace {
                 unsync.vm_space.release();
             }
             &Phase::Complete => {
+                if cfg!(feature = "sanity") {
+                    println!("Post GC sanity check");
+                    unsync.sanity_checker.check(thread_id);
+                }
                 plan::set_gc_status(plan::GcStatus::NotInGC);
                 println!("Finished one GC")
             }

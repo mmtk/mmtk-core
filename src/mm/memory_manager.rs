@@ -29,6 +29,7 @@ use ::plan::Allocator;
 use util::constants::LOG_BYTES_IN_PAGE;
 use util::heap::layout::vm_layout_constants::HEAP_START;
 use util::heap::layout::vm_layout_constants::HEAP_END;
+use ::util::sanity::sanity_checker::{INSIDE_SANITY, SanityChecker};
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
@@ -117,26 +118,44 @@ pub unsafe extern fn is_valid_ref(val: ObjectReference) -> bool {
 #[no_mangle]
 pub unsafe extern fn report_delayed_root_edge(trace_local: *mut c_void, addr: *mut c_void) {
     trace!("JikesRVM called report_delayed_root_edge with trace_local={:?}", trace_local);
-    let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
-    local.report_delayed_root_edge(Address::from_usize(addr as usize));
+    if cfg!(feature = "sanity") && INSIDE_SANITY.load(Ordering::Relaxed) {
+        let local = &mut *(trace_local as *mut SanityChecker);
+        local.report_delayed_root_edge(Address::from_usize(addr as usize));
+    } else {
+        let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
+        local.report_delayed_root_edge(Address::from_usize(addr as usize));
+    }
     trace!("report_delayed_root_edge returned with trace_local={:?}", trace_local);
 }
 
 #[no_mangle]
 pub unsafe extern fn will_not_move_in_current_collection(trace_local: *mut c_void, obj: *mut c_void) -> bool {
     trace!("will_not_move_in_current_collection({:?}, {:?})", trace_local, obj);
-    let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
-    let ret = local.will_not_move_in_current_collection(Address::from_usize(obj as usize).to_object_reference());
-    trace!("will_not_move_in_current_collection returned with trace_local={:?}", trace_local);
-    ret
+    if cfg!(feature = "sanity") && INSIDE_SANITY.load(Ordering::Relaxed) {
+        let local = &mut *(trace_local as *mut SanityChecker);
+        let ret = local.will_not_move_in_current_collection(Address::from_usize(obj as usize).to_object_reference());
+        trace!("will_not_move_in_current_collection returned with trace_local={:?}", trace_local);
+        ret
+    } else {
+        let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
+        let ret = local.will_not_move_in_current_collection(Address::from_usize(obj as usize).to_object_reference());
+        trace!("will_not_move_in_current_collection returned with trace_local={:?}", trace_local);
+        ret
+    }
 }
 
 #[no_mangle]
 pub unsafe extern fn process_interior_edge(trace_local: *mut c_void, target: *mut c_void, slot: *mut c_void, root: bool) {
     trace!("JikesRVM called process_interior_edge with trace_local={:?}", trace_local);
-    let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
-    local.process_interior_edge(Address::from_usize(target as usize).to_object_reference(),
-                                Address::from_usize(slot as usize), root);
+    if cfg!(feature = "sanity") && INSIDE_SANITY.load(Ordering::Relaxed) {
+        let local = &mut *(trace_local as *mut SanityChecker);
+        local.process_interior_edge(Address::from_usize(target as usize).to_object_reference(),
+                                     Address::from_usize(slot as usize), root);
+    } else {
+        let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
+        local.process_interior_edge(Address::from_usize(target as usize).to_object_reference(),
+                                    Address::from_usize(slot as usize), root);
+    }
     trace!("process_interior_root_edge returned with trace_local={:?}", trace_local);
 
 }
