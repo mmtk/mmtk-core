@@ -128,7 +128,6 @@ impl Plan for SemiSpace {
     }
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool {
-        println!("{}", object);
         let unsync = unsafe { &*self.unsync.get() };
         if unsync.versatile_space.in_space(object) {
             return true;
