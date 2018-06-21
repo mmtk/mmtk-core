@@ -16,6 +16,7 @@ use ::plan::trace::Trace;
 use ::util::ObjectReference;
 use ::util::alloc::allocator::determine_collection_attempts;
 use ::util::sanity::sanity_checker::SanityChecker;
+use ::util::sanity::memory_scan;
 
 use ::util::heap::VMRequest;
 
@@ -199,6 +200,8 @@ impl Plan for SemiSpace {
                 if cfg!(feature = "sanity") {
                     println!("Post GC sanity check");
                     unsync.sanity_checker.check(thread_id);
+                    println!("Post GC memory scan");
+                    memory_scan::scan_region();
                 }
                 plan::set_gc_status(plan::GcStatus::NotInGC);
                 println!("Finished one GC")
@@ -221,6 +224,10 @@ impl Plan for SemiSpace {
     fn get_pages_used(&self) -> usize {
         let unsync = unsafe{&*self.unsync.get()};
         self.tospace().reserved_pages() + unsync.versatile_space.reserved_pages()
+    }
+
+    fn is_bad_ref(&self, object: ObjectReference) -> bool {
+        self.fromspace().in_space(object)
     }
 }
 

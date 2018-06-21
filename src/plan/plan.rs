@@ -170,6 +170,8 @@ pub trait Plan {
     }
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool;
+
+    fn is_bad_ref(&self, object: ObjectReference) -> bool;
 }
 
 #[derive(PartialEq)]

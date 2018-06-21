@@ -103,4 +103,8 @@ impl Plan for NoGC {
         }
         return false;
     }
+
+    fn is_bad_ref(&self, object: ObjectReference) -> bool {
+        false
+    }
 }
