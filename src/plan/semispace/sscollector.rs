@@ -98,7 +98,9 @@ impl CollectorContext for SSCollector {
                 // FIXME
             }
             &Phase::ForwardRefs => {
-                // FIXME
+                if cfg!(feature = "jikesrvm") {
+                    ::vm::jikesrvm::JikesRVM::forward_refs(&mut self.trace, self.id);
+                }
             }
             &Phase::ForwardFinalizable => {
                 // FIXME
