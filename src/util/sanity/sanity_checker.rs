@@ -143,4 +143,8 @@ impl TraceLocal for SanityChecker{
     fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool {
         return true;
     }
+
+    fn is_live(&self, object: ObjectReference) -> bool {
+        unimplemented!()
+    }
 }
