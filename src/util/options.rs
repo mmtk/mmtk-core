@@ -120,6 +120,7 @@ options!{
     use_short_stack_scans: bool                 [always_valid] = false,
     use_return_barrier:    bool                 [always_valid] = false,
     eager_complete_sweep:  bool                 [always_valid] = false,
+    ignore_system_g_c:      bool                 [always_valid] = false,
     nursery_zeroing:       NurseryZeroingOptions[always_valid] = NurseryZeroingOptions::Temporal,
     verbose:               usize                [always_valid] = 0,
     stress_factor:         usize                [always_valid] = usize::max_value() >> LOG_BYTES_IN_PAGE,
@@ -142,6 +143,8 @@ impl Options {
         }
 
         let result = set_from_str(self, sr.as_str(), val);
+
+        trace!("Trying to process option pair: ({})", sr);
 
         if result {
             trace!("Validation passed");

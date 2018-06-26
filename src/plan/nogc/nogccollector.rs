@@ -6,6 +6,8 @@ use super::super::TraceLocal;
 use super::super::Phase;
 use super::super::Allocator;
 
+use std::process;
+
 use ::util::{Address, ObjectReference};
 
 pub struct NoGCCollector {
@@ -45,7 +47,8 @@ impl<'a> CollectorContext for NoGCCollector {
     }
 
     fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
-        panic!("GC triggered in NoGC plan");
+        println!("GC triggered in NoGC plan");
+        process::exit(128);
     }
 
     fn get_id(&self) -> usize {
@@ -61,7 +64,8 @@ impl ParallelCollector for NoGCCollector {
     }
 
     fn collect(&self) {
-        panic!("GC triggered in NoGC plan");
+        println!("GC triggered in NoGC plan");
+        process::exit(128);
     }
 
     fn get_current_trace(&mut self) -> &mut NoGCTraceLocal {
