@@ -45,6 +45,7 @@ extern void trace_get_forwarded_reference(MMTk_TraceLocal trace_local, void* obj
 extern void gc_init(size_t heap_size);
 extern bool will_never_move(void* object);
 extern bool process(char* name, char* value);
+extern void scan_region();
 
 /**
  * JikesRVM-specific

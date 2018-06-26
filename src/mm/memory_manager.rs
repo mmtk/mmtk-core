@@ -250,6 +250,11 @@ pub extern fn executable() -> bool {
 }
 
 #[no_mangle]
+pub unsafe extern fn scan_region(){
+    ::util::sanity::memory_scan::scan_region();
+}
+
+#[no_mangle]
 pub unsafe extern fn trace_get_forwarded_referent(trace_local: *mut c_void, object: ObjectReference) -> ObjectReference{
     let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
     local.get_forwarded_reference(object)
