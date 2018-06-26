@@ -14,4 +14,7 @@ pub trait TraceLocal: TransitiveClosure {
 
     fn report_delayed_root_edge(&mut self, slot: Address);
     fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool;
+    fn get_forwarded_reference(&mut self, object: ObjectReference) -> ObjectReference {
+        self.trace_object(object)
+    }
 }
