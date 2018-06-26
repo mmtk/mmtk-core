@@ -59,6 +59,7 @@ impl JikesRVM {
         }
     }
 
+    // FIXME refactor reference processing to a separate file
     pub fn forward_refs<T: TraceLocal>(trace: &mut T, thread_id: usize) {
         let trace_ptr = trace as *mut T;
         unsafe {
