@@ -86,16 +86,19 @@ impl CollectorContext for SSCollector {
                 }
             }
             &Phase::SoftRefs => {
-                // FIXME
+                // FIXME Clear refs if noReferenceTypes is true
+                ::vm::jikesrvm::JikesRVM::scan_soft_refs(&mut self.trace, self.id)
             }
             &Phase::WeakRefs => {
-                // FIXME
+                // FIXME Clear refs if noReferenceTypes is true
+                ::vm::jikesrvm::JikesRVM::scan_weak_refs(&mut self.trace, self.id)
             }
             &Phase::Finalizable => {
                 // FIXME
             }
             &Phase::PhantomRefs => {
-                // FIXME
+                // FIXME Clear refs if noReferenceTypes is true
+                ::vm::jikesrvm::JikesRVM::scan_phantom_refs(&mut self.trace, self.id)
             }
             &Phase::ForwardRefs => {
                 if cfg!(feature = "jikesrvm") {
