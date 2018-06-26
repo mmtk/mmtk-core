@@ -15,7 +15,7 @@ use ::policy::copyspace::CopySpace;
 
 use ::util::heap::{PageResource, MonotonePageResource};
 
-use ::vm::{Scanning, VMScanning};
+use ::vm::{Scanning, VMScanning, References, VMReferences};
 
 use ::plan::semispace::PLAN;
 
@@ -87,23 +87,21 @@ impl CollectorContext for SSCollector {
             }
             &Phase::SoftRefs => {
                 // FIXME Clear refs if noReferenceTypes is true
-                ::vm::jikesrvm::JikesRVM::scan_soft_refs(&mut self.trace, self.id)
+                VMReferences::scan_soft_refs(&mut self.trace, self.id)
             }
             &Phase::WeakRefs => {
                 // FIXME Clear refs if noReferenceTypes is true
-                ::vm::jikesrvm::JikesRVM::scan_weak_refs(&mut self.trace, self.id)
+                VMReferences::scan_soft_refs(&mut self.trace, self.id)
             }
             &Phase::Finalizable => {
                 // FIXME
             }
             &Phase::PhantomRefs => {
                 // FIXME Clear refs if noReferenceTypes is true
-                ::vm::jikesrvm::JikesRVM::scan_phantom_refs(&mut self.trace, self.id)
+                VMReferences::scan_soft_refs(&mut self.trace, self.id)
             }
             &Phase::ForwardRefs => {
-                if cfg!(feature = "jikesrvm") {
-                    ::vm::jikesrvm::JikesRVM::forward_refs(&mut self.trace, self.id);
-                }
+                VMReferences::scan_soft_refs(&mut self.trace, self.id)
             }
             &Phase::ForwardFinalizable => {
                 // FIXME

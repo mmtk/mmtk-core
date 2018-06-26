@@ -22,6 +22,7 @@ pub mod active_plan;
 pub mod heap_layout_constants;
 pub mod boot_image_size;
 pub mod scan_sanity;
+pub mod references;
 
 use ::util::address::Address;
 use plan::TraceLocal;
@@ -58,34 +59,4 @@ impl JikesRVM {
             jtoc_call!(TEST3_METHOD_OFFSET, BOOT_THREAD, input1, input2, input3, input4)
         }
     }
-
-    // FIXME refactor reference processing to a separate file
-    pub fn forward_refs<T: TraceLocal>(trace: &mut T, thread_id: usize) {
-        let trace_ptr = trace as *mut T;
-        unsafe {
-            jtoc_call!(PROCESS_REFERENCE_TYPES_METHOD_OFFSET, thread_id, trace_ptr, false);
-        }
-    }
-
-    pub fn scan_weak_refs<T: TraceLocal>(trace: &mut T, thread_id: usize) {
-        let trace_ptr = trace as *mut T;
-        unsafe {
-            jtoc_call!(SCAN_WEAK_REFERENCE_TYPE_METHOD_OFFSET, thread_id, trace_ptr, false);
-        }
-    }
-
-    pub fn scan_soft_refs<T: TraceLocal>(trace: &mut T, thread_id: usize) {
-        let trace_ptr = trace as *mut T;
-        unsafe {
-            jtoc_call!(SCAN_SOFT_REFERENCE_TYPE_METHOD_OFFSET, thread_id, trace_ptr, false);
-        }
-    }
-
-    pub fn scan_phantom_refs<T: TraceLocal>(trace: &mut T, thread_id: usize) {
-        let trace_ptr = trace as *mut T;
-        unsafe {
-            jtoc_call!(SCAN_PHANTOM_REFERENCE_TYPE_METHOD_OFFSET, thread_id, trace_ptr, false);
-        }
-    }
-
 }

@@ -2,11 +2,13 @@ mod object_model;
 mod scanning;
 mod collection;
 mod active_plan;
+mod references;
 pub mod unboxed_size_constants;
 pub use self::object_model::ObjectModel;
 pub use self::scanning::Scanning;
 pub use self::collection::Collection;
 pub use self::active_plan::ActivePlan;
+pub use self::references::References;
 
 #[cfg(feature = "jikesrvm")]
 pub mod jikesrvm;
@@ -22,6 +24,9 @@ pub use self::jikesrvm::collection::VMCollection as VMCollection;
 
 #[cfg(feature = "jikesrvm")]
 pub use self::jikesrvm::active_plan::VMActivePlan as VMActivePlan;
+
+#[cfg(feature = "jikesrvm")]
+pub use self::jikesrvm::references::VMReferences as VMReferences;
 
 #[cfg(feature = "jikesrvm")]
 pub use self::jikesrvm::JikesRVM;
@@ -43,3 +48,6 @@ pub use self::openjdk::collection::VMCollection as VMCollection;
 
 #[cfg(feature = "openjdk")]
 pub use self::openjdk::active_plan::VMActivePlan as VMActivePlan;
+
+#[cfg(feature = "openjdk")]
+pub use self::openjdk::references::VMReferences as VMReferences;
