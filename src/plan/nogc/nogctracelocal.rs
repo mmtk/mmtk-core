@@ -45,6 +45,10 @@ impl TraceLocal for NoGCTraceLocal {
     fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool {
         true
     }
+
+    fn is_live(&self, object: ObjectReference) -> bool {
+        return true;
+    }
 }
 
 impl NoGCTraceLocal {

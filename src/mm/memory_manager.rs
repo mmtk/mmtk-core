@@ -265,3 +265,15 @@ pub unsafe extern fn trace_get_forwarded_reference(trace_local: *mut c_void, obj
     let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
     local.get_forwarded_reference(object)
 }
+
+#[no_mangle]
+pub unsafe extern fn trace_is_live(trace_local: *mut c_void, object: ObjectReference) -> bool{
+    let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
+    local.is_live(object)
+}
+
+#[no_mangle]
+pub unsafe extern fn trace_retain_referent(trace_local: *mut c_void, object: ObjectReference) -> ObjectReference{
+    let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
+    local.retain_referent(object)
+}

@@ -149,6 +149,35 @@ impl TraceLocal for SSTraceLocal {
         (unsync.hi && !unsync.copyspace0.in_space(obj)) ||
             (!unsync.hi && !unsync.copyspace1.in_space(obj))
     }
+
+    fn is_live(&self, object: ObjectReference) -> bool {
+        if object.is_null() {
+            return false;
+        }
+        let unsync = unsafe { &(*PLAN.unsync.get()) };
+        if unsync.copyspace0.in_space(object) {
+            if unsync.hi {
+                return unsync.copyspace0.is_live(object);
+            } else {
+                return true;
+            }
+        }
+        if unsync.copyspace1.in_space(object) {
+            if unsync.hi {
+                return true;
+            } else {
+                return unsync.copyspace1.is_live(object);
+            }
+        }
+        // FIXME is it actually alive?
+        if unsync.versatile_space.in_space(object) {
+            return true;
+        }
+        if unsync.vm_space.in_space(object) {
+            return true;
+        }
+        panic!("Invalid space")
+    }
 }
 
 impl SSTraceLocal {
