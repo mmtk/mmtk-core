@@ -18,9 +18,12 @@ use ::util::alloc::allocator::determine_collection_attempts;
 use ::util::sanity::sanity_checker::SanityChecker;
 use ::util::sanity::memory_scan;
 
+use ::util::heap::PageResource;
 use ::util::heap::VMRequest;
 
-use libc::c_void;
+use ::util::constants::LOG_BYTES_IN_PAGE;
+
+use libc::{c_void, memset};
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 
@@ -187,6 +190,13 @@ impl Plan for SemiSpace {
             }
             &Phase::Closure => {}
             &Phase::Release => {
+                if cfg!(feature = "sanity") {
+                    println!("Destroying fromspace");
+                    let fromspace_start = self.fromspace().common().start;
+                    let fromspace_commited = self.fromspace().common().pr.as_ref().unwrap().common().committed.load(Ordering::Relaxed);
+                    let commited_bytes = fromspace_commited * (1 << LOG_BYTES_IN_PAGE);
+                    memset(fromspace_start.as_usize() as *mut c_void, 0xFF, commited_bytes);
+                }
                 // release the collected region
                 if unsync.hi {
                     unsync.copyspace0.release();
