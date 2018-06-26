@@ -35,6 +35,10 @@ extern bool will_not_move_in_current_collection(MMTk_TraceLocal trace_local,
 extern void process_interior_edge(MMTk_TraceLocal trace_local, void* target,
                                   void* slot, bool root);
 
+extern void trace_get_forwarded_referent(MMTk_TraceLocal trace_local, void* obj);
+
+extern void trace_get_forwarded_reference(MMTk_TraceLocal trace_local, void* obj);
+
 /**
  * Misc
  */
