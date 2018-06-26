@@ -48,6 +48,10 @@ impl Space for CopySpace {
         }
         common_mut.pr.as_mut().unwrap().bind_space(me);
     }
+
+    fn is_live(&self, object: ObjectReference) -> bool {
+        ForwardingWord::is_forwarded(object)
+    }
 }
 
 impl CopySpace {

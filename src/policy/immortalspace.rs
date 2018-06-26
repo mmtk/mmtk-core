@@ -49,6 +49,10 @@ impl Space for ImmortalSpace {
         }
         common_mut.pr.as_mut().unwrap().bind_space(me);
     }
+
+    fn is_live(&self, object: ObjectReference) -> bool {
+        return true;
+    }
 }
 
 impl ImmortalSpace {

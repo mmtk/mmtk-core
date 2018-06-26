@@ -108,6 +108,8 @@ pub trait Space: Sized + Debug + 'static {
     // UNSAFE: This get's a mutable reference from self
     // (i.e. make sure their are no concurrent accesses through self when calling this)_
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<Self::PR>;
+
+    fn is_live(&self, object: ObjectReference) -> bool;
 }
 
 #[derive(Debug)]
