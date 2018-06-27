@@ -212,9 +212,9 @@ impl Plan for SemiSpace {
                     unsync.sanity_checker.check(thread_id);
                     println!("Post GC memory scan");
                     memory_scan::scan_region();
+                    println!("Finished one GC");
                 }
                 plan::set_gc_status(plan::GcStatus::NotInGC);
-                println!("Finished one GC")
             }
             _ => {
                 panic!("Global phase not handled!")
