@@ -91,17 +91,17 @@ impl CollectorContext for SSCollector {
             }
             &Phase::WeakRefs => {
                 // FIXME Clear refs if noReferenceTypes is true
-                VMReferences::scan_soft_refs(&mut self.trace, self.id)
+                VMReferences::scan_weak_refs(&mut self.trace, self.id)
             }
             &Phase::Finalizable => {
                 // FIXME
             }
             &Phase::PhantomRefs => {
                 // FIXME Clear refs if noReferenceTypes is true
-                VMReferences::scan_soft_refs(&mut self.trace, self.id)
+                VMReferences::scan_phantom_refs(&mut self.trace, self.id)
             }
             &Phase::ForwardRefs => {
-                VMReferences::scan_soft_refs(&mut self.trace, self.id)
+                VMReferences::forward_refs(&mut self.trace, self.id)
             }
             &Phase::ForwardFinalizable => {
                 // FIXME
