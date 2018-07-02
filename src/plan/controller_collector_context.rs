@@ -56,6 +56,9 @@ impl ControllerCollectorContext {
             debug!("[STWController: Stopping the world...]");
             VMCollection::stop_all_mutators(thread_id);
 
+            // For heap growth logic
+            let user_triggered_collection: bool = SelectedPlan::is_user_triggered_collection();
+
             self.clear_request();
 
             debug!("[STWController: Triggering worker threads...]");
