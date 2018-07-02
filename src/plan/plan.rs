@@ -6,6 +6,7 @@ use std::sync::atomic::{self, AtomicUsize, AtomicBool, Ordering};
 use ::policy::space::Space;
 use ::util::heap::PageResource;
 use ::util::options::OPTION_MAP;
+use ::vm::{Collection, VMCollection, ActivePlan, VMActivePlan};
 
 use super::controller_collector_context::ControllerCollectorContext;
 use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
@@ -20,6 +21,7 @@ use util::Address;
 use util::heap::pageresource::cumulative_committed_pages;
 
 pub static EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
+pub static USER_TRIGGERED_COLLECTION: AtomicBool = AtomicBool::new(false);
 
 lazy_static! {
     pub static ref CONTROL_COLLECTOR_CONTEXT: ControllerCollectorContext = ControllerCollectorContext::new();
@@ -151,11 +153,6 @@ pub trait Plan {
         }
     }
 
-    fn is_user_triggered_collection() -> bool {
-        // FIXME
-        false
-    }
-
     fn is_internal_triggered_collection() -> bool {
         // FIXME
         false
@@ -172,6 +169,22 @@ pub trait Plan {
     fn is_valid_ref(&self, object: ObjectReference) -> bool;
 
     fn is_bad_ref(&self, object: ObjectReference) -> bool;
+
+    fn handle_user_collection_request(thread_id: usize) {
+        if !OPTION_MAP.ignore_system_g_c {
+            USER_TRIGGERED_COLLECTION.store(true, Ordering::Relaxed);
+            CONTROL_COLLECTOR_CONTEXT.request();
+            VMCollection::block_for_gc(thread_id);
+        }
+    }
+
+    fn is_user_triggered_collection() -> bool {
+        return USER_TRIGGERED_COLLECTION.load(Ordering::Relaxed);
+    }
+
+    fn reset_collection_trigger() {
+        USER_TRIGGERED_COLLECTION.store(false, Ordering::Relaxed)
+    }
 }
 
 #[derive(PartialEq)]

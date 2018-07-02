@@ -277,3 +277,8 @@ pub unsafe extern fn trace_retain_referent(trace_local: *mut c_void, object: Obj
     let local = &mut *(trace_local as *mut <SelectedPlan as Plan>::TraceLocalT);
     local.retain_referent(object)
 }
+
+#[no_mangle]
+pub extern fn handle_user_collection_request(thread_id: usize) {
+    selected_plan::SelectedPlan::handle_user_collection_request(thread_id);
+}

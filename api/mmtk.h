@@ -50,6 +50,7 @@ extern void gc_init(size_t heap_size);
 extern bool will_never_move(void* object);
 extern bool process(char* name, char* value);
 extern void scan_region();
+extern void handle_user_collection_request(size_t thread_id);
 
 /**
  * JikesRVM-specific
