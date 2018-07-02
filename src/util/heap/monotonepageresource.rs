@@ -1,5 +1,5 @@
 use std::ptr::null_mut;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use std::sync::atomic::AtomicUsize;
 use std::marker::PhantomData;
 
@@ -122,9 +122,10 @@ impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResour
 
         debug_assert!(rtn >= sync.cursor && rtn < sync.cursor + bytes);
         if tmp > sync.sentinel {
-            trace!("tmp={:?} > sync.sentinel={:?}", tmp, sync.sentinel);
+            //debug!("tmp={:?} > sync.sentinel={:?}", tmp, sync.sentinel);
             return unsafe{Address::zero()};
         } else {
+            //debug!("tmp={:?} <= sync.sentinel={:?}", tmp, sync.sentinel);
             let old = sync.cursor;
             sync.cursor = tmp;
 
@@ -223,9 +224,57 @@ impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
     }
 
     pub fn reset(&self) {
-        let guard = self.sync.lock().unwrap();
+        let mut guard = self.sync.lock().unwrap();
         self.common().reserved.store(0, Ordering::Relaxed);
         self.common().committed.store(0, Ordering::Relaxed);
+        self.release_pages(&mut guard);
         drop(guard);
+    }
+
+    /*/**
+   * Release all pages associated with this page resource, optionally
+   * zeroing on release and optionally memory protecting on release.
+   */
+    @Inline
+    private void releasePages() {
+    if (contiguous) {
+    // TODO: We will perform unnecessary zeroing if the nursery size has decreased.
+    if (zeroConcurrent) {
+    // Wait for current zeroing to finish.
+    while (zeroingCursor.LT(zeroingSentinel)) { }
+    }
+    // Reset zeroing region.
+    if (cursor.GT(zeroingSentinel)) {
+    zeroingSentinel = cursor;
+    }
+    zeroingCursor = start;
+    cursor = start;
+    currentChunk = Conversions.chunkAlign(start, true);
+    } else { /* Not contiguous */
+    if (!cursor.isZero()) {
+    do {
+    Extent bytes = cursor.diff(currentChunk).toWord().toExtent();
+    releasePages(currentChunk, bytes);
+    } while (moveToNextChunk());
+
+    currentChunk = Address.zero();
+    sentinel = Address.zero();
+    cursor = Address.zero();
+    space.releaseAllChunks();
+    }
+    }
+    }*/
+
+    #[inline]
+    fn release_pages(&self, guard: &mut MutexGuard<MonotonePageResourceSync>) {
+        // TODO: concurrent zeroing
+        if self.common().contiguous {
+            guard.cursor = match guard.conditional {
+                MonotonePageResourceConditional::Contiguous { start: _start, zeroing_cursor: _, zeroing_sentinel: _ } => _start,
+                _ => unreachable!(),
+            };
+        } else {
+            unimplemented!()
+        }
     }
 }

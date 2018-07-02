@@ -63,7 +63,7 @@ impl MutatorContext for SSMutator {
             AllocationType::Default => {}
             _ => {
                 // FIXME: data race on immortalspace.mark_state !!!
-                let unsync = unsafe { &*PLAN.unsync.get()  };
+                let unsync = unsafe { &*PLAN.unsync.get() };
                 unsync.versatile_space.initialize_header(refer);
             }
         }

@@ -131,9 +131,6 @@ impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
         } else {
             trace!("Acquired a new block of size {} with start address {}",
                    block_size, acquired_start);
-            unsafe {
-                memset(acquired_start.as_usize() as *mut c_void, 0, block_size);
-            }
             self.set_limit(acquired_start, acquired_start + block_size);
             self.alloc(size, align, offset)
         }
