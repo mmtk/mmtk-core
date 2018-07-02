@@ -171,10 +171,11 @@ pub trait Plan {
     fn is_bad_ref(&self, object: ObjectReference) -> bool;
 
     fn handle_user_collection_request(thread_id: usize) {
-        // FIXME: support options
-        USER_TRIGGERED_COLLECTION.store(true, Ordering::Relaxed);
-        CONTROL_COLLECTOR_CONTEXT.request();
-        VMCollection::block_for_gc(thread_id);
+        if !OPTION_MAP.ignore_system_g_c {
+            USER_TRIGGERED_COLLECTION.store(true, Ordering::Relaxed);
+            CONTROL_COLLECTOR_CONTEXT.request();
+            VMCollection::block_for_gc(thread_id);
+        }
     }
 
     fn is_user_triggered_collection() -> bool {
