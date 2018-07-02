@@ -12,6 +12,7 @@ pub mod logger;
 pub mod constants;
 pub mod global_pool;
 pub mod sanity;
+pub mod stats;
 mod synchronized_counter;
 
 pub use self::address::Address;
