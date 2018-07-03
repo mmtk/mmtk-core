@@ -7,7 +7,7 @@ use ::policy::space::Space;
 use ::util::heap::PageResource;
 use ::util::options::OPTION_MAP;
 use ::vm::{Collection, VMCollection, ActivePlan, VMActivePlan};
-
+use ::util::heap::layout::heap_layout::MMAPPER;
 use super::controller_collector_context::ControllerCollectorContext;
 use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use util::constants::LOG_BYTES_IN_MBYTE;
@@ -184,6 +184,19 @@ pub trait Plan {
 
     fn reset_collection_trigger() {
         USER_TRIGGERED_COLLECTION.store(false, Ordering::Relaxed)
+    }
+
+    fn is_mapped_object(&self, object: ObjectReference) -> bool {
+        if object.is_null() {
+            return false;
+        }
+        if !self.is_valid_ref(object) {
+            return false;
+        }
+        if !MMAPPER.object_is_mapped(object) {
+            return false;
+        }
+        true
     }
 }
 

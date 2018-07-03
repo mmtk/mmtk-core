@@ -282,3 +282,8 @@ pub unsafe extern fn trace_retain_referent(trace_local: *mut c_void, object: Obj
 pub extern fn handle_user_collection_request(thread_id: usize) {
     selected_plan::SelectedPlan::handle_user_collection_request(thread_id);
 }
+
+#[no_mangle]
+pub extern fn is_mapped_object(object: ObjectReference) -> bool {
+    selected_plan::PLAN.is_mapped_object(object)
+}
