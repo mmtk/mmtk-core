@@ -179,7 +179,7 @@ pub trait Allocator<PR: PageResource> {
                 drop(guard);
                 trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
-                    VMCollection::out_of_memory();
+                    VMCollection::out_of_memory(thread_id);
                     trace!("Not reached");
                 }
             }

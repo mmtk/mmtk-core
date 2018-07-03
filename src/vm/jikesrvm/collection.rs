@@ -44,6 +44,12 @@ impl Collection for VMCollection {
             jtoc_call!(PREPARE_MUTATOR_METHOD_OFFSET, thread_id, mutator_thread);
         }
     }
+
+    fn out_of_memory(thread_id: usize) {
+        unsafe {
+            jtoc_call!(OUT_OF_MEMORY_METHOD_OFFSET, thread_id);
+        }
+    }
 }
 
 impl VMCollection {
