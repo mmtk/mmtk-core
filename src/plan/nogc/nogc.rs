@@ -107,4 +107,15 @@ impl Plan for NoGC {
     fn is_bad_ref(&self, object: ObjectReference) -> bool {
         false
     }
+
+    fn is_movable(&self, object: ObjectReference) -> bool {
+        let unsync = unsafe { &*self.unsync.get() };
+        if unsync.space.in_space(object) {
+            return unsync.space.is_movable();
+        }
+        if unsync.vm_space.in_space(object) {
+            return unsync.vm_space.is_movable();
+        }
+        return true;
+    }
 }

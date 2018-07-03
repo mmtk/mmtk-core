@@ -239,6 +239,23 @@ impl Plan for SemiSpace {
     fn is_bad_ref(&self, object: ObjectReference) -> bool {
         self.fromspace().in_space(object)
     }
+
+    fn is_movable(&self, object: ObjectReference) -> bool {
+        let unsync = unsafe { &*self.unsync.get() };
+        if unsync.vm_space.in_space(object) {
+            return unsync.vm_space.is_movable();
+        }
+        if unsync.copyspace0.in_space(object) {
+            return unsync.copyspace0.is_movable();
+        }
+        if unsync.copyspace1.in_space(object) {
+            return unsync.copyspace1.is_movable();
+        }
+        if unsync.versatile_space.in_space(object) {
+            return unsync.versatile_space.is_movable();
+        }
+        return true;
+    }
 }
 
 impl SemiSpace {

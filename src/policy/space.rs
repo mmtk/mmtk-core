@@ -110,6 +110,7 @@ pub trait Space: Sized + Debug + 'static {
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<Self::PR>;
 
     fn is_live(&self, object: ObjectReference) -> bool;
+    fn is_movable(&self) -> bool;
 }
 
 #[derive(Debug)]

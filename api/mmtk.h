@@ -23,6 +23,7 @@ extern void post_alloc(MMTk_Mutator mutator, void* refer, void* type_refer,
 
 extern bool is_valid_ref(void* ref);
 extern bool is_mapped_object(void* ref);
+extern void modify_check(void* ref);
 
 /**
  * Tracing

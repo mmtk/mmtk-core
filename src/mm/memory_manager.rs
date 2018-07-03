@@ -287,3 +287,8 @@ pub extern fn handle_user_collection_request(thread_id: usize) {
 pub extern fn is_mapped_object(object: ObjectReference) -> bool {
     selected_plan::PLAN.is_mapped_object(object)
 }
+
+#[no_mangle]
+pub extern fn modify_check(object: ObjectReference) {
+    selected_plan::PLAN.modify_check(object);
+}

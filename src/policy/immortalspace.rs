@@ -53,6 +53,10 @@ impl Space for ImmortalSpace {
     fn is_live(&self, object: ObjectReference) -> bool {
         return true;
     }
+
+    fn is_movable(&self) -> bool {
+        false
+    }
 }
 
 impl ImmortalSpace {

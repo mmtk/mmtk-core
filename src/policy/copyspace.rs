@@ -52,6 +52,10 @@ impl Space for CopySpace {
     fn is_live(&self, object: ObjectReference) -> bool {
         ForwardingWord::is_forwarded(object)
     }
+
+    fn is_movable(&self) -> bool {
+        true
+    }
 }
 
 impl CopySpace {

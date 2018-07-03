@@ -198,6 +198,16 @@ pub trait Plan {
         }
         true
     }
+
+    fn modify_check(&self, object: ObjectReference) {
+        if gc_in_progress_proper() {
+            if self.is_movable(object) {
+                panic!("GC modifying a potentially moving object via Java (i.e. not magic) obj= {}", object);
+            }
+        }
+    }
+
+    fn is_movable(&self, object: ObjectReference) -> bool;
 }
 
 #[derive(PartialEq)]
