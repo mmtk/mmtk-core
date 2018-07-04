@@ -40,8 +40,11 @@ impl MutatorContext for SSMutator {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
-        debug_assert!(self.ss.get_space().unwrap() as *const _ == PLAN.tospace() as *const _);
         trace!("MutatorContext.alloc({}, {}, {}, {:?})", size, align, offset, allocator);
+        debug_assert!(self.ss.get_space().unwrap() as *const _ == PLAN.tospace() as *const _,
+                      "bumpallocator holds wrong space, ss.space: {:?}, tospace: {:?}",
+                      self.ss.get_space().unwrap() as *const _,
+                      PLAN.tospace() as *const _);
         match allocator {
             AllocationType::Default => { self.ss.alloc(size, align, offset) }
             _ => { self.vs.alloc(size, align, offset) }
@@ -50,7 +53,10 @@ impl MutatorContext for SSMutator {
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         trace!("MutatorContext.alloc_slow({}, {}, {}, {:?})", size, align, offset, allocator);
-        debug_assert!(self.ss.get_space().unwrap() as *const _ == PLAN.tospace() as *const _);
+        debug_assert!(self.ss.get_space().unwrap() as *const _ == PLAN.tospace() as *const _,
+                      "bumpallocator holds wrong space, ss.space: {:?}, tospace: {:?}",
+                      self.ss.get_space().unwrap() as *const _,
+                      PLAN.tospace() as *const _);
         match allocator {
             AllocationType::Default => { self.ss.alloc_slow(size, align, offset) }
             _ => { self.vs.alloc_slow(size, align, offset) }
