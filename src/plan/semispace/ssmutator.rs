@@ -42,7 +42,8 @@ impl MutatorContext for SSMutator {
     fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         trace!("MutatorContext.alloc({}, {}, {}, {:?})", size, align, offset, allocator);
         debug_assert!(self.ss.get_space().unwrap() as *const _ == PLAN.tospace() as *const _,
-                      "bumpallocator holds wrong space, ss.space: {:?}, tospace: {:?}",
+                      "bumpallocator {:?} holds wrong space, ss.space: {:?}, tospace: {:?}",
+                      self as *const _,
                       self.ss.get_space().unwrap() as *const _,
                       PLAN.tospace() as *const _);
         match allocator {
@@ -54,7 +55,8 @@ impl MutatorContext for SSMutator {
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         trace!("MutatorContext.alloc_slow({}, {}, {}, {:?})", size, align, offset, allocator);
         debug_assert!(self.ss.get_space().unwrap() as *const _ == PLAN.tospace() as *const _,
-                      "bumpallocator holds wrong space, ss.space: {:?}, tospace: {:?}",
+                      "bumpallocator {:?} holds wrong space, ss.space: {:?}, tospace: {:?}",
+                      self as *const _,
                       self.ss.get_space().unwrap() as *const _,
                       PLAN.tospace() as *const _);
         match allocator {
