@@ -17,7 +17,8 @@ use ::util::ObjectReference;
 use ::util::alloc::allocator::determine_collection_attempts;
 use ::util::sanity::sanity_checker::SanityChecker;
 use ::util::sanity::memory_scan;
-
+use ::util::heap::layout::heap_layout::MMAPPER;
+use ::util::Address;
 use ::util::heap::PageResource;
 use ::util::heap::VMRequest;
 
@@ -255,6 +256,20 @@ impl Plan for SemiSpace {
             return unsync.versatile_space.is_movable();
         }
         return true;
+    }
+
+    fn is_mapped_address(&self, address: Address) -> bool {
+        let unsync = unsafe { &*self.unsync.get() };
+        if unsafe{
+            unsync.vm_space.in_space(address.to_object_reference())  ||
+            unsync.versatile_space.in_space(address.to_object_reference()) ||
+            unsync.copyspace0.in_space(address.to_object_reference()) ||
+            unsync.copyspace1.in_space(address.to_object_reference())
+        } {
+            return MMAPPER.address_is_mapped(address);
+        } else {
+            return false;
+        }
     }
 }
 

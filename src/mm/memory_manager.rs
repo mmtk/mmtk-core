@@ -289,6 +289,11 @@ pub extern fn is_mapped_object(object: ObjectReference) -> bool {
 }
 
 #[no_mangle]
+pub extern fn is_mapped_address(address: Address) -> bool {
+    selected_plan::PLAN.is_mapped_address(address)
+}
+
+#[no_mangle]
 pub extern fn modify_check(object: ObjectReference) {
     selected_plan::PLAN.modify_check(object);
 }

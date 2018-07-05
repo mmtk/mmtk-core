@@ -4,6 +4,8 @@ use ::plan::controller_collector_context::ControllerCollectorContext;
 use ::plan::{Plan, Phase};
 use ::util::ObjectReference;
 use ::util::heap::VMRequest;
+use ::util::heap::layout::heap_layout::MMAPPER;
+use ::util::Address;
 
 use std::cell::UnsafeCell;
 use std::thread;
@@ -106,6 +108,18 @@ impl Plan for NoGC {
 
     fn is_bad_ref(&self, object: ObjectReference) -> bool {
         false
+    }
+
+    fn is_mapped_address(&self, address: Address) -> bool {
+        let unsync = unsafe { &*self.unsync.get() };
+        if unsafe {
+            unsync.space.in_space(address.to_object_reference()) ||
+            unsync.vm_space.in_space(address.to_object_reference())
+        } {
+            return MMAPPER.address_is_mapped(address);
+        } else {
+            return false;
+        }
     }
 
     fn is_movable(&self, object: ObjectReference) -> bool {

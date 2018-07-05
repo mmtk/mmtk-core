@@ -199,6 +199,8 @@ pub trait Plan {
         true
     }
 
+    fn is_mapped_address(&self, address: Address) -> bool;
+
     fn modify_check(&self, object: ObjectReference) {
         if gc_in_progress_proper() {
             if self.is_movable(object) {
