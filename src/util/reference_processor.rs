@@ -22,14 +22,27 @@ const INITIAL_SIZE: usize = 256;
 pub struct ReferenceProcessor {
     // XXX: To support the possibility of the collector working
     //      on the reference in parallel, we wrap the structure
-    //      in an UnsafeCell.+
+    //      in an UnsafeCell.
     sync: UnsafeCell<Mutex<ReferenceprocessorSync>>,
+
+    /**
+     * Semantics
+     */
+    semantics: Semantics,
 }
+
+unsafe impl Sync for ReferenceProcessor {}
 
 pub enum Semantics {
     SOFT,
     WEAK,
     PHANTOM,
+}
+
+lazy_static! {
+    static ref soft_reference_processor: ReferenceProcessor = ReferenceProcessor::new(Semantics::SOFT);
+    static ref weak_reference_processor: ReferenceProcessor = ReferenceProcessor::new(Semantics::WEAK);
+    static ref phantom_reference_processor: ReferenceProcessor = ReferenceProcessor::new(Semantics::PHANTOM);
 }
 
 struct ReferenceprocessorSync {
@@ -54,27 +67,28 @@ struct ReferenceprocessorSync {
      * the reference nursery.
      */
     nursery_index: usize,
-
-    /**
-     * Index of the first free slot in the reference table.
-     */
-    max_index: usize,
-
-    /**
-     * Semantics
-     */
-    semantics: Semantics,
 }
 
 impl ReferenceProcessor {
-    pub fn new(semantics: Semantics) -> Self {
+    fn new(semantics: Semantics) -> Self {
         ReferenceProcessor {
             sync: UnsafeCell::new(Mutex::new(ReferenceprocessorSync {
                 references: Vec::with_capacity(INITIAL_SIZE),
                 nursery_index: 0,
-                max_index: 0,
-                semantics,
             })),
+            semantics,
         }
+    }
+
+    pub fn get(semantics: Semantics) -> &'static Self {
+        match semantics {
+            Semantics::SOFT => &soft_reference_processor,
+            Semantics::WEAK => &weak_reference_processor,
+            Semantics::PHANTOM => &phantom_reference_processor,
+        }
+    }
+
+    pub fn add_candidate(&self) {
+
     }
 }
