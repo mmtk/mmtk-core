@@ -167,7 +167,7 @@ impl Plan for SemiSpace {
                 plan::set_gc_status(plan::GcStatus::GcPrepare);
             }
             &Phase::PrepareStacks => {
-                plan::STACKS_PREPARED.store(true, atomic::Ordering::Relaxed);
+                plan::STACKS_PREPARED.store(true, atomic::Ordering::SeqCst);
             }
             &Phase::Prepare => {
                 if cfg!(feature = "sanity") {

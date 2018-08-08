@@ -220,6 +220,7 @@ pub enum GcStatus {
 }
 
 pub static INITIALIZED: AtomicBool = AtomicBool::new(false);
+// FIXME should probably not use static mut
 static mut GC_STATUS: GcStatus = GcStatus::NotInGC;
 static LAST_STRESS_PAGES: AtomicUsize = AtomicUsize::new(0);
 pub static STACKS_PREPARED: AtomicBool = AtomicBool::new(false);
@@ -335,8 +336,14 @@ lazy_static! {
 }
 
 pub fn set_gc_status(s: GcStatus) {
-    // FIXME
+    if unsafe { GC_STATUS == GcStatus::NotInGC } {
+        STACKS_PREPARED.store(false, Ordering::SeqCst);
+        // FIXME stats
+    }
     unsafe { GC_STATUS = s };
+    if unsafe { GC_STATUS == GcStatus::NotInGC } {
+        // FIXME stats
+    }
 }
 
 pub fn stacks_prepared() -> bool {
