@@ -2,7 +2,7 @@
 #[macro_export]
 macro_rules! jtoc_call {
     ($offset:ident, $thread_id:expr $(, $arg:ident)*) => ({
-        let call_addr = (JTOC_BASE + $offset).load::<fn()>();
+        let call_addr = (::vm::jikesrvm::JTOC_BASE + $offset).load::<fn()>();
         jikesrvm_call!(call_addr, $thread_id $(, $arg)*)
     });
 }

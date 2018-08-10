@@ -3,13 +3,16 @@ use std::cell::UnsafeCell;
 use std::vec::Vec;
 
 use ::util::{Address, ObjectReference};
-use ::vm::{ReferenceGlue, VMReferenceGlue};
+use ::util::options::OPTION_MAP;
+use ::vm::{ActivePlan, VMActivePlan, ReferenceGlue, VMReferenceGlue};
+use ::plan::{Plan, TraceLocal, MutatorContext};
+use ::plan::selected_plan::SelectedPlan;
 
 // Debug flags
-const TRACE: bool = false;
-const TRACE_UNREACHABLE: bool = false;
-const TRACE_DETAIL: bool = false;
-const TRACE_FORWARD: bool = false;
+pub const TRACE: bool = false;
+pub const TRACE_UNREACHABLE: bool = false;
+pub const TRACE_DETAIL: bool = false;
+pub const TRACE_FORWARD: bool = false;
 
 // XXX: We differ from the original implementation
 //      by ignoring "stress," i.e. where the array
@@ -34,6 +37,7 @@ pub struct ReferenceProcessor {
 
 unsafe impl Sync for ReferenceProcessor {}
 
+#[derive(Debug, PartialEq)]
 pub enum Semantics {
     SOFT,
     WEAK,
@@ -55,13 +59,12 @@ struct ReferenceprocessorSync {
      */
     references: Vec<Address>,
 
-    /*
+    /**
      * In a MarkCompact (or similar) collector, we need to update the {@code references}
      * field, and then update its contents.  We implement this by saving the pointer in
      * this untraced field for use during the {@code forward} pass.
      */
-    //unforwarded_references: Vec<Address>,
-    // XXX: ^ Necessary?
+    unforwarded_references: Option<Vec<Address>>,
 
     /**
      * Index into the <code>references</code> table for the start of
@@ -75,6 +78,7 @@ impl ReferenceProcessor {
         ReferenceProcessor {
             sync: UnsafeCell::new(Mutex::new(ReferenceprocessorSync {
                 references: Vec::with_capacity(INITIAL_SIZE),
+                unforwarded_references: None,
                 nursery_index: 0,
             })),
             semantics,
@@ -105,6 +109,103 @@ impl ReferenceProcessor {
         VMReferenceGlue::set_referent(reff, referent);
         sync.references.push(reff.to_address());
     }
+
+    fn forward<T: TraceLocal>(&self, trace: &mut T, nursery: bool) {
+        let mut sync = unsafe { self.sync_mut() };
+        let references: &mut Vec<Address> = &mut sync.references;
+        // XXX: Copies `unforwarded_references` out. Should be fine since it's not accessed
+        //      concurrently & it's set to `None` at the end anyway..
+        let mut unforwarded_references: Vec<Address> = sync.unforwarded_references.clone().unwrap();
+        if TRACE { trace!("Starting ReferenceProcessor.forward({:?})", self.semantics); }
+        if TRACE_DETAIL {
+            trace!("{:?} Reference table is {:?}", self.semantics, references);
+            trace!("{:?} unforwardedReferences is {:?}", self.semantics, unforwarded_references);
+        }
+
+        for i in 0 .. references.len() {
+            let reference = unsafe { unforwarded_references[i].to_object_reference() };
+            if TRACE_DETAIL { trace!("slot {:?}: forwarding {:?}", i, reference); }
+            VMReferenceGlue::set_referent(reference, trace.get_forwarded_referent(
+                VMReferenceGlue::get_referent(reference)));
+            let new_reference = trace.get_forwarded_reference(reference);
+            unforwarded_references[i] = new_reference.to_address();
+        }
+
+        if TRACE { trace!("Ending ReferenceProcessor.forward({:?})", self.semantics) }
+        sync.unforwarded_references = None;
+    }
+
+    fn scan<T: TraceLocal>(&self, trace: &mut T, nursery: bool, retain: bool, thread_id: usize) {
+        let sync = unsafe { self.sync_mut() };
+        sync.unforwarded_references = Some(sync.references.clone());
+        let references: &mut Vec<Address> = &mut sync.references;
+
+        if TRACE { trace!("Starting ReferenceProcessor.scan({:?})", self.semantics); }
+        let mut to_index = if nursery { sync.nursery_index } else { 0 };
+
+        if TRACE_DETAIL { trace!("{:?} Reference table is {:?}", self.semantics, references); }
+        if retain {
+            for from_index in to_index .. references.len() {
+                let reference = unsafe { references[from_index].to_object_reference() };
+                self.retain_referent(trace, reference);
+            }
+        } else {
+            for from_index in to_index .. references.len() {
+                let reference = unsafe { references[from_index].to_object_reference() };
+
+                /* Determine liveness (and forward if necessary) the reference */
+                let new_reference = VMReferenceGlue::process_reference(trace, reference, thread_id);
+                if !new_reference.is_null() {
+                    references[to_index] = new_reference.to_address();
+                    to_index += 1;
+                    if TRACE_DETAIL {
+                        let index = to_index - 1;
+                        trace!("SCANNED {} {:?} -> {:?}", index, references[index],
+                               unsafe { references[index].to_object_reference() });
+                    }
+                }
+            }
+            if OPTION_MAP.verbose >= 3 {
+                trace!("{:?} references: {} -> {}", self.semantics, references.len(), to_index);
+            }
+            sync.nursery_index = to_index;
+        }
+
+        /* flush out any remset entries generated during the above activities */
+        unsafe { VMActivePlan::mutator(thread_id).flush_remembered_sets(); }
+        if TRACE { trace!("Ending ReferenceGlue.scan({:?})", self.semantics); }
+    }
+
+    /**
+     * This method deals only with soft references. It retains the referent
+     * if the reference is definitely reachable.
+     * @param reference the address of the reference. This may or may not
+     * be the address of a heap object, depending on the VM.
+     * @param trace the thread local trace element.
+     */
+    fn retain_referent<T: TraceLocal>(&self, trace: &mut T, reference: ObjectReference) {
+        debug_assert!(!reference.is_null());
+        debug_assert!(self.semantics == Semantics::SOFT);
+
+        if TRACE_DETAIL { trace!("Processing reference: {:?}", reference); }
+
+        if !trace.is_live(reference) {
+            /*
+             * Reference is currently unreachable but may get reachable by the
+             * following trace. We postpone the decision.
+             */
+            return;
+        }
+
+        /*
+         * Reference is definitely reachable.  Retain the referent.
+         */
+        let referent = VMReferenceGlue::get_referent(reference);
+        if !referent.is_null() {
+            trace.retain_referent(referent);
+        }
+        if TRACE_DETAIL { trace!(" ~> {:?} (retained)", referent.to_address()); }
+    }
 }
 
 pub fn add_soft_candidate(reff: ObjectReference, referent: ObjectReference) {
@@ -117,4 +218,23 @@ pub fn add_weak_candidate(reff: ObjectReference, referent: ObjectReference) {
 
 pub fn add_phantom_candidate(reff: ObjectReference, referent: ObjectReference) {
     PHANTOM_REFERENCE_PROCESSOR.add_candidate(reff, referent);
+}
+
+pub fn forward_refs<T: TraceLocal>(trace: &mut T) {
+    SOFT_REFERENCE_PROCESSOR.forward(trace, false);
+    WEAK_REFERENCE_PROCESSOR.forward(trace, false);
+    PHANTOM_REFERENCE_PROCESSOR.forward(trace, false);
+}
+
+pub fn scan_weak_refs<T: TraceLocal>(trace: &mut T, thread_id: usize) {
+    SOFT_REFERENCE_PROCESSOR.scan(trace, false, false, thread_id);
+    WEAK_REFERENCE_PROCESSOR.scan(trace, false, false, thread_id);
+}
+
+pub fn scan_soft_refs<T: TraceLocal>(trace: &mut T, thread_id: usize) {
+    SOFT_REFERENCE_PROCESSOR.scan(trace, false, false, thread_id);
+}
+
+pub fn scan_phantom_refs<T: TraceLocal>(trace: &mut T, thread_id: usize) {
+    PHANTOM_REFERENCE_PROCESSOR.scan(trace, false, false, thread_id);
 }

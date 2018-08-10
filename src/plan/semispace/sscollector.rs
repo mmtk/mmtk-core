@@ -11,11 +11,13 @@ use ::util::alloc::BumpAllocator;
 use ::util::{Address, ObjectReference};
 use ::util::forwarding_word::clear_forwarding_bits;
 
+use ::util::reference_processor::*;
+
 use ::policy::copyspace::CopySpace;
 
 use ::util::heap::{PageResource, MonotonePageResource};
 
-use ::vm::{Scanning, VMScanning, References, VMReferences};
+use ::vm::{Scanning, VMScanning};
 
 use ::plan::semispace::PLAN;
 
@@ -87,21 +89,21 @@ impl CollectorContext for SSCollector {
             }
             &Phase::SoftRefs => {
                 // FIXME Clear refs if noReferenceTypes is true
-                VMReferences::scan_soft_refs(&mut self.trace, self.id)
+                scan_soft_refs(&mut self.trace, self.id)
             }
             &Phase::WeakRefs => {
                 // FIXME Clear refs if noReferenceTypes is true
-                VMReferences::scan_weak_refs(&mut self.trace, self.id)
+                scan_weak_refs(&mut self.trace, self.id)
             }
             &Phase::Finalizable => {
                 // FIXME
             }
             &Phase::PhantomRefs => {
                 // FIXME Clear refs if noReferenceTypes is true
-                VMReferences::scan_phantom_refs(&mut self.trace, self.id)
+                scan_phantom_refs(&mut self.trace, self.id)
             }
             &Phase::ForwardRefs => {
-                VMReferences::forward_refs(&mut self.trace, self.id)
+                forward_refs(&mut self.trace)
             }
             &Phase::ForwardFinalizable => {
                 // FIXME

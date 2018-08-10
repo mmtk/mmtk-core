@@ -90,6 +90,12 @@ extern bool   executable();
 
 //  Last_gc_time();
 
+/**
+ * Reference Processing
+ */
+extern void add_weak_candidate(void* ref, void* referent);
+extern void add_soft_candidate(void* ref, void* referent);
+extern void add_phantom_candidate(void* ref, void* referent);
 
 #ifdef __cplusplus
 }
