@@ -27,7 +27,7 @@ pub struct ReferenceProcessor {
     // XXX: To support the possibility of the collector working
     //      on the reference in parallel, we wrap the structure
     //      in an UnsafeCell.
-    sync: UnsafeCell<Mutex<ReferenceprocessorSync>>,
+    sync: UnsafeCell<Mutex<ReferenceProcessorSync>>,
 
     /**
      * Semantics
@@ -50,7 +50,7 @@ lazy_static! {
     static ref PHANTOM_REFERENCE_PROCESSOR: ReferenceProcessor = ReferenceProcessor::new(Semantics::PHANTOM);
 }
 
-struct ReferenceprocessorSync {
+struct ReferenceProcessorSync {
     // XXX: A data race on any of these fields is UB. If
     //      parallelizing this code, change the types to
     //      have the correct semantics.
@@ -76,7 +76,7 @@ struct ReferenceprocessorSync {
 impl ReferenceProcessor {
     fn new(semantics: Semantics) -> Self {
         ReferenceProcessor {
-            sync: UnsafeCell::new(Mutex::new(ReferenceprocessorSync {
+            sync: UnsafeCell::new(Mutex::new(ReferenceProcessorSync {
                 references: Vec::with_capacity(INITIAL_SIZE),
                 unforwarded_references: None,
                 nursery_index: 0,
@@ -85,14 +85,14 @@ impl ReferenceProcessor {
         }
     }
 
-    fn sync(&self) -> &Mutex<ReferenceprocessorSync> {
+    fn sync(&self) -> &Mutex<ReferenceProcessorSync> {
         unsafe {
             &*self.sync.get()
         }
     }
 
     // UNSAFE: Bypasses mutex
-    unsafe fn sync_mut(&self) -> &mut ReferenceprocessorSync {
+    unsafe fn sync_mut(&self) -> &mut ReferenceProcessorSync {
         (&mut *self.sync.get()).get_mut().unwrap()
     }
 
@@ -169,11 +169,12 @@ impl ReferenceProcessor {
                 trace!("{:?} references: {} -> {}", self.semantics, references.len(), to_index);
             }
             sync.nursery_index = to_index;
+            references.truncate(to_index);
         }
 
         /* flush out any remset entries generated during the above activities */
         unsafe { VMActivePlan::mutator(thread_id).flush_remembered_sets(); }
-        if TRACE { trace!("Ending ReferenceGlue.scan({:?})", self.semantics); }
+        if TRACE { trace!("Ending ReferenceProcessor.scan({:?})", self.semantics); }
     }
 
     /**
