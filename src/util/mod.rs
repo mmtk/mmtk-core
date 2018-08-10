@@ -14,7 +14,7 @@ pub mod global_pool;
 pub mod sanity;
 pub mod stats;
 mod synchronized_counter;
-mod reference_processor;
+pub mod reference_processor;
 
 pub use self::address::Address;
 pub use self::address::ObjectReference;

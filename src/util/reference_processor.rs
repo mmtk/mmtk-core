@@ -2,7 +2,8 @@ use std::sync::Mutex;
 use std::cell::UnsafeCell;
 use std::vec::Vec;
 
-use ::util::Address;
+use ::util::{Address, ObjectReference};
+use ::vm::{ReferenceGlue, VMReferenceGlue};
 
 // Debug flags
 const TRACE: bool = false;
@@ -40,9 +41,9 @@ pub enum Semantics {
 }
 
 lazy_static! {
-    static ref soft_reference_processor: ReferenceProcessor = ReferenceProcessor::new(Semantics::SOFT);
-    static ref weak_reference_processor: ReferenceProcessor = ReferenceProcessor::new(Semantics::WEAK);
-    static ref phantom_reference_processor: ReferenceProcessor = ReferenceProcessor::new(Semantics::PHANTOM);
+    static ref SOFT_REFERENCE_PROCESSOR: ReferenceProcessor = ReferenceProcessor::new(Semantics::SOFT);
+    static ref WEAK_REFERENCE_PROCESSOR: ReferenceProcessor = ReferenceProcessor::new(Semantics::WEAK);
+    static ref PHANTOM_REFERENCE_PROCESSOR: ReferenceProcessor = ReferenceProcessor::new(Semantics::PHANTOM);
 }
 
 struct ReferenceprocessorSync {
@@ -80,15 +81,40 @@ impl ReferenceProcessor {
         }
     }
 
-    pub fn get(semantics: Semantics) -> &'static Self {
-        match semantics {
-            Semantics::SOFT => &soft_reference_processor,
-            Semantics::WEAK => &weak_reference_processor,
-            Semantics::PHANTOM => &phantom_reference_processor,
+    fn sync(&self) -> &Mutex<ReferenceprocessorSync> {
+        unsafe {
+            &*self.sync.get()
         }
     }
 
-    pub fn add_candidate(&self) {
-
+    // UNSAFE: Bypasses mutex
+    unsafe fn sync_mut(&self) -> &mut ReferenceprocessorSync {
+        (&mut *self.sync.get()).get_mut().unwrap()
     }
+
+    pub fn get(semantics: Semantics) -> &'static Self {
+        match semantics {
+            Semantics::SOFT => &SOFT_REFERENCE_PROCESSOR,
+            Semantics::WEAK => &WEAK_REFERENCE_PROCESSOR,
+            Semantics::PHANTOM => &PHANTOM_REFERENCE_PROCESSOR,
+        }
+    }
+
+    fn add_candidate(&self, reff: ObjectReference, referent: ObjectReference) {
+        let mut sync = self.sync().lock().unwrap();
+        VMReferenceGlue::set_referent(reff, referent);
+        sync.references.push(reff.to_address());
+    }
+}
+
+pub fn add_soft_candidate(reff: ObjectReference, referent: ObjectReference) {
+    SOFT_REFERENCE_PROCESSOR.add_candidate(reff, referent);
+}
+
+pub fn add_weak_candidate(reff: ObjectReference, referent: ObjectReference) {
+    WEAK_REFERENCE_PROCESSOR.add_candidate(reff, referent);
+}
+
+pub fn add_phantom_candidate(reff: ObjectReference, referent: ObjectReference) {
+    PHANTOM_REFERENCE_PROCESSOR.add_candidate(reff, referent);
 }

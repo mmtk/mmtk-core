@@ -297,3 +297,24 @@ pub extern fn is_mapped_address(address: Address) -> bool {
 pub extern fn modify_check(object: ObjectReference) {
     selected_plan::PLAN.modify_check(object);
 }
+
+#[no_mangle]
+pub unsafe extern fn add_weak_candidate(reff: *mut c_void, referent: *mut c_void) {
+    ::util::reference_processor::add_weak_candidate(
+        Address::from_mut_ptr(reff).to_object_reference(),
+        Address::from_mut_ptr(referent).to_object_reference());
+}
+
+#[no_mangle]
+pub unsafe extern fn add_soft_candidate(reff: *mut c_void, referent: *mut c_void) {
+    ::util::reference_processor::add_soft_candidate(
+        Address::from_mut_ptr(reff).to_object_reference(),
+        Address::from_mut_ptr(referent).to_object_reference());
+}
+
+#[no_mangle]
+pub unsafe extern fn add_phantom_candidate(reff: *mut c_void, referent: *mut c_void) {
+    ::util::reference_processor::add_phantom_candidate(
+        Address::from_mut_ptr(reff).to_object_reference(),
+        Address::from_mut_ptr(referent).to_object_reference());
+}
