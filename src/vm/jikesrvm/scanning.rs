@@ -13,6 +13,9 @@ use super::super::{ActivePlan, VMActivePlan};
 use super::collection::VMCollection;
 use std::mem::size_of;
 use std::slice;
+use ::vm::jikesrvm::java_header::TIB_OFFSET;
+use ::vm::jikesrvm::tib_layout_constants::TIB_TYPE_INDEX;
+use ::vm::unboxed_size_constants::BYTES_IN_ADDRESS;
 
 static COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
@@ -22,13 +25,16 @@ const DUMP_REF: bool = false;
 
 impl Scanning for VMScanning {
     fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, thread_id: usize) {
-        let obj_ptr = object.value();
         if DUMP_REF {
+            let obj_ptr = object.value();
             unsafe { jtoc_call!(DUMP_REF_METHOD_OFFSET, thread_id, obj_ptr); }
         }
-        trace!("VMScanning::jtoc_call(, {:?}, {:?})", object, thread_id);
+        trace!("Getting reference array");
         let elt0_ptr: usize = unsafe {
-            jtoc_call!(GET_OFFSET_ARRAY_METHOD_OFFSET, thread_id, obj_ptr)
+            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
+            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
+                .load::<usize>());
+            (rvm_type + REFERENCE_OFFSETS_FIELD_OFFSET).load::<usize>()
         };
         trace!("elt0_ptr: {}", elt0_ptr);
         if elt0_ptr == 0 {
