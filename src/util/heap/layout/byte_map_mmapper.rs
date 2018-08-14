@@ -92,10 +92,22 @@ impl Mmapper for ByteMapMmapper {
         }
     }
 
+    /**
+     * Return {@code true} if the given object has been mmapped
+     *
+     * @param object The object in question.
+     * @return {@code true} if the given object has been mmapped
+     */
     fn object_is_mapped(&self, object: ObjectReference) -> bool {
         self.address_is_mapped(VMObjectModel::ref_to_address(object))
     }
 
+    /**
+     * Return {@code true} if the given address has been mmapped
+     *
+     * @param addr The address in question.
+     * @return {@code true} if the given address has been mmapped
+     */
     fn address_is_mapped(&self, addr: Address) -> bool {
         let chunk = Self::address_to_mmap_chunks_down(addr);
         self.mapped[chunk].load(Ordering::Relaxed) == MAPPED
@@ -137,27 +149,6 @@ impl ByteMapMmapper {
             lock: Mutex::new(()),
             mapped: unsafe{transmute([UNMAPPED; MMAP_NUM_CHUNKS])},
         }
-    }
-
-    /**
-   * Return {@code true} if the given address has been mmapped
-   *
-   * @param addr The address in question.
-   * @return {@code true} if the given address has been mmapped
-   */
-    pub fn address_is_mapped(&self, addr: Address) -> bool {
-        let chunk = Self::address_to_mmap_chunks_down(addr);
-        self.mapped[chunk].load(Ordering::Relaxed) == MAPPED
-    }
-
-    /**
-     * Return {@code true} if the given object has been mmapped
-     *
-     * @param object The object in question.
-     * @return {@code true} if the given object has been mmapped
-     */
-    pub fn object_is_mapped(&self, object: ObjectReference) -> bool {
-        self.address_is_mapped(VMObjectModel::ref_to_address(object))
     }
 
     fn bytes_to_mmap_chunks_up(bytes: usize) -> usize {
