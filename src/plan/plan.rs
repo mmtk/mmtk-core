@@ -8,6 +8,7 @@ use ::util::heap::PageResource;
 use ::util::options::OPTION_MAP;
 use ::vm::{Collection, VMCollection, ActivePlan, VMActivePlan};
 use ::util::heap::layout::heap_layout::MMAPPER;
+use ::util::heap::layout::Mmapper;
 use super::controller_collector_context::ControllerCollectorContext;
 use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use util::constants::LOG_BYTES_IN_MBYTE;

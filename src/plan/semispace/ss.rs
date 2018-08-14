@@ -18,6 +18,7 @@ use ::util::alloc::allocator::determine_collection_attempts;
 use ::util::sanity::sanity_checker::SanityChecker;
 use ::util::sanity::memory_scan;
 use ::util::heap::layout::heap_layout::MMAPPER;
+use ::util::heap::layout::Mmapper;
 use ::util::Address;
 use ::util::heap::PageResource;
 use ::util::heap::VMRequest;

@@ -5,6 +5,7 @@ use ::plan::{Plan, Phase};
 use ::util::ObjectReference;
 use ::util::heap::VMRequest;
 use ::util::heap::layout::heap_layout::MMAPPER;
+use ::util::heap::layout::Mmapper;
 use ::util::Address;
 
 use std::cell::UnsafeCell;
