@@ -238,7 +238,7 @@ impl ObjectModel for VMObjectModel {
     fn attempt_available_bits(object: ObjectReference, old: usize, new: usize) -> bool {
         trace!("ObjectModel.attempt_available_bits");
         let loc = unsafe {
-            &*((object.to_address() + STATUS_OFFSET).as_usize() as *mut AtomicUsize)
+            &*((object.to_address() + STATUS_OFFSET).as_usize() as *const AtomicUsize)
         };
         // XXX: Relaxed in OK on failure, right??
         loc.compare_exchange(old, new, Ordering::Release, Ordering::Relaxed).is_ok()
@@ -247,7 +247,7 @@ impl ObjectModel for VMObjectModel {
     fn prepare_available_bits(object: ObjectReference) -> usize {
         trace!("ObjectModel.prepare_available_bits");
         let loc = unsafe {
-            &*((object.to_address() + STATUS_OFFSET).as_usize() as *mut AtomicUsize)
+            &*((object.to_address() + STATUS_OFFSET).as_usize() as *const AtomicUsize)
         };
         loc.load(Ordering::Acquire)
     }
