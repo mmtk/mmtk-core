@@ -88,25 +88,37 @@ impl CollectorContext for SSCollector {
                 }
             }
             &Phase::SoftRefs => {
-                // FIXME Clear refs if noReferenceTypes is true
-                scan_soft_refs(&mut self.trace, self.id)
+                if primary {
+                    // FIXME Clear refs if noReferenceTypes is true
+                    scan_soft_refs(&mut self.trace, self.id)
+                }
             }
             &Phase::WeakRefs => {
-                // FIXME Clear refs if noReferenceTypes is true
-                scan_weak_refs(&mut self.trace, self.id)
+                if primary {
+                    // FIXME Clear refs if noReferenceTypes is true
+                    scan_weak_refs(&mut self.trace, self.id)
+                }
             }
             &Phase::Finalizable => {
-                // FIXME
+                if primary {
+                    // FIXME
+                }
             }
             &Phase::PhantomRefs => {
-                // FIXME Clear refs if noReferenceTypes is true
-                scan_phantom_refs(&mut self.trace, self.id)
+                if primary {
+                    // FIXME Clear refs if noReferenceTypes is true
+                    scan_phantom_refs(&mut self.trace, self.id)
+                }
             }
             &Phase::ForwardRefs => {
-                forward_refs(&mut self.trace)
+                if primary {
+                    forward_refs(&mut self.trace)
+                }
             }
             &Phase::ForwardFinalizable => {
-                // FIXME
+                if primary {
+                    // FIXME
+                }
             }
             &Phase::Complete => {
             }
