@@ -1,8 +1,5 @@
 #![feature(asm)]
 #![feature(const_fn)]
-#![feature(const_atomic_usize_new)]
-#![feature(const_atomic_bool_new)]
-#![feature(const_min_value)]
 #![feature(integer_atomics)]
 
 #[macro_use]
