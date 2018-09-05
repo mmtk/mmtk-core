@@ -1,9 +1,11 @@
-use ::vm::{ActivePlan, VMActivePlan};
 use ::plan;
-use ::plan::{Plan, MutatorContext, SelectedPlan, CollectorContext, ParallelCollector};
-use std::sync::Mutex;
-use std::sync::atomic::AtomicUsize;
+use ::plan::{CollectorContext, MutatorContext, ParallelCollector, Plan, SelectedPlan};
+use ::vm::{ActivePlan, VMActivePlan};
 use std::sync::atomic;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 
 #[derive(Clone)]
 #[derive(PartialEq)]
@@ -59,14 +61,14 @@ pub enum Phase {
     Empty,
 }
 
-static mut EVEN_SCHEDULED_PHASE: (Schedule, Phase) = (Schedule::Empty, Phase::Empty);
-static mut ODD_SCHEDULED_PHASE: (Schedule, Phase) = (Schedule::Empty, Phase::Empty);
-static mut EVEN_MUTATOR_RESET_RENDEZVOUS: bool = false;
-static mut ODD_MUTATOR_RESET_RENDEZVOUS: bool = false;
+static EVEN_MUTATOR_RESET_RENDEZVOUS: AtomicBool = AtomicBool::new(false);
+static ODD_MUTATOR_RESET_RENDEZVOUS: AtomicBool = AtomicBool::new(false);
 static COMPLEX_PHASE_CURSOR: AtomicUsize = AtomicUsize::new(0);
 
 lazy_static! {
     static ref PHASE_STACK: Mutex<Vec<(Schedule, Phase)>> = Mutex::new(vec![]);
+    static ref EVEN_SCHEDULED_PHASE: Mutex<(Schedule, Phase)> = Mutex::new((Schedule::Empty, Phase::Empty));
+    static ref ODD_SCHEDULED_PHASE: Mutex<(Schedule, Phase)> = Mutex::new((Schedule::Empty, Phase::Empty));
 }
 
 // FIXME: It's probably unsafe to call most of these functions, because thread_id
@@ -100,13 +102,13 @@ fn process_phase_stack(thread_id: usize, resume: bool) {
         set_next_phase(false, get_next_phase(), false);
     }
     collector.rendezvous();
-    let (mut schedule, mut phase) = get_current_phase(is_even_phase);
-    while {
+    loop {
         let cp = get_current_phase(is_even_phase);
-        schedule = cp.0;
-        phase = cp.1;
-        phase != Phase::Empty
-    } {
+        let schedule = cp.0;
+        let phase = cp.1;
+        if phase == Phase::Empty {
+            break;
+        }
         // FIXME timer
         match schedule {
             Schedule::Global => {
@@ -156,7 +158,11 @@ fn process_phase_stack(thread_id: usize, resume: bool) {
 }
 
 fn get_current_phase(is_even_phase: bool) -> (Schedule, Phase) {
-    unsafe { if is_even_phase { EVEN_SCHEDULED_PHASE.clone() } else { ODD_SCHEDULED_PHASE.clone() } }
+    if is_even_phase {
+        (*EVEN_SCHEDULED_PHASE.lock().unwrap()).clone()
+    } else {
+        (*ODD_SCHEDULED_PHASE.lock().unwrap()).clone()
+    }
 }
 
 fn get_next_phase() -> (Schedule, Phase) {
@@ -209,15 +215,11 @@ fn set_next_phase(is_even_phase: bool,
                   scheduled_phase: (Schedule, Phase),
                   needs_reset_rendezvous: bool) {
     if is_even_phase {
-        unsafe {
-            ODD_SCHEDULED_PHASE = scheduled_phase;
-            EVEN_MUTATOR_RESET_RENDEZVOUS = needs_reset_rendezvous;
-        }
+        *ODD_SCHEDULED_PHASE.lock().unwrap() = scheduled_phase;
+        EVEN_MUTATOR_RESET_RENDEZVOUS.store(needs_reset_rendezvous, Ordering::Relaxed);
     } else {
-        unsafe {
-            EVEN_SCHEDULED_PHASE = scheduled_phase;
-            ODD_MUTATOR_RESET_RENDEZVOUS = needs_reset_rendezvous;
-        }
+        *EVEN_SCHEDULED_PHASE.lock().unwrap() = scheduled_phase;
+        ODD_MUTATOR_RESET_RENDEZVOUS.store(needs_reset_rendezvous, Ordering::Relaxed);
     }
 }
 
@@ -226,5 +228,9 @@ pub fn push_scheduled_phase(scheduled_phase: (Schedule, Phase)) {
 }
 
 fn needs_mutator_reset_rendevous(is_even_phase: bool) -> bool {
-    unsafe { if is_even_phase { EVEN_MUTATOR_RESET_RENDEZVOUS } else { ODD_MUTATOR_RESET_RENDEZVOUS } }
+    if is_even_phase {
+        EVEN_MUTATOR_RESET_RENDEZVOUS.load(Ordering::Relaxed)
+    } else {
+        ODD_MUTATOR_RESET_RENDEZVOUS.load(Ordering::Relaxed)
+    }
 }
