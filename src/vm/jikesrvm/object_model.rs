@@ -36,6 +36,12 @@ static HASH_TRANSITION2: AtomicUsize = AtomicUsize::new(0);
 /** Whether to pack bytes and shorts into 32bit fields*/
 const PACKED: bool = true;
 
+// FIXME [ZC]: There are places we use Address::load<> instead of atomics operations
+// where the memory location is indeed accessed by multiple threads (collector/mutator).
+// Compiler optimizations and compiler/hardware reordering will affect the correctness of the
+// emitted code.
+// This is perhaps more serious with Rust release build or on machines with weaker memory models.
+
 pub struct VMObjectModel {}
 
 impl ObjectModel for VMObjectModel {
@@ -241,6 +247,9 @@ impl ObjectModel for VMObjectModel {
             &*((object.to_address() + STATUS_OFFSET).as_usize() as *const AtomicUsize)
         };
         // XXX: Relaxed in OK on failure, right??
+        // FIXME: [ZC] What about weak/strong compare_exchange?
+        // And what about CAS?
+        // We use this function in a loop, where the weaker version might be more suitable
         loc.compare_exchange(old, new, Ordering::Release, Ordering::Relaxed).is_ok()
     }
 
@@ -253,8 +262,13 @@ impl ObjectModel for VMObjectModel {
     }
 
     // XXX: Supposedly none of the 4 methods below need to use atomic loads/stores
+    // FIXME: [ZC] read/write to a byte/word is atomic on hardware level does NOT
+    // prevent compiler optimization/reordering and hardware reordering
+    // For example, the use of read_available_byte in a loop in a loop might be eliminated
+    // Common subexpression elimination might also combine multiple reads into one
     fn write_available_byte(object: ObjectReference, val: u8) {
         trace!("ObjectModel.write_available_byte");
+        // FIXME
         unsafe {
             (object.to_address() + AVAILABLE_BITS_OFFSET).store::<u8>(val);
         }
@@ -262,6 +276,7 @@ impl ObjectModel for VMObjectModel {
 
     fn read_available_byte(object: ObjectReference) -> u8 {
         trace!("ObjectModel.read_available_byte");
+        // FIXME
         unsafe {
             (object.to_address() + AVAILABLE_BITS_OFFSET).load::<u8>()
         }
@@ -269,6 +284,7 @@ impl ObjectModel for VMObjectModel {
 
     fn write_available_bits_word(object: ObjectReference, val: usize) {
         trace!("ObjectModel.write_available_bits_word");
+        // FIXME
         unsafe {
             (object.to_address() + STATUS_OFFSET).store::<usize>(val);
         }
@@ -276,6 +292,7 @@ impl ObjectModel for VMObjectModel {
 
     fn read_available_bits_word(object: ObjectReference) -> usize {
         trace!("ObjectModel.read_available_bits_word");
+        // FIXME
         unsafe {
             (object.to_address() + STATUS_OFFSET).load::<usize>()
         }
