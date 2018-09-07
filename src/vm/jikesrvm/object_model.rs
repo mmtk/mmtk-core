@@ -22,7 +22,7 @@ use ::util::alloc::allocator::fill_alignment_gap;
 use ::util::constants::{};
 use ::plan::{Allocator, CollectorContext};
 use std::mem::size_of;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, AtomicU8, Ordering};
 
 /** Should we gather stats on hash code state transitions for address-based hashing? */
 const HASH_STATS: bool = false;
@@ -250,7 +250,7 @@ impl ObjectModel for VMObjectModel {
         // FIXME: [ZC] What about weak/strong compare_exchange?
         // And what about CAS?
         // We use this function in a loop, where the weaker version might be more suitable
-        loc.compare_exchange(old, new, Ordering::Release, Ordering::Relaxed).is_ok()
+        loc.compare_exchange(old, new, Ordering::SeqCst, Ordering::SeqCst).is_ok()
     }
 
     fn prepare_available_bits(object: ObjectReference) -> usize {
@@ -258,7 +258,7 @@ impl ObjectModel for VMObjectModel {
         let loc = unsafe {
             &*((object.to_address() + STATUS_OFFSET).as_usize() as *const AtomicUsize)
         };
-        loc.load(Ordering::Acquire)
+        loc.load(Ordering::SeqCst)
     }
 
     // XXX: Supposedly none of the 4 methods below need to use atomic loads/stores
@@ -268,34 +268,34 @@ impl ObjectModel for VMObjectModel {
     // Common subexpression elimination might also combine multiple reads into one
     fn write_available_byte(object: ObjectReference, val: u8) {
         trace!("ObjectModel.write_available_byte");
-        // FIXME
-        unsafe {
-            (object.to_address() + AVAILABLE_BITS_OFFSET).store::<u8>(val);
-        }
+        let loc = unsafe {
+            &*((object.to_address() + AVAILABLE_BITS_OFFSET).as_usize() as *const AtomicU8)
+        };
+        loc.store(val, Ordering::SeqCst);
     }
 
     fn read_available_byte(object: ObjectReference) -> u8 {
         trace!("ObjectModel.read_available_byte");
-        // FIXME
-        unsafe {
-            (object.to_address() + AVAILABLE_BITS_OFFSET).load::<u8>()
-        }
+        let loc = unsafe {
+            &*((object.to_address() + AVAILABLE_BITS_OFFSET).as_usize() as *const AtomicU8)
+        };
+        loc.load(Ordering::SeqCst)
     }
 
     fn write_available_bits_word(object: ObjectReference, val: usize) {
         trace!("ObjectModel.write_available_bits_word");
-        // FIXME
-        unsafe {
-            (object.to_address() + STATUS_OFFSET).store::<usize>(val);
-        }
+        let loc = unsafe {
+            &*((object.to_address() + STATUS_OFFSET).as_usize() as *const AtomicUsize)
+        };
+        loc.store(val, Ordering::SeqCst);
     }
 
     fn read_available_bits_word(object: ObjectReference) -> usize {
         trace!("ObjectModel.read_available_bits_word");
-        // FIXME
-        unsafe {
-            (object.to_address() + STATUS_OFFSET).load::<usize>()
-        }
+        let loc = unsafe {
+            &*((object.to_address() + STATUS_OFFSET).as_usize() as *const AtomicUsize)
+        };
+        loc.load(Ordering::SeqCst)
     }
 
     fn GC_HEADER_OFFSET() -> isize {
