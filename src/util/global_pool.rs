@@ -1,22 +1,20 @@
 use std::thread;
 use std::sync::mpsc;
-use crossbeam_deque::{Deque, Steal, Stealer};
+use crossbeam_deque::{self as deque, Steal, Stealer};
 
 pub fn new<T: 'static>(name: &'static str) -> (Stealer<T>, mpsc::Sender<T>) where T: Send {
-    let d = Deque::new();
+    let (w, s) = deque::fifo();
     let (tx, rx) = mpsc::channel();
-    let stealer = d.stealer().clone();
     thread::spawn(move || {
         loop {
             let recv = rx.recv();
             match recv {
                 Ok(work) => {
-                    d.push(work);
-                    trace!("GlobalPool({}) len: {}", name, d.len());
+                    w.push(work);
                 },
                 Err(_) => break
             }
         }
     });
-    (stealer, tx)
+    (s, tx)
 }
