@@ -37,6 +37,9 @@ impl Scanning for VMScanning {
             (rvm_type + REFERENCE_OFFSETS_FIELD_OFFSET).load::<usize>()
         };
         trace!("elt0_ptr: {}", elt0_ptr);
+        // In a primitive array this field points to a zero-length array.
+        // In a reference array this field is null.
+        // In a class with pointers, it contains the offsets of reference-containing instance fields
         if elt0_ptr == 0 {
             // object is a REFARRAY
             let length = VMObjectModel::get_array_length(object);
