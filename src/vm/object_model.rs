@@ -1,9 +1,11 @@
 use ::util::{Address, ObjectReference};
 use ::plan::Allocator;
 
+use libc::c_void;
+
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/vm/ObjectModel.java
 pub trait ObjectModel {
-    fn copy(from: ObjectReference, allocator: Allocator, thread_id: usize) -> ObjectReference;
+    fn copy(from: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference;
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address;
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference;
     fn get_size_when_copied(object: ObjectReference) -> usize;

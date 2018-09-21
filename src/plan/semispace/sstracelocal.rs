@@ -10,10 +10,12 @@ use crossbeam_deque::{Steal, Stealer};
 use super::ss;
 use ::plan::semispace::PLAN;
 
+use libc::c_void;
+
 const PUSH_BACK_THRESHOLD: usize = 50;
 
 pub struct SSTraceLocal {
-    thread_id: usize,
+    tls: *mut c_void,
     values: Vec<ObjectReference>,
     values_pool: (Stealer<ObjectReference>, Sender<ObjectReference>),
     root_locations: Vec<Address>,
@@ -70,7 +72,7 @@ impl TraceLocal for SSTraceLocal {
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         trace!("trace_object({:?})", object.to_address());
-        let thread_id = self.thread_id;
+        let tls = self.tls;
         let plan_unsync = unsafe { &*PLAN.unsync.get() };
 
         if object.is_null() {
@@ -79,11 +81,11 @@ impl TraceLocal for SSTraceLocal {
         }
         if plan_unsync.copyspace0.in_space(object) {
             trace!("trace_object: object in copyspace0");
-            return plan_unsync.copyspace0.trace_object(self, object, ss::ALLOC_SS, thread_id);
+            return plan_unsync.copyspace0.trace_object(self, object, ss::ALLOC_SS, tls);
         }
         if plan_unsync.copyspace1.in_space(object) {
             trace!("trace_object: object in copyspace1");
-            return plan_unsync.copyspace1.trace_object(self, object, ss::ALLOC_SS, thread_id);
+            return plan_unsync.copyspace1.trace_object(self, object, ss::ALLOC_SS, tls);
         }
         if plan_unsync.versatile_space.in_space(object) {
             trace!("trace_object: object in versatile_space");
@@ -98,7 +100,7 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn complete_trace(&mut self) {
-        let id = self.thread_id;
+        let id = self.tls;
 
         // TODO Global empty or local empty
         // if !self.root_locations.is_empty() {
@@ -183,7 +185,7 @@ impl TraceLocal for SSTraceLocal {
 impl SSTraceLocal {
     pub fn new(ss_trace: &Trace) -> Self {
         SSTraceLocal {
-            thread_id: 0,
+            tls: 0 as *mut c_void,
             values: Vec::new(),
             values_pool: PLAN.ss_trace.get_value_pool(),
             root_locations: Vec::new(),
@@ -191,7 +193,7 @@ impl SSTraceLocal {
         }
     }
 
-    pub fn init(&mut self, thread_id: usize) {
-        self.thread_id = thread_id;
+    pub fn init(&mut self, tls: *mut c_void) {
+        self.tls = tls;
     }
 }

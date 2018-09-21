@@ -38,7 +38,7 @@ impl ReferenceGlue for VMReferenceGlue {
      * @return an updated reference (e.g. with a new address) if the reference
      *  is still live, {@code ObjectReference.nullReference()} otherwise
      */
-    fn process_reference<T: TraceLocal>(trace: &mut T, reference: ObjectReference, thread_id: usize) -> ObjectReference {
+    fn process_reference<T: TraceLocal>(trace: &mut T, reference: ObjectReference, tls: *mut c_void) -> ObjectReference {
         debug_assert!(!reference.is_null());
 
         if TRACE_DETAIL { trace!("Processing reference: {:?}", reference); }
@@ -120,7 +120,7 @@ impl ReferenceGlue for VMReferenceGlue {
 
             VMReferenceGlue::clear_referent(new_reference);
             let new_reference_raw = new_reference.value() as *mut c_void;
-            unsafe { jtoc_call!(ENQUEUE_REFERENCE_METHOD_OFFSET, thread_id, new_reference_raw); }
+            unsafe { jtoc_call!(ENQUEUE_REFERENCE_METHOD_OFFSET, tls, new_reference_raw); }
             return unsafe { Address::zero().to_object_reference() };
         }
     }

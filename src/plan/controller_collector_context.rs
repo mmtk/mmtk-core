@@ -9,8 +9,10 @@ use ::vm::{Collection, VMCollection};
 use ::plan::{Plan, ParallelCollector};
 use ::plan::selected_plan::SelectedPlan;
 
+use libc::c_void;
+
 struct RequestSync {
-    thread_id: usize,
+    tls: *mut c_void,
     request_count: isize,
     last_request_count: isize,
 }
@@ -29,7 +31,7 @@ impl ControllerCollectorContext {
     pub fn new() -> Self {
         ControllerCollectorContext {
             request_sync: Mutex::new(RequestSync {
-                thread_id: 0,
+                tls: 0 as *mut c_void,
                 request_count: 0,
                 last_request_count: -1,
             }),
@@ -40,9 +42,9 @@ impl ControllerCollectorContext {
         }
     }
 
-    pub fn run(&self, thread_id: usize) {
+    pub fn run(&self, tls: *mut c_void) {
         {
-            self.request_sync.lock().unwrap().thread_id = thread_id;
+            self.request_sync.lock().unwrap().tls = tls;
         }
 
         // Safe provided that we don't hold a &mut to this struct
@@ -54,7 +56,7 @@ impl ControllerCollectorContext {
             self.wait_for_request();
             debug!("[STWController: Request recieved.]");
             debug!("[STWController: Stopping the world...]");
-            VMCollection::stop_all_mutators(thread_id);
+            VMCollection::stop_all_mutators(tls);
 
             // For heap growth logic
             let user_triggered_collection: bool = SelectedPlan::is_user_triggered_collection();
@@ -67,7 +69,7 @@ impl ControllerCollectorContext {
             workers.wait_for_cycle();
             debug!("[STWController: Worker threads complete!]");
             debug!("[STWController: Resuming mutators...]");
-            VMCollection::resume_mutators(thread_id);
+            VMCollection::resume_mutators(tls);
         }
     }
 

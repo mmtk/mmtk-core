@@ -66,7 +66,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResour
     }
 
     fn alloc_pages(&self, reserved_pages: usize, immut_required_pages: usize, zeroed: bool,
-                   thread_id: usize) -> Address {
+                   tls: *mut c_void) -> Address {
         let mut required_pages = immut_required_pages;
         let mut new_chunk = false;
         let mut sync = self.sync.lock().unwrap();
@@ -133,7 +133,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResour
             if self.common().contiguous && chunk_align(sync.cursor, true).as_usize() != sync.current_chunk.as_usize() {
                 sync.current_chunk = chunk_align(sync.cursor, true);
             }
-            self.commit_pages(reserved_pages, required_pages, thread_id);
+            self.commit_pages(reserved_pages, required_pages, tls);
             self.common().space.unwrap().grow_space(old, bytes, new_chunk);
 
             MMAPPER.ensure_mapped(old, required_pages);

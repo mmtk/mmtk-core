@@ -4,6 +4,7 @@ use ::policy::space::Space;
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
+use libc::c_void;
 
 use ::util::constants::*;
 use ::util::heap::PageResource;
@@ -131,7 +132,7 @@ pub fn determine_collection_attempts() -> usize {
 }
 
 pub trait Allocator<PR: PageResource> {
-    fn get_thread_id(&self) -> usize;
+    fn get_tls(&self) -> *mut c_void;
 
     fn get_space(&self) -> Option<&'static PR::Space>;
 
@@ -141,7 +142,7 @@ pub trait Allocator<PR: PageResource> {
 
     #[inline(always)]
     fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        let thread_id = self.get_thread_id();
+        let tls = self.get_tls();
         let tmp = self.get_space();
         let space = tmp.as_ref().unwrap();
 
@@ -151,7 +152,7 @@ pub trait Allocator<PR: PageResource> {
             // Try to allocate using the slow path
             let result = self.alloc_slow_once(size, align, offset);
 
-            if unsafe { !VMActivePlan::is_mutator(thread_id) } {
+            if unsafe { !VMActivePlan::is_mutator(tls) } {
                 debug_assert!(!result.is_zero());
                 return result;
             }
@@ -179,7 +180,7 @@ pub trait Allocator<PR: PageResource> {
                 drop(guard);
                 trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
-                    VMCollection::out_of_memory(thread_id);
+                    VMCollection::out_of_memory(tls);
                     trace!("Not reached");
                 }
             }
@@ -191,7 +192,7 @@ pub trait Allocator<PR: PageResource> {
              * contexts. */
             // FIXME: No good way to do this
             //current = unsafe {
-            //    VMActivePlan::mutator(thread_id).get_allocator_from_space(space)
+            //    VMActivePlan::mutator(tls).get_allocator_from_space(space)
             //};
 
             /*

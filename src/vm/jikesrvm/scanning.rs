@@ -17,6 +17,8 @@ use ::vm::jikesrvm::java_header::TIB_OFFSET;
 use ::vm::jikesrvm::tib_layout_constants::TIB_TYPE_INDEX;
 use ::vm::unboxed_size_constants::BYTES_IN_ADDRESS;
 
+use libc::c_void;
+
 static COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
 pub struct VMScanning {}
@@ -24,10 +26,10 @@ pub struct VMScanning {}
 const DUMP_REF: bool = false;
 
 impl Scanning for VMScanning {
-    fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, thread_id: usize) {
+    fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, tls: *mut c_void) {
         if DUMP_REF {
             let obj_ptr = object.value();
-            unsafe { jtoc_call!(DUMP_REF_METHOD_OFFSET, thread_id, obj_ptr); }
+            unsafe { jtoc_call!(DUMP_REF_METHOD_OFFSET, tls, obj_ptr); }
         }
         trace!("Getting reference array");
         let elt0_ptr: usize = unsafe {
@@ -61,25 +63,25 @@ impl Scanning for VMScanning {
         COUNTER.reset();
     }
 
-    fn notify_initial_thread_scan_complete(partial_scan: bool, thread_id: usize) {
+    fn notify_initial_thread_scan_complete(partial_scan: bool, tls: *mut c_void) {
         if !partial_scan {
             unsafe {
-                jtoc_call!(SNIP_OBSOLETE_COMPILED_METHODS_METHOD_OFFSET, thread_id);
+                jtoc_call!(SNIP_OBSOLETE_COMPILED_METHODS_METHOD_OFFSET, tls);
             }
         }
 
         unsafe {
-            VMActivePlan::mutator(thread_id).flush_remembered_sets();
+            VMActivePlan::mutator(tls).flush_remembered_sets();
         }
     }
 
-    fn compute_static_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
-        super::scan_statics::scan_statics(trace, thread_id);
+    fn compute_static_roots<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+        super::scan_statics::scan_statics(trace, tls);
     }
 
-    fn compute_global_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
+    fn compute_global_roots<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
         unsafe {
-            let cc = VMActivePlan::collector(thread_id);
+            let cc = VMActivePlan::collector(tls);
 
             let jni_functions = Address::from_usize((JTOC_BASE + JNI_FUNCTIONS_FIELD_OFFSET).load::<usize>());
             trace!("jni_functions: {:?}", jni_functions);
@@ -101,7 +103,7 @@ impl Scanning for VMScanning {
 
             for i in start..end {
                 let function_address_slot = jni_functions + (i << LOG_BYTES_IN_ADDRESS);
-                if jtoc_call!(IMPLEMENTED_IN_JAVA_METHOD_OFFSET, thread_id, i) != 0 {
+                if jtoc_call!(IMPLEMENTED_IN_JAVA_METHOD_OFFSET, tls, i) != 0 {
                     trace!("function implemented in java {:?}", function_address_slot);
                     trace.process_root_edge(function_address_slot, true);
                 } else {
@@ -140,16 +142,16 @@ impl Scanning for VMScanning {
         }
     }
 
-    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
-        Self::compute_thread_roots(trace, false, thread_id)
+    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+        Self::compute_thread_roots(trace, false, tls)
     }
 
-    fn compute_new_thread_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
-        Self::compute_thread_roots(trace, true, thread_id)
+    fn compute_new_thread_roots<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+        Self::compute_thread_roots(trace, true, tls)
     }
 
-    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T, thread_id: usize) {
-        super::scan_boot_image::scan_boot_image(trace, thread_id);
+    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+        super::scan_boot_image::scan_boot_image(trace, tls);
     }
 
     fn supports_return_barrier() -> bool {
@@ -159,7 +161,7 @@ impl Scanning for VMScanning {
 }
 
 impl VMScanning {
-    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, new_roots_sufficient: bool, thread_id: usize) {
+    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, new_roots_sufficient: bool, tls: *mut c_void) {
         unsafe {
             let process_code_locations = MOVES_CODE;
 
@@ -185,7 +187,7 @@ impl VMScanning {
                 let trace_ptr = trace as *mut T;
                 let thread_usize = thread.as_usize();
                 debug!("Calling JikesRVM to compute thread roots, thread_usize={:x}", thread_usize);
-                jtoc_call!(SCAN_THREAD_METHOD_OFFSET, thread_id, thread_usize, trace_ptr,
+                jtoc_call!(SCAN_THREAD_METHOD_OFFSET, tls, thread_usize, trace_ptr,
                     process_code_locations, new_roots_sufficient);
                 debug!("Returned from JikesRVM thread roots");
             }

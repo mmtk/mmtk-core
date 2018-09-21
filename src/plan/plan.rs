@@ -54,10 +54,10 @@ pub trait Plan {
     fn new() -> Self;
     // unsafe because this can only be called once by the init thread
     unsafe fn gc_init(&self, heap_size: usize);
-    fn bind_mutator(&self, thread_id: usize) -> *mut c_void;
+    fn bind_mutator(&self, tls: *mut c_void) -> *mut c_void;
     fn will_never_move(&self, object: ObjectReference) -> bool;
     // unsafe because only the primary collector thread can call this
-    unsafe fn collection_phase(&self, thread_id: usize, phase: &phase::Phase);
+    unsafe fn collection_phase(&self, tls: *mut c_void, phase: &phase::Phase);
 
     fn is_initialized(&self) -> bool {
         INITIALIZED.load(Ordering::SeqCst)
@@ -171,11 +171,11 @@ pub trait Plan {
 
     fn is_bad_ref(&self, object: ObjectReference) -> bool;
 
-    fn handle_user_collection_request(thread_id: usize) {
+    fn handle_user_collection_request(tls: *mut c_void) {
         if !OPTION_MAP.ignore_system_g_c {
             USER_TRIGGERED_COLLECTION.store(true, Ordering::Relaxed);
             CONTROL_COLLECTOR_CONTEXT.request();
-            VMCollection::block_for_gc(thread_id);
+            VMCollection::block_for_gc(tls);
         }
     }
 

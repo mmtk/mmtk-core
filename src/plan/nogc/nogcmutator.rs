@@ -7,6 +7,8 @@ use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
 use ::util::heap::MonotonePageResource;
 
+use libc::c_void;
+
 #[repr(C)]
 pub struct NoGCMutator {
     // ImmortalLocal
@@ -14,7 +16,7 @@ pub struct NoGCMutator {
 }
 
 impl MutatorContext for NoGCMutator {
-    fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
         unimplemented!();
     }
 
@@ -36,15 +38,15 @@ impl MutatorContext for NoGCMutator {
         }
     }
 
-    fn get_thread_id(&self) -> usize {
-        self.nogc.thread_id
+    fn get_tls(&self) -> *mut c_void {
+        self.nogc.tls
     }
 }
 
 impl NoGCMutator {
-    pub fn new(thread_id: usize, space: &'static ImmortalSpace) -> Self {
+    pub fn new(tls: *mut c_void, space: &'static ImmortalSpace) -> Self {
         NoGCMutator {
-            nogc: BumpAllocator::new(thread_id, Some(space)),
+            nogc: BumpAllocator::new(tls, Some(space)),
         }
     }
 }

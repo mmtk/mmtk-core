@@ -14,6 +14,7 @@ use ::vm::VMObjectModel;
 use ::plan::Allocator;
 
 use std::cell::UnsafeCell;
+use libc::c_void;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -80,10 +81,10 @@ impl CopySpace {
         trace: &mut T,
         object: ObjectReference,
         allocator: Allocator,
-        thread_id: usize,
+        tls: *mut c_void,
     ) -> ObjectReference
     {
-        trace!("copyspace.trace_object(, {:?}, {:?}, {:?})", object, allocator, thread_id);
+        trace!("copyspace.trace_object(, {:?}, {:?}, {:?})", object, allocator, tls);
         if !self.from_space {
             return object;
         }
@@ -99,7 +100,7 @@ impl CopySpace {
             return ForwardingWord::extract_forwarding_pointer(forwarding_word);
         } else {
             trace!("... no it isn't. Copying");
-            let new_object = VMObjectModel::copy(object, allocator, thread_id);
+            let new_object = VMObjectModel::copy(object, allocator, tls);
             trace!("Setting forwarding pointer");
             ForwardingWord::set_forwarding_pointer(object, new_object);
             trace!("Forwarding pointer");

@@ -9,13 +9,15 @@ use std::collections::{HashSet, LinkedList};
 use ::plan::selected_plan::PLAN;
 use ::plan::Plan;
 
+use libc::c_void;
+
 pub static INSIDE_SANITY: AtomicBool = AtomicBool::new(false);
 
 pub struct SanityChecker {
     roots: Vec<Address>,
     values: LinkedList<ObjectReference>,
     refs: HashSet<ObjectReference>,
-    thread_id: usize
+    tls: *mut c_void,
 }
 
 impl SanityChecker {
@@ -24,21 +26,21 @@ impl SanityChecker {
             roots: Vec::new(),
             values: LinkedList::new(),
             refs: HashSet::new(),
-            thread_id: usize::max_value()
+            tls: usize::max_value() as *mut c_void,
         }
     }
 
-    pub fn check(&mut self, thread_id: usize) {
-        self.thread_id = thread_id;
+    pub fn check(&mut self, tls: *mut c_void) {
+        self.tls = tls;
         INSIDE_SANITY.store(true, Ordering::Relaxed);
         println!("Sanity stackroots, collector");
-        VMScanning::compute_thread_roots(self, thread_id);
+        VMScanning::compute_thread_roots(self, tls);
         println!("Sanity stackroots, global");
-        VMScanning::notify_initial_thread_scan_complete(false, thread_id);
+        VMScanning::notify_initial_thread_scan_complete(false, tls);
         println!("Sanity roots, collector");
-        VMScanning::compute_global_roots(self, thread_id);
-        VMScanning::compute_static_roots(self, thread_id);
-        VMScanning::compute_bootimage_roots(self, thread_id);
+        VMScanning::compute_global_roots(self, tls);
+        VMScanning::compute_static_roots(self, tls);
+        VMScanning::compute_bootimage_roots(self, tls);
         println!("Sanity roots, global");
         VMScanning::reset_thread_counter();
 
@@ -50,7 +52,7 @@ impl SanityChecker {
         self.refs.clear();
 
         INSIDE_SANITY.store(false, Ordering::Relaxed);
-        self.thread_id = usize::max_value();
+        self.tls = usize::max_value() as *mut c_void;
     }
 }
 
@@ -114,8 +116,8 @@ impl TraceLocal for SanityChecker{
             }
 
             let object = self.values.pop_front().unwrap();
-            let id = self.thread_id;
-            VMScanning::scan_object(self, object, id);
+            let tls = self.tls;
+            VMScanning::scan_object(self, object, tls);
         }
     }
 

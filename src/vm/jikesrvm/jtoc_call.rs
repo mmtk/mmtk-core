@@ -1,31 +1,32 @@
 #[cfg(target_arch = "x86")]
 #[macro_export]
 macro_rules! jtoc_call {
-    ($offset:ident, $thread_id:expr $(, $arg:ident)*) => ({
+    ($offset:ident, $tls:expr $(, $arg:ident)*) => ({
         let call_addr = (::vm::jikesrvm::JTOC_BASE + $offset).load::<fn()>();
-        jikesrvm_call!(call_addr, $thread_id $(, $arg)*)
+        jikesrvm_call!(call_addr, $tls $(, $arg)*)
     });
 }
 
 #[cfg(target_arch = "x86")]
 #[macro_export]
 macro_rules! jikesrvm_instance_call {
-    ($obj:expr, $offset:expr, $thread_id:expr $(, $arg:ident)*) => ({
+    ($obj:expr, $offset:expr, $tls:expr $(, $arg:ident)*) => ({
         let tib = Address::from_usize(($obj + ::vm::jikesrvm::java_header::TIB_OFFSET).load::<usize>());
         let call_addr = (tib + $offset).load::<fn()>();
-        jikesrvm_call!(call_addr, $thread_id $(, $arg)*)
+        jikesrvm_call!(call_addr, $tls $(, $arg)*)
     });
 }
 
 #[cfg(target_arch = "x86")]
 #[macro_export]
 macro_rules! jikesrvm_call {
-    ($call_addr:expr, $thread_id:expr $(, $arg:ident)*) => ({
+    ($call_addr:expr, $tls:expr $(, $arg:ident)*) => ({
         use ::vm::jikesrvm::collection::VMCollection as _VMCollection;
-        debug_assert!($thread_id != 0);
+        use libc::c_void;
+        debug_assert!($tls != 0 as *mut c_void);
 
         let ret: usize;
-        let rvm_thread = _VMCollection::thread_from_id($thread_id).as_usize();
+        let rvm_thread = $tls;
 
         $(
             asm!("push %ebx" : : "{ebx}"($arg) : "sp", "memory");

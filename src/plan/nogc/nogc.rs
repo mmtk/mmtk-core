@@ -69,14 +69,14 @@ impl Plan for NoGC {
 
         if !cfg!(feature = "jikesrvm") {
             thread::spawn(|| {
-                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(0)
+                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(0 as *mut c_void)
             });
         }
     }
 
-    fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
+    fn bind_mutator(&self, tls: *mut c_void) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
-        Box::into_raw(Box::new(NoGCMutator::new(thread_id,
+        Box::into_raw(Box::new(NoGCMutator::new(tls,
                                                 &unsync.space))) as *mut c_void
     }
 
@@ -84,7 +84,7 @@ impl Plan for NoGC {
         true
     }
 
-    unsafe fn collection_phase(&self, thread_id: usize, phase: &Phase) {}
+    unsafe fn collection_phase(&self, tls: *mut c_void, phase: &Phase) {}
 
     fn get_total_pages(&self) -> usize {
         let unsync = unsafe { &*self.unsync.get() };

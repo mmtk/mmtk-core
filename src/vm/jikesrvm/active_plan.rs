@@ -1,9 +1,12 @@
 use ::vm::ActivePlan;
 use ::plan::{Plan, SelectedPlan};
 use ::util::{Address, SynchronizedCounter};
+
 use super::entrypoint::*;
 use super::collection::VMCollection;
 use super::JTOC_BASE;
+
+use libc::c_void;
 
 static MUTATOR_COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
@@ -11,8 +14,8 @@ pub struct VMActivePlan<> {}
 
 impl ActivePlan for VMActivePlan {
     // XXX: Are they actually static
-    unsafe fn collector(thread_id: usize) -> &'static mut <SelectedPlan as Plan>::CollectorT {
-        let thread = VMCollection::thread_from_id(thread_id);
+    unsafe fn collector(tls: *mut c_void) -> &'static mut <SelectedPlan as Plan>::CollectorT {
+        let thread = Address::from_mut_ptr(tls);
         let system_thread = Address::from_usize(
             (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
         let cc = &mut *((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
@@ -21,14 +24,14 @@ impl ActivePlan for VMActivePlan {
         cc
     }
 
-    unsafe fn is_mutator(thread_id: usize) -> bool {
-        let thread = VMCollection::thread_from_id(thread_id);
+    unsafe fn is_mutator(tls: *mut c_void) -> bool {
+        let thread = Address::from_mut_ptr(tls);
         !(thread + IS_COLLECTOR_FIELD_OFFSET).load::<bool>()
     }
 
     // XXX: Are they actually static
-    unsafe fn mutator(thread_id: usize) -> &'static mut <SelectedPlan as Plan>::MutatorT {
-        let thread = VMCollection::thread_from_id(thread_id);
+    unsafe fn mutator(tls: *mut c_void) -> &'static mut <SelectedPlan as Plan>::MutatorT {
+        let thread = Address::from_mut_ptr(tls);
         let mutator = (thread + MMTK_HANDLE_FIELD_OFFSET).load::<usize>();
         &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)
     }

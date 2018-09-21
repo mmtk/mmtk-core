@@ -29,7 +29,7 @@ const DATA_END_OFFSET: isize = NEXT_REGION_OFFSET + BYTES_IN_ADDRESS as isize;
 #[repr(C)]
 #[derive(Debug)]
 pub struct BumpAllocator<PR: PageResource> {
-    pub thread_id: usize,
+    pub tls: *mut c_void,
     cursor: Address,
     limit: Address,
     space: Option<&'static PR::Space>
@@ -123,7 +123,7 @@ impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc_slow");
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start: Address = self.space.unwrap().acquire(self.thread_id,
+        let acquired_start: Address = self.space.unwrap().acquire(self.tls,
                                                                   bytes_to_pages(block_size));
         if acquired_start.is_zero() {
             trace!("Failed to acquire a new block");
@@ -136,15 +136,15 @@ impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
         }
     }
 
-    fn get_thread_id(&self) -> usize {
-        self.thread_id
+    fn get_tls(&self) -> *mut c_void {
+        self.tls
     }
 }
 
 impl<PR: PageResource> BumpAllocator<PR> {
-    pub fn new(thread_id: usize, space: Option<&'static PR::Space>) -> Self {
+    pub fn new(tls: *mut c_void, space: Option<&'static PR::Space>) -> Self {
         BumpAllocator {
-            thread_id,
+            tls,
             cursor: unsafe { Address::zero() },
             limit: unsafe { Address::zero() },
             space,

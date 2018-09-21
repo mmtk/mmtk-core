@@ -46,7 +46,7 @@ pub struct VMObjectModel {}
 
 impl ObjectModel for VMObjectModel {
     #[inline(always)]
-    fn copy(from: ObjectReference, allocator: Allocator, thread_id: usize) -> ObjectReference {
+    fn copy(from: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
         trace!("ObjectModel.copy");
         unsafe {
             trace!("getting tib");
@@ -58,10 +58,10 @@ impl ObjectModel for VMObjectModel {
             trace!("Is it a class?");
             if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
                 trace!("... yes");
-                Self::copy_scalar(from, tib, rvm_type, allocator, thread_id)
+                Self::copy_scalar(from, tib, rvm_type, allocator, tls)
             } else {
                 trace!("... no");
-                Self::copy_array(from, tib, rvm_type, allocator, thread_id)
+                Self::copy_array(from, tib, rvm_type, allocator, tls)
             }
         }
     }
@@ -364,12 +364,12 @@ impl ObjectModel for VMObjectModel {
 impl VMObjectModel {
     #[inline(always)]
     fn copy_scalar(from: ObjectReference, tib: Address, rvm_type: Address,
-                   immut_allocator: Allocator, thread_id: usize) -> ObjectReference {
+                   immut_allocator: Allocator, tls: *mut c_void) -> ObjectReference {
         trace!("VMObjectModel.copy_scalar");
         let bytes = Self::bytes_required_when_copied_class(from, rvm_type);
         let align = Self::get_alignment_class(rvm_type);
         let offset = Self::get_offset_for_alignment_class(from, rvm_type);
-        let context = unsafe { VMActivePlan::collector(thread_id) };
+        let context = unsafe { VMActivePlan::collector(tls) };
         let allocator = context.copy_check_allocator(from, bytes, align, immut_allocator);
         let region = context.alloc_copy(from, bytes, align, offset, allocator);
 
@@ -381,12 +381,12 @@ impl VMObjectModel {
 
     #[inline(always)]
     fn copy_array(from: ObjectReference, tib: Address, rvm_type: Address,
-                  immut_allocator: Allocator, thread_id: usize) -> ObjectReference {
+                  immut_allocator: Allocator, tls: *mut c_void) -> ObjectReference {
         trace!("VMObjectModel.copy_array");
         let bytes = Self::bytes_required_when_copied_array(from, rvm_type);
         let align = Self::get_alignment_array(rvm_type);
         let offset = Self::get_offset_for_alignment_array(from, rvm_type);
-        let context = unsafe { VMActivePlan::collector(thread_id) };
+        let context = unsafe { VMActivePlan::collector(tls) };
         let allocator = context.copy_check_allocator(from, bytes, align, immut_allocator);
         let region = context.alloc_copy(from, bytes, align, offset, allocator);
 

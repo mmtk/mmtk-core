@@ -10,6 +10,8 @@ use ::plan::{TraceLocal, Plan, SelectedPlan, ParallelCollector};
 use super::collection::VMCollection;
 use super::super::{ActivePlan, VMActivePlan};
 
+use libc::c_void;
+
 const DEBUG: bool = false;
 const FILTER: bool = true;
 
@@ -24,7 +26,7 @@ const GUARD_REGION: usize = LONGENCODING_OFFSET_BYTES + 1; /* long offset + run 
 static ROOTS: AtomicUsize = AtomicUsize::new(0);
 static REFS: AtomicUsize = AtomicUsize::new(0);
 
-pub fn scan_boot_image<T: TraceLocal>(trace: &mut T, thread_id: usize) {
+pub fn scan_boot_image<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
     unsafe {
         let boot_record = Address::from_usize((JTOC_BASE + THE_BOOT_RECORD_FIELD_OFFSET)
             .load::<usize>());
@@ -35,7 +37,7 @@ pub fn scan_boot_image<T: TraceLocal>(trace: &mut T, thread_id: usize) {
         let image_start = Address::from_usize((boot_record + BOOT_IMAGE_DATA_START_FIELD_OFFSET)
             .load::<usize>());
 
-        let collector = VMActivePlan::collector(thread_id);
+        let collector = VMActivePlan::collector(tls);
 
         let stride = collector.parallel_worker_count() << LOG_CHUNK_BYTES;
         trace!("stride={}", stride);

@@ -16,15 +16,17 @@ use ::util::constants::LOG_BYTES_IN_MBYTE;
 
 use std::fmt::Debug;
 
+use libc::c_void;
+
 pub trait Space: Sized + Debug + 'static {
     type PR: PageResource<Space = Self>;
 
     fn init(&mut self);
 
-    fn acquire(&self, thread_id: usize, pages: usize) -> Address {
-        trace!("Space.acquire, thread_id={}", thread_id);
-        // debug_assert!(thread_id != 0);
-        let allow_poll = unsafe { VMActivePlan::is_mutator(thread_id) }
+    fn acquire(&self, tls: *mut c_void, pages: usize) -> Address {
+        trace!("Space.acquire, tls={:p}", tls);
+        // debug_assert!(tls != 0);
+        let allow_poll = unsafe { VMActivePlan::is_mutator(tls) }
             && PLAN.is_initialized();
 
         trace!("Reserving pages");
@@ -40,11 +42,11 @@ pub trait Space: Sized + Debug + 'static {
         if allow_poll && VMActivePlan::global().poll::<Self::PR>(false, me) {
             trace!("Collection required");
             pr.clear_request(pages_reserved);
-            VMCollection::block_for_gc(thread_id);
+            VMCollection::block_for_gc(tls);
             unsafe { Address::zero() }
         } else {
             trace!("Collection not required");
-            let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, thread_id);
+            let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, tls);
             if rtn.is_zero() {
                 if !allow_poll {
                     panic!("Physical allocation failed when polling not allowed!");
@@ -53,7 +55,7 @@ pub trait Space: Sized + Debug + 'static {
                 let gc_performed = VMActivePlan::global().poll::<Self::PR>(true, me);
                 debug_assert!(gc_performed, "GC not performed when forced.");
                 pr.clear_request(pages_reserved);
-                VMCollection::block_for_gc(thread_id);
+                VMCollection::block_for_gc(tls);
                 unsafe { Address::zero() }
             } else {
                 rtn

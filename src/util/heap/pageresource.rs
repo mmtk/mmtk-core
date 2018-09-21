@@ -7,6 +7,8 @@ use std::sync::{Mutex, MutexGuard};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::fmt::Debug;
 
+use libc::c_void;
+
 static CUMULATIVE_COMMITTED: AtomicUsize = AtomicUsize::new(0);
 
 pub trait PageResource: Sized + 'static + Debug {
@@ -15,8 +17,8 @@ pub trait PageResource: Sized + 'static + Debug {
     /// Allocate pages from this resource.
     /// Simply bump the cursor, and fail if we hit the sentinel.
     /// Return The start of the first page if successful, zero on failure.
-    fn get_new_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, thread_id: usize) -> Address {
-        self.alloc_pages(reserved_pages, required_pages, zeroed, thread_id)
+    fn get_new_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, tls: *mut c_void) -> Address {
+        self.alloc_pages(reserved_pages, required_pages, zeroed, tls)
     }
 
     // XXX: In the original code reserve_pages & clear_request explicitly
@@ -48,7 +50,7 @@ pub trait PageResource: Sized + 'static + Debug {
         panic!("This PageResource does not implement concurrent zeroing")
     }
 
-    fn alloc_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, thread_id: usize) -> Address;
+    fn alloc_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, tls: *mut c_void) -> Address;
 
     fn adjust_for_metadata(&self, pages: usize) -> usize;
 
@@ -62,13 +64,13 @@ pub trait PageResource: Sized + 'static + Debug {
     * This *MUST* be called by each PageResource during the
     * allocPages, and the caller must hold the lock.
     */
-    fn commit_pages(&self, reserved_pages: usize, actual_pages: usize, thread_id: usize) {
+    fn commit_pages(&self, reserved_pages: usize, actual_pages: usize, tls: *mut c_void) {
         let delta = actual_pages - reserved_pages;
         self.common().reserved.store(self.common().reserved.load(Ordering::Relaxed) + delta,
                                      Ordering::Relaxed);
         self.common().committed.store(self.common().committed.load(Ordering::Relaxed) + actual_pages,
                                       Ordering::Relaxed);
-        if unsafe{VMActivePlan::is_mutator(thread_id)} {
+        if unsafe{VMActivePlan::is_mutator(tls)} {
             Self::add_to_committed(actual_pages);
         }
     }

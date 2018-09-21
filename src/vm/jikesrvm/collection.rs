@@ -5,49 +5,49 @@ use ::plan::{MutatorContext, ParallelCollector};
 
 use super::entrypoint::*;
 use super::JTOC_BASE;
+use libc::c_void;
 
-pub const BOOT_THREAD: usize = 1;
+pub static mut BOOT_THREAD: *mut c_void = 0 as *mut c_void;
 
 pub struct VMCollection {}
 
-// FIXME: Shouldn't these all be unsafe because of thread_id?
+// FIXME: Shouldn't these all be unsafe because of tls?
 impl Collection for VMCollection {
     #[inline(always)]
-    fn stop_all_mutators(thread_id: usize) {
+    fn stop_all_mutators(tls: *mut c_void) {
         unsafe {
-            jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_OFFSET, thread_id);
+            jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_OFFSET, tls);
         }
     }
 
     #[inline(always)]
-    fn resume_mutators(thread_id: usize) {
+    fn resume_mutators(tls: *mut c_void) {
         unsafe {
-            jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_OFFSET, thread_id);
+            jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_OFFSET, tls);
         }
     }
 
     #[inline(always)]
-    fn block_for_gc(thread_id: usize) {
+    fn block_for_gc(tls: *mut c_void) {
         unsafe {
-            jtoc_call!(BLOCK_FOR_GC_METHOD_OFFSET, thread_id);
+            jtoc_call!(BLOCK_FOR_GC_METHOD_OFFSET, tls);
         }
     }
 
     #[inline(always)]
-    unsafe fn spawn_worker_thread<T: ParallelCollector>(thread_id: usize, ctx: *mut T) {
-        jtoc_call!(SPAWN_COLLECTOR_THREAD_METHOD_OFFSET, thread_id, ctx);
+    unsafe fn spawn_worker_thread<T: ParallelCollector>(tls: *mut c_void, ctx: *mut T) {
+        jtoc_call!(SPAWN_COLLECTOR_THREAD_METHOD_OFFSET, tls, ctx);
     }
 
-    fn prepare_mutator<T: MutatorContext>(thread_id: usize, m: &T) {
+    fn prepare_mutator<T: MutatorContext>(tls: *mut c_void, m: &T) {
         unsafe {
-            let mutator_thread = Self::thread_from_id(m.get_thread_id()).as_usize();
-            jtoc_call!(PREPARE_MUTATOR_METHOD_OFFSET, thread_id, mutator_thread);
+            jtoc_call!(PREPARE_MUTATOR_METHOD_OFFSET, tls, tls);
         }
     }
 
-    fn out_of_memory(thread_id: usize) {
+    fn out_of_memory(tls: *mut c_void) {
         unsafe {
-            jtoc_call!(OUT_OF_MEMORY_METHOD_OFFSET, thread_id);
+            jtoc_call!(OUT_OF_MEMORY_METHOD_OFFSET, tls);
         }
     }
 }

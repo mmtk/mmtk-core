@@ -12,6 +12,8 @@ use ::vm::{Collection, VMCollection};
 use ::util::heap::{PageResource, MonotonePageResource};
 use ::plan::semispace::PLAN;
 
+use libc::c_void;
+
 #[repr(C)]
 pub struct SSMutator {
     // CopyLocal
@@ -20,11 +22,11 @@ pub struct SSMutator {
 }
 
 impl MutatorContext for SSMutator {
-    fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
         match phase {
             &Phase::PrepareStacks => {
                 if !plan::stacks_prepared() {
-                    VMCollection::prepare_mutator(self.ss.thread_id, self);
+                    VMCollection::prepare_mutator(self.ss.tls, self);
                 }
                 self.flush_remembered_sets();
             }
@@ -77,17 +79,17 @@ impl MutatorContext for SSMutator {
         }
     }
 
-    fn get_thread_id(&self) -> usize {
-        debug_assert!(self.ss.thread_id == self.vs.thread_id);
-        self.ss.thread_id
+    fn get_tls(&self) -> *mut c_void {
+        debug_assert!(self.ss.tls == self.vs.tls);
+        self.ss.tls
     }
 }
 
 impl SSMutator {
-    pub fn new(thread_id: usize, space: &'static CopySpace, versatile_space: &'static ImmortalSpace) -> Self {
+    pub fn new(tls: *mut c_void, space: &'static CopySpace, versatile_space: &'static ImmortalSpace) -> Self {
         SSMutator {
-            ss: BumpAllocator::new(thread_id, Some(space)),
-            vs: BumpAllocator::new(thread_id, Some(versatile_space)),
+            ss: BumpAllocator::new(tls, Some(space)),
+            vs: BumpAllocator::new(tls, Some(versatile_space)),
         }
     }
 }

@@ -7,6 +7,8 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
+use libc::c_void;
+
 #[derive(Clone)]
 #[derive(PartialEq)]
 #[derive(Debug)]
@@ -71,26 +73,26 @@ lazy_static! {
     static ref ODD_SCHEDULED_PHASE: Mutex<(Schedule, Phase)> = Mutex::new((Schedule::Empty, Phase::Empty));
 }
 
-// FIXME: It's probably unsafe to call most of these functions, because thread_id
+// FIXME: It's probably unsafe to call most of these functions, because tls
 
-pub fn begin_new_phase_stack(thread_id: usize, scheduled_phase: (Schedule, Phase)) {
-    let order = unsafe { VMActivePlan::collector(thread_id).rendezvous() };
+pub fn begin_new_phase_stack(tls: *mut c_void, scheduled_phase: (Schedule, Phase)) {
+    let order = unsafe { VMActivePlan::collector(tls).rendezvous() };
 
     if order == 0 {
         push_scheduled_phase(scheduled_phase);
     }
 
-    process_phase_stack(thread_id, false);
+    process_phase_stack(tls, false);
 }
 
-pub fn continue_phase_stack(thread_id: usize) {
-    process_phase_stack(thread_id, true);
+pub fn continue_phase_stack(tls: *mut c_void) {
+    process_phase_stack(tls, true);
 }
 
-fn process_phase_stack(thread_id: usize, resume: bool) {
+fn process_phase_stack(tls: *mut c_void, resume: bool) {
     let mut resume = resume;
     let plan = VMActivePlan::global();
-    let collector = unsafe { VMActivePlan::collector(thread_id) };
+    let collector = unsafe { VMActivePlan::collector(tls) };
     let order = collector.rendezvous();
     let primary = order == 0;
     if primary && resume {
@@ -114,17 +116,17 @@ fn process_phase_stack(thread_id: usize, resume: bool) {
             Schedule::Global => {
                 debug!("Execute {:?} as Global...", phase);
                 if primary {
-                    unsafe { plan.collection_phase(thread_id, &phase) }
+                    unsafe { plan.collection_phase(tls, &phase) }
                 }
             }
             Schedule::Collector => {
                 debug!("Execute {:?} as Collector...", phase);
-                collector.collection_phase(thread_id, &phase, primary)
+                collector.collection_phase(tls, &phase, primary)
             }
             Schedule::Mutator => {
                 debug!("Execute {:?} as Mutator...", phase);
                 while let Some(mutator) = VMActivePlan::get_next_mutator() {
-                    mutator.collection_phase(thread_id, &phase, primary);
+                    mutator.collection_phase(tls, &phase, primary);
                 }
             }
             Schedule::Concurrent => {

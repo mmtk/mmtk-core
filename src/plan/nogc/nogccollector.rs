@@ -7,11 +7,12 @@ use super::super::Phase;
 use super::super::Allocator;
 
 use std::process;
+use libc::c_void;
 
 use ::util::{Address, ObjectReference};
 
 pub struct NoGCCollector {
-    pub id: usize,
+    pub tls: *mut c_void,
     trace: NoGCTraceLocal,
 
     last_trigger_count: usize,
@@ -22,7 +23,7 @@ pub struct NoGCCollector {
 impl<'a> CollectorContext for NoGCCollector {
     fn new() -> Self {
         NoGCCollector {
-            id: 0,
+            tls: 0 as *mut c_void,
             trace: NoGCTraceLocal::new(),
 
             last_trigger_count: 0,
@@ -31,28 +32,28 @@ impl<'a> CollectorContext for NoGCCollector {
         }
     }
 
-    fn init(&mut self, id: usize) {
-        self.id = id;
+    fn init(&mut self, tls: *mut c_void) {
+        self.tls = tls;
     }
 
     fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: Allocator) -> Address {
         unimplemented!();
     }
 
-    fn run(&mut self, thread_id: usize) {
+    fn run(&mut self, tls: *mut c_void) {
         loop {
             self.park();
             self.collect();
         }
     }
 
-    fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
         println!("GC triggered in NoGC plan");
         process::exit(128);
     }
 
-    fn get_id(&self) -> usize {
-        self.id
+    fn get_tls(&self) -> *mut c_void {
+        self.tls
     }
 }
 

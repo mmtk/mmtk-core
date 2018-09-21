@@ -8,6 +8,8 @@ use ::vm::{VMCollection, Collection};
 
 use ::util::options::OPTION_MAP;
 
+use libc::c_void;
+
 pub struct ParallelCollectorGroup<C: ParallelCollector> {
     //name: String,
     contexts: Vec<C>,
@@ -44,7 +46,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         self.contexts.len()
     }
 
-    pub fn init_group(&mut self, thread_id: usize) {
+    pub fn init_group(&mut self, tls: *mut c_void) {
         {
             let inner = self.sync.get_mut().unwrap();
             inner.trigger_count = 1;
@@ -60,7 +62,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
             self.contexts[i].set_group(self_ptr);
             self.contexts[i].set_worker_ordinal(i);
             unsafe {
-                VMCollection::spawn_worker_thread(thread_id, &mut self.contexts[i] as *mut C);
+                VMCollection::spawn_worker_thread(tls, &mut self.contexts[i] as *mut C);
             }
         }
     }
@@ -109,7 +111,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
     }
 
     pub fn is_member(&self, context: &C) -> bool {
-        if let Some(i) = self.contexts.iter().position(|ref c| c.get_id() == context.get_id()) {
+        if let Some(i) = self.contexts.iter().position(|ref c| c.get_tls() == context.get_tls()) {
             true
         } else {
             false

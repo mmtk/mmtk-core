@@ -23,9 +23,11 @@ use ::plan::semispace::PLAN;
 
 use super::sstracelocal::SSTraceLocal;
 
+use libc::c_void;
+
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector {
-    pub id: usize,
+    pub tls: *mut c_void,
     // CopyLocal
     pub ss: BumpAllocator<MonotonePageResource<CopySpace>>,
     trace: SSTraceLocal,
@@ -38,8 +40,8 @@ pub struct SSCollector {
 impl CollectorContext for SSCollector {
     fn new() -> Self {
         SSCollector {
-            id: 0,
-            ss: BumpAllocator::new(0, None),
+            tls: 0 as *mut c_void,
+            ss: BumpAllocator::new(0 as *mut c_void, None),
             trace: SSTraceLocal::new(PLAN.get_sstrace()),
 
             last_trigger_count: 0,
@@ -48,10 +50,10 @@ impl CollectorContext for SSCollector {
         }
     }
 
-    fn init(&mut self, id: usize) {
-        self.id = id;
-        self.ss.thread_id = id;
-        self.trace.init(id);
+    fn init(&mut self, tls: *mut c_void) {
+        self.tls = tls;
+        self.ss.tls = tls;
+        self.trace.init(tls);
     }
 
     fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize,
@@ -59,44 +61,44 @@ impl CollectorContext for SSCollector {
         self.ss.alloc(bytes, align, offset)
     }
 
-    fn run(&mut self, thread_id: usize) {
-        self.id = thread_id;
+    fn run(&mut self, tls: *mut c_void) {
+        self.tls = tls;
         loop {
             self.park();
             self.collect();
         }
     }
 
-    fn collection_phase(&mut self, thread_id: usize, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
         match phase {
             &Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
             &Phase::StackRoots => {
                 trace!("Computing thread roots");
-                VMScanning::compute_thread_roots(&mut self.trace, self.id);
+                VMScanning::compute_thread_roots(&mut self.trace, self.tls);
                 trace!("Thread roots complete");
             }
             &Phase::Roots => {
                 trace!("Computing global roots");
-                VMScanning::compute_global_roots(&mut self.trace, self.id);
+                VMScanning::compute_global_roots(&mut self.trace, self.tls);
                 trace!("Computing static roots");
-                VMScanning::compute_static_roots(&mut self.trace, self.id);
+                VMScanning::compute_static_roots(&mut self.trace, self.tls);
                 trace!("Finished static roots");
                 if super::ss::SCAN_BOOT_IMAGE {
                     trace!("Scanning boot image");
-                    VMScanning::compute_bootimage_roots(&mut self.trace, self.id);
+                    VMScanning::compute_bootimage_roots(&mut self.trace, self.tls);
                     trace!("Finished boot image");
                 }
             }
             &Phase::SoftRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    scan_soft_refs(&mut self.trace, self.id)
+                    scan_soft_refs(&mut self.trace, self.tls)
                 }
             }
             &Phase::WeakRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    scan_weak_refs(&mut self.trace, self.id)
+                    scan_weak_refs(&mut self.trace, self.tls)
                 }
             }
             &Phase::Finalizable => {
@@ -107,7 +109,7 @@ impl CollectorContext for SSCollector {
             &Phase::PhantomRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    scan_phantom_refs(&mut self.trace, self.id)
+                    scan_phantom_refs(&mut self.trace, self.tls)
                 }
             }
             &Phase::ForwardRefs => {
@@ -128,8 +130,8 @@ impl CollectorContext for SSCollector {
         }
     }
 
-    fn get_id(&self) -> usize {
-        self.id
+    fn get_tls(&self) -> *mut c_void {
+        self.tls
     }
 
     fn post_copy(&self, object: ObjectReference, rvm_type: Address, bytes: usize, allocator: ::plan::Allocator) {
@@ -152,7 +154,7 @@ impl ParallelCollector for SSCollector {
 
     fn collect(&self) {
         // FIXME use reference instead of cloning everything
-        phase::begin_new_phase_stack(self.id, (phase::Schedule::Complex, ::plan::plan::COLLECTION.clone()))
+        phase::begin_new_phase_stack(self.tls, (phase::Schedule::Complex, ::plan::plan::COLLECTION.clone()))
     }
 
     fn get_current_trace(&mut self) -> &mut SSTraceLocal {

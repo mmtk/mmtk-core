@@ -10,7 +10,7 @@ typedef void* MMTk_TraceLocal;
 /**
  * Allocation
  */
-extern MMTk_Mutator bind_mutator(size_t thread_id);
+extern MMTk_Mutator bind_mutator(void *tls);
 
 extern void* alloc(MMTk_Mutator mutator, size_t size,
     size_t align, ssize_t offset, int allocator);
@@ -53,18 +53,18 @@ extern void gc_init(size_t heap_size);
 extern bool will_never_move(void* object);
 extern bool process(char* name, char* value);
 extern void scan_region();
-extern void handle_user_collection_request(size_t thread_id);
+extern void handle_user_collection_request(void *tls);
 
 /**
  * JikesRVM-specific
  */
 extern void jikesrvm_gc_init(void* jtoc, size_t heap_size);
 
-extern void enable_collection(size_t thread_id);
+extern void enable_collection(void *tls);
 
-extern void start_control_collector(size_t thread_id);
+extern void start_control_collector(void *tls);
 
-extern void start_worker(size_t thread_id, void* worker);
+extern void start_worker(void *tls, void* worker);
 
 /**
   * VM Accounting

@@ -107,14 +107,14 @@ impl Plan for SemiSpace {
 
         if !cfg!(feature = "jikesrvm") {
             thread::spawn(|| {
-                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(0)
+                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(0 as *mut c_void)
             });
         }
     }
 
-    fn bind_mutator(&self, thread_id: usize) -> *mut c_void {
+    fn bind_mutator(&self, tls: *mut c_void) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
-        Box::into_raw(Box::new(SSMutator::new(thread_id, self.tospace(),
+        Box::into_raw(Box::new(SSMutator::new(tls, self.tospace(),
                                               &unsync.versatile_space))) as *mut c_void
     }
 
@@ -147,7 +147,7 @@ impl Plan for SemiSpace {
         return false;
     }
 
-    unsafe fn collection_phase(&self, thread_id: usize, phase: &Phase) {
+    unsafe fn collection_phase(&self, tls: *mut c_void, phase: &Phase) {
         let unsync = &mut *self.unsync.get();
 
         match phase {
@@ -173,7 +173,7 @@ impl Plan for SemiSpace {
             &Phase::Prepare => {
                 if cfg!(feature = "sanity") {
                     println!("Pre GC sanity check");
-                    unsync.sanity_checker.check(thread_id);
+                    unsync.sanity_checker.check(tls);
                 }
                 unsync.hi = !unsync.hi; // flip the semi-spaces
                 // prepare each of the collected regions
@@ -183,7 +183,7 @@ impl Plan for SemiSpace {
                 unsync.vm_space.prepare();
             }
             &Phase::StackRoots => {
-                VMScanning::notify_initial_thread_scan_complete(false, thread_id);
+                VMScanning::notify_initial_thread_scan_complete(false, tls);
                 plan::set_gc_status(plan::GcStatus::GcProper);
             }
             &Phase::Roots => {
@@ -211,7 +211,7 @@ impl Plan for SemiSpace {
             &Phase::Complete => {
                 if cfg!(feature = "sanity") {
                     println!("Post GC sanity check");
-                    unsync.sanity_checker.check(thread_id);
+                    unsync.sanity_checker.check(tls);
                     println!("Post GC memory scan");
                     memory_scan::scan_region();
                     println!("Finished one GC");

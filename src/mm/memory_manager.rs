@@ -36,6 +36,9 @@ use ::util::sanity::sanity_checker::{INSIDE_SANITY, SanityChecker};
 pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     ::util::logger::init().unwrap();
     JTOC_BASE = Address::from_mut_ptr(jtoc);
+    ::vm::jikesrvm::BOOT_THREAD
+        = ::vm::jikesrvm::collection::VMCollection::thread_from_id(1)
+        .as_usize() as *mut c_void;
     selected_plan::PLAN.gc_init(heap_size);
     debug_assert!(54 == ::vm::JikesRVM::test(44));
     debug_assert!(112 == ::vm::JikesRVM::test2(45, 67));
@@ -50,8 +53,8 @@ pub extern fn jikesrvm_gc_init(_jtoc: *mut c_void, _heap_size: usize) {
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
-pub extern fn start_control_collector(thread_id: usize) {
-    CONTROL_COLLECTOR_CONTEXT.run(thread_id);
+pub extern fn start_control_collector(tls: *mut c_void) {
+    CONTROL_COLLECTOR_CONTEXT.run(tls);
 }
 
 #[no_mangle]
@@ -71,8 +74,8 @@ pub unsafe extern fn gc_init(heap_size: usize) {
 }
 
 #[no_mangle]
-pub extern fn bind_mutator(thread_id: usize) -> *mut c_void {
-    SelectedPlan::bind_mutator(&selected_plan::PLAN, thread_id)
+pub extern fn bind_mutator(tls: *mut c_void) -> *mut c_void {
+    SelectedPlan::bind_mutator(&selected_plan::PLAN, tls)
 }
 
 #[no_mangle]
@@ -161,17 +164,17 @@ pub unsafe extern fn process_interior_edge(trace_local: *mut c_void, target: *mu
 }
 
 #[no_mangle]
-pub unsafe extern fn start_worker(thread_id: usize, worker: *mut c_void) {
+pub unsafe extern fn start_worker(tls: *mut c_void, worker: *mut c_void) {
     let worker_instance = &mut *(worker as *mut <SelectedPlan as Plan>::CollectorT);
-    worker_instance.init(thread_id);
-    worker_instance.run(thread_id);
+    worker_instance.init(tls);
+    worker_instance.run(tls);
 }
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
-pub unsafe extern fn enable_collection(thread_id: usize) {
-    (&mut *CONTROL_COLLECTOR_CONTEXT.workers.get()).init_group(thread_id);
-    VMCollection::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(thread_id, null_mut()); // spawn controller thread
+pub unsafe extern fn enable_collection(tls: *mut c_void) {
+    (&mut *CONTROL_COLLECTOR_CONTEXT.workers.get()).init_group(tls);
+    VMCollection::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(tls, null_mut()); // spawn controller thread
     ::plan::plan::INITIALIZED.store(true, Ordering::SeqCst);
 }
 
@@ -279,8 +282,8 @@ pub unsafe extern fn trace_retain_referent(trace_local: *mut c_void, object: Obj
 }
 
 #[no_mangle]
-pub extern fn handle_user_collection_request(thread_id: usize) {
-    selected_plan::SelectedPlan::handle_user_collection_request(thread_id);
+pub extern fn handle_user_collection_request(tls: *mut c_void) {
+    selected_plan::SelectedPlan::handle_user_collection_request(tls);
 }
 
 #[no_mangle]

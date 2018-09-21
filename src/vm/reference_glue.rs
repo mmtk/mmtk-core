@@ -2,6 +2,8 @@ use ::util::ObjectReference;
 use ::util::Address;
 use ::plan::TraceLocal;
 
+use libc::c_void;
+
 /**
  * VM-specific stuff for util::ReferenceProcessor
  * a.k.a Pavel gets fed up with OOP
@@ -13,5 +15,5 @@ pub trait ReferenceGlue {
     fn get_referent(object: ObjectReference) -> ObjectReference;
     fn set_referent(reff: ObjectReference, referent: ObjectReference);
 
-    fn process_reference<T: TraceLocal>(trace: &mut T, reference: ObjectReference, thread_id: usize) -> ObjectReference;
+    fn process_reference<T: TraceLocal>(trace: &mut T, reference: ObjectReference, tls: *mut c_void) -> ObjectReference;
 }

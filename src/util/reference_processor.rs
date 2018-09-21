@@ -8,6 +8,8 @@ use ::vm::{ActivePlan, VMActivePlan, ReferenceGlue, VMReferenceGlue};
 use ::plan::{Plan, TraceLocal, MutatorContext};
 use ::plan::selected_plan::SelectedPlan;
 
+use libc::c_void;
+
 // Debug flags
 pub const TRACE: bool = false;
 pub const TRACE_UNREACHABLE: bool = false;
@@ -135,7 +137,7 @@ impl ReferenceProcessor {
         sync.unforwarded_references = None;
     }
 
-    fn scan<T: TraceLocal>(&self, trace: &mut T, nursery: bool, retain: bool, thread_id: usize) {
+    fn scan<T: TraceLocal>(&self, trace: &mut T, nursery: bool, retain: bool, tls: *mut c_void) {
         let sync = unsafe { self.sync_mut() };
         sync.unforwarded_references = Some(sync.references.clone());
         let references: &mut Vec<Address> = &mut sync.references;
@@ -154,7 +156,7 @@ impl ReferenceProcessor {
                 let reference = unsafe { references[from_index].to_object_reference() };
 
                 /* Determine liveness (and forward if necessary) the reference */
-                let new_reference = VMReferenceGlue::process_reference(trace, reference, thread_id);
+                let new_reference = VMReferenceGlue::process_reference(trace, reference, tls);
                 if !new_reference.is_null() {
                     references[to_index] = new_reference.to_address();
                     to_index += 1;
@@ -173,7 +175,7 @@ impl ReferenceProcessor {
         }
 
         /* flush out any remset entries generated during the above activities */
-        unsafe { VMActivePlan::mutator(thread_id).flush_remembered_sets(); }
+        unsafe { VMActivePlan::mutator(tls).flush_remembered_sets(); }
         if TRACE { trace!("Ending ReferenceProcessor.scan({:?})", self.semantics); }
     }
 
@@ -227,15 +229,15 @@ pub fn forward_refs<T: TraceLocal>(trace: &mut T) {
     PHANTOM_REFERENCE_PROCESSOR.forward(trace, false);
 }
 
-pub fn scan_weak_refs<T: TraceLocal>(trace: &mut T, thread_id: usize) {
-    SOFT_REFERENCE_PROCESSOR.scan(trace, false, false, thread_id);
-    WEAK_REFERENCE_PROCESSOR.scan(trace, false, false, thread_id);
+pub fn scan_weak_refs<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+    SOFT_REFERENCE_PROCESSOR.scan(trace, false, false, tls);
+    WEAK_REFERENCE_PROCESSOR.scan(trace, false, false, tls);
 }
 
-pub fn scan_soft_refs<T: TraceLocal>(trace: &mut T, thread_id: usize) {
-    SOFT_REFERENCE_PROCESSOR.scan(trace, false, false, thread_id);
+pub fn scan_soft_refs<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+    SOFT_REFERENCE_PROCESSOR.scan(trace, false, false, tls);
 }
 
-pub fn scan_phantom_refs<T: TraceLocal>(trace: &mut T, thread_id: usize) {
-    PHANTOM_REFERENCE_PROCESSOR.scan(trace, false, false, thread_id);
+pub fn scan_phantom_refs<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+    PHANTOM_REFERENCE_PROCESSOR.scan(trace, false, false, tls);
 }

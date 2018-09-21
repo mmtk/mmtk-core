@@ -7,6 +7,8 @@ use ::plan::{TraceLocal, SelectedPlan, Plan, ParallelCollector};
 use super::active_plan::VMActivePlan;
 use super::super::ActivePlan;
 
+use libc::c_void;
+
 #[cfg(target_pointer_width = "32")]
 const REF_SLOT_SIZE: usize = 1;
 #[cfg(target_pointer_width = "64")]
@@ -14,14 +16,14 @@ const REF_SLOT_SIZE: usize = 2;
 
 const CHUNK_SIZE_MASK: usize = 0xFFFFFFFF - (REF_SLOT_SIZE - 1);
 
-pub fn scan_statics<T: TraceLocal>(trace: &mut T, thread_id: usize) {
+pub fn scan_statics<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
     unsafe {
         let slots = JTOC_BASE;
-        let cc = VMActivePlan::collector(thread_id);
+        let cc = VMActivePlan::collector(tls);
 
         let number_of_collectors: usize = cc.parallel_worker_count();
         let number_of_references: usize = jtoc_call!(GET_NUMBER_OF_REFERENCE_SLOTS_METHOD_OFFSET,
-            thread_id);
+            tls);
         let chunk_size: usize = (number_of_references / number_of_collectors) & CHUNK_SIZE_MASK;
         let thread_ordinal = cc.parallel_worker_ordinal();
 

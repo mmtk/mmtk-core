@@ -2,10 +2,12 @@ use ::vm::object_model::ObjectModel;
 use ::util::{Address, ObjectReference};
 use ::plan::Allocator;
 
+use libc::c_void;
+
 pub struct VMObjectModel {}
 
 impl ObjectModel for VMObjectModel {
-    fn copy(from: ObjectReference, allocator: Allocator, thread_id: usize) -> ObjectReference {
+    fn copy(from: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
         unimplemented!()
     }
 
