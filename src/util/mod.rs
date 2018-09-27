@@ -13,6 +13,8 @@ pub mod constants;
 pub mod global_pool;
 pub mod sanity;
 pub mod stats;
+pub mod shared_queue;
+pub mod local_queue;
 mod synchronized_counter;
 pub mod reference_processor;
 
