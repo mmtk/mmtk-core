@@ -43,6 +43,7 @@ impl TraceLocal for SSTraceLocal {
                 }
             }
         }
+        debug_assert!(self.root_locations.is_empty());
     }
 
     fn process_root_edge(&mut self, slot: Address, untraced: bool) {
@@ -87,6 +88,7 @@ impl TraceLocal for SSTraceLocal {
         let id = self.tls;
 
         self.process_roots();
+        debug_assert!(self.root_locations.is_empty());
         loop {
             match self.values.dequeue() {
                 Some(object) => {
@@ -97,9 +99,15 @@ impl TraceLocal for SSTraceLocal {
                 }
             }
         }
+        debug_assert!(self.root_locations.is_empty());
+        debug_assert!(self.values.is_empty());
     }
 
-    fn release(&mut self) {}
+    fn release(&mut self) {
+        // Reset the local buffer (throwing away any local entries).
+        self.root_locations.reset();
+        self.values.reset();
+    }
 
     fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, root: bool) {
         let interior_ref: Address = unsafe { slot.load() };

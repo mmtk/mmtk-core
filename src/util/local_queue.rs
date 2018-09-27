@@ -49,4 +49,8 @@ impl<'a, T> LocalQueue<'a, T> {
     pub fn is_empty(&self) -> bool {
         self.buffer.is_empty()
     }
+
+    pub fn reset(&mut self) {
+        self.buffer.clear();
+    }
 }

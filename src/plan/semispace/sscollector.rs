@@ -1,29 +1,21 @@
+use ::plan::{phase, Phase};
+use ::plan::Allocator as AllocationType;
 use ::plan::CollectorContext;
 use ::plan::ParallelCollector;
 use ::plan::ParallelCollectorGroup;
 use ::plan::semispace;
-use ::plan::{phase, Phase};
+use ::plan::semispace::PLAN;
 use ::plan::TraceLocal;
-use ::plan::Allocator as AllocationType;
-
+use ::policy::copyspace::CopySpace;
+use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
 use ::util::alloc::BumpAllocator;
-use ::util::{Address, ObjectReference};
 use ::util::forwarding_word::clear_forwarding_bits;
-
+use ::util::heap::{MonotonePageResource, PageResource};
 use ::util::reference_processor::*;
-
-use ::policy::copyspace::CopySpace;
-
-use ::util::heap::{PageResource, MonotonePageResource};
-
 use ::vm::{Scanning, VMScanning};
-
-use ::plan::semispace::PLAN;
-
-use super::sstracelocal::SSTraceLocal;
-
 use libc::c_void;
+use super::sstracelocal::SSTraceLocal;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector {
@@ -70,6 +62,7 @@ impl CollectorContext for SSCollector {
     }
 
     fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
+        println!("t {:?} cp {:?}", tls, phase);
         match phase {
             &Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
             &Phase::StackRoots => {
@@ -125,8 +118,14 @@ impl CollectorContext for SSCollector {
             &Phase::Complete => {
                 debug_assert!(self.trace.is_empty());
             }
-            &Phase::Closure => { self.trace.complete_trace() }
-            &Phase::Release => { self.trace.release() }
+            &Phase::Closure => {
+                self.trace.complete_trace();
+                debug_assert!(self.trace.is_empty());
+            }
+            &Phase::Release => {
+                self.trace.release();
+                debug_assert!(self.trace.is_empty());
+            }
             _ => { panic!("Per-collector phase not handled") }
         }
     }
@@ -138,10 +137,10 @@ impl CollectorContext for SSCollector {
     fn post_copy(&self, object: ObjectReference, rvm_type: Address, bytes: usize, allocator: ::plan::Allocator) {
         clear_forwarding_bits(object);
         match allocator {
-            ::plan::Allocator::Default => {},
+            ::plan::Allocator::Default => {}
             _ => {
                 panic!("Currently we can't copy to other spaces other than copyspace")
-            },
+            }
         }
     }
 }
