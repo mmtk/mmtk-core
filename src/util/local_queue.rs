@@ -7,7 +7,7 @@ const PAGES_PER_BUFFER: usize = 1 << LOG_PAGES_PER_BUFFER;
 const LOG_BUFFER_SIZE: usize = (LOG_BYTES_IN_PAGE as usize + LOG_PAGES_PER_BUFFER);
 const BUFFER_SIZE: usize = 1 << LOG_BUFFER_SIZE;
 
-pub struct LocalQueue<'a, T> {
+pub struct LocalQueue<'a, T: 'a> {
     queue: &'a SharedQueue<T>,
     buffer: Vec<T>,
     id: usize,
@@ -44,5 +44,9 @@ impl<'a, T> LocalQueue<'a, T> {
                 None => None
             }
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
     }
 }

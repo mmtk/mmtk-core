@@ -1,25 +1,18 @@
-use ::plan::{TransitiveClosure, TraceLocal};
-use ::plan::trace::Trace;
-use ::util::{Address, ObjectReference};
-use ::policy::space::Space;
-use ::vm::VMScanning;
-use ::vm::Scanning;
-use std::sync::mpsc::Sender;
-use crossbeam_deque::{Steal, Stealer};
-
-use super::ss;
+use ::plan::{TraceLocal, TransitiveClosure};
 use ::plan::semispace::PLAN;
-
+use ::plan::trace::Trace;
+use ::policy::space::Space;
+use ::util::{Address, ObjectReference};
+use ::util::local_queue::LocalQueue;
+use ::vm::Scanning;
+use ::vm::VMScanning;
 use libc::c_void;
-
-const PUSH_BACK_THRESHOLD: usize = 50;
+use super::ss;
 
 pub struct SSTraceLocal {
     tls: *mut c_void,
-    values: Vec<ObjectReference>,
-    values_pool: (Stealer<ObjectReference>, Sender<ObjectReference>),
-    root_locations: Vec<Address>,
-    root_locations_pool: (Stealer<Address>, Sender<Address>),
+    values: LocalQueue<'static, ObjectReference>,
+    root_locations: LocalQueue<'static, Address>,
 }
 
 impl TransitiveClosure for SSTraceLocal {
@@ -34,30 +27,21 @@ impl TransitiveClosure for SSTraceLocal {
 
     fn process_node(&mut self, object: ObjectReference) {
         trace!("process_node({:?})", object);
-        if self.values.len() >= PUSH_BACK_THRESHOLD {
-            self.values_pool.1.send(object).unwrap();
-        } else {
-            self.values.push(object);
-        }
+        self.values.enqueue(object);
     }
 }
 
 impl TraceLocal for SSTraceLocal {
     fn process_roots(&mut self) {
         loop {
-            let slot = {
-                if !self.root_locations.is_empty() {
-                    self.root_locations.pop().unwrap()
-                } else {
-                    let work = self.root_locations_pool.0.steal();
-                    match work {
-                        Steal::Data(s) => s,
-                        Steal::Empty => return,
-                        Steal::Retry => continue
-                    }
+            match self.root_locations.dequeue() {
+                Some(slot) => {
+                    self.process_root_edge(slot, true)
                 }
-            };
-            self.process_root_edge(slot, true)
+                None => {
+                    break;
+                }
+            }
         }
     }
 
@@ -102,24 +86,16 @@ impl TraceLocal for SSTraceLocal {
     fn complete_trace(&mut self) {
         let id = self.tls;
 
-        // TODO Global empty or local empty
-        // if !self.root_locations.is_empty() {
         self.process_roots();
-        // }
         loop {
-            let object = {
-                if !self.values.is_empty() {
-                    self.values.pop().unwrap()
-                } else {
-                    let work = self.values_pool.0.steal();
-                    match work {
-                        Steal::Data(o) => o,
-                        Steal::Empty => return,
-                        Steal::Retry => continue
-                    }
+            match self.values.dequeue() {
+                Some(object) => {
+                    VMScanning::scan_object(self, object, id);
                 }
-            };
-            VMScanning::scan_object(self, object, id);
+                None => {
+                    break;
+                }
+            }
         }
     }
 
@@ -135,15 +111,8 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn report_delayed_root_edge(&mut self, slot: Address) {
-        trace!("report_delayed_root_edge {:?} local len: {:?}", slot, self.root_locations.len());
-        if self.root_locations.len() >= PUSH_BACK_THRESHOLD {
-            trace!("self.root_locations_pool.1.send({:?})", slot);
-            self.root_locations_pool.1.send(slot).unwrap();
-            trace!("self.root_locations_pool.1.sent");
-        } else {
-            trace!("self.root_locations.push({:?})", slot);
-            self.root_locations.push(slot);
-        }
+        trace!("report_delayed_root_edge {:?}", slot);
+        self.root_locations.enqueue(slot);
     }
 
     fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool {
@@ -183,17 +152,19 @@ impl TraceLocal for SSTraceLocal {
 }
 
 impl SSTraceLocal {
-    pub fn new(ss_trace: &Trace) -> Self {
+    pub fn new(ss_trace: &'static Trace) -> Self {
         SSTraceLocal {
             tls: 0 as *mut c_void,
-            values: Vec::new(),
-            values_pool: PLAN.ss_trace.get_value_pool(),
-            root_locations: Vec::new(),
-            root_locations_pool: PLAN.ss_trace.get_root_location_pool(),
+            values: ss_trace.values.spawn_local(),
+            root_locations: ss_trace.root_locations.spawn_local(),
         }
     }
 
     pub fn init(&mut self, tls: *mut c_void) {
         self.tls = tls;
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.root_locations.is_empty() && self.values.is_empty()
     }
 }

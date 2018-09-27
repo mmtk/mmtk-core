@@ -10,7 +10,6 @@ pub mod forwarding_word;
 pub mod header_byte;
 pub mod logger;
 pub mod constants;
-pub mod global_pool;
 pub mod sanity;
 pub mod stats;
 pub mod shared_queue;

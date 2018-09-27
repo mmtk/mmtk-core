@@ -1,10 +1,14 @@
+use ::util::local_queue::LocalQueue;
 use std::collections::HashMap;
 use std::sync::{Condvar, Mutex};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 type Block<T> = Vec<T>;
 
 pub struct SharedQueue<T> {
     blocks: Mutex<Vec<Block<T>>>,
+    count: AtomicUsize,
     bitmap: Mutex<HashMap<usize, bool>>,
 }
 
@@ -12,6 +16,7 @@ impl<T> SharedQueue<T> {
     pub fn new() -> Self {
         SharedQueue {
             blocks: Mutex::new(Vec::new()),
+            count: AtomicUsize::new(0),
             bitmap: Mutex::new(HashMap::new()),
         }
     }
@@ -49,13 +54,20 @@ impl<T> SharedQueue<T> {
         return None;
     }
 
-    pub fn register(&self, id: usize) {
-        let mut bitmap = self.bitmap.lock().unwrap();
-        bitmap.insert(id, false);
-    }
-
     pub fn push(&self, b: Block<T>) {
         let mut blocks = self.blocks.lock().unwrap();
         blocks.push(b);
+    }
+
+    pub fn spawn_local(&self) -> LocalQueue<T> {
+        let mut bitmap = self.bitmap.lock().unwrap();
+        let id = self.count.fetch_add(1, Ordering::SeqCst);
+        bitmap.insert(id, false);
+        LocalQueue::new(id, self)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        let blocks = self.blocks.lock().unwrap();
+        blocks.is_empty()
     }
 }

@@ -216,6 +216,8 @@ impl Plan for SemiSpace {
                     memory_scan::scan_region();
                     println!("Finished one GC");
                 }
+                debug_assert!(self.ss_trace.values.is_empty());
+                debug_assert!(self.ss_trace.root_locations.is_empty());
                 plan::set_gc_status(plan::GcStatus::NotInGC);
             }
             _ => {

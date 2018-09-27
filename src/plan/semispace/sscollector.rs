@@ -123,6 +123,7 @@ impl CollectorContext for SSCollector {
                 }
             }
             &Phase::Complete => {
+                debug_assert!(self.trace.is_empty());
             }
             &Phase::Closure => { self.trace.complete_trace() }
             &Phase::Release => { self.trace.release() }
