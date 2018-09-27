@@ -12,3 +12,5 @@ pub const NEEDS_CONCURRENT_WORKERS: bool = false;
 pub const GENERATE_GC_TRACE: bool = false;
 
 pub const MAX_NON_LOS_COPY_BYTES: usize = MAX_INT;
+
+pub const NEEDS_FORWARD_AFTER_LIVENESS: bool = false;

@@ -16,6 +16,7 @@ use ::util::reference_processor::*;
 use ::vm::{Scanning, VMScanning};
 use libc::c_void;
 use super::sstracelocal::SSTraceLocal;
+use ::plan::selected_plan::SelectedConstraints;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector {
@@ -106,7 +107,7 @@ impl CollectorContext for SSCollector {
                 }
             }
             &Phase::ForwardRefs => {
-                if primary {
+                if primary && SelectedConstraints::NEEDS_FORWARD_AFTER_LIVENESS {
                     forward_refs(&mut self.trace)
                 }
             }
