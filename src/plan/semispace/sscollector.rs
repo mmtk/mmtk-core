@@ -63,7 +63,6 @@ impl CollectorContext for SSCollector {
     }
 
     fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
-        println!("t {:?} cp {:?}", tls, phase);
         match phase {
             &Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
             &Phase::StackRoots => {
