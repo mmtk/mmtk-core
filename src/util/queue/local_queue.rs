@@ -26,6 +26,7 @@ impl<'a, T> LocalQueue<'a, T> where T: Debug {
             let mut b = Vec::with_capacity(BUFFER_SIZE);
             mem::swap(&mut b, &mut self.buffer);
             self.queue.push(b);
+            self.enqueue(v);
         } else {
             self.buffer.push(v);
         }
