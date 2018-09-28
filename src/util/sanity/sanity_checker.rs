@@ -98,7 +98,7 @@ impl TraceLocal for SanityChecker{
 
         if !self.refs.contains(&object) {
             if !PLAN.is_valid_ref(object) {
-                panic!("Invalid reference")
+                panic!("Invalid reference {:?}", object);
             }
             // Object is not "marked"
             self.refs.insert(object); // "Mark" it

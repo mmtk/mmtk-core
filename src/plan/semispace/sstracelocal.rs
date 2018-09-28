@@ -3,7 +3,7 @@ use ::plan::semispace::PLAN;
 use ::plan::trace::Trace;
 use ::policy::space::Space;
 use ::util::{Address, ObjectReference};
-use ::util::local_queue::LocalQueue;
+use ::util::queue::LocalQueue;
 use ::vm::Scanning;
 use ::vm::VMScanning;
 use libc::c_void;

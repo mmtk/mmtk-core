@@ -1,11 +1,7 @@
-use ::util::constants::LOG_BYTES_IN_PAGE;
-use ::util::shared_queue::SharedQueue;
+use ::util::queue::SharedQueue;
+use std::fmt::Debug;
 use std::mem;
-
-const LOG_PAGES_PER_BUFFER: usize = 0;
-const PAGES_PER_BUFFER: usize = 1 << LOG_PAGES_PER_BUFFER;
-const LOG_BUFFER_SIZE: usize = (LOG_BYTES_IN_PAGE as usize + LOG_PAGES_PER_BUFFER);
-const BUFFER_SIZE: usize = 1 << LOG_BUFFER_SIZE;
+use super::{BUFFER_SIZE, TRACE_QUEUE};
 
 pub struct LocalQueue<'a, T: 'a> {
     queue: &'a SharedQueue<T>,
@@ -13,7 +9,7 @@ pub struct LocalQueue<'a, T: 'a> {
     id: usize,
 }
 
-impl<'a, T> LocalQueue<'a, T> {
+impl<'a, T> LocalQueue<'a, T> where T: Debug {
     pub fn new(id: usize, queue: &'a SharedQueue<T>) -> Self {
         LocalQueue {
             queue,
@@ -23,6 +19,9 @@ impl<'a, T> LocalQueue<'a, T> {
     }
 
     pub fn enqueue(&mut self, v: T) {
+        if TRACE_QUEUE {
+            println!("len {:?}", v);
+        }
         if self.buffer.len() >= BUFFER_SIZE {
             let mut b = Vec::with_capacity(BUFFER_SIZE);
             mem::swap(&mut b, &mut self.buffer);
@@ -34,7 +33,11 @@ impl<'a, T> LocalQueue<'a, T> {
 
     pub fn dequeue(&mut self) -> Option<T> {
         if !self.buffer.is_empty() {
-            return self.buffer.pop();
+            let result = self.buffer.pop();
+            if TRACE_QUEUE {
+                println!("lde {:?}", result);
+            }
+            return result;
         } else {
             match self.queue.spin(self.id) {
                 Some(b) => {

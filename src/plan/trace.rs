@@ -1,5 +1,5 @@
 use ::util::{Address, ObjectReference};
-use ::util::shared_queue::SharedQueue;
+use ::util::queue::SharedQueue;
 use crossbeam_deque::Stealer;
 use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;

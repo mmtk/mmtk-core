@@ -175,6 +175,8 @@ impl Plan for SemiSpace {
                     println!("Pre GC sanity check");
                     unsync.sanity_checker.check(tls);
                 }
+                debug_assert!(self.ss_trace.values.is_empty());
+                debug_assert!(self.ss_trace.root_locations.is_empty());
                 unsync.hi = !unsync.hi; // flip the semi-spaces
                 // prepare each of the collected regions
                 unsync.copyspace0.prepare(unsync.hi);

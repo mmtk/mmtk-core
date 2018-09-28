@@ -124,6 +124,7 @@ impl CollectorContext for SSCollector {
                 debug_assert!(self.trace.is_empty());
             }
             &Phase::Release => {
+                debug_assert!(self.trace.is_empty());
                 self.trace.release();
                 debug_assert!(self.trace.is_empty());
             }

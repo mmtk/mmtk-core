@@ -12,8 +12,7 @@ pub mod logger;
 pub mod constants;
 pub mod sanity;
 pub mod stats;
-pub mod shared_queue;
-pub mod local_queue;
+pub mod queue;
 mod synchronized_counter;
 pub mod reference_processor;
 
