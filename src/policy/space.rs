@@ -134,6 +134,7 @@ pub struct CommonSpace<PR: PageResource> {
     pub head_discontiguous_region: Address,
 }
 
+// FIXME replace with atomic ints
 static mut SPACE_COUNT: usize = 0;
 static mut HEAP_CURSOR: Address = HEAP_START;
 static mut HEAP_LIMIT: Address = HEAP_END;
