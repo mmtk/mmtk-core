@@ -14,7 +14,7 @@ use ::vm::VMObjectModel;
 use ::plan::Allocator;
 
 use std::cell::UnsafeCell;
-use libc::c_void;
+use libc::{c_void, mprotect, PROT_NONE, PROT_EXEC, PROT_WRITE, PROT_READ};
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -108,5 +108,23 @@ impl CopySpace {
             trace!("Copying [{:?} -> {:?}]", object, new_object);
             return new_object;
         }
+    }
+
+    pub fn protect(&self) {
+        let start = self.common().start.as_usize();
+        let extent = self.common().extent;
+        unsafe {
+            mprotect(start as *mut c_void, extent, PROT_NONE);
+        }
+        trace!("Protect {:x} {:x}", start, start + extent);
+    }
+
+    pub fn unprotect(&self) {
+        let start = self.common().start.as_usize();
+        let extent = self.common().extent;
+        unsafe {
+            mprotect(start as *mut c_void, extent, PROT_READ | PROT_WRITE | PROT_EXEC);
+        }
+        trace!("Unprotect {:x} {:x}", start, start + extent);
     }
 }
