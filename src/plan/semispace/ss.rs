@@ -177,6 +177,9 @@ impl Plan for SemiSpace {
                 }
                 debug_assert!(self.ss_trace.values.is_empty());
                 debug_assert!(self.ss_trace.root_locations.is_empty());
+                if cfg!(feature = "sanity") {
+                    self.fromspace().unprotect();
+                }
                 unsync.hi = !unsync.hi; // flip the semi-spaces
                 // prepare each of the collected regions
                 unsync.copyspace0.prepare(unsync.hi);
@@ -220,6 +223,9 @@ impl Plan for SemiSpace {
                 }
                 debug_assert!(self.ss_trace.values.is_empty());
                 debug_assert!(self.ss_trace.root_locations.is_empty());
+                if cfg!(feature = "sanity") {
+                    self.fromspace().unprotect();
+                }
                 plan::set_gc_status(plan::GcStatus::NotInGC);
             }
             _ => {
