@@ -224,7 +224,7 @@ impl Plan for SemiSpace {
                 debug_assert!(self.ss_trace.values.is_empty());
                 debug_assert!(self.ss_trace.root_locations.is_empty());
                 if cfg!(feature = "sanity") {
-                    self.fromspace().unprotect();
+                    self.fromspace().protect();
                 }
                 plan::set_gc_status(plan::GcStatus::NotInGC);
             }
