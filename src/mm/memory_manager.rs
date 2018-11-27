@@ -19,6 +19,9 @@ use ::vm::{Collection, VMCollection};
 #[cfg(feature = "jikesrvm")]
 use ::vm::jikesrvm::JTOC_BASE;
 
+#[cfg(feature = "openjdk")]
+use ::vm::openjdk::UPCALLS;
+
 use ::util::{Address, ObjectReference};
 use ::util::options::OPTION_MAP;
 
@@ -47,26 +50,49 @@ pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
 
 #[no_mangle]
 #[cfg(not(feature = "jikesrvm"))]
-pub extern fn jikesrvm_gc_init(_jtoc: *mut c_void, _heap_size: usize) {
+pub unsafe extern fn jikesrvm_gc_init(_jtoc: *mut c_void, _heap_size: usize) {
     panic!("Cannot call jikesrvm_gc_init when not building for JikesRVM");
 }
 
+#[repr(C)]
+pub struct OpenJDK_Upcalls {
+    stop_all_mutators: extern "C" fn(tls: *mut c_void),
+    resume_mutators: extern "C" fn(tls: *mut c_void),
+}
+
 #[no_mangle]
-#[cfg(feature = "jikesrvm")]
+#[cfg(feature = "openjdk")]
+pub unsafe extern fn openjdk_gc_init(calls: *const OpenJDK_Upcalls, heap_size: usize) {
+    ::util::logger::init().unwrap();
+    UPCALLS = calls;
+    selected_plan::PLAN.gc_init(heap_size);
+}
+
+#[no_mangle]
+#[cfg(not(feature = "openjdk"))]
+pub unsafe extern fn openjdk_gc_init(calls: *const OpenJDK_Upcalls, heap_size: usize) {
+    panic!("Cannot call openjdk_gc_init when not building for OpenJDK");
+}
+
+#[no_mangle]
+#[cfg(any(feature = "jikesrvm", feature = "openjdk"))]
 pub extern fn start_control_collector(tls: *mut c_void) {
     CONTROL_COLLECTOR_CONTEXT.run(tls);
 }
 
 #[no_mangle]
-#[cfg(not(feature = "jikesrvm"))]
-pub extern fn start_control_collector(rvm_thread: *mut c_void) {
-    panic!("Cannot call start_control_collector when not building for JikesRVM");
+#[cfg(not(any(feature = "jikesrvm", feature = "openjdk")))]
+pub extern fn start_control_collector(tls: *mut c_void) {
+    panic!("Cannot call start_control_collector when not building for JikesRVM or OpenJDK");
 }
 
 #[no_mangle]
 pub unsafe extern fn gc_init(heap_size: usize) {
     if cfg!(feature = "jikesrvm") {
         panic!("Should be calling jikesrvm_gc_init instead");
+    }
+    if cfg!(feature = "openjdk") {
+        panic!("Should be calling openjdk_gc_init instead");
     }
     ::util::logger::init().unwrap();
     selected_plan::PLAN.gc_init(heap_size);

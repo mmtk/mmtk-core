@@ -37,7 +37,7 @@ pub use self::jikesrvm::memory::VMMemory as VMMemory;
 pub use self::jikesrvm::JikesRVM;
 
 #[cfg(feature = "openjdk")]
-mod openjdk;
+pub mod openjdk;
 
 #[cfg(feature = "openjdk")]
 pub use self::openjdk::*;
