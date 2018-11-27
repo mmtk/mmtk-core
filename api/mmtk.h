@@ -65,6 +65,9 @@ extern void jikesrvm_gc_init(void* jtoc, size_t heap_size);
 
 extern void enable_collection(void *tls);
 
+extern void* jikesrvm_alloc_slow(MMTk_Mutator mutator, size_t size,
+    size_t align, ssize_t offset, int allocator);
+
 /**
  * VM Accounting
  */
