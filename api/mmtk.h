@@ -1,3 +1,6 @@
+#ifndef MMTK_H
+#define MMTK_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -109,3 +112,5 @@ extern void add_phantom_candidate(void* ref, void* referent);
 #ifdef __cplusplus
 }
 #endif
+
+#endif // MMTK_H
