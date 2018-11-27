@@ -32,7 +32,7 @@ pub use self::jikesrvm::reference_glue::VMReferenceGlue as VMReferenceGlue;
 pub use self::jikesrvm::JikesRVM;
 
 #[cfg(feature = "openjdk")]
-mod openjdk;
+pub mod openjdk;
 
 #[cfg(feature = "openjdk")]
 pub use self::openjdk::*;

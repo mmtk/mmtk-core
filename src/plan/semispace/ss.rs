@@ -105,7 +105,9 @@ impl Plan for SemiSpace {
         unsync.copyspace1.init();
         unsync.versatile_space.init();
 
-        if !cfg!(feature = "jikesrvm") {
+        // These VMs require that the controller thread is started by the VM itself.
+        // (Usually because it calls into VM code that accesses the TLS.)
+        if !(cfg!(feature = "jikesrvm") || cfg!(feature = "openjdk")) {
             thread::spawn(|| {
                 ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(0 as *mut c_void)
             });

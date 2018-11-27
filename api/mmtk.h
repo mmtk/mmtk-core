@@ -55,6 +55,9 @@ extern bool process(char* name, char* value);
 extern void scan_region();
 extern void handle_user_collection_request(void *tls);
 
+extern void start_control_collector(void *tls);
+extern void start_worker(void *tls, void* worker);
+
 /**
  * JikesRVM-specific
  */
@@ -62,19 +65,22 @@ extern void jikesrvm_gc_init(void* jtoc, size_t heap_size);
 
 extern void enable_collection(void *tls);
 
-extern void start_control_collector(void *tls);
-
-extern void start_worker(void *tls, void* worker);
-
 /**
-  * VM Accounting
-  */
+ * VM Accounting
+ */
 extern size_t free_bytes();
 extern size_t total_bytes();
 
 /**
  * OpenJDK-specific
  */
+typedef struct {
+    void (*stop_all_mutators) (void *tls);
+    void (*resume_mutators) (void *tls);
+} OpenJDK_Upcalls;
+
+extern void openjdk_gc_init(OpenJDK_Upcalls *calls, size_t heap_size);
+
 extern size_t used_bytes();
 extern void* starting_heap_address();
 extern void* last_heap_address();
