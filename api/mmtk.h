@@ -66,6 +66,9 @@ extern void start_control_collector(void *tls);
 
 extern void start_worker(void *tls, void* worker);
 
+extern void* jikesrvm_alloc_slow(MMTk_Mutator mutator, size_t size,
+    size_t align, ssize_t offset, int allocator);
+
 /**
   * VM Accounting
   */
