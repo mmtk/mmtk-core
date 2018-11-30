@@ -56,8 +56,8 @@ pub unsafe extern fn jikesrvm_gc_init(_jtoc: *mut c_void, _heap_size: usize) {
 
 #[repr(C)]
 pub struct OpenJDK_Upcalls {
-    stop_all_mutators: extern "C" fn(tls: *mut c_void),
-    resume_mutators: extern "C" fn(tls: *mut c_void),
+    pub stop_all_mutators: extern "C" fn(tls: *mut c_void),
+    pub resume_mutators: extern "C" fn(tls: *mut c_void),
 }
 
 #[no_mangle]
