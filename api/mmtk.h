@@ -1,11 +1,12 @@
 #ifndef MMTK_H
 #define MMTK_H
 
+#include <stdbool.h>
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stdbool.h>
 
 typedef void* MMTk_Mutator;
 typedef void* MMTk_TraceLocal;
