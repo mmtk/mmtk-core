@@ -72,6 +72,8 @@ extern void enable_collection(void *tls);
 extern void* jikesrvm_alloc_slow(MMTk_Mutator mutator, size_t size,
     size_t align, ssize_t offset, int allocator);
 
+extern void jikesrvm_handle_user_collection_request(void *tls);
+
 /**
  * VM Accounting
  */
