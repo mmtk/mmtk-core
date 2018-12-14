@@ -19,7 +19,7 @@ jikesrvm_handle_user_collection_request:
     pushl 0x100(%esi)
     mov %esp, 0x100(%esi)
     pushl $0xffffffff #method id
-    pushl 0x1c(%esp)
+    pushl 0xc(%esp)
     call handle_user_collection_request
     add $0x8, %esp #shrink stack for args and method id
     popl 0x100(%esi)
