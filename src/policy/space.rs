@@ -13,6 +13,7 @@ use ::plan::selected_plan::PLAN;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ::util::constants::LOG_BYTES_IN_MBYTE;
+use ::util::conversions;
 
 use std::fmt::Debug;
 
@@ -113,6 +114,15 @@ pub trait Space: Sized + Debug + 'static {
 
     fn is_live(&self, object: ObjectReference) -> bool;
     fn is_movable(&self) -> bool;
+
+
+    fn release_discontiguous_chunks(&mut self, chunk: Address) {
+        debug_assert!(chunk == conversions::chunk_align(chunk, true));
+        if chunk == self.common().head_discontiguous_region {
+            self.common_mut().head_discontiguous_region = ::util::heap::layout::heap_layout::VM_MAP.get_next_contiguous_region(chunk);
+        }
+        ::util::heap::layout::heap_layout::VM_MAP.free_contiguous_chunks(chunk);
+    }
 }
 
 #[derive(Debug)]
@@ -220,6 +230,14 @@ impl<PR: PageResource> CommonSpace<PR> {
 
         rtn
     }
+}
+
+pub fn get_discontig_start() -> Address {
+    unsafe { HEAP_START }
+}
+
+pub fn get_discontig_end() -> Address {
+    unsafe { HEAP_LIMIT - 1 }
 }
 
 fn get_frac_available(frac: f32) -> usize {

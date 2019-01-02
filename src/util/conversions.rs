@@ -2,6 +2,31 @@ use ::util::Address;
 use ::util::heap::layout::vm_layout_constants::*;
 use ::util::constants::*;
 
+pub fn page_align(address: Address) -> Address {
+    Address((address.0 >> LOG_BYTES_IN_PAGE) << LOG_BYTES_IN_PAGE)
+}
+
+pub fn is_page_aligned(address: Address) -> bool {
+    page_align(address) == address
+}
+
+pub fn align_word(mut addr: usize, bits: usize, down: bool) -> usize {
+    if !down {
+      if BITS_IN_ADDRESS == 64 && bits >= 32 {
+        debug_assert!(bits < 64);
+        addr = addr + ((1usize << bits) - 1);
+      } else {
+        debug_assert!(bits < 32);
+        addr = addr + ((1 << bits) - 1);
+      }
+    }
+    (addr >> bits) << bits
+}
+
+pub fn align_up(addr: Address, bits: usize) -> Address {
+    Address(align_word(addr.0, bits, false))
+}
+
 #[macro_export]
 macro_rules! chunk_align {
     ($addr:expr, $down:expr) => (

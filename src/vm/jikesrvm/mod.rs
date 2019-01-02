@@ -23,6 +23,7 @@ pub mod heap_layout_constants;
 pub mod boot_image_size;
 pub mod scan_sanity;
 pub mod reference_glue;
+pub mod memory;
 
 use ::util::address::Address;
 use plan::TraceLocal;
