@@ -3,12 +3,14 @@ mod scanning;
 mod collection;
 mod active_plan;
 mod reference_glue;
+mod memory;
 pub mod unboxed_size_constants;
 pub use self::object_model::ObjectModel;
 pub use self::scanning::Scanning;
 pub use self::collection::Collection;
 pub use self::active_plan::ActivePlan;
 pub use self::reference_glue::ReferenceGlue;
+pub use self::memory::Memory;
 
 #[cfg(feature = "jikesrvm")]
 pub mod jikesrvm;
@@ -27,6 +29,9 @@ pub use self::jikesrvm::active_plan::VMActivePlan as VMActivePlan;
 
 #[cfg(feature = "jikesrvm")]
 pub use self::jikesrvm::reference_glue::VMReferenceGlue as VMReferenceGlue;
+
+#[cfg(feature = "jikesrvm")]
+pub use self::jikesrvm::memory::VMMemory as VMMemory;
 
 #[cfg(feature = "jikesrvm")]
 pub use self::jikesrvm::JikesRVM;
