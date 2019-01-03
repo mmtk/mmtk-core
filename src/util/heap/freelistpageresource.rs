@@ -1,38 +1,28 @@
-use std::ptr::null_mut;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
-use std::marker::PhantomData;
-
-use ::util::address::Address;
-use ::util::conversions::*;
-use ::policy::space::Space;
-use ::policy::space::required_chunks;
-use super::vmrequest::HEAP_LAYOUT_64BIT;
-use super::layout::vm_layout_constants::BYTES_IN_CHUNK;
-
-use ::util::heap::pageresource::CommonPageResource;
-use ::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
-use ::util::alloc::embedded_meta_data::*;
-
-use super::layout::Mmapper;
-use super::layout::heap_layout::MMAPPER;
-
-use super::PageResource;
-use std::sync::atomic::Ordering;
-use ::util::generic_freelist;
-use ::util::generic_freelist::GenericFreeList;
-#[cfg(target_pointer_width = "32")]
-use ::util::int_array_freelist::IntArrayFreeList as FreeList;
-use ::util::heap::layout::vm_layout_constants::*;
-use ::util::heap::layout::heap_layout;
-use ::util::alloc::embedded_meta_data::*;
-use ::util::conversions;
-use ::util::constants::*;
-use super::vmrequest::*;
 use std::mem;
 use std::ops::{Deref, DerefMut};
-
+use std::sync::atomic::Ordering;
 use libc::{c_void, memset};
+
+use util::address::Address;
+use util::heap::pageresource::CommonPageResource;
+use util::alloc::embedded_meta_data::*;
+use util::generic_freelist;
+use util::generic_freelist::GenericFreeList;
+#[cfg(target_pointer_width = "32")]
+use util::int_array_freelist::IntArrayFreeList as FreeList;
+use util::heap::layout::vm_layout_constants::*;
+use util::heap::layout::heap_layout;
+use util::conversions;
+use util::constants::*;
+use policy::space::Space;
+use vm::{VMMemory, Memory};
+use super::vmrequest::HEAP_LAYOUT_64BIT;
+use super::layout::Mmapper;
+use super::layout::heap_layout::MMAPPER;
+use super::PageResource;
+
 
 const SPACE_ALIGN: usize = 1 << 19;
 
@@ -124,7 +114,7 @@ impl<S: Space<PR = FreeListPageResource<S>>> PageResource for FreeListPageResour
         self.common().space.unwrap().grow_space(rtn, bytes, new_chunk);
         MMAPPER.ensure_mapped(rtn, required_pages);
         if zeroed {
-            unsafe { memset(rtn.to_ptr_mut() as *mut c_void, 0, bytes); }
+            VMMemory::zero(rtn, bytes);
         }
         rtn
     }
@@ -275,7 +265,7 @@ impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {
         }
     }
 
-    fn release_pages(&mut self, first: Address) {
+    pub fn release_pages(&mut self, first: Address) {
         debug_assert!(conversions::is_page_aligned(first));
         let page_offset = conversions::bytes_to_pages(first - self.start);
         let pages = self.free_list.size(page_offset as _);

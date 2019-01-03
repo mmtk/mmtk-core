@@ -65,8 +65,12 @@ pub trait Space: Sized + Debug + 'static {
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
-        object.value() >= self.common().start.as_usize()
-            && object.value() < self.common().start.as_usize() + self.common().extent
+        if !self.common().contiguous {
+            ::util::heap::layout::heap_layout::VM_MAP.get_descriptor_for_address(object.to_address()) == self.common().descriptor
+        } else {
+            object.value() >= self.common().start.as_usize()
+                && object.value() < self.common().start.as_usize() + self.common().extent
+        }
     }
 
     // UNSAFE: potential data race as this mutates 'common'

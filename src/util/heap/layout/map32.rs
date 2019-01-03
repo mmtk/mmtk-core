@@ -4,6 +4,7 @@ use ::util::constants::*;
 use ::util::heap::layout::heap_parameters::*;
 use ::util::Address;
 use ::util::int_array_freelist::IntArrayFreeList;
+use ::util::heap::PageResource;
 use ::util::heap::FreeListPageResource;
 use ::util::heap::freelistpageresource::CommonFreeListPageResource;
 use std::sync::Mutex;
@@ -28,6 +29,7 @@ pub struct Map32 {
     total_available_discontiguous_chunks: usize,
     finalized: bool,
     sync: Mutex<()>,
+    descriptor_map: Vec<usize>,
 }
 
 impl Map32 {
@@ -42,6 +44,20 @@ impl Map32 {
             total_available_discontiguous_chunks: 0,
             finalized: false,
             sync: Mutex::new(()),
+            descriptor_map: vec![0; MAX_CHUNKS],
+        }
+    }
+
+    #[allow(mutable_transmutes)]
+    pub fn insert(&self, start: Address, extent: usize, descriptor: usize) {
+        let self_mut: &mut Self = unsafe { mem::transmute(self) };
+        let mut e = 0;
+        while e < extent {
+            let index = self.get_chunk_index(start + e);
+            assert!(self.descriptor_map[index] == 0, "Conflicting virtual address request");
+            self_mut.descriptor_map[index] = descriptor;
+            //   VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, index, space);
+            e += BYTES_IN_CHUNK;
         }
     }
 
@@ -133,6 +149,10 @@ impl Map32 {
         if prev != 0 { self_mut.next_link[prev as usize] = next };
         self_mut.prev_link[chunk as usize] = 0;
         self_mut.next_link[chunk as usize] = 0;
+        for offset in 0..chunks {
+            self_mut.descriptor_map[(chunk + offset) as usize] = 0;
+            // VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, chunk + offset, null);
+        }
         chunks as _
     }
 
@@ -194,6 +214,11 @@ impl Map32 {
         self_mut.shared_fl_map[self.shared_discontig_fl_count] = Some(unsafe { &*(pr as *const CommonFreeListPageResource) });
         self_mut.shared_discontig_fl_count += 1;
         self.shared_discontig_fl_count
+    }
+
+    pub fn get_descriptor_for_address(&self, address: Address) -> usize {
+        let index = self.get_chunk_index(address);
+        self.descriptor_map[index]
     }
 
     fn get_chunk_index(&self, address: Address) -> usize {
