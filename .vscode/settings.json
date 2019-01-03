@@ -1,7 +1,7 @@
 {
     "rust.no_default_features": true,
     "rust.features": [
-        "jikesrvm", "semispace"
+        "nogc"
     ],
     "rust.target": "i686-apple-darwin",
     "rust.unstable_features": true
