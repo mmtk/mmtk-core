@@ -121,6 +121,8 @@ options!{
     use_return_barrier:    bool                 [always_valid] = false,
     eager_complete_sweep:  bool                 [always_valid] = false,
     ignore_system_g_c:     bool                 [always_valid] = false,
+    // Note: Not used. To workaround cmd args passed by the running script
+    variable_size_heap:    bool                 [always_valid] = true,
     no_finalizer:          bool                 [always_valid] = false,
     no_reference_types:    bool                 [always_valid] = false,
     nursery_zeroing:       NurseryZeroingOptions[always_valid] = NurseryZeroingOptions::Temporal,
