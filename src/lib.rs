@@ -1,6 +1,7 @@
 #![feature(asm)]
 #![feature(const_fn)]
 #![feature(integer_atomics)]
+#![feature(drain_filter)]
 
 #[macro_use]
 extern crate custom_derive;

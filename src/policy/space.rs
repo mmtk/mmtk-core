@@ -14,6 +14,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ::util::constants::LOG_BYTES_IN_MBYTE;
 use ::util::conversions;
+use ::util::heap::space_descriptor;
 
 use std::fmt::Debug;
 
@@ -65,7 +66,7 @@ pub trait Space: Sized + Debug + 'static {
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
-        if !self.common().contiguous {
+        if !space_descriptor::is_contiguous(self.common().descriptor) {
             ::util::heap::layout::heap_layout::VM_MAP.get_descriptor_for_address(object.to_address()) == self.common().descriptor
         } else {
             object.value() >= self.common().start.as_usize()
@@ -76,9 +77,7 @@ pub trait Space: Sized + Debug + 'static {
     // UNSAFE: potential data race as this mutates 'common'
     unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
         // FIXME
-        let new_head: Address = unimplemented!(); /*HeapLayout.vmMap. allocate_contiguous_chunks(self.common().descriptor,
-                                                                        self, chunks,
-                                                                        self.common().head_discontiguous_region);*/
+        let new_head: Address = ::util::heap::layout::heap_layout::VM_MAP.allocate_contiguous_chunks(self.common().descriptor, chunks, self.common().head_discontiguous_region);
         if new_head.is_zero() {
             return unsafe{Address::zero()};
         }
@@ -177,7 +176,7 @@ impl<PR: PageResource> CommonSpace<PR> {
         if vmrequest.is_discontiguous() {
             rtn.contiguous = false;
             // FIXME
-            // rtn.descriptor = SpaceDescriptor.createDescriptor()
+            rtn.descriptor = space_descriptor::create_descriptor();
             // VM.memory.setHeapRange(index, HEAP_START, HEAP_END);
             return rtn;
         }
@@ -224,9 +223,9 @@ impl<PR: PageResource> CommonSpace<PR> {
         rtn.start = start;
         rtn.extent = extent;
         // FIXME
-        // rtn.descriptor = SpaceDescriptor.createDescriptor()
+        rtn.descriptor = space_descriptor::create_descriptor_from_heap_range(start, start + extent);
         // VM.memory.setHeapRange(index, start, start.plus(extent));
-        // HeapLayout.vmMap.insert(start, extent, descriptor, this);
+        ::util::heap::layout::heap_layout::VM_MAP.insert(start, extent, rtn.descriptor);
 
         if DEBUG {
             println!("{} {} {} {}", name, start, start + extent, extent);
@@ -237,7 +236,7 @@ impl<PR: PageResource> CommonSpace<PR> {
 }
 
 pub fn get_discontig_start() -> Address {
-    unsafe { HEAP_START }
+    unsafe { HEAP_CURSOR }
 }
 
 pub fn get_discontig_end() -> Address {

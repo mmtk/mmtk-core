@@ -70,7 +70,7 @@ impl Map32 {
     }
 
     #[allow(mutable_transmutes)]
-    pub fn allocate_contiguous_chunks<S: Space<PR = FreeListPageResource<S>>>(&self, descriptor: i32, space: &S, chunks: usize, head: Address) -> Address {
+    pub fn allocate_contiguous_chunks(&self, descriptor: usize, chunks: usize, head: Address) -> Address {
         let self_mut: &mut Self = unsafe { mem::transmute(self) };
         let sync = self.sync.lock().unwrap();
         let chunk = self_mut.region_map.alloc(chunks as _);
@@ -80,7 +80,7 @@ impl Map32 {
         }
         self_mut.total_available_discontiguous_chunks -= chunks;
         let rtn = self.address_for_chunk_index(chunk as _);
-        // insert(rtn, Extent.fromIntZeroExtend(chunks << LOG_BYTES_IN_CHUNK), descriptor, space);
+        self.insert(rtn, chunks << LOG_BYTES_IN_CHUNK, descriptor);
         if head.is_zero() {
             debug_assert!(self.next_link[chunk as usize] == 0);
         } else {

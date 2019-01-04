@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use std::sync::atomic::AtomicUsize;
 use std::mem;
 use std::ops::{Deref, DerefMut};
@@ -90,7 +90,7 @@ impl<S: Space<PR = FreeListPageResource<S>>> PageResource for FreeListPageResour
         let mut new_chunk = false;
         let mut page_offset = self_mut.free_list.alloc(required_pages as _);
         if page_offset == generic_freelist::FAILURE && self.common.growable {
-            page_offset = self_mut.allocate_contiguous_chunks(required_pages);
+            page_offset = self_mut.allocate_contiguous_chunks(required_pages, &mut sync);
             new_chunk = true;
         }
         if page_offset == generic_freelist::FAILURE {
@@ -187,7 +187,7 @@ impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {
         }
     }
 
-    fn allocate_contiguous_chunks(&mut self, pages: usize) -> i32 {
+    fn allocate_contiguous_chunks(&mut self, pages: usize, sync: &mut MutexGuard<FreeListPageResourceSync>) -> i32 {
         debug_assert!(self.meta_data_pages_per_region == 0 || pages <= PAGES_IN_CHUNK - self.meta_data_pages_per_region);
         let mut rtn = generic_freelist::FAILURE;
         let required_chunks = ::policy::space::required_chunks(pages);
@@ -212,7 +212,6 @@ impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {
                     self.free_list.alloc_from_unit(meta_data_pages_per_region as _, p as _); // carve out space for metadata
                 }
                 {
-                    let mut sync = self.sync.lock().unwrap();
                     sync.pages_currently_on_freelist += PAGES_IN_CHUNK - self.meta_data_pages_per_region;
                 }
             }

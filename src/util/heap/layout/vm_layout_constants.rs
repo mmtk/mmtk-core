@@ -114,5 +114,10 @@ pub const SPACE_MASK_64: usize = if_then_else_zero_usize!(HEAP_LAYOUT_64BIT,
  * conditional definition.
  */
 // FIXME: When Compiling for 32 bits this expression makes no sense
-//pub const SPACE_SIZE_64: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT,
+// #[allow(const_err)]
+// pub const SPACE_SIZE_64: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT,
 //    1 << LOG_SPACE_SIZE_64, MAX_SPACE_EXTENT);
+#[cfg(target_pointer_width = "64")]
+pub const SPACE_SIZE_64: usize = 1 << LOG_SPACE_SIZE_64;
+#[cfg(target_pointer_width = "32")]
+pub const SPACE_SIZE_64: usize = MAX_SPACE_EXTENT;
