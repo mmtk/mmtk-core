@@ -11,7 +11,7 @@ pub mod header_byte;
 pub mod logger;
 pub mod constants;
 pub mod sanity;
-pub mod stats;
+pub mod statistics;
 pub mod queue;
 mod synchronized_counter;
 pub mod reference_processor;
