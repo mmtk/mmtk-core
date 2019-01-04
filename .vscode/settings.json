@@ -3,6 +3,5 @@
     "rust.features": [
         "nogc"
     ],
-    "rust.target": "i686-apple-darwin",
     "rust.unstable_features": true
 }
