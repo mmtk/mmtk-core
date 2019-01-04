@@ -10,7 +10,7 @@ pub const PAGES_IN_REGION: usize = 1 << LOG_PAGES_IN_REGION;
 
 #[inline]
 pub fn get_metadata_base(address: Address) -> Address {
-    Address(address.0 & !REGION_MASK)
+    unsafe { Address::from_usize(address.0 & !REGION_MASK) }
 }
 
 #[inline]

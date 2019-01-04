@@ -3,7 +3,7 @@ use ::util::heap::layout::vm_layout_constants::*;
 use ::util::constants::*;
 
 pub fn page_align(address: Address) -> Address {
-    Address((address.0 >> LOG_BYTES_IN_PAGE) << LOG_BYTES_IN_PAGE)
+    unsafe { Address::from_usize((address.0 >> LOG_BYTES_IN_PAGE) << LOG_BYTES_IN_PAGE) }
 }
 
 pub fn is_page_aligned(address: Address) -> bool {
@@ -24,7 +24,7 @@ pub fn align_word(mut addr: usize, bits: usize, down: bool) -> usize {
 }
 
 pub fn align_up(addr: Address, bits: usize) -> Address {
-    Address(align_word(addr.0, bits, false))
+    unsafe { Address::from_usize(align_word(addr.0, bits, false)) }
 }
 
 #[macro_export]

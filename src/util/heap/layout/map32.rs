@@ -76,7 +76,7 @@ impl Map32 {
         let chunk = self_mut.region_map.alloc(chunks as _);
         debug_assert!(chunk != 0);
         if chunk == -1 {
-            return Address(0);
+            return unsafe { Address::zero() };
         }
         self_mut.total_available_discontiguous_chunks -= chunks;
         let rtn = self.address_for_chunk_index(chunk as _);
@@ -95,9 +95,9 @@ impl Map32 {
         debug_assert!(start == conversions::chunk_align(start, true));
         let chunk = self.get_chunk_index(start);
         if chunk == 0 {
-            Address(0)
+            unsafe { Address::zero() }
         } else if self.next_link[chunk] == 0 {
-            Address(0)
+            unsafe { Address::zero() }
         } else {
             let a = self.next_link[chunk];
             self.address_for_chunk_index(a as _)
@@ -226,6 +226,6 @@ impl Map32 {
     }
 
     fn address_for_chunk_index(&self, chunk: usize) -> Address {
-        Address(chunk << LOG_BYTES_IN_CHUNK)
+        unsafe { Address::from_usize(chunk << LOG_BYTES_IN_CHUNK) }
     }
 }

@@ -10,7 +10,8 @@ use util::heap::pageresource::CommonPageResource;
 use util::alloc::embedded_meta_data::*;
 use util::generic_freelist;
 use util::generic_freelist::GenericFreeList;
-#[cfg(target_pointer_width = "32")]
+// #[cfg(target_pointer_width = "32")]
+// FIXME: Use `RawMemoryFreeList` for 64-bit machines
 use util::int_array_freelist::IntArrayFreeList as FreeList;
 use util::heap::layout::vm_layout_constants::*;
 use util::heap::layout::heap_layout;
@@ -93,7 +94,7 @@ impl<S: Space<PR = FreeListPageResource<S>>> PageResource for FreeListPageResour
             new_chunk = true;
         }
         if page_offset == generic_freelist::FAILURE {
-            return Address(0);
+            return unsafe { Address::zero() };
         } else {
             sync.pages_currently_on_freelist -= required_pages;
             if page_offset > sync.highwater_mark {
@@ -246,9 +247,9 @@ impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {
     }
 
     fn reserve_metadata(&mut self, extent: usize) {
-        let highwater_mark = 0;
+        let _highwater_mark = 0;
         if self.meta_data_pages_per_region > 0 {
-            debug_assert!(Address((self.start.0 >> LOG_BYTES_IN_REGION) << LOG_BYTES_IN_REGION) == self.start);
+            debug_assert!(((self.start.0 >> LOG_BYTES_IN_REGION) << LOG_BYTES_IN_REGION) == self.start.0);
             let size = (extent >> LOG_BYTES_IN_REGION) << LOG_BYTES_IN_REGION;
             let mut cursor = self.start + size;
             while cursor > self.start {
