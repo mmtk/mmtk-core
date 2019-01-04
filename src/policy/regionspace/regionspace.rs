@@ -19,9 +19,10 @@ use util::alloc::embedded_meta_data;
 use std::cell::UnsafeCell;
 use libc::{c_void, mprotect, PROT_NONE, PROT_EXEC, PROT_WRITE, PROT_READ};
 use std::collections::HashSet;
-use std::collections::LinkedList;
-
-const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
+use util::conversions;
+use util::constants;
+use vm::{Memory, VMMemory};
+use util::heap::layout::Mmapper;
 
 type PR = FreeListPageResource<RegionSpace>;
 
@@ -45,9 +46,9 @@ impl Space for RegionSpace {
         // Borrow-checker fighting so that we can have a cyclic reference
         let me = unsafe { &*(self as *const Self) };
         if self.vmrequest.is_discontiguous() {
-            self.pr = Some(FreeListPageResource::new_discontiguous(META_DATA_PAGES_PER_REGION));
+            self.pr = Some(FreeListPageResource::new_discontiguous(METADATA_PAGES_PER_CHUNK));
         } else {
-            self.pr = Some(FreeListPageResource::new_contiguous(me, self.start, self.extent, META_DATA_PAGES_PER_REGION));
+            self.pr = Some(FreeListPageResource::new_contiguous(me, self.start, self.extent, METADATA_PAGES_PER_CHUNK));
         }
         self.pr.as_mut().unwrap().bind_space(me);
     }
@@ -62,6 +63,14 @@ impl Space for RegionSpace {
     fn is_movable(&self) -> bool {
         true
     }
+
+    fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
+        if new_chunk {
+            let chunk = conversions::chunk_align(start + bytes, true);
+            ::util::heap::layout::heap_layout::MMAPPER.ensure_mapped(chunk, METADATA_PAGES_PER_CHUNK);
+            VMMemory::zero(chunk, METADATA_PAGES_PER_CHUNK << constants::LOG_BYTES_IN_PAGE);
+        }
+    }
 }
 
 impl RegionSpace {
@@ -75,6 +84,7 @@ impl RegionSpace {
     pub fn acquire_new_region(&self, tls: *mut c_void) -> Option<Region> {
         // Allocate
         let region = self.acquire(tls, PAGES_IN_REGION);
+        debug_assert!(region != embedded_meta_data::get_metadata_base(region));
 
         if !region.is_zero() {
             if cfg!(debug) {
