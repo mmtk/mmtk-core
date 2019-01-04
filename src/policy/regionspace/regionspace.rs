@@ -80,7 +80,7 @@ impl RegionSpace {
             if cfg!(debug) {
                 println!("Region alloc {:?} in chunk {:?}", region, embedded_meta_data::get_metadata_base(region));
             }
-            let region = Region(region);
+            let mut region = Region(region);
             region.committed = true;
             Some(region)
         } else {
@@ -91,18 +91,19 @@ impl RegionSpace {
     pub fn prepare(&mut self) {
         let regions = self.regions.read().unwrap();
         for region in regions.iter() {
-            region.mark_table.clear();
+            region.clone().mark_table.clear();
             region.live_size.store(0, Ordering::Relaxed);
         }
     }
 
     pub fn release(&mut self) {
         // Cleanup regions
+        let me = unsafe { &mut *(self as *mut Self) };
         let mut regions = self.regions.write().unwrap();
         for region in regions.iter() {
             if region.relocate {
-                region.clear();
-                self.pr.unwrap().release_pages(region.0)
+                region.clone().clear();
+                me.pr.as_mut().unwrap().release_pages(region.0)
             }
         }
         regions.retain(|&r| !r.relocate);

@@ -76,7 +76,7 @@ impl Deref for Region {
     type Target = MetaData;
     #[inline]
     fn deref(&self) -> &MetaData {
-        self.metadata()
+        self.metadata() as &'static MetaData
     }
 }
 
