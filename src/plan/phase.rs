@@ -56,6 +56,11 @@ pub enum Phase {
     SanityBuildTable,
     SanityCheckTable,
     SanityRelease,
+    // G1 phases
+    CollectionSetSelection,
+    EvacuatePrepare,
+    EvacuateClosure,
+    EvacuateRelease,
     // Complex phases
     Complex(Vec<(Schedule, Phase)>, usize),
     // associated cursor

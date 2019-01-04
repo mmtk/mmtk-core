@@ -46,7 +46,7 @@ pub fn create_vm_space() -> ImmortalSpace {
     ImmortalSpace::new("boot", false, VMRequest::fixed_size(0))
 }
 
-pub trait Plan {
+pub trait Plan: Sized {
     type MutatorT: MutatorContext;
     type TraceLocalT: TraceLocal;
     type CollectorT: ParallelCollector;
@@ -110,7 +110,7 @@ pub trait Plan {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required<PR: PageResource>(&self, space_full: bool, space: &'static PR::Space) -> bool {
+    fn collection_required<PR: PageResource>(&self, space_full: bool, space: &'static PR::Space) -> bool where Self: Sized {
         let stress_force_gc = self.stress_test_gc_required();
         trace!("self.get_pages_reserved()={}, self.get_total_pages()={}",
                self.get_pages_reserved(), self.get_total_pages());
@@ -124,6 +124,10 @@ pub trait Plan {
     }
 
     fn get_total_pages(&self) -> usize;
+
+    fn get_pages_avail(&self) -> usize {
+        self.get_total_pages() - self.get_pages_reserved()
+    }
 
     fn get_collection_reserve(&self) -> usize {
         0
