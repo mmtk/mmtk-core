@@ -264,7 +264,7 @@ impl ObjectModel for VMObjectModel {
     // XXX: Supposedly none of the 4 methods below need to use atomic loads/stores
     // FIXME: [ZC] read/write to a byte/word is atomic on hardware level does NOT
     // prevent compiler optimization/reordering and hardware reordering
-    // For example, the use of read_available_byte in a loop in a loop might be eliminated
+    // For example, the use of read_available_byte in a loop might be eliminated
     // Common subexpression elimination might also combine multiple reads into one
     fn write_available_byte(object: ObjectReference, val: u8) {
         trace!("ObjectModel.write_available_byte");
