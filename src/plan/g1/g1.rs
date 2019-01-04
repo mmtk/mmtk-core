@@ -257,8 +257,10 @@ impl Plan for G1 {
         if self.get_pages_avail() * 10 < total_pages {
             return true;
         }
-        type P = Plan<MutatorT=G1Mutator, TraceLocalT=G1TraceLocal, CollectorT=G1Collector>;
-        P::collection_required(self, space_full, space)
+        let stress_force_gc = self.stress_test_gc_required();
+        trace!("self.get_pages_reserved()={}, self.get_total_pages()={}", self.get_pages_reserved(), self.get_total_pages());
+        let heap_full = self.get_pages_reserved() > self.get_total_pages();
+        space_full || stress_force_gc || heap_full
     }
 
     fn get_total_pages(&self) -> usize {
