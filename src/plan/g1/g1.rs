@@ -132,6 +132,7 @@ impl Plan for G1 {
     }
 
     unsafe fn gc_init(&self, heap_size: usize) {
+        ::util::heap::layout::heap_layout::VM_MAP.finalize_static_space_map();
         let unsync = &mut *self.unsync.get();
         unsync.total_pages = bytes_to_pages(heap_size);
         unsync.vm_space.init();

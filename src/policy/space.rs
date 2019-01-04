@@ -76,9 +76,7 @@ pub trait Space: Sized + Debug + 'static {
     // UNSAFE: potential data race as this mutates 'common'
     unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
         // FIXME
-        let new_head: Address = unimplemented!(); /*HeapLayout.vmMap. allocate_contiguous_chunks(self.common().descriptor,
-                                                                        self, chunks,
-                                                                        self.common().head_discontiguous_region);*/
+        let new_head: Address = ::util::heap::layout::heap_layout::VM_MAP.allocate_contiguous_chunks(self.common().descriptor, chunks, self.common().head_discontiguous_region);
         if new_head.is_zero() {
             return unsafe{Address::zero()};
         }
@@ -226,7 +224,7 @@ impl<PR: PageResource> CommonSpace<PR> {
         // FIXME
         // rtn.descriptor = SpaceDescriptor.createDescriptor()
         // VM.memory.setHeapRange(index, start, start.plus(extent));
-        // HeapLayout.vmMap.insert(start, extent, descriptor, this);
+        ::util::heap::layout::heap_layout::VM_MAP.insert(start, extent, rtn.descriptor);
 
         if DEBUG {
             println!("{} {} {} {}", name, start, start + extent, extent);
