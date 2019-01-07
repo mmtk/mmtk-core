@@ -57,6 +57,10 @@ impl Space for ImmortalSpace {
     fn is_movable(&self) -> bool {
         false
     }
+
+    fn release_multiple_pages(&mut self, start: Address) {
+        panic!("immortalspace only releases pages enmasse")
+    }
 }
 
 impl ImmortalSpace {
