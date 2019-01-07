@@ -17,6 +17,7 @@ mod synchronized_counter;
 pub mod reference_processor;
 pub mod generic_freelist;
 pub mod int_array_freelist;
+pub mod treadmill;
 
 pub use self::address::Address;
 pub use self::address::ObjectReference;

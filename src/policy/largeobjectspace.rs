@@ -4,6 +4,7 @@ use ::policy::space::{CommonSpace, Space};
 use ::util::constants::BYTES_IN_PAGE;
 use ::util::heap::{FreeListPageResource, PageResource};
 use ::util::{Address, ObjectReference};
+use ::util::treadmill::TreadMill;
 
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
 
@@ -16,6 +17,7 @@ pub struct LargeObjectSpace {
     common: UnsafeCell<CommonSpace<FreeListPageResource<LargeObjectSpace>>>,
     mark_state: u8,
     in_nursery_GC: bool,
+    treadmill: TreadMill
 }
 
 impl Space for LargeObjectSpace {
