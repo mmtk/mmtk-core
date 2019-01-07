@@ -9,6 +9,7 @@ use ::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END};
 
 use ::plan::Plan;
 use ::plan::selected_plan::PLAN;
+use ::plan::{Allocator, TransitiveClosure};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -118,7 +119,6 @@ pub trait Space: Sized + Debug + 'static {
     fn is_live(&self, object: ObjectReference) -> bool;
     fn is_movable(&self) -> bool;
 
-
     fn release_discontiguous_chunks(&mut self, chunk: Address) {
         debug_assert!(chunk == conversions::chunk_align(chunk, true));
         if chunk == self.common().head_discontiguous_region {
@@ -126,6 +126,8 @@ pub trait Space: Sized + Debug + 'static {
         }
         ::util::heap::layout::heap_layout::VM_MAP.free_contiguous_chunks(chunk);
     }
+
+    fn release_multiple_pages(&mut self, start: Address);
 }
 
 #[derive(Debug)]

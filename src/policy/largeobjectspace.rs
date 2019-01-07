@@ -3,7 +3,7 @@ use std::cell::UnsafeCell;
 use ::policy::space::{CommonSpace, Space};
 use ::util::constants::BYTES_IN_PAGE;
 use ::util::heap::{FreeListPageResource, PageResource};
-use ::util::ObjectReference;
+use ::util::{Address, ObjectReference};
 
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
 
@@ -49,5 +49,9 @@ impl Space for LargeObjectSpace {
 
     fn is_movable(&self) -> bool {
         false
+    }
+
+    fn release_multiple_pages(&mut self, start: Address) {
+        self.common_mut().pr.as_mut().unwrap().release_pages(start);
     }
 }

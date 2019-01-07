@@ -71,6 +71,10 @@ impl Space for RegionSpace {
             VMMemory::zero(chunk, METADATA_PAGES_PER_CHUNK << constants::LOG_BYTES_IN_PAGE);
         }
     }
+
+    fn release_multiple_pages(&mut self, start: Address) {
+        unimplemented!()
+    }
 }
 
 impl RegionSpace {

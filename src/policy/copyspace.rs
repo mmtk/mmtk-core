@@ -28,7 +28,7 @@ impl Space for CopySpace {
     type PR = MonotonePageResource<CopySpace>;
 
     fn common(&self) -> &CommonSpace<Self::PR> {
-        unsafe {&*self.common.get()}
+        unsafe { &*self.common.get() }
     }
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<Self::PR> {
         &mut *self.common.get()
@@ -56,6 +56,10 @@ impl Space for CopySpace {
 
     fn is_movable(&self) -> bool {
         true
+    }
+
+    fn release_multiple_pages(&mut self, start: Address) {
+        panic!("copyspace only releases pages enmasse")
     }
 }
 
