@@ -1,44 +1,49 @@
-use std::collections::VecDeque;
+use std::collections::hash_set::Iter;
+use std::collections::HashSet;
 use std::mem::swap;
 
-use ::util::Address;
+use ::util::{Address, ObjectReference};
 
 #[derive(Debug)]
 pub struct TreadMill {
-    from_space: VecDeque<Address>,
-    to_space: VecDeque<Address>,
-    collect_nursery: VecDeque<Address>,
-    alloc_nursery: VecDeque<Address>,
+    from_space: HashSet<Address>,
+    to_space: HashSet<Address>,
+    collect_nursery: HashSet<Address>,
+    alloc_nursery: HashSet<Address>,
 }
 
 impl TreadMill {
     pub fn new() -> Self {
         TreadMill {
-            from_space: VecDeque::new(),
-            to_space: VecDeque::new(),
-            collect_nursery: VecDeque::new(),
-            alloc_nursery: VecDeque::new(),
+            from_space: HashSet::new(),
+            to_space: HashSet::new(),
+            collect_nursery: HashSet::new(),
+            alloc_nursery: HashSet::new(),
         }
     }
 
-    pub fn add_to_treadmill(&mut self, node: Address, nursery: bool) {
+    pub fn add_to_treadmill(&mut self, cell: Address, nursery: bool) {
         if nursery {
-            self.alloc_nursery.push_front(node);
+            self.alloc_nursery.insert(cell);
         } else {
-            self.to_space.push_front(node);
+            self.to_space.insert(cell);
         }
     }
 
-    pub fn pop_nursery(&mut self) -> Address {
-        self.collect_nursery.pop_front().unwrap_or(unsafe { Address::zero() })
+    pub fn iter_nursery(&self) -> Iter<Address> {
+        self.collect_nursery.iter()
     }
 
-    pub fn pop(&mut self) -> Address {
-        self.from_space.pop_front().unwrap_or(unsafe { Address::zero() })
+    pub fn iter(&self) -> Iter<Address> {
+        self.from_space.iter()
     }
 
-    pub fn copy(&mut self, node: Address) {
-        unimplemented!()
+    pub fn copy(&mut self, cell: Address, is_in_nursery: bool) {
+        if is_in_nursery {
+            self.collect_nursery.remove(&cell);
+        } else {
+            self.from_space.remove(&cell);
+        }
     }
 
     pub fn to_space_empty(&self) -> bool {
