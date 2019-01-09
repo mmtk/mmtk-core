@@ -12,3 +12,5 @@ pub use self::g1collector::G1Collector;
 
 pub use self::g1::SelectedPlan;
 pub use self::g1constraints as SelectedConstraints;
+
+const DEBUG: bool = true;

@@ -182,7 +182,8 @@ impl MarkBitMap {
     }
 
     pub fn clear(&mut self) {
-        unimplemented!();
+        VMMemory::zero(self.table(), MARK_TABLE_SIZE);
+        // unimplemented!();
         // let start = EmbeddedMetaData.getMetaDataBase(region).plus(MARKING_METADATA_START);
         // VMMemory::zero(start, Extent.fromIntZeroExtend(MARKING_METADATA_EXTENT));
     }
