@@ -23,6 +23,9 @@ use util::conversions;
 use util::constants;
 use vm::{Memory, VMMemory};
 use util::heap::layout::Mmapper;
+use super::DEBUG;
+
+
 
 type PR = FreeListPageResource<RegionSpace>;
 
@@ -72,8 +75,8 @@ impl Space for RegionSpace {
         }
     }
 
-    fn release_multiple_pages(&mut self, start: Address) {
-        unimplemented!()
+    fn release_multiple_pages(&mut self, _start: Address) {
+        panic!("not supported")
     }
 }
 
@@ -88,14 +91,18 @@ impl RegionSpace {
     pub fn acquire_new_region(&self, tls: *mut c_void) -> Option<Region> {
         // Allocate
         let region = self.acquire(tls, PAGES_IN_REGION);
-        debug_assert!(region != embedded_meta_data::get_metadata_base(region));
 
         if !region.is_zero() {
-            if cfg!(debug) {
-                println!("Region alloc {:?} in chunk {:?}", region, embedded_meta_data::get_metadata_base(region));
+            debug_assert!(region != embedded_meta_data::get_metadata_base(region));
+            if DEBUG {
+                println!("Alloc {:?} in chunk {:?}", region, embedded_meta_data::get_metadata_base(region));
             }
+            VMMemory::zero(region, BYTES_IN_REGION);
             let mut region = Region(region);
+            region.clear();
             region.committed = true;
+            let mut regions = self.regions.write().unwrap();
+            regions.insert(region);
             Some(region)
         } else {
             None
@@ -114,13 +121,22 @@ impl RegionSpace {
         // Cleanup regions
         let me = unsafe { &mut *(self as *mut Self) };
         let mut regions = self.regions.write().unwrap();
-        for region in regions.iter() {
-            if region.relocate {
-                region.clone().clear();
-                me.pr.as_mut().unwrap().release_pages(region.0)
+        let mut to_be_released = {
+            let mut to_be_released = vec![];
+            for region in regions.iter() {
+                if region.relocate {
+                    to_be_released.push(*region);
+                }
             }
-        }
+            to_be_released
+        };
         regions.retain(|&r| !r.relocate);
+        for region in &mut to_be_released {
+            if DEBUG {
+                println!("Release {:?}", region);
+            }
+            me.pr.as_mut().unwrap().release_pages(region.0);
+        }
     }
 
     #[inline]
@@ -155,15 +171,20 @@ impl RegionSpace {
     }
 
     pub fn compute_collection_set(&self) -> Vec<Region> {
+        // FIXME: Bad performance
         let mut regions: Vec<Region> = { self.regions.read().unwrap().iter().map(|r| *r).collect() };
         regions.sort_unstable_by_key(|r| r.live_size.load(Ordering::Relaxed));
-        let min_live_size = (BYTES_IN_REGION as f64 * 0.65) as usize;
-        regions.drain_filter(|r| r.live_size.load(Ordering::Relaxed) > min_live_size);
-        for region in &mut regions {
+        let max_live_size = (BYTES_IN_REGION as f64 * 0.65) as usize;
+        let mut collection_set = regions.drain_filter(|r| r.live_size.load(Ordering::Relaxed) < max_live_size).collect::<Vec<_>>();
+        for region in &mut collection_set {
+            if DEBUG {
+                println!("Relocate {:?}", region);
+            }
             region.relocate = true;
         }
-        debug_assert!(regions.iter().all(|&r| r.live_size.load(Ordering::Relaxed) > min_live_size));
-        regions
+        debug_assert!(regions.iter().all(|&r| r.live_size.load(Ordering::Relaxed) >= max_live_size));
+        debug_assert!(collection_set.iter().all(|&r| r.live_size.load(Ordering::Relaxed) < max_live_size));
+        collection_set
     }
 }
 
