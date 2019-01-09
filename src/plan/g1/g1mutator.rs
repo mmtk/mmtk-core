@@ -10,7 +10,7 @@ use plan::Allocator as AllocationType;
 use plan::plan;
 use vm::{Collection, VMCollection};
 use util::heap::{PageResource, MonotonePageResource};
-use plan::g1::PLAN;
+use plan::g1::{PLAN, DEBUG};
 
 use libc::c_void;
 
@@ -23,7 +23,9 @@ pub struct G1Mutator {
 
 impl MutatorContext for G1Mutator {
     fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
-        println!("Mutator {:?}", phase);
+        if DEBUG {
+            println!("Mutator {:?}", phase);
+        }
         match phase {
             &Phase::PrepareStacks => {
                 if !plan::stacks_prepared() {

@@ -1,41 +1,32 @@
 use ::policy::space::Space;
-
 use super::G1Mutator;
 use super::G1TraceLocal;
 use super::G1Collector;
-
-use ::plan::controller_collector_context::ControllerCollectorContext;
-
 use ::plan::plan;
 use ::plan::phase;
 use ::plan::Plan;
 use ::plan::trace::Trace;
 use ::plan::Allocator;
-use ::policy::copyspace::CopySpace;
 use ::policy::immortalspace::ImmortalSpace;
 use ::plan::Phase;
 use ::util::ObjectReference;
 use ::util::alloc::allocator::determine_collection_attempts;
-use ::util::sanity::sanity_checker::SanityChecker;
-use ::util::sanity::memory_scan;
 use ::util::heap::layout::heap_layout::MMAPPER;
 use ::util::heap::layout::Mmapper;
 use ::util::Address;
 use ::util::heap::PageResource;
 use ::util::heap::VMRequest;
-
-use ::util::constants::LOG_BYTES_IN_PAGE;
-
-use libc::{c_void, memset};
+use libc::c_void;
 use std::cell::UnsafeCell;
-use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
-
+use std::sync::atomic::{self, Ordering};
 use ::vm::{Scanning, VMScanning};
 use std::thread;
 use util::conversions::bytes_to_pages;
 use plan::plan::create_vm_space;
 use plan::plan::EMERGENCY_COLLECTION;
 use policy::regionspace::*;
+use super::DEBUG;
+
 
 pub type SelectedPlan = G1;
 
@@ -122,7 +113,7 @@ impl Plan for G1 {
                 hi: false,
                 vm_space: create_vm_space(),
                 region_space: RegionSpace::new("region_space", VMRequest::RequestDiscontiguous),
-                versatile_space: ImmortalSpace::new("versatile_space", true, VMRequest::RequestFraction { frac: 1.0/3.0, top:  false }),
+                versatile_space: ImmortalSpace::new("versatile_space", true, VMRequest::RequestFraction { frac: 1.0/4.0, top:  false }),
                 total_pages: 0,
                 collection_attempt: 0,
             }),
@@ -178,7 +169,9 @@ impl Plan for G1 {
     }
 
     unsafe fn collection_phase(&self, tls: *mut c_void, phase: &Phase) {
-        println!("Global {:?}", phase);
+        if DEBUG {
+            println!("Global {:?}", phase);
+        }
         let unsync = &mut *self.unsync.get();
 
         match phase {

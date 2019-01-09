@@ -273,12 +273,14 @@ impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
         debug_assert!(pages as usize <= self.common.committed.load(Ordering::Relaxed));
         let me = unsafe { &mut *(self as *mut Self) };
-        let mut sync = self.sync.lock().unwrap();
-        self.common.reserved.fetch_sub(pages as _, Ordering::Relaxed);
-        self.common.committed.fetch_sub(pages as _, Ordering::Relaxed);
-        let freed = me.free_list.free(page_offset as _, true);
-        sync.pages_currently_on_freelist += pages as usize;
-
+        let freed = {
+            let mut sync = self.sync.lock().unwrap();
+            self.common.reserved.fetch_sub(pages as _, Ordering::Relaxed);
+            self.common.committed.fetch_sub(pages as _, Ordering::Relaxed);
+            let freed = me.free_list.free(page_offset as _, true);
+            sync.pages_currently_on_freelist += pages as usize;
+            freed
+        };
         if !self.common.contiguous { // only discontiguous spaces use chunks
             me.release_free_chunks(first, freed as _);
         }
@@ -287,7 +289,7 @@ impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {
 
     fn release_free_chunks(&mut self, freed_page: Address, pages_freed: usize) {
         let page_offset = conversions::bytes_to_pages(freed_page - self.start);
-
+        
         if self.meta_data_pages_per_region > 0 {       // can only be a single chunk
             if pages_freed == (PAGES_IN_CHUNK - self.meta_data_pages_per_region) {
                 self.free_contiguous_chunk(conversions::chunk_align(freed_page, true));

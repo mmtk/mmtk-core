@@ -4,14 +4,12 @@ use ::plan::CollectorContext;
 use ::plan::ParallelCollector;
 use ::plan::ParallelCollectorGroup;
 use ::plan::g1;
-use ::plan::g1::PLAN;
+use ::plan::g1::{PLAN, DEBUG};
 use ::plan::TraceLocal;
-use ::policy::copyspace::CopySpace;
 use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
 use ::util::alloc::RegionAllocator;
 use ::util::forwarding_word::clear_forwarding_bits;
-use ::util::heap::{MonotonePageResource, PageResource};
 use ::util::reference_processor::*;
 use ::vm::{Scanning, VMScanning};
 use libc::c_void;
@@ -65,48 +63,36 @@ impl CollectorContext for G1Collector {
     }
 
     fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
-        println!("Collector {:?}", phase);
+        if DEBUG {
+            println!("Collector {:?}", phase);
+        }
         match phase {
             &Phase::StackRoots => {
                 trace!("Computing thread roots");
-                VMScanning::compute_thread_roots(&mut self.mark_trace, self.tls);
+                let tls = self.tls;
+                VMScanning::compute_thread_roots(self.get_current_trace(), tls);
                 trace!("Thread roots complete");
             }
             &Phase::Roots => {
                 trace!("Computing global roots");
-                match self.current_trace {
-                    TraceKind::Mark => {
-                        VMScanning::compute_global_roots(&mut self.mark_trace, self.tls);
-                        VMScanning::compute_static_roots(&mut self.mark_trace, self.tls);
-                        if super::g1::SCAN_BOOT_IMAGE {
-                            VMScanning::compute_bootimage_roots(&mut self.mark_trace, self.tls);
-                        }
-                    },
-                    TraceKind::Evacuate => {
-                        VMScanning::compute_global_roots(&mut self.evacuate_trace, self.tls);
-                        VMScanning::compute_static_roots(&mut self.evacuate_trace, self.tls);
-                        if super::g1::SCAN_BOOT_IMAGE {
-                            VMScanning::compute_bootimage_roots(&mut self.evacuate_trace, self.tls);
-                        }
-                    },
+                let tls = self.tls;
+                let trace = self.get_current_trace();
+                VMScanning::compute_global_roots(trace, tls);
+                VMScanning::compute_static_roots(trace, tls);
+                if super::g1::SCAN_BOOT_IMAGE {
+                    VMScanning::compute_bootimage_roots(trace, tls);
                 }
             }
             &Phase::SoftRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    match self.current_trace {
-                        TraceKind::Mark => scan_soft_refs(&mut self.mark_trace, tls),
-                        TraceKind::Evacuate => scan_soft_refs(&mut self.evacuate_trace, tls),
-                    }
+                    scan_soft_refs(self.get_current_trace(), tls);
                 }
             }
             &Phase::WeakRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    match self.current_trace {
-                        TraceKind::Mark => scan_weak_refs(&mut self.mark_trace, tls),
-                        TraceKind::Evacuate => scan_weak_refs(&mut self.evacuate_trace, tls),
-                    }
+                    scan_weak_refs(self.get_current_trace(), tls);
                 }
             }
             &Phase::Finalizable => {
@@ -117,18 +103,12 @@ impl CollectorContext for G1Collector {
             &Phase::PhantomRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    match self.current_trace {
-                        TraceKind::Mark => scan_phantom_refs(&mut self.mark_trace, tls),
-                        TraceKind::Evacuate => scan_phantom_refs(&mut self.evacuate_trace, tls),
-                    }
+                    scan_phantom_refs(self.get_current_trace(), tls);
                 }
             }
             &Phase::ForwardRefs => {
                 if primary && SelectedConstraints::NEEDS_FORWARD_AFTER_LIVENESS {
-                    match self.current_trace {
-                        TraceKind::Mark => forward_refs(&mut self.mark_trace),
-                        TraceKind::Evacuate => forward_refs(&mut self.evacuate_trace),
-                    }
+                    forward_refs(self.get_current_trace());
                 }
             }
             &Phase::ForwardFinalizable => {

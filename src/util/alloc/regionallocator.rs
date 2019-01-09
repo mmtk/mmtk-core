@@ -67,6 +67,7 @@ impl Allocator<PR> for RegionAllocator {
     }
 
     fn alloc_slow(&mut self, bytes: usize, align: usize, offset: isize) -> Address {
+        debug_assert!(bytes <= BYTES_IN_REGION);
         // TODO: internalLimit etc.
         self.alloc_slow_inline(bytes, align, offset)
     }
