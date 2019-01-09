@@ -40,10 +40,13 @@ impl TreadMill {
 
     pub fn copy(&mut self, cell: Address, is_in_nursery: bool) {
         if is_in_nursery {
+            debug_assert!(self.collect_nursery.contains(&cell));
             self.collect_nursery.remove(&cell);
         } else {
+            debug_assert!(self.from_space.contains(&cell));
             self.from_space.remove(&cell);
         }
+        self.to_space.insert(cell);
     }
 
     pub fn to_space_empty(&self) -> bool {

@@ -1,11 +1,13 @@
 use std::cell::UnsafeCell;
 
+use ::plan::TransitiveClosure;
 use ::policy::space::{CommonSpace, Space};
 use ::util::{Address, ObjectReference};
 use ::util::constants::BYTES_IN_PAGE;
+use ::util::header_byte;
 use ::util::heap::{FreeListPageResource, PageResource};
 use ::util::treadmill::TreadMill;
-use ::plan::TransitiveClosure;
+use ::vm::{ObjectModel, VMObjectModel};
 
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
 const MARK_BIT: u8 = 0b01;
@@ -46,7 +48,7 @@ impl Space for LargeObjectSpace {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        test_mark_bit(object, self.mark_state)
+        self.test_mark_bit(object, self.mark_state)
     }
 
     fn is_movable(&self) -> bool {
@@ -82,43 +84,78 @@ impl LargeObjectSpace {
         // so the compiler knows I'm borrowing two different fields
         if sweep_nursery {
             for cell in self.treadmill.iter_nursery() {
-                (unsafe {&mut *self.common.get() }).pr.as_mut().unwrap().release_pages(get_super_page(cell));
+                (unsafe { &mut *self.common.get() }).pr.as_mut().unwrap().release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.iter() {
-                (unsafe {&mut *self.common.get() }).pr.as_mut().unwrap().release_pages(get_super_page(cell));
+                (unsafe { &mut *self.common.get() }).pr.as_mut().unwrap().release_pages(get_super_page(cell));
             }
         }
     }
 
     pub fn trace_object<T: TransitiveClosure>(
-        &self,
+        &mut self,
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
         let nursery_object = self.is_in_nursery(object);
         if !self.in_nursery_GC || nursery_object {
             if self.test_and_mark(object, self.mark_state) {
-                // FIXME self.treadmill.copy(node, nursery_object);
+                let cell = VMObjectModel::object_start_ref(object);
+                self.treadmill.copy(cell, nursery_object);
                 trace.process_node(object);
             }
         }
         return object;
     }
 
+    pub fn initialize_header(&mut self, object: ObjectReference, alloc: bool) {
+        let old_value = VMObjectModel::read_available_byte(object);
+        let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
+        if alloc {
+            new_value = new_value | NURSERY_BIT;
+        }
+        if header_byte::NEEDS_UNLOGGED_BIT {
+            new_value = new_value | header_byte::UNLOGGED_BIT;
+        }
+        VMObjectModel::write_available_byte(object, new_value);
+        let cell = VMObjectModel::object_start_ref(object);
+        self.treadmill.add_to_treadmill(cell, alloc);
+    }
+
     fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
-        unimplemented!()
+        let mask = if self.in_nursery_GC {
+            LOS_BIT_MASK
+        } else {
+            MARK_BIT
+        };
+        let mut old_value = VMObjectModel::prepare_available_bits(object);
+        let mut mark_bit = (old_value as u8) & mask;
+        if mark_bit == value {
+            return false;
+        }
+        while !VMObjectModel::attempt_available_bits(
+            object,
+            old_value,
+            old_value ^ (!LOS_BIT_MASK as usize) | value as usize) {
+            old_value = VMObjectModel::prepare_available_bits(object);
+            mark_bit = (old_value as u8) & mask;
+            if mark_bit == value {
+                return false;
+            }
+        }
+        return true;
     }
 
     fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
-        unimplemented!()
+        VMObjectModel::read_available_byte(object) & MARK_BIT == value
     }
 
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        unimplemented!()
+        VMObjectModel::read_available_byte(object) & NURSERY_BIT == NURSERY_BIT
     }
 }
 
 fn get_super_page(cell: &Address) -> Address {
-    unimplemented!()
+    unsafe { Address::from_usize(cell.as_usize() & PAGE_MASK) }
 }
