@@ -224,7 +224,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
         }
     }
 
-    pub fn reset(&self) {
+    pub unsafe fn reset(&self) {
         let mut guard = self.sync.lock().unwrap();
         self.common().reserved.store(0, Ordering::Relaxed);
         self.common().committed.store(0, Ordering::Relaxed);
@@ -267,7 +267,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
     }*/
 
     #[inline]
-    fn release_pages(&mut self, guard: &mut MutexGuard<MonotonePageResourceSync>) {
+    unsafe fn release_pages(&self, guard: &mut MutexGuard<MonotonePageResourceSync>) {
         // TODO: concurrent zeroing
         if self.common().contiguous {
             guard.cursor = match guard.conditional {
@@ -286,7 +286,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
                 guard.current_chunk = unsafe {Address::zero()};
                 guard.sentinel = unsafe {Address::zero()};
                 guard.cursor = unsafe {Address::zero()};
-                self.common_mut().space.as_mut().unwrap().release_all_chunks();
+                self.common().space.as_ref().unwrap().release_all_chunks();
             }
         }
     }

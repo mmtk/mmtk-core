@@ -200,9 +200,9 @@ impl Plan for SemiSpace {
                 }
                 // release the collected region
                 if unsync.hi {
-                    unsync.copyspace0.release();
+                    unsafe { unsync.copyspace0.release() };
                 } else {
-                    unsync.copyspace1.release();
+                    unsafe { unsync.copyspace1.release() };
                 }
                 unsync.versatile_space.release();
                 unsync.vm_space.release();
