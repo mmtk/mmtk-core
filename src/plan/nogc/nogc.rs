@@ -50,10 +50,7 @@ impl Plan for NoGC {
             unsync: UnsafeCell::new(NoGCUnsync {
                 vm_space: create_vm_space(),
                 space: ImmortalSpace::new("nogc_space", true,
-                                          VMRequest::RequestFraction {
-                                              frac: 1.0,
-                                              top: false,
-                                          }),
+                                          VMRequest::discontiguous()),
                 total_pages: 0,
             }
             ),
@@ -61,6 +58,7 @@ impl Plan for NoGC {
     }
 
     unsafe fn gc_init(&self, heap_size: usize) {
+        ::util::heap::layout::heap_layout::VM_MAP.finalize_static_space_map();
         let unsync = &mut *self.unsync.get();
         unsync.total_pages = bytes_to_pages(heap_size);
         // FIXME correctly initialize spaces based on options

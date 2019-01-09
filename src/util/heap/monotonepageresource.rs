@@ -16,6 +16,7 @@ use ::util::alloc::embedded_meta_data::*;
 
 use super::layout::Mmapper;
 use super::layout::heap_layout::MMAPPER;
+use ::util::heap::layout::heap_layout;
 
 use super::PageResource;
 use std::sync::atomic::Ordering;
@@ -223,7 +224,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
         }
     }
 
-    pub fn reset(&self) {
+    pub unsafe fn reset(&self) {
         let mut guard = self.sync.lock().unwrap();
         self.common().reserved.store(0, Ordering::Relaxed);
         self.common().committed.store(0, Ordering::Relaxed);
@@ -266,7 +267,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
     }*/
 
     #[inline]
-    fn release_pages(&self, guard: &mut MutexGuard<MonotonePageResourceSync>) {
+    unsafe fn release_pages(&self, guard: &mut MutexGuard<MonotonePageResourceSync>) {
         // TODO: concurrent zeroing
         if self.common().contiguous {
             guard.cursor = match guard.conditional {
@@ -274,7 +275,37 @@ impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
                 _ => unreachable!(),
             };
         } else {
-            unimplemented!()
+            if !guard.cursor.is_zero() {
+                let mut bytes = guard.cursor - guard.current_chunk;
+                self.release_pages_extent(guard.current_chunk, bytes);
+                while self.move_to_next_chunk(guard) {
+                    let mut bytes = guard.cursor - guard.current_chunk;
+                    self.release_pages_extent(guard.current_chunk, bytes);
+                }
+
+                guard.current_chunk = unsafe {Address::zero()};
+                guard.sentinel = unsafe {Address::zero()};
+                guard.cursor = unsafe {Address::zero()};
+                self.common().space.as_ref().unwrap().release_all_chunks();
+            }
+        }
+    }
+
+    fn release_pages_extent(&self, first: Address, bytes: usize) {
+        let pages = ::util::conversions::bytes_to_pages(bytes);
+        debug_assert!(bytes == ::util::conversions::pages_to_bytes(pages));
+        // FIXME ZERO_PAGES_ON_RELEASE
+        // FIXME Options.protectOnRelease
+        // FIXME VM.events.tracePageReleased
+    }
+
+    fn move_to_next_chunk(&self, guard: &mut MutexGuard<MonotonePageResourceSync>) -> bool{
+        guard.current_chunk = heap_layout::VM_MAP.get_next_contiguous_region(guard.current_chunk);
+        if guard.current_chunk.is_zero() {
+            false
+        } else {
+            guard.cursor = guard.current_chunk + heap_layout::VM_MAP.get_contiguous_region_size(guard.current_chunk);
+            true
         }
     }
 }

@@ -75,7 +75,7 @@ impl CopySpace {
         self.from_space = from_space;
     }
 
-    pub fn release(&mut self) {
+    pub unsafe fn release(&mut self) {
         self.common().pr.as_ref().unwrap().reset();
         self.from_space = false;
     }
