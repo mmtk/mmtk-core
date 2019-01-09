@@ -75,20 +75,11 @@ impl Plan for SemiSpace {
                 hi: false,
                 vm_space: create_vm_space(),
                 copyspace0: CopySpace::new("copyspace0", false, true,
-                                           VMRequest::RequestFraction {
-                                               frac: 1.0/3.0,
-                                               top: false,
-                                           }),
+                                           VMRequest::discontiguous()),
                 copyspace1: CopySpace::new("copyspace1", true, true,
-                                           VMRequest::RequestFraction {
-                                               frac: 1.0/3.0,
-                                               top: false,
-                                           }),
+                                           VMRequest::discontiguous()),
                 versatile_space: ImmortalSpace::new("versatile_space", true,
-                                                    VMRequest::RequestFraction {
-                                                        frac: 1.0/3.0,
-                                                        top:  false,
-                                                    }),
+                                                    VMRequest::discontiguous()),
                 sanity_checker: SanityChecker::new(),
                 total_pages: 0,
                 collection_attempt: 0,
@@ -98,6 +89,7 @@ impl Plan for SemiSpace {
     }
 
     unsafe fn gc_init(&self, heap_size: usize) {
+        ::util::heap::layout::heap_layout::VM_MAP.finalize_static_space_map();
         let unsync = &mut *self.unsync.get();
         unsync.total_pages = bytes_to_pages(heap_size);
         unsync.vm_space.init();

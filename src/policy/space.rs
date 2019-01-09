@@ -128,6 +128,11 @@ pub trait Space: Sized + Debug + 'static {
     }
 
     fn release_multiple_pages(&mut self, start: Address);
+
+    fn release_all_chunks(&mut self) {
+        ::util::heap::layout::heap_layout::VM_MAP.free_all_chunks(self.common_mut().head_discontiguous_region);
+        self.common_mut().head_discontiguous_region = unsafe { Address::zero() };
+    }
 }
 
 #[derive(Debug)]
