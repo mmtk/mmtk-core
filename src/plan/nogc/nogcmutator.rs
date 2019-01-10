@@ -1,5 +1,6 @@
 use ::policy::immortalspace::ImmortalSpace;
-use ::util::alloc::BumpAllocator;
+use ::policy::largeobjectspace::LargeObjectSpace;
+use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
 use ::plan::mutator_context::MutatorContext;
 use ::plan::Phase;
 use ::util::{Address, ObjectReference};
@@ -12,7 +13,8 @@ use libc::c_void;
 #[repr(C)]
 pub struct NoGCMutator {
     // ImmortalLocal
-    nogc: BumpAllocator<MonotonePageResource<ImmortalSpace>>
+    nogc: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
+    los: LargeObjectAllocator
 }
 
 impl MutatorContext for NoGCMutator {
@@ -44,9 +46,10 @@ impl MutatorContext for NoGCMutator {
 }
 
 impl NoGCMutator {
-    pub fn new(tls: *mut c_void, space: &'static ImmortalSpace) -> Self {
+    pub fn new(tls: *mut c_void, space: &'static ImmortalSpace, los: &'static LargeObjectSpace) -> Self {
         NoGCMutator {
             nogc: BumpAllocator::new(tls, Some(space)),
+            los: LargeObjectAllocator::new(tls, Some(los))
         }
     }
 }
