@@ -115,13 +115,9 @@ impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
         }
     }
 
-    fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        // TODO: internalLimit etc.
-        self.alloc_slow_inline(size, align, offset)
-    }
-
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc_slow");
+        // TODO: internalLimit etc.
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
         let acquired_start: Address = self.space.unwrap().acquire(self.tls,
                                                                   bytes_to_pages(block_size));

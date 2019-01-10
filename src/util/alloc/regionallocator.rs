@@ -66,14 +66,9 @@ impl Allocator<PR> for RegionAllocator {
         start
     }
 
-    fn alloc_slow(&mut self, bytes: usize, align: usize, offset: isize) -> Address {
-        debug_assert!(bytes <= BYTES_IN_REGION);
-        // TODO: internalLimit etc.
-        self.alloc_slow_inline(bytes, align, offset)
-    }
-
     fn alloc_slow_once(&mut self, bytes: usize, align: usize, offset: isize) -> Address {
         trace!("alloc_slow");
+        debug_assert!(bytes <= BYTES_IN_REGION);
         match self.space.acquire_new_region(self.tls) {
             Some(region) => {
                 self.cursor = region.0;
