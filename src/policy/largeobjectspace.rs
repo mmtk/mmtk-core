@@ -5,7 +5,7 @@ use ::policy::space::{CommonSpace, Space};
 use ::util::{Address, ObjectReference};
 use ::util::constants::BYTES_IN_PAGE;
 use ::util::header_byte;
-use ::util::heap::{FreeListPageResource, PageResource};
+use ::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use ::util::treadmill::TreadMill;
 use ::vm::{ObjectModel, VMObjectModel};
 
@@ -61,6 +61,15 @@ impl Space for LargeObjectSpace {
 }
 
 impl LargeObjectSpace {
+    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest) -> Self {
+        LargeObjectSpace {
+            common: UnsafeCell::new(CommonSpace::new(name, false, false, zeroed, vmrequest)),
+            mark_state: 0,
+            in_nursery_GC: false,
+            treadmill: TreadMill::new()
+        }
+    }
+
     pub fn prepare(&mut self, full_heap: bool) {
         if full_heap {
             debug_assert!(self.treadmill.from_space_empty());
