@@ -118,7 +118,7 @@ impl LargeObjectSpace {
         return object;
     }
 
-    pub fn initialize_header(&mut self, object: ObjectReference, alloc: bool) {
+    pub fn initialize_header(&self, object: ObjectReference, alloc: bool) {
         let old_value = VMObjectModel::read_available_byte(object);
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
         if alloc {
@@ -165,6 +165,6 @@ impl LargeObjectSpace {
     }
 }
 
-fn get_super_page(cell: &Address) -> Address {
+fn get_super_page(cell: Address) -> Address {
     unsafe { Address::from_usize(cell.as_usize() & PAGE_MASK) }
 }

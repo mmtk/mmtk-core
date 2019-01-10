@@ -1,64 +1,74 @@
 use std::collections::hash_set::Iter;
 use std::collections::HashSet;
 use std::mem::swap;
+use std::sync::Mutex;
 
 use ::util::{Address, ObjectReference};
 
 #[derive(Debug)]
 pub struct TreadMill {
-    from_space: HashSet<Address>,
-    to_space: HashSet<Address>,
-    collect_nursery: HashSet<Address>,
-    alloc_nursery: HashSet<Address>,
+    from_space: Mutex<HashSet<Address>>,
+    to_space: Mutex<HashSet<Address>>,
+    collect_nursery: Mutex<HashSet<Address>>,
+    alloc_nursery: Mutex<HashSet<Address>>,
 }
 
 impl TreadMill {
     pub fn new() -> Self {
         TreadMill {
-            from_space: HashSet::new(),
-            to_space: HashSet::new(),
-            collect_nursery: HashSet::new(),
-            alloc_nursery: HashSet::new(),
+            from_space: Mutex::new(HashSet::new()),
+            to_space: Mutex::new(HashSet::new()),
+            collect_nursery: Mutex::new(HashSet::new()),
+            alloc_nursery: Mutex::new(HashSet::new()),
         }
     }
 
-    pub fn add_to_treadmill(&mut self, cell: Address, nursery: bool) {
+    pub fn add_to_treadmill(&self, cell: Address, nursery: bool) {
+        println!("Adding {:?} to treadmill", cell);
         if nursery {
-            self.alloc_nursery.insert(cell);
+            self.alloc_nursery.lock().unwrap().insert(cell);
         } else {
-            self.to_space.insert(cell);
+            self.to_space.lock().unwrap().insert(cell);
         }
     }
 
-    pub fn iter_nursery(&self) -> Iter<Address> {
-        self.collect_nursery.iter()
+    pub fn iter_nursery(&self) -> Vec<Address> {
+        let guard = self.collect_nursery.lock().unwrap();
+        let vals = guard.iter().map(|x|*x).collect();
+        drop(guard);
+        vals
     }
 
-    pub fn iter(&self) -> Iter<Address> {
-        self.from_space.iter()
+    pub fn iter(&self) -> Vec<Address> {
+        let guard = self.from_space.lock().unwrap();
+        let vals = guard.iter().map(|x|*x).collect();
+        drop(guard);
+        vals
     }
 
     pub fn copy(&mut self, cell: Address, is_in_nursery: bool) {
         if is_in_nursery {
-            debug_assert!(self.collect_nursery.contains(&cell));
-            self.collect_nursery.remove(&cell);
+            let mut guard = self.collect_nursery.lock().unwrap();
+            debug_assert!(guard.contains(&cell));
+            guard.remove(&cell);
         } else {
-            debug_assert!(self.from_space.contains(&cell));
-            self.from_space.remove(&cell);
+            let mut guard = self.from_space.lock().unwrap();
+            debug_assert!(guard.contains(&cell));
+            guard.remove(&cell);
         }
-        self.to_space.insert(cell);
+        self.to_space.lock().unwrap().insert(cell);
     }
 
     pub fn to_space_empty(&self) -> bool {
-        self.to_space.is_empty()
+        self.to_space.lock().unwrap().is_empty()
     }
 
     pub fn from_space_empty(&self) -> bool {
-        self.from_space.is_empty()
+        self.from_space.lock().unwrap().is_empty()
     }
 
     pub fn nursery_empty(&self) -> bool {
-        self.collect_nursery.is_empty()
+        self.collect_nursery.lock().unwrap().is_empty()
     }
 
     pub fn flip(&mut self, full_heap: bool) {

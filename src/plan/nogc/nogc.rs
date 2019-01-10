@@ -29,7 +29,7 @@ pub type SelectedPlan = NoGC;
 
 pub struct NoGC {
     pub control_collector_context: ControllerCollectorContext,
-    unsync: UnsafeCell<NoGCUnsync>,
+    pub unsync: UnsafeCell<NoGCUnsync>,
 }
 
 unsafe impl Sync for NoGC {}
