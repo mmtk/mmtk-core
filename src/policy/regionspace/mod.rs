@@ -4,4 +4,4 @@ mod regionspace;
 pub use self::region::*;
 pub use self::regionspace::*;
 
-const DEBUG: bool = true;
+const DEBUG: bool = false;
