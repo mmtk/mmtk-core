@@ -138,7 +138,10 @@ pub trait Allocator<PR: PageResource> {
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 
-    fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address;
+    #[inline(never)]
+    fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        self.alloc_slow_inline(size, align, offset)
+    }
 
     #[inline(always)]
     fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
