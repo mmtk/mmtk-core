@@ -113,7 +113,7 @@ impl Plan for G1 {
                 hi: false,
                 vm_space: create_vm_space(),
                 region_space: RegionSpace::new("region_space", VMRequest::RequestDiscontiguous),
-                versatile_space: ImmortalSpace::new("versatile_space", true, VMRequest::RequestFraction { frac: 1.0/4.0, top:  false }),
+                versatile_space: ImmortalSpace::new("versatile_space", true, VMRequest::RequestDiscontiguous),
                 total_pages: 0,
                 collection_attempt: 0,
             }),
@@ -218,7 +218,7 @@ impl Plan for G1 {
                 unsync.vm_space.release();
             },
             &Phase::CollectionSetSelection => {
-                self.region_space.compute_collection_set();
+                self.region_space.compute_collection_set(self.get_pages_avail());
             },
             &Phase::EvacuatePrepare => {
                 debug_assert!(self.evacuate_trace.values.is_empty());
@@ -246,15 +246,14 @@ impl Plan for G1 {
         }
     }
 
+    #[inline]
     fn collection_required<PR: PageResource>(&self, space_full: bool, space: &'static PR::Space) -> bool {
         let total_pages = self.get_total_pages();
         if self.get_pages_avail() * 10 < total_pages {
             return true;
         }
-        let stress_force_gc = self.stress_test_gc_required();
-        trace!("self.get_pages_reserved()={}, self.get_total_pages()={}", self.get_pages_reserved(), self.get_total_pages());
-        let heap_full = self.get_pages_reserved() > self.get_total_pages();
-        space_full || stress_force_gc || heap_full
+        let heap_full = self.get_pages_reserved() > total_pages;
+        space_full || heap_full
     }
 
     fn get_total_pages(&self) -> usize {

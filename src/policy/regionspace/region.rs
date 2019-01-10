@@ -6,8 +6,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use vm::{VMObjectModel, ObjectModel, VMMemory, Memory};
 use std::ops::{Deref, DerefMut};
 
-pub const LOG_PAGES_IN_REGION: usize = 8;
-pub const PAGES_IN_REGION: usize = 1 << 8; // 256
+pub const LOG_PAGES_IN_REGION: usize = 6;
+pub const PAGES_IN_REGION: usize = 1 << LOG_PAGES_IN_REGION; // 256
 pub const LOG_BYTES_IN_REGION: usize = LOG_PAGES_IN_REGION + constants::LOG_BYTES_IN_PAGE as usize;
 pub const BYTES_IN_REGION: usize = 1 << LOG_BYTES_IN_REGION;//BYTES_IN_PAGE * PAGES_IN_REGION; // 1048576
 const REGION_MASK: usize = BYTES_IN_REGION - 1;// 0..011111111111
@@ -99,6 +99,7 @@ pub struct MetaData {
 }
 
 impl MetaData {
+    #[inline]
     pub fn get_region(&self) -> Region {
         let self_address: Address = unsafe { ::std::mem::transmute(self) };
         let chunk = embedded_meta_data::get_metadata_base(self_address);
@@ -107,6 +108,7 @@ impl MetaData {
         Region(region_start + (index << LOG_BYTES_IN_REGION))
     }
 
+    #[inline]
     pub fn clear(&mut self) {
         self.mark_table.clear();
         VMMemory::zero(Address::from_ptr(self as _), ::std::mem::size_of::<Self>());
@@ -133,18 +135,22 @@ impl MarkBitMap {
         unsafe { ::std::mem::transmute(&self.table) }
     }
 
+    #[inline]
     pub fn is_marked(&self, object: ObjectReference) -> bool {
         self.live_bit_set(VMObjectModel::object_start_ref(object))
     }
 
+    #[inline]
     pub fn test_and_mark(&self, object: ObjectReference) -> bool {
         self.set_live_bit(VMObjectModel::object_start_ref(object), true)
     }
 
+    #[inline]
     pub fn write_mark_state(&self, object: ObjectReference) {
         self.set_live_bit(VMObjectModel::object_start_ref(object), false);
     }
 
+    #[inline]
     fn set_live_bit(&self, address: Address, atomic: bool) -> bool {
         let live_word = self.get_live_word(address);
         let mask = Self::get_mask(address);
@@ -158,6 +164,7 @@ impl MarkBitMap {
         (old_value & mask) != mask
     }
 
+    #[inline]
     fn live_bit_set(&self, address: Address) -> bool {
       let live_word = self.get_live_word(address);
       let mask = Self::get_mask(address);
@@ -165,22 +172,31 @@ impl MarkBitMap {
       (value & mask) == mask
     }
 
+    #[inline]
     fn get_mask(address: Address) -> usize {
         let shift = (address.0 >> OBJECT_LIVE_SHIFT) & WORD_SHIFT_MASK;
         1 << shift
     }
     
-    fn get_live_word_address(&self, address: Address) -> Address {
-        self.table() + embedded_meta_data::get_metadata_offset(address, LOG_LIVE_COVERAGE, constants::LOG_BYTES_IN_WORD as _)
+    #[inline]
+    pub fn get_live_word_offset(&self, address: Address, log_coverage: usize, log_align: usize) -> usize {
+        ((address.0 & REGION_MASK) >> (log_coverage + log_align)) << log_align
     }
 
+    #[inline]
+    fn get_live_word_address(&self, address: Address) -> Address {
+        self.table() + self.get_live_word_offset(address, LOG_LIVE_COVERAGE, constants::LOG_BYTES_IN_WORD as _)
+    }
+
+    #[inline]
     fn get_live_word(&self, address: Address) -> &AtomicUsize {
         let address = self.get_live_word_address(address);
         debug_assert!(address >= self.table());
-        debug_assert!(address < (self.table() + MARK_TABLE_SIZE));
+        debug_assert!(address < ((self.table() + MARK_TABLE_SIZE)));
         unsafe { ::std::mem::transmute(address) }
     }
 
+    #[inline]
     pub fn clear(&mut self) {
         VMMemory::zero(self.table(), MARK_TABLE_SIZE);
         // unimplemented!();

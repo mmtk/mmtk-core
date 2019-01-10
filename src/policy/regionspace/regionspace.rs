@@ -24,6 +24,8 @@ use util::constants;
 use vm::{Memory, VMMemory};
 use util::heap::layout::Mmapper;
 use super::DEBUG;
+use plan::selected_plan::PLAN;
+use plan::plan::Plan;
 
 
 
@@ -32,7 +34,7 @@ type PR = FreeListPageResource<RegionSpace>;
 #[derive(Debug)]
 pub struct RegionSpace {
     common: UnsafeCell<CommonSpace<PR>>,
-    pub regions: RwLock<HashSet<Region>>
+    // pub regions: RwLock<HashSet<Region>>
 }
 
 impl Space for RegionSpace {
@@ -60,7 +62,7 @@ impl Space for RegionSpace {
         if ForwardingWord::is_forwarded_or_being_forwarded(object) {
             return true;
         }
-        Region::of(object).metadata().mark_table.is_marked(object)
+        Region::of(object).mark_table.is_marked(object)
     }
 
     fn is_movable(&self) -> bool {
@@ -84,10 +86,11 @@ impl RegionSpace {
     pub fn new(name: &'static str, vmrequest: VMRequest) -> Self {
         RegionSpace {
             common: UnsafeCell::new(CommonSpace::new(name, true, false, true, vmrequest)),
-            regions: RwLock::new(HashSet::with_capacity(997)),
+            // regions: RwLock::new(HashSet::with_capacity(997)),
         }
     }
 
+    #[inline]
     pub fn acquire_new_region(&self, tls: *mut c_void) -> Option<Region> {
         // Allocate
         let region = self.acquire(tls, PAGES_IN_REGION);
@@ -97,12 +100,12 @@ impl RegionSpace {
             if DEBUG {
                 println!("Alloc {:?} in chunk {:?}", region, embedded_meta_data::get_metadata_base(region));
             }
-            VMMemory::zero(region, BYTES_IN_REGION);
+            // VMMemory::zero(region, BYTES_IN_REGION);
             let mut region = Region(region);
             region.clear();
             region.committed = true;
-            let mut regions = self.regions.write().unwrap();
-            regions.insert(region);
+            // let mut regions = self.regions.write().unwrap();
+            // regions.insert(region);
             Some(region)
         } else {
             None
@@ -110,8 +113,8 @@ impl RegionSpace {
     }
 
     pub fn prepare(&mut self) {
-        let regions = self.regions.read().unwrap();
-        for region in regions.iter() {
+        let regions = self.regions();
+        for region in regions {
             region.clone().mark_table.clear();
             region.live_size.store(0, Ordering::Relaxed);
         }
@@ -120,40 +123,52 @@ impl RegionSpace {
     pub fn release(&mut self) {
         // Cleanup regions
         let me = unsafe { &mut *(self as *mut Self) };
-        let mut regions = self.regions.write().unwrap();
-        let mut to_be_released = {
+        // for region in self.regions() {
+        //     if region.relocate {
+        //         me.release_region(region);
+        //     }
+        // }
+        let to_be_released = {
             let mut to_be_released = vec![];
-            for region in regions.iter() {
+            for region in self.regions() {
                 if region.relocate {
-                    to_be_released.push(*region);
+                    to_be_released.push(region);
                 }
             }
             to_be_released
         };
-        regions.retain(|&r| !r.relocate);
-        for region in &mut to_be_released {
-            if DEBUG {
-                println!("Release {:?}", region);
-            }
-            me.pr.as_mut().unwrap().release_pages(region.0);
+        for region in to_be_released {
+            me.release_region(region);
         }
     }
 
-    #[inline]
-    fn test_and_mark(object: ObjectReference) -> bool {
-        Region::of(object).mark_table.test_and_mark(object)
+    fn release_region(&mut self, mut region: Region) {
+        if DEBUG {
+            println!("Release {:?}", region);
+        }
+        region.clear();
+        self.pr.as_mut().unwrap().release_pages(region.0);
     }
 
+    #[inline]
+    fn test_and_mark(object: ObjectReference, region: Region) -> bool {
+        region.mark_table.test_and_mark(object)
+    }
+
+    #[inline]
     pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference) -> ObjectReference {
-        if Self::test_and_mark(object) {
-            Region::of(object).live_size.fetch_add(VMObjectModel::get_size_when_copied(object), Ordering::Relaxed);
+        let region = Region::of(object);
+        if Self::test_and_mark(object, region) {
+            region.live_size.fetch_add(VMObjectModel::get_size_when_copied(object), Ordering::Relaxed);
             trace.process_node(object);
         }
         object
     }
 
+    #[inline]
     pub fn trace_evacuate_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
-        if Region::of(object).relocate {
+        let region = Region::of(object);
+        if region.relocate {
             let prior_status_word = ForwardingWord::attempt_to_forward(object);
             if ForwardingWord::state_is_forwarded_or_being_forwarded(prior_status_word) {
                 ForwardingWord::spin_and_get_forwarded_object(object, prior_status_word)
@@ -163,28 +178,52 @@ impl RegionSpace {
                 new_object
             }
         } else {
-            if Self::test_and_mark(object) {
+            if Self::test_and_mark(object, region) {
                 trace.process_node(object);
             }
             object
         }
     }
 
-    pub fn compute_collection_set(&self) -> Vec<Region> {
+    pub fn compute_collection_set(&self, available_pages: usize) {
         // FIXME: Bad performance
-        let mut regions: Vec<Region> = { self.regions.read().unwrap().iter().map(|r| *r).collect() };
+        const MAX_LIVE_SIZE: usize = (BYTES_IN_REGION as f64 * 0.65) as usize;
+        let mut regions: Vec<Region> = self.regions().collect();
         regions.sort_unstable_by_key(|r| r.live_size.load(Ordering::Relaxed));
-        let max_live_size = (BYTES_IN_REGION as f64 * 0.65) as usize;
-        let mut collection_set = regions.drain_filter(|r| r.live_size.load(Ordering::Relaxed) < max_live_size).collect::<Vec<_>>();
-        for region in &mut collection_set {
-            if DEBUG {
-                println!("Relocate {:?}", region);
+        let avail_regions = (available_pages >> embedded_meta_data::LOG_PAGES_IN_REGION) * REGIONS_IN_CHUNK;
+        let mut available_size = avail_regions << LOG_BYTES_IN_REGION;
+
+        for mut region in regions {
+            let meta = region.metadata();
+            let live_size = meta.live_size.load(Ordering::Relaxed);
+            if live_size <= MAX_LIVE_SIZE && live_size < available_size {
+                if DEBUG {
+                    println!("Relocate {:?}", region);
+                }
+                meta.relocate = true;
+                available_size -= live_size;
             }
-            region.relocate = true;
         }
-        debug_assert!(regions.iter().all(|&r| r.live_size.load(Ordering::Relaxed) >= max_live_size));
-        debug_assert!(collection_set.iter().all(|&r| r.live_size.load(Ordering::Relaxed) < max_live_size));
-        collection_set
+        
+        // let mut collection_set = regions.drain_filter(|r| r.live_size.load(Ordering::Relaxed) < max_live_size).collect::<Vec<_>>();
+        // for region in &mut collection_set {
+        //     if DEBUG {
+        //         println!("Relocate {:?}", region);
+        //     }
+        //     region.relocate = true;
+        // }
+        // debug_assert!(regions.iter().all(|&r| r.live_size.load(Ordering::Relaxed) >= max_live_size));
+        // debug_assert!(collection_set.iter().all(|&r| r.live_size.load(Ordering::Relaxed) < max_live_size));
+        // collection_set
+    }
+
+    #[inline]
+    fn regions(&self) -> RegionIterator {
+        debug_assert!(!self.contiguous);
+        RegionIterator {
+            space: unsafe { ::std::mem::transmute(self) },
+            cursor: self.head_discontiguous_region,
+        }
     }
 }
 
@@ -201,8 +240,51 @@ impl ::std::ops::DerefMut for RegionSpace {
     }
 }
 
+struct RegionIterator {
+    space: &'static RegionSpace,
+    cursor: Address,
+}
 
+impl RegionIterator {
+    fn bump_cursor_to_next_region(&mut self) {
+        let mut cursor = self.cursor;
+        let old_chunk = embedded_meta_data::get_metadata_base(cursor);
+        cursor += BYTES_IN_REGION;
+        if embedded_meta_data::get_metadata_base(cursor) != old_chunk {
+            cursor = ::util::heap::layout::heap_layout::VM_MAP.get_next_contiguous_region(old_chunk);
+        }
+        self.cursor = cursor;
+    }
+}
 
-
-
+impl Iterator for RegionIterator {
+    type Item = Region;
+    
+    fn next(&mut self) -> Option<Region> {
+        if self.cursor.is_zero() {
+            return None;
+        }
+        // Continue searching if `cursor` points to a metadata region
+        if self.cursor == embedded_meta_data::get_metadata_base(self.cursor) {
+            debug_assert!(::util::heap::layout::heap_layout::VM_MAP.get_descriptor_for_address(self.cursor) == self.space.descriptor);
+            self.bump_cursor_to_next_region();
+            return self.next();
+        }
+        // Continue searching if `cursor` points to a free region
+        let region = Region(self.cursor);
+        if !region.committed {
+            self.bump_cursor_to_next_region();
+            return self.next();
+        }
+        debug_assert!(::util::heap::layout::heap_layout::VM_MAP.get_descriptor_for_address(self.cursor) == self.space.descriptor);
+        self.bump_cursor_to_next_region();
+        Some(region)
+        // 
+        // let result = RegionSpace::next_region(self.cursor);
+        // if let Some(region) = result {
+        //     self.cursor = region.0;
+        // }
+        // result
+    }
+}
 
