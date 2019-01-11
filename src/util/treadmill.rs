@@ -24,7 +24,6 @@ impl TreadMill {
     }
 
     pub fn add_to_treadmill(&self, cell: Address, nursery: bool) {
-        println!("Adding {:?} to treadmill", cell);
         if nursery {
             self.alloc_nursery.lock().unwrap().insert(cell);
         } else {
