@@ -1,7 +1,7 @@
 {
     "rust.no_default_features": true,
     "rust.features": [
-        "g1", "jikesrvm"
+        "nogc"
     ],
     "rust.target": "i686-apple-darwin"
 }

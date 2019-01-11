@@ -26,6 +26,7 @@ use util::heap::layout::Mmapper;
 use super::DEBUG;
 use plan::selected_plan::PLAN;
 use plan::plan::Plan;
+use ::util::heap::layout::heap_layout::VM_MAP;
 
 
 
@@ -34,7 +35,7 @@ type PR = FreeListPageResource<RegionSpace>;
 #[derive(Debug)]
 pub struct RegionSpace {
     common: UnsafeCell<CommonSpace<PR>>,
-    pub regions: RwLock<HashSet<Region>>
+    // pub regions: RwLock<HashSet<Region>>
 }
 
 impl Space for RegionSpace {
@@ -86,7 +87,7 @@ impl RegionSpace {
     pub fn new(name: &'static str, vmrequest: VMRequest) -> Self {
         RegionSpace {
             common: UnsafeCell::new(CommonSpace::new(name, true, false, true, vmrequest)),
-            regions: RwLock::new(HashSet::with_capacity(997)),
+            // regions: RwLock::new(HashSet::with_capacity(997)),
         }
     }
 
@@ -104,8 +105,8 @@ impl RegionSpace {
             let mut region = Region(region);
             region.clear();
             region.committed = true;
-            let mut regions = self.regions.write().unwrap();
-            regions.insert(region);
+            // let mut regions = self.regions.write().unwrap();
+            // regions.insert(region);
             Some(region)
         } else {
             None
@@ -113,11 +114,13 @@ impl RegionSpace {
     }
 
     pub fn prepare(&mut self) {
-        let regions = self.regions.read().unwrap();
-        for region in regions.iter() {
+        // let regions = self.regions.read().unwrap();
+        // println!("RegionSpace prepare");
+        for region in self.regions() {
             region.clone().mark_table.clear();
             region.live_size.store(0, Ordering::Relaxed);
         }
+        // println!("RegionSpace prepare done");
     }
 
     pub fn release(&mut self) {
@@ -128,21 +131,21 @@ impl RegionSpace {
         //         me.release_region(region);
         //     }
         // }
-        let mut regions = self.regions.write().unwrap();
         let mut to_be_released = {
             let mut to_be_released = vec![];
-            for region in regions.iter() {
+            for region in self.regions() {
                 if region.relocate {
-                    to_be_released.push(*region);
+                    to_be_released.push(region);
                 }
             }
             to_be_released
         };
-        regions.retain(|&r| !r.relocate);
+        // regions.retain(|&r| !r.relocate);
         for region in &mut to_be_released {
             if DEBUG {
                 println!("Release {:?}", region);
             }
+            region.clear();
             me.pr.as_mut().unwrap().release_pages(region.0);
         }
     }
@@ -193,7 +196,7 @@ impl RegionSpace {
     pub fn compute_collection_set(&self, available_pages: usize) {
         // FIXME: Bad performance
         const MAX_LIVE_SIZE: usize = (BYTES_IN_REGION as f64 * 0.65) as usize;
-        let mut regions: Vec<Region> = { self.regions.read().unwrap().iter().map(|r| *r).collect() };
+        let mut regions: Vec<Region> = self.regions().collect();
         regions.sort_unstable_by_key(|r| r.live_size.load(Ordering::Relaxed));
         let avail_regions = (available_pages >> embedded_meta_data::LOG_PAGES_IN_REGION) * REGIONS_IN_CHUNK;
         let mut available_size = avail_regions << LOG_BYTES_IN_REGION;
@@ -222,14 +225,18 @@ impl RegionSpace {
         // collection_set
     }
 
-    // #[inline]
-    // fn regions(&self) -> RegionIterator {
-    //     debug_assert!(!self.contiguous);
-    //     RegionIterator {
-    //         space: unsafe { ::std::mem::transmute(self) },
-    //         cursor: self.head_discontiguous_region,
-    //     }
-    // }
+    #[inline]
+    fn regions(&self) -> RegionIterator {
+        debug_assert!(!self.contiguous);
+        let start = self.head_discontiguous_region;
+        let chunks = VM_MAP.get_contiguous_region_chunks(start);
+        let limit = start + (chunks << embedded_meta_data::LOG_BYTES_IN_REGION);
+        RegionIterator {
+            space: unsafe { ::std::mem::transmute(self) },
+            contingous_chunks: (start, limit),
+            cursor: start,
+        }
+    }
 }
 
 impl ::std::ops::Deref for RegionSpace {
@@ -247,16 +254,26 @@ impl ::std::ops::DerefMut for RegionSpace {
 
 struct RegionIterator {
     space: &'static RegionSpace,
+    contingous_chunks: (Address, Address), // (Start, Limit)
     cursor: Address,
 }
 
 impl RegionIterator {
     fn bump_cursor_to_next_region(&mut self) {
         let mut cursor = self.cursor;
-        let old_chunk = embedded_meta_data::get_metadata_base(cursor);
+        // Bump to next region
         cursor += BYTES_IN_REGION;
-        if embedded_meta_data::get_metadata_base(cursor) != old_chunk {
-            cursor = ::util::heap::layout::heap_layout::VM_MAP.get_next_contiguous_region(old_chunk);
+        // Acquire a new slice of contingous_chunks if cursor >= limit
+        if cursor >= self.contingous_chunks.1 {
+            let start = VM_MAP.get_next_contiguous_region(self.contingous_chunks.0);
+            if start.is_zero() {
+                cursor = unsafe { Address::zero() };
+            } else {
+                let chunks = VM_MAP.get_contiguous_region_chunks(start);
+                let limit = start + (chunks << embedded_meta_data::LOG_BYTES_IN_REGION);
+                self.contingous_chunks = (start, limit);
+                cursor = start;
+            }
         }
         self.cursor = cursor;
     }
@@ -270,8 +287,8 @@ impl Iterator for RegionIterator {
             return None;
         }
         // Continue searching if `cursor` points to a metadata region
-        if self.cursor == embedded_meta_data::get_metadata_base(self.cursor) {
-            debug_assert!(::util::heap::layout::heap_layout::VM_MAP.get_descriptor_for_address(self.cursor) == self.space.descriptor);
+        if self.cursor == self.contingous_chunks.0 {
+            debug_assert!(VM_MAP.get_descriptor_for_address(self.cursor) == self.space.descriptor);
             self.bump_cursor_to_next_region();
             return self.next();
         }
@@ -281,15 +298,10 @@ impl Iterator for RegionIterator {
             self.bump_cursor_to_next_region();
             return self.next();
         }
-        debug_assert!(::util::heap::layout::heap_layout::VM_MAP.get_descriptor_for_address(self.cursor) == self.space.descriptor);
+        // `cursor` points to a committed region
+        debug_assert!(VM_MAP.get_descriptor_for_address(self.cursor) == self.space.descriptor);
         self.bump_cursor_to_next_region();
         Some(region)
-        // 
-        // let result = RegionSpace::next_region(self.cursor);
-        // if let Some(region) = result {
-        //     self.cursor = region.0;
-        // }
-        // result
     }
 }
 
