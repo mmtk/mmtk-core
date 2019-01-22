@@ -2,7 +2,7 @@ use ::util::Address;
 use ::util::ObjectReference;
 use ::util::conversions::*;
 
-use ::vm::{ActivePlan, VMActivePlan, Collection, VMCollection};
+use ::vm::{ActivePlan, VMActivePlan, Collection, VMCollection, ObjectModel, VMObjectModel};
 use ::util::heap::{VMRequest, PageResource};
 use ::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END, AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use ::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END};
@@ -68,11 +68,12 @@ pub trait Space: Sized + Debug + 'static {
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
+        let start = VMObjectModel::ref_to_address(object);
         if !space_descriptor::is_contiguous(self.common().descriptor) {
-            VM_MAP.get_descriptor_for_address(object.to_address()) == self.common().descriptor
+            VM_MAP.get_descriptor_for_address(start) == self.common().descriptor
         } else {
-            object.value() >= self.common().start.as_usize()
-                && object.value() < self.common().start.as_usize() + self.common().extent
+            start.as_usize() >= self.common().start.as_usize()
+                && start.as_usize() < self.common().start.as_usize() + self.common().extent
         }
     }
 
