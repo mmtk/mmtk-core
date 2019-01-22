@@ -192,11 +192,15 @@ impl Plan for SemiSpace {
             &Phase::Closure => {}
             &Phase::Release => {
                 if cfg!(feature = "sanity") {
-                    let fromspace_start = self.fromspace().common().start;
-                    let fromspace_commited = self.fromspace().common().pr.as_ref().unwrap().common().committed.load(Ordering::Relaxed);
-                    let commited_bytes = fromspace_commited * (1 << LOG_BYTES_IN_PAGE);
-                    println!("Destroying fromspace {}~{}", fromspace_start, fromspace_start + commited_bytes);
-                    memset(fromspace_start.as_usize() as *mut c_void, 0xFF, commited_bytes);
+                    if self.fromspace().common().contiguous {
+                        let fromspace_start = self.fromspace().common().start;
+                        let fromspace_commited = self.fromspace().common().pr.as_ref().unwrap().common().committed.load(Ordering::Relaxed);
+                        let commited_bytes = fromspace_commited * (1 << LOG_BYTES_IN_PAGE);
+                        println!("Destroying fromspace {}~{}", fromspace_start, fromspace_start + commited_bytes);
+                        memset(fromspace_start.as_usize() as *mut c_void, 0xFF, commited_bytes);
+                    } else {
+                        println!("Fromspace is discontiguous, not destroying")
+                    }
                 }
                 // release the collected region
                 if unsync.hi {

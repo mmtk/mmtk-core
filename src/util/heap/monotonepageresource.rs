@@ -116,6 +116,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResour
             sync.cursor = sync.current_chunk;
             sync.sentinel = sync.cursor + if sync.current_chunk.is_zero() { 0 } else {
                 required_chunks << LOG_BYTES_IN_CHUNK };
+            //println!("{} {}->{}", self.common.space.unwrap().get_name(), sync.cursor, sync.sentinel);
             rtn = sync.cursor;
             tmp = sync.cursor + bytes;
             new_chunk = true;

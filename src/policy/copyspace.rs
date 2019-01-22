@@ -115,6 +115,9 @@ impl CopySpace {
     }
 
     pub fn protect(&self) {
+        if !self.common().contiguous {
+            panic!("Implement Options.protectOnRelease for MonotonePageResource.release_pages_extent")
+        }
         let start = self.common().start.as_usize();
         let extent = self.common().extent;
         unsafe {
@@ -124,6 +127,9 @@ impl CopySpace {
     }
 
     pub fn unprotect(&self) {
+        if !self.common().contiguous {
+            panic!("Implement Options.protectOnRelease for MonotonePageResource.release_pages_extent")
+        }
         let start = self.common().start.as_usize();
         let extent = self.common().extent;
         unsafe {
