@@ -93,12 +93,12 @@ impl LargeObjectSpace {
         // so the compiler knows I'm borrowing two different fields
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
-                println!("- cn {}", cell);
+                // println!("- cn {}", cell);
                 (unsafe { &mut *self.common.get() }).pr.as_mut().unwrap().release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
-                println!("- ts {}", cell);
+                // println!("- ts {}", cell);
                 (unsafe { &mut *self.common.get() }).pr.as_mut().unwrap().release_pages(get_super_page(cell));
             }
         }
