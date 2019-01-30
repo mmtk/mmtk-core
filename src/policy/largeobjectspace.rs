@@ -92,18 +92,20 @@ impl LargeObjectSpace {
         // didn't call self.release_multiple_pages
         // so the compiler knows I'm borrowing two different fields
         if sweep_nursery {
-            for cell in self.treadmill.iter_nursery() {
+            for cell in self.treadmill.collect_nursery() {
+                println!("- cn {}", cell);
                 (unsafe { &mut *self.common.get() }).pr.as_mut().unwrap().release_pages(get_super_page(cell));
             }
         } else {
-            for cell in self.treadmill.iter() {
+            for cell in self.treadmill.collect() {
+                println!("- ts {}", cell);
                 (unsafe { &mut *self.common.get() }).pr.as_mut().unwrap().release_pages(get_super_page(cell));
             }
         }
     }
 
     pub fn trace_object<T: TransitiveClosure>(
-        &mut self,
+        &self,
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
@@ -146,7 +148,7 @@ impl LargeObjectSpace {
         while !VMObjectModel::attempt_available_bits(
             object,
             old_value,
-            old_value ^ (!LOS_BIT_MASK as usize) | value as usize) {
+            old_value & (!LOS_BIT_MASK as usize) | value as usize) {
             old_value = VMObjectModel::prepare_available_bits(object);
             mark_bit = (old_value as u8) & mask;
             if mark_bit == value {

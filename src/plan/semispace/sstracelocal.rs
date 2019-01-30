@@ -80,6 +80,11 @@ impl TraceLocal for SSTraceLocal {
             trace!("trace_object: object in boot space");
             return plan_unsync.vm_space.trace_object(self, object);
         }
+        if plan_unsync.los.in_space(object) {
+            trace!("trace_object: object in los");
+            return plan_unsync.los.trace_object(self, object);
+        }
+
         panic!("No special case for space in trace_object");
     }
 
@@ -152,6 +157,9 @@ impl TraceLocal for SSTraceLocal {
             return true;
         }
         if unsync.vm_space.in_space(object) {
+            return true;
+        }
+        if unsync.los.in_space(object) {
             return true;
         }
         panic!("Invalid space")

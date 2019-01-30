@@ -25,35 +25,41 @@ impl TreadMill {
 
     pub fn add_to_treadmill(&self, cell: Address, nursery: bool) {
         if nursery {
+            // println!("+ an {}", cell);
             self.alloc_nursery.lock().unwrap().insert(cell);
         } else {
+            // println!("+ ts {}", cell);
             self.to_space.lock().unwrap().insert(cell);
         }
     }
 
-    pub fn iter_nursery(&self) -> Vec<Address> {
-        let guard = self.collect_nursery.lock().unwrap();
+    pub fn collect_nursery(&self) -> Vec<Address> {
+        let mut guard = self.collect_nursery.lock().unwrap();
         let vals = guard.iter().map(|x|*x).collect();
+        guard.clear();
         drop(guard);
         vals
     }
 
-    pub fn iter(&self) -> Vec<Address> {
-        let guard = self.from_space.lock().unwrap();
+    pub fn collect(&self) -> Vec<Address> {
+        let mut guard = self.from_space.lock().unwrap();
         let vals = guard.iter().map(|x|*x).collect();
+        guard.clear();
         drop(guard);
         vals
     }
 
-    pub fn copy(&mut self, cell: Address, is_in_nursery: bool) {
+    pub fn copy(&self, cell: Address, is_in_nursery: bool) {
         if is_in_nursery {
             let mut guard = self.collect_nursery.lock().unwrap();
             debug_assert!(guard.contains(&cell));
             guard.remove(&cell);
+            // println!("cn -> ts {}", cell);
         } else {
             let mut guard = self.from_space.lock().unwrap();
             debug_assert!(guard.contains(&cell));
             guard.remove(&cell);
+            // println!("fs -> ts {}", cell);
         }
         self.to_space.lock().unwrap().insert(cell);
     }
@@ -72,8 +78,10 @@ impl TreadMill {
 
     pub fn flip(&mut self, full_heap: bool) {
         swap(&mut self.alloc_nursery, &mut self.collect_nursery);
+        // println!("an <-> cn");
         if full_heap {
             swap(&mut self.from_space, &mut self.to_space);
+            // println!("fs <-> ts");
         }
     }
 }
