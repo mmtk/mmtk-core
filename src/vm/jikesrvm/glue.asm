@@ -1,9 +1,24 @@
-.global jikesrvm_alloc_slow, jikesrvm_handle_user_collection_request
-.extern alloc_slow, handle_user_collection_request
+.global jikesrvm_alloc, jikesrvm_alloc_slow, jikesrvm_handle_user_collection_request
+.extern alloc, alloc_slow, handle_user_collection_request
+.include "inc.asm"
+
+jikesrvm_alloc:
+    pushl fp_offset(%esi)
+    mov %esp, fp_offset(%esi)
+    pushl $0xffffffff #method id
+    pushl 0x1c(%esp)
+    pushl 0x1c(%esp)
+    pushl 0x1c(%esp)
+    pushl 0x1c(%esp)
+    pushl 0x1c(%esp)
+    call alloc
+    add $0x18, %esp #shrink stack for args and method id
+    popl fp_offset(%esi)
+    ret
 
 jikesrvm_alloc_slow:
-    pushl 0x100(%esi)
-    mov %esp, 0x100(%esi)
+    pushl fp_offset(%esi)
+    mov %esp, fp_offset(%esi)
     pushl $0xffffffff #method id
     pushl 0x1c(%esp)
     pushl 0x1c(%esp)
@@ -12,15 +27,15 @@ jikesrvm_alloc_slow:
     pushl 0x1c(%esp)
     call alloc_slow
     add $0x18, %esp #shrink stack for args and method id
-    popl 0x100(%esi)
+    popl fp_offset(%esi)
     ret
 
 jikesrvm_handle_user_collection_request:
-    pushl 0x100(%esi)
-    mov %esp, 0x100(%esi)
+    pushl fp_offset(%esi)
+    mov %esp, fp_offset(%esi)
     pushl $0xffffffff #method id
     pushl 0xc(%esp)
     call handle_user_collection_request
     add $0x8, %esp #shrink stack for args and method id
-    popl 0x100(%esi)
+    popl fp_offset(%esi)
     ret

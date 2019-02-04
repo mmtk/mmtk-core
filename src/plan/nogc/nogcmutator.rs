@@ -1,18 +1,21 @@
 use ::policy::immortalspace::ImmortalSpace;
-use ::util::alloc::BumpAllocator;
+use ::policy::largeobjectspace::LargeObjectSpace;
+use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
 use ::plan::mutator_context::MutatorContext;
 use ::plan::Phase;
 use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
 use ::util::heap::MonotonePageResource;
+use ::plan::nogc::PLAN;
 
 use libc::c_void;
 
 #[repr(C)]
 pub struct NoGCMutator {
     // ImmortalLocal
-    nogc: BumpAllocator<MonotonePageResource<ImmortalSpace>>
+    nogc: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
+    los: LargeObjectAllocator
 }
 
 impl MutatorContext for NoGCMutator {
@@ -22,17 +25,27 @@ impl MutatorContext for NoGCMutator {
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         trace!("MutatorContext.alloc({}, {}, {}, {:?})", size, align, offset, allocator);
-        self.nogc.alloc(size, align, offset)
+        match allocator {
+            AllocationType::Los => self.los.alloc(size, align, offset),
+            _ => self.nogc.alloc(size, align, offset)
+        }
     }
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         trace!("MutatorContext.alloc_slow({}, {}, {}, {:?})", size, align, offset, allocator);
-        self.nogc.alloc_slow(size, align, offset)
+        match allocator {
+            AllocationType::Los => self.los.alloc(size, align, offset),
+            _ => self.nogc.alloc(size, align, offset)
+        }
     }
 
     fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
         match allocator {
-            AllocationType::Default => {}
+            AllocationType::Los => {
+                // FIXME: data race on immortalspace.mark_state !!!
+                let unsync = unsafe { &*PLAN.unsync.get() };
+                unsync.los.initialize_header(refer, true);
+            }
             // FIXME: other allocation types
             _ => {}
         }
@@ -44,9 +57,10 @@ impl MutatorContext for NoGCMutator {
 }
 
 impl NoGCMutator {
-    pub fn new(tls: *mut c_void, space: &'static ImmortalSpace) -> Self {
+    pub fn new(tls: *mut c_void, space: &'static ImmortalSpace, los: &'static LargeObjectSpace) -> Self {
         NoGCMutator {
             nogc: BumpAllocator::new(tls, Some(space)),
+            los: LargeObjectAllocator::new(tls, Some(los))
         }
     }
 }

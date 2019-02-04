@@ -11,6 +11,7 @@ use ::plan::Plan;
 use ::plan::Allocator;
 use ::policy::copyspace::CopySpace;
 use ::policy::immortalspace::ImmortalSpace;
+use ::policy::largeobjectspace::LargeObjectSpace;
 use ::plan::Phase;
 use ::plan::trace::Trace;
 use ::util::ObjectReference;
@@ -55,6 +56,7 @@ pub struct SemiSpaceUnsync {
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
+    pub los: LargeObjectSpace,
     sanity_checker: SanityChecker,
     // FIXME: This should be inside HeapGrowthManager
     total_pages: usize,
@@ -80,6 +82,7 @@ impl Plan for SemiSpace {
                                            VMRequest::discontiguous()),
                 versatile_space: ImmortalSpace::new("versatile_space", true,
                                                     VMRequest::discontiguous()),
+                los: LargeObjectSpace::new("los", true, VMRequest::discontiguous()),
                 sanity_checker: SanityChecker::new(),
                 total_pages: 0,
                 collection_attempt: 0,
@@ -96,6 +99,7 @@ impl Plan for SemiSpace {
         unsync.copyspace0.init();
         unsync.copyspace1.init();
         unsync.versatile_space.init();
+        unsync.los.init();
 
         // These VMs require that the controller thread is started by the VM itself.
         // (Usually because it calls into VM code that accesses the TLS.)
@@ -109,7 +113,7 @@ impl Plan for SemiSpace {
     fn bind_mutator(&self, tls: *mut c_void) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
         Box::into_raw(Box::new(SSMutator::new(tls, self.tospace(),
-                                              &unsync.versatile_space))) as *mut c_void
+                                              &unsync.versatile_space, &unsync.los))) as *mut c_void
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {
@@ -119,7 +123,7 @@ impl Plan for SemiSpace {
             return false;
         }
 
-        if unsync.versatile_space.in_space(object) {
+        if unsync.versatile_space.in_space(object) || unsync.los.in_space(object) {
             return true;
         }
 
@@ -136,6 +140,9 @@ impl Plan for SemiSpace {
             return true;
         }
         if self.tospace().in_space(object) {
+            return true;
+        }
+        if unsync.los.in_space(object) {
             return true;
         }
         return false;
@@ -180,6 +187,7 @@ impl Plan for SemiSpace {
                 unsync.copyspace1.prepare(!unsync.hi);
                 unsync.versatile_space.prepare();
                 unsync.vm_space.prepare();
+                unsync.los.prepare(true);
             }
             &Phase::StackRoots => {
                 VMScanning::notify_initial_thread_scan_complete(false, tls);
@@ -192,11 +200,15 @@ impl Plan for SemiSpace {
             &Phase::Closure => {}
             &Phase::Release => {
                 if cfg!(feature = "sanity") {
-                    let fromspace_start = self.fromspace().common().start;
-                    let fromspace_commited = self.fromspace().common().pr.as_ref().unwrap().common().committed.load(Ordering::Relaxed);
-                    let commited_bytes = fromspace_commited * (1 << LOG_BYTES_IN_PAGE);
-                    println!("Destroying fromspace {}~{}", fromspace_start, fromspace_start + commited_bytes);
-                    memset(fromspace_start.as_usize() as *mut c_void, 0xFF, commited_bytes);
+                    if self.fromspace().common().contiguous {
+                        let fromspace_start = self.fromspace().common().start;
+                        let fromspace_commited = self.fromspace().common().pr.as_ref().unwrap().common().committed.load(Ordering::Relaxed);
+                        let commited_bytes = fromspace_commited * (1 << LOG_BYTES_IN_PAGE);
+                        println!("Destroying fromspace {}~{}", fromspace_start, fromspace_start + commited_bytes);
+                        memset(fromspace_start.as_usize() as *mut c_void, 0xFF, commited_bytes);
+                    } else {
+                        println!("Fromspace is discontiguous, not destroying")
+                    }
                 }
                 // release the collected region
                 if unsync.hi {
@@ -206,6 +218,7 @@ impl Plan for SemiSpace {
                 }
                 unsync.versatile_space.release();
                 unsync.vm_space.release();
+                unsync.los.release(true);
             }
             &Phase::Complete => {
                 if cfg!(feature = "sanity") {
@@ -239,7 +252,7 @@ impl Plan for SemiSpace {
 
     fn get_pages_used(&self) -> usize {
         let unsync = unsafe{&*self.unsync.get()};
-        self.tospace().reserved_pages() + unsync.versatile_space.reserved_pages()
+        self.tospace().reserved_pages() + unsync.versatile_space.reserved_pages() + unsync.los.reserved_pages()
     }
 
     fn is_bad_ref(&self, object: ObjectReference) -> bool {
@@ -260,6 +273,9 @@ impl Plan for SemiSpace {
         if unsync.versatile_space.in_space(object) {
             return unsync.versatile_space.is_movable();
         }
+        if unsync.los.in_space(object) {
+            return unsync.los.is_movable();
+        }
         return true;
     }
 
@@ -269,7 +285,8 @@ impl Plan for SemiSpace {
             unsync.vm_space.in_space(address.to_object_reference())  ||
             unsync.versatile_space.in_space(address.to_object_reference()) ||
             unsync.copyspace0.in_space(address.to_object_reference()) ||
-            unsync.copyspace1.in_space(address.to_object_reference())
+            unsync.copyspace1.in_space(address.to_object_reference()) ||
+            unsync.los.in_space(address.to_object_reference())
         } {
             return MMAPPER.address_is_mapped(address);
         } else {
@@ -301,5 +318,11 @@ impl SemiSpace {
 
     pub fn get_sstrace(&self) -> &Trace {
         &self.ss_trace
+    }
+
+    pub fn get_los(&self) -> &'static LargeObjectSpace {
+        let unsync = unsafe { &*self.unsync.get() };
+
+        &unsync.los
     }
 }

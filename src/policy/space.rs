@@ -2,7 +2,7 @@ use ::util::Address;
 use ::util::ObjectReference;
 use ::util::conversions::*;
 
-use ::vm::{ActivePlan, VMActivePlan, Collection, VMCollection};
+use ::vm::{ActivePlan, VMActivePlan, Collection, VMCollection, ObjectModel, VMObjectModel};
 use ::util::heap::{VMRequest, PageResource};
 use ::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END, AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use ::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END};
@@ -16,6 +16,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use ::util::constants::LOG_BYTES_IN_MBYTE;
 use ::util::conversions;
 use ::util::heap::space_descriptor;
+use ::util::heap::layout::heap_layout::VM_MAP;
 
 use std::fmt::Debug;
 
@@ -67,18 +68,19 @@ pub trait Space: Sized + Debug + 'static {
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
+        let start = VMObjectModel::ref_to_address(object);
         if !space_descriptor::is_contiguous(self.common().descriptor) {
-            ::util::heap::layout::heap_layout::VM_MAP.get_descriptor_for_address(object.to_address()) == self.common().descriptor
+            VM_MAP.get_descriptor_for_address(start) == self.common().descriptor
         } else {
-            object.value() >= self.common().start.as_usize()
-                && object.value() < self.common().start.as_usize() + self.common().extent
+            start.as_usize() >= self.common().start.as_usize()
+                && start.as_usize() < self.common().start.as_usize() + self.common().extent
         }
     }
 
     // UNSAFE: potential data race as this mutates 'common'
     unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
         // FIXME
-        let new_head: Address = ::util::heap::layout::heap_layout::VM_MAP.allocate_contiguous_chunks(self.common().descriptor, chunks, self.common().head_discontiguous_region);
+        let new_head: Address = VM_MAP.allocate_contiguous_chunks(self.common().descriptor, chunks, self.common().head_discontiguous_region);
         if new_head.is_zero() {
             return unsafe{Address::zero()};
         }
@@ -122,16 +124,54 @@ pub trait Space: Sized + Debug + 'static {
     fn release_discontiguous_chunks(&mut self, chunk: Address) {
         debug_assert!(chunk == conversions::chunk_align(chunk, true));
         if chunk == self.common().head_discontiguous_region {
-            self.common_mut().head_discontiguous_region = ::util::heap::layout::heap_layout::VM_MAP.get_next_contiguous_region(chunk);
+            self.common_mut().head_discontiguous_region = VM_MAP.get_next_contiguous_region(chunk);
         }
-        ::util::heap::layout::heap_layout::VM_MAP.free_contiguous_chunks(chunk);
+        VM_MAP.free_contiguous_chunks(chunk);
     }
 
     fn release_multiple_pages(&mut self, start: Address);
 
     unsafe fn release_all_chunks(&self) {
-        ::util::heap::layout::heap_layout::VM_MAP.free_all_chunks(self.common().head_discontiguous_region);
+        VM_MAP.free_all_chunks(self.common().head_discontiguous_region);
         self.unsafe_common_mut().head_discontiguous_region = Address::zero();
+    }
+
+    fn print_vm_map(&self) {
+        let common = self.common();
+        print!("{} ", common.name);
+        if common.immortal {
+            print!("I");
+        } else {
+            print!(" ");
+        }
+        if common.movable {
+            print!(" ");
+        } else {
+            print!("N");
+        }
+        print!(" ");
+        if common.contiguous {
+            print!("{}->{}", common.start, common.start+common.extent-1);
+            match common.vmrequest {
+                VMRequest::RequestExtent { extent, top } => {
+                    print!(" E {}", extent);
+                },
+                VMRequest::RequestFraction {frac, top } => {
+                    print!(" F {}", frac);
+                },
+                _ => {}
+            }
+        } else {
+            let mut a = common.head_discontiguous_region;
+            while !a.is_zero() {
+                print!("{}->{}", a, a + VM_MAP.get_contiguous_region_size(a) - 1);
+                a = VM_MAP.get_next_contiguous_region(a);
+                if !a.is_zero() {
+                    print!(" ");
+                }
+            }
+        }
+        println!();
     }
 }
 
