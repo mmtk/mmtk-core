@@ -7,7 +7,7 @@ pub trait Counter {
     fn stop(&mut self);
     fn phase_change(&mut self, old_phase: usize);
     fn print_count(&self, phase: usize);
-    fn print_total(&self, mutator: bool);
+    fn print_total(&self, mutator: Option<bool>);
     fn print_min(&self, mutator: bool);
     fn print_max(&self, mutator: bool);
     fn print_last(&self) {
@@ -16,45 +16,48 @@ pub trait Counter {
             self.print_count(phase - 1);
         }
     }
+    fn merge_phases(&self) -> bool;
 }
 
-trait Diffiable {
+pub trait Diffable {
     type Val;
     fn current_value() -> Self::Val;
-    fn diff(val: &Self::Val) -> u64;
+    fn diff(current: &Self::Val, earlier: &Self::Val) -> u64;
 }
 
-struct MonotoneNanoTime;
+pub struct MonotoneNanoTime;
 
-impl Diffiable for MonotoneNanoTime {
+impl Diffable for MonotoneNanoTime {
     type Val = Instant;
 
     fn current_value() -> Instant {
         Instant::now()
     }
 
-    fn diff(val: &Instant) -> u64 {
-        let now = Instant::now();
-        let delta = now.duration_since(*val);
+    fn diff(current: &Instant, earlier: &Instant) -> u64 {
+        let delta = current.duration_since(*earlier);
         delta.as_secs() * 1_000_000_000 + delta.subsec_nanos() as u64
     }
 }
 
-struct LongCounter<T: Diffiable> {
+pub struct LongCounter<T: Diffable> {
+    name: &'static str,
+    start: bool,
+    merge_phases: bool,
     count: [u64; super::stats::MAX_PHASES],
-    start_value: T::Val,
+    start_value: Option<T::Val>,
     total_count: u64,
-    running: bool,
+    running: bool
 }
 
-impl<T: Diffiable> Counter for LongCounter<T> {
+impl<T: Diffable> Counter for LongCounter<T> {
     fn start(&mut self) {
         if !get_gathering_stats() {
             return;
         }
         debug_assert!(!self.running);
         self.running = true;
-        self.start_value = T::current_value();
+        self.start_value = Some(T::current_value());
     }
 
     fn stop(&mut self) {
@@ -63,30 +66,90 @@ impl<T: Diffiable> Counter for LongCounter<T> {
         }
         debug_assert!(self.running);
         self.running = false;
-        let delta = T::diff(&self.start_value);
+        let delta = T::diff(&T::current_value(), self.start_value.as_ref().unwrap());
         self.count[get_phase()] += delta;
         self.total_count += delta;
     }
 
     fn phase_change(&mut self, old_phase: usize) {
-        unimplemented!()
+        if self.running {
+            let now = T::current_value();
+            let delta = T::diff(&now, self.start_value.as_ref().unwrap());
+            self.count[old_phase] += delta;
+            self.total_count += delta;
+            self.start_value = Some(now);
+        }
     }
 
     fn print_count(&self, phase: usize) {
-        unimplemented!()
+        if self.merge_phases() {
+            debug_assert!((phase | 1) == (phase + 1));
+            print_value(self.count[phase] + self.count[phase + 1]);
+        } else {
+            print_value(self.count[phase]);
+        }
     }
 
-    fn print_total(&self, mutator: bool) {
-        unimplemented!()
+    fn print_total(&self, mutator: Option<bool>) {
+        match mutator {
+            None => { print_value(self.total_count) },
+            Some(m) => {
+                let mut total = 0;
+                let mut p = if m { 0 } else { 1 };
+                while p <= get_phase() {
+                    total += self.count[p];
+                    p += 2;
+                }
+                print_value(total);
+            }
+        };
     }
 
     fn print_min(&self, mutator: bool) {
-        unimplemented!()
+        let mut p = if mutator { 0 } else { 1 };
+        let mut min = self.count[p];
+        while p < get_phase() {
+            if self.count[p] < min {
+                min = self.count[p];
+                p += 2;
+            }
+        }
+        print_value(min);
     }
 
     fn print_max(&self, mutator: bool) {
-        unimplemented!()
+        let mut p = if mutator { 0 } else { 1 };
+        let mut max = self.count[p];
+        while p < get_phase() {
+            if self.count[p] > max {
+                max = self.count[p];
+                p += 2;
+            }
+        }
+        print_value(max);
+    }
+
+    fn merge_phases(&self) -> bool {
+        self.merge_phases
+    }
+}
+
+impl<T: Diffable> LongCounter<T>{
+    pub fn new(name: &'static str, start: bool, merge_phases: bool) -> Self {
+        LongCounter {
+            name,
+            start,
+            merge_phases,
+            count: [0; super::stats::MAX_PHASES],
+            start_value: None,
+            total_count: 0,
+            running: false
+        }
     }
 }
 
 pub type Timer = LongCounter<MonotoneNanoTime>;
+
+fn print_value(value: u64) {
+    println!("{}", value);
+}

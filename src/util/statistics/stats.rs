@@ -1,14 +1,19 @@
 use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+use ::util::statistics::counter::Counter;
+use std::sync::Mutex;
 
 lazy_static! {
     pub static ref STATS: Stats = Stats::new();
+    static ref COUNTER: Mutex<Vec<Box<Counter + Send>>> = Mutex::new(Vec::new());
 }
 
 // FIXME overflow detection
 static PHASE: AtomicUsize = AtomicUsize::new(0);
+static COUNTERS: AtomicUsize = AtomicUsize::new(0);
 static GATHERING_STATS: AtomicBool = AtomicBool::new(false);
 
 pub const MAX_PHASES: usize = 1 << 12;
+pub const MAX_COUNTERS: usize = 100;
 
 fn increment_phase() {
     PHASE.fetch_add(1, Ordering::SeqCst);

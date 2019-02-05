@@ -20,12 +20,15 @@ use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_END;
 use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
 use util::Address;
 use util::heap::pageresource::cumulative_committed_pages;
+use util::statistics::Timer;
+use util::statistics::counter::LongCounter;
 
 pub static EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
 pub static USER_TRIGGERED_COLLECTION: AtomicBool = AtomicBool::new(false);
 
 lazy_static! {
     pub static ref CONTROL_COLLECTOR_CONTEXT: ControllerCollectorContext = ControllerCollectorContext::new();
+    pub static ref TOTAL_TIME: Timer = LongCounter::new("totalTime", true, false);
 }
 
 // FIXME: Move somewhere more appropriate
