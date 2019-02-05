@@ -20,15 +20,13 @@ use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_END;
 use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
 use util::Address;
 use util::heap::pageresource::cumulative_committed_pages;
-use util::statistics::Timer;
-use util::statistics::counter::LongCounter;
+use util::statistics::stats::{STATS, get_gathering_stats};
 
 pub static EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
 pub static USER_TRIGGERED_COLLECTION: AtomicBool = AtomicBool::new(false);
 
 lazy_static! {
     pub static ref CONTROL_COLLECTOR_CONTEXT: ControllerCollectorContext = ControllerCollectorContext::new();
-    pub static ref TOTAL_TIME: Timer = LongCounter::new("totalTime", true, false);
 }
 
 // FIXME: Move somewhere more appropriate
@@ -347,10 +345,15 @@ pub fn set_gc_status(s: GcStatus) {
     if unsafe { GC_STATUS == GcStatus::NotInGC } {
         STACKS_PREPARED.store(false, Ordering::SeqCst);
         // FIXME stats
+        STATS.lock().unwrap().start_gc();
+
     }
     unsafe { GC_STATUS = s };
     if unsafe { GC_STATUS == GcStatus::NotInGC } {
         // FIXME stats
+        if get_gathering_stats() {
+            STATS.lock().unwrap().end_gc();
+        }
     }
 }
 

@@ -42,7 +42,7 @@ impl Diffable for MonotoneNanoTime {
 
 pub struct LongCounter<T: Diffable> {
     name: &'static str,
-    start: bool,
+    pub start: bool,
     merge_phases: bool,
     count: [u64; super::stats::MAX_PHASES],
     start_value: Option<T::Val>,
@@ -151,5 +151,5 @@ impl<T: Diffable> LongCounter<T>{
 pub type Timer = LongCounter<MonotoneNanoTime>;
 
 fn print_value(value: u64) {
-    println!("{}", value);
+    print!("{}", value);
 }
