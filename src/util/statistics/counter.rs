@@ -23,6 +23,7 @@ pub trait Diffable {
     type Val;
     fn current_value() -> Self::Val;
     fn diff(current: &Self::Val, earlier: &Self::Val) -> u64;
+    fn print_diff(val: u64);
 }
 
 pub struct MonotoneNanoTime;
@@ -37,6 +38,10 @@ impl Diffable for MonotoneNanoTime {
     fn diff(current: &Instant, earlier: &Instant) -> u64 {
         let delta = current.duration_since(*earlier);
         delta.as_secs() * 1_000_000_000 + delta.subsec_nanos() as u64
+    }
+
+    fn print_diff(val: u64) {
+        print!("{}", format!("{:.*}", 2, val as f64 / 1e6f64));
     }
 }
 
@@ -84,15 +89,15 @@ impl<T: Diffable> Counter for LongCounter<T> {
     fn print_count(&self, phase: usize) {
         if self.merge_phases() {
             debug_assert!((phase | 1) == (phase + 1));
-            print_value(self.count[phase] + self.count[phase + 1]);
+            self.print_value(self.count[phase] + self.count[phase + 1]);
         } else {
-            print_value(self.count[phase]);
+            self.print_value(self.count[phase]);
         }
     }
 
     fn print_total(&self, mutator: Option<bool>) {
         match mutator {
-            None => { print_value(self.total_count) },
+            None => { self.print_value(self.total_count) },
             Some(m) => {
                 let mut total = 0;
                 let mut p = if m { 0 } else { 1 };
@@ -100,7 +105,7 @@ impl<T: Diffable> Counter for LongCounter<T> {
                     total += self.count[p];
                     p += 2;
                 }
-                print_value(total);
+                self.print_value(total);
             }
         };
     }
@@ -114,7 +119,7 @@ impl<T: Diffable> Counter for LongCounter<T> {
                 p += 2;
             }
         }
-        print_value(min);
+        self.print_value(min);
     }
 
     fn print_max(&self, mutator: bool) {
@@ -126,7 +131,7 @@ impl<T: Diffable> Counter for LongCounter<T> {
                 p += 2;
             }
         }
-        print_value(max);
+        self.print_value(max);
     }
 
     fn merge_phases(&self) -> bool {
@@ -146,10 +151,10 @@ impl<T: Diffable> LongCounter<T>{
             running: false
         }
     }
+
+    pub fn print_value(&self, val: u64) {
+        T::print_diff(val);
+    }
 }
 
 pub type Timer = LongCounter<MonotoneNanoTime>;
-
-fn print_value(value: u64) {
-    print!("{}", value);
-}

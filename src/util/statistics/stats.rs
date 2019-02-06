@@ -73,7 +73,8 @@ impl Stats {
 
     pub fn print_stats(&self) {
         println!("========================= Rust MMTk Statistics Totals =========================");
-        println!("GC Count: {}", self.gc_count);
+        self.print_column_names();
+        print!("{}\t", get_phase() / 2);
         if self.total_time.merge_phases() {
             self.total_time.print_total(None);
         } else {
@@ -83,13 +84,20 @@ impl Stats {
             print!("\t");
         }
         println!();
+        print!("Total time: ");
+        self.total_time.print_total(None);
+        println!(" ms");
         println!("----------------------- End Rust MMTk Statistics Totals -----------------------")
+    }
+
+    pub fn print_column_names(&self) {
+        println!("GC\ttime.mu\ttime.gc");
     }
 
     pub fn start_all(&mut self) {
         if get_gathering_stats() {
             println!("Error: calling Stats.startAll() while stats running");
-            println!("       verbosity > 0 and the harness mechanism may be conflicitng");
+            println!("       verbosity > 0 and the harness mechanism may be conflicting");
             debug_assert!(false);
         }
         set_gathering_stats(true);
