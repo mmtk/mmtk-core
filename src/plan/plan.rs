@@ -368,3 +368,16 @@ pub fn gc_in_progress() -> bool {
 pub fn gc_in_progress_proper() -> bool {
     unsafe { GC_STATUS == GcStatus::GcProper }
 }
+
+static INSIDE_HARNESS: AtomicBool = AtomicBool::new(false);
+
+pub fn harness_begin() {
+    // FIXME Do a full heap GC
+    INSIDE_HARNESS.store(true, Ordering::SeqCst);
+    STATS.lock().unwrap().start_all();
+}
+
+pub fn harness_end() {
+    STATS.lock().unwrap().stop_all();
+    INSIDE_HARNESS.store(false, Ordering::SeqCst);
+}
