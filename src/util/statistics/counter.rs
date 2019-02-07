@@ -49,7 +49,7 @@ pub struct LongCounter<T: Diffable> {
     name: &'static str,
     pub start: bool,
     merge_phases: bool,
-    count: [u64; super::stats::MAX_PHASES],
+    count: [u64; super::stats::MAX_PHASES], // FIXME make this resizable
     start_value: Option<T::Val>,
     total_count: u64,
     running: bool
