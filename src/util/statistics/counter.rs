@@ -47,7 +47,7 @@ impl Diffable for MonotoneNanoTime {
 
 pub struct LongCounter<T: Diffable> {
     name: &'static str,
-    pub start: bool,
+    pub implicitly_start: bool,
     merge_phases: bool,
     count: [u64; super::stats::MAX_PHASES], // FIXME make this resizable
     start_value: Option<T::Val>,
@@ -140,10 +140,10 @@ impl<T: Diffable> Counter for LongCounter<T> {
 }
 
 impl<T: Diffable> LongCounter<T>{
-    pub fn new(name: &'static str, start: bool, merge_phases: bool) -> Self {
+    pub fn new(name: &'static str, implicitly_start: bool, merge_phases: bool) -> Self {
         LongCounter {
             name,
-            start,
+            implicitly_start,
             merge_phases,
             count: [0; super::stats::MAX_PHASES],
             start_value: None,

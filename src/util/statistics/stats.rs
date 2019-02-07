@@ -101,7 +101,7 @@ impl Stats {
             debug_assert!(false);
         }
         set_gathering_stats(true);
-        if self.total_time.start {
+        if self.total_time.implicitly_start {
             self.total_time.start()
         }
     }
