@@ -347,3 +347,13 @@ pub unsafe extern fn add_phantom_candidate(reff: *mut c_void, referent: *mut c_v
         Address::from_mut_ptr(reff).to_object_reference(),
         Address::from_mut_ptr(referent).to_object_reference());
 }
+
+#[no_mangle]
+pub extern fn harness_begin() {
+    ::plan::plan::harness_begin();
+}
+
+#[no_mangle]
+pub extern fn harness_end() {
+    ::plan::plan::harness_end();
+}

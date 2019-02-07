@@ -1,5 +1,5 @@
 pub use self::counter::Counter;
 pub use self::counter::Timer;
 
-mod counter;
-mod stats;
+pub mod counter;
+pub mod stats;

@@ -20,6 +20,7 @@ use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_END;
 use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
 use util::Address;
 use util::heap::pageresource::cumulative_committed_pages;
+use util::statistics::stats::{STATS, get_gathering_stats};
 
 pub static EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
 pub static USER_TRIGGERED_COLLECTION: AtomicBool = AtomicBool::new(false);
@@ -344,10 +345,15 @@ pub fn set_gc_status(s: GcStatus) {
     if unsafe { GC_STATUS == GcStatus::NotInGC } {
         STACKS_PREPARED.store(false, Ordering::SeqCst);
         // FIXME stats
+        STATS.lock().unwrap().start_gc();
+
     }
     unsafe { GC_STATUS = s };
     if unsafe { GC_STATUS == GcStatus::NotInGC } {
         // FIXME stats
+        if get_gathering_stats() {
+            STATS.lock().unwrap().end_gc();
+        }
     }
 }
 
@@ -361,4 +367,17 @@ pub fn gc_in_progress() -> bool {
 
 pub fn gc_in_progress_proper() -> bool {
     unsafe { GC_STATUS == GcStatus::GcProper }
+}
+
+static INSIDE_HARNESS: AtomicBool = AtomicBool::new(false);
+
+pub fn harness_begin() {
+    // FIXME Do a full heap GC
+    INSIDE_HARNESS.store(true, Ordering::SeqCst);
+    STATS.lock().unwrap().start_all();
+}
+
+pub fn harness_end() {
+    STATS.lock().unwrap().stop_all();
+    INSIDE_HARNESS.store(false, Ordering::SeqCst);
 }

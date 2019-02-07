@@ -115,6 +115,9 @@ extern void add_weak_candidate(void* ref, void* referent);
 extern void add_soft_candidate(void* ref, void* referent);
 extern void add_phantom_candidate(void* ref, void* referent);
 
+extern void harness_begin();
+extern void harness_end();
+
 #ifdef __cplusplus
 }
 #endif
