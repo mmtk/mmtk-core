@@ -3,6 +3,7 @@
 #![feature(integer_atomics)]
 #![feature(drain_filter)]
 #![feature(nll)]
+#![feature(box_syntax)]
 
 #[macro_use]
 extern crate custom_derive;
