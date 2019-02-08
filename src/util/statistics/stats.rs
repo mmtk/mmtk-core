@@ -72,7 +72,7 @@ impl Stats {
     }
 
     pub fn print_stats(&self) {
-        println!("========================= Rust MMTk Statistics Totals =========================");
+        println!("============================ MMTk Statistics Totals ============================");
         self.print_column_names();
         print!("{}\t", get_phase() / 2);
         if self.total_time.merge_phases() {
@@ -87,7 +87,7 @@ impl Stats {
         print!("Total time: ");
         self.total_time.print_total(None);
         println!(" ms");
-        println!("----------------------- End Rust MMTk Statistics Totals -----------------------")
+        println!("------------------------------ End MMTk Statistics -----------------------------")
     }
 
     pub fn print_column_names(&self) {
