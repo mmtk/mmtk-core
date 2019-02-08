@@ -372,9 +372,16 @@ pub fn gc_in_progress_proper() -> bool {
 static INSIDE_HARNESS: AtomicBool = AtomicBool::new(false);
 
 pub fn harness_begin(tls: *mut c_void) {
-    // FIXME Do a full heap GC
-    INSIDE_HARNESS.store(true, Ordering::SeqCst);
+    // FIXME Do a full heap GC if we have generational GC
+    let old_ignore = OPTION_MAP.ignore_system_g_c;
+    unsafe { OPTION_MAP.process("ignoreSystemGC", "false"); }
     ::plan::selected_plan::SelectedPlan::handle_user_collection_request(tls);
+    if old_ignore {
+        unsafe { OPTION_MAP.process("ignoreSystemGC", "true"); }
+    } else {
+        unsafe { OPTION_MAP.process("ignoreSystemGC", "false"); }
+    }
+    INSIDE_HARNESS.store(true, Ordering::SeqCst);
     STATS.lock().unwrap().start_all();
 }
 
