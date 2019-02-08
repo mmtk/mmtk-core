@@ -371,9 +371,10 @@ pub fn gc_in_progress_proper() -> bool {
 
 static INSIDE_HARNESS: AtomicBool = AtomicBool::new(false);
 
-pub fn harness_begin() {
+pub fn harness_begin(tls: *mut c_void) {
     // FIXME Do a full heap GC
     INSIDE_HARNESS.store(true, Ordering::SeqCst);
+    ::plan::selected_plan::SelectedPlan::handle_user_collection_request(tls);
     STATS.lock().unwrap().start_all();
 }
 

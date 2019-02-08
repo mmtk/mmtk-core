@@ -77,6 +77,8 @@ extern void* jikesrvm_alloc_slow(MMTk_Mutator mutator, size_t size,
 
 extern void jikesrvm_handle_user_collection_request(void *tls);
 
+extern void jikesrvm_harness_begin(void *tls);
+
 /**
  * VM Accounting
  */
@@ -115,7 +117,7 @@ extern void add_weak_candidate(void* ref, void* referent);
 extern void add_soft_candidate(void* ref, void* referent);
 extern void add_phantom_candidate(void* ref, void* referent);
 
-extern void harness_begin();
+extern void harness_begin(void *tls);
 extern void harness_end();
 
 #ifdef __cplusplus

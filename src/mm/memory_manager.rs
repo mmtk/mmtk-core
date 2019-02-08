@@ -349,8 +349,8 @@ pub unsafe extern fn add_phantom_candidate(reff: *mut c_void, referent: *mut c_v
 }
 
 #[no_mangle]
-pub extern fn harness_begin() {
-    ::plan::plan::harness_begin();
+pub extern fn harness_begin(tls: *mut c_void) {
+    ::plan::plan::harness_begin(tls);
 }
 
 #[no_mangle]
