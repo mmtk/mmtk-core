@@ -7,9 +7,10 @@ use ::plan::semispace;
 use ::plan::semispace::PLAN;
 use ::plan::TraceLocal;
 use ::policy::copyspace::CopySpace;
+use ::policy::largeobjectspace::LargeObjectSpace;
 use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
-use ::util::alloc::BumpAllocator;
+use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
 use ::util::forwarding_word::clear_forwarding_bits;
 use ::util::heap::{MonotonePageResource, PageResource};
 use ::util::reference_processor::*;
@@ -23,6 +24,7 @@ pub struct SSCollector {
     pub tls: *mut c_void,
     // CopyLocal
     pub ss: BumpAllocator<MonotonePageResource<CopySpace>>,
+    los: LargeObjectAllocator,
     trace: SSTraceLocal,
 
     last_trigger_count: usize,
@@ -35,6 +37,7 @@ impl CollectorContext for SSCollector {
         SSCollector {
             tls: 0 as *mut c_void,
             ss: BumpAllocator::new(0 as *mut c_void, None),
+            los: LargeObjectAllocator::new(0 as *mut c_void, Some(semispace::PLAN.get_los())),
             trace: SSTraceLocal::new(PLAN.get_sstrace()),
 
             last_trigger_count: 0,
@@ -46,12 +49,17 @@ impl CollectorContext for SSCollector {
     fn init(&mut self, tls: *mut c_void) {
         self.tls = tls;
         self.ss.tls = tls;
+        self.los.tls = tls;
         self.trace.init(tls);
     }
 
     fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize,
                   allocator: AllocationType) -> Address {
-        self.ss.alloc(bytes, align, offset)
+        match allocator {
+            ::plan::Allocator::Los => self.los.alloc(bytes, align, offset),
+            _ => self.ss.alloc(bytes, align, offset)
+        }
+
     }
 
     fn run(&mut self, tls: *mut c_void) {
@@ -139,6 +147,10 @@ impl CollectorContext for SSCollector {
         clear_forwarding_bits(object);
         match allocator {
             ::plan::Allocator::Default => {}
+            ::plan::Allocator::Los => {
+                let unsync = unsafe { &*PLAN.unsync.get() };
+                unsync.los.initialize_header(object, false);
+            }
             _ => {
                 panic!("Currently we can't copy to other spaces other than copyspace")
             }

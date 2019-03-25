@@ -45,7 +45,7 @@ macro_rules! jikesrvm_call_helper {
         asm!("call *%ebx"
              : "={eax}"($ret)
              : "{esi}"($rvm_thread), "{ebx}"($call_addr)
-             : "ebx", "ecx", "edx", "esi", "memory"
+             : "ebx", "ecx", "edx", "esi", "memory", "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7"
              : "volatile");
     );
 
@@ -53,7 +53,7 @@ macro_rules! jikesrvm_call_helper {
         asm!("call *%ebx"
              : "={eax}"($ret)
              : "{esi}"($rvm_thread), "{ebx}"($call_addr), "{eax}"($arg1)
-             : "ebx", "ecx", "edx", "esi", "memory"
+             : "ebx", "ecx", "edx", "esi", "memory", "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7"
              : "volatile");
     );
 
@@ -61,7 +61,7 @@ macro_rules! jikesrvm_call_helper {
         asm!("call *%ebx"
              : "={eax}"($ret)
              : "{esi}"($rvm_thread), "{ebx}"($call_addr), "{eax}"($arg1), "{edx}"($arg2)
-             : "ebx", "ecx", "edx", "esi", "memory"
+             : "ebx", "ecx", "edx", "esi", "memory", "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7"
              : "volatile");
     );
 }

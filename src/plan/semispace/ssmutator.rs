@@ -1,6 +1,7 @@
 use ::policy::copyspace::CopySpace;
 use ::policy::immortalspace::ImmortalSpace;
-use ::util::alloc::BumpAllocator;
+use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
+use ::policy::largeobjectspace::LargeObjectSpace;
 use ::plan::mutator_context::MutatorContext;
 use ::plan::Phase;
 use ::plan::semispace;
@@ -19,6 +20,7 @@ pub struct SSMutator {
     // CopyLocal
     ss: BumpAllocator<MonotonePageResource<CopySpace>>,
     vs: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
+    los: LargeObjectAllocator
 }
 
 impl MutatorContext for SSMutator {
@@ -50,6 +52,7 @@ impl MutatorContext for SSMutator {
                       PLAN.tospace() as *const _);
         match allocator {
             AllocationType::Default => { self.ss.alloc(size, align, offset) }
+            AllocationType::Los => { self.los.alloc(size, align, offset) }
             _ => { self.vs.alloc(size, align, offset) }
         }
     }
@@ -63,6 +66,7 @@ impl MutatorContext for SSMutator {
                       PLAN.tospace() as *const _);
         match allocator {
             AllocationType::Default => { self.ss.alloc_slow(size, align, offset) }
+            AllocationType::Los => { self.los.alloc(size, align, offset) }
             _ => { self.vs.alloc_slow(size, align, offset) }
         }
     }
@@ -71,6 +75,11 @@ impl MutatorContext for SSMutator {
         debug_assert!(self.ss.get_space().unwrap() as *const _ == PLAN.tospace() as *const _);
         match allocator {
             AllocationType::Default => {}
+            AllocationType::Los => {
+                // FIXME: data race on immortalspace.mark_state !!!
+                let unsync = unsafe { &*PLAN.unsync.get() };
+                unsync.los.initialize_header(refer, true);
+            }
             _ => {
                 // FIXME: data race on immortalspace.mark_state !!!
                 let unsync = unsafe { &*PLAN.unsync.get() };
@@ -81,15 +90,17 @@ impl MutatorContext for SSMutator {
 
     fn get_tls(&self) -> *mut c_void {
         debug_assert!(self.ss.tls == self.vs.tls);
+        debug_assert!(self.ss.tls == self.los.tls);
         self.ss.tls
     }
 }
 
 impl SSMutator {
-    pub fn new(tls: *mut c_void, space: &'static CopySpace, versatile_space: &'static ImmortalSpace) -> Self {
+    pub fn new(tls: *mut c_void, space: &'static CopySpace, versatile_space: &'static ImmortalSpace, los: &'static LargeObjectSpace) -> Self {
         SSMutator {
             ss: BumpAllocator::new(tls, Some(space)),
             vs: BumpAllocator::new(tls, Some(versatile_space)),
+            los: LargeObjectAllocator::new(tls, Some(los))
         }
     }
 }

@@ -69,6 +69,9 @@ extern void jikesrvm_gc_init(void* jtoc, size_t heap_size);
 
 extern void enable_collection(void *tls);
 
+extern void* jikesrvm_alloc(MMTk_Mutator mutator, size_t size,
+    size_t align, ssize_t offset, int allocator);
+
 extern void* jikesrvm_alloc_slow(MMTk_Mutator mutator, size_t size,
     size_t align, ssize_t offset, int allocator);
 
@@ -111,6 +114,9 @@ extern bool   executable();
 extern void add_weak_candidate(void* ref, void* referent);
 extern void add_soft_candidate(void* ref, void* referent);
 extern void add_phantom_candidate(void* ref, void* referent);
+
+extern void harness_begin();
+extern void harness_end();
 
 #ifdef __cplusplus
 }
