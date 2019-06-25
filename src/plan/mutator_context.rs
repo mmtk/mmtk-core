@@ -12,4 +12,10 @@ pub trait MutatorContext {
                   allocator: Allocator);
     fn flush_remembered_sets(&mut self) {}
     fn get_tls(&self) -> *mut c_void;
+    fn object_reference_write_slow(&mut self, _src: ObjectReference, _slot: Address, _value: ObjectReference) {
+        unreachable!()
+    }
+    fn deinit_mutator(&mut self) {
+        self.flush_remembered_sets();
+    }
 }

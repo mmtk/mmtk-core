@@ -24,4 +24,5 @@ pub trait TraceLocal: TransitiveClosure {
     fn retain_referent(&mut self, object: ObjectReference) -> ObjectReference {
         self.trace_object(object)
     }
+    fn process_remembered_sets(&mut self) {}
 }

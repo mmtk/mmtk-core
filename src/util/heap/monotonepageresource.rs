@@ -8,7 +8,7 @@ use ::util::conversions::*;
 use ::policy::space::Space;
 use ::policy::space::required_chunks;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
-use super::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use super::layout::vm_layout_constants::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 
 use ::util::heap::pageresource::CommonPageResource;
 use ::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
@@ -161,6 +161,18 @@ impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResour
     fn adjust_for_metadata(&self, pages: usize) -> usize {
         pages + ((pages + PAGES_IN_REGION - 1) >> LOG_PAGES_IN_REGION)
             * self.meta_data_pages_per_region
+    }
+
+    fn get_available_physical_pages(&self) -> usize {
+        let (sentinel, cursor) = {
+            let sync = self.sync.lock().unwrap();
+            (sync.sentinel, sync.cursor)
+        };
+        let mut rtn = ::util::conversions::bytes_to_pages(sentinel - cursor);
+        if !self.common().contiguous {
+            rtn += heap_layout::VM_MAP.get_available_discontiguous_chunks() * PAGES_IN_CHUNK;
+        }
+        return rtn;
     }
 }
 

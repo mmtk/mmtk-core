@@ -18,6 +18,15 @@ impl<'a, T> LocalQueue<'a, T> where T: Debug {
         }
     }
 
+    pub fn flush(&mut self) {
+        if self.buffer.len() == 0 {
+            return;
+        }
+        let mut b = Vec::with_capacity(BUFFER_SIZE);
+        mem::swap(&mut b, &mut self.buffer);
+        self.queue.push(b);
+    }
+
     pub fn enqueue(&mut self, v: T) {
         if TRACE_QUEUE {
             println!("len {:?}", v);

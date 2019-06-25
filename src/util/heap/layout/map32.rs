@@ -228,4 +228,12 @@ impl Map32 {
     fn address_for_chunk_index(&self, chunk: usize) -> Address {
         unsafe { Address::from_usize(chunk << LOG_BYTES_IN_CHUNK) }
     }
+
+    pub fn get_available_discontiguous_chunks(&self) -> usize {
+        return self.total_available_discontiguous_chunks;
+    }
+
+    pub fn get_chunk_consumer_count(&self) -> usize {
+        return self.shared_discontig_fl_count;
+    }
 }

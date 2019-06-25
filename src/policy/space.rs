@@ -136,6 +136,10 @@ pub trait Space: Sized + Debug + 'static {
         self.unsafe_common_mut().head_discontiguous_region = Address::zero();
     }
 
+    fn available_physical_pages(&self) -> usize {
+        self.common().pr.as_ref().unwrap().get_available_physical_pages()
+    }
+
     fn print_vm_map(&self) {
         let common = self.common();
         print!("{} ", common.name);

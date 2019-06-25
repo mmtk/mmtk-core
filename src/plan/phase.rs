@@ -61,6 +61,11 @@ pub enum Phase {
     EvacuatePrepare,
     EvacuateClosure,
     EvacuateRelease,
+    // Validation phases
+    ValidatePlaceholder,
+    ValidatePrepare,
+    ValidateClosure,
+    ValidateRelease,
     // Complex phases
     Complex(Vec<(Schedule, Phase)>, usize),
     // associated cursor

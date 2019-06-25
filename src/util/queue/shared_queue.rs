@@ -71,4 +71,9 @@ impl<T> SharedQueue<T> where T: Debug {
         let blocks = self.blocks.lock().unwrap();
         blocks.is_empty()
     }
+
+    pub fn clear(&self) {
+        let mut blocks = self.blocks.lock().unwrap();
+        blocks.clear();
+    }
 }

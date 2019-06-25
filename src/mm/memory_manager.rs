@@ -127,6 +127,18 @@ pub extern fn post_alloc(mutator: *mut c_void, refer: ObjectReference, type_refe
 }
 
 #[no_mangle]
+pub extern fn object_reference_write_slow(mutator: *mut c_void, src: ObjectReference, slot: Address, value: ObjectReference) {
+    let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
+    local.object_reference_write_slow(src, slot, value);
+}
+
+#[no_mangle]
+pub extern fn deinit_mutator(mutator: *mut c_void) {
+    let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
+    local.deinit_mutator();
+}
+
+#[no_mangle]
 pub unsafe extern fn mmtk_malloc(size: usize) -> *mut c_void {
     alloc(null_mut(), size, 1, 0, Allocator::Default)
 }

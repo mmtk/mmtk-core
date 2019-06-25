@@ -67,6 +67,8 @@ impl ControllerCollectorContext {
             workers.trigger_cycle();
 
             workers.wait_for_cycle();
+
+            <SelectedPlan as Plan>::reset_collection_trigger();
             debug!("[STWController: Worker threads complete!]");
             debug!("[STWController: Resuming mutators...]");
             VMCollection::resume_mutators(tls);

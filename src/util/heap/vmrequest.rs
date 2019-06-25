@@ -73,6 +73,17 @@ impl VMRequest {
         }
     }
 
+    pub fn high_fraction(frac: f32) -> Self {
+        if HEAP_LAYOUT_64BIT {
+            Self::common64bit(false)
+        } else {
+            VMRequest::RequestFraction {
+                frac,
+                top: true,
+            }
+        }
+    }
+
     pub fn high_fixed_size(mb: usize) -> Self {
         if HEAP_LAYOUT_64BIT {
             Self::common64bit(false)
