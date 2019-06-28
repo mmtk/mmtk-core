@@ -119,7 +119,7 @@ impl Stats {
     pub fn new() -> Self {
         Stats {
             gc_count: 0,
-            total_time: LongCounter::new("totalTime", true, false)
+            total_time: LongCounter::new("totalTime".to_string(), true, false)
         }
     }
 }
