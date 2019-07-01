@@ -17,6 +17,7 @@ pub trait Counter {
         }
     }
     fn merge_phases(&self) -> bool;
+    fn implicitly_start(&self) -> bool;
 }
 
 pub trait Diffable {
@@ -137,6 +138,10 @@ impl<T: Diffable> Counter for LongCounter<T> {
     fn merge_phases(&self) -> bool {
         self.merge_phases
     }
+
+    fn implicitly_start(&self) -> bool {
+        self.implicitly_start
+    }
 }
 
 impl<T: Diffable> LongCounter<T>{
@@ -152,7 +157,7 @@ impl<T: Diffable> LongCounter<T>{
         }
     }
 
-    pub fn print_value(&self, val: u64) {
+    fn print_value(&self, val: u64) {
         T::print_diff(val);
     }
 }

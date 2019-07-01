@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use std::sync::Mutex;
 use util::statistics::Timer;
 use util::statistics::counter::{Counter, LongCounter};
-
+use util::statistics::counter::MonotoneNanoTime;
 
 lazy_static! {
     pub static ref STATS: Mutex<Box<Stats>> = Mutex::new(box Stats::new());
@@ -22,6 +22,12 @@ fn increment_phase() {
     PHASE.fetch_add(1, Ordering::SeqCst);
 }
 
+fn new_counter<T: Counter + Send + 'static>(c: T) -> usize {
+    let mut counter = COUNTER.lock().unwrap();
+    counter.push(Box::new(c));
+    return counter.len();
+}
+
 pub fn get_phase() -> usize {
     PHASE.load(Ordering::SeqCst)
 }
@@ -36,17 +42,18 @@ pub fn set_gathering_stats(val: bool) {
 
 pub struct Stats {
     gc_count: usize,
-    total_time: Timer
+    total_time: usize
 }
 
 impl Stats {
     pub fn start_gc(&mut self) {
+        let mut counter = COUNTER.lock().unwrap();
         self.gc_count += 1;
         if !get_gathering_stats() {
             return;
         }
         if get_phase() < MAX_PHASES - 1 {
-            self.total_time.phase_change(get_phase());
+            counter[self.total_time].phase_change(get_phase());
             increment_phase();
         } else {
             if !EXCEEDED_PHASE_LIMIT.load(Ordering::SeqCst) {
@@ -57,11 +64,12 @@ impl Stats {
     }
 
     pub fn end_gc(&mut self) {
+        let mut counter = COUNTER.lock().unwrap();
         if !get_gathering_stats() {
             return;
         }
         if get_phase() < MAX_PHASES - 1 {
-            self.total_time.phase_change(get_phase());
+            counter[self.total_time].phase_change(get_phase());
             increment_phase();
         } else {
             if !EXCEEDED_PHASE_LIMIT.load(Ordering::SeqCst) {
@@ -72,20 +80,21 @@ impl Stats {
     }
 
     pub fn print_stats(&self) {
+        let mut counter = COUNTER.lock().unwrap();
         println!("============================ MMTk Statistics Totals ============================");
         self.print_column_names();
         print!("{}\t", get_phase() / 2);
-        if self.total_time.merge_phases() {
-            self.total_time.print_total(None);
+        if counter[self.total_time].merge_phases() {
+            counter[self.total_time].print_total(None);
         } else {
-            self.total_time.print_total(Some(true));
+            counter[self.total_time].print_total(Some(true));
             print!("\t");
-            self.total_time.print_total(Some(false));
+            counter[self.total_time].print_total(Some(false));
             print!("\t");
         }
         println!();
         print!("Total time: ");
-        self.total_time.print_total(None);
+        counter[self.total_time].print_total(None);
         println!(" ms");
         println!("------------------------------ End MMTk Statistics -----------------------------")
     }
@@ -95,14 +104,15 @@ impl Stats {
     }
 
     pub fn start_all(&mut self) {
+        let mut counter = COUNTER.lock().unwrap();
         if get_gathering_stats() {
             println!("Error: calling Stats.startAll() while stats running");
             println!("       verbosity > 0 and the harness mechanism may be conflicting");
             debug_assert!(false);
         }
         set_gathering_stats(true);
-        if self.total_time.implicitly_start {
-            self.total_time.start()
+        if counter[self.total_time].implicitly_start() {
+            counter[self.total_time].start()
         }
     }
 
@@ -112,14 +122,16 @@ impl Stats {
     }
 
     pub fn stop_all_counters(&mut self) {
-        self.total_time.stop();
+        let mut counter = COUNTER.lock().unwrap();
+        counter[self.total_time].stop();
         set_gathering_stats(false);
     }
 
     pub fn new() -> Self {
+        let t: Timer = LongCounter::new("totalTime".to_string(), true, false);
         Stats {
             gc_count: 0,
-            total_time: LongCounter::new("totalTime".to_string(), true, false)
+            total_time: new_counter(t)
         }
     }
 }
