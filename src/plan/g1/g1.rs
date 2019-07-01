@@ -60,7 +60,7 @@ lazy_static! {
         (phase::Schedule::Mutator,   phase::Phase::EvacuateRelease),
         (phase::Schedule::Global,    phase::Phase::EvacuateRelease),
         (phase::Schedule::Collector, phase::Phase::EvacuateRelease),
-    ], 0);
+    ], 0, None);
     pub static ref COLLECTION: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Complex, plan::INIT_PHASE.clone()),
         (phase::Schedule::Complex, plan::ROOT_CLOSURE_PHASE.clone()),
@@ -69,7 +69,7 @@ lazy_static! {
         (phase::Schedule::Global,  phase::Phase::CollectionSetSelection),
         (phase::Schedule::Complex, EVACUATE_PHASE.clone()),
         (phase::Schedule::Complex, plan::FINISH_PHASE.clone()),
-    ], 0);
+    ], 0, None);
 }
 
 pub struct G1 {

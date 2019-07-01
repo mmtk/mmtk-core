@@ -6,12 +6,11 @@ use util::statistics::counter::MonotoneNanoTime;
 
 lazy_static! {
     pub static ref STATS: Mutex<Box<Stats>> = Mutex::new(box Stats::new());
-    static ref COUNTER: Mutex<Vec<Box<Counter + Send>>> = Mutex::new(Vec::new());
+    pub static ref COUNTER: Mutex<Vec<Box<Counter + Send>>> = Mutex::new(Vec::new());
 }
 
 // FIXME overflow detection
 static PHASE: AtomicUsize = AtomicUsize::new(0);
-static COUNTERS: AtomicUsize = AtomicUsize::new(0);
 static GATHERING_STATS: AtomicBool = AtomicBool::new(false);
 static EXCEEDED_PHASE_LIMIT: AtomicBool = AtomicBool::new(false);
 
@@ -22,10 +21,10 @@ fn increment_phase() {
     PHASE.fetch_add(1, Ordering::SeqCst);
 }
 
-fn new_counter<T: Counter + Send + 'static>(c: T) -> usize {
+pub fn new_counter<T: Counter + Send + 'static>(c: T) -> usize {
     let mut counter = COUNTER.lock().unwrap();
     counter.push(Box::new(c));
-    return counter.len();
+    return counter.len() - 1;
 }
 
 pub fn get_phase() -> usize {
