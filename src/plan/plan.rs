@@ -276,7 +276,7 @@ lazy_static! {
         (phase::Schedule::Global, phase::Phase::SetCollectionKind),
         (phase::Schedule::Global, phase::Phase::Initiate),
         (phase::Schedule::Placeholder, phase::Phase::PreSanityPlaceholder)
-    ], 0, None);
+    ], 0, Some(new_counter(LongCounter::<MonotoneNanoTime>::new("init".to_string(), false, true))));
 
     pub static ref ROOT_CLOSURE_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Mutator, phase::Phase::Prepare),
@@ -319,7 +319,7 @@ lazy_static! {
         (phase::Schedule::Placeholder, phase::Phase::PostSanityPlaceholder),
         (phase::Schedule::Collector, phase::Phase::Complete),
         (phase::Schedule::Global, phase::Phase::Complete)
-    ], 0, Some(new_counter(LongCounter::<MonotoneNanoTime>::new("finish".to_string(), true, false))));
+    ], 0, Some(new_counter(LongCounter::<MonotoneNanoTime>::new("finish".to_string(), false, true))));
 
     pub static ref COLLECTION: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Complex, INIT_PHASE.clone()),

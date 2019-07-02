@@ -79,17 +79,20 @@ impl Stats {
     }
 
     pub fn print_stats(&self) {
-        let mut counter = COUNTER.lock().unwrap();
         println!("============================ MMTk Statistics Totals ============================");
         self.print_column_names();
         print!("{}\t", get_phase() / 2);
-        if counter[self.total_time].merge_phases() {
-            counter[self.total_time].print_total(None);
-        } else {
-            counter[self.total_time].print_total(Some(true));
-            print!("\t");
-            counter[self.total_time].print_total(Some(false));
-            print!("\t");
+        let counter = COUNTER.lock().unwrap();
+        for c in &(*counter) {
+            if c.merge_phases() {
+                c.print_total(None);
+                print!("\t");
+            } else {
+                c.print_total(Some(true));
+                print!("\t");
+                c.print_total(Some(false));
+                print!("\t");
+            }
         }
         println!();
         print!("Total time: ");
@@ -99,7 +102,16 @@ impl Stats {
     }
 
     pub fn print_column_names(&self) {
-        println!("GC\ttime.mu\ttime.gc");
+        print!("GC\t");
+        let counter = COUNTER.lock().unwrap();
+        for c in &(*counter) {
+            if c.merge_phases() {
+                print!("{}\t", c.name());
+            } else {
+                print!("{}.mu\t{}.gc\t", c.name(), c.name());
+            }
+        }
+        print!("\n");
     }
 
     pub fn start_all(&mut self) {
@@ -127,7 +139,7 @@ impl Stats {
     }
 
     pub fn new() -> Self {
-        let t: Timer = LongCounter::new("totalTime".to_string(), true, false);
+        let t: Timer = LongCounter::new("time".to_string(), true, false);
         Stats {
             gc_count: 0,
             total_time: new_counter(t)

@@ -99,7 +99,11 @@ pub fn continue_phase_stack(tls: *mut c_void) {
 }
 
 fn resume_complex_timers() {
-    unimplemented!()
+    let stack = PHASE_STACK.lock().unwrap();
+    for cp in (*stack).iter().rev() {
+        let phase = &cp.1;
+        PHASE_TIMER.start_timer(phase);
+    }
 }
 
 fn process_phase_stack(tls: *mut c_void, resume: bool) {
