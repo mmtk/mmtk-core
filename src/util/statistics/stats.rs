@@ -5,7 +5,7 @@ use util::statistics::counter::{Counter, LongCounter};
 use util::statistics::counter::MonotoneNanoTime;
 
 lazy_static! {
-    pub static ref STATS: Mutex<Box<Stats>> = Mutex::new(box Stats::new());
+    pub static ref STATS: Mutex<Stats> = Mutex::new(Stats::new());
     pub static ref COUNTER: Mutex<Vec<Box<Counter + Send>>> = Mutex::new(Vec::new());
 }
 

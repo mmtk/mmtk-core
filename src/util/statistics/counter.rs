@@ -50,7 +50,7 @@ pub struct LongCounter<T: Diffable> {
     name: String,
     pub implicitly_start: bool,
     merge_phases: bool,
-    count: [u64; super::stats::MAX_PHASES], // FIXME make this resizable
+    count: Box<[u64; super::stats::MAX_PHASES]>, // FIXME make this resizable
     start_value: Option<T::Val>,
     total_count: u64,
     running: bool
@@ -150,7 +150,7 @@ impl<T: Diffable> LongCounter<T>{
             name,
             implicitly_start,
             merge_phases,
-            count: [0; super::stats::MAX_PHASES],
+            count: box [0; super::stats::MAX_PHASES],
             start_value: None,
             total_count: 0,
             running: false
