@@ -37,12 +37,14 @@ impl MutatorContext for SSMutator {
             &Phase::Prepare => {
                 self.ss.reset();
                 self.flush_remembered_sets();
+                debug_assert!(self.remset.is_empty());
             }
             &Phase::ValidatePrepare => {
                 self.ss.reset();
             }
             &Phase::Release => {
                 self.ss.reset();
+                debug_assert!(self.remset.is_empty());
             }
             &Phase::ValidateRelease => {
                 self.ss.reset();

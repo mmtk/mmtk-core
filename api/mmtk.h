@@ -28,6 +28,8 @@ extern void post_alloc(MMTk_Mutator mutator, void* refer, void* type_refer,
 extern void object_reference_write_slow(MMTk_Mutator mutator, void* src, void* slot, void* value);
 
 extern void deinit_mutator(MMTk_Mutator mutator);
+extern void flush(MMTk_Mutator mutator);
+extern void flush_remembered_sets(MMTk_Mutator mutator);
 
 extern bool is_valid_ref(void* ref);
 extern bool is_mapped_object(void* ref);

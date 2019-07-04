@@ -139,6 +139,18 @@ pub extern fn deinit_mutator(mutator: *mut c_void) {
 }
 
 #[no_mangle]
+pub extern fn flush(mutator: *mut c_void) {
+    let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
+    local.flush();
+}
+
+#[no_mangle]
+pub extern fn flush_remembered_sets(mutator: *mut c_void) {
+    let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
+    local.flush_remembered_sets();
+}
+
+#[no_mangle]
 pub unsafe extern fn mmtk_malloc(size: usize) -> *mut c_void {
     alloc(null_mut(), size, 1, 0, Allocator::Default)
 }
