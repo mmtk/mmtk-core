@@ -20,7 +20,7 @@ pub struct SSMutator {
     // CopyLocal
     ss: BumpAllocator<MonotonePageResource<CopySpace>>,
     vs: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
-    // los: LargeObjectAllocator,
+    los: LargeObjectAllocator,
     remset: Box<LocalQueue<'static, Address>>,
 }
 
@@ -63,7 +63,7 @@ impl MutatorContext for SSMutator {
                       PLAN.nursery_space() as *const _);
         match allocator {
             AllocationType::Default => { self.ss.alloc(size, align, offset) }
-            // AllocationType::Los => { unimplemented!() }
+            AllocationType::Los => { self.los.alloc(size, align, offset) }
             _ => { self.vs.alloc(size, align, offset) }
         }
     }
@@ -76,7 +76,7 @@ impl MutatorContext for SSMutator {
                       PLAN.nursery_space() as *const _);
         match allocator {
             AllocationType::Default => { self.ss.alloc_slow(size, align, offset) }
-            // AllocationType::Los => { self.los.alloc(size, align, offset) }
+            AllocationType::Los => { self.los.alloc(size, align, offset) }
             _ => { self.vs.alloc_slow(size, align, offset) }
         }
     }
@@ -87,11 +87,11 @@ impl MutatorContext for SSMutator {
             AllocationType::Default => {
                 // println!("Alloc nursery {:?} tib={:?}", refer, type_refer);
             }
-            // AllocationType::Los => {
-            //     // FIXME: data race on immortalspace.mark_state !!!
-            //     let unsync = unsafe { &*PLAN.unsync.get() };
-            //     unsync.los.initialize_header(refer, true);
-            // }
+            AllocationType::Los => {
+                // FIXME: data race on immortalspace.mark_state !!!
+                let unsync = unsafe { &*PLAN.unsync.get() };
+                unsync.los.initialize_header(refer, true);
+            }
             _ => {
                 // FIXME: data race on immortalspace.mark_state !!!
                 let unsync = unsafe { &*PLAN.unsync.get() };
@@ -117,11 +117,11 @@ impl MutatorContext for SSMutator {
 }
 
 impl SSMutator {
-    pub fn new(tls: *mut c_void, space: &'static CopySpace, versatile_space: &'static ImmortalSpace) -> Self {
+    pub fn new(tls: *mut c_void, space: &'static CopySpace, versatile_space: &'static ImmortalSpace, los: &'static LargeObjectSpace) -> Self {
         SSMutator {
             ss: BumpAllocator::new(tls, Some(space)),
             vs: BumpAllocator::new(tls, Some(versatile_space)),
-            // los: LargeObjectAllocator::new(tls, Some(los)),
+            los: LargeObjectAllocator::new(tls, Some(los)),
             remset: box PLAN.remset_pool.spawn_local(),
         }
     }

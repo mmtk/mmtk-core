@@ -87,9 +87,9 @@ impl TraceLocal for SSTraceLocal {
                 PLAN.versatile_space.trace_object(self, object)
             } else if PLAN.vm_space.in_space(object) {
                 PLAN.vm_space.trace_object(self, object)
-            } /*else if PLAN.los.in_space(object) {
+            } else if PLAN.los.in_space(object) {
                 PLAN.los.trace_object(self, object)
-            } */else {
+            } else {
                 panic!("No special case for space in trace_object")
             }
         } else {
@@ -185,9 +185,9 @@ impl TraceLocal for SSTraceLocal {
                 true
             } else if PLAN.vm_space.in_space(object) {
                 true
-            } /*else if PLAN.los.in_space(object) {
+            } else if PLAN.los.in_space(object) {
                 true
-            } */else {
+            } else {
                 panic!("Invalid space")
             }
         } else {

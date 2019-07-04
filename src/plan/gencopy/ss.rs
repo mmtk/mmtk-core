@@ -71,7 +71,7 @@ pub struct SemiSpaceUnsync {
     pub copyspace0: CopySpace,
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
-    // pub los: LargeObjectSpace,
+    pub los: LargeObjectSpace,
     pub gc_full_heap: bool,
     pub next_gc_full_heap: bool,
     pub remset_pool: SharedQueue<Address>,
@@ -96,7 +96,7 @@ impl Plan for SemiSpace {
                 copyspace0: CopySpace::new("copyspace0", false, true, VMRequest::discontiguous()),
                 copyspace1: CopySpace::new("copyspace1", true, true, VMRequest::discontiguous()),
                 versatile_space: ImmortalSpace::new("versatile_space", true, VMRequest::discontiguous()),
-                // los: LargeObjectSpace::new("los", true, VMRequest::discontiguous()),
+                los: LargeObjectSpace::new("los", true, VMRequest::discontiguous()),
                 total_pages: 0,
                 collection_attempt: 0,
                 gc_full_heap: false,
@@ -116,7 +116,7 @@ impl Plan for SemiSpace {
         unsync.copyspace0.init();
         unsync.copyspace1.init();
         unsync.versatile_space.init();
-        // unsync.los.init();
+        unsync.los.init();
 
         // These VMs require that the controller thread is started by the VM itself.
         // (Usually because it calls into VM code that accesses the TLS.)
@@ -130,7 +130,7 @@ impl Plan for SemiSpace {
     fn bind_mutator(&self, tls: *mut c_void) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
         Box::into_raw(Box::new(SSMutator::new(tls, self.nursery_space(),
-                                              &unsync.versatile_space/*, &unsync.los*/))) as *mut c_void
+                                              &unsync.versatile_space, &unsync.los))) as *mut c_void
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {
@@ -140,7 +140,7 @@ impl Plan for SemiSpace {
             return false;
         }
 
-        if unsync.versatile_space.in_space(object)/* || unsync.los.in_space(object)*/ {
+        if unsync.versatile_space.in_space(object) || unsync.los.in_space(object) {
             return true;
         }
 
@@ -162,9 +162,9 @@ impl Plan for SemiSpace {
         if self.tospace().in_space(object) {
             return true;
         }
-        // if unsync.los.in_space(object) {
-        //     return true;
-        // }
+        if unsync.los.in_space(object) {
+            return true;
+        }
         return false;
     }
 
@@ -254,7 +254,7 @@ impl Plan for SemiSpace {
                     unsync.copyspace1.prepare(!unsync.hi);
                     unsync.versatile_space.prepare();
                     unsync.vm_space.prepare();
-                    // unsync.los.prepare(true);
+                    unsync.los.prepare(true);
                     unsync.remset_pool.clear();
                 }
             }
@@ -279,7 +279,7 @@ impl Plan for SemiSpace {
                     }
                     unsync.versatile_space.release();
                     unsync.vm_space.release();
-                    // unsync.los.release(true);
+                    unsync.los.release(true);
                 }
                 { &mut *(self as *const Self as usize as *mut Self) }.next_gc_full_heap = false;//(self.get_pages_avail() < Options.nurserySize.getMinNursery());
             }
@@ -298,7 +298,7 @@ impl Plan for SemiSpace {
                     unsync.copyspace0.print_vm_map();
                     unsync.copyspace1.print_vm_map();
                     unsync.versatile_space.print_vm_map();
-                    // unsync.los.print_vm_map();
+                    unsync.los.print_vm_map();
                     unsync.vm_space.print_vm_map();
                 }
                 debug_assert!(self.remset_pool.is_empty());
@@ -323,7 +323,7 @@ impl Plan for SemiSpace {
 
     fn get_pages_used(&self) -> usize {
         let unsync = unsafe{&*self.unsync.get()};
-        self.nursery_space().reserved_pages() + self.tospace().reserved_pages() + unsync.versatile_space.reserved_pages()// + unsync.los.reserved_pages()
+        self.nursery_space().reserved_pages() + self.tospace().reserved_pages() + unsync.versatile_space.reserved_pages() + unsync.los.reserved_pages()
     }
 
     fn is_bad_ref(&self, object: ObjectReference) -> bool {
@@ -346,9 +346,9 @@ impl Plan for SemiSpace {
         if self.versatile_space.in_space(object) {
             return self.versatile_space.is_movable();
         }
-        // if unsync.los.in_space(object) {
-        //     return unsync.los.is_movable();
-        // }
+        if self.los.in_space(object) {
+            return self.los.is_movable();
+        }
         return true;
     }
 
@@ -358,8 +358,8 @@ impl Plan for SemiSpace {
             self.versatile_space.in_space(address.to_object_reference()) ||
             self.nursery_space.in_space(address.to_object_reference()) ||
             self.copyspace0.in_space(address.to_object_reference()) ||
-            self.copyspace1.in_space(address.to_object_reference())/* ||
-            self.los.in_space(address.to_object_reference())*/
+            self.copyspace1.in_space(address.to_object_reference()) ||
+            self.los.in_space(address.to_object_reference())
         } {
             return MMAPPER.address_is_mapped(address);
         } else {
@@ -427,11 +427,10 @@ impl SemiSpace {
         &self.ss_trace
     }
 
-    // pub fn get_los(&self) -> &'static LargeObjectSpace {
-    //     let unsync = unsafe { &*self.unsync.get() };
-
-    //     &unsync.los
-    // }
+    pub fn get_los(&self) -> &'static LargeObjectSpace {
+        let unsync = unsafe { &*self.unsync.get() };
+        &unsync.los
+    }
 }
 
 impl ::std::ops::Deref for SemiSpace {

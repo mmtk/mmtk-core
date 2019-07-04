@@ -23,7 +23,7 @@ use super::VERBOSE;
 pub struct SSCollector {
     pub tls: *mut c_void,
     pub ss: BumpAllocator<MonotonePageResource<CopySpace>>,
-    // los: LargeObjectAllocator,
+    los: LargeObjectAllocator,
     trace: SSTraceLocal,
 
     last_trigger_count: usize,
@@ -36,7 +36,7 @@ impl CollectorContext for SSCollector {
         SSCollector {
             tls: 0 as *mut c_void,
             ss: BumpAllocator::new(0 as *mut c_void, None),
-            // los: LargeObjectAllocator::new(0 as *mut c_void, Some(PLAN.get_los())),
+            los: LargeObjectAllocator::new(0 as *mut c_void, Some(PLAN.get_los())),
             trace: SSTraceLocal::new(PLAN.get_sstrace()),
 
             last_trigger_count: 0,
@@ -48,14 +48,14 @@ impl CollectorContext for SSCollector {
     fn init(&mut self, tls: *mut c_void) {
         self.tls = tls;
         self.ss.tls = tls;
-        // self.los.tls = tls;
+        self.los.tls = tls;
         self.trace.init(tls);
     }
 
     fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize,
                   allocator: AllocationType) -> Address {
         match allocator {
-            // ::plan::Allocator::Los => unimplemented!(),//self.los.alloc(bytes, align, offset),
+            ::plan::Allocator::Los => self.los.alloc(bytes, align, offset),
             ::plan::Allocator::Default => self.ss.alloc(bytes, align, offset),
             _ => unreachable!(),
         }
@@ -167,10 +167,10 @@ impl CollectorContext for SSCollector {
         clear_forwarding_bits(object);
         match allocator {
             ::plan::Allocator::Default => {}
-            // ::plan::Allocator::Los => {
-            //     let unsync = unsafe { &*PLAN.unsync.get() };
-            //     unsync.los.initialize_header(object, false);
-            // }
+            ::plan::Allocator::Los => {
+                let unsync = unsafe { &*PLAN.unsync.get() };
+                unsync.los.initialize_header(object, false);
+            }
             _ => {
                 panic!("Currently we can't copy to other spaces other than copyspace")
             }
