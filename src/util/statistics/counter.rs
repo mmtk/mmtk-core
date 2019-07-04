@@ -17,6 +17,8 @@ pub trait Counter {
         }
     }
     fn merge_phases(&self) -> bool;
+    fn implicitly_start(&self) -> bool;
+    fn name(&self) -> &String;
 }
 
 pub trait Diffable {
@@ -46,10 +48,10 @@ impl Diffable for MonotoneNanoTime {
 }
 
 pub struct LongCounter<T: Diffable> {
-    name: &'static str,
+    name: String,
     pub implicitly_start: bool,
     merge_phases: bool,
-    count: [u64; super::stats::MAX_PHASES], // FIXME make this resizable
+    count: Box<[u64; super::stats::MAX_PHASES]>, // FIXME make this resizable
     start_value: Option<T::Val>,
     total_count: u64,
     running: bool
@@ -137,22 +139,30 @@ impl<T: Diffable> Counter for LongCounter<T> {
     fn merge_phases(&self) -> bool {
         self.merge_phases
     }
+
+    fn implicitly_start(&self) -> bool {
+        self.implicitly_start
+    }
+
+    fn name(&self) -> &String {
+        &self.name
+    }
 }
 
 impl<T: Diffable> LongCounter<T>{
-    pub fn new(name: &'static str, implicitly_start: bool, merge_phases: bool) -> Self {
+    pub fn new(name: String, implicitly_start: bool, merge_phases: bool) -> Self {
         LongCounter {
             name,
             implicitly_start,
             merge_phases,
-            count: [0; super::stats::MAX_PHASES],
+            count: box [0; super::stats::MAX_PHASES],
             start_value: None,
             total_count: 0,
             running: false
         }
     }
 
-    pub fn print_value(&self, val: u64) {
+    fn print_value(&self, val: u64) {
         T::print_diff(val);
     }
 }
