@@ -22,6 +22,8 @@ pub struct ControllerCollectorContext {
     request_condvar: Condvar,
 
     pub workers: UnsafeCell<ParallelCollectorGroup<<SelectedPlan as Plan>::CollectorT>>,
+    pub concurrent_workers: UnsafeCell<ParallelCollectorGroup<<SelectedPlan as Plan>::CollectorT>>,
+    concurrent_collection: AtomicBool,
     request_flag: AtomicBool,
 }
 
@@ -37,7 +39,9 @@ impl ControllerCollectorContext {
             }),
             request_condvar: Condvar::new(),
 
-            workers: UnsafeCell::new(ParallelCollectorGroup::<<SelectedPlan as Plan>::CollectorT>::new()),
+            workers: UnsafeCell::new(ParallelCollectorGroup::<<SelectedPlan as Plan>::CollectorT>::new(false)),
+            concurrent_workers: UnsafeCell::new(ParallelCollectorGroup::<<SelectedPlan as Plan>::CollectorT>::new(true)),
+            concurrent_collection: AtomicBool::new(false),
             request_flag: AtomicBool::new(false),
         }
     }
@@ -50,12 +54,21 @@ impl ControllerCollectorContext {
         // Safe provided that we don't hold a &mut to this struct
         // before executing run()
         let workers = unsafe { &*self.workers.get() };
+        let concurrent_workers = unsafe { &*self.concurrent_workers.get() };
 
         loop {
             debug!("[STWController: Waiting for request...]");
             self.wait_for_request();
             debug!("[STWController: Request recieved.]");
             debug!("[STWController: Stopping the world...]");
+
+            if self.concurrent_collection.load(Ordering::Relaxed) {
+                concurrent_workers.abort_cycle();
+                concurrent_workers.wait_for_cycle();
+                ::plan::phase::clear_concurrent_phase();
+                self.concurrent_collection.store(false, Ordering::Relaxed);
+            }
+
             VMCollection::stop_all_mutators(tls);
 
             // For heap growth logic
@@ -72,7 +85,15 @@ impl ControllerCollectorContext {
             debug!("[STWController: Worker threads complete!]");
             debug!("[STWController: Resuming mutators...]");
             VMCollection::resume_mutators(tls);
+
+            if self.concurrent_collection.load(Ordering::Relaxed) {
+                concurrent_workers.trigger_cycle();
+            }
         }
+    }
+
+    pub fn request_concurrent_collection(&self) {
+        self.concurrent_collection.store(true, Ordering::Relaxed);
     }
 
     pub fn request(&self) {

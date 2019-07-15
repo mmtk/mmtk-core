@@ -40,5 +40,10 @@ pub mod g1;
 #[cfg(feature = "g1")]
 pub use self::g1 as selected_plan;
 
+pub mod concnogc;
+
+#[cfg(feature = "concnogc")]
+pub use self::concnogc as selected_plan;
+
 pub use self::selected_plan::SelectedPlan;
 pub use self::selected_plan::SelectedConstraints;

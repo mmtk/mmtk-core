@@ -31,4 +31,8 @@ impl Collection for VMCollection {
     fn prepare_mutator<T: MutatorContext>(tls: *mut c_void, m: &T) {
         unimplemented!()
     }
+
+    fn request_mutator_flush(_tls: *mut c_void) {
+        unimplemented!()
+    }
 }

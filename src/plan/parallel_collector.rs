@@ -7,6 +7,9 @@ pub trait ParallelCollector: CollectorContext + Sized {
 
     fn park(&mut self);
     fn collect(&self);
+    fn concurrent_collect(&mut self) {
+      unimplemented!()
+    }
     fn get_current_trace(&mut self) -> &mut Self::T;
     fn parallel_worker_count(&self) -> usize;
     fn parallel_worker_ordinal(&self) -> usize;

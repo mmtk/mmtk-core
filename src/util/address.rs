@@ -230,6 +230,11 @@ impl fmt::Debug for Address {
 pub struct ObjectReference(usize);
 
 impl ObjectReference {
+    #[inline(always)]
+    pub const fn null() -> ObjectReference {
+        ObjectReference(0)
+    }
+    
     /// converts the ObjectReference to an Address
     #[inline(always)]
     pub fn to_address(&self) -> Address {

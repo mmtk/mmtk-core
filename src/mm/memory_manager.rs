@@ -133,6 +133,18 @@ pub extern fn object_reference_write_slow(mutator: *mut c_void, src: ObjectRefer
 }
 
 #[no_mangle]
+pub extern fn object_reference_try_compare_and_swap_slow(mutator: *mut c_void, src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference) {
+    let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
+    local.object_reference_try_compare_and_swap_slow(src, slot, old, new);
+}
+
+#[no_mangle]
+pub extern fn java_lang_reference_read_slow(mutator: *mut c_void, src: ObjectReference) -> ObjectReference {
+    let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
+    return local.java_lang_reference_read_slow(src);
+}
+
+#[no_mangle]
 pub extern fn deinit_mutator(mutator: *mut c_void) {
     let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
     local.deinit_mutator();
@@ -224,6 +236,9 @@ pub unsafe extern fn start_worker(tls: *mut c_void, worker: *mut c_void) {
 #[cfg(feature = "jikesrvm")]
 pub unsafe extern fn enable_collection(tls: *mut c_void) {
     (&mut *CONTROL_COLLECTOR_CONTEXT.workers.get()).init_group(tls);
+    if ::plan::SelectedConstraints::NEEDS_CONCURRENT_WORKERS {
+        (&mut *CONTROL_COLLECTOR_CONTEXT.concurrent_workers.get()).init_group(tls);
+    }
     VMCollection::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(tls, null_mut()); // spawn controller thread
     ::plan::plan::INITIALIZED.store(true, Ordering::SeqCst);
 }

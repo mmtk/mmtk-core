@@ -23,6 +23,8 @@ use util::heap::pageresource::cumulative_committed_pages;
 use util::statistics::stats::{STATS, get_gathering_stats};
 
 pub static EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
+pub static LAST_INTERNAL_TRIGGERED_COLLECTION: AtomicBool = AtomicBool::new(false);
+pub static INTERNAL_TRIGGERED_COLLECTION: AtomicBool = AtomicBool::new(false);
 pub static USER_TRIGGERED_COLLECTION: AtomicBool = AtomicBool::new(false);
 
 lazy_static! {
@@ -82,19 +84,25 @@ pub trait Plan: Sized {
         }
 
         // FIXME
-        /*if self.concurrent_collection_required() {
+        if self.concurrent_collection_required() {
             // FIXME
             /*if space == self.common().meta_data_space {
                 self.log_poll(space, "Triggering async concurrent collection");
                 Self::trigger_internal_collection_request();
                 return false;
             } else {*/
-            self.log_poll(space, "Triggering concurrent collection");
+            self.log_poll::<PR>(space, "Triggering concurrent collection");
             Self::trigger_internal_collection_request();
             return true;
-        }*/
+        }
 
         return false;
+    }
+
+    fn trigger_internal_collection_request() {
+        LAST_INTERNAL_TRIGGERED_COLLECTION.store(true, Ordering::Relaxed);
+        INTERNAL_TRIGGERED_COLLECTION.store(true, Ordering::Relaxed);
+        CONTROL_COLLECTOR_CONTEXT.request();
     }
 
     fn log_poll<PR: PageResource>(&self, space: &'static PR::Space, message: &'static str) {
@@ -118,6 +126,10 @@ pub trait Plan: Sized {
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
 
         space_full || stress_force_gc || heap_full
+    }
+
+    fn concurrent_collection_required(&self) -> bool {
+        false
     }
 
     fn get_pages_reserved(&self) -> usize {
@@ -160,8 +172,7 @@ pub trait Plan: Sized {
     }
 
     fn is_internal_triggered_collection() -> bool {
-        // FIXME
-        false
+        LAST_INTERNAL_TRIGGERED_COLLECTION.load(Ordering::Relaxed)
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {
@@ -189,6 +200,8 @@ pub trait Plan: Sized {
     }
 
     fn reset_collection_trigger() {
+        LAST_INTERNAL_TRIGGERED_COLLECTION.store(INTERNAL_TRIGGERED_COLLECTION.load(Ordering::Relaxed), Ordering::Relaxed);
+        INTERNAL_TRIGGERED_COLLECTION.store(false, Ordering::Relaxed);
         USER_TRIGGERED_COLLECTION.store(false, Ordering::Relaxed)
     }
 
