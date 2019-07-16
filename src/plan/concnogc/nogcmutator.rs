@@ -11,6 +11,7 @@ use super::PLAN;
 use ::vm::*;
 use util::queue::LocalQueue;
 use super::nogc::{HEAD, set_next};
+use std::sync::atomic::{Ordering, AtomicUsize};
 
 use libc::c_void;
 
@@ -67,7 +68,7 @@ impl MutatorContext for NoGCMutator {
 
     }
 
-    fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, _allocator: AllocationType) -> Address {
+    fn alloc_slow(&mut self, _size: usize, _align: usize, _offset: isize, _allocator: AllocationType) -> Address {
         unreachable!()
     }
 
@@ -87,10 +88,12 @@ impl MutatorContext for NoGCMutator {
         }
     }
 
-    fn object_reference_try_compare_and_swap_slow(&mut self, _src: ObjectReference, _slot: Address, old: ObjectReference, _new: ObjectReference) {
+    fn object_reference_try_compare_and_swap_slow(&mut self, _src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference) -> bool {
         if self.barrier_active {
             self.check_and_enqueue_reference(old);
         }
+        let slot = unsafe { ::std::mem::transmute::<Address, &AtomicUsize>(slot) };
+        return slot.compare_and_swap(old.to_address().as_usize(), new.to_address().as_usize(), Ordering::Relaxed) == old.to_address().as_usize()
     }
 
     fn java_lang_reference_read_slow(&mut self, obj: ObjectReference) -> ObjectReference {

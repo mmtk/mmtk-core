@@ -1,7 +1,7 @@
 {
     "rust.no_default_features": true,
     "rust.features": [
-        "concnogc", "jikesrvm"
+        "concss", "jikesrvm"
     ],
     "rust.target": "i686-unknown-linux-gnu",
     "rust.all_targets": false,

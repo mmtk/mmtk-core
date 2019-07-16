@@ -133,6 +133,12 @@ pub extern fn object_reference_write_slow(mutator: *mut c_void, src: ObjectRefer
 }
 
 #[no_mangle]
+pub extern fn object_reference_read_slow(mutator: *mut c_void, src: ObjectReference, slot: Address) -> ObjectReference {
+    let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
+    local.object_reference_read_slow(src, slot)
+}
+
+#[no_mangle]
 pub extern fn object_reference_try_compare_and_swap_slow(mutator: *mut c_void, src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference) {
     let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
     local.object_reference_try_compare_and_swap_slow(src, slot, old, new);

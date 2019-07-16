@@ -18,7 +18,10 @@ pub trait MutatorContext {
     fn object_reference_write_slow(&mut self, _src: ObjectReference, _slot: Address, _value: ObjectReference) {
         unreachable!()
     }
-    fn object_reference_try_compare_and_swap_slow(&mut self, _src: ObjectReference, _slot: Address, _old: ObjectReference, _new: ObjectReference) {
+    fn object_reference_read_slow(&mut self, _src: ObjectReference, _slot: Address) -> ObjectReference {
+        unreachable!()
+    }
+    fn object_reference_try_compare_and_swap_slow(&mut self, _src: ObjectReference, _slot: Address, _old: ObjectReference, _new: ObjectReference) -> bool {
         unreachable!()
     }
     fn java_lang_reference_read_slow(&mut self, _ref: ObjectReference) -> ObjectReference {

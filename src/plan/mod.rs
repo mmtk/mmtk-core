@@ -45,5 +45,10 @@ pub mod concnogc;
 #[cfg(feature = "concnogc")]
 pub use self::concnogc as selected_plan;
 
+pub mod concss;
+
+#[cfg(feature = "concss")]
+pub use self::concss as selected_plan;
+
 pub use self::selected_plan::SelectedPlan;
 pub use self::selected_plan::SelectedConstraints;
