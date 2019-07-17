@@ -3,6 +3,7 @@ mod sscollector;
 mod ssmutator;
 pub mod ssconstraints;
 mod sstracelocal;
+mod validate;
 
 const VERBOSE: bool = false;//cfg!(debug_assertions);
 

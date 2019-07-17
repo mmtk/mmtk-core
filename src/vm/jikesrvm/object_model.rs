@@ -23,6 +23,10 @@ use ::util::constants::{};
 use ::plan::{Allocator, CollectorContext};
 use std::mem::size_of;
 use std::sync::atomic::{AtomicUsize, AtomicU8, Ordering};
+use plan::mutator_context::MutatorContext;
+use plan::selected_plan::SelectedConstraints::MAX_NON_LOS_COPY_BYTES;
+use plan::selected_plan::SelectedPlan;
+use plan::Plan;
 
 /** Should we gather stats on hash code state transitions for address-based hashing? */
 const HASH_STATS: bool = false;
@@ -62,6 +66,26 @@ impl ObjectModel for VMObjectModel {
             } else {
                 trace!("... no");
                 Self::copy_array(from, tib, rvm_type, allocator, tls)
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn mutator_copy(from: ObjectReference, allocator: Allocator, tls: &mut <SelectedPlan as Plan>::MutatorT) -> ObjectReference {
+        unsafe {
+            trace!("getting tib");
+            let tib = Address::from_usize((from.to_address() + TIB_OFFSET).load::<usize>());
+            trace!("getting type, tib={:?}", tib);
+            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
+                .load::<usize>());
+
+            trace!("Is it a class?");
+            if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
+                trace!("... yes");
+                Self::mutator_copy_scalar(from, tib, rvm_type, allocator, tls)
+            } else {
+                trace!("... no");
+                Self::mutator_copy_array(from, tib, rvm_type, allocator, tls)
             }
         }
     }
@@ -393,6 +417,46 @@ impl VMObjectModel {
         let to_obj = Self::move_object(region, from, unsafe {Address::zero().to_object_reference()},
                                        bytes, rvm_type);
         context.post_copy(to_obj, tib, bytes, allocator);
+        // XXX: Do not sync icache/dcache because we do not support PowerPC
+        to_obj
+    }
+
+    #[inline(always)]
+    fn copy_check_allocator(from: ObjectReference, bytes: usize, align: usize,
+                            allocator: Allocator) -> Allocator {
+        let large = ::util::alloc::allocator::get_maximum_aligned_size(bytes, align,
+            ::util::alloc::allocator::MIN_ALIGNMENT) > MAX_NON_LOS_COPY_BYTES;
+        if large { Allocator::Los } else { allocator }
+    }
+
+    #[inline(always)]
+    fn mutator_copy_scalar(from: ObjectReference, tib: Address, rvm_type: Address,
+                   immut_allocator: Allocator, context: &mut <SelectedPlan as Plan>::MutatorT) -> ObjectReference {
+        trace!("VMObjectModel.copy_scalar");
+        let bytes = Self::bytes_required_when_copied_class(from, rvm_type);
+        let align = Self::get_alignment_class(rvm_type);
+        let offset = Self::get_offset_for_alignment_class(from, rvm_type);
+        // let context = unsafe { VMActivePlan::mutator(tls) };
+        let allocator = Self::copy_check_allocator(from, bytes, align, immut_allocator);
+        let region = context.alloc(bytes, align, offset, allocator);
+        let to_obj = Self::move_object(region, from, unsafe {Address::zero().to_object_reference()}, bytes, rvm_type);
+        context.post_alloc(to_obj, unsafe { tib.to_object_reference() }, bytes, allocator);
+        to_obj
+    }
+
+    #[inline(always)]
+    fn mutator_copy_array(from: ObjectReference, tib: Address, rvm_type: Address,
+                  immut_allocator: Allocator, context: &mut <SelectedPlan as Plan>::MutatorT) -> ObjectReference {
+        trace!("VMObjectModel.copy_array");
+        let bytes = Self::bytes_required_when_copied_array(from, rvm_type);
+        let align = Self::get_alignment_array(rvm_type);
+        let offset = Self::get_offset_for_alignment_array(from, rvm_type);
+        // let context = unsafe { VMActivePlan::mutator(tls) };
+        let allocator = Self::copy_check_allocator(from, bytes, align, immut_allocator);
+        let region = context.alloc(bytes, align, offset, allocator);
+
+        let to_obj = Self::move_object(region, from, unsafe {Address::zero().to_object_reference()}, bytes, rvm_type);
+        context.post_alloc(to_obj, unsafe { tib.to_object_reference() }, bytes, allocator);
         // XXX: Do not sync icache/dcache because we do not support PowerPC
         to_obj
     }

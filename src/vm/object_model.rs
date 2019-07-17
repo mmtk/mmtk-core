@@ -1,10 +1,12 @@
 use ::util::{Address, ObjectReference};
 use ::plan::Allocator;
-
+use plan::selected_plan::SelectedPlan;
+use plan::Plan;
 use libc::c_void;
 
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/vm/ObjectModel.java
 pub trait ObjectModel {
+    fn mutator_copy(from: ObjectReference, allocator: Allocator, tls: &mut <SelectedPlan as Plan>::MutatorT) -> ObjectReference;
     fn copy(from: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference;
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address;
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference;

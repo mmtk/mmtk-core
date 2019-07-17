@@ -71,6 +71,7 @@ pub enum Phase {
     FlushMutator,
     SetBarrierActive,
     ClearBarrierActive,
+    FinalClosure,
     // Complex phases
     Complex(Vec<(Schedule, Phase)>, usize),
     Concurrent(Box<(Schedule, Phase)>),
@@ -264,6 +265,8 @@ fn get_next_phase() -> (Schedule, Phase) {
                         },
                         _ => unreachable!(),
                     }
+                } else {
+                    stack.push((schedule.clone(), phase.clone()));
                 }
                 return (schedule, phase);
             }

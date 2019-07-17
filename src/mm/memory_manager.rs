@@ -105,6 +105,12 @@ pub extern fn bind_mutator(tls: *mut c_void) -> *mut c_void {
 }
 
 #[no_mangle]
+pub extern fn mark_as_mapped(start: Address, size: usize) {
+    use util::heap::layout::Mmapper;
+    ::util::heap::layout::heap_layout::MMAPPER.mark_as_mapped(start, size);
+}
+
+#[no_mangle]
 pub unsafe fn alloc(mutator: *mut c_void, size: usize,
              align: usize, offset: isize, allocator: Allocator) -> *mut c_void {
     let local = &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT);
@@ -148,6 +154,18 @@ pub extern fn object_reference_try_compare_and_swap_slow(mutator: *mut c_void, s
 pub extern fn java_lang_reference_read_slow(mutator: *mut c_void, src: ObjectReference) -> ObjectReference {
     let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
     return local.java_lang_reference_read_slow(src);
+}
+
+#[no_mangle]
+pub extern fn object_reference_non_heap_write_slow(mutator: *mut c_void, slot: Address, value: ObjectReference) {
+    let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
+    local.object_reference_non_heap_write_slow(slot, value);
+}
+
+#[no_mangle]
+pub extern fn object_reference_non_heap_read_slow(mutator: *mut c_void, slot: Address) -> ObjectReference {
+    let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
+    local.object_reference_non_heap_read_slow(slot)
 }
 
 #[no_mangle]

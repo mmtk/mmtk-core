@@ -22,11 +22,12 @@ use ::plan::phase;
 use libc::{c_void};
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, Ordering};
-use ::vm::{Scanning, VMScanning};
+use ::vm::*;
 use std::thread;
 use util::conversions::bytes_to_pages;
 use plan::plan::create_vm_space;
 use plan::plan::EMERGENCY_COLLECTION;
+use util::queue::SharedQueue;
 use super::VERBOSE;
 
 pub type SelectedPlan = SemiSpace;
@@ -51,6 +52,8 @@ lazy_static! {
       )),
       (phase::Schedule::Global,     phase::Phase::ClearBarrierActive),
       (phase::Schedule::Mutator,    phase::Phase::ClearBarrierActive),
+      (phase::Schedule::Mutator,  phase::Phase::FinalClosure),
+      (phase::Schedule::Collector,  phase::Phase::FinalClosure),
     ], 0);
 
     pub static ref ROOT_CLOSURE_PHASE: phase::Phase = phase::Phase::Complex(vec![
@@ -83,6 +86,7 @@ lazy_static! {
         (phase::Schedule::Complex, ROOT_CLOSURE_PHASE.clone()),
         (phase::Schedule::Complex, REF_TYPE_CLOSURE_PHASE.clone()),
         (phase::Schedule::Complex, plan::COMPLETE_CLOSURE_PHASE.clone()),
+        super::validate::schedule_validation_phase(),
         (phase::Schedule::Complex, plan::FINISH_PHASE.clone()),
     ], 0);
 }
@@ -90,6 +94,7 @@ lazy_static! {
 pub struct SemiSpace {
     pub unsync: UnsafeCell<SemiSpaceUnsync>,
     pub ss_trace: Trace,
+    pub modbuf_pool: SharedQueue<ObjectReference>,
 }
 
 pub struct SemiSpaceUnsync {
@@ -101,6 +106,8 @@ pub struct SemiSpaceUnsync {
     pub los: LargeObjectSpace,
     total_pages: usize,
     collection_attempt: usize,
+    pub log_state: usize,
+    pub new_barrier_active: bool,
 }
 
 unsafe impl Sync for SemiSpace {}
@@ -121,8 +128,11 @@ impl Plan for SemiSpace {
                 los: LargeObjectSpace::new("los", true, VMRequest::discontiguous()),
                 total_pages: 0,
                 collection_attempt: 0,
+                log_state: 1,
+                new_barrier_active: false,
             }),
             ss_trace: Trace::new(),
+            modbuf_pool: SharedQueue::new(),
         }
     }
 
@@ -182,15 +192,31 @@ impl Plan for SemiSpace {
         return false;
     }
 
-    fn collection_required<PR: PageResource>(&self, space_full: bool, _space: &'static PR::Space) -> bool where Self: Sized {
+    fn collection_required<PR: PageResource>(&self, space_full: bool, space: &'static PR::Space) -> bool where Self: Sized {
         let stress_force_gc = self.stress_test_gc_required();
         trace!("self.get_pages_reserved()={}, self.get_total_pages()={}",
                self.get_pages_reserved(), self.get_total_pages());
+        {
+            let used = self.tospace().reserved_pages() as f32;
+            let total = (self.get_total_pages() >> 1) as f32;
+            if used / total > 0.7f32 {
+                return true;
+            }
+        }
+        
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
         space_full || stress_force_gc || heap_full
     }
 
     fn concurrent_collection_required(&self) -> bool {
+        if !::plan::phase::concurrent_phase_active() {
+            // return self.get_pages_used() as f32 / self.get_total_pages() as f32 > 0.3f32;
+            let used = self.tospace().reserved_pages() as f32;
+            let total = (self.get_total_pages() >> 1) as f32;
+            if used / total > 0.3f32 {
+                return true;
+            }
+        }
         false
     }
 
@@ -219,6 +245,7 @@ impl Plan for SemiSpace {
                     unsync.copyspace0.print_vm_map();
                     unsync.copyspace1.print_vm_map();
                     unsync.versatile_space.print_vm_map();
+                    unsync.los.print_vm_map();
                     unsync.vm_space.print_vm_map();
                 }
             }
@@ -238,6 +265,10 @@ impl Plan for SemiSpace {
                 unsync.versatile_space.prepare();
                 unsync.vm_space.prepare();
                 unsync.los.prepare(true);
+                unsync.log_state += 1;
+                while unsync.log_state == 0 {
+                    unsync.log_state += 1;
+                }
             }
             &Phase::StackRoots => {
                 VMScanning::notify_initial_thread_scan_complete(false, tls);
@@ -270,6 +301,28 @@ impl Plan for SemiSpace {
                 debug_assert!(self.ss_trace.values.is_empty());
                 debug_assert!(self.ss_trace.root_locations.is_empty());
                 plan::set_gc_status(plan::GcStatus::NotInGC);
+            }
+            &Phase::SetBarrierActive => {
+                unsync.new_barrier_active = true;
+            }
+            &Phase::ClearBarrierActive => {
+                unsync.new_barrier_active = false;
+            }
+            &Phase::ValidatePrepare => {
+                super::validate::prepare();
+                debug_assert!(self.ss_trace.values.is_empty());
+                debug_assert!(self.ss_trace.root_locations.is_empty());
+                if VERBOSE {
+                    unsync.copyspace0.print_vm_map();
+                    unsync.copyspace1.print_vm_map();
+                    unsync.versatile_space.print_vm_map();
+                    unsync.los.print_vm_map();
+                    unsync.vm_space.print_vm_map();
+                }
+                // unsync.remset_pool.clear();
+            }
+            &Phase::ValidateRelease => {
+                super::validate::release();
             }
             _ => {
                 panic!("Global phase not handled!")
@@ -367,5 +420,15 @@ impl ::std::ops::Deref for SemiSpace {
 impl ::std::ops::DerefMut for SemiSpace {
     fn deref_mut(&mut self) -> &mut SemiSpaceUnsync {
         unsafe { &mut *self.unsync.get() }
+    }
+}
+
+pub fn log(object: ObjectReference) -> bool {
+    let log_slot = object.to_address() + (VMObjectModel::GC_HEADER_OFFSET());
+    if (unsafe { log_slot.load::<usize>() }) == PLAN.log_state {
+        false
+    } else {
+        unsafe { log_slot.store::<usize>(PLAN.log_state) };
+        true
     }
 }

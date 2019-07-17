@@ -3,7 +3,6 @@ use ::plan::Allocator as AllocationType;
 use ::plan::CollectorContext;
 use ::plan::ParallelCollector;
 use ::plan::ParallelCollectorGroup;
-use super::PLAN;
 use ::plan::TraceLocal;
 use ::policy::copyspace::CopySpace;
 use ::util::{Address, ObjectReference};
@@ -12,11 +11,14 @@ use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
 use ::util::forwarding_word::clear_forwarding_bits;
 use ::util::heap::{MonotonePageResource};
 use ::util::reference_processor::*;
-use ::vm::{Scanning, VMScanning};
 use libc::c_void;
-use super::sstracelocal::SSTraceLocal;
 use ::plan::selected_plan::SelectedConstraints;
+use vm::*;
+use super::PLAN;
+use super::sstracelocal::SSTraceLocal;
 use super::VERBOSE;
+
+static mut CONTINUE_COLLECTING: bool = false;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector {
@@ -49,6 +51,10 @@ impl CollectorContext for SSCollector {
         self.trace.init(tls);
     }
 
+    fn get_tls(&self) -> *mut c_void {
+        self.tls
+    }
+
     fn alloc_copy(&mut self, _original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         match allocator {
             ::plan::Allocator::Los => self.los.alloc(bytes, align, offset),
@@ -57,11 +63,28 @@ impl CollectorContext for SSCollector {
         }
     }
 
+    fn post_copy(&self, object: ObjectReference, _rvm_type: Address, _bytes: usize, allocator: ::plan::Allocator) {
+        clear_forwarding_bits(object);
+        match allocator {
+            ::plan::Allocator::Default => {}
+            ::plan::Allocator::Los => {
+                PLAN.los.initialize_header(object, false);
+            }
+            _ => {
+                panic!("Currently we can't copy to other spaces other than copyspace")
+            }
+        }
+    }
+
     fn run(&mut self, tls: *mut c_void) {
         self.tls = tls;
         loop {
             self.park();
-            self.collect();
+            if self.group.unwrap().concurrent {
+                self.concurrent_collect();
+            } else {
+                self.collect();
+            }
         }
     }
 
@@ -70,6 +93,10 @@ impl CollectorContext for SSCollector {
             println!("Collector {:?}", phase);
         }
         match phase {
+            &Phase::FlushCollector => {
+                self.trace.process_roots();
+                self.trace.flush();
+            }
             &Phase::Prepare => {
                 self.ss.rebind(Some(PLAN.tospace()))
             }
@@ -130,7 +157,7 @@ impl CollectorContext for SSCollector {
                 self.trace.complete_trace();
                 debug_assert!(self.trace.is_empty());
             }
-            &Phase::ValidateClosure => {
+            &Phase::FinalClosure => {
                 self.trace.complete_trace();
                 debug_assert!(self.trace.is_empty());
             }
@@ -138,32 +165,56 @@ impl CollectorContext for SSCollector {
                 debug_assert!(self.trace.is_empty());
                 self.trace.release();
                 debug_assert!(self.trace.is_empty());
-                // debug_assert!(self.trace.remset.is_empty());
+                debug_assert!(self.trace.modbuf.is_empty());
             }
             &Phase::ValidatePrepare => {}
+            &Phase::ValidateClosure => {
+                self.trace.complete_trace();
+                debug_assert!(self.trace.is_empty());
+            }
             &Phase::ValidateRelease => {
                 debug_assert!(self.trace.is_empty());
-                // debug_assert!(self.trace.remset.is_empty());
+                debug_assert!(self.trace.modbuf.is_empty());
                 self.trace.release();
             }
             _ => { panic!("Per-collector phase not handled") }
         }
     }
 
-    fn get_tls(&self) -> *mut c_void {
-        self.tls
-    }
-
-    fn post_copy(&self, object: ObjectReference, _rvm_type: Address, _bytes: usize, allocator: ::plan::Allocator) {
-        clear_forwarding_bits(object);
-        match allocator {
-            ::plan::Allocator::Default => {}
-            ::plan::Allocator::Los => {
-                PLAN.los.initialize_header(object, false);
-            }
-            _ => {
-                panic!("Currently we can't copy to other spaces other than copyspace")
-            }
+    fn concurrent_collection_phase(&mut self, phase: &Phase) {
+        if VERBOSE {
+            println!("Concurrent {:?}", phase);
+        }
+        match phase {
+            &Phase::Concurrent(_) => {
+                self.ss.rebind(Some(PLAN.tospace()));
+                debug_assert!(!::plan::plan::gc_in_progress());
+                while !self.trace.incremental_trace(100) {
+                    if self.group.unwrap().is_aborted() {
+                      self.trace.flush();
+                    //   println!("Concurrent Collection Aborted!");
+                      break;
+                    }
+                }
+                if self.rendezvous() == 0 {
+                    unsafe { CONTINUE_COLLECTING = false };
+                    if !self.group.unwrap().is_aborted() {
+                        /* We are responsible for ensuring termination. */
+                        debug!("< requesting mutator flush >");
+                        VMCollection::request_mutator_flush(self.tls);
+                        debug!("< mutators flushed >");
+                        if self.concurrent_trace_complete() {
+                          let continue_collecting = ::plan::phase::notify_concurrent_phase_complete();
+                          unsafe { CONTINUE_COLLECTING = continue_collecting };
+                        } else {
+                          unsafe { CONTINUE_COLLECTING = true };
+                          ::plan::phase::notify_concurrent_phase_incomplete();
+                        }
+                    }
+                }
+                self.rendezvous();
+            },
+            _ => unreachable!(),
         }
     }
 }
@@ -176,8 +227,22 @@ impl ParallelCollector for SSCollector {
     }
 
     fn collect(&self) {
-        // FIXME use reference instead of cloning everything
-        phase::begin_new_phase_stack(self.tls, (phase::Schedule::Complex, super::ss::COLLECTION.clone()))
+        if !phase::is_phase_stack_empty() {
+            phase::continue_phase_stack(self.tls);
+        } else {
+            phase::begin_new_phase_stack(self.tls, (phase::Schedule::Complex, super::ss::COLLECTION.clone()));
+        }
+    }
+
+    fn concurrent_collect(&mut self) {
+        debug_assert!(!::plan::plan::gc_in_progress());
+        loop {
+            let phase = ::plan::phase::get_concurrent_phase();
+            self.concurrent_collection_phase(&phase);
+            if !unsafe { CONTINUE_COLLECTING } {
+                break;
+            }
+        }
     }
 
     fn get_current_trace(&mut self) -> &mut SSTraceLocal {
@@ -214,5 +279,11 @@ impl ParallelCollector for SSCollector {
 
     fn set_worker_ordinal(&mut self, ordinal: usize) {
         self.worker_ordinal = ordinal;
+    }
+}
+
+impl SSCollector {
+    fn concurrent_trace_complete(&self) -> bool {
+        !PLAN.ss_trace.has_work()
     }
 }

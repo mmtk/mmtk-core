@@ -27,6 +27,12 @@ pub trait MutatorContext {
     fn java_lang_reference_read_slow(&mut self, _ref: ObjectReference) -> ObjectReference {
         unreachable!()
     }
+    fn object_reference_non_heap_write_slow(&mut self, _slot: Address, _value: ObjectReference) {
+        unreachable!()
+    }
+    fn object_reference_non_heap_read_slow(&mut self, _slot: Address) -> ObjectReference {
+        unreachable!()
+    }
     fn deinit_mutator(&mut self) {
         self.flush();
     }
