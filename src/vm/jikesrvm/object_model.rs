@@ -26,7 +26,6 @@ use std::sync::atomic::{AtomicUsize, AtomicU8, Ordering};
 use plan::mutator_context::MutatorContext;
 use plan::selected_plan::SelectedConstraints::MAX_NON_LOS_COPY_BYTES;
 use plan::selected_plan::SelectedPlan;
-use plan::Plan;
 
 /** Should we gather stats on hash code state transitions for address-based hashing? */
 const HASH_STATS: bool = false;
@@ -71,7 +70,7 @@ impl ObjectModel for VMObjectModel {
     }
 
     #[inline(always)]
-    fn mutator_copy(from: ObjectReference, allocator: Allocator, tls: &mut <SelectedPlan as Plan>::MutatorT) -> ObjectReference {
+    fn mutator_copy<M: MutatorContext>(from: ObjectReference, allocator: Allocator, tls: &mut M) -> ObjectReference {
         unsafe {
             trace!("getting tib");
             let tib = Address::from_usize((from.to_address() + TIB_OFFSET).load::<usize>());
@@ -430,8 +429,8 @@ impl VMObjectModel {
     }
 
     #[inline(always)]
-    fn mutator_copy_scalar(from: ObjectReference, tib: Address, rvm_type: Address,
-                   immut_allocator: Allocator, context: &mut <SelectedPlan as Plan>::MutatorT) -> ObjectReference {
+    fn mutator_copy_scalar<M: MutatorContext>(from: ObjectReference, tib: Address, rvm_type: Address,
+                   immut_allocator: Allocator, context: &mut M) -> ObjectReference {
         trace!("VMObjectModel.copy_scalar");
         let bytes = Self::bytes_required_when_copied_class(from, rvm_type);
         let align = Self::get_alignment_class(rvm_type);
@@ -445,8 +444,8 @@ impl VMObjectModel {
     }
 
     #[inline(always)]
-    fn mutator_copy_array(from: ObjectReference, tib: Address, rvm_type: Address,
-                  immut_allocator: Allocator, context: &mut <SelectedPlan as Plan>::MutatorT) -> ObjectReference {
+    fn mutator_copy_array<M: MutatorContext>(from: ObjectReference, tib: Address, rvm_type: Address,
+                  immut_allocator: Allocator, context: &mut M) -> ObjectReference {
         trace!("VMObjectModel.copy_array");
         let bytes = Self::bytes_required_when_copied_array(from, rvm_type);
         let align = Self::get_alignment_array(rvm_type);
