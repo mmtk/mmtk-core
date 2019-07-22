@@ -50,6 +50,7 @@ impl Allocator<PR> for RegionAllocator {
         Some(self.space)
     }
 
+    #[inline]
     fn alloc(&mut self, bytes: usize, align: usize, offset: isize) -> Address {
         debug_assert!(bytes <= BYTES_IN_REGION);
         trace!("alloc");
@@ -62,7 +63,7 @@ impl Allocator<PR> for RegionAllocator {
         // sufficient memory is available, so we can finish performing the allocation
         fill_alignment_gap(self.cursor, start);
         self.cursor = end;
-        Region::of(start).cursor = end;
+        // Region::of(start).cursor = end;
         start
     }
 

@@ -15,12 +15,13 @@ use ::vm::{Scanning, VMScanning};
 use libc::c_void;
 use super::g1tracelocal::{G1TraceLocal, TraceKind};
 use ::plan::selected_plan::SelectedConstraints;
+use util::alloc::LargeObjectAllocator;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct G1Collector {
     pub tls: *mut c_void,
-    // CopyLocal
-    pub rs: RegionAllocator,
+    rs: RegionAllocator,
+    los: LargeObjectAllocator,
     mark_trace: G1TraceLocal,
     evacuate_trace: G1TraceLocal,
     current_trace: TraceKind,
@@ -34,6 +35,7 @@ impl CollectorContext for G1Collector {
         G1Collector {
             tls: 0 as *mut c_void,
             rs: RegionAllocator::new(0 as *mut c_void, &PLAN.region_space),
+            los: LargeObjectAllocator::new(0 as *mut c_void, Some(PLAN.get_los())),
             mark_trace: G1TraceLocal::new(TraceKind::Mark, &PLAN.mark_trace),
             evacuate_trace: G1TraceLocal::new(TraceKind::Evacuate, &PLAN.evacuate_trace),
             last_trigger_count: 0,
@@ -46,12 +48,17 @@ impl CollectorContext for G1Collector {
     fn init(&mut self, tls: *mut c_void) {
         self.tls = tls;
         self.rs.tls = tls;
+        self.los.tls = tls;
         self.mark_trace.init(tls);
         self.evacuate_trace.init(tls);
     }
 
     fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
-        self.rs.alloc(bytes, align, offset)
+        match allocator {
+            AllocationType::Los => self.los.alloc(bytes, align, offset),
+            AllocationType::Default => self.rs.alloc(bytes, align, offset),
+            _ => unreachable!(),
+        }
     }
 
     fn run(&mut self, tls: *mut c_void) {
@@ -158,9 +165,10 @@ impl CollectorContext for G1Collector {
         clear_forwarding_bits(object);
         match allocator {
             ::plan::Allocator::Default => {}
-            _ => {
-                panic!("Currently we can't copy to other spaces other than copyspace")
+            ::plan::Allocator::Los => {
+                PLAN.los.initialize_header(object, false);
             }
+            _ => unreachable!()
         }
     }
 }

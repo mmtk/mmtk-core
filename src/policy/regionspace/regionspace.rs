@@ -103,7 +103,7 @@ impl RegionSpace {
             }
             // VMMemory::zero(region, BYTES_IN_REGION);
             let mut region = Region(region);
-            region.clear();
+            // region.clear();
             region.committed = true;
             // let mut regions = self.regions.write().unwrap();
             // regions.insert(region);

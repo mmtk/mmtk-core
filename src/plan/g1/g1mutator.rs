@@ -11,6 +11,8 @@ use plan::plan;
 use vm::{Collection, VMCollection};
 use util::heap::{PageResource, MonotonePageResource};
 use plan::g1::{PLAN, DEBUG};
+use util::alloc::LargeObjectAllocator;
+use policy::largeobjectspace::LargeObjectSpace;
 
 use libc::c_void;
 
@@ -18,6 +20,7 @@ use libc::c_void;
 pub struct G1Mutator {
     // CopyLocal
     rs: RegionAllocator,
+    los: LargeObjectAllocator,
     vs: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
 }
 
@@ -63,8 +66,9 @@ impl MutatorContext for G1Mutator {
                       self.rs.get_space().unwrap() as *const _,
                       &PLAN.region_space as *const _);
         match allocator {
-            AllocationType::Default => { self.rs.alloc(size, align, offset) }
-            _ => { self.vs.alloc(size, align, offset) }
+            AllocationType::Default => self.rs.alloc(size, align, offset),
+            AllocationType::Los => self.los.alloc(size, align, offset),
+            _ => self.vs.alloc(size, align, offset),
         }
     }
 
@@ -76,8 +80,9 @@ impl MutatorContext for G1Mutator {
                       self.rs.get_space().unwrap() as *const _,
                       &PLAN.region_space as *const _);
         match allocator {
-            AllocationType::Default => { self.rs.alloc_slow(size, align, offset) }
-            _ => { self.vs.alloc_slow(size, align, offset) }
+            AllocationType::Default => self.rs.alloc_slow(size, align, offset),
+            AllocationType::Los => self.los.alloc(size, align, offset),
+            _ => self.vs.alloc_slow(size, align, offset),
         }
     }
 
@@ -85,6 +90,9 @@ impl MutatorContext for G1Mutator {
         debug_assert!(self.rs.get_space().unwrap() as *const _ == &PLAN.region_space as *const _);
         match allocator {
             AllocationType::Default => {}
+            AllocationType::Los => {
+                PLAN.los.initialize_header(refer, true);
+            }
             _ => {
                 // FIXME: data race on immortalspace.mark_state !!!
                 let unsync = unsafe { &*PLAN.unsync.get() };
@@ -100,9 +108,10 @@ impl MutatorContext for G1Mutator {
 }
 
 impl G1Mutator {
-    pub fn new(tls: *mut c_void, space: &'static RegionSpace, versatile_space: &'static ImmortalSpace) -> Self {
+    pub fn new(tls: *mut c_void, space: &'static RegionSpace, los: &'static LargeObjectSpace, versatile_space: &'static ImmortalSpace) -> Self {
         G1Mutator {
             rs: RegionAllocator::new(tls, space),
+            los: LargeObjectAllocator::new(tls, Some(los)),
             vs: BumpAllocator::new(tls, Some(versatile_space)),
         }
     }

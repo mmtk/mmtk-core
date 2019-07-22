@@ -70,22 +70,20 @@ impl TraceLocal for G1TraceLocal {
         let tls = self.tls;
 
         if object.is_null() {
-            trace!("trace_object: object is null");
             object
         } else if PLAN.region_space.in_space(object) {
-            trace!("trace_object: object in region_space");
             match self.kind {
                 TraceKind::Mark => PLAN.region_space.trace_mark_object(self, object),
                 TraceKind::Evacuate => PLAN.region_space.trace_evacuate_object(self, object, g1::ALLOC_RS, tls),
             }
         } else if PLAN.versatile_space.in_space(object) {
-            trace!("trace_object: object in versatile_space");
             PLAN.versatile_space.trace_object(self, object)
+        } else if PLAN.los.in_space(object) {
+            PLAN.los.trace_object(self, object)
         } else if PLAN.vm_space.in_space(object) {
-            trace!("trace_object: object in boot space");
             PLAN.vm_space.trace_object(self, object)
         } else {
-            unreachable!()
+            unreachable!("{:?}", object)
         }
     }
 
@@ -141,9 +139,11 @@ impl TraceLocal for G1TraceLocal {
         if object.is_null() {
             return false;
         } else if PLAN.region_space.in_space(object) {
-            g1::PLAN.region_space.is_live(object)
+            PLAN.region_space.is_live(object)
         } else if PLAN.versatile_space.in_space(object) {
             true
+        } else if PLAN.los.in_space(object) {
+            PLAN.los.is_live(object)
         } else if PLAN.vm_space.in_space(object) {
             true
         } else {

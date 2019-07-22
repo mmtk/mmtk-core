@@ -26,6 +26,7 @@ use plan::plan::create_vm_space;
 use plan::plan::EMERGENCY_COLLECTION;
 use policy::regionspace::*;
 use super::DEBUG;
+use policy::largeobjectspace::LargeObjectSpace;
 
 
 pub type SelectedPlan = G1;
@@ -82,6 +83,7 @@ pub struct G1Unsync {
     pub hi: bool,
     pub vm_space: ImmortalSpace,
     pub region_space: RegionSpace,
+    pub los: LargeObjectSpace,
     pub versatile_space: ImmortalSpace,
     total_pages: usize,
     collection_attempt: usize,
@@ -112,8 +114,9 @@ impl Plan for G1 {
             unsync: UnsafeCell::new(G1Unsync {
                 hi: false,
                 vm_space: create_vm_space(),
-                region_space: RegionSpace::new("region_space", VMRequest::RequestDiscontiguous),
-                versatile_space: ImmortalSpace::new("versatile_space", true, VMRequest::RequestDiscontiguous),
+                region_space: RegionSpace::new("region_space", VMRequest::discontiguous()),
+                los: LargeObjectSpace::new("los", true, VMRequest::discontiguous()),
+                versatile_space: ImmortalSpace::new("versatile_space", true, VMRequest::discontiguous()),
                 total_pages: 0,
                 collection_attempt: 0,
             }),
@@ -128,6 +131,7 @@ impl Plan for G1 {
         unsync.total_pages = bytes_to_pages(heap_size);
         unsync.vm_space.init();
         unsync.region_space.init();
+        unsync.los.init();
         unsync.versatile_space.init();
 
         if !cfg!(feature = "jikesrvm") {
@@ -139,7 +143,7 @@ impl Plan for G1 {
 
     fn bind_mutator(&self, tls: *mut c_void) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
-        Box::into_raw(Box::new(G1Mutator::new(tls, &unsync.region_space, &unsync.versatile_space))) as *mut c_void
+        Box::into_raw(Box::new(G1Mutator::new(tls, &unsync.region_space, &unsync.los, &unsync.versatile_space))) as *mut c_void
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {
@@ -147,7 +151,9 @@ impl Plan for G1 {
             false
         } else if self.versatile_space.in_space(object) {
             true
-        }  else if self.vm_space.in_space(object) {
+        } else if self.los.in_space(object) {
+            true
+        } else if self.vm_space.in_space(object) {
             true
         } else {
             unreachable!()
@@ -155,13 +161,13 @@ impl Plan for G1 {
     }
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-
-        if unsync.region_space.in_space(object) {
+        if self.region_space.in_space(object) {
             true
-        } else if unsync.versatile_space.in_space(object) {
+        } else if self.versatile_space.in_space(object) {
             true
-        }  else if unsync.vm_space.in_space(object) {
+        } else if self.los.in_space(object) {
+            true
+        } else if self.vm_space.in_space(object) {
             true
         } else {
             false
@@ -200,8 +206,10 @@ impl Plan for G1 {
                 debug_assert!(self.mark_trace.root_locations.is_empty());
                 // prepare each of the collected regions
                 unsync.region_space.prepare();
+                unsync.los.prepare(true);
                 unsync.versatile_space.prepare();
                 unsync.vm_space.prepare();
+                self.print_vm_map();
             },
             &Phase::StackRoots => {
                 VMScanning::notify_initial_thread_scan_complete(false, tls);
@@ -215,10 +223,11 @@ impl Plan for G1 {
             &Phase::Release => {
                 // unsync.region_space.release();
                 unsync.versatile_space.release();
+                unsync.los.release(true);
                 unsync.vm_space.release();
             },
             &Phase::CollectionSetSelection => {
-                self.region_space.compute_collection_set(self.get_pages_avail());
+                self.region_space.compute_collection_set(self.get_total_pages() - self.get_pages_used());
             },
             &Phase::EvacuatePrepare => {
                 debug_assert!(self.evacuate_trace.values.is_empty());
@@ -226,11 +235,13 @@ impl Plan for G1 {
                 // prepare each of the collected regions
                 unsync.region_space.prepare();
                 unsync.versatile_space.prepare();
+                unsync.los.prepare(true);
                 unsync.vm_space.prepare();
             },
             &Phase::EvacuateClosure => {},
             &Phase::EvacuateRelease => {
                 unsync.region_space.release();
+                unsync.los.release(true);
                 unsync.versatile_space.release();
                 unsync.vm_space.release();
             },
@@ -240,6 +251,7 @@ impl Plan for G1 {
                 debug_assert!(self.evacuate_trace.values.is_empty());
                 debug_assert!(self.evacuate_trace.root_locations.is_empty());
                 plan::set_gc_status(plan::GcStatus::NotInGC);
+                self.print_vm_map();
             },
 
             _ => panic!("Global phase not handled!"),
@@ -249,9 +261,9 @@ impl Plan for G1 {
     #[inline]
     fn collection_required<PR: PageResource>(&self, space_full: bool, space: &'static PR::Space) -> bool {
         let total_pages = self.get_total_pages();
-        if self.get_pages_avail() * 10 < total_pages {
-            return true;
-        }
+        // if self.get_pages_avail() * 10 < total_pages {
+        //     return true;
+        // }
         let heap_full = self.get_pages_reserved() > total_pages;
         space_full || heap_full
     }
@@ -261,11 +273,13 @@ impl Plan for G1 {
     }
 
     fn get_collection_reserve(&self) -> usize {
-        self.region_space.reserved_pages()
+        // println!("{} {}", self.total_pages, self.total_pages / 10);
+        self.total_pages / 10
+        // self.region_space.reserved_pages()
     }
 
     fn get_pages_used(&self) -> usize {
-        self.region_space.reserved_pages() + self.versatile_space.reserved_pages()
+        self.region_space.reserved_pages() + self.los.reserved_pages() + self.versatile_space.reserved_pages()
     }
 
     fn is_bad_ref(&self, object: ObjectReference) -> bool {
@@ -277,6 +291,8 @@ impl Plan for G1 {
             self.vm_space.is_movable()
         } else if self.region_space.in_space(object) {
             self.region_space.is_movable()
+        } else if self.los.in_space(object) {
+            self.los.is_movable()
         } else if self.versatile_space.in_space(object) {
             self.versatile_space.is_movable()
         } else {
@@ -288,10 +304,27 @@ impl Plan for G1 {
         let object = unsafe { address.to_object_reference() };
         if self.vm_space.in_space(object)
           || self.versatile_space.in_space(object)
-          || self.region_space.in_space(object) {
+          || self.region_space.in_space(object)
+          || self.los.in_space(object) {
             MMAPPER.address_is_mapped(address)
         } else {
             false
+        }
+    }
+}
+
+impl G1 {
+    pub fn get_los(&self) -> &'static LargeObjectSpace {
+        let unsync = unsafe { &*self.unsync.get() };
+        &unsync.los
+    }
+
+    fn print_vm_map(&self) {
+        if super::DEBUG {
+            self.region_space.print_vm_map();
+            self.los.print_vm_map();
+            self.versatile_space.print_vm_map();
+            self.vm_space.print_vm_map();
         }
     }
 }
