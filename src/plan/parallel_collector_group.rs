@@ -15,8 +15,8 @@ pub struct ParallelCollectorGroup<C: ParallelCollector> {
     contexts: Vec<C>,
     sync: Mutex<ParallelCollectorGroupSync>,
     condvar: Condvar,
-
     aborted: AtomicBool,
+    pub concurrent: bool,
 }
 
 struct ParallelCollectorGroupSync {
@@ -27,7 +27,7 @@ struct ParallelCollectorGroupSync {
 }
 
 impl<C: ParallelCollector> ParallelCollectorGroup<C> {
-    pub fn new() -> Self {
+    pub fn new(concurrent: bool) -> Self {
         Self {
             contexts: Vec::<C>::new(),
             sync: Mutex::new(ParallelCollectorGroupSync {
@@ -37,8 +37,8 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
                 current_rendezvous_counter: 0,
             }),
             condvar: Condvar::new(),
-
             aborted: AtomicBool::new(false),
+            concurrent,
         }
     }
 
@@ -100,7 +100,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         context.increment_last_trigger_count();
         if context.get_last_trigger_count() == inner.trigger_count {
             inner.contexts_parked += 1;
-            if inner.contexts_parked == inner.trigger_count {
+            if inner.contexts_parked == self.contexts.len() {
                 self.aborted.store(false, Ordering::Relaxed);
             }
             self.condvar.notify_all();

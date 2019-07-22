@@ -14,6 +14,9 @@ pub trait CollectorContext {
     fn run(&mut self, tls: *mut c_void);
     /// Perform a (local, i.e. per-collector) collection phase.
     fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool);
+    fn concurrent_collection_phase(&mut self, phase: &Phase) {
+        unreachable!()
+    }
     /// Unique identifier for this collector context.
     fn get_tls(&self) -> *mut c_void;
 

@@ -123,6 +123,23 @@ impl<S: Space<PR = FreeListPageResource<S>>> PageResource for FreeListPageResour
     fn adjust_for_metadata(&self, pages: usize) -> usize {
         pages
     }
+
+    fn get_available_physical_pages(&self) -> usize {
+        let mut rtn = { self.sync.lock().unwrap().pages_currently_on_freelist };
+        if !self.common().contiguous {
+            let available_discontiguous_chunks = heap_layout::VM_MAP.get_available_discontiguous_chunks();
+            let chunk_consumer_count = heap_layout::VM_MAP.get_chunk_consumer_count();
+            let chunks = if available_discontiguous_chunks >= chunk_consumer_count {
+                available_discontiguous_chunks - chunk_consumer_count
+            } else {
+                0
+            };
+            rtn += chunks * (PAGES_IN_CHUNK - self.meta_data_pages_per_region);
+        } else if self.common().growable && HEAP_LAYOUT_64BIT {
+            rtn = PAGES_IN_SPACE64 - self.common().reserved.load(Ordering::Relaxed);
+        }
+        return rtn;
+    }
 }
 
 impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {

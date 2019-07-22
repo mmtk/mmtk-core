@@ -18,4 +18,8 @@ impl Trace {
     }
 
     pub fn prepare(&mut self) {}
+
+    pub fn has_work(&self) -> bool {
+        !self.values.is_empty() || !self.root_locations.is_empty()
+    }
 }

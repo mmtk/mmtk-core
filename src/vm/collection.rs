@@ -11,4 +11,5 @@ pub trait Collection {
     fn out_of_memory(tls: *mut c_void) {
         panic!("Out of memory!");
     }
+    fn request_mutator_flush(tls: *mut c_void);
 }

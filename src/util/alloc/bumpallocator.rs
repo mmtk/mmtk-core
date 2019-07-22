@@ -41,7 +41,7 @@ impl<PR: PageResource> BumpAllocator<PR> {
         self.limit = limit;
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.cursor = unsafe { Address::zero() };
         self.limit = unsafe { Address::zero() };
     }

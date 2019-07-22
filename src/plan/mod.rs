@@ -30,10 +30,25 @@ pub mod semispace;
 #[cfg(feature = "semispace")]
 pub use self::semispace as selected_plan;
 
+pub mod gencopy;
+
+#[cfg(feature = "gencopy")]
+pub use self::gencopy as selected_plan;
+
 pub mod g1;
 
 #[cfg(feature = "g1")]
 pub use self::g1 as selected_plan;
+
+pub mod concnogc;
+
+#[cfg(feature = "concnogc")]
+pub use self::concnogc as selected_plan;
+
+pub mod concss;
+
+#[cfg(feature = "concss")]
+pub use self::concss as selected_plan;
 
 pub use self::selected_plan::SelectedPlan;
 pub use self::selected_plan::SelectedConstraints;

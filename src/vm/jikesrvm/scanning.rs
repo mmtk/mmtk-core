@@ -191,6 +191,8 @@ impl VMScanning {
                     process_code_locations, new_roots_sufficient);
                 debug!("Returned from JikesRVM thread roots");
             }
+            
+            VMActivePlan::mutator(tls).flush_remembered_sets();
         }
     }
 }

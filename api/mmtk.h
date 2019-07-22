@@ -16,6 +16,8 @@ typedef void* MMTk_TraceLocal;
  */
 extern MMTk_Mutator bind_mutator(void *tls);
 
+extern void mark_as_mapped(void* start, size_t bytes);
+
 extern void* alloc(MMTk_Mutator mutator, size_t size,
     size_t align, ssize_t offset, int allocator);
 
@@ -24,6 +26,17 @@ extern void* alloc_slow(MMTk_Mutator mutator, size_t size,
 
 extern void post_alloc(MMTk_Mutator mutator, void* refer, void* type_refer,
     int bytes, int allocator);
+
+extern void object_reference_write_slow(MMTk_Mutator mutator, void* src, void* slot, void* value);
+extern void* object_reference_read_slow(MMTk_Mutator mutator, void* src, void* slot);
+extern bool object_reference_try_compare_and_swap_slow(MMTk_Mutator mutator, void* src, void* slot, void* old, void* tgt);
+extern void* java_lang_reference_read_slow(MMTk_Mutator mutator, void* obj);
+extern void object_reference_non_heap_write_slow(MMTk_Mutator mutator, void* slot, void* value);
+extern void* object_reference_non_heap_read_slow(MMTk_Mutator mutator, void* slot);
+
+extern void deinit_mutator(MMTk_Mutator mutator);
+extern void flush(MMTk_Mutator mutator);
+extern void flush_remembered_sets(MMTk_Mutator mutator);
 
 extern bool is_valid_ref(void* ref);
 extern bool is_mapped_object(void* ref);

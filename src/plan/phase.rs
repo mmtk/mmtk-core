@@ -61,8 +61,20 @@ pub enum Phase {
     EvacuatePrepare,
     EvacuateClosure,
     EvacuateRelease,
+    // Validation phases
+    ValidatePlaceholder,
+    ValidatePrepare,
+    ValidateClosure,
+    ValidateRelease,
+    // Concurrent gc related phases
+    FlushCollector,
+    FlushMutator,
+    SetBarrierActive,
+    ClearBarrierActive,
+    FinalClosure,
     // Complex phases
     Complex(Vec<(Schedule, Phase)>, usize),
+    Concurrent(Box<(Schedule, Phase)>),
     // associated cursor
     // No phases are left
     Empty,
@@ -71,6 +83,8 @@ pub enum Phase {
 static EVEN_MUTATOR_RESET_RENDEZVOUS: AtomicBool = AtomicBool::new(false);
 static ODD_MUTATOR_RESET_RENDEZVOUS: AtomicBool = AtomicBool::new(false);
 static COMPLEX_PHASE_CURSOR: AtomicUsize = AtomicUsize::new(0);
+static mut CONCURRENT_PHASE: Phase = Phase::Empty;
+static ALLOW_CONCURRENT_PHASE: AtomicBool = AtomicBool::new(false);
 
 lazy_static! {
     static ref PHASE_STACK: Mutex<Vec<(Schedule, Phase)>> = Mutex::new(vec![]);
@@ -78,11 +92,50 @@ lazy_static! {
     static ref ODD_SCHEDULED_PHASE: Mutex<(Schedule, Phase)> = Mutex::new((Schedule::Empty, Phase::Empty));
 }
 
+pub fn get_concurrent_phase() -> Phase {
+    unsafe { CONCURRENT_PHASE.clone() }
+}
+
+pub fn clear_concurrent_phase() {
+    unsafe { CONCURRENT_PHASE = Phase::Empty };// _ID.store(0, Ordering::Relaxed);
+}
+
+pub fn concurrent_phase_active() -> bool {
+    unsafe { CONCURRENT_PHASE != Phase::Empty }
+}
+
+pub fn notify_concurrent_phase_complete() -> bool {
+    /* Concurrent phase is complete*/
+    unsafe { CONCURRENT_PHASE = Phase::Empty };
+    /* Remove it from the stack */
+    { // popScheduledPhase()
+        let mut stack = PHASE_STACK.lock().unwrap();
+        stack.pop().unwrap();
+    }
+    /* Pop the next phase off the stack */
+    let (schedule, next_scheduled_phase) = get_next_phase();
+    if next_scheduled_phase != Phase::Empty {
+      /* A concurrent phase, lets wake up and do it all again */
+      if schedule == Schedule::Concurrent {
+        unsafe { CONCURRENT_PHASE = next_scheduled_phase };
+        return true;
+      }
+      /* Push phase back on and resume atomic collection */
+      push_scheduled_phase((schedule, next_scheduled_phase));
+      ::plan::SelectedPlan::trigger_internal_collection_request();
+    } 
+    return false;
+  }
+
+pub fn notify_concurrent_phase_incomplete() {
+
+}
+
 // FIXME: It's probably unsafe to call most of these functions, because tls
 
 pub fn begin_new_phase_stack(tls: *mut c_void, scheduled_phase: (Schedule, Phase)) {
     let order = unsafe { VMActivePlan::collector(tls).rendezvous() };
-
+    
     if order == 0 {
         push_scheduled_phase(scheduled_phase);
     }
@@ -94,6 +147,11 @@ pub fn continue_phase_stack(tls: *mut c_void) {
     process_phase_stack(tls, true);
 }
 
+pub fn is_phase_stack_empty() -> bool {
+    let stack = PHASE_STACK.lock().unwrap();
+    return stack.is_empty();
+}
+
 fn process_phase_stack(tls: *mut c_void, resume: bool) {
     let mut resume = resume;
     let plan = VMActivePlan::global();
@@ -101,11 +159,14 @@ fn process_phase_stack(tls: *mut c_void, resume: bool) {
     let order = collector.rendezvous();
     let primary = order == 0;
     if primary && resume {
+        debug_assert!(!is_phase_stack_empty());
+        debug_assert!(!super::plan::gc_in_progress());
         plan::plan::set_gc_status(plan::plan::GcStatus::GcProper);
     }
     let mut is_even_phase = true;
     if primary {
         // FIXME allowConcurrentPhase
+        ALLOW_CONCURRENT_PHASE.store(<SelectedPlan as Plan>::is_internal_triggered_collection() && !<SelectedPlan as Plan>::is_emergency_collection(), Ordering::Relaxed);
         set_next_phase(false, get_next_phase(), false);
     }
     collector.rendezvous();
@@ -135,7 +196,15 @@ fn process_phase_stack(tls: *mut c_void, resume: bool) {
                 }
             }
             Schedule::Concurrent => {
-                unimplemented!()
+                if primary {
+                    unsafe { CONCURRENT_PHASE = phase.clone() };
+                    /* Concurrent phase, we need to stop gc */
+                    ::plan::plan::set_gc_status(plan::plan::GcStatus::NotInGC);
+                    ::plan::plan::CONTROL_COLLECTOR_CONTEXT.request_concurrent_collection();
+                    
+                }
+                collector.rendezvous();
+                return;
             }
             _ => {
                 panic!("Invalid schedule in Phase.process_phase_stack")
@@ -188,7 +257,18 @@ fn get_next_phase() -> (Schedule, Phase) {
                 return (schedule, phase);
             }
             Schedule::Concurrent => {
-                unimplemented!()
+                if !ALLOW_CONCURRENT_PHASE.load(Ordering::Relaxed) {
+                    match phase {
+                        Phase::Concurrent(alt) => {
+                            stack.push(*alt.clone());
+                            continue;
+                        },
+                        _ => unreachable!(),
+                    }
+                } else {
+                    stack.push((schedule.clone(), phase.clone()));
+                }
+                return (schedule, phase);
             }
             Schedule::Complex => {
                 let mut internal_phase = (Schedule::Empty, Phase::Empty);

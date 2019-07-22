@@ -45,6 +45,12 @@ impl Collection for VMCollection {
         }
     }
 
+    fn request_mutator_flush(tls: *mut c_void) {
+        unsafe {
+            jtoc_call!(REQUEST_MUTATOR_FLUSH_METHOD_OFFSET, tls);
+        }
+    }
+
     fn out_of_memory(tls: *mut c_void) {
         unsafe {
             jtoc_call!(OUT_OF_MEMORY_METHOD_OFFSET, tls);

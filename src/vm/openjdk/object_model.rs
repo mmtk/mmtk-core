@@ -1,12 +1,17 @@
 use ::vm::object_model::ObjectModel;
 use ::util::{Address, ObjectReference};
 use ::plan::Allocator;
-
+use plan::selected_plan::SelectedPlan;
+use plan::{Plan, MutatorContext};
 use libc::c_void;
 
 pub struct VMObjectModel {}
 
 impl ObjectModel for VMObjectModel {
+    fn mutator_copy<M: MutatorContext>(from: ObjectReference, allocator: Allocator, tls: &mut M) -> ObjectReference {
+        unimplemented!()
+    }
+
     fn copy(from: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
         unimplemented!()
     }

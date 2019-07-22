@@ -92,6 +92,8 @@ pub trait PageResource: Sized + 'static + Debug {
         self.common_mut().space = Some(space);
     }
 
+    fn get_available_physical_pages(&self) -> usize;
+
     fn common(&self) -> &CommonPageResource<Self>;
     fn common_mut(&mut self) -> &mut CommonPageResource<Self>;
 }
