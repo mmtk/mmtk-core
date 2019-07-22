@@ -213,6 +213,7 @@ impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {
         };
 
         if !region.is_zero() {
+            debug_assert!(region >= self.start);
             let region_start = conversions::bytes_to_pages(region - self.start);
             let region_end = region_start + (required_chunks * PAGES_IN_CHUNK) - 1;
             self.free_list.set_uncoalescable(region_start as _);
