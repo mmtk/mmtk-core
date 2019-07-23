@@ -65,7 +65,6 @@ impl MutatorContext for NoGCMutator {
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize, _allocator: AllocationType) -> Address {
         self.nogc.alloc(size, align, offset)
-
     }
 
     fn alloc_slow(&mut self, _size: usize, _align: usize, _offset: isize, _allocator: AllocationType) -> Address {
@@ -120,6 +119,7 @@ impl NoGCMutator {
             barrier_active: PLAN.new_barrier_active,
         }
     }
+    
     #[inline(always)]
     fn check_and_enqueue_reference(&mut self, object: ObjectReference) {
         if object.is_null() {

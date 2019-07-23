@@ -3,6 +3,7 @@ mod g1collector;
 mod g1mutator;
 pub mod g1constraints;
 mod g1tracelocal;
+mod collection;
 
 pub use self::g1::G1;
 pub use self::g1::PLAN;

@@ -13,15 +13,17 @@ use util::heap::{PageResource, MonotonePageResource};
 use plan::g1::{PLAN, DEBUG};
 use util::alloc::LargeObjectAllocator;
 use policy::largeobjectspace::LargeObjectSpace;
-
+use util::queue::LocalQueue;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use libc::c_void;
 
 #[repr(C)]
 pub struct G1Mutator {
-    // CopyLocal
     rs: RegionAllocator,
     los: LargeObjectAllocator,
     vs: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
+    modbuf: Box<LocalQueue<'static, ObjectReference>>,
+    barrier_active: usize,
 }
 
 impl MutatorContext for G1Mutator {
@@ -30,6 +32,19 @@ impl MutatorContext for G1Mutator {
             println!("Mutator {:?}", phase);
         }
         match phase {
+            &Phase::SetBarrierActive => {
+                self.flush();
+                self.barrier_active = 1;
+            }
+            &Phase::ClearBarrierActive => {
+                self.barrier_active = 0;
+            }
+            &Phase::FlushMutator => {
+                self.flush();
+            }
+            &Phase::FinalClosure => {
+                self.flush();
+            }
             &Phase::PrepareStacks => {
                 if !plan::stacks_prepared() {
                     VMCollection::prepare_mutator(self.rs.tls, self);
@@ -99,12 +114,39 @@ impl MutatorContext for G1Mutator {
                 unsync.versatile_space.initialize_header(refer);
             }
         }
+        ::util::header_byte::mark_as_logged(refer);
     }
 
     fn get_tls(&self) -> *mut c_void {
         debug_assert!(self.rs.tls == self.vs.tls);
         self.rs.tls
     }
+
+    fn object_reference_write_slow(&mut self, _src: ObjectReference, slot: Address, value: ObjectReference) {
+        debug_assert!(self.barrier_active());
+
+        let old = unsafe { slot.load::<ObjectReference>() };
+        self.check_and_enqueue_reference(old);
+
+        unsafe { slot.store(value) }
+    }
+
+    fn object_reference_try_compare_and_swap_slow(&mut self, _src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference) -> bool {
+        debug_assert!(self.barrier_active());
+        self.check_and_enqueue_reference(old);
+        let slot = unsafe { ::std::mem::transmute::<Address, &AtomicUsize>(slot) };
+        return slot.compare_and_swap(old.to_address().as_usize(), new.to_address().as_usize(), Ordering::Relaxed) == old.to_address().as_usize()
+    }
+
+    fn java_lang_reference_read_slow(&mut self, mut obj: ObjectReference) -> ObjectReference {
+        debug_assert!(self.barrier_active());
+        self.check_and_enqueue_reference(obj);
+        obj
+    }
+
+    fn flush_remembered_sets(&mut self) {
+        self.modbuf.flush();
+    } 
 }
 
 impl G1Mutator {
@@ -113,6 +155,19 @@ impl G1Mutator {
             rs: RegionAllocator::new(tls, space),
             los: LargeObjectAllocator::new(tls, Some(los)),
             vs: BumpAllocator::new(tls, Some(versatile_space)),
+            modbuf: box PLAN.modbuf_pool.spawn_local(),
+            barrier_active: PLAN.new_barrier_active as usize,
         }
+    }
+    
+    #[inline(always)]
+    fn check_and_enqueue_reference(&mut self, object: ObjectReference) {
+        if !object.is_null() && ::util::header_byte::attempt_unlog(object) {
+            self.modbuf.enqueue(object);
+        }
+    }
+
+    fn barrier_active(&self) -> bool {
+        self.barrier_active != 0
     }
 }

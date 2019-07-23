@@ -11,11 +11,13 @@ use ::util::alloc::Allocator;
 use ::util::alloc::RegionAllocator;
 use ::util::forwarding_word::clear_forwarding_bits;
 use ::util::reference_processor::*;
-use ::vm::{Scanning, VMScanning};
+use ::vm::*;
 use libc::c_void;
 use super::g1tracelocal::{G1TraceLocal, TraceKind};
 use ::plan::selected_plan::SelectedConstraints;
 use util::alloc::LargeObjectAllocator;
+
+static mut CONTINUE_COLLECTING: bool = false;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct G1Collector {
@@ -45,6 +47,10 @@ impl CollectorContext for G1Collector {
         }
     }
 
+    fn get_tls(&self) -> *mut c_void {
+        self.tls
+    }
+
     fn init(&mut self, tls: *mut c_void) {
         self.tls = tls;
         self.rs.tls = tls;
@@ -61,11 +67,27 @@ impl CollectorContext for G1Collector {
         }
     }
 
+    fn post_copy(&self, object: ObjectReference, rvm_type: Address, bytes: usize, allocator: ::plan::Allocator) {
+        clear_forwarding_bits(object);
+        match allocator {
+            ::plan::Allocator::Default => {}
+            ::plan::Allocator::Los => {
+                PLAN.los.initialize_header(object, false);
+            }
+            _ => unreachable!()
+        }
+        ::util::header_byte::mark_as_logged(object);
+    }
+
     fn run(&mut self, tls: *mut c_void) {
         self.tls = tls;
         loop {
             self.park();
-            self.collect();
+            if self.group.unwrap().concurrent {
+                self.concurrent_collect();
+            } else {
+                self.collect();
+            }
         }
     }
 
@@ -74,6 +96,10 @@ impl CollectorContext for G1Collector {
             println!("Collector {:?}", phase);
         }
         match phase {
+            &Phase::FlushCollector => {
+                self.mark_trace.process_roots();
+                self.mark_trace.flush();
+            }
             &Phase::StackRoots => {
                 trace!("Computing thread roots");
                 let tls = self.tls;
@@ -135,6 +161,10 @@ impl CollectorContext for G1Collector {
                 self.mark_trace.complete_trace();
                 debug_assert!(self.mark_trace.is_empty());
             }
+            &Phase::FinalClosure => {
+                self.mark_trace.complete_trace();
+                debug_assert!(self.mark_trace.is_empty());
+            }
             &Phase::Release => {
                 debug_assert!(self.mark_trace.is_empty());
                 self.mark_trace.release();
@@ -157,18 +187,38 @@ impl CollectorContext for G1Collector {
         }
     }
 
-    fn get_tls(&self) -> *mut c_void {
-        self.tls
-    }
-
-    fn post_copy(&self, object: ObjectReference, rvm_type: Address, bytes: usize, allocator: ::plan::Allocator) {
-        clear_forwarding_bits(object);
-        match allocator {
-            ::plan::Allocator::Default => {}
-            ::plan::Allocator::Los => {
-                PLAN.los.initialize_header(object, false);
-            }
-            _ => unreachable!()
+    fn concurrent_collection_phase(&mut self, phase: &Phase) {
+        if super::DEBUG {
+            println!("Concurrent {:?}", phase);
+        }
+        match phase {
+            &Phase::Concurrent(_) => {
+                debug_assert!(!::plan::plan::gc_in_progress());
+                while !self.mark_trace.incremental_trace(100) {
+                    if self.group.unwrap().is_aborted() {
+                      self.mark_trace.flush();
+                      break;
+                    }
+                }
+                if self.rendezvous() == 0 {
+                    unsafe { CONTINUE_COLLECTING = false };
+                    if !self.group.unwrap().is_aborted() {
+                        /* We are responsible for ensuring termination. */
+                        debug!("< requesting mutator flush >");
+                        VMCollection::request_mutator_flush(self.tls);
+                        debug!("< mutators flushed >");
+                        if self.concurrent_trace_complete() {
+                          let continue_collecting = ::plan::phase::notify_concurrent_phase_complete();
+                          unsafe { CONTINUE_COLLECTING = continue_collecting };
+                        } else {
+                          unsafe { CONTINUE_COLLECTING = true };
+                          ::plan::phase::notify_concurrent_phase_incomplete();
+                        }
+                    }
+                }
+                self.rendezvous();
+            },
+            _ => unreachable!(),
         }
     }
 }
@@ -180,15 +230,29 @@ impl ParallelCollector for G1Collector {
         self.group.unwrap().park(self);
     }
 
-    fn collect(&self) {
-        // FIXME use reference instead of cloning everything
-        phase::begin_new_phase_stack(self.tls, (phase::Schedule::Complex, g1::g1::COLLECTION.clone()))
-    }
-
     fn get_current_trace(&mut self) -> &mut G1TraceLocal {
         match self.current_trace {
             TraceKind::Mark => &mut self.mark_trace,
             TraceKind::Evacuate => &mut self.evacuate_trace,
+        }
+    }
+
+    fn collect(&self) {
+        if !phase::is_phase_stack_empty() {
+            phase::continue_phase_stack(self.tls);
+        } else {
+            phase::begin_new_phase_stack(self.tls, (phase::Schedule::Complex, super::collection::COLLECTION.clone()));
+        }
+    }
+
+    fn concurrent_collect(&mut self) {
+        debug_assert!(!::plan::plan::gc_in_progress());
+        loop {
+            let phase = ::plan::phase::get_concurrent_phase();
+            self.concurrent_collection_phase(&phase);
+            if !unsafe { CONTINUE_COLLECTING } {
+                break;
+            }
         }
     }
 
@@ -222,5 +286,11 @@ impl ParallelCollector for G1Collector {
 
     fn set_worker_ordinal(&mut self, ordinal: usize) {
         self.worker_ordinal = ordinal;
+    }
+}
+
+impl G1Collector {
+    fn concurrent_trace_complete(&self) -> bool {
+        !PLAN.mark_trace.has_work()
     }
 }

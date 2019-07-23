@@ -19,6 +19,7 @@ pub struct G1TraceLocal {
     kind: TraceKind,
     values: LocalQueue<'static, ObjectReference>,
     root_locations: LocalQueue<'static, Address>,
+    pub modbuf: LocalQueue<'static, ObjectReference>,
 }
 
 impl TransitiveClosure for G1TraceLocal {
@@ -38,20 +39,21 @@ impl TransitiveClosure for G1TraceLocal {
 }
 
 impl TraceLocal for G1TraceLocal {
+    fn process_remembered_sets(&mut self) {
+        while let Some(obj) = self.modbuf.dequeue() {
+            if ::util::header_byte::attempt_log(obj) {
+                self.trace_object(obj);
+            }
+        }
+    }
+
     fn overwrite_reference_during_trace(&self) -> bool {
         self.kind == TraceKind::Evacuate
     }
 
     fn process_roots(&mut self) {
-        loop {
-            match self.root_locations.dequeue() {
-                Some(slot) => {
-                    self.process_root_edge(slot, true)
-                }
-                None => {
-                    break;
-                }
-            }
+        while let Some(slot) = self.root_locations.dequeue() {
+            self.process_root_edge(slot, true)
         }
         debug_assert!(self.root_locations.is_empty());
     }
@@ -69,7 +71,7 @@ impl TraceLocal for G1TraceLocal {
         trace!("trace_object({:?})", object.to_address());
         let tls = self.tls;
 
-        if object.is_null() {
+        let new_object = if object.is_null() {
             object
         } else if PLAN.region_space.in_space(object) {
             match self.kind {
@@ -84,22 +86,22 @@ impl TraceLocal for G1TraceLocal {
             PLAN.vm_space.trace_object(self, object)
         } else {
             unreachable!("{:?}", object)
-        }
+        };
+
+        new_object
     }
 
     fn complete_trace(&mut self) {
         let id = self.tls;
-
         self.process_roots();
         debug_assert!(self.root_locations.is_empty());
         loop {
-            match self.values.dequeue() {
-                Some(object) => {
-                    VMScanning::scan_object(self, object, id);
-                }
-                None => {
-                    break;
-                }
+            while let Some(object) = self.values.dequeue() {
+                VMScanning::scan_object(self, object, id);
+            }
+            self.process_remembered_sets();
+            if self.values.is_empty() {
+                break;
             }
         }
         debug_assert!(self.root_locations.is_empty());
@@ -159,6 +161,7 @@ impl G1TraceLocal {
             kind,
             values: trace.values.spawn_local(),
             root_locations: trace.root_locations.spawn_local(),
+            modbuf: PLAN.modbuf_pool.spawn_local(),
         }
     }
 
@@ -168,5 +171,22 @@ impl G1TraceLocal {
 
     pub fn is_empty(&self) -> bool {
         self.root_locations.is_empty() && self.values.is_empty()
+    }
+    
+    pub fn flush(&mut self) {
+        self.values.flush();
+        self.root_locations.flush();
+    }
+
+    pub fn incremental_trace(&mut self, work_limit: usize) -> bool {
+        let mut units = 0;
+        while let Some(v) = self.values.dequeue() {
+            VMScanning::scan_object(self, v, self.tls);
+            units += 1;
+            if units >= work_limit {
+                break;
+            }
+        }
+        return self.values.is_empty();
     }
 }

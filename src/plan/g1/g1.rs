@@ -27,6 +27,7 @@ use plan::plan::EMERGENCY_COLLECTION;
 use policy::regionspace::*;
 use super::DEBUG;
 use policy::largeobjectspace::LargeObjectSpace;
+use util::queue::SharedQueue;
 
 
 pub type SelectedPlan = G1;
@@ -36,47 +37,13 @@ pub const SCAN_BOOT_IMAGE: bool = true;
 
 lazy_static! {
     pub static ref PLAN: G1 = G1::new();
-    pub static ref EVACUATE_PHASE: phase::Phase = phase::Phase::Complex(vec![
-        (phase::Schedule::Mutator,   phase::Phase::EvacuatePrepare),
-        (phase::Schedule::Global,    phase::Phase::EvacuatePrepare),
-        (phase::Schedule::Collector, phase::Phase::EvacuatePrepare),
-        // Roots
-        (phase::Schedule::Complex,   plan::PREPARE_STACKS.clone()),
-        (phase::Schedule::Collector, phase::Phase::StackRoots),
-        (phase::Schedule::Global,    phase::Phase::StackRoots),
-        (phase::Schedule::Collector, phase::Phase::Roots),
-        (phase::Schedule::Global,    phase::Phase::Roots),
-        (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
-        (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
-        // Refs
-        (phase::Schedule::Collector, phase::Phase::SoftRefs),
-        (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
-        (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
-        (phase::Schedule::Collector, phase::Phase::WeakRefs),
-        (phase::Schedule::Collector, phase::Phase::Finalizable),
-        (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
-        (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
-        (phase::Schedule::Collector, phase::Phase::PhantomRefs),
-
-        (phase::Schedule::Mutator,   phase::Phase::EvacuateRelease),
-        (phase::Schedule::Global,    phase::Phase::EvacuateRelease),
-        (phase::Schedule::Collector, phase::Phase::EvacuateRelease),
-    ], 0);
-    pub static ref COLLECTION: phase::Phase = phase::Phase::Complex(vec![
-        (phase::Schedule::Complex, plan::INIT_PHASE.clone()),
-        (phase::Schedule::Complex, plan::ROOT_CLOSURE_PHASE.clone()),
-        (phase::Schedule::Complex, plan::REF_TYPE_CLOSURE_PHASE.clone()),
-        (phase::Schedule::Complex, plan::COMPLETE_CLOSURE_PHASE.clone()),
-        (phase::Schedule::Global,  phase::Phase::CollectionSetSelection),
-        (phase::Schedule::Complex, EVACUATE_PHASE.clone()),
-        (phase::Schedule::Complex, plan::FINISH_PHASE.clone()),
-    ], 0);
 }
 
 pub struct G1 {
     pub unsync: UnsafeCell<G1Unsync>,
     pub mark_trace: Trace,
     pub evacuate_trace: Trace,
+    pub modbuf_pool: SharedQueue<ObjectReference>,
 }
 
 pub struct G1Unsync {
@@ -87,6 +54,7 @@ pub struct G1Unsync {
     pub versatile_space: ImmortalSpace,
     total_pages: usize,
     collection_attempt: usize,
+    pub new_barrier_active: bool,
 }
 
 unsafe impl Sync for G1 {}
@@ -119,9 +87,11 @@ impl Plan for G1 {
                 versatile_space: ImmortalSpace::new("versatile_space", true, VMRequest::discontiguous()),
                 total_pages: 0,
                 collection_attempt: 0,
+                new_barrier_active: false,
             }),
             mark_trace: Trace::new(),
             evacuate_trace: Trace::new(),
+            modbuf_pool: SharedQueue::new(),
         }
     }
 
@@ -253,7 +223,12 @@ impl Plan for G1 {
                 plan::set_gc_status(plan::GcStatus::NotInGC);
                 self.print_vm_map();
             },
-
+            &Phase::SetBarrierActive => {
+                unsync.new_barrier_active = true;
+            }
+            &Phase::ClearBarrierActive => {
+                unsync.new_barrier_active = false;
+            }
             _ => panic!("Global phase not handled!"),
         }
     }
@@ -266,6 +241,18 @@ impl Plan for G1 {
         // }
         let heap_full = self.get_pages_reserved() > total_pages;
         space_full || heap_full
+    }
+
+    fn concurrent_collection_required(&self) -> bool {
+        if !::plan::phase::concurrent_phase_active() {
+            // return self.get_pages_used() as f32 / self.get_total_pages() as f32 > 0.3f32;
+            let used = self.get_pages_used() as f32;
+            let total = self.get_total_pages() as f32;
+            if (used / total) > 0.45f32 {
+                return true;
+            }
+        }
+        false
     }
 
     fn get_total_pages(&self) -> usize {
@@ -314,6 +301,11 @@ impl Plan for G1 {
 }
 
 impl G1 {
+    pub fn region_space(&self) -> &'static RegionSpace {
+        let unsync = unsafe { &*self.unsync.get() };
+        &unsync.region_space
+    }
+
     pub fn get_los(&self) -> &'static LargeObjectSpace {
         let unsync = unsafe { &*self.unsync.get() };
         &unsync.los

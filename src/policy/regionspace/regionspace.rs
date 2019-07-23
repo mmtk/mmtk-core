@@ -166,6 +166,7 @@ impl RegionSpace {
     #[inline]
     pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference) -> ObjectReference {
         let region = Region::of(object);
+        debug_assert!(region.0 != ::util::alloc::embedded_meta_data::get_metadata_base(region.0), "Invalid region {:?}, object {:?}", region.0, object);
         if Self::test_and_mark(object, region) {
             region.live_size.fetch_add(VMObjectModel::get_size_when_copied(object), Ordering::Relaxed);
             trace.process_node(object);
@@ -176,6 +177,7 @@ impl RegionSpace {
     #[inline]
     pub fn trace_evacuate_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
         let region = Region::of(object);
+        debug_assert!(region.0 != ::util::alloc::embedded_meta_data::get_metadata_base(region.0), "Invalid region {:?}, object {:?}", region.0, object);
         if region.relocate {
             let prior_status_word = ForwardingWord::attempt_to_forward(object);
             if ForwardingWord::state_is_forwarded_or_being_forwarded(prior_status_word) {

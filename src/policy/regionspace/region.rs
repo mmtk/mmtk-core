@@ -33,7 +33,7 @@ impl ToAddress for Address {
 impl ToAddress for ObjectReference {
     #[inline]
     fn to_address(&self) -> Address {
-        self.to_address()
+        VMObjectModel::ref_to_address(*self)
     }
 }
 
@@ -56,6 +56,7 @@ impl Region {
     pub fn index(&self) -> usize {
         let chunk = embedded_meta_data::get_metadata_base(self.0);
         let region_start = chunk + METADATA_BYTES_PER_CHUNK;
+        debug_assert!(self.0 >= region_start, "Invalid region {:?}, chunk {:?}", self.0, chunk);
         let index = (self.0 - region_start) >> LOG_BYTES_IN_REGION;
         index
     }

@@ -198,6 +198,7 @@ impl SSMutator {
         }
         object
     }
+    
     #[inline(always)]
     fn check_and_enqueue_reference(&mut self, object: ObjectReference) {
         if !object.is_null() && super::ss::log(object) {

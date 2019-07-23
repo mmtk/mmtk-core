@@ -22,3 +22,29 @@ pub fn is_unlogged(object: ObjectReference) -> bool {
     let value = VMObjectModel::read_available_byte(object);
     (value & UNLOGGED_BIT) == UNLOGGED_BIT
 }
+
+pub fn attempt_unlog(object: ObjectReference) -> bool {
+    loop {
+        let old = VMObjectModel::prepare_available_bits(object);
+        if (old & (UNLOGGED_BIT as usize)) == (UNLOGGED_BIT as usize) {
+            return false; // Already unlogged
+        }
+        let new = old | (UNLOGGED_BIT as usize);
+        if VMObjectModel::attempt_available_bits(object, old, new) {
+            return true
+        }
+    }
+}
+
+pub fn attempt_log(object: ObjectReference) -> bool {
+    loop {
+        let old = VMObjectModel::prepare_available_bits(object);
+        if (old & (UNLOGGED_BIT as usize)) == 0usize {
+            return false; // Already logged
+        }
+        let new = old & !(UNLOGGED_BIT as usize);
+        if VMObjectModel::attempt_available_bits(object, old, new) {
+            return true
+        }
+    }
+}
