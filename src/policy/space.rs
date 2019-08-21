@@ -67,14 +67,18 @@ pub trait Space: Sized + Debug + 'static {
         }
     }
 
-    fn in_space(&self, object: ObjectReference) -> bool {
-        let start = VMObjectModel::ref_to_address(object);
+    fn address_in_space(&self, start: Address) -> bool {
         if !space_descriptor::is_contiguous(self.common().descriptor) {
             VM_MAP.get_descriptor_for_address(start) == self.common().descriptor
         } else {
             start.as_usize() >= self.common().start.as_usize()
                 && start.as_usize() < self.common().start.as_usize() + self.common().extent
         }
+    }
+    
+    fn in_space(&self, object: ObjectReference) -> bool {
+        let start = VMObjectModel::ref_to_address(object);
+        self.address_in_space(start)
     }
 
     // UNSAFE: potential data race as this mutates 'common'

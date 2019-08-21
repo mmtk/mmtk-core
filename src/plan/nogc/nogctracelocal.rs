@@ -5,7 +5,7 @@ use ::plan::tracelocal::TraceLocal;
 pub struct NoGCTraceLocal {}
 
 impl TransitiveClosure for NoGCTraceLocal {
-    fn process_edge(&mut self, slot: Address) {
+    fn process_edge(&mut self, _src: ObjectReference, _slot: Address) {
         unimplemented!();
     }
 

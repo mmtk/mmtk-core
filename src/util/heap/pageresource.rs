@@ -65,8 +65,8 @@ pub trait PageResource: Sized + 'static + Debug {
     * allocPages, and the caller must hold the lock.
     */
     fn commit_pages(&self, reserved_pages: usize, actual_pages: usize, tls: *mut c_void) {
-        let delta = actual_pages - reserved_pages;
-        self.common().reserved.store(self.common().reserved.load(Ordering::Relaxed) + delta,
+        let delta = (actual_pages as isize) - (reserved_pages as isize);
+        self.common().reserved.store((self.common().reserved.load(Ordering::Relaxed) as isize + delta) as usize,
                                      Ordering::Relaxed);
         self.common().committed.store(self.common().committed.load(Ordering::Relaxed) + actual_pages,
                                       Ordering::Relaxed);
@@ -93,6 +93,8 @@ pub trait PageResource: Sized + 'static + Debug {
     }
 
     fn get_available_physical_pages(&self) -> usize;
+
+    fn meta_data_pages_per_region(&self) -> usize;
 
     fn common(&self) -> &CommonPageResource<Self>;
     fn common_mut(&mut self) -> &mut CommonPageResource<Self>;

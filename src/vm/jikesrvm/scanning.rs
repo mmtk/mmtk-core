@@ -46,7 +46,7 @@ impl Scanning for VMScanning {
             // object is a REFARRAY
             let length = VMObjectModel::get_array_length(object);
             for i in 0..length {
-                trace.process_edge(object.to_address() + (i << LOG_BYTES_IN_ADDRESS));
+                trace.process_edge(object, object.to_address() + (i << LOG_BYTES_IN_ADDRESS));
             }
         } else {
             let len_ptr: usize = elt0_ptr - size_of::<isize>();
@@ -54,7 +54,7 @@ impl Scanning for VMScanning {
             let offsets = unsafe { slice::from_raw_parts(elt0_ptr as *const isize, len as usize) };
 
             for offset in offsets.iter() {
-                trace.process_edge(object.to_address() + *offset);
+                trace.process_edge(object, object.to_address() + *offset);
             }
         }
     }

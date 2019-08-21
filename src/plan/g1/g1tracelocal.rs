@@ -1,192 +1,119 @@
-use plan::{TraceLocal, TransitiveClosure};
-use plan::g1::PLAN;
-use plan::trace::Trace;
+use super::{G1MarkTraceLocal, G1EvacuateTraceLocal};
+use super::multitracelocal::*;
+use super::validate::{Validator, ValidateTraceLocal};
+use super::PLAN;
+use policy::region::*;
+use ::util::{Address, ObjectReference};
 use policy::space::Space;
-use util::{Address, ObjectReference};
-use util::queue::LocalQueue;
-use vm::Scanning;
-use vm::VMScanning;
-use libc::c_void;
-use super::g1;
 
-#[derive(PartialEq)]
+#[repr(u8)]
+#[derive(PartialEq, Eq)]
 pub enum TraceKind {
-  Mark, Evacuate
+    Mark = 0,
+    Evacuate = 1,
+    Validate = 2,
 }
 
-pub struct G1TraceLocal {
-    tls: *mut c_void,
-    kind: TraceKind,
-    values: LocalQueue<'static, ObjectReference>,
-    root_locations: LocalQueue<'static, Address>,
-    pub modbuf: LocalQueue<'static, ObjectReference>,
+fn get_space_name(o: ObjectReference) -> &'static str {
+    if PLAN.vm_space.in_space(o) {
+        "vm"
+    } else if PLAN.versatile_space.in_space(o) {
+        "vs"
+    } else if PLAN.region_space.in_space(o) {
+        "g1"
+    } else if PLAN.los.in_space(o) {
+        "los"
+    } else {
+        unreachable!()
+    }
 }
 
-impl TransitiveClosure for G1TraceLocal {
-    fn process_edge(&mut self, slot: Address) {
-        trace!("process_edge({:?})", slot);
-        let object: ObjectReference = unsafe { slot.load() };
-        let new_object = self.trace_object(object);
-        if self.overwrite_reference_during_trace() {
-            unsafe { slot.store(new_object) };
+impl Validator for () {
+    fn validate_edge(src: ObjectReference, slot: Address, obj: ObjectReference) {
+        assert!(PLAN.is_mapped_object(src));
+        if obj.is_null() {
+            return
         }
-    }
-
-    fn process_node(&mut self, object: ObjectReference) {
-        trace!("process_node({:?})", object);
-        self.values.enqueue(object);
-    }
-}
-
-impl TraceLocal for G1TraceLocal {
-    fn process_remembered_sets(&mut self) {
-        while let Some(obj) = self.modbuf.dequeue() {
-            if ::util::header_byte::attempt_log(obj) {
-                self.trace_object(obj);
+        if !PLAN.is_mapped_object(obj) {
+            println!("<{} {:?}>.{:?} points to an unmapped object {:?}", get_space_name(src), src, slot, obj)
+        }
+        assert!(PLAN.is_mapped_object(obj));
+        
+        if PLAN.region_space.in_space(obj) {
+            let region = Region::of(obj);
+            assert!(region.committed);
+            assert!(!region.relocate);
+            if region != Region::of(src) && !PLAN.vm_space.in_space(src) {
+                if Card::of(src).get_state() == CardState::Dirty {
+                    if !region.remset.contains_card(Card::of(src)) {
+                        println!(
+                            "WARNING: {} card {:?} for object {:?}, slot {:?} is not remembered by {} region {:?} ({:?})", get_space_name(src), Card::of(src).0, src, slot, get_space_name(obj), region, obj
+                        );
+                    }
+                } else {
+                    assert!(region.remset.contains_card(Card::of(src)),
+                        "{} card {:?} for object {:?}, slot {:?} is not remembered by {} region {:?} ({:?})", get_space_name(src), Card::of(src).0, src, slot, get_space_name(obj), region, obj
+                    )
+                }
             }
         }
     }
-
-    fn overwrite_reference_during_trace(&self) -> bool {
-        self.kind == TraceKind::Evacuate
-    }
-
-    fn process_roots(&mut self) {
-        while let Some(slot) = self.root_locations.dequeue() {
-            self.process_root_edge(slot, true)
-        }
-        debug_assert!(self.root_locations.is_empty());
-    }
-
-    fn process_root_edge(&mut self, slot: Address, untraced: bool) {
-        trace!("process_root_edge({:?}, {:?})", slot, untraced);
-        let object: ObjectReference = unsafe { slot.load() };
-        let new_object = self.trace_object(object);
-        if self.overwrite_reference_during_trace() {
-            unsafe { slot.store(new_object) };
-        }
-    }
-
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        trace!("trace_object({:?})", object.to_address());
-        let tls = self.tls;
-
-        let new_object = if object.is_null() {
-            object
-        } else if PLAN.region_space.in_space(object) {
-            match self.kind {
-                TraceKind::Mark => PLAN.region_space.trace_mark_object(self, object),
-                TraceKind::Evacuate => PLAN.region_space.trace_evacuate_object(self, object, g1::ALLOC_RS, tls),
-            }
-        } else if PLAN.versatile_space.in_space(object) {
-            PLAN.versatile_space.trace_object(self, object)
-        } else if PLAN.los.in_space(object) {
-            PLAN.los.trace_object(self, object)
-        } else if PLAN.vm_space.in_space(object) {
-            PLAN.vm_space.trace_object(self, object)
+    
+    fn validate_object(o: ObjectReference) {
+        assert!(PLAN.is_mapped_object(o));
+        if PLAN.region_space.in_space(o) {
+            let region = Region::of(o);
+            assert!(!region.relocate);
+            assert!(in_regions_set(region));
+            assert!(PLAN.region_space.is_live(o));
+        } else if PLAN.versatile_space.in_space(o) {
+            // assert!(PLAN.versatile_space.is_marked(o));
+        } else if PLAN.los.in_space(o) {
+            assert!(PLAN.los.is_live(o));
+        } else if PLAN.vm_space.in_space(o) {
+            // assert!(PLAN.vm_space.is_marked(o), "{:?} is not marked", o);
         } else {
-            unreachable!("{:?}", object)
-        };
-
-        new_object
-    }
-
-    fn complete_trace(&mut self) {
-        let id = self.tls;
-        self.process_roots();
-        debug_assert!(self.root_locations.is_empty());
-        loop {
-            while let Some(object) = self.values.dequeue() {
-                VMScanning::scan_object(self, object, id);
-            }
-            self.process_remembered_sets();
-            if self.values.is_empty() {
-                break;
-            }
-        }
-        debug_assert!(self.root_locations.is_empty());
-        debug_assert!(self.values.is_empty());
-    }
-
-    fn release(&mut self) {
-        // Reset the local buffer (throwing away any local entries).
-        self.root_locations.reset();
-        self.values.reset();
-    }
-
-    fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, root: bool) {
-        let interior_ref: Address = unsafe { slot.load() };
-        let offset = interior_ref - target.to_address();
-        let new_target = self.trace_object(target);
-        if self.overwrite_reference_during_trace() {
-            unsafe { slot.store(new_target.to_address() + offset) };
+            panic!("Unmapped object {:?}", o)
         }
     }
+}
 
-    fn report_delayed_root_edge(&mut self, slot: Address) {
-        trace!("report_delayed_root_edge {:?}", slot);
-        self.root_locations.enqueue(slot);
-    }
-
-    fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool {
-        let unsync = unsafe { &(*PLAN.unsync.get()) };
-        if g1::PLAN.region_space.in_space(obj) {
-            self.kind == TraceKind::Mark
-        } else {
-            true
+fn in_regions_set(r: Region) -> bool {
+    for x in PLAN.region_space.regions() {
+        if x == r {
+            return true
         }
     }
+    return false
+}
 
-    fn is_live(&self, object: ObjectReference) -> bool {
-        if object.is_null() {
-            return false;
-        } else if PLAN.region_space.in_space(object) {
-            PLAN.region_space.is_live(object)
-        } else if PLAN.versatile_space.in_space(object) {
-            true
-        } else if PLAN.los.in_space(object) {
-            PLAN.los.is_live(object)
-        } else if PLAN.vm_space.in_space(object) {
-            true
+pub type G1TraceLocal = Cons<G1MarkTraceLocal, Cons<G1EvacuateTraceLocal, Cons<ValidateTraceLocal<()>, Nil>>>;
+
+impl G1TraceLocal {
+    pub fn mark_trace(&self) -> &G1MarkTraceLocal {
+        &self.head
+    }
+    pub fn mark_trace_mut(&mut self) -> &mut G1MarkTraceLocal {
+        &mut self.head
+    }
+    pub fn evacuate_trace(&self) -> &G1EvacuateTraceLocal {
+        &self.tail.head
+    }
+    pub fn evacuate_trace_mut(&mut self) -> &mut G1EvacuateTraceLocal {
+        &mut self.tail.head
+    }
+    pub fn validate_trace_mut(&mut self) -> &mut ValidateTraceLocal<()> {
+        &mut self.tail.tail.head
+    }
+    pub fn activated_trace(&self) -> TraceKind {
+        if self.active {
+            TraceKind::Mark
+        } else if self.tail.active {
+            TraceKind::Evacuate
+        } else if self.tail.tail.active {
+            TraceKind::Validate
         } else {
             unreachable!()
         }
-    }
-}
-
-impl G1TraceLocal {
-    pub fn new(kind: TraceKind, trace: &'static Trace) -> Self {
-        G1TraceLocal {
-            tls: 0 as *mut c_void,
-            kind,
-            values: trace.values.spawn_local(),
-            root_locations: trace.root_locations.spawn_local(),
-            modbuf: PLAN.modbuf_pool.spawn_local(),
-        }
-    }
-
-    pub fn init(&mut self, tls: *mut c_void) {
-        self.tls = tls;
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.root_locations.is_empty() && self.values.is_empty()
-    }
-    
-    pub fn flush(&mut self) {
-        self.values.flush();
-        self.root_locations.flush();
-    }
-
-    pub fn incremental_trace(&mut self, work_limit: usize) -> bool {
-        let mut units = 0;
-        while let Some(v) = self.values.dequeue() {
-            VMScanning::scan_object(self, v, self.tls);
-            units += 1;
-            if units >= work_limit {
-                break;
-            }
-        }
-        return self.values.is_empty();
     }
 }

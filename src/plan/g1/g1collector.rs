@@ -3,7 +3,6 @@ use ::plan::Allocator as AllocationType;
 use ::plan::CollectorContext;
 use ::plan::ParallelCollector;
 use ::plan::ParallelCollectorGroup;
-use ::plan::g1;
 use ::plan::g1::{PLAN, DEBUG};
 use ::plan::TraceLocal;
 use ::util::{Address, ObjectReference};
@@ -16,6 +15,10 @@ use libc::c_void;
 use super::g1tracelocal::{G1TraceLocal, TraceKind};
 use ::plan::selected_plan::SelectedConstraints;
 use util::alloc::LargeObjectAllocator;
+use policy::region::cardtable;
+use super::multitracelocal::*;
+use super::{G1MarkTraceLocal, G1EvacuateTraceLocal};
+use super::validate::ValidateTraceLocal;
 
 static mut CONTINUE_COLLECTING: bool = false;
 
@@ -24,9 +27,7 @@ pub struct G1Collector {
     pub tls: *mut c_void,
     rs: RegionAllocator,
     los: LargeObjectAllocator,
-    mark_trace: G1TraceLocal,
-    evacuate_trace: G1TraceLocal,
-    current_trace: TraceKind,
+    trace: G1TraceLocal,
     last_trigger_count: usize,
     worker_ordinal: usize,
     group: Option<&'static ParallelCollectorGroup<G1Collector>>,
@@ -34,16 +35,19 @@ pub struct G1Collector {
 
 impl CollectorContext for G1Collector {
     fn new() -> Self {
+        let unsync = unsafe { &mut *PLAN.unsync.get() };
         G1Collector {
             tls: 0 as *mut c_void,
-            rs: RegionAllocator::new(0 as *mut c_void, &PLAN.region_space),
+            rs: RegionAllocator::new(0 as *mut c_void, &mut unsync.region_space),
             los: LargeObjectAllocator::new(0 as *mut c_void, Some(PLAN.get_los())),
-            mark_trace: G1TraceLocal::new(TraceKind::Mark, &PLAN.mark_trace),
-            evacuate_trace: G1TraceLocal::new(TraceKind::Evacuate, &PLAN.evacuate_trace),
+            trace: multitracelocal! {
+                G1MarkTraceLocal::new(&PLAN.mark_trace),
+                G1EvacuateTraceLocal::new(&PLAN.evacuate_trace),
+                ValidateTraceLocal::<()>::new()
+            },
             last_trigger_count: 0,
             worker_ordinal: 0,
             group: None,
-            current_trace: TraceKind::Mark,
         }
     }
 
@@ -55,11 +59,13 @@ impl CollectorContext for G1Collector {
         self.tls = tls;
         self.rs.tls = tls;
         self.los.tls = tls;
-        self.mark_trace.init(tls);
-        self.evacuate_trace.init(tls);
+        self.trace.mark_trace_mut().init(tls);
+        self.trace.evacuate_trace_mut().init(tls);
+        self.trace.validate_trace_mut().init(tls);
+        self.trace.set_active(TraceKind::Mark as _);
     }
 
-    fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
+    fn alloc_copy(&mut self, _original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         match allocator {
             AllocationType::Los => self.los.alloc(bytes, align, offset),
             AllocationType::Default => self.rs.alloc(bytes, align, offset),
@@ -67,10 +73,12 @@ impl CollectorContext for G1Collector {
         }
     }
 
-    fn post_copy(&self, object: ObjectReference, rvm_type: Address, bytes: usize, allocator: ::plan::Allocator) {
+    fn post_copy(&self, object: ObjectReference, _rvm_type: Address, _bytes: usize, allocator: ::plan::Allocator) {
         clear_forwarding_bits(object);
         match allocator {
-            ::plan::Allocator::Default => {}
+            ::plan::Allocator::Default => {
+                PLAN.region_space.initialize_header(object);
+            }
             ::plan::Allocator::Los => {
                 PLAN.los.initialize_header(object, false);
             }
@@ -97,8 +105,8 @@ impl CollectorContext for G1Collector {
         }
         match phase {
             &Phase::FlushCollector => {
-                self.mark_trace.process_roots();
-                self.mark_trace.flush();
+                self.trace.process_roots();
+                self.trace.mark_trace_mut().flush();
             }
             &Phase::StackRoots => {
                 trace!("Computing thread roots");
@@ -112,9 +120,16 @@ impl CollectorContext for G1Collector {
                 let trace = self.get_current_trace();
                 VMScanning::compute_global_roots(trace, tls);
                 VMScanning::compute_static_roots(trace, tls);
-                if super::g1::SCAN_BOOT_IMAGE {
-                    VMScanning::compute_bootimage_roots(trace, tls);
+                VMScanning::compute_bootimage_roots(trace, tls);
+            }
+            &Phase::RemSetRoots => {
+                debug_assert!(super::USE_REMEMBERED_SETS);
+                debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
+                if primary {
+                    // super::concurrent_refine::collector_refine_all_dirty_cards();
+                    PLAN.region_space.iterate_tospace_remset_roots(self.get_current_trace());
                 }
+                self.rendezvous();
             }
             &Phase::SoftRefs => {
                 if primary {
@@ -150,38 +165,66 @@ impl CollectorContext for G1Collector {
                 }
             }
             &Phase::Complete => {
-                debug_assert!(self.mark_trace.is_empty());
-                debug_assert!(self.evacuate_trace.is_empty());
+                debug_assert!(self.trace.mark_trace().is_empty());
+                debug_assert!(self.trace.evacuate_trace().is_empty());
             }
             &Phase::Prepare => {
-                self.current_trace = TraceKind::Mark;
+                self.trace.set_active(TraceKind::Mark as _);
+                debug_assert!(self.trace.activated_trace() == TraceKind::Mark);
                 self.rs.reset()
             }
             &Phase::Closure => {
-                self.mark_trace.complete_trace();
-                debug_assert!(self.mark_trace.is_empty());
+                self.trace.complete_trace();
             }
             &Phase::FinalClosure => {
-                self.mark_trace.complete_trace();
-                debug_assert!(self.mark_trace.is_empty());
+                debug_assert!(self.trace.activated_trace() == TraceKind::Mark);
+                self.trace.complete_trace();
+                debug_assert!(self.trace.mark_trace().is_empty());
             }
             &Phase::Release => {
-                debug_assert!(self.mark_trace.is_empty());
-                self.mark_trace.release();
-                debug_assert!(self.mark_trace.is_empty());
+                debug_assert!(self.trace.activated_trace() == TraceKind::Mark);
+                debug_assert!(self.trace.mark_trace().is_empty());
+                self.trace.release();
+                debug_assert!(self.trace.mark_trace().is_empty());
+            }
+            &Phase::RefineCards => {
+                debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
+                if primary {
+                    super::concurrent_refine::collector_refine_all_dirty_cards();
+                }
+                self.rendezvous();
+                if cfg!(debug_assertions) && primary {
+                    cardtable::get().assert_all_cards_are_not_marked();
+                }
+                self.rendezvous();
             }
             &Phase::EvacuatePrepare => {
-                self.current_trace = TraceKind::Evacuate;
+                self.trace.set_active(TraceKind::Evacuate as _);
+                debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
                 self.rs.reset()
             }
             &Phase::EvacuateClosure => {
-                self.evacuate_trace.complete_trace();
-                debug_assert!(self.evacuate_trace.is_empty());
+                debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
+                self.trace.complete_trace();
+                debug_assert!(self.trace.evacuate_trace().is_empty());
             }
             &Phase::EvacuateRelease => {
-                debug_assert!(self.evacuate_trace.is_empty());
-                self.evacuate_trace.release();
-                debug_assert!(self.evacuate_trace.is_empty());
+                debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
+                debug_assert!(self.trace.evacuate_trace().is_empty());
+                self.trace.release();
+                debug_assert!(self.trace.evacuate_trace().is_empty());
+                
+                if cfg!(debug_assertions) && primary {
+                    cardtable::get().assert_all_cards_are_not_marked();
+                }
+                self.rendezvous();
+            }
+            &Phase::ValidatePrepare => {
+                self.trace.set_active(TraceKind::Validate as _);
+                self.rs.reset()
+            }
+            &Phase::ValidateRelease => {
+                self.trace.release();
             }
             _ => { panic!("Per-collector phase not handled") }
         }
@@ -193,10 +236,12 @@ impl CollectorContext for G1Collector {
         }
         match phase {
             &Phase::Concurrent(_) => {
+                self.trace.set_active(TraceKind::Mark as _);
+                debug_assert!(self.trace.activated_trace() == TraceKind::Mark);
                 debug_assert!(!::plan::plan::gc_in_progress());
-                while !self.mark_trace.incremental_trace(100) {
+                while !self.trace.mark_trace_mut().incremental_trace(100) {
                     if self.group.unwrap().is_aborted() {
-                      self.mark_trace.flush();
+                      self.trace.mark_trace_mut().flush();
                       break;
                     }
                 }
@@ -231,10 +276,7 @@ impl ParallelCollector for G1Collector {
     }
 
     fn get_current_trace(&mut self) -> &mut G1TraceLocal {
-        match self.current_trace {
-            TraceKind::Mark => &mut self.mark_trace,
-            TraceKind::Evacuate => &mut self.evacuate_trace,
-        }
+        &mut self.trace
     }
 
     fn collect(&self) {

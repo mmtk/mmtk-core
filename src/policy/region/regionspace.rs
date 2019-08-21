@@ -1,32 +1,28 @@
 use std::sync::Mutex;
-use std::sync::RwLock;
 use std::sync::atomic::Ordering;
-
-use ::util::heap::PageResource;
-use ::util::heap::FreeListPageResource;
-use ::util::heap::VMRequest;
-use ::util::constants::CARD_META_PAGES_PER_REGION;
-
-use ::policy::space::{Space, CommonSpace};
-use ::util::{Address, ObjectReference};
-use ::plan::TransitiveClosure;
-use ::util::forwarding_word as ForwardingWord;
-use ::vm::ObjectModel;
-use ::vm::VMObjectModel;
-use ::plan::Allocator;
+use util::heap::PageResource;
+use util::heap::FreeListPageResource;
+use util::heap::VMRequest;
+use policy::space::{Space, CommonSpace};
+use util::{Address, ObjectReference};
+use plan::TransitiveClosure;
+use plan::TraceLocal;
+use util::forwarding_word as ForwardingWord;
+use vm::ObjectModel;
+use vm::VMObjectModel;
+use plan::Allocator;
 use super::region::*;
 use util::alloc::embedded_meta_data;
 use std::cell::UnsafeCell;
-use libc::{c_void, mprotect, PROT_NONE, PROT_EXEC, PROT_WRITE, PROT_READ};
-use std::collections::HashSet;
+use libc::c_void;
 use util::conversions;
 use util::constants;
-use vm::{Memory, VMMemory};
+use vm::*;
 use util::heap::layout::Mmapper;
 use super::DEBUG;
 use plan::selected_plan::PLAN;
 use plan::plan::Plan;
-use ::util::heap::layout::heap_layout::VM_MAP;
+use util::heap::layout::heap_layout::VM_MAP;
 
 
 
@@ -35,7 +31,7 @@ type PR = FreeListPageResource<RegionSpace>;
 #[derive(Debug)]
 pub struct RegionSpace {
     common: UnsafeCell<CommonSpace<PR>>,
-    // pub regions: RwLock<HashSet<Region>>
+    pub alloc_region: (Option<Region>, Mutex<()>, usize),
 }
 
 impl Space for RegionSpace {
@@ -63,7 +59,7 @@ impl Space for RegionSpace {
         if ForwardingWord::is_forwarded_or_being_forwarded(object) {
             return true;
         }
-        Region::of(object).mark_table.is_marked(object)
+        Region::of(object).prev_mark_table().is_marked(object)
     }
 
     fn is_movable(&self) -> bool {
@@ -87,50 +83,147 @@ impl RegionSpace {
     pub fn new(name: &'static str, vmrequest: VMRequest) -> Self {
         RegionSpace {
             common: UnsafeCell::new(CommonSpace::new(name, true, false, true, vmrequest)),
+            alloc_region: (None, Mutex::new(()), 0),
             // regions: RwLock::new(HashSet::with_capacity(997)),
         }
     }
 
-    #[inline]
-    pub fn acquire_new_region(&self, tls: *mut c_void) -> Option<Region> {
-        // Allocate
-        let region = self.acquire(tls, PAGES_IN_REGION);
+    pub fn is_live_current(&self, object: ObjectReference) -> bool {
+        Region::of(object).curr_mark_table().is_marked(object)
+    }
 
-        if !region.is_zero() {
-            debug_assert!(region != embedded_meta_data::get_metadata_base(region));
-            if DEBUG {
-                println!("Alloc {:?} in chunk {:?}", region, embedded_meta_data::get_metadata_base(region));
-            }
-            // VMMemory::zero(region, BYTES_IN_REGION);
-            let mut region = Region(region);
-            // region.clear();
-            region.committed = true;
-            // let mut regions = self.regions.write().unwrap();
-            // regions.insert(region);
-            Some(region)
+    pub fn initialize_header(&self, object: ObjectReference) {
+        Region::of(object).prev_mark_table().mark(object, false);
+    }
+
+    #[inline]
+    fn refill_fast_once(region: Option<Region>, size: usize) -> Option<Address> {
+        if let Some(alloc_region) = region {
+            alloc_region.allocate_par(size)
         } else {
             None
+        }
+    }
+
+    #[inline]
+    pub fn refill(&mut self, tls: *mut c_void, size: usize) -> Option<Address> {
+        debug_assert!(self.alloc_region.2 != tls as usize);
+        debug_assert!(size < BYTES_IN_REGION, "Size too large {}", size);
+        if let Some(a) = Self::refill_fast_once(self.alloc_region.0, size) {
+            return Some(a);
+        }
+        // Slow path
+        let result = self.refill_slow(tls, size);
+        if result.is_none() {
+            VMCollection::block_for_gc(tls);
+        }
+        result
+    }
+
+    #[inline(never)]
+    fn refill_slow(&mut self, tls: *mut c_void, size: usize) -> Option<Address> {
+        debug_assert!(self.alloc_region.2 != tls as usize);
+        let _alloc_region = self.alloc_region.1.lock().unwrap();
+        self.alloc_region.2 = tls as _;
+        // Try again
+        if let Some(a) = Self::refill_fast_once(self.alloc_region.0, size) {
+            self.alloc_region.2 = 0;
+            return Some(a);
+        }
+        // Acquire new region
+        match self.acquire_with_lock(tls, PAGES_IN_REGION) {
+            Some(region) => {
+                let region = Region::new(region);
+                let result = region.allocate(size).unwrap();
+                self.alloc_region.0 = Some(region);
+                self.alloc_region.2 = 0;
+                Some(result)
+            }
+            None => {
+                self.alloc_region.2 = 0;
+                None
+            },
+        }
+    }
+
+    fn acquire_with_lock(&self, tls: *mut c_void, pages: usize) -> Option<Address> {
+        let allow_poll = unsafe { VMActivePlan::is_mutator(tls) } && PLAN.is_initialized();
+
+        let pr = self.common().pr.as_ref().unwrap();
+        let pages_reserved = pr.reserve_pages(pages);
+
+        // FIXME: Possibly unnecessary borrow-checker fighting
+        let me = unsafe { &*(self as *const Self) };
+
+        trace!("Polling ..");
+
+        if allow_poll && VMActivePlan::global().poll::<PR>(false, me) {
+            trace!("Collection required");
+            pr.clear_request(pages_reserved);
+            None
+        } else {
+            trace!("Collection not required");
+            let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, tls);
+            if rtn.is_zero() {
+                if !allow_poll {
+                    panic!("Physical allocation failed when polling not allowed!");
+                }
+                let gc_performed = VMActivePlan::global().poll::<PR>(true, me);
+                debug_assert!(gc_performed, "GC not performed when forced.");
+                pr.clear_request(pages_reserved);
+                None
+            } else {
+                Some(rtn)
+            }
+        }
+    }
+
+    pub fn swap_mark_tables(&self) {
+        for mut region in self.regions() {
+            region.swap_mark_tables();
+        }
+    }
+
+    pub fn clear_next_mark_tables(&self) {
+        for mut region in self.regions() {
+            region.clear_next_mark_table();
         }
     }
 
     pub fn prepare(&mut self) {
         // let regions = self.regions.read().unwrap();
         // println!("RegionSpace prepare");
+        {
+            // let mut alloc_region = self.alloc_region.write().unwrap();
+            self.alloc_region.0 = None;
+        }
         for region in self.regions() {
-            region.clone().mark_table.clear();
             region.live_size.store(0, Ordering::Relaxed);
         }
         // println!("RegionSpace prepare done");
     }
 
+    // pub fn assert_all_live_objects_are_forwarded(&mut self) {
+
+    // }
+    
     pub fn release(&mut self) {
+        {
+            // let mut alloc_region = self.alloc_region.write().unwrap();
+            self.alloc_region.0 = None;
+        }
         // Cleanup regions
-        let me = unsafe { &mut *(self as *mut Self) };
+        // let me = unsafe { &mut *(self as *mut Self) };
         // for region in self.regions() {
         //     if region.relocate {
         //         me.release_region(region);
         //     }
         // }
+        for mut region in self.regions() {
+            if !region.relocate {
+                region.remset.clear_cards_in_collection_set();
+            }
+        }
         let mut to_be_released = {
             let mut to_be_released = vec![];
             for region in self.regions() {
@@ -142,25 +235,18 @@ impl RegionSpace {
         };
         // regions.retain(|&r| !r.relocate);
         for region in &mut to_be_released {
-            if DEBUG {
-                println!("Release {:?}", region);
-            }
-            region.clear();
-            me.pr.as_mut().unwrap().release_pages(region.0);
+            self.release_region(*region);
         }
     }
 
-    fn release_region(&mut self, mut region: Region) {
-        if DEBUG {
-            println!("Release {:?}", region);
-        }
-        region.clear();
+    fn release_region(&mut self, region: Region) {
+        region.release();
         self.pr.as_mut().unwrap().release_pages(region.0);
     }
 
     #[inline]
     fn test_and_mark(object: ObjectReference, region: Region) -> bool {
-        region.mark_table.test_and_mark(object)
+        region.curr_mark_table().mark(object, true)
     }
 
     #[inline]
@@ -203,7 +289,7 @@ impl RegionSpace {
         let avail_regions = (available_pages >> embedded_meta_data::LOG_PAGES_IN_REGION) * REGIONS_IN_CHUNK;
         let mut available_size = avail_regions << LOG_BYTES_IN_REGION;
 
-        for mut region in regions {
+        for region in regions {
             let meta = region.metadata();
             let live_size = meta.live_size.load(Ordering::Relaxed);
             if live_size <= MAX_LIVE_SIZE && live_size < available_size {
@@ -214,21 +300,27 @@ impl RegionSpace {
                 available_size -= live_size;
             }
         }
-        
-        // let mut collection_set = regions.drain_filter(|r| r.live_size.load(Ordering::Relaxed) < max_live_size).collect::<Vec<_>>();
-        // for region in &mut collection_set {
-        //     if DEBUG {
-        //         println!("Relocate {:?}", region);
-        //     }
-        //     region.relocate = true;
-        // }
-        // debug_assert!(regions.iter().all(|&r| r.live_size.load(Ordering::Relaxed) >= max_live_size));
-        // debug_assert!(collection_set.iter().all(|&r| r.live_size.load(Ordering::Relaxed) < max_live_size));
-        // collection_set
+    }
+    
+    pub fn iterate_tospace_remset_roots<T: TraceLocal>(&self, trace: &T) {
+        for region in self.regions() {
+            if region.relocate {
+                region.remset.iterate(|card| {
+                    // println!("Scan card eva {:?}", card.0);
+                    card.linear_scan(|obj| {
+                        if PLAN.versatile_space.in_space(obj) && !PLAN.versatile_space.is_marked(obj) {
+                            return
+                        }
+                        let trace: &mut T = unsafe { &mut *(trace as *const _ as usize as *mut T) };
+                        trace.process_node(obj);
+                    })
+                })
+            }
+        }
     }
 
     #[inline]
-    fn regions(&self) -> RegionIterator {
+    pub fn regions(&self) -> RegionIterator {
         debug_assert!(!self.contiguous);
         let start = self.head_discontiguous_region;
         let chunks = VM_MAP.get_contiguous_region_chunks(start);
@@ -254,7 +346,7 @@ impl ::std::ops::DerefMut for RegionSpace {
     }
 }
 
-struct RegionIterator {
+pub struct RegionIterator {
     space: &'static RegionSpace,
     contingous_chunks: (Address, Address), // (Start, Limit)
     cursor: Address,

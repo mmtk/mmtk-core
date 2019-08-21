@@ -1,33 +1,14 @@
-use ::util::{Address, ObjectReference};
-use super::allocator::{align_allocation_no_fill, fill_alignment_gap, MIN_ALIGNMENT};
-
+use ::util::Address;
+use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
 use ::util::alloc::Allocator;
-use ::util::heap::{PageResource, FreeListPageResource};
-use ::util::alloc::linear_scan::LinearScan;
-use ::util::alloc::dump_linear_scan::DumpLinearScan;
-use policy::regionspace::*;
-
-use ::vm::ObjectModel;
-use ::vm::VMObjectModel;
-
-use std::marker::PhantomData;
-
-use libc::{memset, c_void};
-
-use ::policy::space::Space;
-use util::conversions::bytes_to_pages;
-use ::util::constants::BYTES_IN_ADDRESS;
-
-
-const BYTES_IN_PAGE: usize = 1 << 12;
-const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
-const BLOCK_MASK: usize = BLOCK_SIZE - 1;
-
-const REGION_LIMIT_OFFSET: isize = 0;
-const NEXT_REGION_OFFSET: isize = REGION_LIMIT_OFFSET + BYTES_IN_ADDRESS as isize;
-const DATA_END_OFFSET: isize = NEXT_REGION_OFFSET + BYTES_IN_ADDRESS as isize;
+use ::util::heap::FreeListPageResource;
+use policy::region::*;
+use libc::c_void;
 
 type PR = FreeListPageResource<RegionSpace>;
+
+const MIN_TLAB_SIZE: usize = 2 * 1024;
+const MAX_TLAB_SIZE: usize = ::plan::SelectedConstraints::MAX_NON_LOS_COPY_BYTES;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -35,19 +16,34 @@ pub struct RegionAllocator {
     pub tls: *mut c_void,
     cursor: Address,
     limit: Address,
-    pub space: &'static RegionSpace,
+    pub space: &'static mut RegionSpace,
+    refills: usize,
+    tlab_size: usize,
 }
 
 impl RegionAllocator {
+    pub fn adjust_tlab_size(&mut self) {
+        let factor = self.refills as f32 / 50f32;
+        self.tlab_size = (self.tlab_size as f32 * factor) as usize;
+        if self.tlab_size < MIN_TLAB_SIZE {
+            self.tlab_size = MIN_TLAB_SIZE;
+        } else if self.tlab_size > MAX_TLAB_SIZE {
+            self.tlab_size = MAX_TLAB_SIZE;
+        }
+        self.refills = 0;
+    }
+
     pub fn reset(&mut self) {
+        self.retire_tlab();
         self.cursor = unsafe { Address::zero() };
         self.limit = unsafe { Address::zero() };
+        self.refills = 0;
     }
 }
 
 impl Allocator<PR> for RegionAllocator {
     fn get_space(&self) -> Option<&'static RegionSpace> {
-        Some(self.space)
+        Some(unsafe { &*(self.space as *const _) })
     }
 
     #[inline]
@@ -70,10 +66,19 @@ impl Allocator<PR> for RegionAllocator {
     fn alloc_slow_once(&mut self, bytes: usize, align: usize, offset: isize) -> Address {
         trace!("alloc_slow");
         debug_assert!(bytes <= BYTES_IN_REGION);
-        match self.space.acquire_new_region(self.tls) {
-            Some(region) => {
-                self.cursor = region.0;
-                self.limit = self.cursor + BYTES_IN_REGION;
+        let mut size = if bytes > self.tlab_size { bytes } else { self.tlab_size };
+        let mut tlabs = size / MIN_TLAB_SIZE;
+        if tlabs * MIN_TLAB_SIZE < size {
+            tlabs += 1;
+        }
+        size = tlabs * MIN_TLAB_SIZE;
+        debug_assert!(size > bytes);
+        match self.space.refill(self.tls, size) {
+            Some(tlab) => {
+                self.refills += 1;
+                self.retire_tlab();
+                self.cursor = tlab;
+                self.limit = self.cursor + size;
                 self.alloc(bytes, align, offset)
             },
             None => unsafe { Address::zero() },
@@ -86,12 +91,22 @@ impl Allocator<PR> for RegionAllocator {
 }
 
 impl RegionAllocator {
-    pub fn new(tls: *mut c_void, space: &'static RegionSpace) -> Self {
+    pub fn new(tls: *mut c_void, space: &'static mut RegionSpace) -> Self {
         RegionAllocator {
             tls,
             cursor: unsafe { Address::zero() },
             limit: unsafe { Address::zero() },
             space,
+            tlab_size: (MIN_TLAB_SIZE + MAX_TLAB_SIZE) / 2,
+            refills: 0,
         }
+    }
+
+    fn retire_tlab(&self) {
+        let (cursor, end) = (self.cursor, self.limit);
+        if cursor.is_zero() || end.is_zero() {
+            return;
+        }
+        fill_alignment_gap(cursor, end);
     }
 }

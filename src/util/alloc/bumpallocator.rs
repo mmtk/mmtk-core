@@ -15,7 +15,8 @@ use libc::{memset, c_void};
 
 use ::policy::space::Space;
 use util::conversions::bytes_to_pages;
-use ::util::constants::BYTES_IN_ADDRESS;
+use util::constants::*;
+use util::alloc::embedded_meta_data;
 
 
 const BYTES_IN_PAGE: usize = 1 << 12;
@@ -32,16 +33,22 @@ pub struct BumpAllocator<PR: PageResource> {
     pub tls: *mut c_void,
     cursor: Address,
     limit: Address,
-    space: Option<&'static PR::Space>
+    space: Option<&'static PR::Space>,
 }
 
 impl<PR: PageResource> BumpAllocator<PR> {
     pub fn set_limit(&mut self, cursor: Address, limit: Address) {
+        if !self.cursor.is_zero() && !self.limit.is_zero() {
+            fill_alignment_gap(self.cursor, self.limit);
+        }
         self.cursor = cursor;
         self.limit = limit;
     }
 
     pub fn reset(&mut self) {
+        if !self.cursor.is_zero() && !self.limit.is_zero() {
+            fill_alignment_gap(self.cursor, self.limit);
+        }
         self.cursor = unsafe { Address::zero() };
         self.limit = unsafe { Address::zero() };
     }
@@ -119,14 +126,22 @@ impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
         trace!("alloc_slow");
         // TODO: internalLimit etc.
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start: Address = self.space.unwrap().acquire(self.tls,
-                                                                  bytes_to_pages(block_size));
+        let mut acquired_start: Address = self.space.unwrap().acquire(self.tls, bytes_to_pages(block_size));
+        
         if acquired_start.is_zero() {
             trace!("Failed to acquire a new block");
             acquired_start
         } else {
             trace!("Acquired a new block of size {} with start address {}",
                    block_size, acquired_start);
+            if acquired_start == embedded_meta_data::get_metadata_base(acquired_start) {
+                // New block
+                acquired_start += self.space.unwrap().common().pr.as_ref().unwrap().meta_data_pages_per_region() << LOG_BYTES_IN_PAGE;
+            }
+            if SUPPORT_CARD_SCANNING {
+                let card = get_card(acquired_start);
+                self.create_card_anchor(card, acquired_start, block_size);
+            }
             self.set_limit(acquired_start, acquired_start + block_size);
             self.alloc(size, align, offset)
         }
@@ -144,6 +159,52 @@ impl<PR: PageResource> BumpAllocator<PR> {
             cursor: unsafe { Address::zero() },
             limit: unsafe { Address::zero() },
             space,
+        }
+    }
+
+    fn create_card_anchor(&self, mut card: Address, start: Address, bytes: usize) {
+        let mut bytes = bytes as isize;
+        while bytes > 0 {
+            unsafe { get_card_metadata(card).store(start) };
+            card = card + (1usize << LOG_CARD_BYTES);
+            bytes -= 1 << LOG_CARD_BYTES;
+        }
+    }
+}
+
+pub fn get_card_metadata(card: Address) -> Address {
+    let metadata = embedded_meta_data::get_metadata_base(card);
+    let offset = embedded_meta_data::get_metadata_offset(card, LOG_CARD_BYTES - LOG_CARD_META_SIZE, LOG_CARD_META_SIZE);
+    debug_assert!(offset == (offset & !(BYTES_IN_WORD - 1)));
+    metadata + offset
+}
+
+pub fn get_card(card: Address) -> Address {
+    unsafe { Address::from_usize(card.as_usize() & !CARD_MASK) }
+}
+
+pub fn linear_scan<F: Fn(ObjectReference)>(card: Address, _limit: Address, f: F) {
+    debug_assert!(card == get_card(card));
+    let mut cursor = unsafe { get_card_metadata(card).load::<Address>() };
+    if cursor.is_zero() {
+        return
+    }
+    let limit = card + (1usize << LOG_CARD_BYTES);
+    let mut should_update_anchor = cursor < card;
+    
+    while cursor < limit {
+        if should_update_anchor && cursor >= card {
+            should_update_anchor = false;
+            unsafe { get_card_metadata(card).store(cursor) };
+        }
+        let object = unsafe { VMObjectModel::get_object_from_start_address(cursor) };
+        if VMObjectModel::object_start_ref(object) >= limit {
+            break;
+        }
+        cursor = VMObjectModel::get_object_end_address(object);
+        let obj_start = VMObjectModel::object_start_ref(object);
+        if obj_start >= card && obj_start < limit {
+            f(object);
         }
     }
 }

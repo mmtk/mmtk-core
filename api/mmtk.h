@@ -35,6 +35,7 @@ extern void object_reference_non_heap_write_slow(MMTk_Mutator mutator, void* slo
 extern void* object_reference_non_heap_read_slow(MMTk_Mutator mutator, void* slot);
 
 extern void deinit_mutator(MMTk_Mutator mutator);
+extern void report_fake_tib(void* tib);
 extern void flush(MMTk_Mutator mutator);
 extern void flush_remembered_sets(MMTk_Mutator mutator);
 

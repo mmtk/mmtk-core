@@ -59,6 +59,10 @@ pub enum MonotonePageResourceConditional {
 impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResource<S> {
     type Space = S;
 
+    fn meta_data_pages_per_region(&self) -> usize {
+        self.meta_data_pages_per_region
+    }
+
     fn common(&self) -> &CommonPageResource<Self> {
         &self.common
     }

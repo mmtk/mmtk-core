@@ -37,7 +37,7 @@ pub struct SSTraceLocal {
 }
 
 impl TransitiveClosure for SSTraceLocal {
-    fn process_edge(&mut self, slot: Address) {
+    fn process_edge(&mut self, src: ObjectReference, slot: Address) {
         validate_slot(slot);
         let a = unsafe { ::std::mem::transmute::<Address, &AtomicUsize>(slot) };
         loop {

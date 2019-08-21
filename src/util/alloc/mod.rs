@@ -1,5 +1,5 @@
-mod bumpallocator;
-mod regionallocator;
+pub mod bumpallocator;
+pub mod regionallocator;
 pub mod allocator;
 pub mod embedded_meta_data;
 pub mod linear_scan;

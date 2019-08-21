@@ -75,6 +75,10 @@ impl <S: Space<PR = FreeListPageResource<S>>> DerefMut for FreeListPageResource<
 impl<S: Space<PR = FreeListPageResource<S>>> PageResource for FreeListPageResource<S> {
     type Space = S;
 
+    fn meta_data_pages_per_region(&self) -> usize {
+        self.meta_data_pages_per_region
+    }
+
     fn common(&self) -> &CommonPageResource<Self> {
         &self.common
     }

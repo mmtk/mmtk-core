@@ -1,15 +1,14 @@
-use policy::regionspace::RegionSpace;
+use policy::region::*;
 use policy::immortalspace::ImmortalSpace;
 use util::alloc::{BumpAllocator, RegionAllocator};
 use plan::mutator_context::MutatorContext;
 use plan::Phase;
-use plan::semispace;
 use util::{Address, ObjectReference};
 use util::alloc::Allocator;
 use plan::Allocator as AllocationType;
 use plan::plan;
-use vm::{Collection, VMCollection};
-use util::heap::{PageResource, MonotonePageResource};
+use vm::*;
+use util::heap::{MonotonePageResource};
 use plan::g1::{PLAN, DEBUG};
 use util::alloc::LargeObjectAllocator;
 use policy::largeobjectspace::LargeObjectSpace;
@@ -23,11 +22,13 @@ pub struct G1Mutator {
     los: LargeObjectAllocator,
     vs: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
     modbuf: Box<LocalQueue<'static, ObjectReference>>,
+    dirty_card_quene: Box<Vec<Card>>,
     barrier_active: usize,
+    remset: Box<LocalQueue<'static, Address>>,
 }
 
 impl MutatorContext for G1Mutator {
-    fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, _tls: *mut c_void, phase: &Phase, _primary: bool) {
         if DEBUG {
             println!("Mutator {:?}", phase);
         }
@@ -52,20 +53,38 @@ impl MutatorContext for G1Mutator {
                 self.flush_remembered_sets();
             }
             &Phase::Prepare => {
+                self.rs.adjust_tlab_size();
                 self.rs.reset();
+                self.vs.reset();
             }
             &Phase::Release => {
                 // rebind the allocation bump pointer to the appropriate semispace
                 // self.rs.rebind(Some(semispace::PLAN.tospace()));
                 self.rs.reset();
+                self.vs.reset();
+            }
+            &Phase::RefineCards => {
+                self.dirty_card_quene.clear();
             }
             &Phase::EvacuatePrepare => {
                 self.rs.reset();
+                self.vs.reset();
             }
             &Phase::EvacuateRelease => {
                 // rebind the allocation bump pointer to the appropriate semispace
                 // self.rs.rebind(Some(semispace::PLAN.tospace()));
                 self.rs.reset();
+                self.vs.reset();
+            }
+            &Phase::ValidatePrepare => {
+                self.rs.reset();
+                self.vs.reset();
+            }
+            &Phase::ValidateRelease => {
+                // rebind the allocation bump pointer to the appropriate semispace
+                // self.rs.rebind(Some(semispace::PLAN.tospace()));
+                self.rs.reset();
+                self.vs.reset();
             }
             _ => {
                 panic!("Per-mutator phase not handled!")
@@ -80,11 +99,12 @@ impl MutatorContext for G1Mutator {
                       self as *const _,
                       self.rs.get_space().unwrap() as *const _,
                       &PLAN.region_space as *const _);
-        match allocator {
-            AllocationType::Default => self.rs.alloc(size, align, offset),
-            AllocationType::Los => self.los.alloc(size, align, offset),
-            _ => self.vs.alloc(size, align, offset),
-        }
+                      unimplemented!()
+        // match allocator {
+        //     AllocationType::Default => self.rs.alloc(size, align, offset),
+        //     AllocationType::Los => self.los.alloc(size, align, offset),
+        //     _ => self.vs.alloc(size, align, offset),
+        // }
     }
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
@@ -101,10 +121,12 @@ impl MutatorContext for G1Mutator {
         }
     }
 
-    fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
+    fn post_alloc(&mut self, refer: ObjectReference, _type_refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
         debug_assert!(self.rs.get_space().unwrap() as *const _ == &PLAN.region_space as *const _);
         match allocator {
-            AllocationType::Default => {}
+            AllocationType::Default => {
+                PLAN.region_space.initialize_header(refer);
+            }
             AllocationType::Los => {
                 PLAN.los.initialize_header(refer, true);
             }
@@ -122,23 +144,31 @@ impl MutatorContext for G1Mutator {
         self.rs.tls
     }
 
-    fn object_reference_write_slow(&mut self, _src: ObjectReference, slot: Address, value: ObjectReference) {
-        debug_assert!(self.barrier_active());
-
-        let old = unsafe { slot.load::<ObjectReference>() };
-        self.check_and_enqueue_reference(old);
+    fn object_reference_write_slow(&mut self, src: ObjectReference, slot: Address, value: ObjectReference) {
+        if self.barrier_active() {
+            let old = unsafe { slot.load::<ObjectReference>() };
+            self.check_and_enqueue_reference(old);
+        }
 
         unsafe { slot.store(value) }
+
+        self.card_marking_barrier(src, slot);
     }
 
-    fn object_reference_try_compare_and_swap_slow(&mut self, _src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference) -> bool {
-        debug_assert!(self.barrier_active());
-        self.check_and_enqueue_reference(old);
-        let slot = unsafe { ::std::mem::transmute::<Address, &AtomicUsize>(slot) };
-        return slot.compare_and_swap(old.to_address().as_usize(), new.to_address().as_usize(), Ordering::Relaxed) == old.to_address().as_usize()
+    fn object_reference_try_compare_and_swap_slow(&mut self, src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference) -> bool {
+        if self.barrier_active() {
+            self.check_and_enqueue_reference(old);
+        }
+
+        let aslot = unsafe { ::std::mem::transmute::<Address, &AtomicUsize>(slot) };
+        let result = aslot.compare_and_swap(old.to_address().as_usize(), new.to_address().as_usize(), Ordering::Relaxed) == old.to_address().as_usize();
+
+        self.card_marking_barrier(src, slot);
+
+        result
     }
 
-    fn java_lang_reference_read_slow(&mut self, mut obj: ObjectReference) -> ObjectReference {
+    fn java_lang_reference_read_slow(&mut self, obj: ObjectReference) -> ObjectReference {
         debug_assert!(self.barrier_active());
         self.check_and_enqueue_reference(obj);
         obj
@@ -146,17 +176,20 @@ impl MutatorContext for G1Mutator {
 
     fn flush_remembered_sets(&mut self) {
         self.modbuf.flush();
+        self.remset.flush();
     } 
 }
 
 impl G1Mutator {
-    pub fn new(tls: *mut c_void, space: &'static RegionSpace, los: &'static LargeObjectSpace, versatile_space: &'static ImmortalSpace) -> Self {
+    pub fn new(tls: *mut c_void, space: &'static mut RegionSpace, los: &'static LargeObjectSpace, versatile_space: &'static ImmortalSpace) -> Self {
         G1Mutator {
             rs: RegionAllocator::new(tls, space),
             los: LargeObjectAllocator::new(tls, Some(los)),
             vs: BumpAllocator::new(tls, Some(versatile_space)),
             modbuf: box PLAN.modbuf_pool.spawn_local(),
+            dirty_card_quene: box Vec::with_capacity(super::DIRTY_CARD_QUEUE_SIZE),
             barrier_active: PLAN.new_barrier_active as usize,
+            remset: box PLAN.remset_pool.spawn_local(),
         }
     }
     
@@ -167,6 +200,35 @@ impl G1Mutator {
         }
     }
 
+    #[inline(always)]
+    fn card_marking_barrier(&mut self, src: ObjectReference, _slot: Address) {
+        if super::ENABLE_FULL_TRACE_EVACUATION {
+            return // we don't need remsets
+        }
+        let card = Card::of(src);
+        
+        if card.get_state() == CardState::NotDirty {
+            card.set_state(CardState::Dirty);
+            self.rs_enquene(card);
+        }
+    }
+
+    fn flush_dirty_card_queue(&mut self) {
+        let mut b = box Vec::with_capacity(super::DIRTY_CARD_QUEUE_SIZE);
+        ::std::mem::swap(&mut b, &mut self.dirty_card_quene);
+        // println!("Enqueue dirty card queue {:?}", &b as *const _);
+        super::concurrent_refine::enquene(*b);
+    }
+
+    fn rs_enquene(&mut self, card: Card) {
+        debug_assert!(self.dirty_card_quene.len() < super::DIRTY_CARD_QUEUE_SIZE);
+        self.dirty_card_quene.push(card);
+        if self.dirty_card_quene.len() == super::DIRTY_CARD_QUEUE_SIZE {
+            self.flush_dirty_card_queue()
+        }
+    }
+
+    #[inline(always)]
     fn barrier_active(&self) -> bool {
         self.barrier_active != 0
     }

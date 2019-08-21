@@ -31,7 +31,7 @@ pub struct SSTraceLocal {
 }
 
 impl TransitiveClosure for SSTraceLocal {
-    fn process_edge(&mut self, slot: Address) {
+    fn process_edge(&mut self, _src: ObjectReference, slot: Address) {
         validate_slot(slot);
         let object: ObjectReference = unsafe { slot.load() };
         let new_object = self.trace_object(object);

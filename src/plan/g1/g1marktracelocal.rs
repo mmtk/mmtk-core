@@ -1,20 +1,23 @@
-use ::plan::{TraceLocal, TransitiveClosure};
-use super::PLAN;
-use ::plan::trace::Trace;
-use ::util::{Address, ObjectReference};
-use ::util::queue::LocalQueue;
-use vm::*;
+use plan::{TraceLocal, TransitiveClosure};
+use plan::g1::PLAN;
+use plan::trace::Trace;
+use policy::space::Space;
+use util::{Address, ObjectReference};
+use util::queue::LocalQueue;
+use vm::Scanning;
+use vm::VMScanning;
 use libc::c_void;
+use policy::region::*;
 
-pub struct NoGCTraceLocal {
+pub struct G1MarkTraceLocal {
     tls: *mut c_void,
     values: LocalQueue<'static, ObjectReference>,
     root_locations: LocalQueue<'static, Address>,
     pub modbuf: LocalQueue<'static, ObjectReference>,
 }
 
-impl TransitiveClosure for NoGCTraceLocal {
-    fn process_edge(&mut self, src: ObjectReference, slot: Address) {
+impl TransitiveClosure for G1MarkTraceLocal {
+    fn process_edge(&mut self, _src: ObjectReference, slot: Address) {
         let object: ObjectReference = unsafe { slot.load() };
         let new_object = self.trace_object(object);
         if self.overwrite_reference_during_trace() {
@@ -27,7 +30,19 @@ impl TransitiveClosure for NoGCTraceLocal {
     }
 }
 
-impl TraceLocal for NoGCTraceLocal {
+impl TraceLocal for G1MarkTraceLocal {
+    fn process_remembered_sets(&mut self) {
+        while let Some(obj) = self.modbuf.dequeue() {
+            if ::util::header_byte::attempt_log(obj) {
+                self.trace_object(obj);
+            }
+        }
+    }
+
+    fn overwrite_reference_during_trace(&self) -> bool {
+        false
+    }
+
     fn process_roots(&mut self) {
         while let Some(slot) = self.root_locations.dequeue() {
             self.process_root_edge(slot, true)
@@ -45,15 +60,19 @@ impl TraceLocal for NoGCTraceLocal {
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
-            return object;
+            object
+        } else if PLAN.region_space.in_space(object) {
+            debug_assert!(Region::of(object).committed);
+            PLAN.region_space.trace_mark_object(self, object)
+        } else if PLAN.versatile_space.in_space(object) {
+            PLAN.versatile_space.trace_object(self, object)
+        } else if PLAN.los.in_space(object) {
+            PLAN.los.trace_object(self, object)
+        } else if PLAN.vm_space.in_space(object) {
+            PLAN.vm_space.trace_object(self, object)
+        } else {
+            unreachable!("{:?}", object)
         }
-
-        let mark_slot = object.to_address() + (VMObjectModel::GC_HEADER_OFFSET() + 2isize);
-        if unsafe { mark_slot.load::<u16>() } != PLAN.mark_state {
-            unsafe { mark_slot.store(PLAN.mark_state as u16) };
-            self.process_node(object)
-        }
-        return object
     }
 
     fn complete_trace(&mut self) {
@@ -93,35 +112,35 @@ impl TraceLocal for NoGCTraceLocal {
     }
 
     fn will_not_move_in_current_collection(&self, _obj: ObjectReference) -> bool {
-        return true;
+        true
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        return !object.is_null();
-    }
-
-    fn process_remembered_sets(&mut self) {
-        while let Some(obj) = self.modbuf.dequeue() {
-            self.trace_object(obj);
+        if object.is_null() {
+            return false;
+        } else if PLAN.region_space.in_space(object) {
+            PLAN.region_space.is_live_current(object)
+        } else if PLAN.versatile_space.in_space(object) {
+            true
+        } else if PLAN.los.in_space(object) {
+            PLAN.los.is_live(object)
+        } else if PLAN.vm_space.in_space(object) {
+            true
+        } else {
+            unreachable!()
         }
     }
 }
 
-impl NoGCTraceLocal {
+impl G1MarkTraceLocal {
     pub fn new(trace: &'static Trace) -> Self {
-        NoGCTraceLocal {
+        Self {
             tls: 0 as *mut c_void,
             values: trace.values.spawn_local(),
             root_locations: trace.root_locations.spawn_local(),
-            modbuf: PLAN.modbuf_pool.spawn_local()
+            modbuf: PLAN.modbuf_pool.spawn_local(),
         }
     }
-
-    pub fn flush(&mut self) {
-        self.values.flush();
-        self.root_locations.flush();
-    }
-
 
     pub fn init(&mut self, tls: *mut c_void) {
         self.tls = tls;
@@ -129,6 +148,11 @@ impl NoGCTraceLocal {
 
     pub fn is_empty(&self) -> bool {
         self.root_locations.is_empty() && self.values.is_empty()
+    }
+    
+    pub fn flush(&mut self) {
+        self.values.flush();
+        self.root_locations.flush();
     }
 
     pub fn incremental_trace(&mut self, work_limit: usize) -> bool {
@@ -142,5 +166,4 @@ impl NoGCTraceLocal {
         }
         return self.values.is_empty();
     }
-
 }

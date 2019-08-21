@@ -58,9 +58,11 @@ pub enum Phase {
     SanityRelease,
     // G1 phases
     CollectionSetSelection,
+    RemSetRoots,
     EvacuatePrepare,
     EvacuateClosure,
     EvacuateRelease,
+    RefineCards,
     // Validation phases
     ValidatePlaceholder,
     ValidatePrepare,

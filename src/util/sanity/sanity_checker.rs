@@ -57,7 +57,7 @@ impl SanityChecker {
 }
 
 impl TransitiveClosure for SanityChecker{
-    fn process_edge(&mut self, slot: Address) {
+    fn process_edge(&mut self, _src: ObjectReference, slot: Address) {
         trace!("process_edge({:?})", slot);
         let object: ObjectReference = unsafe { slot.load() };
         let new_object = self.trace_object(object);

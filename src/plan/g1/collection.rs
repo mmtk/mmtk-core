@@ -16,7 +16,7 @@ lazy_static! {
         )),
         (phase::Schedule::Global,     phase::Phase::ClearBarrierActive),
         (phase::Schedule::Mutator,    phase::Phase::ClearBarrierActive),
-        (phase::Schedule::Mutator,  phase::Phase::FinalClosure),
+        (phase::Schedule::Mutator,    phase::Phase::FinalClosure),
         (phase::Schedule::Collector,  phase::Phase::FinalClosure),
     ], 0);
 
@@ -45,10 +45,14 @@ lazy_static! {
         (phase::Schedule::Collector, phase::Phase::PhantomRefs)
     ], 0);
 
-    static ref EVACUATE_PHASE: phase::Phase = phase::Phase::Complex(vec![
+    static ref FULL_TRACE_EVACUATE_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Mutator,   phase::Phase::EvacuatePrepare),
         (phase::Schedule::Global,    phase::Phase::EvacuatePrepare),
         (phase::Schedule::Collector, phase::Phase::EvacuatePrepare),
+        
+        (phase::Schedule::Mutator,   phase::Phase::RefineCards),
+        (phase::Schedule::Global,    phase::Phase::RefineCards),
+        (phase::Schedule::Collector, phase::Phase::RefineCards),
         // Roots
         (phase::Schedule::Complex,   plan::PREPARE_STACKS.clone()),
         (phase::Schedule::Collector, phase::Phase::StackRoots),
@@ -72,13 +76,59 @@ lazy_static! {
         (phase::Schedule::Collector, phase::Phase::EvacuateRelease),
     ], 0);
 
+    static ref REMSET_EVACUATE_PHASE: phase::Phase = phase::Phase::Complex(vec![
+        (phase::Schedule::Mutator,   phase::Phase::EvacuatePrepare),
+        (phase::Schedule::Global,    phase::Phase::EvacuatePrepare),
+        (phase::Schedule::Collector, phase::Phase::EvacuatePrepare),
+        
+        (phase::Schedule::Mutator,   phase::Phase::RefineCards),
+        (phase::Schedule::Global,    phase::Phase::RefineCards),
+        (phase::Schedule::Collector, phase::Phase::RefineCards),
+        // Roots
+        (phase::Schedule::Complex,   plan::PREPARE_STACKS.clone()),
+        (phase::Schedule::Collector, phase::Phase::StackRoots),
+        (phase::Schedule::Global,    phase::Phase::StackRoots),
+        (phase::Schedule::Collector, phase::Phase::RemSetRoots),
+        (phase::Schedule::Collector, phase::Phase::Roots),
+        (phase::Schedule::Global,    phase::Phase::Roots),
+        (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
+        // Refs
+        (phase::Schedule::Collector, phase::Phase::SoftRefs),
+        (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::WeakRefs),
+        (phase::Schedule::Collector, phase::Phase::Finalizable),
+        (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::PhantomRefs),
+        
+        (phase::Schedule::Mutator,   phase::Phase::RefineCards),
+        (phase::Schedule::Global,    phase::Phase::RefineCards),
+        (phase::Schedule::Collector, phase::Phase::RefineCards),
+        (phase::Schedule::Collector, phase::Phase::RemSetRoots),
+        (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
+
+        (phase::Schedule::Mutator,   phase::Phase::EvacuateRelease),
+        (phase::Schedule::Global,    phase::Phase::EvacuateRelease),
+        (phase::Schedule::Collector, phase::Phase::EvacuateRelease),
+    ], 0);
+
     pub static ref COLLECTION: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Complex, plan::INIT_PHASE.clone()),
         (phase::Schedule::Complex, ROOT_CLOSURE_PHASE.clone()),
         (phase::Schedule::Complex, REF_TYPE_CLOSURE_PHASE.clone()),
         (phase::Schedule::Complex, plan::COMPLETE_CLOSURE_PHASE.clone()),
         (phase::Schedule::Global,  phase::Phase::CollectionSetSelection),
-        (phase::Schedule::Complex, EVACUATE_PHASE.clone()),
+        (phase::Schedule::Complex, {
+            if super::ENABLE_FULL_TRACE_EVACUATION {
+                FULL_TRACE_EVACUATE_PHASE.clone()
+            } else {
+                REMSET_EVACUATE_PHASE.clone()
+            }
+        }),
+        super::validate::schedule_validation_phase(),
         (phase::Schedule::Complex, plan::FINISH_PHASE.clone()),
     ], 0);
 }

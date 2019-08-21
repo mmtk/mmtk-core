@@ -26,6 +26,8 @@ use std::sync::atomic::{AtomicUsize, AtomicU8, Ordering};
 use plan::mutator_context::MutatorContext;
 use plan::selected_plan::SelectedConstraints::MAX_NON_LOS_COPY_BYTES;
 use plan::selected_plan::SelectedPlan;
+use std::sync::Mutex;
+use std::collections::HashSet;
 
 /** Should we gather stats on hash code state transitions for address-based hashing? */
 const HASH_STATS: bool = false;
@@ -44,6 +46,28 @@ const PACKED: bool = true;
 // Compiler optimizations and compiler/hardware reordering will affect the correctness of the
 // emitted code.
 // This is perhaps more serious with Rust release build or on machines with weaker memory models.
+
+lazy_static! {
+    static ref FAKE_TIBS: Mutex<HashSet<Address>> = Mutex::new(HashSet::new());
+}
+
+static mut FAKE_TIBS_REF: *const HashSet<Address> = 0 as _;
+
+pub fn report_fake_tib(a: Address) {
+    let mut set = FAKE_TIBS.lock().unwrap();
+    set.insert(a);
+}
+
+fn is_fake_tib(a: Address) -> bool {
+    unsafe {
+        if FAKE_TIBS_REF == 0 as _ {
+            let set = FAKE_TIBS.lock().unwrap();
+            FAKE_TIBS_REF = (&set as &HashSet<Address>) as *const HashSet<Address>;
+        }
+        let set = &*FAKE_TIBS_REF;
+        set.contains(&a)
+    }
+}
 
 pub struct VMObjectModel {}
 
@@ -206,17 +230,24 @@ impl ObjectModel for VMObjectModel {
         trace!("ObjectModel.get_object_end_address");
         unsafe {
             let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
+            let is_fake_tib = is_fake_tib(tib);
+            debug_assert!(!tib.is_zero(), "object {:?}", object);
+            debug_assert!(tib.as_usize() != 0xdeadbeef);
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
-
-            let mut size = if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
-                (rvm_type + INSTANCE_SIZE_FIELD_OFFSET).load::<usize>()
-            } else {
-                let num_elements = Self::get_array_length(object);
-                ARRAY_HEADER_SIZE
-                    + (num_elements << (rvm_type + LOG_ELEMENT_SIZE_FIELD_OFFSET).load::<usize>())
+            debug_assert!(!rvm_type.is_zero());
+            let mut size = {
+                if is_fake_tib {
+                    let num_elements = Self::get_array_length(object);
+                    ARRAY_HEADER_SIZE + (num_elements << LOG_BYTES_IN_WORD)
+                } else if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
+                    (rvm_type + INSTANCE_SIZE_FIELD_OFFSET).load::<usize>()
+                } else {
+                    let num_elements = Self::get_array_length(object);
+                    ARRAY_HEADER_SIZE + (num_elements << (rvm_type + LOG_ELEMENT_SIZE_FIELD_OFFSET).load::<usize>())
+                }
             };
-
+            
             if ADDRESS_BASED_HASHING && DYNAMIC_HASH_OFFSET {
                 let hash_state = (object.to_address() + STATUS_OFFSET).load::<usize>()
                     & HASH_STATE_MASK;

@@ -89,6 +89,12 @@ impl ImmortalSpace {
         return true;
     }
 
+    pub fn is_marked(&self, object: ObjectReference) -> bool {
+        let old_value = VMObjectModel::prepare_available_bits(object);
+        let mark_bit = (old_value as u8) & GC_MARK_BIT_MASK;
+        mark_bit == self.mark_state
+    }
+
     pub fn trace_object<T: TransitiveClosure>(
         &self,
         trace: &mut T,

@@ -175,6 +175,17 @@ pub extern fn deinit_mutator(mutator: *mut c_void) {
 }
 
 #[no_mangle]
+#[cfg(feature="jikesrvm")]
+pub extern fn report_fake_tib(address: *mut c_void) {
+    ::vm::jikesrvm::object_model::report_fake_tib(Address::from_mut_ptr(address));
+}
+
+#[no_mangle]
+#[cfg(not(feature="jikesrvm"))]
+pub extern fn report_fake_tib(address: *mut c_void) {
+}
+
+#[no_mangle]
 pub extern fn flush(mutator: *mut c_void) {
     let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
     local.flush();
