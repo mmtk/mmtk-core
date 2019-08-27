@@ -7,6 +7,7 @@ use libc::c_void;
 
 type PR = FreeListPageResource<RegionSpace>;
 
+const USE_TLABS: bool = false;
 const MIN_TLAB_SIZE: usize = 2 * 1024;
 const MAX_TLAB_SIZE: usize = ::plan::SelectedConstraints::MAX_NON_LOS_COPY_BYTES;
 
@@ -23,21 +24,25 @@ pub struct RegionAllocator {
 
 impl RegionAllocator {
     pub fn adjust_tlab_size(&mut self) {
-        let factor = self.refills as f32 / 50f32;
-        self.tlab_size = (self.tlab_size as f32 * factor) as usize;
-        if self.tlab_size < MIN_TLAB_SIZE {
-            self.tlab_size = MIN_TLAB_SIZE;
-        } else if self.tlab_size > MAX_TLAB_SIZE {
-            self.tlab_size = MAX_TLAB_SIZE;
+        if USE_TLABS {
+            let factor = self.refills as f32 / 50f32;
+            self.tlab_size = (self.tlab_size as f32 * factor) as usize;
+            if self.tlab_size < MIN_TLAB_SIZE {
+                self.tlab_size = MIN_TLAB_SIZE;
+            } else if self.tlab_size > MAX_TLAB_SIZE {
+                self.tlab_size = MAX_TLAB_SIZE;
+            }
+            self.refills = 0;
         }
-        self.refills = 0;
     }
 
     pub fn reset(&mut self) {
         self.retire_tlab();
         self.cursor = unsafe { Address::zero() };
         self.limit = unsafe { Address::zero() };
-        self.refills = 0;
+        if USE_TLABS {
+            self.refills = 0;
+        }
     }
 }
 
@@ -66,22 +71,34 @@ impl Allocator<PR> for RegionAllocator {
     fn alloc_slow_once(&mut self, bytes: usize, align: usize, offset: isize) -> Address {
         trace!("alloc_slow");
         debug_assert!(bytes <= BYTES_IN_REGION);
-        let mut size = if bytes > self.tlab_size { bytes } else { self.tlab_size };
-        let mut tlabs = size / MIN_TLAB_SIZE;
-        if tlabs * MIN_TLAB_SIZE < size {
-            tlabs += 1;
-        }
-        size = tlabs * MIN_TLAB_SIZE;
-        debug_assert!(size >= bytes);
-        match self.space.refill(self.tls, size) {
-            Some(tlab) => {
-                self.refills += 1;
-                self.retire_tlab();
-                self.cursor = tlab;
-                self.limit = self.cursor + size;
-                self.alloc(bytes, align, offset)
-            },
-            None => unsafe { Address::zero() },
+        if USE_TLABS {
+            let mut size = if bytes > self.tlab_size { bytes } else { self.tlab_size };
+            let mut tlabs = size / MIN_TLAB_SIZE;
+            if tlabs * MIN_TLAB_SIZE < size {
+                tlabs += 1;
+            }
+            size = tlabs * MIN_TLAB_SIZE;
+            debug_assert!(size >= bytes);
+            match self.space.refill(self.tls, size) {
+                Some(tlab) => {
+                    self.refills += 1;
+                    self.retire_tlab();
+                    self.cursor = tlab;
+                    self.limit = self.cursor + size;
+                    self.alloc(bytes, align, offset)
+                },
+                None => unsafe { Address::zero() },
+            }
+        } else {
+            match self.space.acquire_new_region(self.tls) {
+                Some(region) => {
+                    self.cursor = region.0;
+                    self.limit = self.cursor + BYTES_IN_REGION;
+                    self.alloc(bytes, align, offset)
+                },
+                None => unsafe { Address::zero() },
+            }
+
         }
     }
 
@@ -103,10 +120,12 @@ impl RegionAllocator {
     }
 
     fn retire_tlab(&self) {
-        let (cursor, end) = (self.cursor, self.limit);
-        if cursor.is_zero() || end.is_zero() {
-            return;
+        if USE_TLABS {
+            let (cursor, end) = (self.cursor, self.limit);
+            if cursor.is_zero() || end.is_zero() {
+                return;
+            }
+            fill_alignment_gap(cursor, end);
         }
-        fill_alignment_gap(cursor, end);
     }
 }

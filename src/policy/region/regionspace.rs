@@ -186,6 +186,19 @@ impl RegionSpace {
         }
     }
 
+    pub fn acquire_new_region(&mut self, tls: *mut c_void) -> Option<Region> {
+        let address = self.acquire(tls, PAGES_IN_REGION);
+
+        if !address.is_zero() {
+            debug_assert!(address != embedded_meta_data::get_metadata_base(address));
+            let mut region = Region::new(address);
+            region.committed = true;
+            Some(region)
+        } else {
+            None
+        }
+    }
+
     pub fn swap_mark_tables(&self) {
         for mut region in self.regions() {
             region.swap_mark_tables();
