@@ -124,7 +124,7 @@ impl ReferenceProcessor {
             trace!("{:?} unforwardedReferences is {:?}", self.semantics, unforwarded_references);
         }
 
-        for i in 0 .. references.len() {
+        for i in 0 ..unforwarded_references.len() {
             let reference = unsafe { unforwarded_references[i].to_object_reference() };
             if TRACE_DETAIL { trace!("slot {:?}: forwarding {:?}", i, reference); }
             VMReferenceGlue::set_referent(reference, trace.get_forwarded_referent(

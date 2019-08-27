@@ -34,8 +34,10 @@ impl Scanning for VMScanning {
         trace!("Getting reference array");
         let elt0_ptr: usize = unsafe {
             let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
+            debug_assert!(!tib.is_zero());
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());
+            debug_assert!(!rvm_type.is_zero());
             (rvm_type + REFERENCE_OFFSETS_FIELD_OFFSET).load::<usize>()
         };
         trace!("elt0_ptr: {}", elt0_ptr);

@@ -24,7 +24,7 @@ use util::conversions::bytes_to_pages;
 use plan::plan::create_vm_space;
 use plan::plan::EMERGENCY_COLLECTION;
 use policy::region::*;
-use super::DEBUG;
+use super::VERBOSE;
 use policy::largeobjectspace::LargeObjectSpace;
 use util::queue::SharedQueue;
 
@@ -150,7 +150,7 @@ impl Plan for G1 {
     }
 
     unsafe fn collection_phase(&self, tls: *mut c_void, phase: &Phase) {
-        if DEBUG {
+        if VERBOSE {
             println!("Global {:?}", phase);
         }
         let unsync = &mut *self.unsync.get();
@@ -340,7 +340,7 @@ impl G1 {
     }
 
     fn print_vm_map(&self) {
-        if super::DEBUG {
+        if super::VERBOSE {
             self.region_space.print_vm_map();
             self.los.print_vm_map();
             self.versatile_space.print_vm_map();

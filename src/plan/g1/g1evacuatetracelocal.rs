@@ -19,21 +19,55 @@ pub struct G1EvacuateTraceLocal {
 
 impl TransitiveClosure for G1EvacuateTraceLocal {
     fn process_edge(&mut self, src: ObjectReference, slot: Address) {
+        debug_assert!(MMAPPER.address_is_mapped(slot));
         let object: ObjectReference = unsafe { slot.load() };
+        // if PLAN.region_space.in_space(object) {
+        //     if !Region::of(object).committed {
+        //         println!("Region {:?} for object {:?} is not allocated", Region::of(object), object);
+        //     }
+        //     if VMObjectModel::object_start_ref(object) >= Region::of(object).cursor {
+        //         println!("Object {:?} starting at {:?} is beyond limit {:?}", object, VMObjectModel::object_start_ref(object), Region::of(object).cursor);
+        //     }
+        //     ::vm::jikesrvm::object_model::validate_object(src, object);
+        // }
         let new_object = self.trace_object(object);
         if self.overwrite_reference_during_trace() {
             if super::USE_REMEMBERED_SETS {
                 // println!("{:?}.{:?} -> {:?}", src, slot, new_object);
                 // if new_object != object {
                     if !new_object.is_null() && PLAN.region_space.in_space(new_object) {
-                        let other_region = Region::of(new_object);
-                        if other_region != Region::of(src) {
+                        let other_region = Region::of_object(new_object);
+                        if other_region.committed && other_region != Region::of_object(src) && PLAN.region_space.is_live(new_object) {
                             // if new_object == object {
                             //     assert!(other_region.remset.contains_card(Card::of(src)))
                             // }
                             other_region.remset.add_card(Card::of(src))
                         }
                     }
+                // } else {
+                //     if !object.is_null() && PLAN.region_space.in_space(object) {
+                //         let other_region = Region::of(object);
+                //         if other_region != Region::of(src) {
+                //             use super::g1tracelocal::get_space_name;
+                //             if !other_region.remset.contains_card(Card::of(src)) {
+                //                 println!(
+                //                     "{} {} card {:?} for object {:?}, slot {:?} is not remembered by {} region {:?} {} ({:?})",
+                //                     get_space_name(src),
+                //                     if PLAN.region_space.in_space(src) {
+                //                         if Region::of(src).relocate { "reloc" } else { "x" }
+                //                     } else {
+                //                         "-"
+                //                     },
+                //                     Card::of(src).0, src, slot, get_space_name(new_object), other_region, if other_region.relocate { "reloc" } else { "-" }, object
+                //                 );
+                //                 if Card::of(src).get_state() == CardState::Dirty {
+                //                     panic!("Card {:?} is dirty", Card::of(src).0);
+                //                 } else {
+                //                     panic!("Card is clean");
+                //                 }
+                //             }
+                //         }
+                //     }
                 // }
             }
             unsafe { slot.store(new_object) };
@@ -44,6 +78,16 @@ impl TransitiveClosure for G1EvacuateTraceLocal {
         if !MMAPPER.address_is_mapped(VMObjectModel::ref_to_address(object)) {
             return
         }
+        // if PLAN.los.in_space(object) && !PLAN.los.is_live(object) {
+        //     return
+        // }
+        // if PLAN.vm_space.in_space(object) && !PLAN.vm_space.is_marked(object) {
+        //     return
+        // }
+        // if PLAN.versatile_space.in_space(object) && !PLAN.versatile_space.is_marked(object) {
+        //     return
+        // }
+        // }
         self.values.enqueue(object);
     }
 }
@@ -83,12 +127,25 @@ impl TraceLocal for G1EvacuateTraceLocal {
             if object.is_null() {
                 object
             } else if !MMAPPER.address_is_mapped(VMObjectModel::ref_to_address(object)) {
-                object
+                ObjectReference::null()
             } else if PLAN.region_space.in_space(object) {
-                if Region::of(object).committed && Region::of(object).relocate && PLAN.region_space.is_live(object) {
-                    PLAN.region_space.trace_evacuate_object(self, object, g1::ALLOC_RS, tls)
+                let region = Region::of_object(object);
+                if region.committed {
+                    if region.relocate {
+                        if PLAN.region_space.is_live(object) {
+                            PLAN.region_space.trace_evacuate_object_in_cset(self, object, g1::ALLOC_RS, tls)
+                        } else {
+                            ObjectReference::null()
+                        }
+                    } else {
+                        if PLAN.region_space.is_live(object) {
+                            object
+                        } else {
+                            ObjectReference::null()
+                        }
+                    }
                 } else {
-                    object
+                    ObjectReference::null()
                 }
             } else  {
                 object
@@ -97,7 +154,7 @@ impl TraceLocal for G1EvacuateTraceLocal {
             if object.is_null() {
                 object
             } else if PLAN.region_space.in_space(object) {
-                debug_assert!(Region::of(object).committed);
+                debug_assert!(Region::of_object(object).committed);
                 PLAN.region_space.trace_evacuate_object(self, object, g1::ALLOC_RS, tls)
             } else if PLAN.versatile_space.in_space(object) {
                 PLAN.versatile_space.trace_object(self, object)
@@ -137,7 +194,7 @@ impl TraceLocal for G1EvacuateTraceLocal {
     }
 
     fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, _root: bool) {
-        // unreachable!();
+        unreachable!();
         let interior_ref: Address = unsafe { slot.load() };
         let offset = interior_ref - target.to_address();
         let new_target = self.trace_object(target);
@@ -159,45 +216,44 @@ impl TraceLocal for G1EvacuateTraceLocal {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        //  if object.is_null() {
-        //     return false;
-        // } else if PLAN.region_space.in_space(object) {
-        //     if Region::of(object).relocate {
-        //         if ::util::forwarding_word::is_forwarded_or_being_forwarded(object) {
-        //             return true;
-        //         }
-        //         false
-        //     } else {
-        //         true//PLAN.region_space.is_live(object)
-        //     }
-        // } else if PLAN.versatile_space.in_space(object) {
-        //     true
-        // } else if PLAN.los.in_space(object) {
-        //     true//PLAN.los.is_live(object)
-        // } else if PLAN.vm_space.in_space(object) {
-        //     true
-        // } else {
-        //     unreachable!()
-        // }
-        if object.is_null() {
-            return false;
-        } else if PLAN.region_space.in_space(object) {
-            if Region::of(object).relocate {
+        if super::USE_REMEMBERED_SETS {
+            if object.is_null() {
+                return false;
+            } else if PLAN.region_space.in_space(object) {
+                if Region::of_object(object).relocate {
+                    if ::util::forwarding_word::is_forwarded_or_being_forwarded(object) {
+                        return true;
+                    }
+                    false
+                } else {
+                    PLAN.region_space.is_live_prev(object)
+                }
+            } else if PLAN.versatile_space.in_space(object) {
+                true
+            } else if PLAN.los.in_space(object) {
+                PLAN.los.is_live(object)
+            } else if PLAN.vm_space.in_space(object) {
+                true
+            } else {
+                unreachable!()
+            }
+        } else {
+            if object.is_null() {
+                return false;
+            } else if PLAN.region_space.in_space(object) {
                 if ::util::forwarding_word::is_forwarded_or_being_forwarded(object) {
                     return true;
                 }
-                false
+                PLAN.region_space.is_live_current(object)
+            } else if PLAN.versatile_space.in_space(object) {
+                true
+            } else if PLAN.los.in_space(object) {
+                PLAN.los.is_live(object)
+            } else if PLAN.vm_space.in_space(object) {
+                true
             } else {
-                PLAN.region_space.is_live(object)
+                unreachable!()
             }
-        } else if PLAN.versatile_space.in_space(object) {
-            PLAN.versatile_space.is_marked(object)
-        } else if PLAN.los.in_space(object) {
-            PLAN.los.is_live(object)
-        } else if PLAN.vm_space.in_space(object) {
-            PLAN.vm_space.is_marked(object)
-        } else {
-            unreachable!()
         }
     }
 }

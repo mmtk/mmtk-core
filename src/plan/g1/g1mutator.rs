@@ -9,7 +9,7 @@ use plan::Allocator as AllocationType;
 use plan::plan;
 use vm::*;
 use util::heap::{MonotonePageResource};
-use plan::g1::{PLAN, DEBUG};
+use plan::g1::{PLAN, VERBOSE};
 use util::alloc::LargeObjectAllocator;
 use policy::largeobjectspace::LargeObjectSpace;
 use util::queue::LocalQueue;
@@ -29,8 +29,8 @@ pub struct G1Mutator {
 
 impl MutatorContext for G1Mutator {
     fn collection_phase(&mut self, _tls: *mut c_void, phase: &Phase, _primary: bool) {
-        if DEBUG {
-            println!("Mutator {:?}", phase);
+        if VERBOSE {
+            // println!("Mutator {:?}", phase);
         }
         match phase {
             &Phase::SetBarrierActive => {
@@ -121,11 +121,12 @@ impl MutatorContext for G1Mutator {
         }
     }
 
-    fn post_alloc(&mut self, refer: ObjectReference, _type_refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
+    fn post_alloc(&mut self, refer: ObjectReference, _type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
         debug_assert!(self.rs.get_space().unwrap() as *const _ == &PLAN.region_space as *const _);
         match allocator {
             AllocationType::Default => {
-                PLAN.region_space.initialize_header(refer);
+                // println!("Alloc {:?} end {:?} {:?}", refer, VMObjectModel::object_start_ref(refer) + bytes, VMObjectModel::get_object_end_address(refer));
+                PLAN.region_space.initialize_header(refer, true);
             }
             AllocationType::Los => {
                 PLAN.los.initialize_header(refer, true);

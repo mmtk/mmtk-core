@@ -3,7 +3,7 @@ use ::plan::Allocator as AllocationType;
 use ::plan::CollectorContext;
 use ::plan::ParallelCollector;
 use ::plan::ParallelCollectorGroup;
-use ::plan::g1::{PLAN, DEBUG};
+use ::plan::g1::{PLAN, VERBOSE};
 use ::plan::TraceLocal;
 use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
@@ -77,7 +77,7 @@ impl CollectorContext for G1Collector {
         clear_forwarding_bits(object);
         match allocator {
             ::plan::Allocator::Default => {
-                PLAN.region_space.initialize_header(object);
+                PLAN.region_space.initialize_header(object, false);
             }
             ::plan::Allocator::Los => {
                 PLAN.los.initialize_header(object, false);
@@ -100,7 +100,7 @@ impl CollectorContext for G1Collector {
     }
 
     fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
-        if DEBUG {
+        if VERBOSE && primary {
             println!("Collector {:?}", phase);
         }
         match phase {
@@ -195,7 +195,11 @@ impl CollectorContext for G1Collector {
                 self.rendezvous();
                 if cfg!(debug_assertions) && primary {
                     cardtable::get().assert_all_cards_are_not_marked();
+                    // PLAN.region_space.validate_remsets();
                 }
+                // if primary {
+                //     PLAN.region_space.validate_remsets();
+                // }
                 self.rendezvous();
             }
             &Phase::EvacuatePrepare => {
@@ -231,8 +235,11 @@ impl CollectorContext for G1Collector {
     }
 
     fn concurrent_collection_phase(&mut self, phase: &Phase) {
-        if super::DEBUG {
-            println!("Concurrent {:?}", phase);
+        if super::VERBOSE {
+            if self.rendezvous() == 0 {
+                println!("Concurrent Closure");
+            }
+            self.rendezvous();
         }
         match phase {
             &Phase::Concurrent(_) => {

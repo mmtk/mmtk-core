@@ -59,7 +59,7 @@ impl Space for RegionSpace {
         if ForwardingWord::is_forwarded_or_being_forwarded(object) {
             return true;
         }
-        Region::of(object).prev_mark_table().is_marked(object)
+        Region::of_object(object).prev_mark_table().is_marked(object)
     }
 
     fn is_movable(&self) -> bool {
@@ -89,11 +89,19 @@ impl RegionSpace {
     }
 
     pub fn is_live_current(&self, object: ObjectReference) -> bool {
-        Region::of(object).curr_mark_table().is_marked(object)
+        Region::of_object(object).curr_mark_table().is_marked(object)
+    }
+    pub fn is_live_prev(&self, object: ObjectReference) -> bool {
+        Region::of_object(object).prev_mark_table().is_marked(object)
     }
 
-    pub fn initialize_header(&self, object: ObjectReference) {
-        Region::of(object).prev_mark_table().mark(object, false);
+    pub fn initialize_header(&self, object: ObjectReference, is_mutator: bool) {
+        if is_mutator {
+            Region::of_object(object).curr_mark_table().mark(object, false);
+        } else {
+            Region::of_object(object).curr_mark_table().mark(object, false);
+            Region::of_object(object).prev_mark_table().mark(object, false);
+        }
     }
 
     #[inline]
@@ -251,7 +259,7 @@ impl RegionSpace {
 
     #[inline]
     pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference) -> ObjectReference {
-        let region = Region::of(object);
+        let region = Region::of_object(object);
         debug_assert!(region.0 != ::util::alloc::embedded_meta_data::get_metadata_base(region.0), "Invalid region {:?}, object {:?}", region.0, object);
         if Self::test_and_mark(object, region) {
             region.live_size.fetch_add(VMObjectModel::get_size_when_copied(object), Ordering::Relaxed);
@@ -262,7 +270,7 @@ impl RegionSpace {
 
     #[inline]
     pub fn trace_evacuate_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
-        let region = Region::of(object);
+        let region = Region::of_object(object);
         debug_assert!(region.0 != ::util::alloc::embedded_meta_data::get_metadata_base(region.0), "Invalid region {:?}, object {:?}", region.0, object);
         if region.relocate {
             let prior_status_word = ForwardingWord::attempt_to_forward(object);
@@ -278,6 +286,22 @@ impl RegionSpace {
                 trace.process_node(object);
             }
             object
+        }
+    }
+
+    // #[inline(never)]
+    pub fn trace_evacuate_object_in_cset<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
+        let region = Region::of_object(object);
+        debug_assert!(region.0 != ::util::alloc::embedded_meta_data::get_metadata_base(region.0), "Invalid region {:?}, object {:?}", region.0, object);
+        debug_assert!(region.committed);
+        debug_assert!(region.relocate);
+        let prior_status_word = ForwardingWord::attempt_to_forward(object);
+        if ForwardingWord::state_is_forwarded_or_being_forwarded(prior_status_word) {
+            ForwardingWord::spin_and_get_forwarded_object(object, prior_status_word)
+        } else {
+            let new_object = ForwardingWord::forward_object(object, allocator, tls);
+            trace.process_node(new_object);
+            new_object
         }
     }
 
@@ -308,9 +332,9 @@ impl RegionSpace {
                 region.remset.iterate(|card| {
                     // println!("Scan card eva {:?}", card.0);
                     card.linear_scan(|obj| {
-                        if PLAN.versatile_space.in_space(obj) && !PLAN.versatile_space.is_marked(obj) {
-                            return
-                        }
+                        // if PLAN.versatile_space.in_space(obj) && !PLAN.versatile_space.is_marked(obj) {
+                        //     return
+                        // }
                         let trace: &mut T = unsafe { &mut *(trace as *const _ as usize as *mut T) };
                         trace.process_node(obj);
                     })
@@ -331,6 +355,48 @@ impl RegionSpace {
             cursor: start,
         }
     }
+
+    pub fn validate_remsets(&self) {
+        for region in self.regions() {
+            region.prev_mark_table().iterate(region.0, region.cursor, |src| {
+                scan_edge(src, |slot| {
+                    let obj = unsafe { slot.load::<ObjectReference>() };
+                    if !obj.is_null() && self.in_space(obj) && Region::of_object(obj) != region {
+                        let other_region = Region::of_object(obj);
+                        use super::*;
+                        if !other_region.remset.contains_card(Card::of(src)) {
+                            println!(
+                                "Card {:?} for <{:?}.{:?}> ({:?} {}) is not remembered by region {:?} {} ({:?})",
+                                Card::of(src).0, src, slot, region, if region.relocate { "reloc" } else { "-" },
+                                other_region, if other_region.relocate { "reloc" } else { "-" }, obj
+                            );
+                            if Card::of(src).get_state() == CardState::Dirty {
+                                panic!("Card {:?} is dirty", Card::of(src).0);
+                            } else {
+                                panic!("Card is clean");
+                            }
+                        }
+                    }
+                });
+            });
+        }
+        println!("[RemSet Validation Finished]")
+    }
+}
+
+fn scan_edge<F: Fn(Address)>(object: ObjectReference, f: F) {
+    struct ObjectFieldsClosure<F: Fn(Address)>(F);
+    impl <F: Fn(Address)> ::plan::TransitiveClosure for ObjectFieldsClosure<F> {
+        #[inline(always)]
+        fn process_edge(&mut self, _src: ObjectReference, slot: Address) {
+            (self.0)(slot)
+        }
+        fn process_node(&mut self, _object: ObjectReference) {
+            unreachable!();
+        }
+    }
+    let mut closure = ObjectFieldsClosure(f);
+    VMScanning::scan_object(&mut closure, object, 0 as _);
 }
 
 impl ::std::ops::Deref for RegionSpace {

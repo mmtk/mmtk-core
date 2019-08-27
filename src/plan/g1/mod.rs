@@ -22,12 +22,12 @@ pub use self::g1collector::G1Collector;
 pub use self::g1::SelectedPlan;
 pub use self::g1constraints as SelectedConstraints;
 
-const DEBUG: bool = false;
+const VERBOSE: bool = true;
 
 // Feature switches
 
-const ENABLE_CONCURRENT_MARKING: bool = true;
-const ENABLE_FULL_TRACE_EVACUATION: bool = false;
+const ENABLE_CONCURRENT_MARKING: bool = false;
+const ENABLE_FULL_TRACE_EVACUATION: bool = true;
 const ENABLE_GENERATIONAL_GC: bool = false;
 
 // Configs

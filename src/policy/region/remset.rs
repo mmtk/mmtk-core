@@ -9,7 +9,7 @@ use vm::*;
 
 
 pub struct RemSet {
-    prts: Option<Box<[Option<Box<PerRegionTable>>; REGIONS_IN_HEAP]>>,
+    prts: Box<[Option<Box<PerRegionTable>>; REGIONS_IN_HEAP]>,
 }
 
 
@@ -21,30 +21,11 @@ impl RemSet {
         }
     }
 
-    fn get_prts(&self) -> &[Option<Box<PerRegionTable>>; REGIONS_IN_HEAP] {
-        let entry: &AtomicPtr<[Option<Box<PerRegionTable>>; REGIONS_IN_HEAP]> = {
-            let r: &Option<Box<[Option<Box<PerRegionTable>>; REGIONS_IN_HEAP]>> = &self.prts;
-            unsafe { ::std::mem::transmute(r) }
-        };
-        let mut ptr = entry.load(Ordering::SeqCst);
-        if ptr == 0 as _ {
-            let new_prts = Box::into_raw(unsafe { ::std::mem::transmute(box [0usize; REGIONS_IN_HEAP]) });
-            let old_prts = entry.compare_and_swap(0 as _, new_prts, Ordering::SeqCst);
-            if old_prts == 0 as _ {
-                ptr = new_prts;
-            } else {
-                // Drop this array
-                let _array = unsafe { Box::from_raw(new_prts) };
-                ptr = old_prts;
-            }
-        }
-        unsafe { &*ptr }
-    }
 
     fn get_per_region_table(&self, region: Region) -> &'static PerRegionTable {
         let index = region.heap_index();
         let entry: &AtomicPtr<PerRegionTable> = {
-            let r: &Option<Box<PerRegionTable>> = &self.get_prts()[index];
+            let r: &Option<Box<PerRegionTable>> = &self.prts[index];
             debug_assert!(::std::mem::size_of::<Option<Box<PerRegionTable>>>() == ::std::mem::size_of::<AtomicPtr<PerRegionTable>>());
             unsafe { ::std::mem::transmute(r) }
         };
@@ -76,14 +57,12 @@ impl RemSet {
     }
 
     pub fn clear_cards_in_collection_set(&mut self) {
-        if let Some(prts) = self.prts.as_mut() {
-            for prt in prts.iter_mut() {
-                if prt.is_some() {
-                    if prt.as_ref().unwrap().region_in_cset() {
-                        *prt = None;
-                    } else {
-                        prt.as_ref().unwrap().clean_los_cards();
-                    }
+        for prt in self.prts.iter_mut() {
+            if prt.is_some() {
+                if prt.as_ref().unwrap().region_in_cset() {
+                    *prt = None;
+                } else {
+                    prt.as_ref().unwrap().clean_los_cards();
                 }
             }
         }
@@ -91,12 +70,10 @@ impl RemSet {
 
     #[inline(always)]
     pub fn iterate<F: Fn(Card)>(&self, f: F) {
-        if let Some(prts) = self.prts.as_ref() {
-            for prt in prts.iter() {
-                if let Some(prt) = prt {
-                    if !prt.region_in_cset() {
-                        prt.iterate(&f)
-                    }
+        for prt in self.prts.iter() {
+            if let Some(prt) = prt {
+                if !prt.region_in_cset() {
+                    prt.iterate(&f)
                 }
             }
         }

@@ -62,7 +62,7 @@ impl TraceLocal for G1MarkTraceLocal {
         if object.is_null() {
             object
         } else if PLAN.region_space.in_space(object) {
-            debug_assert!(Region::of(object).committed);
+            debug_assert!(Region::of_object(object).committed);
             PLAN.region_space.trace_mark_object(self, object)
         } else if PLAN.versatile_space.in_space(object) {
             PLAN.versatile_space.trace_object(self, object)

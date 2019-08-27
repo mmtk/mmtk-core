@@ -50,9 +50,9 @@ lazy_static! {
         (phase::Schedule::Global,    phase::Phase::EvacuatePrepare),
         (phase::Schedule::Collector, phase::Phase::EvacuatePrepare),
         
-        (phase::Schedule::Mutator,   phase::Phase::RefineCards),
-        (phase::Schedule::Global,    phase::Phase::RefineCards),
-        (phase::Schedule::Collector, phase::Phase::RefineCards),
+        // (phase::Schedule::Mutator,   phase::Phase::RefineCards),
+        // (phase::Schedule::Global,    phase::Phase::RefineCards),
+        // (phase::Schedule::Collector, phase::Phase::RefineCards),
         // Roots
         (phase::Schedule::Complex,   plan::PREPARE_STACKS.clone()),
         (phase::Schedule::Collector, phase::Phase::StackRoots),
@@ -70,6 +70,8 @@ lazy_static! {
         (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
         (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
         (phase::Schedule::Collector, phase::Phase::PhantomRefs),
+        // ForwardRefs
+        (phase::Schedule::Complex, plan::FORWARD_PHASE.clone()),
 
         (phase::Schedule::Mutator,   phase::Phase::EvacuateRelease),
         (phase::Schedule::Global,    phase::Phase::EvacuateRelease),
@@ -81,18 +83,24 @@ lazy_static! {
         (phase::Schedule::Global,    phase::Phase::EvacuatePrepare),
         (phase::Schedule::Collector, phase::Phase::EvacuatePrepare),
         
-        (phase::Schedule::Mutator,   phase::Phase::RefineCards),
-        (phase::Schedule::Global,    phase::Phase::RefineCards),
-        (phase::Schedule::Collector, phase::Phase::RefineCards),
+        // (phase::Schedule::Mutator,   phase::Phase::RefineCards),
+        // (phase::Schedule::Global,    phase::Phase::RefineCards),
+        // (phase::Schedule::Collector, phase::Phase::RefineCards),
         // Roots
         (phase::Schedule::Complex,   plan::PREPARE_STACKS.clone()),
         (phase::Schedule::Collector, phase::Phase::StackRoots),
         (phase::Schedule::Global,    phase::Phase::StackRoots),
-        (phase::Schedule::Collector, phase::Phase::RemSetRoots),
         (phase::Schedule::Collector, phase::Phase::Roots),
         (phase::Schedule::Global,    phase::Phase::Roots),
+        (phase::Schedule::Mutator,   phase::Phase::RefineCards),
+        (phase::Schedule::Global,    phase::Phase::RefineCards),
+        (phase::Schedule::Collector, phase::Phase::RefineCards),
+        (phase::Schedule::Collector, phase::Phase::RemSetRoots),
         (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
         (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
+
+        // (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
+        // (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
         // Refs
         (phase::Schedule::Collector, phase::Phase::SoftRefs),
         (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
@@ -102,6 +110,9 @@ lazy_static! {
         (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
         (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
         (phase::Schedule::Collector, phase::Phase::PhantomRefs),
+
+        // ForwardRefs
+        // (phase::Schedule::Complex, plan::FORWARD_PHASE.clone()),
         
         (phase::Schedule::Mutator,   phase::Phase::RefineCards),
         (phase::Schedule::Global,    phase::Phase::RefineCards),
@@ -119,6 +130,7 @@ lazy_static! {
         (phase::Schedule::Complex, plan::INIT_PHASE.clone()),
         (phase::Schedule::Complex, ROOT_CLOSURE_PHASE.clone()),
         (phase::Schedule::Complex, REF_TYPE_CLOSURE_PHASE.clone()),
+        // (phase::Schedule::Complex, plan::FORWARD_PHASE.clone()),
         (phase::Schedule::Complex, plan::COMPLETE_CLOSURE_PHASE.clone()),
         (phase::Schedule::Global,  phase::Phase::CollectionSetSelection),
         (phase::Schedule::Complex, {

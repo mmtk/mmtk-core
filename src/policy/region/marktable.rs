@@ -28,12 +28,13 @@ impl MarkTable {
 
     fn get_entry(&self, obj: ObjectReference) -> (usize, usize) {
         debug_assert!(!obj.is_null());
-        let addr = VMObjectModel::object_start_ref(obj);
+        let addr = VMObjectModel::ref_to_address(obj);
         self.get_entry_for_address(addr)
     }
 
     pub fn mark(&self, obj: ObjectReference, atomic: bool) -> bool {
         let (index, offset) = self.get_entry(obj);
+        debug_assert!(index < self.data.len());
         let entry = &self.data[index];
         let mask = 1 << offset;
         if atomic {
@@ -58,17 +59,30 @@ impl MarkTable {
     }
 
     pub fn is_marked(&self, o: ObjectReference) -> bool {
-        self.test(VMObjectModel::object_start_ref(o))
+        self.test(VMObjectModel::ref_to_address(o))
     }
     
     #[inline(always)]
     pub fn iterate<F: Fn(ObjectReference)>(&self, start: Address, end: Address, f: F) {
+        let region_end = Region::of(start).cursor;
+        // Find first slot of a object
         let mut cursor = start;
-        while cursor < end {
+        let limit = end + 24usize;
+        let limit = if limit > region_end { region_end } else { limit };
+        while cursor < limit {
             if self.test(cursor) {
-                let object = unsafe { VMObjectModel::get_object_from_start_address(cursor) };
-                debug_assert!(VMObjectModel::object_start_ref(object) == cursor);
-                f(object);
+                // let object = unsafe { VMObjectModel::get_object_from_start_address(cursor) };
+                // debug_assert!(VMObjectModel::object_start_ref(object) == cursor);
+                use ::vm::jikesrvm::java_header::TIB_OFFSET;
+                let object_address = cursor + (-TIB_OFFSET);
+                let object = unsafe { object_address.to_object_reference() };
+                assert!(VMObjectModel::ref_to_address(object) == cursor);
+                let obj_start = VMObjectModel::object_start_ref(object);
+                if obj_start >= start && obj_start < end {
+                    f(object);
+                } else if obj_start >= end {
+                    break;
+                }
             }
             cursor = cursor + BYTES_IN_ADDRESS;
         }

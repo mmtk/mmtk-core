@@ -72,7 +72,7 @@ impl Allocator<PR> for RegionAllocator {
             tlabs += 1;
         }
         size = tlabs * MIN_TLAB_SIZE;
-        debug_assert!(size > bytes);
+        debug_assert!(size >= bytes);
         match self.space.refill(self.tls, size) {
             Some(tlab) => {
                 self.refills += 1;

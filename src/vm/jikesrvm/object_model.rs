@@ -47,29 +47,44 @@ const PACKED: bool = true;
 // emitted code.
 // This is perhaps more serious with Rust release build or on machines with weaker memory models.
 
-lazy_static! {
-    static ref FAKE_TIBS: Mutex<HashSet<Address>> = Mutex::new(HashSet::new());
-}
 
-static mut FAKE_TIBS_REF: *const HashSet<Address> = 0 as _;
+static mut FAKE_TIBS: [Address; 8] = [Address(0); 8];
+static FAKE_TIBS_CURSOR: AtomicUsize = AtomicUsize::new(0);
 
 pub fn report_fake_tib(a: Address) {
-    let mut set = FAKE_TIBS.lock().unwrap();
-    set.insert(a);
+    if is_fake_tib(a) {
+        return;
+    }
+    let index = FAKE_TIBS_CURSOR.fetch_add(1, Ordering::SeqCst);
+    unsafe {
+        assert!(index < FAKE_TIBS.len());
+        FAKE_TIBS[index] = a;
+    }
 }
 
 fn is_fake_tib(a: Address) -> bool {
+    let length = FAKE_TIBS_CURSOR.load(Ordering::SeqCst);
     unsafe {
-        if FAKE_TIBS_REF == 0 as _ {
-            let set = FAKE_TIBS.lock().unwrap();
-            FAKE_TIBS_REF = (&set as &HashSet<Address>) as *const HashSet<Address>;
+        for i in 0..length {
+            if !FAKE_TIBS[i].is_zero() && FAKE_TIBS[i] == a {
+                return true;
+            }
         }
-        let set = &*FAKE_TIBS_REF;
-        set.contains(&a)
+        false
     }
 }
 
 pub struct VMObjectModel {}
+
+#[inline(never)]
+pub fn validate_object(s: ObjectReference, o: ObjectReference) {
+    let tib = unsafe {
+        Address::from_usize((o.to_address() + TIB_OFFSET).load::<usize>())
+    };
+    if tib.is_zero() {
+        panic!("Object {:?}, referenced by {:?} has null tib", o, s);
+    }
+}
 
 impl ObjectModel for VMObjectModel {
     #[inline(always)]

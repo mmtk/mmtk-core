@@ -105,7 +105,7 @@ fn refine_one_card(card: Card) {
             let field = unsafe { slot.load::<ObjectReference>() };
             if !field.is_null() {
                 if PLAN.region_space.in_space(field) {
-                    let other_region = Region::of(field);
+                    let other_region = Region::of_object(field);
                     if other_region.0 != current_region {
                         other_region.remset.add_card(card)
                     }

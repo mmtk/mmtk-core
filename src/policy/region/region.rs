@@ -71,12 +71,13 @@ impl Region {
     }
 
     #[inline]
-    pub fn of<TA: ToAddress>(a: TA) -> Region {
-        let mut r = Region(Self::align(a.to_address()));
-        // while r.is_humongous {
-        //     r = r.preceding_region();
-        // }
-        r
+    pub fn of(a: Address) -> Region {
+        Region(Self::align(a))
+    }
+
+    #[inline]
+    pub fn of_object(o: ObjectReference) -> Region {
+        Region(Self::align(VMObjectModel::ref_to_address(o)))
     }
 
     #[inline]
@@ -163,8 +164,6 @@ pub struct MetaData {
     pub relocate: bool,
     pub cursor: Address,
     pub remset: &'static mut RemSet,
-    // pub is_humongous: bool,
-    // pub mark_table: MarkBitMap,
     prev_mark_table: Option<MarkTable>,
     curr_mark_table: Option<MarkTable>,
 }
