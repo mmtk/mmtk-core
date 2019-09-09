@@ -30,7 +30,7 @@ const SLOW_ASSERTIONS: bool = false;
 const ENABLE_CONCURRENT_MARKING: bool = true;
 const ENABLE_REMEMBERED_SETS: bool = true;
 const ENABLE_CONCURRENT_REFINEMENT: bool = true;
-const ENABLE_HOT_CARDS_OPTIMIZATION: bool = false;
+const ENABLE_HOT_CARDS_OPTIMIZATION: bool = true;
 const ENABLE_GENERATIONAL_GC: bool = false;
 
 // Configs
