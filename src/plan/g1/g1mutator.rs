@@ -24,7 +24,6 @@ pub struct G1Mutator {
     modbuf: Box<LocalQueue<'static, ObjectReference>>,
     dirty_card_quene: Box<Vec<Card>>,
     barrier_active: usize,
-    remset: Box<LocalQueue<'static, Address>>,
 }
 
 impl MutatorContext for G1Mutator {
@@ -58,10 +57,14 @@ impl MutatorContext for G1Mutator {
                 self.vs.reset();
             }
             &Phase::Release => {
-                // rebind the allocation bump pointer to the appropriate semispace
-                // self.rs.rebind(Some(semispace::PLAN.tospace()));
                 self.rs.reset();
                 self.vs.reset();
+            }
+            &Phase::Complete => {
+                self.rs.reset();
+                self.vs.reset();
+                self.modbuf.reset();
+                self.dirty_card_quene.clear();
             }
             &Phase::RefineCards => {
                 self.dirty_card_quene.clear();
@@ -71,8 +74,6 @@ impl MutatorContext for G1Mutator {
                 self.vs.reset();
             }
             &Phase::EvacuateRelease => {
-                // rebind the allocation bump pointer to the appropriate semispace
-                // self.rs.rebind(Some(semispace::PLAN.tospace()));
                 self.rs.reset();
                 self.vs.reset();
             }
@@ -81,8 +82,6 @@ impl MutatorContext for G1Mutator {
                 self.vs.reset();
             }
             &Phase::ValidateRelease => {
-                // rebind the allocation bump pointer to the appropriate semispace
-                // self.rs.rebind(Some(semispace::PLAN.tospace()));
                 self.rs.reset();
                 self.vs.reset();
             }
@@ -126,18 +125,16 @@ impl MutatorContext for G1Mutator {
         match allocator {
             AllocationType::Default => {
                 // println!("Alloc {:?} end {:?} {:?}", refer, VMObjectModel::object_start_ref(refer) + bytes, VMObjectModel::get_object_end_address(refer));
-                PLAN.region_space.initialize_header(refer, true);
+                PLAN.region_space.initialize_header(refer, bytes, true, false, true);
             }
             AllocationType::Los => {
                 PLAN.los.initialize_header(refer, true);
             }
             _ => {
                 // FIXME: data race on immortalspace.mark_state !!!
-                let unsync = unsafe { &*PLAN.unsync.get() };
-                unsync.versatile_space.initialize_header(refer);
+                PLAN.versatile_space.initialize_header(refer);
             }
         }
-        ::util::header_byte::mark_as_logged(refer);
     }
 
     fn get_tls(&self) -> *mut c_void {
@@ -146,7 +143,7 @@ impl MutatorContext for G1Mutator {
     }
 
     fn object_reference_write_slow(&mut self, src: ObjectReference, slot: Address, value: ObjectReference) {
-        if self.barrier_active() {
+        if super::ENABLE_CONCURRENT_MARKING && self.barrier_active() {
             let old = unsafe { slot.load::<ObjectReference>() };
             self.check_and_enqueue_reference(old);
         }
@@ -157,7 +154,7 @@ impl MutatorContext for G1Mutator {
     }
 
     fn object_reference_try_compare_and_swap_slow(&mut self, src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference) -> bool {
-        if self.barrier_active() {
+        if super::ENABLE_CONCURRENT_MARKING && self.barrier_active() {
             self.check_and_enqueue_reference(old);
         }
 
@@ -171,14 +168,17 @@ impl MutatorContext for G1Mutator {
 
     fn java_lang_reference_read_slow(&mut self, obj: ObjectReference) -> ObjectReference {
         debug_assert!(self.barrier_active());
-        self.check_and_enqueue_reference(obj);
+        if super::ENABLE_CONCURRENT_MARKING {
+            self.check_and_enqueue_reference(obj);
+        }
         obj
     }
 
     fn flush_remembered_sets(&mut self) {
+        self.rs.reset();
+        self.vs.reset();
         self.modbuf.flush();
-        self.remset.flush();
-    } 
+    }
 }
 
 impl G1Mutator {
@@ -190,7 +190,6 @@ impl G1Mutator {
             modbuf: box PLAN.modbuf_pool.spawn_local(),
             dirty_card_quene: box Vec::with_capacity(super::DIRTY_CARD_QUEUE_SIZE),
             barrier_active: PLAN.new_barrier_active as usize,
-            remset: box PLAN.remset_pool.spawn_local(),
         }
     }
     
@@ -203,22 +202,23 @@ impl G1Mutator {
 
     #[inline(always)]
     fn card_marking_barrier(&mut self, src: ObjectReference, _slot: Address) {
-        if super::ENABLE_FULL_TRACE_EVACUATION {
+        if !super::ENABLE_REMEMBERED_SETS {
             return // we don't need remsets
         }
         let card = Card::of(src);
         
         if card.get_state() == CardState::NotDirty {
             card.set_state(CardState::Dirty);
-            self.rs_enquene(card);
+            if super::ENABLE_CONCURRENT_REFINEMENT {
+                self.rs_enquene(card);
+            }
         }
     }
 
     fn flush_dirty_card_queue(&mut self) {
         let mut b = box Vec::with_capacity(super::DIRTY_CARD_QUEUE_SIZE);
         ::std::mem::swap(&mut b, &mut self.dirty_card_quene);
-        // println!("Enqueue dirty card queue {:?}", &b as *const _);
-        super::concurrent_refine::enquene(*b);
+        super::concurrent_refine::enquene(b);
     }
 
     fn rs_enquene(&mut self, card: Card) {

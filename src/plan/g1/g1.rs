@@ -42,7 +42,6 @@ pub struct G1 {
     pub mark_trace: Trace,
     pub evacuate_trace: Trace,
     pub modbuf_pool: SharedQueue<ObjectReference>,
-    pub remset_pool: SharedQueue<Address>,
 }
 
 pub struct G1Unsync {
@@ -91,7 +90,6 @@ impl Plan for G1 {
             mark_trace: Trace::new(),
             evacuate_trace: Trace::new(),
             modbuf_pool: SharedQueue::new(),
-            remset_pool: SharedQueue::new(),
         }
     }
 
@@ -105,7 +103,7 @@ impl Plan for G1 {
         unsync.versatile_space.init();
 
         
-        if super::USE_REMEMBERED_SETS {
+        if super::ENABLE_REMEMBERED_SETS {
             super::concurrent_refine::spawn_refine_threads();
         }
 
@@ -197,9 +195,9 @@ impl Plan for G1 {
             },
             &Phase::Closure => {},
             &Phase::Release => {
-                unsync.region_space.swap_mark_tables();
-                // unsync.region_space.release();
-                if super::ENABLE_FULL_TRACE_EVACUATION {
+                debug_assert!(self.mark_trace.values.is_empty());
+                debug_assert!(self.mark_trace.root_locations.is_empty());
+                if !super::ENABLE_REMEMBERED_SETS {
                     unsync.versatile_space.release();
                     unsync.los.release(true);
                     unsync.vm_space.release();
@@ -209,26 +207,33 @@ impl Plan for G1 {
                 self.region_space.compute_collection_set(self.get_total_pages() - self.get_pages_used());
             },
             &Phase::EvacuatePrepare => {
+                if super::ENABLE_REMEMBERED_SETS {
+                    super::concurrent_refine::disable_concurrent_refinement();
+                }
                 debug_assert!(self.evacuate_trace.values.is_empty());
                 debug_assert!(self.evacuate_trace.root_locations.is_empty());
                 // prepare each of the collected regions
-                if super::ENABLE_FULL_TRACE_EVACUATION {
+                unsync.region_space.shift_mark_tables();
+                if !super::ENABLE_REMEMBERED_SETS {
                     unsync.region_space.prepare();
                     unsync.versatile_space.prepare();
                     unsync.los.prepare(true);
                     unsync.vm_space.prepare();
                 } else {
-                    // unsync.vm_space.prepare();
                     unsync.region_space.prepare();
                 }
+                
+                self.print_vm_map();
             },
             &Phase::RefineCards => {
-                if super::USE_REMEMBERED_SETS {
-                    super::concurrent_refine::disable_concurrent_refinement();
-                }
+                // if super::USE_REMEMBERED_SETS {
+                //     super::concurrent_refine::disable_concurrent_refinement();
+                // }
             }
             &Phase::EvacuateClosure => {},
             &Phase::EvacuateRelease => {
+                debug_assert!(self.evacuate_trace.values.is_empty());
+                debug_assert!(self.evacuate_trace.root_locations.is_empty());
                 unsync.region_space.release();
                 unsync.los.release(true);
                 unsync.versatile_space.release();
@@ -241,7 +246,7 @@ impl Plan for G1 {
                 debug_assert!(self.evacuate_trace.root_locations.is_empty());
                 plan::set_gc_status(plan::GcStatus::NotInGC);
                 self.print_vm_map();
-                if super::USE_REMEMBERED_SETS {
+                if super::ENABLE_REMEMBERED_SETS {
                     super::concurrent_refine::enable_concurrent_refinement();
                 }
             },
@@ -262,14 +267,13 @@ impl Plan for G1 {
         }
     }
 
-    #[inline]
-    fn collection_required<PR: PageResource>(&self, space_full: bool, _space: &'static PR::Space) -> bool {
-        let total_pages = self.get_total_pages();
-        // if self.get_pages_avail() * 10 < total_pages {
-        //     return true;
-        // }
-        let heap_full = self.get_pages_reserved() > total_pages;
-        space_full || heap_full
+    fn collection_required<PR: PageResource>(&self, space_full: bool, _space: &'static PR::Space) -> bool where Self: Sized {
+        let stress_force_gc = self.stress_test_gc_required();
+        trace!("self.get_pages_reserved()={}, self.get_total_pages()={}",
+               self.get_pages_reserved(), self.get_total_pages());
+        let heap_full = self.get_pages_reserved() > self.get_total_pages();
+
+        space_full || stress_force_gc || heap_full
     }
 
     fn concurrent_collection_required(&self) -> bool {
@@ -288,9 +292,7 @@ impl Plan for G1 {
     }
 
     fn get_collection_reserve(&self) -> usize {
-        // println!("{} {}", self.total_pages, self.total_pages / 10);
-        self.total_pages / 10
-        // self.region_space.reserved_pages()
+        self.region_space.reserved_pages() / 10
     }
 
     fn get_pages_used(&self) -> usize {

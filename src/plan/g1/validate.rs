@@ -11,7 +11,7 @@ use vm::VMScanning;
 use libc::c_void;
 use std::marker::PhantomData;
 
-pub const ENABLE: bool = false;
+pub const ENABLE: bool = true;
 
 // const USE_LOG_BIT_FOR_MARKING: bool = true;
 
@@ -132,12 +132,14 @@ pub struct ValidateTraceLocal<V: Validator> {
 
 impl <V: Validator> TransitiveClosure for ValidateTraceLocal<V> {
     fn process_edge(&mut self, src: ObjectReference, slot: Address) {
+        V::validate_object(src);
         let object: ObjectReference = unsafe { slot.load() };
         V::validate_edge(src, slot, object);
         self.trace_object(object);
     }
 
     fn process_node(&mut self, object: ObjectReference) {
+        V::validate_object(object);
         self.values.enqueue(object);
     }
 }
@@ -167,8 +169,8 @@ impl <V: Validator> TraceLocal for ValidateTraceLocal<V> {
             if object.is_null() {
                 return object;
             }
+            V::validate_object(object);
             if test_and_mark(object) {
-                V::validate_object(object);
                 self.process_node(object);
             }
         }
@@ -181,6 +183,7 @@ impl <V: Validator> TraceLocal for ValidateTraceLocal<V> {
         debug_assert!(self.root_locations.is_empty());
         loop {
             while let Some(object) = self.values.dequeue() {
+                V::validate_object(object);
                 VMScanning::scan_object(self, object, id);
             }
             self.process_remembered_sets();
@@ -207,13 +210,19 @@ impl <V: Validator> TraceLocal for ValidateTraceLocal<V> {
         self.root_locations.enqueue(slot);
     }
 
-    fn will_not_move_in_current_collection(&self, _obj: ObjectReference) -> bool {
+    fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool {
+        V::validate_object(obj);
         true
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
+        use policy::space::Space;
         if object.is_null() {
             return false;
+        } if super::PLAN.versatile_space.in_space(object) {
+            true
+        } else if super::PLAN.vm_space.in_space(object) {
+            true
         } else {
             V::validate_object(object);
             is_marked(object)

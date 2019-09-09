@@ -119,7 +119,7 @@ impl TraceLocal for G1MarkTraceLocal {
         if object.is_null() {
             return false;
         } else if PLAN.region_space.in_space(object) {
-            PLAN.region_space.is_live_current(object)
+            PLAN.region_space.is_live_next(object)
         } else if PLAN.versatile_space.in_space(object) {
             true
         } else if PLAN.los.in_space(object) {

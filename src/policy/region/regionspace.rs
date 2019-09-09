@@ -32,6 +32,7 @@ type PR = FreeListPageResource<RegionSpace>;
 pub struct RegionSpace {
     common: UnsafeCell<CommonSpace<PR>>,
     pub alloc_region: (Option<Region>, Mutex<()>, usize),
+    regions: Vec<Region>,
 }
 
 impl Space for RegionSpace {
@@ -55,11 +56,8 @@ impl Space for RegionSpace {
         self.pr.as_mut().unwrap().bind_space(me);
     }
 
-    fn is_live(&self, object: ObjectReference) -> bool {
-        if ForwardingWord::is_forwarded_or_being_forwarded(object) {
-            return true;
-        }
-        Region::of_object(object).prev_mark_table().is_marked(object)
+    fn is_live(&self, _object: ObjectReference) -> bool {
+        unreachable!()
     }
 
     fn is_movable(&self) -> bool {
@@ -84,23 +82,30 @@ impl RegionSpace {
         RegionSpace {
             common: UnsafeCell::new(CommonSpace::new(name, true, false, true, vmrequest)),
             alloc_region: (None, Mutex::new(()), 0),
+            regions: vec![],
             // regions: RwLock::new(HashSet::with_capacity(997)),
         }
     }
 
-    pub fn is_live_current(&self, object: ObjectReference) -> bool {
-        Region::of_object(object).curr_mark_table().is_marked(object)
+    pub fn is_live_next(&self, object: ObjectReference) -> bool {
+        Region::of_object(object).next_mark_table().is_marked(object)
     }
+
     pub fn is_live_prev(&self, object: ObjectReference) -> bool {
         Region::of_object(object).prev_mark_table().is_marked(object)
     }
 
-    pub fn initialize_header(&self, object: ObjectReference, is_mutator: bool) {
-        if is_mutator {
-            Region::of_object(object).curr_mark_table().mark(object, false);
+    pub fn initialize_header(&self, object: ObjectReference, size: usize, is_mutator: bool, collector_full_trace: bool, in_marking: bool) {
+        let region = Region::of_object(object);
+        if is_mutator && in_marking {
+            region.live_size.fetch_add(size, Ordering::Relaxed);
+        }
+        if is_mutator || collector_full_trace {
+            region.next_mark_table().mark(object, false);
+            region.prev_mark_table().mark(object, false);
         } else {
-            Region::of_object(object).curr_mark_table().mark(object, false);
-            Region::of_object(object).prev_mark_table().mark(object, false);
+            region.next_mark_table().mark(object, false);
+            region.prev_mark_table().mark(object, false);
         }
     }
 
@@ -154,6 +159,37 @@ impl RegionSpace {
         }
     }
 
+    #[inline(never)]
+    #[allow(dead_code)]
+    pub fn refill_simple(&mut self, tls: *mut c_void, size: usize) -> Option<Address> {
+        lazy_static! {
+            static ref LOCK: ::std::sync::Mutex<()> = ::std::sync::Mutex::new(());
+        }
+        let lock = LOCK.lock().unwrap();
+        // Fast
+        {
+            if let Some(region) = self.alloc_region.0 {
+                if let Some(r) = region.allocate(size) {
+                    return Some(r);
+                }
+            }
+        }
+        // Slow
+        match self.acquire_with_lock(tls, PAGES_IN_REGION) {
+            Some(region) => {
+                let region = Region::new(region);
+                let result = region.allocate(size).unwrap();
+                self.alloc_region.0 = Some(region);
+                Some(result)
+            }
+            None => {
+                ::std::mem::drop(lock);
+                VMCollection::block_for_gc(tls);
+                None
+            },
+        }
+    }
+
     fn acquire_with_lock(&self, tls: *mut c_void, pages: usize) -> Option<Address> {
         let allow_poll = unsafe { VMActivePlan::is_mutator(tls) } && PLAN.is_initialized();
 
@@ -199,9 +235,9 @@ impl RegionSpace {
         }
     }
 
-    pub fn swap_mark_tables(&self) {
+    pub fn shift_mark_tables(&self) {
         for mut region in self.regions() {
-            region.swap_mark_tables();
+            region.shift_mark_table();
         }
     }
 
@@ -240,9 +276,9 @@ impl RegionSpace {
         //         me.release_region(region);
         //     }
         // }
-        for mut region in self.regions() {
+        for region in self.regions() {
             if !region.relocate {
-                region.remset.clear_cards_in_collection_set();
+                region.remset().clear_cards_in_collection_set();
             }
         }
         let mut to_be_released = {
@@ -267,7 +303,7 @@ impl RegionSpace {
 
     #[inline]
     fn test_and_mark(object: ObjectReference, region: Region) -> bool {
-        region.curr_mark_table().mark(object, true)
+        region.next_mark_table().mark(object, true)
     }
 
     #[inline]
@@ -338,22 +374,87 @@ impl RegionSpace {
             }
         }
     }
+
+    #[inline(always)]
+    pub fn is_cross_region_ref(_src: ObjectReference, slot: Address, obj: ObjectReference) -> bool {
+        if obj.is_null() {
+            return false;
+        }
+        let x = slot.as_usize();
+        let y = VMObjectModel::ref_to_address(obj).as_usize();
+        ((x ^ y) >> LOG_BYTES_IN_REGION) != 0
+    }
     
-    pub fn iterate_tospace_remset_roots<T: TraceLocal>(&self, trace: &T) {
-        for region in self.regions() {
-            if region.relocate {
-                region.remset.iterate(|card| {
-                    // println!("Scan card eva {:?}", card.0);
-                    card.linear_scan(|obj| {
-                        // if PLAN.versatile_space.in_space(obj) && !PLAN.versatile_space.is_marked(obj) {
-                        //     return
-                        // }
-                        let trace: &mut T = unsafe { &mut *(trace as *const _ as usize as *mut T) };
-                        trace.process_node(obj);
-                    })
-                })
+    pub fn prepare_to_iterate_regions_par(&self) {
+        let me = unsafe { &mut *(self as *const _ as usize as *mut Self) };
+        me.regions = self.regions().filter(|r| r.relocate).collect();
+    }
+    
+    pub fn iterate_tospace_remset_roots<T: TraceLocal>(&self, trace: &T, id: usize, num_workers: usize) {
+        let size = (self.regions.len() + num_workers - 1) / num_workers;
+        let start = size * id;
+        let limit = size * (id + 1);
+        for i in start..limit {
+            if i >= self.regions.len() {
+                break
+            }
+            let region = self.regions[i];
+            debug_assert!(region.relocate);
+            self.iterate_region_remset_roots(region, trace);
+        }
+        // if id == 0 {
+        //     for region in self.regions() {
+        //         if region.relocate {
+        //             self.iterate_region_remset_roots(region, trace);
+        //         }
+        //     }
+        // }
+    }
+
+    fn iterate_region_remset_roots<T: TraceLocal>(&self, region: Region, trace: &T) {
+        region.remset().iterate(|card| {
+            card.linear_scan(|obj| {
+                // if ::plan::g1::SLOW_ASSERTIONS {
+                //     Self::validate_remset_root(obj);
+                // }
+                let trace: &mut T = unsafe { &mut *(trace as *const _ as usize as *mut T) };
+                trace.process_node(obj);
+            }, true);
+            // region.remset().remove_card(card);
+        })
+    }
+
+    #[cfg(not(feature = "g1"))]
+    fn validate_remset_root(obj: ObjectReference) {}
+
+    #[cfg(feature = "g1")]
+    fn validate_remset_root(obj: ObjectReference) {
+        struct C<F: Fn(Address)>(F);
+        impl <F: Fn(Address)> ::plan::TransitiveClosure for C<F> {
+            #[inline(always)]
+            fn process_edge(&mut self, _src: ObjectReference, slot: Address) {
+                (self.0)(slot)
+            }
+            fn process_node(&mut self, _object: ObjectReference) {
+                unreachable!();
             }
         }
+        let mut closure = C(|slot| {
+            let field = unsafe { slot.load::<ObjectReference>() };
+            if field.is_null() {
+                return
+            }
+            assert!(PLAN.is_mapped_object(field),
+                "{:?}.{:?} -> unmapped {:?}", obj, slot, field
+            );
+            if PLAN.region_space.in_space(field) {
+                assert!(Region::of_object(field).committed,
+                    "{:?}.{:?} -> g1 {:?} but {:?} is released", obj, slot, field, Region::of_object(field)
+                );
+            }
+        });
+        VMScanning::scan_object(&mut closure, obj, 0 as _);
+
     }
 
     #[inline]
@@ -377,7 +478,7 @@ impl RegionSpace {
                     if !obj.is_null() && self.in_space(obj) && Region::of_object(obj) != region {
                         let other_region = Region::of_object(obj);
                         use super::*;
-                        if !other_region.remset.contains_card(Card::of(src)) {
+                        if !other_region.remset().contains_card(Card::of(src)) {
                             println!(
                                 "Card {:?} for <{:?}.{:?}> ({:?} {}) is not remembered by region {:?} {} ({:?})",
                                 Card::of(src).0, src, slot, region, if region.relocate { "reloc" } else { "-" },
@@ -478,3 +579,8 @@ impl Iterator for RegionIterator {
     }
 }
 
+impl ::std::fmt::Debug for RegionIterator {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "_")
+    }
+}

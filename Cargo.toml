@@ -3,6 +3,10 @@ name = "mmtk"
 version = "0.0.1"
 authors = [" <>"]
 
+[profile.release]
+debug = true
+debug-assertions = true
+
 [lib]
 name = "mmtk"
 crate-type = ["rlib", "dylib", "staticlib"]

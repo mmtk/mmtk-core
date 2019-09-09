@@ -44,10 +44,32 @@ impl RemSet {
         unsafe { &*ptr }
     }
 
+    fn get_per_region_table_opt(&self, region: Region) -> Option<&'static PerRegionTable> {
+        let index = region.heap_index();
+        let entry: &AtomicPtr<PerRegionTable> = {
+            let r: &Option<Box<PerRegionTable>> = &self.prts[index];
+            debug_assert!(::std::mem::size_of::<Option<Box<PerRegionTable>>>() == ::std::mem::size_of::<AtomicPtr<PerRegionTable>>());
+            unsafe { ::std::mem::transmute(r) }
+        };
+        let ptr = entry.load(Ordering::SeqCst);
+        if ptr == 0 as _ {
+            None
+        } else {
+            Some(unsafe { &*ptr })
+        }
+    }
+
     pub fn add_card(&self, card: Card) {
         // debug_assert!(Region::of(card.0).committed);
         let prt = self.get_per_region_table(Region::of(card.0));
         prt.add_card(card);
+    }
+
+    pub fn remove_card(&self, card: Card) {
+        // debug_assert!(Region::of(card.0).committed);
+        if let Some(prt) = self.get_per_region_table_opt(Region::of(card.0)) {
+            prt.remove_card(card);
+        }
     }
 
     pub fn contains_card(&self, card: Card) -> bool {

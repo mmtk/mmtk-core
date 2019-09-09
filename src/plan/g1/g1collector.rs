@@ -73,18 +73,17 @@ impl CollectorContext for G1Collector {
         }
     }
 
-    fn post_copy(&self, object: ObjectReference, _rvm_type: Address, _bytes: usize, allocator: ::plan::Allocator) {
+    fn post_copy(&self, object: ObjectReference, _rvm_type: Address, bytes: usize, allocator: ::plan::Allocator) {
         clear_forwarding_bits(object);
         match allocator {
             ::plan::Allocator::Default => {
-                PLAN.region_space.initialize_header(object, false);
+                PLAN.region_space.initialize_header(object, bytes, false, !super::ENABLE_REMEMBERED_SETS, false);
             }
             ::plan::Allocator::Los => {
                 PLAN.los.initialize_header(object, false);
             }
             _ => unreachable!()
         }
-        ::util::header_byte::mark_as_logged(object);
     }
 
     fn run(&mut self, tls: *mut c_void) {
@@ -123,12 +122,15 @@ impl CollectorContext for G1Collector {
                 VMScanning::compute_bootimage_roots(trace, tls);
             }
             &Phase::RemSetRoots => {
-                debug_assert!(super::USE_REMEMBERED_SETS);
+                debug_assert!(super::ENABLE_REMEMBERED_SETS);
                 debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
                 if primary {
-                    // super::concurrent_refine::collector_refine_all_dirty_cards();
-                    PLAN.region_space.iterate_tospace_remset_roots(self.get_current_trace());
+                    PLAN.region_space.prepare_to_iterate_regions_par();
                 }
+                self.rendezvous();
+                let id = self.worker_ordinal;
+                let workers = self.parallel_worker_count();
+                PLAN.region_space.iterate_tospace_remset_roots(self.get_current_trace(), id, workers);
                 self.rendezvous();
             }
             &Phase::SoftRefs => {
@@ -185,22 +187,20 @@ impl CollectorContext for G1Collector {
                 debug_assert!(self.trace.activated_trace() == TraceKind::Mark);
                 debug_assert!(self.trace.mark_trace().is_empty());
                 self.trace.release();
+                self.rs.reset();
                 debug_assert!(self.trace.mark_trace().is_empty());
             }
             &Phase::RefineCards => {
                 debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
-                if primary {
-                    super::concurrent_refine::collector_refine_all_dirty_cards();
-                }
+                let workers = self.parallel_worker_count();
+                super::concurrent_refine::collector_refine_all_dirty_cards(self.worker_ordinal, workers);
                 self.rendezvous();
-                if cfg!(debug_assertions) && primary {
-                    cardtable::get().assert_all_cards_are_not_marked();
-                    // PLAN.region_space.validate_remsets();
+                if super::SLOW_ASSERTIONS {
+                    if primary {
+                        cardtable::get().assert_all_cards_are_not_marked();
+                    }
+                    self.rendezvous();
                 }
-                // if primary {
-                //     PLAN.region_space.validate_remsets();
-                // }
-                self.rendezvous();
             }
             &Phase::EvacuatePrepare => {
                 self.trace.set_active(TraceKind::Evacuate as _);
@@ -216,12 +216,15 @@ impl CollectorContext for G1Collector {
                 debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
                 debug_assert!(self.trace.evacuate_trace().is_empty());
                 self.trace.release();
+                self.rs.reset();
                 debug_assert!(self.trace.evacuate_trace().is_empty());
                 
-                if cfg!(debug_assertions) && primary {
-                    cardtable::get().assert_all_cards_are_not_marked();
+                if super::SLOW_ASSERTIONS {
+                    if primary {
+                        cardtable::get().assert_all_cards_are_not_marked();
+                    }
+                    self.rendezvous();
                 }
-                self.rendezvous();
             }
             &Phase::ValidatePrepare => {
                 self.trace.set_active(TraceKind::Validate as _);
@@ -229,6 +232,7 @@ impl CollectorContext for G1Collector {
             }
             &Phase::ValidateRelease => {
                 self.trace.release();
+                self.rs.reset();
             }
             _ => { panic!("Per-collector phase not handled") }
         }

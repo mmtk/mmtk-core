@@ -2,6 +2,7 @@ use super::ToAddress;
 use util::*;
 use super::region::*;
 use super::cardtable;
+use super::cardtable::CardTable;
 use util::heap::layout::vm_layout_constants::*;
 use vm::*;
 use plan::selected_plan::PLAN;
@@ -38,6 +39,11 @@ impl Card {
     }
 
     #[inline]
+    pub fn inc_hotness(&self) -> bool {
+        CardTable::inc_hotness(*self)
+    }
+
+    #[inline]
     pub fn set_state(&self, s: cardtable::CardState) {
         cardtable::get().set_entry(self.0, s);
     }
@@ -49,6 +55,7 @@ impl Card {
     }
     
     #[inline(never)]
+    #[allow(dead_code)]
     #[cfg(feature = "g1")]
     fn scan_g1<Closure: Fn(ObjectReference)>(&self, start: Address, limit: Address, cl: Closure) {
         let v = ::plan::plan::gc_in_progress();
@@ -75,7 +82,8 @@ impl Card {
     
     #[inline(always)]
     #[cfg(feature = "g1")]
-    pub fn linear_scan<Closure: Fn(ObjectReference)>(&self, cl: Closure) {
+    pub fn linear_scan<Closure: Fn(ObjectReference)>(&self, cl: Closure, mark_dead: bool) {
+        CardTable::clear_hotness(*self);
         use plan::plan::Plan;
         if !::plan::selected_plan::PLAN.is_mapped_address(self.0) {
             return
@@ -86,20 +94,43 @@ impl Card {
                 return
             }
             debug_assert!(region.committed, "Invalid region {:?} in chunk {:?}", region.0, ::util::alloc::embedded_meta_data::get_metadata_base(region.0));
-            // let cursor = 
             region.prev_mark_table().iterate(self.0, self.0 + BYTES_IN_CARD, cl);
             // self.scan_g1(self.0, self.0 + BYTES_IN_CARD, cl);
         } else if PLAN.los.address_in_space(self.0) {
             let o = unsafe { VMObjectModel::get_object_from_start_address(self.0) };
-            // if PLAN.los.is_live(o) {
-                cl(o)
-            // }
+            if PLAN.los.is_live(o) {
+                cl(o);
+            }
         } else if PLAN.versatile_space.address_in_space(self.0) {
-            bumpallocator::linear_scan(self.0, self.0 + BYTES_IN_CARD, cl);
+            bumpallocator::linear_scan(self.0, self.0 + BYTES_IN_CARD, |obj| {
+                if mark_dead {
+                    if PLAN.versatile_space.is_marked(obj) && !is_dead(obj) {
+                        cl(obj);
+                    } else {
+                        mark_as_dead(obj);
+                    }
+                } else {
+                    if !is_dead(obj) {
+                        cl(obj);
+                    }
+                }
+            });
         } else {
             // Do nothing...
         }
     }
+}
+
+const DEATH_BIT: u8 = 0b1000;
+
+fn mark_as_dead(object: ObjectReference) {
+    let value = VMObjectModel::read_available_byte(object);
+    VMObjectModel::write_available_byte(object, value | DEATH_BIT);
+}
+
+fn is_dead(object: ObjectReference) -> bool {
+    let value = VMObjectModel::read_available_byte(object);
+    (value & DEATH_BIT) == DEATH_BIT
 }
 
 impl ::std::ops::Deref for Card {

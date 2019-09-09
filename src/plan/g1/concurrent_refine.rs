@@ -9,7 +9,7 @@ use policy::space::Space;
 use util::heap::layout::vm_layout_constants::*;
 
 lazy_static! {
-    static ref GLOBAL_RS_BUFFER: Mutex<Vec<Vec<Card>>> = Mutex::new(vec![]);
+    static ref GLOBAL_RS_BUFFER: Mutex<Vec<Box<Vec<Card>>>> = Mutex::new(vec![]);
     static ref CVAR: Condvar = Condvar::new();
     static ref SYNC: Mutex<ConcurrentRefineWorkerGroupSync> = Mutex::new(ConcurrentRefineWorkerGroupSync {
         trigger_count: 1,
@@ -30,9 +30,13 @@ struct ConcurrentRefineWorker {
 }
 
 impl ConcurrentRefineWorker {
-    fn refine_one_buffer(&self, buf: Vec<Card>) {
-        for card in buf {
-            refine_one_card(card);
+    fn refine_one_buffer(&self, buf: Box<Vec<Card>>) {
+        for card in *buf {
+            if ENABLE_HOT_CARDS_OPTIMIZATION && card.inc_hotness() {
+                // Skip this hot card
+                continue;
+            }
+            refine_one_card(card, false);
             if ABORT.load(Ordering::SeqCst) {
                 return;
             }
@@ -64,7 +68,7 @@ impl ConcurrentRefineWorker {
             inner.contexts_parked += 1;
             if inner.contexts_parked == CONCURRENT_REFINEMENT_THREADS {
                 // ABORT.store(false, Ordering::Relaxed);
-                REQUEST_FLAG.store(true, Ordering::Relaxed);
+                REQUEST_FLAG.store(false, Ordering::Relaxed);
             }
             CVAR.notify_all();
             while self.last_trigger_count == inner.trigger_count {
@@ -90,29 +94,24 @@ pub fn scan_edge<F: Fn(Address)>(object: ObjectReference, f: F) {
     VMScanning::scan_object(&mut closure, object, 0 as _);
 }
 
-fn refine_one_card(card: Card) {
+fn refine_one_card(card: Card, mark_dead: bool) {
     if card.get_state() != CardState::Dirty {
         return;
     }
     card.set_state(CardState::NotDirty);
     
-    let current_region = card.get_region();
     card.linear_scan(|obj| {
         debug_assert!(VMObjectModel::object_start_ref(obj) >= card.0, "card {:?}, obj {:?}: {:?}..{:?}", card.0, obj, VMObjectModel::object_start_ref(obj), VMObjectModel::get_object_end_address(obj));
         debug_assert!(VMObjectModel::object_start_ref(obj) < card.0 + BYTES_IN_CARD, "card {:?}, obj {:?}: {:?}..{:?}", card.0, obj, VMObjectModel::object_start_ref(obj), VMObjectModel::get_object_end_address(obj));
         
         scan_edge(obj, |slot| {
             let field = unsafe { slot.load::<ObjectReference>() };
-            if !field.is_null() {
-                if PLAN.region_space.in_space(field) {
-                    let other_region = Region::of_object(field);
-                    if other_region.0 != current_region {
-                        other_region.remset.add_card(card)
-                    }
-                }
+            // obj.slot -> field
+            if RegionSpace::is_cross_region_ref(obj, slot, field) && PLAN.region_space.in_space(field) {
+                Region::of_object(field).remset().add_card(card)
             }
         });
-    });
+    }, mark_dead);
 }
 
 pub fn spawn_refine_threads() {
@@ -125,7 +124,7 @@ pub fn spawn_refine_threads() {
 }
 
 fn trigger_concurrent_refine() {
-    if REQUEST_FLAG.load(Ordering::Relaxed) {
+    if REQUEST_FLAG.load(Ordering::Relaxed) || ABORT.load(Ordering::Relaxed) {
         return
     }
     let mut inner = SYNC.lock().unwrap();
@@ -145,16 +144,35 @@ pub fn enable_concurrent_refinement() {
     ABORT.store(false, Ordering::SeqCst);
 }
 
-pub fn collector_refine_all_dirty_cards() {
-    for i in 0..CARDS_IN_HEAP {
+pub fn collector_refine_all_dirty_cards(id: usize, num_workers: usize) {
+    if id == 0 {
+        let mut global_buffer = GLOBAL_RS_BUFFER.lock().unwrap();
+        global_buffer.clear();
+    }
+    let size = (CARDS_IN_HEAP + num_workers - 1) / num_workers;
+    let start = size * id;
+    let limit = size * (id + 1);
+    for i in start..limit {
+        if i >= CARDS_IN_HEAP {
+            break
+        }
         let card = Card(HEAP_START + (i << LOG_BYTES_IN_CARD));
         if card.get_state() == CardState::Dirty {
-            refine_one_card(card);
+            refine_one_card(card, false);
         }
     }
+
+    // if id == 0 {
+    //     for i in 0..CARDS_IN_HEAP {
+    //         let card = Card(HEAP_START + (i << LOG_BYTES_IN_CARD));
+    //         if card.get_state() == CardState::Dirty {
+    //             refine_one_card(card, false);
+    //         }
+    //     }
+    // }
 }
 
-pub fn enquene(buf: Vec<Card>) {
+pub fn enquene(buf: Box<Vec<Card>>) {
     if ABORT.load(Ordering::SeqCst) {
         return;
     }

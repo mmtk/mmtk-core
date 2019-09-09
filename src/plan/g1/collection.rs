@@ -70,8 +70,6 @@ lazy_static! {
         (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
         (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
         (phase::Schedule::Collector, phase::Phase::PhantomRefs),
-        // ForwardRefs
-        (phase::Schedule::Complex, plan::FORWARD_PHASE.clone()),
 
         (phase::Schedule::Mutator,   phase::Phase::EvacuateRelease),
         (phase::Schedule::Global,    phase::Phase::EvacuateRelease),
@@ -130,17 +128,17 @@ lazy_static! {
         (phase::Schedule::Complex, plan::INIT_PHASE.clone()),
         (phase::Schedule::Complex, ROOT_CLOSURE_PHASE.clone()),
         (phase::Schedule::Complex, REF_TYPE_CLOSURE_PHASE.clone()),
-        // (phase::Schedule::Complex, plan::FORWARD_PHASE.clone()),
         (phase::Schedule::Complex, plan::COMPLETE_CLOSURE_PHASE.clone()),
         (phase::Schedule::Global,  phase::Phase::CollectionSetSelection),
         (phase::Schedule::Complex, {
-            if super::ENABLE_FULL_TRACE_EVACUATION {
+            if !super::ENABLE_REMEMBERED_SETS {
                 FULL_TRACE_EVACUATE_PHASE.clone()
             } else {
                 REMSET_EVACUATE_PHASE.clone()
             }
         }),
         super::validate::schedule_validation_phase(),
+        (phase::Schedule::Mutator, phase::Phase::Complete),
         (phase::Schedule::Complex, plan::FINISH_PHASE.clone()),
     ], 0);
 }

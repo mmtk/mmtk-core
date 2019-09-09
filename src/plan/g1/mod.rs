@@ -23,20 +23,18 @@ pub use self::g1::SelectedPlan;
 pub use self::g1constraints as SelectedConstraints;
 
 const VERBOSE: bool = true;
+const SLOW_ASSERTIONS: bool = false;
 
 // Feature switches
 
-const ENABLE_CONCURRENT_MARKING: bool = false;
-const ENABLE_FULL_TRACE_EVACUATION: bool = true;
+const ENABLE_CONCURRENT_MARKING: bool = true;
+const ENABLE_REMEMBERED_SETS: bool = true;
+const ENABLE_CONCURRENT_REFINEMENT: bool = false;
+const ENABLE_HOT_CARDS_OPTIMIZATION: bool = false;
 const ENABLE_GENERATIONAL_GC: bool = false;
 
 // Configs
 
 const DIRTY_CARD_QUEUE_SIZE: usize = 500;
 const CONCURRENT_REFINEMENT_THREADS: usize = 1;
-
-// Derived
-
-const USE_REMEMBERED_SETS: bool = !ENABLE_FULL_TRACE_EVACUATION;
-const USE_CARDS: bool = USE_REMEMBERED_SETS;
 

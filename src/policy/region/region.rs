@@ -3,7 +3,7 @@ use util::constants;
 use util::Address;
 use util::ObjectReference;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use vm::{VMObjectModel, ObjectModel, VMMemory, Memory};
+use vm::*;
 use std::ops::{Deref, DerefMut};
 use util::heap::layout::vm_layout_constants::*;
 use super::{RemSet, MarkTable};
@@ -50,11 +50,7 @@ impl Region {
             println!("Alloc {:?} in chunk {:?}", addr, embedded_meta_data::get_metadata_base(addr));
         }
         let mut region = Region(addr);
-        region.committed = true;
-        region.cursor = region.0;
-        region.remset = Box::leak(box RemSet::new());
-        region.prev_mark_table = None;
-        region.curr_mark_table = Some(MarkTable::new());
+        region.initialize(Region(addr));
         region
     }
 
@@ -99,7 +95,7 @@ impl Region {
         debug_assert!(::std::mem::size_of::<MetaData>() <= METADATA_BYTES_PER_REGION);
         let chunk = embedded_meta_data::get_metadata_base(self.0);
         let index = self.index();
-        let address = chunk + METADATA_BYTES_PER_REGION * index;
+        let address = chunk + ::std::mem::size_of::<MetaData>() * index;
         unsafe {
             ::std::mem::transmute(address.0)
         }
@@ -163,12 +159,20 @@ pub struct MetaData {
     pub live_size: AtomicUsize,
     pub relocate: bool,
     pub cursor: Address,
-    pub remset: &'static mut RemSet,
-    prev_mark_table: Option<MarkTable>,
-    curr_mark_table: Option<MarkTable>,
+    remset: Option<RemSet>,
+    mark_table0: MarkTable,
+    mark_table1: MarkTable,
+    active_table: usize,
+    inactivate_table_used: bool,
 }
 
 impl MetaData {
+    #[inline]
+    pub fn remset(&self) -> &'static mut RemSet {
+        let r: &RemSet = self.remset.as_ref().unwrap();
+        unsafe { &mut *(r as *const _ as usize as *mut _) }
+    }
+
     #[inline]
     pub fn get_region(&self) -> Region {
         let self_address: Address = unsafe { ::std::mem::transmute(self) };
@@ -177,35 +181,72 @@ impl MetaData {
         let region_start = chunk + (METADATA_REGIONS_PER_CHUNK << LOG_BYTES_IN_REGION);
         Region(region_start + (index << LOG_BYTES_IN_REGION))
     }
+    
+    #[inline]
+    fn initialize(&mut self, region: Region) {
+        self.committed = true;
+        self.live_size.store(0, Ordering::SeqCst);
+        self.cursor = region.0;
+        self.relocate = false;
+        self.remset = Some(RemSet::new());
+        self.mark_table0.clear();
+        self.mark_table1.clear();
+        self.active_table = 0;
+        self.inactivate_table_used = false;
+    }
 
     #[inline]
     fn release(&mut self) {
-        self.prev_mark_table = None;
-        self.curr_mark_table = None;
-        let _remset = unsafe { Box::from_raw(self.remset) };
-        VMMemory::zero(Address::from_ptr(self as _), ::std::mem::size_of::<Self>());
+        self.remset = None;
+        self.committed = false;
+        self.active_table = 0;
+        self.inactivate_table_used = false;
+        // VMMemory::zero(Address::from_ptr(self as _), ::std::mem::size_of::<Self>());
     }
 
-    pub fn prev_mark_table(&self) -> &MarkTable {
-        if let Some(t) = self.prev_mark_table.as_ref() {
-            t
+    pub fn next_mark_table(&self) -> &MarkTable {
+        if self.active_table == 0 {
+            &self.mark_table0
         } else {
-            self.curr_mark_table.as_ref().unwrap()
+            &self.mark_table1
         }
     }
 
-    pub fn curr_mark_table(&self) -> &MarkTable {
-        self.curr_mark_table.as_ref().unwrap()
+    pub fn prev_mark_table(&self) -> &MarkTable {
+        if self.active_table == 0 {
+            &self.mark_table1
+        } else {
+            &self.mark_table0
+        }
     }
 
-    pub fn swap_mark_tables(&mut self) {
-        ::std::mem::swap(&mut self.prev_mark_table, &mut self.curr_mark_table);
-        // self.prev_mark_table = self.curr_mark_table;
-        self.curr_mark_table = Some(MarkTable::new());
+    pub fn prev_mark_table_or_next(&self) -> &MarkTable {
+        if !self.inactivate_table_used {
+            return self.next_mark_table();
+        }
+        if self.active_table == 0 {
+            &self.mark_table1
+        } else {
+            &self.mark_table0
+        }
+    }
+
+    pub fn shift_mark_table(&mut self) {
+        self.active_table = 1 - self.active_table;
+        self.inactivate_table_used = true;
+        if self.active_table == 0 {
+            self.mark_table0.clear()
+        } else {
+            self.mark_table1.clear()
+        }
     }
 
     pub fn clear_next_mark_table(&mut self) {
-        self.curr_mark_table = Some(MarkTable::new());
+        if self.active_table == 0 {
+            self.mark_table0.clear()
+        } else {
+            self.mark_table1.clear()
+        }
     }
 }
 

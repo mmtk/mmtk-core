@@ -7,7 +7,7 @@ use libc::c_void;
 
 type PR = FreeListPageResource<RegionSpace>;
 
-const USE_TLABS: bool = false;
+const USE_TLABS: bool = true;
 const MIN_TLAB_SIZE: usize = 2 * 1024;
 const MAX_TLAB_SIZE: usize = ::plan::SelectedConstraints::MAX_NON_LOS_COPY_BYTES;
 
@@ -40,9 +40,6 @@ impl RegionAllocator {
         self.retire_tlab();
         self.cursor = unsafe { Address::zero() };
         self.limit = unsafe { Address::zero() };
-        if USE_TLABS {
-            self.refills = 0;
-        }
     }
 }
 

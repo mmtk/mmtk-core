@@ -57,7 +57,6 @@ pub fn report_fake_tib(a: Address) {
     }
     let index = FAKE_TIBS_CURSOR.fetch_add(1, Ordering::SeqCst);
     unsafe {
-        assert!(index < FAKE_TIBS.len());
         FAKE_TIBS[index] = a;
     }
 }
@@ -246,7 +245,7 @@ impl ObjectModel for VMObjectModel {
         unsafe {
             let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
             let is_fake_tib = is_fake_tib(tib);
-            debug_assert!(!tib.is_zero(), "object {:?}", object);
+            debug_assert!(!tib.is_zero(), "object {:?} tib={:?}", object, tib);
             debug_assert!(tib.as_usize() != 0xdeadbeef);
             let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
                 .load::<usize>());

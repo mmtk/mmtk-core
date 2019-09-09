@@ -9,6 +9,7 @@ use ::util::{Address, ObjectReference};
 pub trait Node: Sized + TransitiveClosure + TraceLocal {
     fn set_active(&mut self, index: u8);
     fn set_all_inactive(&mut self);
+    fn activated_index(&self) -> u8;
 }
 
 pub struct Cons<H: TraceLocal, T: Node> {
@@ -32,11 +33,21 @@ impl <H: TraceLocal, T: Node> Node for Cons<H, T> {
             self.tail.set_active(index - 1);
         }
     }
+    fn activated_index(&self) -> u8 {
+        if self.active {
+            0
+        } else {
+            1 + self.tail.activated_index()
+        }
+    }
 }
 
 impl Node for Nil {
     fn set_all_inactive(&mut self) {}
     fn set_active(&mut self, _index: u8) {
+        unreachable!()
+    }
+    fn activated_index(&self) -> u8 {
         unreachable!()
     }
 }
@@ -164,6 +175,38 @@ impl <H: TraceLocal, T: Node> TraceLocal for Cons<H, T> {
             self.head.is_live(object)
         } else {
             self.tail.is_live(object)
+        }
+    }
+    #[inline(always)]
+    fn overwrite_reference_during_trace(&self) -> bool {
+        if self.active {
+            self.head.overwrite_reference_during_trace()
+        } else {
+            self.tail.overwrite_reference_during_trace()
+        }
+    }
+    #[inline(always)]
+    fn get_forwarded_reference(&mut self, object: ObjectReference) -> ObjectReference {
+        if self.active {
+            self.head.get_forwarded_reference(object)
+        } else {
+            self.tail.get_forwarded_reference(object)
+        }
+    }
+    #[inline(always)]
+    fn get_forwarded_referent(&mut self, object: ObjectReference) -> ObjectReference {
+        if self.active {
+            self.head.get_forwarded_referent(object)
+        } else {
+            self.tail.get_forwarded_referent(object)
+        }
+    }
+    #[inline(always)]
+    fn retain_referent(&mut self, object: ObjectReference) -> ObjectReference {
+           if self.active {
+            self.head.retain_referent(object)
+        } else {
+            self.tail.retain_referent(object)
         }
     }
 }

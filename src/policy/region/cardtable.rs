@@ -6,6 +6,9 @@ static mut CARD_TABLE: CardTable = CardTable {
     table: [CardState::NotDirty; CARDS_IN_HEAP]
 };
 
+static mut CARD_HOTNESS_TABLE: [u8; CARDS_IN_HEAP] = [0; CARDS_IN_HEAP];
+const HOTNESS_THRESHOLD: u8 = 5;
+
 #[inline(always)]
 pub fn get() -> &'static mut CardTable {
     unsafe { &mut CARD_TABLE }
@@ -24,6 +27,30 @@ pub struct CardTable {
 }
 
 impl CardTable {
+    fn get_index(card: Card) -> usize {
+        (card.0 - HEAP_START) >> LOG_BYTES_IN_CARD
+    }
+
+    pub fn inc_hotness(card: Card) -> bool {
+        let index = Self::get_index(card);
+        unsafe {
+            if CARD_HOTNESS_TABLE[index] >= HOTNESS_THRESHOLD {
+                return true;
+            }
+            CARD_HOTNESS_TABLE[index] += 1;
+            false
+        }
+    }
+
+    pub fn clear_hotness(card: Card) {
+        let index = Self::get_index(card);
+        unsafe {
+            CARD_HOTNESS_TABLE[index] = 0;
+        }
+    }
+}
+
+impl CardTable {
     #[inline(always)]
     pub fn get_entry(&self, addr: Address) -> CardState {
         debug_assert!(addr >= HEAP_START && addr < HEAP_END);
@@ -36,17 +63,13 @@ impl CardTable {
         self.table[(addr - HEAP_START) >> LOG_BYTES_IN_CARD] = state;
     }
 
-    #[inline(always)]
-    pub fn clear_all(&mut self) {
-        for i in 0..CARDS_IN_HEAP {
-            self.table[i] = CardState::NotDirty;
-        }
-    }
-
     pub fn assert_all_cards_are_not_marked(&self) {
         assert!(cfg!(debug_assertions));
         for i in 0..CARDS_IN_HEAP {
             assert!(self.table[i] == CardState::NotDirty);
+            unsafe {
+                assert!(CARD_HOTNESS_TABLE[i] == 0);
+            }
         }
     }
 }
