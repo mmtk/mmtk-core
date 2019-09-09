@@ -198,11 +198,8 @@ pub fn linear_scan<F: Fn(ObjectReference)>(card: Address, _limit: Address, f: F)
             unsafe { get_card_metadata(card).store(cursor) };
         }
         let object = unsafe { VMObjectModel::get_object_from_start_address(cursor) };
-        unsafe {
-            let tib = Address::from_usize((object.to_address() + ::vm::jikesrvm::java_header::TIB_OFFSET).load::<usize>());
-            if tib.is_zero() {
-                return;
-            }
+        if tib_is_zero(object) {
+            return;
         }
         let start_ref = VMObjectModel::object_start_ref(object);
         // let start_ref = object.to_address() + (-::vm::jikesrvm::java_header::OBJECT_REF_OFFSET);
@@ -215,4 +212,17 @@ pub fn linear_scan<F: Fn(ObjectReference)>(card: Address, _limit: Address, f: F)
             f(object);
         }
     }
+}
+
+#[cfg(feature="jikesrvm")]
+pub fn tib_is_zero(object: ObjectReference) -> bool {
+    unsafe {
+        let tib = Address::from_usize((object.to_address() + ::vm::jikesrvm::java_header::TIB_OFFSET).load::<usize>());
+        tib.is_zero()
+    }
+}
+
+#[cfg(not(feature="jikesrvm"))]
+pub fn tib_is_zero(object: ObjectReference) -> bool {
+    false
 }

@@ -50,7 +50,7 @@ impl Card {
     
     #[inline(always)]
     #[cfg(not(feature = "g1"))]
-    pub fn linear_scan<Closure: Fn(ObjectReference)>(&self, cl: Closure) {
+    pub fn linear_scan<Closure: Fn(ObjectReference)>(&self, cl: Closure, mark_dead: bool) {
         unimplemented!()
     }
     
@@ -78,11 +78,8 @@ impl Card {
             if start_ref >= limit {
                 break;
             }
-            unsafe {
-                let tib = Address::from_usize((object.to_address() + ::vm::jikesrvm::java_header::TIB_OFFSET).load::<usize>());
-                if tib.is_zero() {
-                    return;
-                }
+            if ::util::alloc::bumpallocator::tib_is_zero(object) {
+                return
             }
             cursor = VMObjectModel::get_object_end_address(object);
             debug_assert!(cursor == start_ref + VMObjectModel::get_current_size(object));
@@ -163,6 +160,7 @@ impl ::std::ops::Deref for Card {
     }
 }
 
+#[cfg(feature="jikesrvm")]
 unsafe fn get_object_from_start_address(start: Address, limit: Address) -> Option<ObjectReference> {
     // trace!("ObjectModel.get_object_from_start_address");
     let mut _start = start;
@@ -177,4 +175,9 @@ unsafe fn get_object_from_start_address(start: Address, limit: Address) -> Optio
         }
     }
     Some((_start + ::vm::jikesrvm::java_header::OBJECT_REF_OFFSET).to_object_reference())
+}
+
+#[cfg(not(feature="jikesrvm"))]
+unsafe fn get_object_from_start_address(start: Address, limit: Address) -> Option<ObjectReference> {
+    unimplemented!()
 }

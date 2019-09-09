@@ -100,12 +100,12 @@ impl MutatorContext for G1Mutator {
                       self as *const _,
                       self.rs.get_space().unwrap() as *const _,
                       &PLAN.region_space as *const _);
-                      unimplemented!()
-        // match allocator {
-        //     AllocationType::Default => self.rs.alloc(size, align, offset),
-        //     AllocationType::Los => self.los.alloc(size, align, offset),
-        //     _ => self.vs.alloc(size, align, offset),
-        // }
+                    //   unimplemented!()
+        match allocator {
+            AllocationType::Default => self.rs.alloc(size, align, offset),
+            AllocationType::Los => self.los.alloc(size, align, offset),
+            _ => self.vs.alloc(size, align, offset),
+        }
     }
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
