@@ -22,14 +22,14 @@ pub use self::g1collector::G1Collector;
 pub use self::g1::SelectedPlan;
 pub use self::g1constraints as SelectedConstraints;
 
-const VERBOSE: bool = true;
+const VERBOSE: bool = false;
 const SLOW_ASSERTIONS: bool = false;
 
 // Feature switches
 
 const ENABLE_CONCURRENT_MARKING: bool = true;
 const ENABLE_REMEMBERED_SETS: bool = true;
-const ENABLE_CONCURRENT_REFINEMENT: bool = false;
+const ENABLE_CONCURRENT_REFINEMENT: bool = true;
 const ENABLE_HOT_CARDS_OPTIMIZATION: bool = false;
 const ENABLE_GENERATIONAL_GC: bool = false;
 

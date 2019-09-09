@@ -76,6 +76,80 @@ impl MarkTable {
     }
     
     #[inline(always)]
+    pub fn block_start(&self, start: Address, end: Address) -> Address {
+        let mut region = Region::of(start);
+        let cot_index = (start - region.0) >> LOG_BYTES_IN_CARD;
+        let addr = region.card_offset_table[cot_index];
+        if addr >= start {
+            debug_assert!(addr < end);
+            return addr;
+        }
+        // Find first slot of a object
+        let region_end = region.cursor;
+        let mut cursor = start;
+        let limit = end + 24usize;
+        let limit = if limit > region_end { region_end } else { limit };
+        while cursor < limit {
+            if self.test(cursor) {
+                use ::vm::jikesrvm::java_header::TIB_OFFSET;
+                let object_address = cursor + (-TIB_OFFSET);
+                let object = unsafe { object_address.to_object_reference() };
+                debug_assert!(VMObjectModel::ref_to_address(object) == cursor);
+                let obj_start = VMObjectModel::object_start_ref(object);
+                if obj_start >= start && obj_start < end {
+                    // Update COT
+                    region.card_offset_table[cot_index] = obj_start;
+                    return obj_start;
+                } else if obj_start >= end {
+                    break;
+                }
+            }
+            cursor = cursor + BYTES_IN_ADDRESS;
+        }
+        return end;
+
+
+        // let region_end = Region::of(start).cursor;
+        // debug_assert!(Region::of(start).committed);
+        // debug_assert!(!Region::of(start).relocate);
+        // debug_assert!(start < region_end);
+        
+        // let limit = limit + 24usize;
+        // let limit = if limit > region_end { region_end } else { limit };
+        
+        // let mut cursor = start;
+        // while cursor < limit && !self.test(cursor)  {
+        //     cursor += BYTES_IN_WORD;
+        // }
+        // if cursor >= limit {
+        //     return limit;
+        //     // let region = Region::of(start);
+        //     // let card = Card::align(start);
+        //     // let card_index = (card - region.0) >> LOG_BYTES_IN_CARD;
+        //     // return region.card_offset_table[card_index];
+        // } else {
+        //     debug_assert!(self.test(cursor));
+        //     use ::vm::jikesrvm::java_header::TIB_OFFSET;
+        //     let object_address = cursor + (-TIB_OFFSET);
+        //     let object = unsafe { object_address.to_object_reference() };
+        //     debug_assert!(VMObjectModel::ref_to_address(object) == cursor);
+        //     let a = VMObjectModel::object_start_ref(object);
+        //     // debug_assert!(a >= start);
+        //     return a;
+        // }
+        // if start == region_start {
+        //     return start;
+        // }
+        // use ::vm::jikesrvm::java_header::TIB_OFFSET;
+        // let object_address = start + (-TIB_OFFSET);
+        // let object = unsafe { object_address.to_object_reference() };
+        // debug_assert!(VMObjectModel::ref_to_address(object) == start);
+        // let a = VMObjectModel::object_start_ref(object);
+        // debug_assert!(a >= region_start);
+        // a
+    }
+
+    #[inline(always)]
     pub fn iterate<F: Fn(ObjectReference)>(&self, start: Address, end: Address, f: F) {
         let region_end = Region::of(start).cursor;
         // Find first slot of a object

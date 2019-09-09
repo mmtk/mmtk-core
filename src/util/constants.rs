@@ -29,7 +29,10 @@ pub const BYTES_IN_KBYTE: usize = 1 << LOG_BYTES_IN_KBYTE;
  * Card scanning
  */
 
+#[cfg(feature="g1")]
 pub const SUPPORT_CARD_SCANNING: bool = true;
+#[cfg(not(feature="g1"))]
+pub const SUPPORT_CARD_SCANNING: bool = false;
 pub const LOG_CARD_META_SIZE: usize = 2;// each card consumes four bytes of metadata
 pub const LOG_CARD_UNITS: usize = 9;  // number of units tracked per card
 pub const LOG_CARD_GRAIN: usize = 0;   // track at byte grain, save shifting

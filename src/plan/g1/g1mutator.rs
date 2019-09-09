@@ -67,6 +67,8 @@ impl MutatorContext for G1Mutator {
                 self.dirty_card_quene.clear();
             }
             &Phase::RefineCards => {
+                self.rs.reset();
+                self.vs.reset();
                 self.dirty_card_quene.clear();
             }
             &Phase::EvacuatePrepare => {
@@ -124,7 +126,7 @@ impl MutatorContext for G1Mutator {
         debug_assert!(self.rs.get_space().unwrap() as *const _ == &PLAN.region_space as *const _);
         match allocator {
             AllocationType::Default => {
-                // println!("Alloc {:?} end {:?} {:?}", refer, VMObjectModel::object_start_ref(refer) + bytes, VMObjectModel::get_object_end_address(refer));
+                // println!("Alloc {:?} tib={:?}, size={:?}, end={:?}|{:?}", refer, _type_refer, bytes, VMObjectModel::object_start_ref(refer) + bytes, VMObjectModel::get_object_end_address(refer));
                 PLAN.region_space.initialize_header(refer, bytes, true, false, true);
             }
             AllocationType::Los => {

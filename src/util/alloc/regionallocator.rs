@@ -82,6 +82,7 @@ impl Allocator<PR> for RegionAllocator {
                     self.retire_tlab();
                     self.cursor = tlab;
                     self.limit = self.cursor + size;
+                    self.init_offsets(self.cursor, self.limit);
                     self.alloc(bytes, align, offset)
                 },
                 None => unsafe { Address::zero() },
@@ -113,6 +114,19 @@ impl RegionAllocator {
             space,
             tlab_size: (MIN_TLAB_SIZE + MAX_TLAB_SIZE) / 2,
             refills: 0,
+        }
+    }
+
+    fn init_offsets(&self, start: Address, limit: Address) {
+        let mut region = Region::of(start);
+        let region_start = region.0;
+        debug_assert!(limit <= region_start + BYTES_IN_REGION);
+        let mut cursor = start;
+        while cursor < limit {
+            debug_assert!(cursor >= region_start);
+            let index = (cursor - region_start) >> LOG_BYTES_IN_CARD;
+            region.card_offset_table[index] = start;
+            cursor += BYTES_IN_CARD;
         }
     }
 

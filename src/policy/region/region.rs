@@ -153,7 +153,6 @@ impl DerefMut for Region {
 
 
 #[repr(C)]
-#[derive(Debug)]
 pub struct MetaData {
     pub committed: bool,
     pub live_size: AtomicUsize,
@@ -164,6 +163,7 @@ pub struct MetaData {
     mark_table1: MarkTable,
     active_table: usize,
     inactivate_table_used: bool,
+    pub card_offset_table: [Address; super::CARDS_IN_REGION],
 }
 
 impl MetaData {
@@ -201,6 +201,9 @@ impl MetaData {
         self.committed = false;
         self.active_table = 0;
         self.inactivate_table_used = false;
+        for i in 0..super::CARDS_IN_REGION {
+            self.card_offset_table[i] = unsafe { Address::zero() };
+        }
         // VMMemory::zero(Address::from_ptr(self as _), ::std::mem::size_of::<Self>());
     }
 

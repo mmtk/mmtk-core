@@ -57,27 +57,46 @@ impl Card {
     #[inline(never)]
     #[allow(dead_code)]
     #[cfg(feature = "g1")]
-    fn scan_g1<Closure: Fn(ObjectReference)>(&self, start: Address, limit: Address, cl: Closure) {
-        let v = ::plan::plan::gc_in_progress();
-        let mut cursor = Region::align(start);
-        if v { println!("start {:?} limit {:?} region-limit {:?}", start, limit, Region::of(start).cursor); }
+    fn scan_g1<Closure: Fn(ObjectReference)>(&self, mut region: Region, start: Address, limit: Address, cl: Closure) {
+        // println!("Scan card {:?} in {:?} {:?}", start, region, region.relocate);
+        // println!("limit {:?}", limit);
+        let mut cursor = region.prev_mark_table().block_start(start, limit);
+        let mut should_update_cot = cursor < start;
+        // println!("block_start {:?}", cursor);
         while cursor < limit {
-            // if ::plan::plan::gc_in_progress() {
-            //     println!("Cursor: {:?} in region {:?}", cursor, Region::align(start));
-            // }
-            let object = unsafe { VMObjectModel::get_object_from_start_address(cursor) };
-            let object_start = VMObjectModel::object_start_ref(object);
-            if object_start >= limit {
-                break
+            // println!("  cursor={:?}", cursor);
+            let object = match unsafe { get_object_from_start_address(cursor, limit) } {
+                Some(o) => o,
+                None => break,
+            };
+            
+            // println!("  object={:?}", object);
+            let start_ref = VMObjectModel::object_start_ref(object);
+            // let start_ref = object.to_address() + (-::vm::jikesrvm::java_header::OBJECT_REF_OFFSET);
+            // debug_assert!(unsafe { VMObjectModel::get_object_from_start_address(cursor) } == object);
+            // println!("  start_ref={:?}", start_ref);
+            if start_ref >= limit {
+                break;
             }
-            if object_start >= start {
-                if v { println!(" - scan {:?}", object); }
-                cl(object);
-                if v { println!(" - scan {:?} end {:?}", object, VMObjectModel::get_object_end_address(object)); }
+            unsafe {
+                let tib = Address::from_usize((object.to_address() + ::vm::jikesrvm::java_header::TIB_OFFSET).load::<usize>());
+                if tib.is_zero() {
+                    return;
+                }
             }
             cursor = VMObjectModel::get_object_end_address(object);
+            debug_assert!(cursor == start_ref + VMObjectModel::get_current_size(object));
+            if start_ref >= start && start_ref < limit {
+                if should_update_cot {
+                    should_update_cot = false;
+                    let cot_index = (start - region.0) >> LOG_BYTES_IN_CARD;
+                    region.card_offset_table[cot_index] = start_ref;
+                }
+
+                cl(object);
+            }
         }
-        if v { println!("finish {:?}", start); }
+        // println!("Scan card {:?} Finish", start);
     }
     
     #[inline(always)]
@@ -93,9 +112,12 @@ impl Card {
             if !region.committed {
                 return
             }
+            if region.relocate {
+                return
+            }
             debug_assert!(region.committed, "Invalid region {:?} in chunk {:?}", region.0, ::util::alloc::embedded_meta_data::get_metadata_base(region.0));
-            region.prev_mark_table().iterate(self.0, self.0 + BYTES_IN_CARD, cl);
-            // self.scan_g1(self.0, self.0 + BYTES_IN_CARD, cl);
+            // region.prev_mark_table().iterate(self.0, self.0 + BYTES_IN_CARD, cl);
+            self.scan_g1(region, self.0, self.0 + BYTES_IN_CARD, cl);
         } else if PLAN.los.address_in_space(self.0) {
             let o = unsafe { VMObjectModel::get_object_from_start_address(self.0) };
             if PLAN.los.is_live(o) {
@@ -103,6 +125,7 @@ impl Card {
             }
         } else if PLAN.versatile_space.address_in_space(self.0) {
             bumpallocator::linear_scan(self.0, self.0 + BYTES_IN_CARD, |obj| {
+                // cl(obj);
                 if mark_dead {
                     if PLAN.versatile_space.is_marked(obj) && !is_dead(obj) {
                         cl(obj);
@@ -138,4 +161,20 @@ impl ::std::ops::Deref for Card {
     fn deref(&self) -> &Address {
         &self.0
     }
+}
+
+unsafe fn get_object_from_start_address(start: Address, limit: Address) -> Option<ObjectReference> {
+    // trace!("ObjectModel.get_object_from_start_address");
+    let mut _start = start;
+    if _start >= limit {
+            return None;
+        }
+    /* Skip over any alignment fill */
+    while _start.load::<usize>() == ::vm::jikesrvm::java_header::ALIGNMENT_VALUE {
+        _start += ::std::mem::size_of::<usize>();
+        if _start >= limit {
+            return None;
+        }
+    }
+    Some((_start + ::vm::jikesrvm::java_header::OBJECT_REF_OFFSET).to_object_reference())
 }

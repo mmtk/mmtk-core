@@ -420,7 +420,7 @@ impl RegionSpace {
                 let trace: &mut T = unsafe { &mut *(trace as *const _ as usize as *mut T) };
                 trace.process_node(obj);
             }, true);
-            // region.remset().remove_card(card);
+            region.remset().remove_card(card);
         })
     }
 
@@ -454,7 +454,6 @@ impl RegionSpace {
             }
         });
         VMScanning::scan_object(&mut closure, obj, 0 as _);
-
     }
 
     #[inline]

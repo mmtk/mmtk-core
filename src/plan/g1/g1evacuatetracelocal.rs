@@ -79,7 +79,11 @@ impl TraceLocal for G1EvacuateTraceLocal {
                 let region = Region::of_object(object);
                 debug_assert!(region.committed);
                 if region.relocate {
-                    PLAN.region_space.trace_evacuate_object_in_cset(self, object, g1::ALLOC_RS, tls)
+                    if region.prev_mark_table().is_marked(object) {
+                        PLAN.region_space.trace_evacuate_object_in_cset(self, object, g1::ALLOC_RS, tls)
+                    } else {
+                        ObjectReference::null()
+                    }
                 } else {
                     object
                 }

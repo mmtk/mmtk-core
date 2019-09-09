@@ -11,7 +11,7 @@ use vm::VMScanning;
 use libc::c_void;
 use std::marker::PhantomData;
 
-pub const ENABLE: bool = true;
+pub const ENABLE: bool = false;
 
 // const USE_LOG_BIT_FOR_MARKING: bool = true;
 
