@@ -90,7 +90,7 @@ impl Allocator<PR> for RegionAllocator {
         } else {
             match self.space.acquire_new_region(self.tls) {
                 Some(region) => {
-                    self.cursor = region.0;
+                    self.cursor = region.start();
                     self.limit = self.cursor + BYTES_IN_REGION;
                     self.alloc(bytes, align, offset)
                 },
@@ -119,7 +119,7 @@ impl RegionAllocator {
 
     fn init_offsets(&self, start: Address, limit: Address) {
         let mut region = Region::of(start);
-        let region_start = region.0;
+        let region_start = region.start();
         debug_assert!(limit <= region_start + BYTES_IN_REGION);
         let mut cursor = start;
         while cursor < limit {

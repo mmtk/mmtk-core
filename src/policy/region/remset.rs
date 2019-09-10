@@ -61,20 +61,20 @@ impl RemSet {
 
     pub fn add_card(&self, card: Card) {
         // debug_assert!(Region::of(card.0).committed);
-        let prt = self.get_per_region_table(Region::of(card.0));
+        let prt = self.get_per_region_table(Region::of(card.start()));
         prt.add_card(card);
     }
 
     pub fn remove_card(&self, card: Card) {
         // debug_assert!(Region::of(card.0).committed);
-        if let Some(prt) = self.get_per_region_table_opt(Region::of(card.0)) {
+        if let Some(prt) = self.get_per_region_table_opt(Region::of(card.start())) {
             prt.remove_card(card);
         }
     }
 
     pub fn contains_card(&self, card: Card) -> bool {
         // debug_assert!(Region::of(card.0).committed);
-        let prt = self.get_per_region_table(Region::of(card.0));
+        let prt = self.get_per_region_table(Region::of(card.start()));
         prt.contains_card(card)
     }
 
@@ -117,13 +117,13 @@ struct PerRegionTable {
 impl PerRegionTable {
     fn new(region: Region) -> Self {
         Self {
-            region: region.0,
+            region: region.start(),
             data: unsafe { ::std::mem::transmute(box [0usize; CARDS_IN_REGION / BITS_IN_WORD]) }
         }
     }
 
     fn get_entry(&self, card: Card) -> (&AtomicUsize, usize) {
-        let index = (card.0.as_usize() & REGION_MASK) >> LOG_BYTES_IN_CARD;
+        let index = (card.start().as_usize() & REGION_MASK) >> LOG_BYTES_IN_CARD;
         // const BYTES_IN_USIZE: usize = ::std::mem::size_of::<usize>();
         (&self.data[index >> LOG_BITS_IN_WORD], index & (BITS_IN_WORD - 1))
     }
@@ -152,7 +152,7 @@ impl PerRegionTable {
     fn clean_los_cards(&self) {
         if PLAN.los.address_in_space(self.region) {
             self.iterate(&|card| {
-                let o = unsafe { VMObjectModel::get_object_from_start_address(card.0) };
+                let o = unsafe { VMObjectModel::get_object_from_start_address(card.start()) };
                 if !PLAN.los.is_live(o) {
                     self.remove_card(card);
                 }
@@ -188,7 +188,7 @@ impl PerRegionTable {
                         debug_assert!(Card::align(card) == card);
                         debug_assert!(card >= self.region);
                         debug_assert!(card < (self.region + BYTES_IN_REGION), "{:?} {:?} {:?} {:?}", index, CARDS_IN_REGION, card, self.region.0);
-                        f(Card(card))
+                        f(Card::of(card))
                     }
                 }
             }

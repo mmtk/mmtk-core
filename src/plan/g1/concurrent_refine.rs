@@ -101,8 +101,8 @@ fn refine_one_card(card: Card, mark_dead: bool) {
     card.set_state(CardState::NotDirty);
     
     card.linear_scan(|obj| {
-        debug_assert!(VMObjectModel::object_start_ref(obj) >= card.0, "card {:?}, obj {:?}: {:?}..{:?}", card.0, obj, VMObjectModel::object_start_ref(obj), VMObjectModel::get_object_end_address(obj));
-        debug_assert!(VMObjectModel::object_start_ref(obj) < card.0 + BYTES_IN_CARD, "card {:?}, obj {:?}: {:?}..{:?}", card.0, obj, VMObjectModel::object_start_ref(obj), VMObjectModel::get_object_end_address(obj));
+        debug_assert!(VMObjectModel::object_start_ref(obj) >= card.start(), "card {:?}, obj {:?}: {:?}..{:?}", card.start(), obj, VMObjectModel::object_start_ref(obj), VMObjectModel::get_object_end_address(obj));
+        debug_assert!(VMObjectModel::object_start_ref(obj) < card.start() + BYTES_IN_CARD, "card {:?}, obj {:?}: {:?}..{:?}", card.start(), obj, VMObjectModel::object_start_ref(obj), VMObjectModel::get_object_end_address(obj));
         
         scan_edge(obj, |slot| {
             let field = unsafe { slot.load::<ObjectReference>() };
@@ -156,7 +156,7 @@ pub fn collector_refine_all_dirty_cards(id: usize, num_workers: usize) {
         if i >= CARDS_IN_HEAP {
             break
         }
-        let card = Card(HEAP_START + (i << LOG_BYTES_IN_CARD));
+        let card = unsafe { Card::unchecked(HEAP_START + (i << LOG_BYTES_IN_CARD)) };
         if card.get_state() == CardState::Dirty {
             refine_one_card(card, false);
         }

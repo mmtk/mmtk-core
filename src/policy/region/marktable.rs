@@ -85,7 +85,7 @@ impl MarkTable {
     #[cfg(feature="jikesrvm")]
     pub fn block_start(&self, start: Address, end: Address) -> Address {
         let mut region = Region::of(start);
-        let cot_index = (start - region.0) >> LOG_BYTES_IN_CARD;
+        let cot_index = (start - region.start()) >> LOG_BYTES_IN_CARD;
         let addr = region.card_offset_table[cot_index];
         if addr >= start {
             debug_assert!(addr < end);

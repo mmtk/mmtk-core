@@ -41,7 +41,7 @@ impl ToAddress for ObjectReference {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct Region(pub Address);
+pub struct Region(Address);
 
 impl Region {
     pub fn new(addr: Address) -> Self {
@@ -59,6 +59,17 @@ impl Region {
             println!("Release {:?} in chunk {:?}", self.0, embedded_meta_data::get_metadata_base(self.0));
         }
         self.metadata().release();
+    }
+
+    #[inline]
+    pub unsafe fn unchecked(a: Address) -> Self {
+        debug_assert!(Self::align(a) == a);
+        Self(a)
+    }
+
+    #[inline]
+    pub fn start(&self) -> Address {
+        self.0
     }
 
     #[inline]

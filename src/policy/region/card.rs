@@ -16,12 +16,23 @@ pub const CARDS_IN_REGION: usize = BYTES_IN_REGION / BYTES_IN_CARD;
 pub const CARD_MASK: usize = BYTES_IN_CARD - 1;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd)]
-pub struct Card(pub Address);
+pub struct Card(Address);
 
 impl Card {
     #[inline]
+    pub fn start(&self) -> Address {
+        self.0
+    }
+
+    #[inline]
     pub fn align(address: Address) -> Address {
         unsafe { Address::from_usize(address.to_address().0 & !CARD_MASK) }
+    }
+
+    #[inline]
+    pub unsafe fn unchecked(a: Address) -> Self {
+        debug_assert!(Self::align(a) == a);
+        Self(a)
     }
 
     #[inline]
@@ -86,7 +97,7 @@ impl Card {
             if start_ref >= start && start_ref < limit {
                 if should_update_cot {
                     should_update_cot = false;
-                    let cot_index = (start - region.0) >> LOG_BYTES_IN_CARD;
+                    let cot_index = (start - region.start()) >> LOG_BYTES_IN_CARD;
                     region.card_offset_table[cot_index] = start_ref;
                 }
 
@@ -112,7 +123,7 @@ impl Card {
             if region.relocate {
                 return
             }
-            debug_assert!(region.committed, "Invalid region {:?} in chunk {:?}", region.0, ::util::alloc::embedded_meta_data::get_metadata_base(region.0));
+            debug_assert!(region.committed, "Invalid region {:?} in chunk {:?}", region.start(), ::util::alloc::embedded_meta_data::get_metadata_base(region.start()));
             // region.prev_mark_table().iterate(self.0, self.0 + BYTES_IN_CARD, cl);
             self.scan_g1(region, self.0, self.0 + BYTES_IN_CARD, cl);
         } else if PLAN.los.address_in_space(self.0) {

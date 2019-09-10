@@ -298,7 +298,7 @@ impl RegionSpace {
 
     fn release_region(&mut self, region: Region) {
         region.release();
-        self.pr.as_mut().unwrap().release_pages(region.0);
+        self.pr.as_mut().unwrap().release_pages(region.start());
     }
 
     #[inline]
@@ -309,7 +309,7 @@ impl RegionSpace {
     #[inline]
     pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference) -> ObjectReference {
         let region = Region::of_object(object);
-        debug_assert!(region.0 != ::util::alloc::embedded_meta_data::get_metadata_base(region.0), "Invalid region {:?}, object {:?}", region.0, object);
+        debug_assert!(region.start() != ::util::alloc::embedded_meta_data::get_metadata_base(region.start()), "Invalid region {:?}, object {:?}", region.start(), object);
         if Self::test_and_mark(object, region) {
             region.live_size.fetch_add(VMObjectModel::get_size_when_copied(object), Ordering::Relaxed);
             trace.process_node(object);
@@ -320,7 +320,7 @@ impl RegionSpace {
     #[inline]
     pub fn trace_evacuate_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
         let region = Region::of_object(object);
-        debug_assert!(region.0 != ::util::alloc::embedded_meta_data::get_metadata_base(region.0), "Invalid region {:?}, object {:?}", region.0, object);
+        debug_assert!(region.start() != ::util::alloc::embedded_meta_data::get_metadata_base(region.start()), "Invalid region {:?}, object {:?}", region.start(), object);
         if region.relocate {
             let prior_status_word = ForwardingWord::attempt_to_forward(object);
             if ForwardingWord::state_is_forwarded_or_being_forwarded(prior_status_word) {
@@ -341,7 +341,7 @@ impl RegionSpace {
     // #[inline(never)]
     pub fn trace_evacuate_object_in_cset<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
         let region = Region::of_object(object);
-        debug_assert!(region.0 != ::util::alloc::embedded_meta_data::get_metadata_base(region.0), "Invalid region {:?}, object {:?}", region.0, object);
+        debug_assert!(region.start() != ::util::alloc::embedded_meta_data::get_metadata_base(region.start()), "Invalid region {:?}, object {:?}", region.start(), object);
         debug_assert!(region.committed);
         debug_assert!(region.relocate);
         let prior_status_word = ForwardingWord::attempt_to_forward(object);
@@ -471,7 +471,7 @@ impl RegionSpace {
 
     pub fn validate_remsets(&self) {
         for region in self.regions() {
-            region.prev_mark_table().iterate(region.0, region.cursor, |src| {
+            region.prev_mark_table().iterate(region.start(), region.cursor, |src| {
                 scan_edge(src, |slot| {
                     let obj = unsafe { slot.load::<ObjectReference>() };
                     if !obj.is_null() && self.in_space(obj) && Region::of_object(obj) != region {
@@ -566,7 +566,7 @@ impl Iterator for RegionIterator {
             return self.next();
         }
         // Continue searching if `cursor` points to a free region
-        let region = Region(self.cursor);
+        let region = unsafe { Region::unchecked(self.cursor) };
         if !region.committed {
             self.bump_cursor_to_next_region();
             return self.next();

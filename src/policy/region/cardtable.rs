@@ -28,7 +28,7 @@ pub struct CardTable {
 
 impl CardTable {
     fn get_index(card: Card) -> usize {
-        (card.0 - HEAP_START) >> LOG_BYTES_IN_CARD
+        (card.start() - HEAP_START) >> LOG_BYTES_IN_CARD
     }
 
     pub fn inc_hotness(card: Card) -> bool {
