@@ -31,7 +31,9 @@ use util::queue::SharedQueue;
 
 pub type SelectedPlan = G1;
 
-pub const ALLOC_RS: Allocator = Allocator::Default;
+pub const ALLOC_EDEN: Allocator = Allocator::Default;
+pub const ALLOC_SURVIVOR: Allocator = Allocator::G1Survivor;
+pub const ALLOC_OLD: Allocator = Allocator::G1Old;
 
 lazy_static! {
     pub static ref PLAN: G1 = G1::new();
@@ -53,6 +55,8 @@ pub struct G1Unsync {
     total_pages: usize,
     collection_attempt: usize,
     pub new_barrier_active: bool,
+    pub in_nursery: bool,
+    pub in_gc: bool,
 }
 
 unsafe impl Sync for G1 {}
@@ -86,6 +90,8 @@ impl Plan for G1 {
                 total_pages: 0,
                 collection_attempt: 0,
                 new_barrier_active: false,
+                in_nursery: false,
+                in_gc: false,
             }),
             mark_trace: Trace::new(),
             evacuate_trace: Trace::new(),
@@ -98,6 +104,7 @@ impl Plan for G1 {
         let unsync = &mut *self.unsync.get();
         unsync.total_pages = bytes_to_pages(heap_size);
         unsync.vm_space.init();
+        unsync.region_space.heap_size = heap_size;
         unsync.region_space.init();
         unsync.los.init();
         unsync.versatile_space.init();
@@ -149,12 +156,13 @@ impl Plan for G1 {
 
     unsafe fn collection_phase(&self, tls: *mut c_void, phase: &Phase) {
         if VERBOSE {
-            println!("Global {:?}", phase);
+            println!("Global {:?} {:?}", phase, PLAN.in_nursery);
         }
         let unsync = &mut *self.unsync.get();
 
         match phase {
             &Phase::SetCollectionKind => {
+                unsync.in_gc = true;
                 unsync.collection_attempt = if <SelectedPlan as Plan>::is_user_triggered_collection() {
                     1
                 } else {
@@ -204,7 +212,16 @@ impl Plan for G1 {
                 }
             },
             &Phase::CollectionSetSelection => {
-                self.region_space.compute_collection_set(self.get_total_pages() - self.get_pages_used());
+                let available_pages = self.get_total_pages() - self.get_pages_used();
+                if super::ENABLE_GENERATIONAL_GC {
+                    if PLAN.in_nursery {
+                        self.region_space.compute_collection_set_for_nursery_gc(available_pages);
+                    } else {
+                        self.region_space.compute_collection_set_for_mixed_gc(available_pages);
+                    }
+                } else {
+                    self.region_space.compute_collection_set(available_pages);
+                }
             },
             &Phase::EvacuatePrepare => {
                 if super::ENABLE_REMEMBERED_SETS {
@@ -213,7 +230,11 @@ impl Plan for G1 {
                 debug_assert!(self.evacuate_trace.values.is_empty());
                 debug_assert!(self.evacuate_trace.root_locations.is_empty());
                 // prepare each of the collected regions
-                unsync.region_space.shift_mark_tables();
+                if !PLAN.in_nursery {
+                    unsync.region_space.shift_mark_tables();
+                } else {
+                    unsync.region_space.clear_next_mark_tables();
+                }
                 if !super::ENABLE_REMEMBERED_SETS {
                     unsync.region_space.prepare();
                     unsync.versatile_space.prepare();
@@ -235,9 +256,11 @@ impl Plan for G1 {
                 debug_assert!(self.evacuate_trace.values.is_empty());
                 debug_assert!(self.evacuate_trace.root_locations.is_empty());
                 unsync.region_space.release();
-                unsync.los.release(true);
-                unsync.versatile_space.release();
-                unsync.vm_space.release();
+                if !PLAN.in_nursery {
+                    unsync.los.release(true);
+                    unsync.versatile_space.release();
+                    unsync.vm_space.release();
+                }
             },
             &Phase::Complete => {
                 debug_assert!(self.mark_trace.values.is_empty());
@@ -249,6 +272,7 @@ impl Plan for G1 {
                 if super::ENABLE_REMEMBERED_SETS {
                     super::concurrent_refine::enable_concurrent_refinement();
                 }
+                unsync.in_gc = false;
             },
             &Phase::SetBarrierActive => {
                 unsync.new_barrier_active = true;
@@ -272,8 +296,19 @@ impl Plan for G1 {
         trace!("self.get_pages_reserved()={}, self.get_total_pages()={}",
                self.get_pages_reserved(), self.get_total_pages());
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
-
-        space_full || stress_force_gc || heap_full
+        let me = unsafe { &mut *(self as *const _ as usize as *mut Self) };
+        if space_full || stress_force_gc || heap_full {
+            // Mixed GC
+            me.in_nursery = false;
+            return true;
+        }
+        if super::ENABLE_GENERATIONAL_GC && !PLAN.in_gc {
+            if PLAN.region_space.nursery_ratio() > 0.1 {
+                me.in_nursery = true;
+                return true;
+            }
+        }
+        false
     }
 
     fn concurrent_collection_required(&self) -> bool {
@@ -281,10 +316,20 @@ impl Plan for G1 {
             let used = self.get_pages_used() as f32;
             let total = self.get_total_pages() as f32;
             if (used / total) > 0.45f32 {
+                PLAN.as_mut().in_nursery = false;
                 return true;
             }
         }
         false
+    }
+
+    fn handle_user_collection_request(tls: *mut c_void) {
+        if !::util::options::OPTION_MAP.ignore_system_g_c {
+            PLAN.as_mut().in_nursery = false;
+            ::plan::plan::USER_TRIGGERED_COLLECTION.store(true, Ordering::Relaxed);
+            ::plan::plan::CONTROL_COLLECTOR_CONTEXT.request();
+            VMCollection::block_for_gc(tls);
+        }
     }
 
     fn get_total_pages(&self) -> usize {
@@ -339,6 +384,10 @@ impl G1 {
     pub fn get_los(&self) -> &'static LargeObjectSpace {
         let unsync = unsafe { &*self.unsync.get() };
         &unsync.los
+    }
+    
+    fn as_mut(&self) -> &mut Self {
+        unsafe { &mut *(self as *const _ as usize as *mut _) }
     }
 
     fn print_vm_map(&self) {

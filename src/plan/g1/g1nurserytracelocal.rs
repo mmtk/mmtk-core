@@ -11,31 +11,20 @@ use policy::region::*;
 use ::util::heap::layout::Mmapper;
 use ::util::heap::layout::heap_layout::MMAPPER;
 
-pub struct G1EvacuateTraceLocal {
+pub struct G1NurseryTraceLocal {
     tls: *mut c_void,
     values: LocalQueue<'static, ObjectReference>,
     root_locations: LocalQueue<'static, Address>,
 }
 
-impl TransitiveClosure for G1EvacuateTraceLocal {
+impl TransitiveClosure for G1NurseryTraceLocal {
     fn process_edge(&mut self, src: ObjectReference, slot: Address) {
         debug_assert!(MMAPPER.address_is_mapped(slot));
         let object: ObjectReference = unsafe { slot.load() };
         let new_object = self.trace_object(object);
         if self.overwrite_reference_during_trace() {
-            if super::ENABLE_REMEMBERED_SETS {
-                // src.slot -> new_object
-                if RegionSpace::is_cross_region_ref(src, slot, new_object) && PLAN.region_space.in_space(new_object) {
-                    Region::of_object(new_object).remset().add_card(Card::of(src))
-                }
-
-                // if !new_object.is_null() && PLAN.region_space.in_space(new_object) {
-                //     let other_region = Region::of_object(new_object);
-                //     debug_assert!(other_region.committed);
-                //     if other_region != Region::of_object(src) {
-                //         other_region.remset().add_card(Card::of(src))
-                //     }
-                // }
+            if RegionSpace::is_cross_region_ref(src, slot, new_object) && PLAN.region_space.in_space(new_object) {
+                Region::of_object(new_object).remset().add_card(Card::of(src))
             }
             unsafe { slot.store(new_object) };
         }
@@ -46,7 +35,7 @@ impl TransitiveClosure for G1EvacuateTraceLocal {
     }
 }
 
-impl TraceLocal for G1EvacuateTraceLocal {
+impl TraceLocal for G1NurseryTraceLocal {
     fn process_remembered_sets(&mut self) {
     }
 
@@ -70,44 +59,33 @@ impl TraceLocal for G1EvacuateTraceLocal {
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        debug_assert!(super::ENABLE_REMEMBERED_SETS);
         let tls = self.tls;
 
-        if super::ENABLE_REMEMBERED_SETS {
-            if object.is_null() {
-                object
-            } else if PLAN.region_space.in_space(object) {
-                let region = Region::of_object(object);
-                debug_assert!(region.committed);
-                if region.relocate {
-                    if region.prev_mark_table().is_marked(object) {
-                        let allocator = Self::pick_copy_allocator(object);
-                        PLAN.region_space.trace_evacuate_object_in_cset(self, object, allocator, tls)
-                    } else {
-                        ObjectReference::null()
-                    }
+        if object.is_null() {
+            object
+        } else if PLAN.region_space.in_space(object) {
+            let region = Region::of_object(object);
+            debug_assert!(region.committed);
+            if region.relocate {
+                // println!("Nursery Eva start {:?} {:?}", object, region);
+                let o = if region.prev_mark_table().is_marked(object) {
+                    let allocator = Self::pick_copy_allocator(object);
+                    // println!("Nursery Copy start {:?} {:?}", object, region);
+                    let o = PLAN.region_space.trace_evacuate_object_in_cset(self, object, allocator, tls);
+                    // println!("Nursery Copy end");
+                    o
                 } else {
-                    object
-                }
+                    ObjectReference::null()
+                };
+                // println!("Nursery Eva end");
+                o
             } else {
-                debug_assert!(PLAN.is_mapped_object(object));
                 object
             }
         } else {
-            if object.is_null() {
-                object
-            } else if PLAN.region_space.in_space(object) {
-                debug_assert!(Region::of_object(object).committed);
-                let allocator = Self::pick_copy_allocator(object);
-                PLAN.region_space.trace_evacuate_object(self, object, allocator, tls)
-            } else if PLAN.versatile_space.in_space(object) {
-                PLAN.versatile_space.trace_object(self, object)
-            } else if PLAN.los.in_space(object) {
-                PLAN.los.trace_object(self, object)
-            } else if PLAN.vm_space.in_space(object) {
-                PLAN.vm_space.trace_object(self, object)
-            } else {
-                unreachable!("{:?}", object)
-            }
+            debug_assert!(PLAN.is_mapped_object(object));
+            object
         }
     }
 
@@ -155,47 +133,22 @@ impl TraceLocal for G1EvacuateTraceLocal {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        if super::ENABLE_REMEMBERED_SETS {
-            if object.is_null() {
-                return false;
-            } else if PLAN.region_space.in_space(object) {
-                if Region::of_object(object).relocate {
-                    ::util::forwarding_word::is_forwarded_or_being_forwarded(object)
-                } else {
-                    true
-                }
+        if object.is_null() {
+            return false;
+        } else if PLAN.region_space.in_space(object) {
+            if Region::of_object(object).relocate {
+                ::util::forwarding_word::is_forwarded_or_being_forwarded(object)
             } else {
-                debug_assert!(PLAN.is_mapped_object(object));
                 true
             }
         } else {
-            if object.is_null() {
-                return false;
-            } else if PLAN.region_space.in_space(object) {
-                debug_assert!(Region::of_object(object).committed);
-                if Region::of_object(object).relocate {
-                    if ::util::forwarding_word::is_forwarded_or_being_forwarded(object) {
-                        return true;
-                    } else {
-                        return false
-                    }
-                } else {
-                    PLAN.region_space.is_live_next(object)
-                }
-            } else if PLAN.versatile_space.in_space(object) {
-                true
-            } else if PLAN.los.in_space(object) {
-                PLAN.los.is_live(object)
-            } else if PLAN.vm_space.in_space(object) {
-                true
-            } else {
-                unreachable!()
-            }
+            debug_assert!(PLAN.is_mapped_object(object));
+            true
         }
     }
 }
 
-impl G1EvacuateTraceLocal {
+impl G1NurseryTraceLocal {
     pub fn new(trace: &'static Trace) -> Self {
         Self {
             tls: 0 as *mut c_void,
@@ -219,9 +172,7 @@ impl G1EvacuateTraceLocal {
 
     #[inline]
     fn pick_copy_allocator(o: ObjectReference) -> ::plan::Allocator {
-        if !super::ENABLE_GENERATIONAL_GC {
-            return g1::ALLOC_OLD;
-        }
+        debug_assert!(super::ENABLE_GENERATIONAL_GC);
         match Region::of_object(o).generation {
             Gen::Eden => g1::ALLOC_SURVIVOR,
             _ => g1::ALLOC_OLD,

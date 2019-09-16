@@ -44,13 +44,13 @@ impl ToAddress for ObjectReference {
 pub struct Region(Address);
 
 impl Region {
-    pub fn new(addr: Address) -> Self {
+    pub fn new(addr: Address, generation: Gen) -> Self {
         debug_assert!(addr != embedded_meta_data::get_metadata_base(addr));
         if super::DEBUG {
             println!("Alloc {:?} in chunk {:?}", addr, embedded_meta_data::get_metadata_base(addr));
         }
         let mut region = Region(addr);
-        region.initialize(Region(addr));
+        region.initialize(Region(addr), generation);
         region
     }
 
@@ -88,7 +88,7 @@ impl Region {
     }
 
     #[inline]
-    pub fn index(&self) -> usize {
+    fn index(&self) -> usize {
         let chunk = embedded_meta_data::get_metadata_base(self.0);
         let region_start = chunk + METADATA_BYTES_PER_CHUNK;
         debug_assert!(self.0 >= region_start, "Invalid region {:?}, chunk {:?}", self.0, chunk);
@@ -128,7 +128,6 @@ impl Region {
     #[inline]
     pub fn allocate_par(&self, tlab_size: usize) -> Option<Address> {
         let slot: &AtomicUsize = unsafe { ::std::mem::transmute(&self.cursor) };
-        // let mut spin = 0usize;
         loop {
             let old = slot.load(Ordering::SeqCst);
             let new = old + tlab_size;
@@ -138,12 +137,7 @@ impl Region {
             if old == slot.compare_and_swap(old, new, Ordering::SeqCst) {
                 return Some(unsafe { Address::from_usize(old) })
             }
-            // ::std::thread::yield_now();
         }
-    }
-
-    pub fn preceding_region(&self) -> Region {
-        Region(self.0 - BYTES_IN_REGION)
     }
 }
 
@@ -162,6 +156,13 @@ impl DerefMut for Region {
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
+#[repr(usize)]
+pub enum Gen {
+    Eden = 0,
+    Survivor = 1,
+    Old = 2,
+}
 
 #[repr(C)]
 pub struct MetaData {
@@ -175,6 +176,7 @@ pub struct MetaData {
     active_table: usize,
     inactivate_table_used: bool,
     pub card_offset_table: [Address; super::CARDS_IN_REGION],
+    pub generation: Gen,
 }
 
 impl MetaData {
@@ -194,7 +196,7 @@ impl MetaData {
     }
     
     #[inline]
-    fn initialize(&mut self, region: Region) {
+    fn initialize(&mut self, region: Region, generation: Gen) {
         self.committed = true;
         self.live_size.store(0, Ordering::SeqCst);
         self.cursor = region.0;
@@ -204,6 +206,7 @@ impl MetaData {
         self.mark_table1.clear();
         self.active_table = 0;
         self.inactivate_table_used = false;
+        self.generation = generation;
     }
 
     #[inline]
@@ -265,3 +268,4 @@ impl MetaData {
 }
 
 pub const REGIONS_IN_HEAP: usize = (HEAP_END.as_usize() - HEAP_START.as_usize()) / BYTES_IN_REGION;
+pub const AVAILABLE_REGIONS_IN_HEAP: usize = (AVAILABLE_END.as_usize() - AVAILABLE_START.as_usize()) / BYTES_IN_REGION;

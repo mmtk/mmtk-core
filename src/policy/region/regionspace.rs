@@ -23,6 +23,7 @@ use super::DEBUG;
 use plan::selected_plan::PLAN;
 use plan::plan::Plan;
 use util::heap::layout::heap_layout::VM_MAP;
+use std::sync::atomic::{AtomicUsize};
 
 
 
@@ -31,8 +32,13 @@ type PR = FreeListPageResource<RegionSpace>;
 #[derive(Debug)]
 pub struct RegionSpace {
     common: UnsafeCell<CommonSpace<PR>>,
-    pub alloc_region: (Option<Region>, Mutex<()>, usize),
+    pub alloc_regions: (Option<Region>, Option<Region>, Option<Region>),
+    lock: Mutex<()>,
+    // pub alloc_region: (Option<Region>, Mutex<()>, usize),
+    nursery_regions: AtomicUsize,
+    total_regions: AtomicUsize,
     regions: Vec<Region>,
+    pub heap_size: usize,
 }
 
 impl Space for RegionSpace {
@@ -81,8 +87,12 @@ impl RegionSpace {
     pub fn new(name: &'static str, vmrequest: VMRequest) -> Self {
         RegionSpace {
             common: UnsafeCell::new(CommonSpace::new(name, true, false, true, vmrequest)),
-            alloc_region: (None, Mutex::new(()), 0),
+            alloc_regions: (None, None, None),
+            lock: Mutex::new(()),
             regions: vec![],
+            nursery_regions: AtomicUsize::new(0),
+            total_regions: AtomicUsize::new(0),
+            heap_size: 0,
             // regions: RwLock::new(HashSet::with_capacity(997)),
         }
     }
@@ -109,6 +119,15 @@ impl RegionSpace {
         }
     }
 
+    #[inline(always)]
+    fn get_alloc_region(&self, gen: Gen) -> Option<Region> {
+        match gen {
+            Gen::Eden => self.alloc_regions.0,
+            Gen::Survivor => self.alloc_regions.1,
+            Gen::Old => self.alloc_regions.2,
+        }
+    } 
+
     #[inline]
     fn refill_fast_once(region: Option<Region>, size: usize) -> Option<Address> {
         if let Some(alloc_region) = region {
@@ -119,14 +138,13 @@ impl RegionSpace {
     }
 
     #[inline]
-    pub fn refill(&mut self, tls: *mut c_void, size: usize) -> Option<Address> {
-        debug_assert!(self.alloc_region.2 != tls as usize);
+    pub fn refill(&mut self, tls: *mut c_void, size: usize, generation: Gen) -> Option<Address> {
         debug_assert!(size < BYTES_IN_REGION, "Size too large {}", size);
-        if let Some(a) = Self::refill_fast_once(self.alloc_region.0, size) {
+        if let Some(a) = Self::refill_fast_once(self.get_alloc_region(generation), size) {
             return Some(a);
         }
         // Slow path
-        let result = self.refill_slow(tls, size);
+        let result = self.refill_slow(tls, size, generation);
         if result.is_none() {
             VMCollection::block_for_gc(tls);
         }
@@ -134,26 +152,30 @@ impl RegionSpace {
     }
 
     #[inline(never)]
-    fn refill_slow(&mut self, tls: *mut c_void, size: usize) -> Option<Address> {
-        debug_assert!(self.alloc_region.2 != tls as usize);
-        let _alloc_region = self.alloc_region.1.lock().unwrap();
-        self.alloc_region.2 = tls as _;
+    fn refill_slow(&mut self, tls: *mut c_void, size: usize, generation: Gen) -> Option<Address> {
+        let _lock = self.lock.lock().unwrap();
         // Try again
-        if let Some(a) = Self::refill_fast_once(self.alloc_region.0, size) {
-            self.alloc_region.2 = 0;
+        if let Some(a) = Self::refill_fast_once(self.get_alloc_region(generation), size) {
             return Some(a);
         }
         // Acquire new region
         match self.acquire_with_lock(tls, PAGES_IN_REGION) {
             Some(region) => {
-                let region = Region::new(region);
+                if generation != Gen::Old {
+                    self.nursery_regions.fetch_add(1, Ordering::SeqCst);
+                }
+                self.total_regions.fetch_add(1, Ordering::SeqCst);
+                let region = Region::new(region, generation);
                 let result = region.allocate(size).unwrap();
-                self.alloc_region.0 = Some(region);
-                self.alloc_region.2 = 0;
+                match generation {
+                    Gen::Eden => self.alloc_regions.0 = Some(region),
+                    Gen::Survivor => self.alloc_regions.1 = Some(region),
+                    Gen::Old => self.alloc_regions.2 = Some(region),
+                }
+                // println!("Alloc region {:?} {:?}", generation, region);
                 Some(result)
             }
             None => {
-                self.alloc_region.2 = 0;
                 None
             },
         }
@@ -161,14 +183,14 @@ impl RegionSpace {
 
     #[inline(never)]
     #[allow(dead_code)]
-    pub fn refill_simple(&mut self, tls: *mut c_void, size: usize) -> Option<Address> {
+    pub fn refill_simple(&mut self, tls: *mut c_void, size: usize, generation: Gen) -> Option<Address> {
         lazy_static! {
             static ref LOCK: ::std::sync::Mutex<()> = ::std::sync::Mutex::new(());
         }
         let lock = LOCK.lock().unwrap();
         // Fast
         {
-            if let Some(region) = self.alloc_region.0 {
+            if let Some(region) = self.get_alloc_region(generation) {
                 if let Some(r) = region.allocate(size) {
                     return Some(r);
                 }
@@ -177,9 +199,19 @@ impl RegionSpace {
         // Slow
         match self.acquire_with_lock(tls, PAGES_IN_REGION) {
             Some(region) => {
-                let region = Region::new(region);
+                if generation != Gen::Old {
+                    self.nursery_regions.fetch_add(1, Ordering::SeqCst);
+                }
+                self.total_regions.fetch_add(1, Ordering::SeqCst);
+                let region = Region::new(region, generation);
                 let result = region.allocate(size).unwrap();
-                self.alloc_region.0 = Some(region);
+                // self.alloc_region.0 = Some(region);
+                match generation {
+                    Gen::Eden => self.alloc_regions.0 = Some(region),
+                    Gen::Survivor => self.alloc_regions.1 = Some(region),
+                    Gen::Old => self.alloc_regions.2 = Some(region),
+                }
+                // println!("Alloc region {:?} {:?}", generation, region);
                 Some(result)
             }
             None => {
@@ -222,12 +254,16 @@ impl RegionSpace {
         }
     }
 
-    pub fn acquire_new_region(&mut self, tls: *mut c_void) -> Option<Region> {
+    pub fn acquire_new_region(&mut self, tls: *mut c_void, generation: Gen) -> Option<Region> {
         let address = self.acquire(tls, PAGES_IN_REGION);
 
         if !address.is_zero() {
             debug_assert!(address != embedded_meta_data::get_metadata_base(address));
-            let mut region = Region::new(address);
+            if generation != Gen::Old {
+                self.nursery_regions.fetch_add(1, Ordering::SeqCst);
+            }
+            self.total_regions.fetch_add(1, Ordering::SeqCst);
+            let mut region = Region::new(address, generation);
             region.committed = true;
             Some(region)
         } else {
@@ -252,7 +288,9 @@ impl RegionSpace {
         // println!("RegionSpace prepare");
         {
             // let mut alloc_region = self.alloc_region.write().unwrap();
-            self.alloc_region.0 = None;
+            self.alloc_regions.0 = None;
+            self.alloc_regions.1 = None;
+            self.alloc_regions.2 = None;
         }
         for region in self.regions() {
             region.live_size.store(0, Ordering::Relaxed);
@@ -267,7 +305,9 @@ impl RegionSpace {
     pub fn release(&mut self) {
         {
             // let mut alloc_region = self.alloc_region.write().unwrap();
-            self.alloc_region.0 = None;
+            self.alloc_regions.0 = None;
+            self.alloc_regions.1 = None;
+            self.alloc_regions.2 = None;
         }
         // Cleanup regions
         // let me = unsafe { &mut *(self as *mut Self) };
@@ -296,7 +336,24 @@ impl RegionSpace {
         }
     }
 
+    pub fn nursery_ratio(&self) -> f32 {
+        let nursery = self.nursery_regions.load(Ordering::SeqCst) as f32;
+        // let total = self.total_regions.load(Ordering::SeqCst) as f32;
+        // let total = AVAILABLE_REGIONS_IN_HEAP as f32;
+        debug_assert!(self.heap_size != 0);
+        let total = (self.heap_size >> LOG_BYTES_IN_REGION) as f32;
+        debug_assert!(total != 0f32);
+        // println!("Nursery Ratio {}/{} = {}", nursery, total, nursery / total);
+        // println!("Total: {}", total);
+        // println!("Ratio: {}", nursery / total);
+        nursery / total
+    }
+
     fn release_region(&mut self, region: Region) {
+        if region.generation != Gen::Old {
+            self.nursery_regions.fetch_sub(1, Ordering::SeqCst);
+        }
+        self.total_regions.fetch_sub(1, Ordering::SeqCst);
         region.release();
         self.pr.as_mut().unwrap().release_pages(region.start());
     }
@@ -354,6 +411,65 @@ impl RegionSpace {
         }
     }
 
+    pub fn compute_collection_set_for_nursery_gc(&self, available_pages: usize) {
+        const MAX_LIVE_SIZE: usize = (BYTES_IN_REGION as f64 * 0.65) as usize;
+        let mut regions: Vec<Region> = self.regions().collect();
+        regions.sort_unstable_by_key(|r| r.live_size.load(Ordering::Relaxed));
+        let avail_regions = (available_pages >> embedded_meta_data::LOG_PAGES_IN_REGION) * REGIONS_IN_CHUNK;
+        let mut available_size = avail_regions << LOG_BYTES_IN_REGION;
+        // Select all young regions
+        for region in &regions {
+            let meta = region.metadata();
+            if meta.generation != Gen::Old {
+                // let live_size = meta.live_size.load(Ordering::Relaxed);
+                // if live_size <= MAX_LIVE_SIZE && live_size < available_size {
+                    // if DEBUG {
+                        // println!("Relocate {:?} {:?}", region.generation, region);
+                    // }
+                    meta.relocate = true;
+                    // available_size -= live_size;
+                // }
+            }
+        }
+    }
+
+    pub fn compute_collection_set_for_mixed_gc(&self, available_pages: usize) {
+        // FIXME: Bad performance
+        const MAX_LIVE_SIZE: usize = (BYTES_IN_REGION as f64 * 0.65) as usize;
+        let mut regions: Vec<Region> = self.regions().collect();
+        regions.sort_unstable_by_key(|r| r.live_size.load(Ordering::Relaxed));
+        let avail_regions = (available_pages >> embedded_meta_data::LOG_PAGES_IN_REGION) * REGIONS_IN_CHUNK;
+        let mut available_size = avail_regions << LOG_BYTES_IN_REGION;
+        // Select all young regions
+        for region in &regions {
+            let meta = region.metadata();
+            if meta.generation != Gen::Old {
+                let live_size = meta.live_size.load(Ordering::Relaxed);
+                if live_size <= MAX_LIVE_SIZE && live_size < available_size {
+                    if DEBUG {
+                        println!("Relocate {:?}", region);
+                    }
+                    meta.relocate = true;
+                    available_size -= live_size;
+                }
+            }
+        }
+        // Select some old regions
+        for region in regions {
+            let meta = region.metadata();
+            if meta.generation == Gen::Old {
+                let live_size = meta.live_size.load(Ordering::Relaxed);
+                if live_size <= MAX_LIVE_SIZE && live_size < available_size {
+                    if DEBUG {
+                        println!("Relocate {:?}", region);
+                    }
+                    meta.relocate = true;
+                    available_size -= live_size;
+                }
+            }
+        }
+    }
+
     pub fn compute_collection_set(&self, available_pages: usize) {
         // FIXME: Bad performance
         const MAX_LIVE_SIZE: usize = (BYTES_IN_REGION as f64 * 0.65) as usize;
@@ -390,7 +506,7 @@ impl RegionSpace {
         me.regions = self.regions().filter(|r| r.relocate).collect();
     }
     
-    pub fn iterate_tospace_remset_roots<T: TraceLocal>(&self, trace: &T, id: usize, num_workers: usize) {
+    pub fn iterate_tospace_remset_roots<T: TraceLocal>(&self, trace: &T, id: usize, num_workers: usize, nursery: bool) {
         let size = (self.regions.len() + num_workers - 1) / num_workers;
         let start = size * id;
         let limit = size * (id + 1);
@@ -400,7 +516,7 @@ impl RegionSpace {
             }
             let region = self.regions[i];
             debug_assert!(region.relocate);
-            self.iterate_region_remset_roots(region, trace);
+            self.iterate_region_remset_roots(region, trace, nursery);
         }
         // if id == 0 {
         //     for region in self.regions() {
@@ -411,7 +527,7 @@ impl RegionSpace {
         // }
     }
 
-    fn iterate_region_remset_roots<T: TraceLocal>(&self, region: Region, trace: &T) {
+    fn iterate_region_remset_roots<T: TraceLocal>(&self, region: Region, trace: &T, nursery: bool) {
         region.remset().iterate(|card| {
             card.linear_scan(|obj| {
                 // if ::plan::g1::SLOW_ASSERTIONS {
@@ -419,7 +535,7 @@ impl RegionSpace {
                 // }
                 let trace: &mut T = unsafe { &mut *(trace as *const _ as usize as *mut T) };
                 trace.process_node(obj);
-            }, true);
+            }, !nursery);
             region.remset().remove_card(card);
         })
     }

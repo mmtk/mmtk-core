@@ -7,6 +7,7 @@ pub mod g1constraints;
 mod g1tracelocal;
 mod g1marktracelocal;
 mod g1evacuatetracelocal;
+mod g1nurserytracelocal;
 mod collection;
 mod concurrent_refine;
 mod validate;
@@ -16,6 +17,7 @@ pub use self::g1::PLAN;
 pub use self::g1mutator::G1Mutator;
 pub use self::g1marktracelocal::G1MarkTraceLocal;
 pub use self::g1evacuatetracelocal::G1EvacuateTraceLocal;
+pub use self::g1nurserytracelocal::G1NurseryTraceLocal;
 pub use self::g1tracelocal::G1TraceLocal;
 pub use self::g1collector::G1Collector;
 
@@ -31,7 +33,7 @@ const ENABLE_CONCURRENT_MARKING: bool = true;
 const ENABLE_REMEMBERED_SETS: bool = true;
 const ENABLE_CONCURRENT_REFINEMENT: bool = true;
 const ENABLE_HOT_CARDS_OPTIMIZATION: bool = true;
-const ENABLE_GENERATIONAL_GC: bool = false;
+const ENABLE_GENERATIONAL_GC: bool = true;
 
 // Configs
 

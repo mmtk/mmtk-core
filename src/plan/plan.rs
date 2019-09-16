@@ -257,8 +257,10 @@ pub enum Allocator {
     GcSpy = 6,
     Code = 7,
     LargeCode = 8,
-    Allocators = 9,
-    DefaultSite = -1,
+    G1Survivor = 9,
+    G1Old = 10,
+    // Allocators = 9,
+    // DefaultSite = -1,
 }
 
 lazy_static! {

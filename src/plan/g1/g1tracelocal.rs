@@ -1,6 +1,6 @@
-use super::{G1MarkTraceLocal, G1EvacuateTraceLocal};
+use super::{G1MarkTraceLocal, G1EvacuateTraceLocal, G1NurseryTraceLocal};
 use super::multitracelocal::*;
-use super::validate::{Validator, ValidateTraceLocal};
+use super::validate::{self, Validator};
 use super::PLAN;
 use policy::region::*;
 use ::util::{Address, ObjectReference};
@@ -11,7 +11,8 @@ use policy::space::Space;
 pub enum TraceKind {
     Mark = 0,
     Evacuate = 1,
-    Validate = 2,
+    Nursery = 2,
+    Validate = 3,
 }
 
 fn spaceof(o: ObjectReference) -> &'static str {
@@ -101,7 +102,9 @@ fn in_regions_set(r: Region) -> bool {
     return false
 }
 
-pub type G1TraceLocal = Cons<G1MarkTraceLocal, Cons<G1EvacuateTraceLocal, Cons<ValidateTraceLocal<()>, Nil>>>;
+type ValidateTraceLocal = validate::ValidateTraceLocal<()>;
+
+pub type G1TraceLocal = Cons<G1MarkTraceLocal, Cons<G1EvacuateTraceLocal, Cons<G1NurseryTraceLocal, Cons<ValidateTraceLocal, Nil>>>>;
 
 impl G1TraceLocal {
     pub fn mark_trace(&self) -> &G1MarkTraceLocal {
@@ -116,8 +119,14 @@ impl G1TraceLocal {
     pub fn evacuate_trace_mut(&mut self) -> &mut G1EvacuateTraceLocal {
         &mut self.tail.head
     }
-    pub fn validate_trace_mut(&mut self) -> &mut ValidateTraceLocal<()> {
+    pub fn nursery_trace(&self) -> &G1NurseryTraceLocal {
+        &self.tail.tail.head
+    }
+    pub fn nursery_trace_mut(&mut self) -> &mut G1NurseryTraceLocal {
         &mut self.tail.tail.head
+    }
+    pub fn validate_trace_mut(&mut self) -> &mut ValidateTraceLocal {
+        &mut self.tail.tail.tail.head
     }
     pub fn activated_trace(&self) -> TraceKind {
         if self.active {

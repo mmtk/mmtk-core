@@ -152,7 +152,7 @@ impl MutatorContext for G1Mutator {
 
         unsafe { slot.store(value) }
 
-        self.card_marking_barrier(src, slot);
+        self.card_marking_barrier(src, slot, value);
     }
 
     fn object_reference_try_compare_and_swap_slow(&mut self, src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference) -> bool {
@@ -163,7 +163,7 @@ impl MutatorContext for G1Mutator {
         let aslot = unsafe { ::std::mem::transmute::<Address, &AtomicUsize>(slot) };
         let result = aslot.compare_and_swap(old.to_address().as_usize(), new.to_address().as_usize(), Ordering::Relaxed) == old.to_address().as_usize();
 
-        self.card_marking_barrier(src, slot);
+        self.card_marking_barrier(src, slot, new);
 
         result
     }
@@ -186,7 +186,7 @@ impl MutatorContext for G1Mutator {
 impl G1Mutator {
     pub fn new(tls: *mut c_void, space: &'static mut RegionSpace, los: &'static LargeObjectSpace, versatile_space: &'static ImmortalSpace) -> Self {
         G1Mutator {
-            rs: RegionAllocator::new(tls, space),
+            rs: RegionAllocator::new(tls, space, Gen::Eden),
             los: LargeObjectAllocator::new(tls, Some(los)),
             vs: BumpAllocator::new(tls, Some(versatile_space)),
             modbuf: box PLAN.modbuf_pool.spawn_local(),
@@ -203,10 +203,13 @@ impl G1Mutator {
     }
 
     #[inline(always)]
-    fn card_marking_barrier(&mut self, src: ObjectReference, _slot: Address) {
+    fn card_marking_barrier(&mut self, src: ObjectReference, slot: Address, obj: ObjectReference) {
         if !super::ENABLE_REMEMBERED_SETS {
             return // we don't need remsets
         }
+        // if !RegionSpace::is_cross_region_ref(src, slot, obj) {
+        //     return
+        // }
         let card = Card::of(src);
         
         if card.get_state() == CardState::NotDirty {

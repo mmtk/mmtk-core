@@ -15,9 +15,9 @@ use libc::c_void;
 use super::g1tracelocal::{G1TraceLocal, TraceKind};
 use ::plan::selected_plan::SelectedConstraints;
 use util::alloc::LargeObjectAllocator;
-use policy::region::cardtable;
+use policy::region::*;
 use super::multitracelocal::*;
-use super::{G1MarkTraceLocal, G1EvacuateTraceLocal};
+use super::{G1MarkTraceLocal, G1EvacuateTraceLocal, G1NurseryTraceLocal};
 use super::validate::ValidateTraceLocal;
 
 static mut CONTINUE_COLLECTING: bool = false;
@@ -25,7 +25,8 @@ static mut CONTINUE_COLLECTING: bool = false;
 /// per-collector thread behavior and state for the SS plan
 pub struct G1Collector {
     pub tls: *mut c_void,
-    rs: RegionAllocator,
+    rs_survivor: RegionAllocator,
+    rs_old: RegionAllocator,
     los: LargeObjectAllocator,
     trace: G1TraceLocal,
     last_trigger_count: usize,
@@ -38,11 +39,13 @@ impl CollectorContext for G1Collector {
         let unsync = unsafe { &mut *PLAN.unsync.get() };
         G1Collector {
             tls: 0 as *mut c_void,
-            rs: RegionAllocator::new(0 as *mut c_void, &mut unsync.region_space),
+            rs_survivor: RegionAllocator::new(0 as *mut c_void, &mut unsync.region_space, Gen::Survivor),
+            rs_old: RegionAllocator::new(0 as *mut c_void, &mut unsafe { &mut *PLAN.unsync.get() }.region_space, Gen::Old),
             los: LargeObjectAllocator::new(0 as *mut c_void, Some(PLAN.get_los())),
             trace: multitracelocal! {
                 G1MarkTraceLocal::new(&PLAN.mark_trace),
                 G1EvacuateTraceLocal::new(&PLAN.evacuate_trace),
+                G1NurseryTraceLocal::new(&PLAN.evacuate_trace),
                 ValidateTraceLocal::<()>::new()
             },
             last_trigger_count: 0,
@@ -57,10 +60,12 @@ impl CollectorContext for G1Collector {
 
     fn init(&mut self, tls: *mut c_void) {
         self.tls = tls;
-        self.rs.tls = tls;
+        self.rs_survivor.tls = tls;
+        self.rs_old.tls = tls;
         self.los.tls = tls;
         self.trace.mark_trace_mut().init(tls);
         self.trace.evacuate_trace_mut().init(tls);
+        self.trace.nursery_trace_mut().init(tls);
         self.trace.validate_trace_mut().init(tls);
         self.trace.set_active(TraceKind::Mark as _);
     }
@@ -68,7 +73,8 @@ impl CollectorContext for G1Collector {
     fn alloc_copy(&mut self, _original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         match allocator {
             AllocationType::Los => self.los.alloc(bytes, align, offset),
-            AllocationType::Default => self.rs.alloc(bytes, align, offset),
+            AllocationType::G1Survivor => self.rs_survivor.alloc(bytes, align, offset),
+            AllocationType::G1Old => self.rs_old.alloc(bytes, align, offset),
             _ => unreachable!(),
         }
     }
@@ -76,10 +82,10 @@ impl CollectorContext for G1Collector {
     fn post_copy(&self, object: ObjectReference, _rvm_type: Address, bytes: usize, allocator: ::plan::Allocator) {
         clear_forwarding_bits(object);
         match allocator {
-            ::plan::Allocator::Default => {
+            AllocationType::G1Survivor | AllocationType::G1Old => {
                 PLAN.region_space.initialize_header(object, bytes, false, !super::ENABLE_REMEMBERED_SETS, false);
             }
-            ::plan::Allocator::Los => {
+            AllocationType::Los => {
                 PLAN.los.initialize_header(object, false);
             }
             _ => unreachable!()
@@ -123,14 +129,14 @@ impl CollectorContext for G1Collector {
             }
             &Phase::RemSetRoots => {
                 debug_assert!(super::ENABLE_REMEMBERED_SETS);
-                debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
+                // debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
                 if primary {
                     PLAN.region_space.prepare_to_iterate_regions_par();
                 }
                 self.rendezvous();
                 let id = self.worker_ordinal;
                 let workers = self.parallel_worker_count();
-                PLAN.region_space.iterate_tospace_remset_roots(self.get_current_trace(), id, workers);
+                PLAN.region_space.iterate_tospace_remset_roots(self.get_current_trace(), id, workers, PLAN.in_nursery);
                 self.rendezvous();
             }
             &Phase::SoftRefs => {
@@ -173,7 +179,8 @@ impl CollectorContext for G1Collector {
             &Phase::Prepare => {
                 self.trace.set_active(TraceKind::Mark as _);
                 debug_assert!(self.trace.activated_trace() == TraceKind::Mark);
-                self.rs.reset()
+                self.rs_survivor.reset();
+                self.rs_old.reset();
             }
             &Phase::Closure => {
                 self.trace.complete_trace();
@@ -187,11 +194,12 @@ impl CollectorContext for G1Collector {
                 debug_assert!(self.trace.activated_trace() == TraceKind::Mark);
                 debug_assert!(self.trace.mark_trace().is_empty());
                 self.trace.release();
-                self.rs.reset();
+                self.rs_survivor.reset();
+                self.rs_old.reset();
                 debug_assert!(self.trace.mark_trace().is_empty());
             }
             &Phase::RefineCards => {
-                debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
+                // debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
                 let workers = self.parallel_worker_count();
                 super::concurrent_refine::collector_refine_all_dirty_cards(self.worker_ordinal, workers);
                 self.rendezvous();
@@ -203,20 +211,23 @@ impl CollectorContext for G1Collector {
                 }
             }
             &Phase::EvacuatePrepare => {
-                self.trace.set_active(TraceKind::Evacuate as _);
-                debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
-                self.rs.reset()
+                if PLAN.in_nursery {
+                    self.trace.set_active(TraceKind::Nursery as _);
+                } else {
+                    self.trace.set_active(TraceKind::Evacuate as _);
+                }
+                self.rs_survivor.reset();
+                self.rs_old.reset();
             }
             &Phase::EvacuateClosure => {
-                debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
                 self.trace.complete_trace();
                 debug_assert!(self.trace.evacuate_trace().is_empty());
             }
             &Phase::EvacuateRelease => {
-                debug_assert!(self.trace.activated_trace() == TraceKind::Evacuate);
                 debug_assert!(self.trace.evacuate_trace().is_empty());
                 self.trace.release();
-                self.rs.reset();
+                self.rs_survivor.reset();
+                self.rs_old.reset();
                 debug_assert!(self.trace.evacuate_trace().is_empty());
                 
                 if super::SLOW_ASSERTIONS {
@@ -228,11 +239,13 @@ impl CollectorContext for G1Collector {
             }
             &Phase::ValidatePrepare => {
                 self.trace.set_active(TraceKind::Validate as _);
-                self.rs.reset()
+                self.rs_survivor.reset();
+                self.rs_old.reset();
             }
             &Phase::ValidateRelease => {
                 self.trace.release();
-                self.rs.reset();
+                self.rs_survivor.reset();
+                self.rs_old.reset();
             }
             _ => { panic!("Per-collector phase not handled") }
         }
@@ -294,7 +307,12 @@ impl ParallelCollector for G1Collector {
         if !phase::is_phase_stack_empty() {
             phase::continue_phase_stack(self.tls);
         } else {
-            phase::begin_new_phase_stack(self.tls, (phase::Schedule::Complex, super::collection::COLLECTION.clone()));
+            if PLAN.in_nursery {
+                debug_assert!(super::ENABLE_GENERATIONAL_GC);
+                phase::begin_new_phase_stack(self.tls, (phase::Schedule::Complex, super::collection::NURSERY_COLLECTION.clone()));
+            } else {
+                phase::begin_new_phase_stack(self.tls, (phase::Schedule::Complex, super::collection::COLLECTION.clone()));
+            }
         }
     }
 

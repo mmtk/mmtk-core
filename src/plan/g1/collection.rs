@@ -124,6 +124,51 @@ lazy_static! {
         (phase::Schedule::Collector, phase::Phase::EvacuateRelease),
     ], 0);
 
+    pub static ref NURSERY_COLLECTION: phase::Phase = phase::Phase::Complex(vec![
+        (phase::Schedule::Complex, plan::INIT_PHASE.clone()),
+        (phase::Schedule::Global,  phase::Phase::CollectionSetSelection),
+        // Prepare
+        (phase::Schedule::Mutator,   phase::Phase::EvacuatePrepare),
+        (phase::Schedule::Global,    phase::Phase::EvacuatePrepare),
+        (phase::Schedule::Collector, phase::Phase::EvacuatePrepare),
+        // Roots
+        (phase::Schedule::Complex,   plan::PREPARE_STACKS.clone()),
+        (phase::Schedule::Collector, phase::Phase::StackRoots),
+        (phase::Schedule::Global,    phase::Phase::StackRoots),
+        (phase::Schedule::Collector, phase::Phase::Roots),
+        (phase::Schedule::Global,    phase::Phase::Roots),
+        (phase::Schedule::Mutator,   phase::Phase::RefineCards),
+        (phase::Schedule::Global,    phase::Phase::RefineCards),
+        (phase::Schedule::Collector, phase::Phase::RefineCards),
+        (phase::Schedule::Collector, phase::Phase::RemSetRoots),
+        (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
+        // Refs
+        (phase::Schedule::Collector, phase::Phase::SoftRefs),
+        (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::WeakRefs),
+        (phase::Schedule::Collector, phase::Phase::Finalizable),
+        (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::PhantomRefs),
+        // Scan remsets again
+        (phase::Schedule::Mutator,   phase::Phase::RefineCards),
+        (phase::Schedule::Global,    phase::Phase::RefineCards),
+        (phase::Schedule::Collector, phase::Phase::RefineCards),
+        (phase::Schedule::Collector, phase::Phase::RemSetRoots),
+        (phase::Schedule::Global,    phase::Phase::EvacuateClosure),
+        (phase::Schedule::Collector, phase::Phase::EvacuateClosure),
+        // Release
+        (phase::Schedule::Mutator,   phase::Phase::EvacuateRelease),
+        (phase::Schedule::Global,    phase::Phase::EvacuateRelease),
+        (phase::Schedule::Collector, phase::Phase::EvacuateRelease),
+        super::validate::schedule_validation_phase(),
+        // Complete
+        (phase::Schedule::Mutator, phase::Phase::Complete),
+        (phase::Schedule::Complex, plan::FINISH_PHASE.clone()),
+    ], 0);
+
     pub static ref COLLECTION: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Complex, plan::INIT_PHASE.clone()),
         (phase::Schedule::Complex, ROOT_CLOSURE_PHASE.clone()),
@@ -141,4 +186,16 @@ lazy_static! {
         (phase::Schedule::Mutator, phase::Phase::Complete),
         (phase::Schedule::Complex, plan::FINISH_PHASE.clone()),
     ], 0);
+}
+
+pub fn get_collection_phase() -> phase::Phase {
+    if super::ENABLE_GENERATIONAL_GC {
+        if super::PLAN.in_nursery {
+            NURSERY_COLLECTION.clone()
+        } else {
+            COLLECTION.clone()
+        }
+    } else {
+        COLLECTION.clone()
+    }
 }

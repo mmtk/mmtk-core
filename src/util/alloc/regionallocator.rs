@@ -20,6 +20,7 @@ pub struct RegionAllocator {
     pub space: &'static mut RegionSpace,
     refills: usize,
     tlab_size: usize,
+    generation: Gen,
 }
 
 impl RegionAllocator {
@@ -76,7 +77,7 @@ impl Allocator<PR> for RegionAllocator {
             }
             size = tlabs * MIN_TLAB_SIZE;
             debug_assert!(size >= bytes);
-            match self.space.refill(self.tls, size) {
+            match self.space.refill(self.tls, size, self.generation) {
                 Some(tlab) => {
                     self.refills += 1;
                     self.retire_tlab();
@@ -88,7 +89,7 @@ impl Allocator<PR> for RegionAllocator {
                 None => unsafe { Address::zero() },
             }
         } else {
-            match self.space.acquire_new_region(self.tls) {
+            match self.space.acquire_new_region(self.tls, self.generation) {
                 Some(region) => {
                     self.cursor = region.start();
                     self.limit = self.cursor + BYTES_IN_REGION;
@@ -106,7 +107,7 @@ impl Allocator<PR> for RegionAllocator {
 }
 
 impl RegionAllocator {
-    pub fn new(tls: *mut c_void, space: &'static mut RegionSpace) -> Self {
+    pub fn new(tls: *mut c_void, space: &'static mut RegionSpace, generation: Gen) -> Self {
         RegionAllocator {
             tls,
             cursor: unsafe { Address::zero() },
@@ -114,6 +115,7 @@ impl RegionAllocator {
             space,
             tlab_size: (MIN_TLAB_SIZE + MAX_TLAB_SIZE) / 2,
             refills: 0,
+            generation,
         }
     }
 
