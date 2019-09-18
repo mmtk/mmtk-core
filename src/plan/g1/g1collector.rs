@@ -218,6 +218,8 @@ impl CollectorContext for G1Collector {
                 }
                 self.rs_survivor.reset();
                 self.rs_old.reset();
+                let workers = self.parallel_worker_count();
+                super::concurrent_refine::collector_clear_hotness_table(self.worker_ordinal, workers);
             }
             &Phase::EvacuateClosure => {
                 self.trace.complete_trace();

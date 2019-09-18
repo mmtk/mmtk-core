@@ -94,14 +94,15 @@ impl Card {
             }
             cursor = VMObjectModel::get_object_end_address(object);
             debug_assert!(cursor == start_ref + VMObjectModel::get_current_size(object));
-            if start_ref >= start && start_ref < limit {
+            if start_ref >= start {
                 if should_update_cot {
                     should_update_cot = false;
                     let cot_index = (start - region.start()) >> LOG_BYTES_IN_CARD;
                     region.card_offset_table[cot_index] = start_ref;
                 }
-
-                cl(object);
+                if start_ref < limit {
+                    cl(object);
+                }
             }
         }
         // println!("Scan card {:?} Finish", start);
@@ -110,7 +111,9 @@ impl Card {
     #[inline(always)]
     #[cfg(feature = "g1")]
     pub fn linear_scan<Closure: Fn(ObjectReference)>(&self, cl: Closure, mark_dead: bool) {
-        CardTable::clear_hotness(*self);
+        // if CLEAR_HOTNESS {
+        //     CardTable::clear_hotness(*self);
+        // }
         use plan::plan::Plan;
         if !::plan::selected_plan::PLAN.is_mapped_address(self.0) {
             return
@@ -176,8 +179,8 @@ unsafe fn get_object_from_start_address(start: Address, limit: Address) -> Optio
     // trace!("ObjectModel.get_object_from_start_address");
     let mut _start = start;
     if _start >= limit {
-            return None;
-        }
+        return None;
+    }
     /* Skip over any alignment fill */
     while _start.load::<usize>() == ::vm::jikesrvm::java_header::ALIGNMENT_VALUE {
         _start += ::std::mem::size_of::<usize>();

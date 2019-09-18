@@ -510,10 +510,9 @@ impl RegionSpace {
         let size = (self.regions.len() + num_workers - 1) / num_workers;
         let start = size * id;
         let limit = size * (id + 1);
+        let regions = self.regions.len();
+        let limit = if limit > regions { regions } else { limit };
         for i in start..limit {
-            if i >= self.regions.len() {
-                break
-            }
             let region = self.regions[i];
             debug_assert!(region.relocate);
             self.iterate_region_remset_roots(region, trace, nursery);

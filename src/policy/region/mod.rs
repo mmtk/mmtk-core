@@ -10,6 +10,6 @@ pub use self::regionspace::*;
 pub use self::card::*;
 pub use self::remset::*;
 pub use self::marktable::*;
-pub use self::cardtable::CardState;
+pub use self::cardtable::*;
 
 const DEBUG: bool = false;
