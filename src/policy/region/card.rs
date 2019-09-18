@@ -68,10 +68,10 @@ impl Card {
     #[inline(never)]
     #[allow(dead_code)]
     #[cfg(feature = "g1")]
-    fn scan_g1<Closure: Fn(ObjectReference)>(&self, mut region: Region, start: Address, limit: Address, cl: Closure) {
+    fn scan_g1<Closure: Fn(ObjectReference)>(&self, region: RegionRef, start: Address, limit: Address, cl: Closure) {
         // println!("Scan card {:?} in {:?} {:?}", start, region, region.relocate);
         // println!("limit {:?}", limit);
-        let mut cursor = region.prev_mark_table().block_start(start, limit);
+        let mut cursor = region.prev_mark_table().block_start(region, start, limit);
         let mut should_update_cot = cursor < start;
         // println!("block_start {:?}", cursor);
         while cursor < limit {
@@ -98,7 +98,10 @@ impl Card {
                 if should_update_cot {
                     should_update_cot = false;
                     let cot_index = (start - region.start()) >> LOG_BYTES_IN_CARD;
-                    region.card_offset_table[cot_index] = start_ref;
+                    debug_assert!(cot_index < region.card_offset_table.len());
+                    unsafe {
+                        *region.get_mut().card_offset_table.get_unchecked_mut(cot_index) = start_ref;
+                    }
                 }
                 if start_ref < limit {
                     cl(object);

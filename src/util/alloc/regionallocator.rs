@@ -120,14 +120,18 @@ impl RegionAllocator {
     }
 
     fn init_offsets(&self, start: Address, limit: Address) {
-        let mut region = Region::of(start);
+        let region = Region::of(start);
         let region_start = region.start();
         debug_assert!(limit <= region_start + BYTES_IN_REGION);
         let mut cursor = start;
         while cursor < limit {
             debug_assert!(cursor >= region_start);
             let index = (cursor - region_start) >> LOG_BYTES_IN_CARD;
-            region.card_offset_table[index] = start;
+            // region.get_mut().card_offset_table[index] = start;
+            debug_assert!(index < region.card_offset_table.len());
+            unsafe {
+                *region.get_mut().card_offset_table.get_unchecked_mut(index) = start;
+            }
             cursor += BYTES_IN_CARD;
         }
     }

@@ -5,10 +5,10 @@ use util::*;
 use vm::*;
 
 const BITS_IN_MARK_TABLE: usize = BYTES_IN_REGION / BYTES_IN_WORD;
-const MARK_TABLE_SIZE: usize = BITS_IN_MARK_TABLE / BITS_IN_BYTE;
+const MARK_TABLE_ENTRIES: usize = BITS_IN_MARK_TABLE / constants::BITS_IN_WORD;
 
 pub struct MarkTable {
-    data: [usize; MARK_TABLE_SIZE],
+    data: [usize; MARK_TABLE_ENTRIES],
 }
 
 impl MarkTable {
@@ -16,20 +16,24 @@ impl MarkTable {
         VMMemory::zero(Address::from_ptr(self as _), ::std::mem::size_of::<Self>());
     }
 
+    #[inline(always)]
     fn get_entry_for_address(&self, addr: Address) -> (usize, usize) {
         debug_assert!(!addr.is_zero());
-        let diff = addr - Region::align(addr);
-        let index = diff >> LOG_BITS_IN_WORD;
-        let offset = diff & (BITS_IN_WORD - 1);
+        let diff = addr.as_usize() & REGION_MASK;
+        let bit_index = diff >> LOG_BYTES_IN_WORD;
+        let index = bit_index >> LOG_BITS_IN_WORD;
+        let offset = bit_index & (BITS_IN_WORD - 1);
         (index, offset)
     }
 
+    #[inline(always)]
     fn get_entry(&self, obj: ObjectReference) -> (usize, usize) {
         debug_assert!(!obj.is_null());
         let addr = VMObjectModel::ref_to_address(obj);
         self.get_entry_for_address(addr)
     }
 
+    #[inline(always)]
     fn get_atomic_element(&self, index: usize) -> &AtomicUsize {
         unsafe {
             // let r: &usize = &self.data[index];
@@ -47,9 +51,9 @@ impl MarkTable {
     #[inline(always)]
     pub fn mark(&self, obj: ObjectReference, atomic: bool) -> bool {
         let (index, offset) = self.get_entry(obj);
-        debug_assert!(index < self.data.len());
+        debug_assert!(index < self.data.len(), "{:?} {} {}", VMObjectModel::ref_to_address(obj), index, offset);
         let entry = self.get_atomic_element(index);
-        let mask = 1 << offset;
+        let mask = 1usize << offset;
         if atomic {
             let old_value = entry.fetch_or(mask, Ordering::Relaxed);
             (old_value & mask) == 0
@@ -63,6 +67,7 @@ impl MarkTable {
         }
     }
 
+    #[inline(always)]
     fn test(&self, a: Address) -> bool {
         let (index, offset) = self.get_entry_for_address(a);
         let entry = self.get_atomic_element(index);
@@ -71,6 +76,7 @@ impl MarkTable {
         (value & mask) != 0
     }
 
+    #[inline(always)]
     pub fn is_marked(&self, o: ObjectReference) -> bool {
         self.test(VMObjectModel::ref_to_address(o))
     }
@@ -83,10 +89,11 @@ impl MarkTable {
 
     #[inline(always)]
     #[cfg(feature="jikesrvm")]
-    pub fn block_start(&self, start: Address, end: Address) -> Address {
-        let mut region = Region::of(start);
+    pub fn block_start(&self, region: RegionRef, start: Address, end: Address) -> Address {
+        // let mut region = Region::of(start);
         let cot_index = (start - region.start()) >> LOG_BYTES_IN_CARD;
-        let addr = region.card_offset_table[cot_index];
+        debug_assert!(cot_index < region.card_offset_table.len());
+        let addr = unsafe { *region.card_offset_table.get_unchecked(cot_index) };
         if addr >= start {
             debug_assert!(addr < end);
             return addr;
@@ -105,7 +112,11 @@ impl MarkTable {
                 let obj_start = VMObjectModel::object_start_ref(object);
                 if obj_start >= start && obj_start < end {
                     // Update COT
-                    region.card_offset_table[cot_index] = obj_start;
+                    // region.get_mut().card_offset_table[cot_index] = obj_start;
+                    debug_assert!(cot_index < region.card_offset_table.len());
+                    unsafe {
+                        *region.get_mut().card_offset_table.get_unchecked_mut(cot_index) = obj_start;
+                    }
                     return obj_start;
                 } else if obj_start >= end {
                     break;

@@ -93,7 +93,7 @@ impl Validator for () {
 }
 
 #[allow(dead_code)]
-fn in_regions_set(r: Region) -> bool {
+fn in_regions_set(r: RegionRef) -> bool {
     for x in PLAN.region_space.regions() {
         if x == r {
             return true

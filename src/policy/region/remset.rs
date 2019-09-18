@@ -22,8 +22,8 @@ impl RemSet {
     }
 
 
-    fn get_per_region_table(&self, region: Region) -> &'static PerRegionTable {
-        let index = region.heap_index();
+    fn get_per_region_table(&self, region: Address) -> &'static PerRegionTable {
+        let index = Region::heap_index(region);
         let entry: &AtomicPtr<PerRegionTable> = {
             let r: &Option<Box<PerRegionTable>> = &self.prts[index];
             debug_assert!(::std::mem::size_of::<Option<Box<PerRegionTable>>>() == ::std::mem::size_of::<AtomicPtr<PerRegionTable>>());
@@ -44,8 +44,8 @@ impl RemSet {
         unsafe { &*ptr }
     }
 
-    fn get_per_region_table_opt(&self, region: Region) -> Option<&'static PerRegionTable> {
-        let index = region.heap_index();
+    fn get_per_region_table_opt(&self, region: Address) -> Option<&'static PerRegionTable> {
+        let index = Region::heap_index(region);
         let entry: &AtomicPtr<PerRegionTable> = {
             let r: &Option<Box<PerRegionTable>> = &self.prts[index];
             debug_assert!(::std::mem::size_of::<Option<Box<PerRegionTable>>>() == ::std::mem::size_of::<AtomicPtr<PerRegionTable>>());
@@ -61,20 +61,20 @@ impl RemSet {
 
     pub fn add_card(&self, card: Card) {
         // debug_assert!(Region::of(card.0).committed);
-        let prt = self.get_per_region_table(Region::of(card.start()));
+        let prt = self.get_per_region_table(Region::align(card.start()));
         prt.add_card(card);
     }
 
     pub fn remove_card(&self, card: Card) {
         // debug_assert!(Region::of(card.0).committed);
-        if let Some(prt) = self.get_per_region_table_opt(Region::of(card.start())) {
+        if let Some(prt) = self.get_per_region_table_opt(Region::align(card.start())) {
             prt.remove_card(card);
         }
     }
 
     pub fn contains_card(&self, card: Card) -> bool {
         // debug_assert!(Region::of(card.0).committed);
-        let prt = self.get_per_region_table(Region::of(card.start()));
+        let prt = self.get_per_region_table(Region::align(card.start()));
         prt.contains_card(card)
     }
 
@@ -115,9 +115,9 @@ struct PerRegionTable {
 }
 
 impl PerRegionTable {
-    fn new(region: Region) -> Self {
+    fn new(region: Address) -> Self {
         Self {
-            region: region.start(),
+            region,
             data: unsafe { ::std::mem::transmute(box [0usize; CARDS_IN_REGION / BITS_IN_WORD]) }
         }
     }
