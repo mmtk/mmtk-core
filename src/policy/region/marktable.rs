@@ -83,7 +83,7 @@ impl MarkTable {
     
     #[inline(always)]
     #[cfg(not(feature="jikesrvm"))]
-    pub fn block_start(&self, start: Address, end: Address) -> Address {
+    pub fn block_start(&self, region: RegionRef, start: Address, end: Address) -> Address {
         unimplemented!()
     }
 
