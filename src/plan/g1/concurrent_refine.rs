@@ -94,9 +94,9 @@ pub fn scan_edge<F: Fn(Address)>(object: ObjectReference, f: F) {
     VMScanning::scan_object(&mut closure, object, 0 as _);
 }
 
-fn refine_one_card(card: Card, mark_dead: bool) {
+fn refine_one_card(card: Card, mark_dead: bool) -> bool {
     if card.get_state() != CardState::Dirty {
-        return;
+        return false;
     }
     card.set_state(CardState::NotDirty);
     card.linear_scan(|obj| {
@@ -111,6 +111,7 @@ fn refine_one_card(card: Card, mark_dead: bool) {
             }
         });
     }, mark_dead);
+    true
 }
 
 pub fn spawn_refine_threads() {
@@ -148,16 +149,22 @@ pub fn collector_refine_all_dirty_cards(id: usize, num_workers: usize) {
         let mut global_buffer = GLOBAL_RS_BUFFER.lock().unwrap();
         global_buffer.clear();
     }
+    let start_time = ::std::time::SystemTime::now();
     let size = (CARDS_IN_HEAP + num_workers - 1) / num_workers;
     let start = size * id;
     let limit = size * (id + 1);
     let limit = if limit > CARDS_IN_HEAP { CARDS_IN_HEAP } else { limit };
+    let mut cards = 0;
     for i in start..limit {
         let card = unsafe { Card::unchecked(HEAP_START + (i << LOG_BYTES_IN_CARD)) };
         if card.get_state() == CardState::Dirty {
-            refine_one_card(card, false);
+            if refine_one_card(card, false) {
+                cards += 1;
+            }
         }
     }
+    let time = start_time.elapsed().unwrap().as_millis() as usize;
+    PLAN.predictor.timer.report_dirty_card_scanning_time(time, cards);
 }
 
 pub fn collector_clear_hotness_table(id: usize, num_workers: usize) {

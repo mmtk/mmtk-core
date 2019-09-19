@@ -186,7 +186,9 @@ impl MutatorContext for G1Mutator {
 impl G1Mutator {
     pub fn new(tls: *mut c_void, space: &'static mut RegionSpace, los: &'static LargeObjectSpace, versatile_space: &'static ImmortalSpace) -> Self {
         G1Mutator {
-            rs: RegionAllocator::new(tls, space, Gen::Eden),
+            rs: RegionAllocator::new(tls, space,
+                if super::ENABLE_GENERATIONAL_GC { Gen::Eden } else { Gen::Old }
+            ),
             los: LargeObjectAllocator::new(tls, Some(los)),
             vs: BumpAllocator::new(tls, Some(versatile_space)),
             modbuf: box PLAN.modbuf_pool.spawn_local(),

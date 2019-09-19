@@ -221,6 +221,11 @@ impl Region {
         unsafe { &mut *(r as *const _ as usize as *mut _) }
     }
 
+    #[inline]
+    pub fn rs_size(&self) -> usize {
+        self.remset().rs_size.load(Ordering::Relaxed)
+    }
+
     pub fn next_mark_table(&self) -> &MarkTable {
         if self.active_table == 0 {
             &self.mark_table0

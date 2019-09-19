@@ -15,6 +15,7 @@ pub struct G1EvacuateTraceLocal {
     tls: *mut c_void,
     values: LocalQueue<'static, ObjectReference>,
     root_locations: LocalQueue<'static, Address>,
+    bytes_copied: usize,
 }
 
 impl TransitiveClosure for G1EvacuateTraceLocal {
@@ -28,14 +29,6 @@ impl TransitiveClosure for G1EvacuateTraceLocal {
                 if RegionSpace::is_cross_region_ref(src, slot, new_object) && PLAN.region_space.in_space(new_object) {
                     Region::of_object(new_object).remset().add_card(Card::of(src))
                 }
-
-                // if !new_object.is_null() && PLAN.region_space.in_space(new_object) {
-                //     let other_region = Region::of_object(new_object);
-                //     debug_assert!(other_region.committed);
-                //     if other_region != Region::of_object(src) {
-                //         other_region.remset().add_card(Card::of(src))
-                //     }
-                // }
             }
             unsafe { slot.store(new_object) };
         }
@@ -81,7 +74,9 @@ impl TraceLocal for G1EvacuateTraceLocal {
                 if region.relocate {
                     if region.prev_mark_table().is_marked(object) {
                         let allocator = Self::pick_copy_allocator(object);
-                        PLAN.region_space.trace_evacuate_object_in_cset(self, object, allocator, tls)
+                        let (o, s) = PLAN.region_space.trace_evacuate_object_in_cset(self, object, allocator, tls);
+                        self.bytes_copied += s;
+                        o
                     } else {
                         ObjectReference::null()
                     }
@@ -112,6 +107,8 @@ impl TraceLocal for G1EvacuateTraceLocal {
     }
 
     fn complete_trace(&mut self) {
+        let start = ::std::time::SystemTime::now();
+        self.bytes_copied = 0;
         let id = self.tls;
         self.process_roots();
         debug_assert!(self.root_locations.is_empty());
@@ -124,6 +121,8 @@ impl TraceLocal for G1EvacuateTraceLocal {
                 break;
             }
         }
+        let time = start.elapsed().unwrap().as_millis() as usize;
+        PLAN.predictor.timer.report_evacuation_time(time, self.bytes_copied);
         debug_assert!(self.root_locations.is_empty());
         debug_assert!(self.values.is_empty());
     }
@@ -201,6 +200,7 @@ impl G1EvacuateTraceLocal {
             tls: 0 as *mut c_void,
             values: trace.values.spawn_local(),
             root_locations: trace.root_locations.spawn_local(),
+            bytes_copied: 0,
         }
     }
 

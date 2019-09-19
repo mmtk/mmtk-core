@@ -190,7 +190,7 @@ lazy_static! {
 
 pub fn get_collection_phase() -> phase::Phase {
     if super::ENABLE_GENERATIONAL_GC {
-        if super::PLAN.in_nursery {
+        if super::PLAN.gc_kind == super::g1::GCKind::Young {
             NURSERY_COLLECTION.clone()
         } else {
             COLLECTION.clone()

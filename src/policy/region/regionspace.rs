@@ -24,6 +24,7 @@ use plan::selected_plan::PLAN;
 use plan::plan::Plan;
 use util::heap::layout::heap_layout::VM_MAP;
 use std::sync::atomic::{AtomicUsize};
+use super::*;
 
 
 
@@ -336,8 +337,12 @@ impl RegionSpace {
         }
     }
 
+    pub fn nursery_regions(&self) -> usize {
+        self.nursery_regions.load(Ordering::Relaxed)
+    }
+    
     pub fn nursery_ratio(&self) -> f32 {
-        let nursery = self.nursery_regions.load(Ordering::SeqCst) as f32;
+        let nursery = self.nursery_regions.load(Ordering::Relaxed) as f32;
         // let total = self.total_regions.load(Ordering::SeqCst) as f32;
         // let total = AVAILABLE_REGIONS_IN_HEAP as f32;
         debug_assert!(self.heap_size != 0);
@@ -347,6 +352,14 @@ impl RegionSpace {
         // println!("Total: {}", total);
         // println!("Ratio: {}", nursery / total);
         nursery / total
+    }
+
+    pub fn committed_ratio(&self) -> f32 {
+        let committed = self.total_regions.load(Ordering::Relaxed) as f32;
+        debug_assert!(self.heap_size != 0);
+        let total = (self.heap_size >> LOG_BYTES_IN_REGION) as f32;
+        debug_assert!(total != 0f32);
+        committed / total
     }
 
     fn release_region(&mut self, region: &Region) {
@@ -396,22 +409,22 @@ impl RegionSpace {
     }
 
     // #[inline(never)]
-    pub fn trace_evacuate_object_in_cset<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
+    pub fn trace_evacuate_object_in_cset<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, allocator: Allocator, tls: *mut c_void) -> (ObjectReference, usize) {
         let region = Region::of_object(object);
         debug_assert!(region.start() != ::util::alloc::embedded_meta_data::get_metadata_base(region.start()), "Invalid region {:?}, object {:?}", region.start(), object);
         debug_assert!(region.committed);
         debug_assert!(region.relocate);
         let prior_status_word = ForwardingWord::attempt_to_forward(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(prior_status_word) {
-            ForwardingWord::spin_and_get_forwarded_object(object, prior_status_word)
+            (ForwardingWord::spin_and_get_forwarded_object(object, prior_status_word), 0)
         } else {
             let new_object = ForwardingWord::forward_object(object, allocator, tls);
             trace.process_node(new_object);
-            new_object
+            (new_object, VMObjectModel::get_current_size(new_object))
         }
     }
 
-    pub fn compute_collection_set_for_nursery_gc(&self, available_pages: usize) {
+    pub fn compute_collection_set_for_nursery_gc(&self, available_pages: usize, predictor: impl AccumulativePauseTimePredictor) {
         const MAX_LIVE_SIZE: usize = (BYTES_IN_REGION as f64 * 0.65) as usize;
         let mut regions: Vec<RegionRef> = self.regions().collect();
         regions.sort_unstable_by_key(|r| r.live_size.load(Ordering::Relaxed));
@@ -432,13 +445,15 @@ impl RegionSpace {
         }
     }
 
-    pub fn compute_collection_set_for_mixed_gc(&self, available_pages: usize) {
+    pub fn compute_collection_set_for_mixed_gc(&self, available_pages: usize, mut predictor: impl AccumulativePauseTimePredictor) {
+        // println!("Mixed GC");
         // FIXME: Bad performance
         const MAX_LIVE_SIZE: usize = (BYTES_IN_REGION as f64 * 0.65) as usize;
         let mut regions: Vec<RegionRef> = self.regions().collect();
         regions.sort_unstable_by_key(|r| r.live_size.load(Ordering::Relaxed));
         let avail_regions = (available_pages >> embedded_meta_data::LOG_PAGES_IN_REGION) * REGIONS_IN_CHUNK;
         let mut available_size = avail_regions << LOG_BYTES_IN_REGION;
+        let mut n = 0;
         // Select all young regions
         for region in &regions {
             if region.generation != Gen::Old {
@@ -447,8 +462,11 @@ impl RegionSpace {
                     if DEBUG {
                         println!("Relocate {:?}", region);
                     }
+                    predictor.record(region);
                     region.get_mut().relocate = true;
                     available_size -= live_size;
+                    n += 1;
+                    // println!("{} nursery regions, pause time = {} ms", n, predictor.predict());
                 }
             }
         }
@@ -457,17 +475,25 @@ impl RegionSpace {
             if region.generation == Gen::Old {
                 let live_size = region.live_size.load(Ordering::Relaxed);
                 if live_size <= MAX_LIVE_SIZE && live_size < available_size {
-                    if DEBUG {
-                        println!("Relocate {:?}", region);
+                    predictor.record(region);
+                    if predictor.within_budget() {
+                        if DEBUG {
+                            println!("Relocate {:?}", region);
+                        }
+                        region.get_mut().relocate = true;
+                        available_size -= live_size;
+                        n += 1;
+                        // println!("{} old regions, pause time = {} ms", n, predictor.predict_f32());
+                    } else {
+                        break;
                     }
-                    region.get_mut().relocate = true;
-                    available_size -= live_size;
                 }
             }
         }
+        // println!("Mixed GC CS={}", n);
     }
 
-    pub fn compute_collection_set(&self, available_pages: usize) {
+    pub fn compute_collection_set_full_heap(&self, available_pages: usize) {
         // FIXME: Bad performance
         const MAX_LIVE_SIZE: usize = (BYTES_IN_REGION as f64 * 0.65) as usize;
         let mut regions: Vec<RegionRef> = self.regions().collect();
@@ -502,28 +528,28 @@ impl RegionSpace {
         me.regions = self.regions().filter(|r| r.relocate).collect();
     }
     
-    pub fn iterate_tospace_remset_roots<T: TraceLocal>(&self, trace: &T, id: usize, num_workers: usize, nursery: bool) {
+    pub fn iterate_tospace_remset_roots<T: TraceLocal>(&self, trace: &T, id: usize, num_workers: usize, nursery: bool, timer: &PauseTimePredictionTimer) {
+        let start_time = ::std::time::SystemTime::now();
         let size = (self.regions.len() + num_workers - 1) / num_workers;
         let start = size * id;
         let limit = size * (id + 1);
         let regions = self.regions.len();
         let limit = if limit > regions { regions } else { limit };
+        let mut cards = 0;
+        
         for i in start..limit {
             let region = &self.regions[i];
             debug_assert!(region.relocate);
-            self.iterate_region_remset_roots(region, trace, nursery);
+            cards += self.iterate_region_remset_roots(region, trace, nursery);
         }
-        // if id == 0 {
-        //     for region in self.regions() {
-        //         if region.relocate {
-        //             self.iterate_region_remset_roots(region, trace);
-        //         }
-        //     }
-        // }
+        let time = start_time.elapsed().unwrap().as_millis() as usize;
+        timer.report_remset_card_scanning_time(time, cards);
     }
 
-    fn iterate_region_remset_roots<T: TraceLocal>(&self, region: &Region, trace: &T, nursery: bool) {
+    fn iterate_region_remset_roots<T: TraceLocal>(&self, region: &Region, trace: &T, nursery: bool) -> usize {
+        let mut cards = 0;
         region.remset().iterate(|card| {
+            cards += 1;
             card.linear_scan(|obj| {
                 // if ::plan::g1::SLOW_ASSERTIONS {
                 //     Self::validate_remset_root(obj);
@@ -532,7 +558,8 @@ impl RegionSpace {
                 trace.process_node(obj);
             }, !nursery);
             region.remset().remove_card(card);
-        })
+        });
+        cards
     }
 
     #[cfg(not(feature = "g1"))]

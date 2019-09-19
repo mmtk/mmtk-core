@@ -11,6 +11,7 @@ mod g1nurserytracelocal;
 mod collection;
 mod concurrent_refine;
 mod validate;
+mod predictor;
 
 pub use self::g1::G1;
 pub use self::g1::PLAN;
@@ -34,6 +35,7 @@ const ENABLE_REMEMBERED_SETS: bool = true;
 const ENABLE_CONCURRENT_REFINEMENT: bool = true;
 const ENABLE_HOT_CARDS_OPTIMIZATION: bool = true;
 const ENABLE_GENERATIONAL_GC: bool = true;
+const ENABLE_PAUSE_TIME_PREDICTOR: bool = true;
 
 // Configs
 

@@ -9,6 +9,7 @@ use vm::*;
 
 
 pub struct RemSet {
+    pub rs_size: AtomicUsize,
     prts: Box<[Option<Box<PerRegionTable>>; REGIONS_IN_HEAP]>,
 }
 
@@ -17,6 +18,7 @@ pub struct RemSet {
 impl RemSet {
     pub fn new() -> Self {
         Self {
+            rs_size: AtomicUsize::new(0),
             prts: unsafe { ::std::mem::transmute(box [0usize; REGIONS_IN_HEAP]) }
         }
     }
@@ -62,13 +64,17 @@ impl RemSet {
     pub fn add_card(&self, card: Card) {
         // debug_assert!(Region::of(card.0).committed);
         let prt = self.get_per_region_table(Region::align(card.start()));
-        prt.add_card(card);
+        if prt.add_card(card) {
+            self.rs_size.fetch_add(1, Ordering::Relaxed);
+        }
     }
 
     pub fn remove_card(&self, card: Card) {
         // debug_assert!(Region::of(card.0).committed);
         if let Some(prt) = self.get_per_region_table_opt(Region::align(card.start())) {
-            prt.remove_card(card);
+            if prt.remove_card(card) {
+                self.rs_size.fetch_sub(1, Ordering::Relaxed);
+            }
         }
     }
 
@@ -79,23 +85,26 @@ impl RemSet {
     }
 
     pub fn clear_cards_in_collection_set(&mut self) {
+        let mut n = 0;
         for prt in self.prts.iter_mut() {
             if prt.is_some() {
                 if prt.as_ref().unwrap().region_in_cset() {
+                    n += prt.as_ref().unwrap().num_cards();
                     *prt = None;
                 } else {
-                    prt.as_ref().unwrap().clean_los_cards();
+                    n += prt.as_ref().unwrap().clean_los_cards();
                 }
             }
         }
+        self.rs_size.fetch_sub(n, Ordering::Relaxed);
     }
 
     #[inline(always)]
-    pub fn iterate<F: Fn(Card)>(&self, f: F) {
+    pub fn iterate<F: FnMut(Card)>(&self, mut f: F) {
         for prt in self.prts.iter() {
             if let Some(prt) = prt {
                 if !prt.region_in_cset() {
-                    prt.iterate(&f)
+                    prt.iterate(&mut f)
                 }
             }
         }
@@ -128,9 +137,10 @@ impl PerRegionTable {
         (&self.data[index >> LOG_BITS_IN_WORD], index & (BITS_IN_WORD - 1))
     }
 
-    fn add_card(&self, card: Card) {
+    fn add_card(&self, card: Card) -> bool {
         let (entry, offset) = self.get_entry(card);
-        entry.fetch_or(1 << offset, Ordering::SeqCst);
+        let old = entry.fetch_or(1 << offset, Ordering::SeqCst);
+        old & (1 << offset) == 0
     }
 
     fn contains_card(&self, card: Card) -> bool {
@@ -138,26 +148,47 @@ impl PerRegionTable {
         (entry.load(Ordering::SeqCst) & (1 << offset)) != 0
     }
 
-    fn remove_card(&self, card: Card) {
+    fn remove_card(&self, card: Card) -> bool {
         let (entry, offset) = self.get_entry(card);
-        entry.fetch_and(!(1 << offset), Ordering::SeqCst);
+        let old = entry.fetch_and(!(1 << offset), Ordering::SeqCst);
+        old & (1 << offset) != 0
     }
 
     #[cfg(not(feature = "g1"))]
-    fn clean_los_cards(&self) {
+    fn clean_los_cards(&self) -> usize {
         unimplemented!()
     }
 
     #[cfg(feature = "g1")]
-    fn clean_los_cards(&self) {
+    fn clean_los_cards(&self) -> usize {
+        let mut n = 0;
         if PLAN.los.address_in_space(self.region) {
-            self.iterate(&|card| {
+            self.iterate(&mut |card| {
                 let o = unsafe { VMObjectModel::get_object_from_start_address(card.start()) };
                 if !PLAN.los.is_live(o) {
-                    self.remove_card(card);
+                    if self.remove_card(card) {
+                        n += 1;
+                    }
                 }
             })
         }
+        n
+    }
+
+    fn num_cards(&self) -> usize {
+        let mut n = 0;
+        for i in 0..self.data.len() {
+            let val = self.data[i].load(Ordering::SeqCst);
+            if val != 0 {
+                for j in 0..BITS_IN_WORD {
+                    if (val & (1 << j)) != 0 {
+                        // This card is remembered
+                        n += 1;
+                    }
+                }
+            }
+        }
+        n
     }
 
     #[cfg(not(feature = "g1"))]
@@ -175,7 +206,7 @@ impl PerRegionTable {
     }
 
     #[inline(always)]
-    pub fn iterate<F: Fn(Card)>(&self, f: &F) {
+    fn iterate<F: FnMut(Card)>(&self, f: &mut F) {
         for i in 0..self.data.len() {
             let val = self.data[i].load(Ordering::SeqCst);
             if val != 0 {

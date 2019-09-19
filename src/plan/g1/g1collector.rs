@@ -19,6 +19,7 @@ use policy::region::*;
 use super::multitracelocal::*;
 use super::{G1MarkTraceLocal, G1EvacuateTraceLocal, G1NurseryTraceLocal};
 use super::validate::ValidateTraceLocal;
+use super::g1::GCKind;
 
 static mut CONTINUE_COLLECTING: bool = false;
 
@@ -136,7 +137,7 @@ impl CollectorContext for G1Collector {
                 self.rendezvous();
                 let id = self.worker_ordinal;
                 let workers = self.parallel_worker_count();
-                PLAN.region_space.iterate_tospace_remset_roots(self.get_current_trace(), id, workers, PLAN.in_nursery);
+                PLAN.region_space.iterate_tospace_remset_roots(self.get_current_trace(), id, workers, PLAN.gc_kind == GCKind::Young, &PLAN.predictor.timer);
                 self.rendezvous();
             }
             &Phase::SoftRefs => {
@@ -211,7 +212,7 @@ impl CollectorContext for G1Collector {
                 }
             }
             &Phase::EvacuatePrepare => {
-                if PLAN.in_nursery {
+                if PLAN.gc_kind == GCKind::Young {
                     self.trace.set_active(TraceKind::Nursery as _);
                 } else {
                     self.trace.set_active(TraceKind::Evacuate as _);
@@ -285,6 +286,8 @@ impl CollectorContext for G1Collector {
                           unsafe { CONTINUE_COLLECTING = true };
                           ::plan::phase::notify_concurrent_phase_incomplete();
                         }
+                    } else {
+                        PLAN.as_mut().gc_kind = GCKind::Full;
                     }
                 }
                 self.rendezvous();
@@ -309,7 +312,7 @@ impl ParallelCollector for G1Collector {
         if !phase::is_phase_stack_empty() {
             phase::continue_phase_stack(self.tls);
         } else {
-            if PLAN.in_nursery {
+            if PLAN.gc_kind == GCKind::Young {
                 debug_assert!(super::ENABLE_GENERATIONAL_GC);
                 phase::begin_new_phase_stack(self.tls, (phase::Schedule::Complex, super::collection::NURSERY_COLLECTION.clone()));
             } else {

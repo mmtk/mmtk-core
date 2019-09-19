@@ -1,9 +1,11 @@
 use super::card::*;
 use util::heap::layout::vm_layout_constants::*;
 use util::*;
+use std::sync::atomic::{AtomicUsize, AtomicU8, Ordering};
 
 static mut CARD_TABLE: CardTable = CardTable {
-    table: [CardState::NotDirty; CARDS_IN_HEAP]
+    table: [CardState::NotDirty; CARDS_IN_HEAP],
+    dirty: AtomicUsize::new(0),
 };
 
 static mut CARD_HOTNESS_TABLE: [u8; CARDS_IN_HEAP] = [0; CARDS_IN_HEAP];
@@ -14,16 +16,21 @@ pub fn get() -> &'static mut CardTable {
     unsafe { &mut CARD_TABLE }
 }
 
+#[inline(always)]
+pub fn num_dirty_cards() -> usize {
+    get().dirty.load(Ordering::Relaxed)
+}
+
 #[repr(u8)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum CardState {
-    Young = 0,
     NotDirty = 1,
     Dirty = 2,
 }
 
 pub struct CardTable {
-    table: [CardState; CARDS_IN_HEAP]
+    table: [CardState; CARDS_IN_HEAP],
+    dirty: AtomicUsize,
 }
 
 impl CardTable {
@@ -96,7 +103,23 @@ impl CardTable {
         let index = (addr - HEAP_START) >> LOG_BYTES_IN_CARD;
         debug_assert!(index < self.table.len());
         unsafe {
-            *self.table.get_unchecked_mut(index) = state;
+            let entry: &mut CardState = self.table.get_unchecked_mut(index);
+            let entry: &mut AtomicU8 = ::std::mem::transmute(entry);
+            match state {
+                CardState::Dirty => {
+                    let old: CardState = ::std::mem::transmute(entry.compare_and_swap(CardState::NotDirty as _, CardState::Dirty as _, Ordering::Relaxed));
+                    if old == CardState::NotDirty {
+                        self.dirty.fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+                CardState::NotDirty => {
+                    let old: CardState = ::std::mem::transmute(entry.compare_and_swap(CardState::Dirty as _, CardState::NotDirty as _, Ordering::Relaxed));
+                    if old == CardState::Dirty {
+                        self.dirty.fetch_sub(1, Ordering::Relaxed);
+                    }
+                }
+            }
+            // *self.table.get_unchecked_mut(index) = state;
         }
     }
 

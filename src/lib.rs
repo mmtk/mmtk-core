@@ -4,6 +4,7 @@
 #![feature(drain_filter)]
 #![feature(nll)]
 #![feature(box_syntax)]
+#![feature(unboxed_closures)]
 
 #[macro_use]
 extern crate custom_derive;

@@ -15,6 +15,7 @@ pub struct G1NurseryTraceLocal {
     tls: *mut c_void,
     values: LocalQueue<'static, ObjectReference>,
     root_locations: LocalQueue<'static, Address>,
+    bytes_copied: usize,
 }
 
 impl TransitiveClosure for G1NurseryTraceLocal {
@@ -72,8 +73,8 @@ impl TraceLocal for G1NurseryTraceLocal {
                 let o = if region.prev_mark_table().is_marked(object) {
                     let allocator = Self::pick_copy_allocator(object);
                     // println!("Nursery Copy start {:?} {:?}", object, region);
-                    let o = PLAN.region_space.trace_evacuate_object_in_cset(self, object, allocator, tls);
-                    // println!("Nursery Copy end");
+                    let (o, s) = PLAN.region_space.trace_evacuate_object_in_cset(self, object, allocator, tls);
+                    self.bytes_copied += s;
                     o
                 } else {
                     ObjectReference::null()
@@ -90,6 +91,8 @@ impl TraceLocal for G1NurseryTraceLocal {
     }
 
     fn complete_trace(&mut self) {
+        let start = ::std::time::SystemTime::now();
+        self.bytes_copied = 0;
         let id = self.tls;
         self.process_roots();
         debug_assert!(self.root_locations.is_empty());
@@ -102,6 +105,8 @@ impl TraceLocal for G1NurseryTraceLocal {
                 break;
             }
         }
+        let time = start.elapsed().unwrap().as_millis() as usize;
+        PLAN.predictor.timer.report_evacuation_time(time, self.bytes_copied);
         debug_assert!(self.root_locations.is_empty());
         debug_assert!(self.values.is_empty());
     }
@@ -154,6 +159,7 @@ impl G1NurseryTraceLocal {
             tls: 0 as *mut c_void,
             values: trace.values.spawn_local(),
             root_locations: trace.root_locations.spawn_local(),
+            bytes_copied: 0,
         }
     }
 

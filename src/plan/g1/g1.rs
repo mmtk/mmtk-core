@@ -27,6 +27,8 @@ use policy::region::*;
 use super::VERBOSE;
 use policy::largeobjectspace::LargeObjectSpace;
 use util::queue::SharedQueue;
+use super::predictor::PauseTimePredictor;
+use plan::parallel_collector::ParallelCollector;
 
 
 pub type SelectedPlan = G1;
@@ -37,6 +39,11 @@ pub const ALLOC_OLD: Allocator = Allocator::G1Old;
 
 lazy_static! {
     pub static ref PLAN: G1 = G1::new();
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum GCKind {
+    Young, Mixed, Full
 }
 
 pub struct G1 {
@@ -55,8 +62,9 @@ pub struct G1Unsync {
     total_pages: usize,
     collection_attempt: usize,
     pub new_barrier_active: bool,
-    pub in_nursery: bool,
     pub in_gc: bool,
+    pub gc_kind: GCKind,
+    pub predictor: PauseTimePredictor,
 }
 
 unsafe impl Sync for G1 {}
@@ -90,8 +98,9 @@ impl Plan for G1 {
                 total_pages: 0,
                 collection_attempt: 0,
                 new_barrier_active: false,
-                in_nursery: false,
                 in_gc: false,
+                gc_kind: GCKind::Young,
+                predictor: PauseTimePredictor::new(),
             }),
             mark_trace: Trace::new(),
             evacuate_trace: Trace::new(),
@@ -156,7 +165,7 @@ impl Plan for G1 {
 
     unsafe fn collection_phase(&self, tls: *mut c_void, phase: &Phase) {
         if VERBOSE {
-            println!("Global {:?} {:?}", phase, PLAN.in_nursery);
+            println!("Global {:?} {:?}", phase, PLAN.gc_kind);
         }
         let unsync = &mut *self.unsync.get();
 
@@ -212,15 +221,18 @@ impl Plan for G1 {
                 }
             },
             &Phase::CollectionSetSelection => {
+                unsync.predictor.pause_start(
+                    VMActivePlan::collector(tls).parallel_worker_count(),
+                    PLAN.region_space.nursery_regions(),
+                );
                 let available_pages = self.get_total_pages() - self.get_pages_used();
-                if super::ENABLE_GENERATIONAL_GC {
-                    if PLAN.in_nursery {
-                        self.region_space.compute_collection_set_for_nursery_gc(available_pages);
-                    } else {
-                        self.region_space.compute_collection_set_for_mixed_gc(available_pages);
-                    }
+                let predictor = self.predictor.get_accumulative_predictor(cardtable::num_dirty_cards());
+                if super::ENABLE_GENERATIONAL_GC && self.gc_kind == GCKind::Young {
+                    self.region_space.compute_collection_set_for_nursery_gc(available_pages, predictor);
+                } else if self.gc_kind == GCKind::Mixed {
+                    self.region_space.compute_collection_set_for_mixed_gc(available_pages, predictor);
                 } else {
-                    self.region_space.compute_collection_set(available_pages);
+                    self.region_space.compute_collection_set_full_heap(available_pages);
                 }
             },
             &Phase::EvacuatePrepare => {
@@ -230,7 +242,7 @@ impl Plan for G1 {
                 debug_assert!(self.evacuate_trace.values.is_empty());
                 debug_assert!(self.evacuate_trace.root_locations.is_empty());
                 // prepare each of the collected regions
-                if !PLAN.in_nursery {
+                if PLAN.gc_kind != GCKind::Young {
                     unsync.region_space.shift_mark_tables();
                 } else {
                     unsync.region_space.clear_next_mark_tables();
@@ -256,7 +268,7 @@ impl Plan for G1 {
                 debug_assert!(self.evacuate_trace.values.is_empty());
                 debug_assert!(self.evacuate_trace.root_locations.is_empty());
                 unsync.region_space.release();
-                if !PLAN.in_nursery {
+                if PLAN.gc_kind != GCKind::Young {
                     unsync.los.release(true);
                     unsync.versatile_space.release();
                     unsync.vm_space.release();
@@ -273,6 +285,7 @@ impl Plan for G1 {
                     super::concurrent_refine::enable_concurrent_refinement();
                 }
                 unsync.in_gc = false;
+                unsync.predictor.pause_end(self.gc_kind);
             },
             &Phase::SetBarrierActive => {
                 unsync.new_barrier_active = true;
@@ -291,6 +304,11 @@ impl Plan for G1 {
         }
     }
 
+    fn force_full_heap_collection(&self) {
+        let unsync = unsafe { &mut *self.unsync.get() };
+        unsync.gc_kind = GCKind::Full;
+    }
+
     fn collection_required<PR: PageResource>(&self, space_full: bool, _space: &'static PR::Space) -> bool where Self: Sized {
         let stress_force_gc = self.stress_test_gc_required();
         trace!("self.get_pages_reserved()={}, self.get_total_pages()={}",
@@ -299,12 +317,12 @@ impl Plan for G1 {
         let me = unsafe { &mut *(self as *const _ as usize as *mut Self) };
         if space_full || stress_force_gc || heap_full {
             // Mixed GC
-            me.in_nursery = false;
+            me.gc_kind = GCKind::Full;
             return true;
         }
         if super::ENABLE_GENERATIONAL_GC && !PLAN.in_gc {
-            if PLAN.region_space.nursery_ratio() > 0.1 {
-                me.in_nursery = true;
+            if PLAN.region_space.nursery_ratio() > self.predictor.nursery_ratio {
+                me.gc_kind = GCKind::Young;
                 return true;
             }
         }
@@ -313,10 +331,11 @@ impl Plan for G1 {
 
     fn concurrent_collection_required(&self) -> bool {
         if super::ENABLE_CONCURRENT_MARKING && !::plan::phase::concurrent_phase_active() {
-            let used = self.get_pages_used() as f32;
-            let total = self.get_total_pages() as f32;
-            if (used / total) > 0.45f32 {
-                PLAN.as_mut().in_nursery = false;
+            // let used = self.get_pages_used() as f32;
+            // let total = self.get_total_pages() as f32;
+            // if (used / total) > 0.45f32 {
+            if PLAN.region_space.committed_ratio() > 0.45 {
+                PLAN.as_mut().gc_kind = GCKind::Mixed;
                 return true;
             }
         }
@@ -325,7 +344,7 @@ impl Plan for G1 {
 
     fn handle_user_collection_request(tls: *mut c_void) {
         if !::util::options::OPTION_MAP.ignore_system_g_c {
-            PLAN.as_mut().in_nursery = false;
+            PLAN.as_mut().gc_kind = GCKind::Full;
             ::plan::plan::USER_TRIGGERED_COLLECTION.store(true, Ordering::Relaxed);
             ::plan::plan::CONTROL_COLLECTOR_CONTEXT.request();
             VMCollection::block_for_gc(tls);
@@ -386,7 +405,7 @@ impl G1 {
         &unsync.los
     }
     
-    fn as_mut(&self) -> &mut Self {
+    pub fn as_mut(&self) -> &mut Self {
         unsafe { &mut *(self as *const _ as usize as *mut _) }
     }
 
