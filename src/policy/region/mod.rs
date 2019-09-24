@@ -4,6 +4,7 @@ pub mod cardtable;
 mod card;
 mod remset;
 mod marktable;
+mod blockoffsettable;
 
 pub use self::region::*;
 pub use self::regionspace::*;
@@ -11,6 +12,7 @@ pub use self::card::*;
 pub use self::remset::*;
 pub use self::marktable::*;
 pub use self::cardtable::*;
+pub use self::blockoffsettable::*;
 
 const DEBUG: bool = false;
 
@@ -92,4 +94,33 @@ impl PauseTimePredictionTimer {
     // pub fn d(&self) -> f32 { self.u_cards.load(Ordering::Relaxed) as f32 }
     pub fn s(&self) -> f32 { self.s.load(Ordering::Relaxed) as f32 / self.s_cards.load(Ordering::Relaxed) as f32 }
     pub fn c(&self) -> f32 { self.c.load(Ordering::Relaxed) as f32 / self.c_bytes.load(Ordering::Relaxed) as f32 }
+}
+
+use util::*;
+
+/// Return the first object where start <= start_ref(obj) < limit 
+#[inline(always)]
+#[cfg(feature="jikesrvm")]
+unsafe fn get_object_from_start_address(start: Address, limit: Address) -> Option<(Address, ObjectReference)> {
+    let mut cursor = start;
+    if cursor >= limit {
+        return None;
+    }
+    /* Skip over any alignment fill */
+    while cursor.load::<usize>() == ::vm::jikesrvm::java_header::ALIGNMENT_VALUE {
+        cursor += ::std::mem::size_of::<usize>();
+        if cursor >= limit {
+            return None;
+        }
+    }
+    let object = (cursor + ::vm::jikesrvm::java_header::OBJECT_REF_OFFSET).to_object_reference();
+    if ::util::alloc::bumpallocator::tib_is_zero(object) {
+        return None;
+    }
+    Some((cursor, object))
+}
+
+#[cfg(not(feature="jikesrvm"))]
+unsafe fn get_object_from_start_address(start: Address, limit: Address) -> Option<(Address, ObjectReference)> {
+    unimplemented!()
 }

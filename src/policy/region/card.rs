@@ -64,53 +64,31 @@ impl Card {
     pub fn linear_scan<Closure: Fn(ObjectReference)>(&self, cl: Closure, mark_dead: bool) {
         unimplemented!()
     }
-    
-    #[inline(never)]
-    #[allow(dead_code)]
-    #[cfg(feature = "g1")]
+
     fn scan_g1<Closure: Fn(ObjectReference)>(&self, region: RegionRef, start: Address, limit: Address, cl: Closure) {
-        // println!("Scan card {:?} in {:?} {:?}", start, region, region.relocate);
-        // println!("limit {:?}", limit);
-        let mut cursor = region.prev_mark_table().block_start(region, start, limit);
-        let mut should_update_cot = cursor < start;
-        // println!("block_start {:?}", cursor);
+        let region = region.get_mut();
+        let mut cursor = match region.card_offset_table.block_start(*self) {
+            Some(a) => a,
+            None => return,
+        };
+        // assert!(start <= cursor);
         while cursor < limit {
-            // println!("  cursor={:?}", cursor);
-            let object = match unsafe { get_object_from_start_address(cursor, limit) } {
-                Some(o) => o,
+            let object = match unsafe { super::get_object_from_start_address(cursor, limit) } {
+                Some(o) => o.1,
                 None => break,
             };
-            
-            // println!("  object={:?}", object);
-            let start_ref = VMObjectModel::object_start_ref(object);
-            // let start_ref = object.to_address() + (-::vm::jikesrvm::java_header::OBJECT_REF_OFFSET);
-            // debug_assert!(unsafe { VMObjectModel::get_object_from_start_address(cursor) } == object);
-            // println!("  start_ref={:?}", start_ref);
-            if start_ref >= limit {
-                break;
-            }
-            if ::util::alloc::bumpallocator::tib_is_zero(object) {
-                return
-            }
+            // assert!(cursor <= start_ref);
+            // assert!(start_ref < limit);
+            cl(object);
             cursor = VMObjectModel::get_object_end_address(object);
-            debug_assert!(cursor == start_ref + VMObjectModel::get_current_size(object));
-            if start_ref >= start {
-                if should_update_cot {
-                    should_update_cot = false;
-                    let cot_index = (start - region.start()) >> LOG_BYTES_IN_CARD;
-                    debug_assert!(cot_index < region.card_offset_table.len());
-                    unsafe {
-                        *region.get_mut().card_offset_table.get_unchecked_mut(cot_index) = start_ref;
-                    }
-                }
-                if start_ref < limit {
-                    cl(object);
-                }
-            }
+            // if start_ref >= start {
+            //     if start_ref < limit {
+            //         cl(object);
+            //     }
+            // }
         }
-        // println!("Scan card {:?} Finish", start);
     }
-    
+
     #[inline(always)]
     #[cfg(feature = "g1")]
     pub fn linear_scan<Closure: Fn(ObjectReference)>(&self, cl: Closure, mark_dead: bool) {
@@ -175,26 +153,4 @@ impl ::std::ops::Deref for Card {
     fn deref(&self) -> &Address {
         &self.0
     }
-}
-
-#[cfg(feature="jikesrvm")]
-unsafe fn get_object_from_start_address(start: Address, limit: Address) -> Option<ObjectReference> {
-    // trace!("ObjectModel.get_object_from_start_address");
-    let mut _start = start;
-    if _start >= limit {
-        return None;
-    }
-    /* Skip over any alignment fill */
-    while _start.load::<usize>() == ::vm::jikesrvm::java_header::ALIGNMENT_VALUE {
-        _start += ::std::mem::size_of::<usize>();
-        if _start >= limit {
-            return None;
-        }
-    }
-    Some((_start + ::vm::jikesrvm::java_header::OBJECT_REF_OFFSET).to_object_reference())
-}
-
-#[cfg(not(feature="jikesrvm"))]
-unsafe fn get_object_from_start_address(start: Address, limit: Address) -> Option<ObjectReference> {
-    unimplemented!()
 }

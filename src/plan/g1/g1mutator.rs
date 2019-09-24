@@ -127,7 +127,7 @@ impl MutatorContext for G1Mutator {
         match allocator {
             AllocationType::Default => {
                 // println!("Alloc {:?} tib={:?}, size={:?}, end={:?}|{:?}", refer, _type_refer, bytes, VMObjectModel::object_start_ref(refer) + bytes, VMObjectModel::get_object_end_address(refer));
-                PLAN.region_space.initialize_header(refer, bytes, true, false, true);
+                // PLAN.region_space.initialize_header(refer, bytes, true, false, true);
             }
             AllocationType::Los => {
                 PLAN.los.initialize_header(refer, true);

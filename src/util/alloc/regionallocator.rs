@@ -8,8 +8,21 @@ use libc::c_void;
 type PR = FreeListPageResource<RegionSpace>;
 
 const USE_TLABS: bool = true;
+const LOG_UNIT_SIZE: usize = 9;
+const UNIT_SIZE: usize = 1 << LOG_UNIT_SIZE;
 const MIN_TLAB_SIZE: usize = 2 * 1024;
 const MAX_TLAB_SIZE: usize = ::plan::SelectedConstraints::MAX_NON_LOS_COPY_BYTES;
+
+#[inline(always)]
+fn ceil_div(x: usize, y: usize) -> usize {
+    1 + ((x - 1) / y)
+}
+
+#[inline(always)]
+fn align_tlabs(mut size: usize) -> usize {
+    size = size + (UNIT_SIZE - 1);
+    size & !(UNIT_SIZE - 1)
+}
 
 #[repr(C)]
 #[derive(Debug)]
@@ -28,11 +41,13 @@ impl RegionAllocator {
         if USE_TLABS {
             let factor = self.refills as f32 / 50f32;
             self.tlab_size = (self.tlab_size as f32 * factor) as usize;
+            self.tlab_size = align_tlabs(self.tlab_size);
             if self.tlab_size < MIN_TLAB_SIZE {
                 self.tlab_size = MIN_TLAB_SIZE;
             } else if self.tlab_size > MAX_TLAB_SIZE {
                 self.tlab_size = MAX_TLAB_SIZE;
             }
+            // println!("TLAB {}", self.tlab_size);
             self.refills = 0;
         }
     }
@@ -71,11 +86,7 @@ impl Allocator<PR> for RegionAllocator {
         debug_assert!(bytes <= BYTES_IN_REGION);
         if USE_TLABS {
             let mut size = if bytes > self.tlab_size { bytes } else { self.tlab_size };
-            let mut tlabs = size / MIN_TLAB_SIZE;
-            if tlabs * MIN_TLAB_SIZE < size {
-                tlabs += 1;
-            }
-            size = tlabs * MIN_TLAB_SIZE;
+            size = align_tlabs(size);
             debug_assert!(size >= bytes);
             match self.space.refill(self.tls, size, self.generation) {
                 Some(tlab) => {
@@ -120,18 +131,13 @@ impl RegionAllocator {
     }
 
     fn init_offsets(&self, start: Address, limit: Address) {
-        let region = Region::of(start);
+        let region = Region::of(start).get_mut();
         let region_start = region.start();
         debug_assert!(limit <= region_start + BYTES_IN_REGION);
         let mut cursor = start;
         while cursor < limit {
             debug_assert!(cursor >= region_start);
-            let index = (cursor - region_start) >> LOG_BYTES_IN_CARD;
-            // region.get_mut().card_offset_table[index] = start;
-            debug_assert!(index < region.card_offset_table.len());
-            unsafe {
-                *region.get_mut().card_offset_table.get_unchecked_mut(index) = start;
-            }
+            region.card_offset_table.set(Card::of(cursor), start);
             cursor += BYTES_IN_CARD;
         }
     }

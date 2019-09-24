@@ -78,6 +78,16 @@ fn test_and_mark(object: ObjectReference) -> bool {
     // } else {
         let mark_word = object.to_address() + *MARK_WORD_OFFSET;
         let mark_state = MARK_STATE.load(Ordering::Relaxed);
+
+        // loop {
+        //     let old = unsafe { mark_word.load::<usize>() };
+        //     if old == mark_state {
+        //         return false;
+        //     }
+        //     if unsafe { mark_word.attempt(old, mark_state, Ordering::SeqCst) == old } {
+        //         return true;
+        //     }
+        // }
         if unsafe { mark_word.load::<usize>() } != mark_state {
             unsafe { mark_word.store(mark_state) };
             true
@@ -93,12 +103,8 @@ fn is_marked(object: ObjectReference) -> bool {
     // } else {
         let mark_word = object.to_address() + *MARK_WORD_OFFSET;
         let mark_state = MARK_STATE.load(Ordering::Relaxed);
-        if unsafe { mark_word.load::<usize>() } != mark_state {
-            unsafe { mark_word.store(mark_state) };
-            true
-        } else {
-            false
-        }
+        let state = unsafe { mark_word.load::<usize>() };
+        state == mark_state
     // }
 }
 

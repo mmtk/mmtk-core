@@ -253,7 +253,7 @@ impl Plan for G1 {
                     unsync.los.prepare(true);
                     unsync.vm_space.prepare();
                 } else {
-                    unsync.region_space.prepare();
+                    unsync.region_space.reset_alloc_regions();
                 }
                 
                 self.print_vm_map();
@@ -321,7 +321,8 @@ impl Plan for G1 {
             return true;
         }
         if super::ENABLE_GENERATIONAL_GC && !PLAN.in_gc {
-            if PLAN.region_space.nursery_ratio() > self.predictor.nursery_ratio {
+            // if PLAN.region_space.nursery_ratio() > self.predictor.nursery_ratio {
+            if self.predictor.within_nursery_budget(cardtable::num_dirty_cards()) {
                 me.gc_kind = GCKind::Young;
                 return true;
             }

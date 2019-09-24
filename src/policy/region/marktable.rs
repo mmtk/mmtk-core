@@ -83,23 +83,16 @@ impl MarkTable {
     
     #[inline(always)]
     #[cfg(not(feature="jikesrvm"))]
-    pub fn block_start(&self, region: RegionRef, start: Address, end: Address) -> Address {
+    pub fn block_start(&self, region: RegionRef, start: Address, end: Address) -> Option<Address> {
         unimplemented!()
     }
 
     #[inline(always)]
     #[cfg(feature="jikesrvm")]
-    pub fn block_start(&self, region: RegionRef, start: Address, end: Address) -> Address {
-        // let mut region = Region::of(start);
-        let cot_index = (start - region.start()) >> LOG_BYTES_IN_CARD;
-        debug_assert!(cot_index < region.card_offset_table.len());
-        let addr = unsafe { *region.card_offset_table.get_unchecked(cot_index) };
-        if addr >= start {
-            debug_assert!(addr < end);
-            return addr;
-        }
+    pub fn block_start(&self, region: RegionRef, start: Address, end: Address) -> Option<Address> {
+        // assert!(start < region.next_cursor);
         // Find first slot of a object
-        let region_end = region.cursor;
+        let region_end = region.next_cursor;
         let mut cursor = start;
         let limit = end + 24usize;
         let limit = if limit > region_end { region_end } else { limit };
@@ -111,20 +104,14 @@ impl MarkTable {
                 debug_assert!(VMObjectModel::ref_to_address(object) == cursor);
                 let obj_start = VMObjectModel::object_start_ref(object);
                 if obj_start >= start && obj_start < end {
-                    // Update COT
-                    // region.get_mut().card_offset_table[cot_index] = obj_start;
-                    debug_assert!(cot_index < region.card_offset_table.len());
-                    unsafe {
-                        *region.get_mut().card_offset_table.get_unchecked_mut(cot_index) = obj_start;
-                    }
-                    return obj_start;
+                    return Some(obj_start);
                 } else if obj_start >= end {
                     break;
                 }
             }
             cursor = cursor + BYTES_IN_ADDRESS;
         }
-        return end;
+        return None;
     }
 
     #[inline(always)]
@@ -133,52 +120,6 @@ impl MarkTable {
         unimplemented!()
     }
 
-    #[inline(always)]
-    #[cfg(feature="jikesrvm")]
-    pub fn iterate<F: Fn(ObjectReference)>(&self, start: Address, end: Address, f: F) {
-        let region_end = Region::of(start).cursor;
-        // Find first slot of a object
-        let mut cursor = start;
-        let limit = end + 24usize;
-        let limit = if limit > region_end { region_end } else { limit };
-        while cursor < limit {
-            if self.test(cursor) {
-                // let object = unsafe { VMObjectModel::get_object_from_start_address(cursor) };
-                // debug_assert!(VMObjectModel::object_start_ref(object) == cursor);
-                use ::vm::jikesrvm::java_header::TIB_OFFSET;
-                let object_address = cursor + (-TIB_OFFSET);
-                let object = unsafe { object_address.to_object_reference() };
-                debug_assert!(VMObjectModel::ref_to_address(object) == cursor);
-                let obj_start = VMObjectModel::object_start_ref(object);
-                if obj_start >= start && obj_start < end {
-                    f(object);
-                } else if obj_start >= end {
-                    break;
-                }
-            }
-            cursor = cursor + BYTES_IN_ADDRESS;
-        }
-    }
-
-    #[inline(never)]
-    pub fn zero_dead_memory(&self, region: Address) {
-        debug_assert!(Region::of(region).committed);
-        let limit = Region::of(region).cursor;
-        let mut cursor = region;
-        while cursor < limit {
-            if self.test(cursor) {
-                let object = unsafe { VMObjectModel::get_object_from_start_address(cursor) };
-                debug_assert!(VMObjectModel::object_start_ref(object) == cursor);
-                let end = VMObjectModel::get_object_end_address(object);
-                cursor = end;
-            } else {
-                unsafe {
-                    cursor.store(0x0usize);
-                }
-                cursor = cursor + BYTES_IN_ADDRESS;
-            }
-        }
-    }
 }
 
 impl ::std::fmt::Debug for MarkTable {

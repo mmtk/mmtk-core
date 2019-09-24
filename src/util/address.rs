@@ -2,6 +2,7 @@ use std::cmp;
 use std::fmt;
 use std::mem;
 use std::ops::*;
+use std::sync::atomic::Ordering;
 
 /// size in bytes
 pub type ByteSize = usize;
@@ -127,6 +128,17 @@ impl Address {
     #[inline(always)]
     pub unsafe fn store<T>(&self, value: T) {
         *(self.0 as *mut T) = value;
+    }
+
+    #[inline(always)]
+    pub unsafe fn attempt<T>(&self, old: T, new: T, order: Ordering) -> T {
+        let dst = self.to_ptr_mut::<T>();
+        let (val, ok) = match order {
+            Ordering::Relaxed => ::std::intrinsics::atomic_cxchg_relaxed(dst, old, new),
+            Ordering::SeqCst => ::std::intrinsics::atomic_cxchg(dst, old, new),
+            _ => unimplemented!()
+        };
+        val
     }
 
     /// is this address zero?

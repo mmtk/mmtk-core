@@ -70,7 +70,7 @@ impl TraceLocal for G1NurseryTraceLocal {
             debug_assert!(region.committed);
             if region.relocate {
                 // println!("Nursery Eva start {:?} {:?}", object, region);
-                let o = if region.prev_mark_table().is_marked(object) {
+                let o = if PLAN.region_space.is_live_prev(object) {
                     let allocator = Self::pick_copy_allocator(object);
                     // println!("Nursery Copy start {:?} {:?}", object, region);
                     let (o, s) = PLAN.region_space.trace_evacuate_object_in_cset(self, object, allocator, tls);

@@ -215,6 +215,7 @@ pub fn linear_scan<F: Fn(ObjectReference)>(card: Address, _limit: Address, f: F)
 }
 
 #[cfg(feature="jikesrvm")]
+#[inline(always)]
 pub fn tib_is_zero(object: ObjectReference) -> bool {
     unsafe {
         let tib = Address::from_usize((object.to_address() + ::vm::jikesrvm::java_header::TIB_OFFSET).load::<usize>());

@@ -5,6 +5,7 @@
 #![feature(nll)]
 #![feature(box_syntax)]
 #![feature(unboxed_closures)]
+#![feature(core_intrinsics)]
 
 #[macro_use]
 extern crate custom_derive;

@@ -84,7 +84,7 @@ impl CollectorContext for G1Collector {
         clear_forwarding_bits(object);
         match allocator {
             AllocationType::G1Survivor | AllocationType::G1Old => {
-                PLAN.region_space.initialize_header(object, bytes, false, !super::ENABLE_REMEMBERED_SETS, false);
+                // PLAN.region_space.initialize_header(object, bytes, false, !super::ENABLE_REMEMBERED_SETS, false);
             }
             AllocationType::Los => {
                 PLAN.los.initialize_header(object, false);

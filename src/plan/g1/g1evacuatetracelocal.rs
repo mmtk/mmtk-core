@@ -72,7 +72,7 @@ impl TraceLocal for G1EvacuateTraceLocal {
                 let region = Region::of_object(object);
                 debug_assert!(region.committed);
                 if region.relocate {
-                    if region.prev_mark_table().is_marked(object) {
+                    if PLAN.region_space.is_live_prev(object) {
                         let allocator = Self::pick_copy_allocator(object);
                         let (o, s) = PLAN.region_space.trace_evacuate_object_in_cset(self, object, allocator, tls);
                         self.bytes_copied += s;

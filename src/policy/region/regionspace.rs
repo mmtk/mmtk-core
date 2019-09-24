@@ -99,18 +99,20 @@ impl RegionSpace {
     }
 
     pub fn is_live_next(&self, object: ObjectReference) -> bool {
-        Region::of_object(object).next_mark_table().is_marked(object)
+        let region = Region::of_object(object);
+        region.allocated_within_concurrent_marking(object) || region.next_mark_table().is_marked(object)
     }
 
     pub fn is_live_prev(&self, object: ObjectReference) -> bool {
-        Region::of_object(object).prev_mark_table().is_marked(object)
+        let region = Region::of_object(object);
+        region.allocated_within_concurrent_marking(object) || region.prev_mark_table().is_marked(object)
     }
 
     pub fn initialize_header(&self, object: ObjectReference, size: usize, is_mutator: bool, collector_full_trace: bool, in_marking: bool) {
         let region = Region::of_object(object);
-        if is_mutator && in_marking {
-            region.live_size.fetch_add(size, Ordering::Relaxed);
-        }
+        // if is_mutator && in_marking {
+        //     region.live_size.fetch_add(size, Ordering::Relaxed);
+        // }
         if is_mutator || collector_full_trace {
             region.next_mark_table().mark(object, false);
             region.prev_mark_table().mark(object, false);
@@ -287,14 +289,23 @@ impl RegionSpace {
     pub fn prepare(&mut self) {
         // let regions = self.regions.read().unwrap();
         // println!("RegionSpace prepare");
+        self.reset_alloc_regions();
+        for region in self.regions() {
+            // region.live_size.store(0, Ordering::Relaxed);
+            region.clear_live_size();
+            region.get_mut().prev_cursor = region.next_cursor;
+        }
+        // println!("RegionSpace prepare done");
+    }
+
+    pub fn reset_alloc_regions(&mut self) {
+        // let regions = self.regions.read().unwrap();
+        // println!("RegionSpace prepare");
         {
             // let mut alloc_region = self.alloc_region.write().unwrap();
             self.alloc_regions.0 = None;
             self.alloc_regions.1 = None;
             self.alloc_regions.2 = None;
-        }
-        for region in self.regions() {
-            region.live_size.store(0, Ordering::Relaxed);
         }
         // println!("RegionSpace prepare done");
     }
@@ -321,6 +332,7 @@ impl RegionSpace {
             if !region.relocate {
                 region.remset().clear_cards_in_collection_set();
             }
+            // region.get_mut().prev_cursor = region.next_cursor;
         }
         let mut to_be_released = {
             let mut to_be_released = vec![];
@@ -381,7 +393,9 @@ impl RegionSpace {
         let region = Region::of_object(object);
         debug_assert!(region.start() != ::util::alloc::embedded_meta_data::get_metadata_base(region.start()), "Invalid region {:?}, object {:?}", region.start(), object);
         if Self::test_and_mark(object, region) {
-            region.live_size.fetch_add(VMObjectModel::get_size_when_copied(object), Ordering::Relaxed);
+            if !region.allocated_within_concurrent_marking(object) {
+                region.inc_live_size(VMObjectModel::get_size_when_copied(object), true);
+            }
             trace.process_node(object);
         }
         object
@@ -427,7 +441,7 @@ impl RegionSpace {
     pub fn compute_collection_set_for_nursery_gc(&self, available_pages: usize, predictor: impl AccumulativePauseTimePredictor) {
         const MAX_LIVE_SIZE: usize = (BYTES_IN_REGION as f64 * 0.65) as usize;
         let mut regions: Vec<RegionRef> = self.regions().collect();
-        regions.sort_unstable_by_key(|r| r.live_size.load(Ordering::Relaxed));
+        regions.sort_unstable_by_key(|r| r.live_size());
         let avail_regions = (available_pages >> embedded_meta_data::LOG_PAGES_IN_REGION) * REGIONS_IN_CHUNK;
         let mut available_size = avail_regions << LOG_BYTES_IN_REGION;
         // Select all young regions
@@ -450,14 +464,14 @@ impl RegionSpace {
         // FIXME: Bad performance
         const MAX_LIVE_SIZE: usize = (BYTES_IN_REGION as f64 * 0.65) as usize;
         let mut regions: Vec<RegionRef> = self.regions().collect();
-        regions.sort_unstable_by_key(|r| r.live_size.load(Ordering::Relaxed));
+        regions.sort_unstable_by_key(|r| r.live_size());
         let avail_regions = (available_pages >> embedded_meta_data::LOG_PAGES_IN_REGION) * REGIONS_IN_CHUNK;
         let mut available_size = avail_regions << LOG_BYTES_IN_REGION;
         let mut n = 0;
         // Select all young regions
         for region in &regions {
             if region.generation != Gen::Old {
-                let live_size = region.live_size.load(Ordering::Relaxed);
+                let live_size = region.live_size();
                 if live_size <= MAX_LIVE_SIZE && live_size < available_size {
                     if DEBUG {
                         println!("Relocate {:?}", region);
@@ -473,7 +487,7 @@ impl RegionSpace {
         // Select some old regions
         for region in regions {
             if region.generation == Gen::Old {
-                let live_size = region.live_size.load(Ordering::Relaxed);
+                let live_size = region.live_size();
                 if live_size <= MAX_LIVE_SIZE && live_size < available_size {
                     predictor.record(region);
                     if predictor.within_budget() {
@@ -497,12 +511,12 @@ impl RegionSpace {
         // FIXME: Bad performance
         const MAX_LIVE_SIZE: usize = (BYTES_IN_REGION as f64 * 0.65) as usize;
         let mut regions: Vec<RegionRef> = self.regions().collect();
-        regions.sort_unstable_by_key(|r| r.live_size.load(Ordering::Relaxed));
+        regions.sort_unstable_by_key(|r| r.live_size());
         let avail_regions = (available_pages >> embedded_meta_data::LOG_PAGES_IN_REGION) * REGIONS_IN_CHUNK;
         let mut available_size = avail_regions << LOG_BYTES_IN_REGION;
 
         for region in regions {
-            let live_size = region.live_size.load(Ordering::Relaxed);
+            let live_size = region.live_size();
             if live_size <= MAX_LIVE_SIZE && live_size < available_size {
                 if DEBUG {
                     println!("Relocate {:?}", region);
@@ -605,33 +619,6 @@ impl RegionSpace {
             contingous_chunks: (start, limit),
             cursor: start,
         }
-    }
-
-    pub fn validate_remsets(&self) {
-        for region in self.regions() {
-            region.prev_mark_table().iterate(region.start(), region.cursor, |src| {
-                scan_edge(src, |slot| {
-                    let obj = unsafe { slot.load::<ObjectReference>() };
-                    if !obj.is_null() && self.in_space(obj) && Region::of_object(obj) != region {
-                        let other_region = Region::of_object(obj);
-                        use super::*;
-                        if !other_region.remset().contains_card(Card::of(src)) {
-                            println!(
-                                "Card {:?} for <{:?}.{:?}> ({:?} {}) is not remembered by region {:?} {} ({:?})",
-                                Card::of(src).0, src, slot, region, if region.relocate { "reloc" } else { "-" },
-                                other_region, if other_region.relocate { "reloc" } else { "-" }, obj
-                            );
-                            if Card::of(src).get_state() == CardState::Dirty {
-                                panic!("Card {:?} is dirty", Card::of(src).0);
-                            } else {
-                                panic!("Card is clean");
-                            }
-                        }
-                    }
-                });
-            });
-        }
-        println!("[RemSet Validation Finished]")
     }
 }
 

@@ -49,15 +49,16 @@ impl ToAddress for ObjectReference {
 pub struct Region {
     // start: Address,
     pub committed: bool,
-    pub live_size: AtomicUsize,
+    live_size: AtomicUsize,
     pub relocate: bool,
-    pub cursor: Address,
+    pub prev_cursor: Address,
+    pub next_cursor: Address,
     remset: Option<RemSet>,
     mark_table0: MarkTable,
     mark_table1: MarkTable,
     active_table: usize,
     inactivate_table_used: bool,
-    pub card_offset_table: [Address; super::CARDS_IN_REGION],
+    pub card_offset_table: super::CardOffsetTable,
     pub generation: Gen,
 }
 
@@ -76,7 +77,8 @@ impl Region {
         // region.start = addr;
         region.committed = true;
         region.live_size.store(0, Ordering::SeqCst);
-        region.cursor = addr;
+        region.prev_cursor = addr;
+        region.next_cursor = addr;
         region.relocate = false;
         region.remset = Some(RemSet::new());
         region.mark_table0.clear();
@@ -92,9 +94,7 @@ impl Region {
         self.committed = false;
         self.active_table = 0;
         self.inactivate_table_used = false;
-        for i in 0..super::CARDS_IN_REGION {
-            self.card_offset_table[i] = unsafe { Address::zero() };
-        }
+        self.card_offset_table.clear();
     }
 
     // Static methods
@@ -161,6 +161,35 @@ impl Region {
         unsafe { Address::from_usize(base | (index << LOG_BYTES_IN_REGION)) }
     }
 
+    #[inline(always)]
+    pub fn allocated_within_concurrent_marking(&self, o: ObjectReference) -> bool {
+        let a = VMObjectModel::ref_to_address(o);
+        self.prev_cursor <= a && a <= self.next_cursor
+    }
+
+    #[inline(always)]
+    pub fn inc_live_size(&self, bytes: usize, atomic: bool) {
+        // if atomic {
+            self.live_size.fetch_add(bytes, Ordering::Relaxed);
+        // } else {
+            // self.live_size.store(self.live_size.load(Ordering::Relaxed) + bytes, Ordering::Relaxed);
+        // }
+    }
+
+    #[inline(always)]
+    pub fn clear_live_size(&self) {
+        self.live_size.store(0, Ordering::Relaxed);
+    }
+
+    #[inline(always)]
+    pub fn live_size(&self) -> usize {
+        let a = self.live_size.load(Ordering::Relaxed);
+        debug_assert!(self.next_cursor >= self.prev_cursor);
+        // a
+        let b = self.next_cursor - self.prev_cursor;
+        a + b
+    }
+
 
     // #[inline]
     // fn index(&self) -> usize {
@@ -189,7 +218,7 @@ impl Region {
     
     #[inline]
     pub fn allocate(&self, tlab_size: usize) -> Option<Address> {
-        let slot: &AtomicUsize = unsafe { ::std::mem::transmute(&self.cursor) };
+        let slot: &AtomicUsize = unsafe { ::std::mem::transmute(&self.next_cursor) };
         let old = slot.load(Ordering::SeqCst);
         let new = old + tlab_size;
         if new > self.start().as_usize() + BYTES_IN_REGION {
@@ -202,7 +231,7 @@ impl Region {
 
     #[inline]
     pub fn allocate_par(&self, tlab_size: usize) -> Option<Address> {
-        let slot: &AtomicUsize = unsafe { ::std::mem::transmute(&self.cursor) };
+        let slot: &AtomicUsize = unsafe { ::std::mem::transmute(&self.next_cursor) };
         loop {
             let old = slot.load(Ordering::SeqCst);
             let new = old + tlab_size;

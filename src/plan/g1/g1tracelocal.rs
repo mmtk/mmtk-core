@@ -50,7 +50,8 @@ impl Validator for () {
             assert!(!region.relocate,
                 "{} {:?}.{:?} -> {} {:?}", spaceof(src), src, slot, spaceof(obj), obj
             );
-            if region != Region::of_object(src) && !PLAN.vm_space.in_space(src) {
+            use ::vm::*;
+            if region.start() != Region::align(VMObjectModel::ref_to_address(src)) && !PLAN.vm_space.in_space(src) {
                 if Card::of(src).get_state() == CardState::Dirty {
                     if !region.remset().contains_card(Card::of(src)) {
                         // println!(
