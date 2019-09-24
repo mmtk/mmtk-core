@@ -81,13 +81,13 @@ impl MutatorContext for NoGCMutator {
         unsafe { mark_slot.store(PLAN.mark_state as u16) };
     }
 
-    fn object_reference_write_slow(&mut self, _src: ObjectReference, slot: Address, _value: ObjectReference) {
+    fn object_reference_write_slow(&mut self, _src: ObjectReference, slot: Address, _value: ObjectReference, _meta: usize) {
         if self.barrier_active {
             self.check_and_enqueue_reference(unsafe { slot.load::<ObjectReference>() });
         }
     }
 
-    fn object_reference_try_compare_and_swap_slow(&mut self, _src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference) -> bool {
+    fn object_reference_try_compare_and_swap_slow(&mut self, _src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference, _meta: usize) -> bool {
         if self.barrier_active {
             self.check_and_enqueue_reference(old);
         }
@@ -95,7 +95,7 @@ impl MutatorContext for NoGCMutator {
         return slot.compare_and_swap(old.to_address().as_usize(), new.to_address().as_usize(), Ordering::Relaxed) == old.to_address().as_usize()
     }
 
-    fn java_lang_reference_read_slow(&mut self, obj: ObjectReference) -> ObjectReference {
+    fn java_lang_reference_read_slow(&mut self, obj: ObjectReference, _meta: usize) -> ObjectReference {
         if self.barrier_active {
             self.check_and_enqueue_reference(obj);
         }

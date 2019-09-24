@@ -15,22 +15,22 @@ pub trait MutatorContext {
     }
     fn flush_remembered_sets(&mut self) {}
     fn get_tls(&self) -> *mut c_void;
-    fn object_reference_write_slow(&mut self, _src: ObjectReference, _slot: Address, _value: ObjectReference) {
+    fn object_reference_write_slow(&mut self, _src: ObjectReference, _slot: Address, _value: ObjectReference, _meta: usize) {
         unreachable!()
     }
-    fn object_reference_read_slow(&mut self, _src: ObjectReference, _slot: Address) -> ObjectReference {
+    fn object_reference_read_slow(&mut self, _src: ObjectReference, _slot: Address, _meta: usize) -> ObjectReference {
         unreachable!()
     }
-    fn object_reference_try_compare_and_swap_slow(&mut self, _src: ObjectReference, _slot: Address, _old: ObjectReference, _new: ObjectReference) -> bool {
+    fn object_reference_try_compare_and_swap_slow(&mut self, _src: ObjectReference, _slot: Address, _old: ObjectReference, _new: ObjectReference, _meta: usize) -> bool {
         unreachable!()
     }
-    fn java_lang_reference_read_slow(&mut self, _ref: ObjectReference) -> ObjectReference {
+    fn java_lang_reference_read_slow(&mut self, _ref: ObjectReference, _meta: usize) -> ObjectReference {
         unreachable!()
     }
-    fn object_reference_non_heap_write_slow(&mut self, _slot: Address, _value: ObjectReference) {
+    fn object_reference_non_heap_write_slow(&mut self, _slot: Address, _value: ObjectReference, _meta: usize) {
         unreachable!()
     }
-    fn object_reference_non_heap_read_slow(&mut self, _slot: Address) -> ObjectReference {
+    fn object_reference_non_heap_read_slow(&mut self, _slot: Address, _meta: usize) -> ObjectReference {
         unreachable!()
     }
     fn deinit_mutator(&mut self) {

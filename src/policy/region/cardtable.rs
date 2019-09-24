@@ -17,6 +17,12 @@ pub fn get() -> &'static mut CardTable {
 }
 
 #[inline(always)]
+pub fn get_addr() -> usize {
+    let t = get();
+    &t.table as *const [CardState; CARDS_IN_HEAP] as usize
+}
+
+#[inline(always)]
 pub fn num_dirty_cards() -> usize {
     get().dirty.load(Ordering::Relaxed)
 }
@@ -24,8 +30,8 @@ pub fn num_dirty_cards() -> usize {
 #[repr(u8)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum CardState {
-    NotDirty = 1,
-    Dirty = 2,
+    NotDirty = 0,
+    Dirty = 1,
 }
 
 pub struct CardTable {

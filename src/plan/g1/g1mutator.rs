@@ -24,6 +24,7 @@ pub struct G1Mutator {
     modbuf: Box<LocalQueue<'static, ObjectReference>>,
     dirty_card_quene: Box<Vec<Card>>,
     barrier_active: usize,
+    card_table: usize,
 }
 
 impl MutatorContext for G1Mutator {
@@ -144,18 +145,38 @@ impl MutatorContext for G1Mutator {
         self.rs.tls
     }
 
-    fn object_reference_write_slow(&mut self, src: ObjectReference, slot: Address, value: ObjectReference) {
-        if super::ENABLE_CONCURRENT_MARKING && self.barrier_active() {
-            let old = unsafe { slot.load::<ObjectReference>() };
-            self.check_and_enqueue_reference(old);
+    fn object_reference_write_slow(&mut self, src: ObjectReference, slot: Address, value: ObjectReference, meta: usize) {
+        const OBJECT_REFERENCE_SLOW_FOR_LOGGED_OBJECT: usize = 1;
+        const OBJECT_REFERENCE_SLOW_FOR_CROSS_REGION_REF: usize = 2;
+        
+        
+        if meta == OBJECT_REFERENCE_SLOW_FOR_LOGGED_OBJECT {
+            if super::ENABLE_CONCURRENT_MARKING {
+                let old = unsafe { slot.load::<ObjectReference>() };
+                self.modbuf.enqueue(old);
+                // self.check_and_enqueue_reference(old);
+            }
+            unsafe { slot.store(value) }
+            self.card_marking_barrier(src, slot, value);
+            return;
         }
 
-        unsafe { slot.store(value) }
+        // unsafe { slot.store(value) }
 
-        self.card_marking_barrier(src, slot, value);
+        if meta == OBJECT_REFERENCE_SLOW_FOR_CROSS_REGION_REF {
+            self.card_marking_barrier(src, slot, value);
+            // if super::ENABLE_REMEMBERED_SETS && super::ENABLE_CONCURRENT_REFINEMENT {
+            //     let card = Card::of(src);
+            //     self.rs_enquene(card);
+            // }
+        }
+        // if meta == 3 {
+        //     let card = Card::of(src);
+        //     assert!(card.get_state() == CardState::Dirty);
+        // }
     }
 
-    fn object_reference_try_compare_and_swap_slow(&mut self, src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference) -> bool {
+    fn object_reference_try_compare_and_swap_slow(&mut self, src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference, _meta: usize) -> bool {
         if super::ENABLE_CONCURRENT_MARKING && self.barrier_active() {
             self.check_and_enqueue_reference(old);
         }
@@ -168,10 +189,11 @@ impl MutatorContext for G1Mutator {
         result
     }
 
-    fn java_lang_reference_read_slow(&mut self, obj: ObjectReference) -> ObjectReference {
-        debug_assert!(self.barrier_active());
+    fn java_lang_reference_read_slow(&mut self, obj: ObjectReference, _meta: usize) -> ObjectReference {
+        // debug_assert!(self.barrier_active());
         if super::ENABLE_CONCURRENT_MARKING {
-            self.check_and_enqueue_reference(obj);
+            self.modbuf.enqueue(obj);
+            // self.check_and_enqueue_reference(obj);
         }
         obj
     }
@@ -194,6 +216,7 @@ impl G1Mutator {
             modbuf: box PLAN.modbuf_pool.spawn_local(),
             dirty_card_quene: box Vec::with_capacity(super::DIRTY_CARD_QUEUE_SIZE),
             barrier_active: PLAN.new_barrier_active as usize,
+            card_table: ::policy::region::cardtable::get_addr(),
         }
     }
     

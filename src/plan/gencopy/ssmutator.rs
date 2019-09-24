@@ -109,7 +109,7 @@ impl MutatorContext for SSMutator {
         self.remset.flush();
     }
 
-    fn object_reference_write_slow(&mut self, src: ObjectReference, slot: Address, value: ObjectReference) {
+    fn object_reference_write_slow(&mut self, src: ObjectReference, slot: Address, value: ObjectReference, _meta: usize) {
         debug_assert!(PLAN.nursery_space().in_space(value), "value={:?}", value);
         debug_assert!(!PLAN.nursery_space().in_space(src));
         self.remset.enqueue(slot);

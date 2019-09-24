@@ -135,7 +135,7 @@ impl MutatorContext for SSMutator {
         self.trace.flush();
     }
 
-     fn object_reference_write_slow(&mut self, mut src: ObjectReference, mut slot: Address, mut value: ObjectReference) {
+     fn object_reference_write_slow(&mut self, mut src: ObjectReference, mut slot: Address, mut value: ObjectReference, _meta: usize) {
         debug_assert!(self.barrier_active());
 
         let old = unsafe { slot.load::<ObjectReference>() };
@@ -144,7 +144,7 @@ impl MutatorContext for SSMutator {
         unsafe { slot.store(value) }
     }
 
-    fn object_reference_try_compare_and_swap_slow(&mut self, mut src: ObjectReference, slot: Address, old: ObjectReference, mut tgt: ObjectReference) -> bool {
+    fn object_reference_try_compare_and_swap_slow(&mut self, mut src: ObjectReference, slot: Address, old: ObjectReference, mut tgt: ObjectReference, _meta: usize) -> bool {
         debug_assert!(self.barrier_active());
         
         let mut result = compare_and_swap(slot, old, tgt);
@@ -155,13 +155,13 @@ impl MutatorContext for SSMutator {
         return result;
     }
 
-    fn java_lang_reference_read_slow(&mut self, mut obj: ObjectReference) -> ObjectReference {
+    fn java_lang_reference_read_slow(&mut self, mut obj: ObjectReference, _meta: usize) -> ObjectReference {
         debug_assert!(self.barrier_active());
         self.check_and_enqueue_reference(obj);
         self.forward(obj)
     }
 
-    fn object_reference_read_slow(&mut self, mut src: ObjectReference, mut slot: Address) -> ObjectReference {
+    fn object_reference_read_slow(&mut self, mut src: ObjectReference, mut slot: Address, _meta: usize) -> ObjectReference {
         debug_assert!(self.barrier_active());
         self.forward(unsafe { slot.load() })
     }

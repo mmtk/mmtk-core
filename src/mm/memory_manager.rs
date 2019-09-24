@@ -133,39 +133,39 @@ pub extern fn post_alloc(mutator: *mut c_void, refer: ObjectReference, type_refe
 }
 
 #[no_mangle]
-pub extern fn object_reference_write_slow(mutator: *mut c_void, src: ObjectReference, slot: Address, value: ObjectReference) {
+pub extern fn object_reference_write_slow(mutator: *mut c_void, src: ObjectReference, slot: Address, value: ObjectReference, meta: usize) {
     let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
-    local.object_reference_write_slow(src, slot, value);
+    local.object_reference_write_slow(src, slot, value, meta);
 }
 
 #[no_mangle]
-pub extern fn object_reference_read_slow(mutator: *mut c_void, src: ObjectReference, slot: Address) -> ObjectReference {
+pub extern fn object_reference_read_slow(mutator: *mut c_void, src: ObjectReference, slot: Address, meta: usize) -> ObjectReference {
     let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
-    local.object_reference_read_slow(src, slot)
+    local.object_reference_read_slow(src, slot, meta)
 }
 
 #[no_mangle]
-pub extern fn object_reference_try_compare_and_swap_slow(mutator: *mut c_void, src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference) {
+pub extern fn object_reference_try_compare_and_swap_slow(mutator: *mut c_void, src: ObjectReference, slot: Address, old: ObjectReference, new: ObjectReference, meta: usize) {
     let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
-    local.object_reference_try_compare_and_swap_slow(src, slot, old, new);
+    local.object_reference_try_compare_and_swap_slow(src, slot, old, new, meta);
 }
 
 #[no_mangle]
-pub extern fn java_lang_reference_read_slow(mutator: *mut c_void, src: ObjectReference) -> ObjectReference {
+pub extern fn java_lang_reference_read_slow(mutator: *mut c_void, src: ObjectReference, meta: usize) -> ObjectReference {
     let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
-    return local.java_lang_reference_read_slow(src);
+    return local.java_lang_reference_read_slow(src, meta);
 }
 
 #[no_mangle]
-pub extern fn object_reference_non_heap_write_slow(mutator: *mut c_void, slot: Address, value: ObjectReference) {
+pub extern fn object_reference_non_heap_write_slow(mutator: *mut c_void, slot: Address, value: ObjectReference, meta: usize) {
     let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
-    local.object_reference_non_heap_write_slow(slot, value);
+    local.object_reference_non_heap_write_slow(slot, value, meta);
 }
 
 #[no_mangle]
-pub extern fn object_reference_non_heap_read_slow(mutator: *mut c_void, slot: Address) -> ObjectReference {
+pub extern fn object_reference_non_heap_read_slow(mutator: *mut c_void, slot: Address, meta: usize) -> ObjectReference {
     let local = unsafe {&mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)};
-    local.object_reference_non_heap_read_slow(slot)
+    local.object_reference_non_heap_read_slow(slot, meta)
 }
 
 #[no_mangle]
