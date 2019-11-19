@@ -27,7 +27,7 @@ extern void gc_init(size_t heap_size) {
     IMMORTAL_SPACE.heap_cursor = IMMORTAL_SPACE.heap_start;
 }
 
-extern MMTk_Mutator bind_mutator(size_t thread_id) {
+extern MMTk_Mutator bind_mutator(void *tls) {
     return NULL;
 }
 

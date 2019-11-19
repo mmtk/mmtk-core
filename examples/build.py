@@ -6,10 +6,12 @@ import shutil
 import os
 import sys
 
-plan_dir = os.path.abspath(os.path.join(__file__, "..", "src", "plan"))
+MMTk_ROOT = os.path.join(__file__, "..", "..")
+
+plan_dir = os.path.abspath(os.path.join(MMTk_ROOT, "src", "plan"))
 PLANS = next(os.walk(plan_dir))[1]
 
-os.chdir(os.path.abspath(os.path.join(__file__, "..")))
+os.chdir(os.path.abspath(MMTk_ROOT))
 
 extra_features = ""
 if len(sys.argv) > 1:
@@ -67,7 +69,7 @@ for plan in PLANS:
         "-O3",
         "-o",
         "test_mmtk",
-        "./api/main.c"])
+        "./examples/main.c"])
 
     if system == "Linux":
         exec_and_redirect([
@@ -78,7 +80,7 @@ for plan in PLANS:
             "-O3", "-m32",
             "-o",
             "test_mmtk_32",
-            "./api/main.c"])
+            "./examples/main.c"])
 
     exec_and_redirect(["./test_mmtk"], env={LIBRARY_PATH: "."})
     os.remove("./test_mmtk")
