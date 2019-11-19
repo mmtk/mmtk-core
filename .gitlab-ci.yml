@@ -1,8 +1,14 @@
 stages:
   - test
-  
+  - alloc_test_all_plans
+
 test:
   stage: test
   script:
-    - ./build.py
     - cargo +nightly test
+
+alloc_test_all_plans:
+  stage: alloc_test_all_plans
+  script:
+    - cd examples
+    - ./build.py
