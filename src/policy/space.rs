@@ -8,7 +8,6 @@ use ::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END, AVAILABLE_
 use ::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END};
 
 use ::plan::Plan;
-use ::plan::selected_plan::PLAN;
 use ::plan::{Allocator, TransitiveClosure};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -30,8 +29,7 @@ pub trait Space: Sized + Debug + 'static {
     fn acquire(&self, tls: *mut c_void, pages: usize) -> Address {
         trace!("Space.acquire, tls={:p}", tls);
         // debug_assert!(tls != 0);
-        let allow_poll = unsafe { VMActivePlan::is_mutator(tls) }
-            && PLAN.is_initialized();
+        let allow_poll = unsafe { VMActivePlan::is_mutator(tls) };
 
         trace!("Reserving pages");
         let pr = self.common().pr.as_ref().unwrap();

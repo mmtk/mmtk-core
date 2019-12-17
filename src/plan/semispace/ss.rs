@@ -57,7 +57,6 @@ pub struct SemiSpaceUnsync {
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
     pub los: LargeObjectSpace,
-    sanity_checker: SanityChecker,
     // FIXME: This should be inside HeapGrowthManager
     total_pages: usize,
 
@@ -83,7 +82,6 @@ impl Plan for SemiSpace {
                 versatile_space: ImmortalSpace::new("versatile_space", true,
                                                     VMRequest::discontiguous()),
                 los: LargeObjectSpace::new("los", true, VMRequest::discontiguous()),
-                sanity_checker: SanityChecker::new(),
                 total_pages: 0,
                 collection_attempt: 0,
             }),
@@ -174,7 +172,7 @@ impl Plan for SemiSpace {
             &Phase::Prepare => {
                 if cfg!(feature = "sanity") {
                     println!("Pre GC sanity check");
-                    unsync.sanity_checker.check(tls);
+                    SanityChecker::new(tls, &self).check();
                 }
                 debug_assert!(self.ss_trace.values.is_empty());
                 debug_assert!(self.ss_trace.root_locations.is_empty());
@@ -223,9 +221,9 @@ impl Plan for SemiSpace {
             &Phase::Complete => {
                 if cfg!(feature = "sanity") {
                     println!("Post GC sanity check");
-                    unsync.sanity_checker.check(tls);
+                    SanityChecker::new(tls, &self).check();
                     println!("Post GC memory scan");
-                    memory_scan::scan_region();
+                    memory_scan::scan_region(&self);
                     println!("Finished one GC");
                 }
                 debug_assert!(self.ss_trace.values.is_empty());

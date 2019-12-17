@@ -10,7 +10,6 @@ use ::util::constants::*;
 use ::util::heap::PageResource;
 use ::vm::{ActivePlan, VMActivePlan, Collection, VMCollection};
 use ::plan::MutatorContext;
-use ::plan::selected_plan::PLAN;
 use ::plan::selected_plan::SelectedPlan;
 use ::plan::Plan;
 

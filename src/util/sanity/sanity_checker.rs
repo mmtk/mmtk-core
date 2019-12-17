@@ -6,41 +6,42 @@ use ::policy::space::Space;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::collections::{HashSet, LinkedList};
-use ::plan::selected_plan::PLAN;
 use ::plan::Plan;
+use ::plan::SelectedPlan;
 
 use libc::c_void;
 
 pub static INSIDE_SANITY: AtomicBool = AtomicBool::new(false);
 
-pub struct SanityChecker {
+pub struct SanityChecker<'a> {
     roots: Vec<Address>,
     values: LinkedList<ObjectReference>,
     refs: HashSet<ObjectReference>,
     tls: *mut c_void,
+    plan: &'a SelectedPlan,
 }
 
-impl SanityChecker {
-    pub fn new() -> Self {
+impl<'a> SanityChecker<'a> {
+    pub fn new(tls: *mut c_void, plan: &'a SelectedPlan) -> Self {
         SanityChecker {
             roots: Vec::new(),
             values: LinkedList::new(),
             refs: HashSet::new(),
-            tls: usize::max_value() as *mut c_void,
+            tls,
+            plan,
         }
     }
 
-    pub fn check(&mut self, tls: *mut c_void) {
-        self.tls = tls;
+    pub fn check(&mut self) {
         INSIDE_SANITY.store(true, Ordering::Relaxed);
         println!("Sanity stackroots, collector");
-        VMScanning::compute_thread_roots(self, tls);
+        VMScanning::compute_thread_roots(self, self.tls);
         println!("Sanity stackroots, global");
-        VMScanning::notify_initial_thread_scan_complete(false, tls);
+        VMScanning::notify_initial_thread_scan_complete(false, self.tls);
         println!("Sanity roots, collector");
-        VMScanning::compute_global_roots(self, tls);
-        VMScanning::compute_static_roots(self, tls);
-        VMScanning::compute_bootimage_roots(self, tls);
+        VMScanning::compute_global_roots(self, self.tls);
+        VMScanning::compute_static_roots(self, self.tls);
+        VMScanning::compute_bootimage_roots(self, self.tls);
         println!("Sanity roots, global");
         VMScanning::reset_thread_counter();
 
@@ -52,11 +53,10 @@ impl SanityChecker {
         self.refs.clear();
 
         INSIDE_SANITY.store(false, Ordering::Relaxed);
-        self.tls = usize::max_value() as *mut c_void;
     }
 }
 
-impl TransitiveClosure for SanityChecker{
+impl<'a> TransitiveClosure for SanityChecker<'a> {
     fn process_edge(&mut self, slot: Address) {
         trace!("process_edge({:?})", slot);
         let object: ObjectReference = unsafe { slot.load() };
@@ -71,7 +71,7 @@ impl TransitiveClosure for SanityChecker{
     }
 }
 
-impl TraceLocal for SanityChecker{
+impl<'a> TraceLocal for SanityChecker<'a> {
     fn process_roots(&mut self) {
         loop {
             if self.roots.is_empty() {
@@ -97,7 +97,7 @@ impl TraceLocal for SanityChecker{
         }
 
         if !self.refs.contains(&object) {
-            if !PLAN.is_valid_ref(object) {
+            if !self.plan.is_valid_ref(object) {
                 panic!("Invalid reference {:?}", object);
             }
             // Object is not "marked"

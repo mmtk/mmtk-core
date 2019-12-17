@@ -7,7 +7,7 @@ use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
 use ::util::heap::MonotonePageResource;
-use ::plan::nogc::PLAN;
+use crate::mmtk::SINGLETON;
 
 use libc::c_void;
 
@@ -43,8 +43,7 @@ impl MutatorContext for NoGCMutator {
         match allocator {
             AllocationType::Los => {
                 // FIXME: data race on immortalspace.mark_state !!!
-                let unsync = unsafe { &*PLAN.unsync.get() };
-                unsync.los.initialize_header(refer, true);
+                self.los.get_space().unwrap().initialize_header(refer, true);
             }
             // FIXME: other allocation types
             _ => {}

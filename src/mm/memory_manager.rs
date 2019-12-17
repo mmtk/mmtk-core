@@ -34,6 +34,8 @@ use util::heap::layout::vm_layout_constants::HEAP_START;
 use util::heap::layout::vm_layout_constants::HEAP_END;
 use ::util::sanity::sanity_checker::{INSIDE_SANITY, SanityChecker};
 
+use crate::mmtk::SINGLETON;
+
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
 pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
@@ -280,7 +282,7 @@ pub extern fn executable() -> bool {
 
 #[no_mangle]
 pub unsafe extern fn scan_region(){
-    ::util::sanity::memory_scan::scan_region();
+    ::util::sanity::memory_scan::scan_region(&SINGLETON.plan);
 }
 
 #[no_mangle]
