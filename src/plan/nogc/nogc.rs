@@ -16,10 +16,6 @@ use libc::c_void;
 
 use std::mem::uninitialized;
 
-lazy_static! {
-    pub static ref PLAN: NoGC = NoGC::new();
-}
-
 use super::NoGCTraceLocal;
 use super::NoGCMutator;
 use super::NoGCCollector;
