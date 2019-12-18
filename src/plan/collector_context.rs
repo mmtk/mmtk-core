@@ -1,11 +1,12 @@
 use ::util::{Address, ObjectReference};
 use ::plan::{Phase, Allocator};
 use ::plan::selected_plan::SelectedConstraints::*;
+use ::plan::selected_plan::SelectedPlan;
 use ::util::OpaquePointer;
 use libc::c_void;
 
 pub trait CollectorContext {
-    fn new() -> Self;
+    fn new(plan: &'static SelectedPlan) -> Self;
     /// Notify that the collector context is registered and ready to execute.
     fn init(&mut self, tls: OpaquePointer);
     /// Allocate space for copying an object.

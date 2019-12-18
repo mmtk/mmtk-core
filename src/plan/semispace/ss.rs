@@ -43,10 +43,6 @@ pub type SelectedPlan = SemiSpace;
 pub const ALLOC_SS: Allocator = Allocator::Default;
 pub const SCAN_BOOT_IMAGE: bool = true;
 
-lazy_static! {
-    pub static ref PLAN: SemiSpace = SemiSpace::new();
-}
-
 pub struct SemiSpace {
     pub unsync: UnsafeCell<SemiSpaceUnsync>,
     pub ss_trace: Trace,
@@ -110,10 +106,9 @@ impl Plan for SemiSpace {
         }
     }
 
-    fn bind_mutator(&self, tls: OpaquePointer) -> *mut c_void {
+    fn bind_mutator(&'static self, tls: OpaquePointer) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
-        Box::into_raw(Box::new(SSMutator::new(tls, self.tospace(),
-                                              &unsync.versatile_space, &unsync.los))) as *mut c_void
+        Box::into_raw(Box::new(SSMutator::new(tls, self))) as *mut c_void
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {
@@ -318,6 +313,11 @@ impl SemiSpace {
 
     pub fn get_sstrace(&self) -> &Trace {
         &self.ss_trace
+    }
+
+    pub fn get_versatile_space(&self) -> &'static ImmortalSpace {
+        let unsync = unsafe { &*self.unsync.get() };
+        &unsync.versatile_space
     }
 
     pub fn get_los(&self) -> &'static LargeObjectSpace {

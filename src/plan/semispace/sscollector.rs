@@ -4,7 +4,6 @@ use ::plan::CollectorContext;
 use ::plan::ParallelCollector;
 use ::plan::ParallelCollectorGroup;
 use ::plan::semispace;
-use ::plan::semispace::PLAN;
 use ::plan::TraceLocal;
 use ::policy::copyspace::CopySpace;
 use ::policy::largeobjectspace::LargeObjectSpace;
@@ -20,6 +19,8 @@ use super::sstracelocal::SSTraceLocal;
 use ::plan::selected_plan::SelectedConstraints;
 use util::OpaquePointer;
 use util::opaque_pointer::UNINITIALIZED_OPAQUE_POINTER;
+use plan::semispace::SelectedPlan;
+use plan::semispace::SemiSpace;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector {
@@ -32,19 +33,22 @@ pub struct SSCollector {
     last_trigger_count: usize,
     worker_ordinal: usize,
     group: Option<&'static ParallelCollectorGroup<SSCollector>>,
+
+    plan: &'static SemiSpace
 }
 
 impl CollectorContext for SSCollector {
-    fn new() -> Self {
+    fn new(plan: &'static SelectedPlan) -> Self {
         SSCollector {
             tls: UNINITIALIZED_OPAQUE_POINTER,
             ss: BumpAllocator::new(UNINITIALIZED_OPAQUE_POINTER, None),
-            los: LargeObjectAllocator::new(UNINITIALIZED_OPAQUE_POINTER, Some(semispace::PLAN.get_los())),
-            trace: SSTraceLocal::new(PLAN.get_sstrace()),
+            los: LargeObjectAllocator::new(UNINITIALIZED_OPAQUE_POINTER, Some(plan.get_los())),
+            trace: SSTraceLocal::new(plan),
 
             last_trigger_count: 0,
             worker_ordinal: 0,
             group: None,
+            plan,
         }
     }
 
@@ -74,7 +78,7 @@ impl CollectorContext for SSCollector {
 
     fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
-            &Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
+            &Phase::Prepare => { self.ss.rebind(Some(self.plan.tospace())) }
             &Phase::StackRoots => {
                 trace!("Computing thread roots");
                 VMScanning::compute_thread_roots(&mut self.trace, self.tls);
@@ -150,8 +154,7 @@ impl CollectorContext for SSCollector {
         match allocator {
             ::plan::Allocator::Default => {}
             ::plan::Allocator::Los => {
-                let unsync = unsafe { &*PLAN.unsync.get() };
-                unsync.los.initialize_header(object, false);
+                self.los.get_space().unwrap().initialize_header(object, false);
             }
             _ => {
                 panic!("Currently we can't copy to other spaces other than copyspace")

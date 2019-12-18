@@ -200,7 +200,7 @@ pub unsafe extern fn start_worker(tls: OpaquePointer, worker: *mut c_void) {
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
 pub unsafe extern fn enable_collection(tls: OpaquePointer) {
-    (&mut *CONTROL_COLLECTOR_CONTEXT.workers.get()).init_group(tls);
+    (&mut *CONTROL_COLLECTOR_CONTEXT.workers.get()).init_group(&SINGLETON.plan, tls);
     VMCollection::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(tls, null_mut()); // spawn controller thread
     ::plan::plan::INITIALIZED.store(true, Ordering::SeqCst);
 }

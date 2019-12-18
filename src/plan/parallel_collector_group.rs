@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::ParallelCollector;
 use ::vm::{VMCollection, Collection};
+use plan::selected_plan::SelectedPlan;
 
 use ::util::options::OPTION_MAP;
 
@@ -46,7 +47,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         self.contexts.len()
     }
 
-    pub fn init_group(&mut self, tls: OpaquePointer) {
+    pub fn init_group(&mut self, plan: &'static SelectedPlan, tls: OpaquePointer) {
         {
             let inner = self.sync.get_mut().unwrap();
             inner.trigger_count = 1;
@@ -54,7 +55,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         let size = OPTION_MAP.threads;
         self.contexts = Vec::<C>::with_capacity(size);
         for i in 0..size {
-            self.contexts.push(C::new());
+            self.contexts.push(C::new(plan));
             // XXX: Borrow-checker fighting. I _believe_ this is unavoidable
             //      because we have a circular dependency here, but I'd very
             //      much like to be wrong.

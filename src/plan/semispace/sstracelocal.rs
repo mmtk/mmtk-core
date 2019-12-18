@@ -1,5 +1,4 @@
 use ::plan::{TraceLocal, TransitiveClosure};
-use ::plan::semispace::PLAN;
 use ::plan::trace::Trace;
 use ::policy::space::Space;
 use ::util::{Address, ObjectReference};
@@ -10,11 +9,13 @@ use libc::c_void;
 use super::ss;
 use util::OpaquePointer;
 use util::opaque_pointer::UNINITIALIZED_OPAQUE_POINTER;
+use plan::semispace::SemiSpace;
 
 pub struct SSTraceLocal {
     tls: OpaquePointer,
     values: LocalQueue<'static, ObjectReference>,
     root_locations: LocalQueue<'static, Address>,
+    plan: &'static SemiSpace
 }
 
 impl TransitiveClosure for SSTraceLocal {
@@ -60,7 +61,7 @@ impl TraceLocal for SSTraceLocal {
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         trace!("trace_object({:?})", object.to_address());
         let tls = self.tls;
-        let plan_unsync = unsafe { &*PLAN.unsync.get() };
+        let plan_unsync = unsafe { &*self.plan.unsync.get() };
 
         if object.is_null() {
             trace!("trace_object: object is null");
@@ -130,7 +131,7 @@ impl TraceLocal for SSTraceLocal {
     }
 
     fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool {
-        let unsync = unsafe { &(*PLAN.unsync.get()) };
+        let unsync = unsafe { &(*self.plan.unsync.get()) };
         (unsync.hi && !unsync.copyspace0.in_space(obj)) ||
             (!unsync.hi && !unsync.copyspace1.in_space(obj))
     }
@@ -139,7 +140,7 @@ impl TraceLocal for SSTraceLocal {
         if object.is_null() {
             return false;
         }
-        let unsync = unsafe { &(*PLAN.unsync.get()) };
+        let unsync = unsafe { &(*self.plan.unsync.get()) };
         if unsync.copyspace0.in_space(object) {
             if unsync.hi {
                 return unsync.copyspace0.is_live(object);
@@ -169,11 +170,13 @@ impl TraceLocal for SSTraceLocal {
 }
 
 impl SSTraceLocal {
-    pub fn new(ss_trace: &'static Trace) -> Self {
+    pub fn new(ss: &'static SemiSpace) -> Self {
+        let ss_trace = ss.get_sstrace();
         SSTraceLocal {
             tls: UNINITIALIZED_OPAQUE_POINTER,
             values: ss_trace.values.spawn_local(),
             root_locations: ss_trace.root_locations.spawn_local(),
+            plan: ss,
         }
     }
 

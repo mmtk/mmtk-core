@@ -5,6 +5,7 @@ use super::super::CollectorContext;
 use super::super::TraceLocal;
 use super::super::Phase;
 use super::super::Allocator;
+use plan::nogc::SelectedPlan;
 
 use std::process;
 use libc::c_void;
@@ -23,7 +24,7 @@ pub struct NoGCCollector {
 }
 
 impl<'a> CollectorContext for NoGCCollector {
-    fn new() -> Self {
+    fn new(_: &'static SelectedPlan) -> Self {
         NoGCCollector {
             tls: UNINITIALIZED_OPAQUE_POINTER,
             trace: NoGCTraceLocal::new(),

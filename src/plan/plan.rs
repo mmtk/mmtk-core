@@ -57,7 +57,7 @@ pub trait Plan: Sized {
     fn new() -> Self;
     // unsafe because this can only be called once by the init thread
     unsafe fn gc_init(&self, heap_size: usize);
-    fn bind_mutator(&self, tls: OpaquePointer) -> *mut c_void;
+    fn bind_mutator(&'static self, tls: OpaquePointer) -> *mut c_void;
     fn will_never_move(&self, object: ObjectReference) -> bool;
     // unsafe because only the primary collector thread can call this
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &phase::Phase);
