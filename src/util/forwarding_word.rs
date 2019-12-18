@@ -2,6 +2,7 @@
 use ::util::{Address, ObjectReference};
 use ::vm::ObjectModel;
 use ::vm::VMObjectModel;
+use ::util::OpaquePointer;
 
 use libc::c_void;
 
@@ -42,7 +43,7 @@ pub fn spin_and_get_forwarded_object(object: ObjectReference, status_word: usize
     } else { object }
 }
 
-pub fn forward_object(object: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
+pub fn forward_object(object: ObjectReference, allocator: Allocator, tls: OpaquePointer) -> ObjectReference {
     let new_object = VMObjectModel::copy(object, allocator, tls);
     VMObjectModel::write_available_bits_word(object, new_object.to_address().as_usize() | FORWARDED as usize);
     new_object

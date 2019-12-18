@@ -23,6 +23,7 @@ use ::util::heap::layout::Mmapper;
 use ::util::Address;
 use ::util::heap::PageResource;
 use ::util::heap::VMRequest;
+use ::util::OpaquePointer;
 
 use ::util::constants::LOG_BYTES_IN_PAGE;
 
@@ -35,6 +36,7 @@ use std::thread;
 use util::conversions::bytes_to_pages;
 use plan::plan::create_vm_space;
 use plan::plan::EMERGENCY_COLLECTION;
+use util::opaque_pointer::UNINITIALIZED_OPAQUE_POINTER;
 
 pub type SelectedPlan = SemiSpace;
 
@@ -103,12 +105,12 @@ impl Plan for SemiSpace {
         // (Usually because it calls into VM code that accesses the TLS.)
         if !(cfg!(feature = "jikesrvm") || cfg!(feature = "openjdk")) {
             thread::spawn(|| {
-                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(0 as *mut c_void)
+                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(UNINITIALIZED_OPAQUE_POINTER)
             });
         }
     }
 
-    fn bind_mutator(&self, tls: *mut c_void) -> *mut c_void {
+    fn bind_mutator(&self, tls: OpaquePointer) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
         Box::into_raw(Box::new(SSMutator::new(tls, self.tospace(),
                                               &unsync.versatile_space, &unsync.los))) as *mut c_void
@@ -146,7 +148,7 @@ impl Plan for SemiSpace {
         return false;
     }
 
-    unsafe fn collection_phase(&self, tls: *mut c_void, phase: &Phase) {
+    unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {
         let unsync = &mut *self.unsync.get();
 
         match phase {

@@ -8,9 +8,11 @@ use ::vm::Scanning;
 use ::vm::VMScanning;
 use libc::c_void;
 use super::ss;
+use util::OpaquePointer;
+use util::opaque_pointer::UNINITIALIZED_OPAQUE_POINTER;
 
 pub struct SSTraceLocal {
-    tls: *mut c_void,
+    tls: OpaquePointer,
     values: LocalQueue<'static, ObjectReference>,
     root_locations: LocalQueue<'static, Address>,
 }
@@ -169,13 +171,13 @@ impl TraceLocal for SSTraceLocal {
 impl SSTraceLocal {
     pub fn new(ss_trace: &'static Trace) -> Self {
         SSTraceLocal {
-            tls: 0 as *mut c_void,
+            tls: UNINITIALIZED_OPAQUE_POINTER,
             values: ss_trace.values.spawn_local(),
             root_locations: ss_trace.root_locations.spawn_local(),
         }
     }
 
-    pub fn init(&mut self, tls: *mut c_void) {
+    pub fn init(&mut self, tls: OpaquePointer) {
         self.tls = tls;
     }
 

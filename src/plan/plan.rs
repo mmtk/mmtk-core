@@ -2,7 +2,7 @@ use libc::c_void;
 use ::util::ObjectReference;
 use super::{MutatorContext, CollectorContext, ParallelCollector, TraceLocal, phase, Phase};
 use std::sync::atomic::{self, AtomicUsize, AtomicBool, Ordering};
-
+use ::util::OpaquePointer;
 use ::policy::space::Space;
 use ::util::heap::PageResource;
 use ::util::options::OPTION_MAP;
@@ -57,10 +57,10 @@ pub trait Plan: Sized {
     fn new() -> Self;
     // unsafe because this can only be called once by the init thread
     unsafe fn gc_init(&self, heap_size: usize);
-    fn bind_mutator(&self, tls: *mut c_void) -> *mut c_void;
+    fn bind_mutator(&self, tls: OpaquePointer) -> *mut c_void;
     fn will_never_move(&self, object: ObjectReference) -> bool;
     // unsafe because only the primary collector thread can call this
-    unsafe fn collection_phase(&self, tls: *mut c_void, phase: &phase::Phase);
+    unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &phase::Phase);
 
     fn is_initialized(&self) -> bool {
         INITIALIZED.load(Ordering::SeqCst)
@@ -178,7 +178,7 @@ pub trait Plan: Sized {
 
     fn is_bad_ref(&self, object: ObjectReference) -> bool;
 
-    fn handle_user_collection_request(tls: *mut c_void) {
+    fn handle_user_collection_request(tls: OpaquePointer) {
         if !OPTION_MAP.ignore_system_g_c {
             USER_TRIGGERED_COLLECTION.store(true, Ordering::Relaxed);
             CONTROL_COLLECTOR_CONTEXT.request();
@@ -373,7 +373,7 @@ pub fn gc_in_progress_proper() -> bool {
 
 static INSIDE_HARNESS: AtomicBool = AtomicBool::new(false);
 
-pub fn harness_begin(tls: *mut c_void) {
+pub fn harness_begin(tls: OpaquePointer) {
     // FIXME Do a full heap GC if we have generational GC
     let old_ignore = OPTION_MAP.ignore_system_g_c;
     unsafe { OPTION_MAP.process("ignoreSystemGC", "false"); }

@@ -12,6 +12,7 @@ use ::plan::plan;
 use ::vm::{Collection, VMCollection};
 use ::util::heap::{PageResource, MonotonePageResource};
 use ::plan::semispace::PLAN;
+use ::util::OpaquePointer;
 
 use libc::c_void;
 
@@ -24,7 +25,7 @@ pub struct SSMutator {
 }
 
 impl MutatorContext for SSMutator {
-    fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
             &Phase::PrepareStacks => {
                 if !plan::stacks_prepared() {
@@ -88,7 +89,7 @@ impl MutatorContext for SSMutator {
         }
     }
 
-    fn get_tls(&self) -> *mut c_void {
+    fn get_tls(&self) -> OpaquePointer {
         debug_assert!(self.ss.tls == self.vs.tls);
         debug_assert!(self.ss.tls == self.los.tls);
         self.ss.tls
@@ -96,7 +97,7 @@ impl MutatorContext for SSMutator {
 }
 
 impl SSMutator {
-    pub fn new(tls: *mut c_void, space: &'static CopySpace, versatile_space: &'static ImmortalSpace, los: &'static LargeObjectSpace) -> Self {
+    pub fn new(tls: OpaquePointer, space: &'static CopySpace, versatile_space: &'static ImmortalSpace, los: &'static LargeObjectSpace) -> Self {
         SSMutator {
             ss: BumpAllocator::new(tls, Some(space)),
             vs: BumpAllocator::new(tls, Some(versatile_space)),

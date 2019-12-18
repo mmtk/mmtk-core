@@ -33,7 +33,7 @@ use util::constants::LOG_BYTES_IN_PAGE;
 use util::heap::layout::vm_layout_constants::HEAP_START;
 use util::heap::layout::vm_layout_constants::HEAP_END;
 use ::util::sanity::sanity_checker::{INSIDE_SANITY, SanityChecker};
-
+use util::OpaquePointer;
 use crate::mmtk::SINGLETON;
 
 #[no_mangle]
@@ -42,8 +42,7 @@ pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     ::util::logger::init().unwrap();
     JTOC_BASE = Address::from_mut_ptr(jtoc);
     ::vm::jikesrvm::BOOT_THREAD
-        = ::vm::jikesrvm::collection::VMCollection::thread_from_id(1)
-        .as_usize() as *mut c_void;
+        = OpaquePointer::from_address(::vm::jikesrvm::collection::VMCollection::thread_from_id(1));
     selected_plan::PLAN.gc_init(heap_size);
     debug_assert!(54 == ::vm::JikesRVM::test(44));
     debug_assert!(112 == ::vm::JikesRVM::test2(45, 67));
@@ -58,8 +57,8 @@ pub unsafe extern fn jikesrvm_gc_init(_jtoc: *mut c_void, _heap_size: usize) {
 
 #[repr(C)]
 pub struct OpenJDK_Upcalls {
-    pub stop_all_mutators: extern "C" fn(tls: *mut c_void),
-    pub resume_mutators: extern "C" fn(tls: *mut c_void),
+    pub stop_all_mutators: extern "C" fn(tls: OpaquePointer),
+    pub resume_mutators: extern "C" fn(tls: OpaquePointer),
 }
 
 #[no_mangle]
@@ -78,13 +77,13 @@ pub unsafe extern fn openjdk_gc_init(calls: *const OpenJDK_Upcalls, heap_size: u
 
 #[no_mangle]
 #[cfg(any(feature = "jikesrvm", feature = "openjdk"))]
-pub extern fn start_control_collector(tls: *mut c_void) {
+pub extern fn start_control_collector(tls: OpaquePointer) {
     CONTROL_COLLECTOR_CONTEXT.run(tls);
 }
 
 #[no_mangle]
 #[cfg(not(any(feature = "jikesrvm", feature = "openjdk")))]
-pub extern fn start_control_collector(tls: *mut c_void) {
+pub extern fn start_control_collector(tls: OpaquePointer) {
     panic!("Cannot call start_control_collector when not building for JikesRVM or OpenJDK");
 }
 
@@ -102,7 +101,7 @@ pub unsafe extern fn gc_init(heap_size: usize) {
 }
 
 #[no_mangle]
-pub extern fn bind_mutator(tls: *mut c_void) -> *mut c_void {
+pub extern fn bind_mutator(tls: OpaquePointer) -> *mut c_void {
     SelectedPlan::bind_mutator(&selected_plan::PLAN, tls)
 }
 
@@ -192,7 +191,7 @@ pub unsafe extern fn process_interior_edge(trace_local: *mut c_void, target: *mu
 }
 
 #[no_mangle]
-pub unsafe extern fn start_worker(tls: *mut c_void, worker: *mut c_void) {
+pub unsafe extern fn start_worker(tls: OpaquePointer, worker: *mut c_void) {
     let worker_instance = &mut *(worker as *mut <SelectedPlan as Plan>::CollectorT);
     worker_instance.init(tls);
     worker_instance.run(tls);
@@ -200,7 +199,7 @@ pub unsafe extern fn start_worker(tls: *mut c_void, worker: *mut c_void) {
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
-pub unsafe extern fn enable_collection(tls: *mut c_void) {
+pub unsafe extern fn enable_collection(tls: OpaquePointer) {
     (&mut *CONTROL_COLLECTOR_CONTEXT.workers.get()).init_group(tls);
     VMCollection::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(tls, null_mut()); // spawn controller thread
     ::plan::plan::INITIALIZED.store(true, Ordering::SeqCst);
@@ -310,7 +309,7 @@ pub unsafe extern fn trace_retain_referent(trace_local: *mut c_void, object: Obj
 }
 
 #[no_mangle]
-pub extern fn handle_user_collection_request(tls: *mut c_void) {
+pub extern fn handle_user_collection_request(tls: OpaquePointer) {
     selected_plan::SelectedPlan::handle_user_collection_request(tls);
 }
 
@@ -351,7 +350,7 @@ pub unsafe extern fn add_phantom_candidate(reff: *mut c_void, referent: *mut c_v
 }
 
 #[no_mangle]
-pub extern fn harness_begin(tls: *mut c_void) {
+pub extern fn harness_begin(tls: OpaquePointer) {
     ::plan::plan::harness_begin(tls);
 }
 

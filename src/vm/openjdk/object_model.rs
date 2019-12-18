@@ -1,13 +1,13 @@
 use ::vm::object_model::ObjectModel;
 use ::util::{Address, ObjectReference};
 use ::plan::Allocator;
-
+use ::util::OpaquePointer;
 use libc::c_void;
 
 pub struct VMObjectModel {}
 
 impl ObjectModel for VMObjectModel {
-    fn copy(from: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
+    fn copy(from: ObjectReference, allocator: Allocator, tls: OpaquePointer) -> ObjectReference {
         unimplemented!()
     }
 

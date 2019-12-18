@@ -13,6 +13,7 @@ use super::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use ::util::heap::pageresource::CommonPageResource;
 use ::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use ::util::alloc::embedded_meta_data::*;
+use ::util::OpaquePointer;
 
 use super::layout::Mmapper;
 use super::layout::heap_layout::MMAPPER;
@@ -67,7 +68,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResour
     }
 
     fn alloc_pages(&self, reserved_pages: usize, immut_required_pages: usize, zeroed: bool,
-                   tls: *mut c_void) -> Address {
+                   tls: OpaquePointer) -> Address {
         let mut required_pages = immut_required_pages;
         let mut new_chunk = false;
         let mut sync = self.sync.lock().unwrap();

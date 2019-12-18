@@ -7,8 +7,8 @@ use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
 use ::util::heap::MonotonePageResource;
-use crate::mmtk::SINGLETON;
-
+use ::mmtk::SINGLETON;
+use ::util::OpaquePointer;
 use libc::c_void;
 
 #[repr(C)]
@@ -19,7 +19,7 @@ pub struct NoGCMutator {
 }
 
 impl MutatorContext for NoGCMutator {
-    fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         unimplemented!();
     }
 
@@ -50,13 +50,13 @@ impl MutatorContext for NoGCMutator {
         }
     }
 
-    fn get_tls(&self) -> *mut c_void {
+    fn get_tls(&self) -> OpaquePointer {
         self.nogc.tls
     }
 }
 
 impl NoGCMutator {
-    pub fn new(tls: *mut c_void, space: &'static ImmortalSpace, los: &'static LargeObjectSpace) -> Self {
+    pub fn new(tls: OpaquePointer, space: &'static ImmortalSpace, los: &'static LargeObjectSpace) -> Self {
         NoGCMutator {
             nogc: BumpAllocator::new(tls, Some(space)),
             los: LargeObjectAllocator::new(tls, Some(los))

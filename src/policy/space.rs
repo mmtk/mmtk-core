@@ -16,6 +16,7 @@ use ::util::constants::LOG_BYTES_IN_MBYTE;
 use ::util::conversions;
 use ::util::heap::space_descriptor;
 use ::util::heap::layout::heap_layout::VM_MAP;
+use ::util::OpaquePointer;
 
 use std::fmt::Debug;
 
@@ -26,8 +27,8 @@ pub trait Space: Sized + Debug + 'static {
 
     fn init(&mut self);
 
-    fn acquire(&self, tls: *mut c_void, pages: usize) -> Address {
-        trace!("Space.acquire, tls={:p}", tls);
+    fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
+        trace!("Space.acquire, tls={:?}", tls);
         // debug_assert!(tls != 0);
         let allow_poll = unsafe { VMActivePlan::is_mutator(tls) };
 

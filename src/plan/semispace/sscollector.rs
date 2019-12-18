@@ -18,10 +18,12 @@ use ::vm::{Scanning, VMScanning};
 use libc::c_void;
 use super::sstracelocal::SSTraceLocal;
 use ::plan::selected_plan::SelectedConstraints;
+use util::OpaquePointer;
+use util::opaque_pointer::UNINITIALIZED_OPAQUE_POINTER;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector {
-    pub tls: *mut c_void,
+    pub tls: OpaquePointer,
     // CopyLocal
     pub ss: BumpAllocator<MonotonePageResource<CopySpace>>,
     los: LargeObjectAllocator,
@@ -35,9 +37,9 @@ pub struct SSCollector {
 impl CollectorContext for SSCollector {
     fn new() -> Self {
         SSCollector {
-            tls: 0 as *mut c_void,
-            ss: BumpAllocator::new(0 as *mut c_void, None),
-            los: LargeObjectAllocator::new(0 as *mut c_void, Some(semispace::PLAN.get_los())),
+            tls: UNINITIALIZED_OPAQUE_POINTER,
+            ss: BumpAllocator::new(UNINITIALIZED_OPAQUE_POINTER, None),
+            los: LargeObjectAllocator::new(UNINITIALIZED_OPAQUE_POINTER, Some(semispace::PLAN.get_los())),
             trace: SSTraceLocal::new(PLAN.get_sstrace()),
 
             last_trigger_count: 0,
@@ -46,7 +48,7 @@ impl CollectorContext for SSCollector {
         }
     }
 
-    fn init(&mut self, tls: *mut c_void) {
+    fn init(&mut self, tls: OpaquePointer) {
         self.tls = tls;
         self.ss.tls = tls;
         self.los.tls = tls;
@@ -62,7 +64,7 @@ impl CollectorContext for SSCollector {
 
     }
 
-    fn run(&mut self, tls: *mut c_void) {
+    fn run(&mut self, tls: OpaquePointer) {
         self.tls = tls;
         loop {
             self.park();
@@ -70,7 +72,7 @@ impl CollectorContext for SSCollector {
         }
     }
 
-    fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
             &Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
             &Phase::StackRoots => {
@@ -139,7 +141,7 @@ impl CollectorContext for SSCollector {
         }
     }
 
-    fn get_tls(&self) -> *mut c_void {
+    fn get_tls(&self) -> OpaquePointer {
         self.tls
     }
 

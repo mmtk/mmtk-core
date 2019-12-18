@@ -4,7 +4,7 @@ use ::util::heap::PageResource;
 use ::util::heap::MonotonePageResource;
 use ::util::heap::VMRequest;
 use ::util::constants::CARD_META_PAGES_PER_REGION;
-
+use ::util::OpaquePointer;
 use ::policy::space::{Space, CommonSpace};
 use ::util::{Address, ObjectReference};
 use ::plan::TransitiveClosure;
@@ -85,7 +85,7 @@ impl CopySpace {
         trace: &mut T,
         object: ObjectReference,
         allocator: Allocator,
-        tls: *mut c_void,
+        tls: OpaquePointer,
     ) -> ObjectReference
     {
         trace!("copyspace.trace_object(, {:?}, {:?}, {:?})", object, allocator, tls);

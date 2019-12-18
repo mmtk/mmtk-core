@@ -1,6 +1,6 @@
 use std::vec::Vec;
 use std::sync::{Mutex, Condvar};
-
+use ::util::OpaquePointer;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::ParallelCollector;
@@ -46,7 +46,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         self.contexts.len()
     }
 
-    pub fn init_group(&mut self, tls: *mut c_void) {
+    pub fn init_group(&mut self, tls: OpaquePointer) {
         {
             let inner = self.sync.get_mut().unwrap();
             inner.trigger_count = 1;

@@ -3,6 +3,7 @@ use ::util::{Address, ObjectReference};
 use ::vm::VMScanning;
 use ::vm::Scanning;
 use ::policy::space::Space;
+use ::util::OpaquePointer;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::collections::{HashSet, LinkedList};
@@ -17,12 +18,12 @@ pub struct SanityChecker<'a> {
     roots: Vec<Address>,
     values: LinkedList<ObjectReference>,
     refs: HashSet<ObjectReference>,
-    tls: *mut c_void,
+    tls: OpaquePointer,
     plan: &'a SelectedPlan,
 }
 
 impl<'a> SanityChecker<'a> {
-    pub fn new(tls: *mut c_void, plan: &'a SelectedPlan) -> Self {
+    pub fn new(tls: OpaquePointer, plan: &'a SelectedPlan) -> Self {
         SanityChecker {
             roots: Vec::new(),
             values: LinkedList::new(),
