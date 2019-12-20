@@ -1,5 +1,5 @@
-.global jikesrvm_alloc, jikesrvm_alloc_slow, jikesrvm_handle_user_collection_request
-.extern alloc, alloc_slow, handle_user_collection_request
+.global jikesrvm_alloc, jikesrvm_alloc_slow, jikesrvm_handle_user_collection_request, jikesrvm_harness_begin
+.extern alloc, alloc_slow, handle_user_collection_request, harness_begin
 .include "inc.asm"
 
 jikesrvm_alloc:
@@ -39,3 +39,14 @@ jikesrvm_handle_user_collection_request:
     add $0x8, %esp #shrink stack for args and method id
     popl fp_offset(%esi)
     ret
+
+jikesrvm_harness_begin:
+    pushl fp_offset(%esi)
+    mov %esp, fp_offset(%esi)
+    pushl $0xffffffff #method id
+    pushl 0xc(%esp)
+    call harness_begin
+    add $0x8, %esp #shrink stack for args and method id
+    popl fp_offset(%esi)
+    ret
+

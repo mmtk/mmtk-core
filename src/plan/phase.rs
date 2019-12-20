@@ -6,6 +6,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
+use util::statistics::phase_timer::PhaseTimer;
 
 use libc::c_void;
 
@@ -62,7 +63,7 @@ pub enum Phase {
     EvacuateClosure,
     EvacuateRelease,
     // Complex phases
-    Complex(Vec<(Schedule, Phase)>, usize),
+    Complex(Vec<(Schedule, Phase)>, usize, Option<usize>),
     // associated cursor
     // No phases are left
     Empty,
@@ -76,6 +77,9 @@ lazy_static! {
     static ref PHASE_STACK: Mutex<Vec<(Schedule, Phase)>> = Mutex::new(vec![]);
     static ref EVEN_SCHEDULED_PHASE: Mutex<(Schedule, Phase)> = Mutex::new((Schedule::Empty, Phase::Empty));
     static ref ODD_SCHEDULED_PHASE: Mutex<(Schedule, Phase)> = Mutex::new((Schedule::Empty, Phase::Empty));
+    static ref START_COMPLEX_TIMER: Mutex<Option<usize>> = Mutex::new(None);
+    static ref STOP_COMPLEX_TIMER: Mutex<Option<usize>> = Mutex::new(None);
+    static ref PHASE_TIMER: PhaseTimer = PhaseTimer::new();
 }
 
 // FIXME: It's probably unsafe to call most of these functions, because tls
@@ -92,6 +96,14 @@ pub fn begin_new_phase_stack(tls: *mut c_void, scheduled_phase: (Schedule, Phase
 
 pub fn continue_phase_stack(tls: *mut c_void) {
     process_phase_stack(tls, true);
+}
+
+fn resume_complex_timers() {
+    let stack = PHASE_STACK.lock().unwrap();
+    for cp in (*stack).iter().rev() {
+        let phase = &cp.1;
+        PHASE_TIMER.start_timer(phase);
+    }
 }
 
 fn process_phase_stack(tls: *mut c_void, resume: bool) {
@@ -116,7 +128,19 @@ fn process_phase_stack(tls: *mut c_void, resume: bool) {
         if phase == Phase::Empty {
             break;
         }
-        // FIXME timer
+        if primary {
+            if resume {
+                resume_complex_timers();
+            }
+            PHASE_TIMER.start_timer(&phase);
+            {
+                let mut start_complex_timer = START_COMPLEX_TIMER.lock().unwrap();
+                if let Some(id) = *start_complex_timer {
+                    PHASE_TIMER.start_timer_id(id);
+                    *start_complex_timer = None;
+                }
+            }
+        }
         match schedule {
             Schedule::Global => {
                 debug!("Execute {:?} as Global...", phase);
@@ -158,7 +182,16 @@ fn process_phase_stack(tls: *mut c_void, resume: bool) {
             collector.rendezvous();
         }
 
-        // FIXME timer
+        if primary {
+            PHASE_TIMER.stop_timer(&phase);
+            {
+                let mut stop_complex_timer = STOP_COMPLEX_TIMER.lock().unwrap();
+                if let Some(id) = *stop_complex_timer {
+                    PHASE_TIMER.stop_timer_id(id);
+                    *stop_complex_timer = None;
+                }
+            }
+        }
         is_even_phase = !is_even_phase;
         resume = false;
     }
@@ -193,12 +226,22 @@ fn get_next_phase() -> (Schedule, Phase) {
             Schedule::Complex => {
                 let mut internal_phase = (Schedule::Empty, Phase::Empty);
                 // FIXME start complex timer
-                if let Phase::Complex(ref v, ref mut cursor) = phase {
+                if let Phase::Complex(ref v, ref mut cursor, ref timer_id) = phase {
                     trace!("Complex phase: {:?} with cursor: {:?}", v, cursor);
+                    if *cursor == 0 {
+                        if let Some(id) = timer_id {
+                            let mut start_complex_timer = START_COMPLEX_TIMER.lock().unwrap();
+                            *start_complex_timer = Some(*id);
+                        }
+                    }
                     if *cursor < v.len() {
                         internal_phase = v[*cursor].clone();
                         *cursor += 1;
                     } else {
+                        if let Some(id) = timer_id {
+                            let mut stop_complex_timer = STOP_COMPLEX_TIMER.lock().unwrap();
+                            *stop_complex_timer = Some(*id);
+                        }
                         trace!("Finished processing phase");
                     }
                 } else {

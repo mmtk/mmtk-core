@@ -20,7 +20,9 @@ use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_END;
 use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
 use util::Address;
 use util::heap::pageresource::cumulative_committed_pages;
-use util::statistics::stats::{STATS, get_gathering_stats};
+use util::statistics::stats::{STATS, get_gathering_stats, new_counter};
+use util::statistics::counter::{Counter, LongCounter};
+use util::statistics::counter::MonotoneNanoTime;
 
 pub static EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
 pub static USER_TRIGGERED_COLLECTION: AtomicBool = AtomicBool::new(false);
@@ -252,7 +254,7 @@ lazy_static! {
     pub static ref PREPARE_STACKS: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Mutator, phase::Phase::PrepareStacks),
         (phase::Schedule::Global, phase::Phase::PrepareStacks)
-    ], 0);
+    ], 0, None);
 
     pub static ref SANITY_BUILD_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Global, phase::Phase::SanityPrepare),
@@ -262,19 +264,19 @@ lazy_static! {
         (phase::Schedule::Global, phase::Phase::SanityRoots),
         (phase::Schedule::Collector, phase::Phase::SanityCopyRoots),
         (phase::Schedule::Global, phase::Phase::SanityBuildTable)
-    ], 0);
+    ], 0, None);
 
     pub static ref SANITY_CHECK_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Global, phase::Phase::SanityCheckTable),
         (phase::Schedule::Collector, phase::Phase::SanityRelease),
         (phase::Schedule::Global, phase::Phase::SanityRelease)
-    ], 0);
+    ], 0, None);
 
     pub static ref INIT_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Global, phase::Phase::SetCollectionKind),
         (phase::Schedule::Global, phase::Phase::Initiate),
         (phase::Schedule::Placeholder, phase::Phase::PreSanityPlaceholder)
-    ], 0);
+    ], 0, Some(new_counter(LongCounter::<MonotoneNanoTime>::new("init".to_string(), false, true))));
 
     pub static ref ROOT_CLOSURE_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Mutator, phase::Phase::Prepare),
@@ -287,7 +289,7 @@ lazy_static! {
         (phase::Schedule::Global, phase::Phase::Roots),
         (phase::Schedule::Global, phase::Phase::Closure),
         (phase::Schedule::Collector, phase::Phase::Closure)
-    ], 0);
+    ], 0, None);
 
     pub static ref REF_TYPE_CLOSURE_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Collector, phase::Phase::SoftRefs),
@@ -299,25 +301,25 @@ lazy_static! {
         (phase::Schedule::Collector, phase::Phase::Closure),
         (phase::Schedule::Placeholder, phase::Phase::WeakTrackRefs),
         (phase::Schedule::Collector, phase::Phase::PhantomRefs)
-    ], 0);
+    ], 0, None);
 
     pub static ref FORWARD_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Placeholder, phase::Phase::Forward),
         (phase::Schedule::Collector, phase::Phase::ForwardRefs),
         (phase::Schedule::Collector, phase::Phase::ForwardFinalizable)
-    ], 0);
+    ], 0, None);
 
     pub static ref COMPLETE_CLOSURE_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Mutator, phase::Phase::Release),
         (phase::Schedule::Collector, phase::Phase::Release),
         (phase::Schedule::Global, phase::Phase::Release)
-    ], 0);
+    ], 0, None);
 
     pub static ref FINISH_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Placeholder, phase::Phase::PostSanityPlaceholder),
         (phase::Schedule::Collector, phase::Phase::Complete),
         (phase::Schedule::Global, phase::Phase::Complete)
-    ], 0);
+    ], 0, Some(new_counter(LongCounter::<MonotoneNanoTime>::new("finish".to_string(), false, true))));
 
     pub static ref COLLECTION: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Complex, INIT_PHASE.clone()),
@@ -326,19 +328,19 @@ lazy_static! {
         (phase::Schedule::Complex, FORWARD_PHASE.clone()),
         (phase::Schedule::Complex, COMPLETE_CLOSURE_PHASE.clone()),
         (phase::Schedule::Complex, FINISH_PHASE.clone())
-    ], 0);
+    ], 0, None);
 
     pub static ref PRE_SANITY_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Global, phase::Phase::SanitySetPreGC),
         (phase::Schedule::Complex, SANITY_BUILD_PHASE.clone()),
         (phase::Schedule::Complex, SANITY_CHECK_PHASE.clone())
-    ], 0);
+    ], 0, None);
 
     pub static ref POST_SANITY_PHASE: phase::Phase = phase::Phase::Complex(vec![
         (phase::Schedule::Global, phase::Phase::SanitySetPostGC),
         (phase::Schedule::Complex, SANITY_BUILD_PHASE.clone()),
         (phase::Schedule::Complex, SANITY_CHECK_PHASE.clone())
-    ], 0);
+    ], 0, None);
 }
 
 pub fn set_gc_status(s: GcStatus) {
@@ -371,8 +373,16 @@ pub fn gc_in_progress_proper() -> bool {
 
 static INSIDE_HARNESS: AtomicBool = AtomicBool::new(false);
 
-pub fn harness_begin() {
-    // FIXME Do a full heap GC
+pub fn harness_begin(tls: *mut c_void) {
+    // FIXME Do a full heap GC if we have generational GC
+    let old_ignore = OPTION_MAP.ignore_system_g_c;
+    unsafe { OPTION_MAP.process("ignoreSystemGC", "false"); }
+    ::plan::selected_plan::SelectedPlan::handle_user_collection_request(tls);
+    if old_ignore {
+        unsafe { OPTION_MAP.process("ignoreSystemGC", "true"); }
+    } else {
+        unsafe { OPTION_MAP.process("ignoreSystemGC", "false"); }
+    }
     INSIDE_HARNESS.store(true, Ordering::SeqCst);
     STATS.lock().unwrap().start_all();
 }
