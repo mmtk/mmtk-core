@@ -22,7 +22,7 @@
 #[cfg(target_pointer_width = "32")]
 pub const DATA_SIZE_ADJUSTMENT: f32 = 1.0;
 
-#[cfg(target_pointr_width = "64")]
+#[cfg(target_pointer_width = "64")]
 pub const DATA_SIZE_ADJUSTMENT: f32 = 1.35;
 
 // x64 code is a lot bigger than ia32 code.
