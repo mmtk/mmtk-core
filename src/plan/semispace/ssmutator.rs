@@ -84,7 +84,7 @@ impl MutatorContext for SSMutator {
             }
             _ => {
                 // FIXME: data race on immortalspace.mark_state !!!
-                self.los.get_space().unwrap().initialize_header(refer, true);
+                self.vs.get_space().unwrap().initialize_header(refer);
             }
         }
     }
