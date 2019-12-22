@@ -21,6 +21,7 @@ use util::OpaquePointer;
 use util::opaque_pointer::UNINITIALIZED_OPAQUE_POINTER;
 use plan::semispace::SelectedPlan;
 use plan::semispace::SemiSpace;
+use plan::phase::ScheduledPhase;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector {
@@ -172,7 +173,7 @@ impl ParallelCollector for SSCollector {
 
     fn collect(&self) {
         // FIXME use reference instead of cloning everything
-        phase::begin_new_phase_stack(self.tls, (phase::Schedule::Complex, ::plan::plan::COLLECTION.clone()))
+        phase::begin_new_phase_stack(self.tls, ScheduledPhase::new(phase::Schedule::Complex, ::plan::plan::COLLECTION.clone()))
     }
 
     fn get_current_trace(&mut self) -> &mut SSTraceLocal {

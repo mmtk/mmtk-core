@@ -63,10 +63,29 @@ pub enum Phase {
     EvacuateClosure,
     EvacuateRelease,
     // Complex phases
-    Complex(Vec<(Schedule, Phase)>, usize, Option<usize>),
+    Complex(Vec<ScheduledPhase>, usize, Option<usize>),
     // associated cursor
     // No phases are left
     Empty,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct ScheduledPhase {
+    schedule: Schedule,
+    phase: Phase,
+}
+
+impl ScheduledPhase {
+    pub fn new(schedule: Schedule, phase: Phase) -> Self {
+        ScheduledPhase { schedule, phase }
+    }
+
+    pub fn empty() -> Self {
+        ScheduledPhase {
+            schedule: Schedule::Empty,
+            phase: Phase::Empty,
+        }
+    }
 }
 
 static EVEN_MUTATOR_RESET_RENDEZVOUS: AtomicBool = AtomicBool::new(false);
@@ -74,9 +93,9 @@ static ODD_MUTATOR_RESET_RENDEZVOUS: AtomicBool = AtomicBool::new(false);
 static COMPLEX_PHASE_CURSOR: AtomicUsize = AtomicUsize::new(0);
 
 lazy_static! {
-    static ref PHASE_STACK: Mutex<Vec<(Schedule, Phase)>> = Mutex::new(vec![]);
-    static ref EVEN_SCHEDULED_PHASE: Mutex<(Schedule, Phase)> = Mutex::new((Schedule::Empty, Phase::Empty));
-    static ref ODD_SCHEDULED_PHASE: Mutex<(Schedule, Phase)> = Mutex::new((Schedule::Empty, Phase::Empty));
+    static ref PHASE_STACK: Mutex<Vec<ScheduledPhase>> = Mutex::new(vec![]);
+    static ref EVEN_SCHEDULED_PHASE: Mutex<ScheduledPhase> = Mutex::new(ScheduledPhase::empty());
+    static ref ODD_SCHEDULED_PHASE: Mutex<ScheduledPhase> = Mutex::new(ScheduledPhase::empty());
     static ref START_COMPLEX_TIMER: Mutex<Option<usize>> = Mutex::new(None);
     static ref STOP_COMPLEX_TIMER: Mutex<Option<usize>> = Mutex::new(None);
     static ref PHASE_TIMER: PhaseTimer = PhaseTimer::new();
@@ -84,7 +103,7 @@ lazy_static! {
 
 // FIXME: It's probably unsafe to call most of these functions, because tls
 
-pub fn begin_new_phase_stack(tls: OpaquePointer, scheduled_phase: (Schedule, Phase)) {
+pub fn begin_new_phase_stack(tls: OpaquePointer, scheduled_phase: ScheduledPhase) {
     let order = unsafe { VMActivePlan::collector(tls).rendezvous() };
 
     if order == 0 {
@@ -101,8 +120,7 @@ pub fn continue_phase_stack(tls: OpaquePointer) {
 fn resume_complex_timers() {
     let stack = PHASE_STACK.lock().unwrap();
     for cp in (*stack).iter().rev() {
-        let phase = &cp.1;
-        PHASE_TIMER.start_timer(phase);
+        PHASE_TIMER.start_timer(&cp.phase);
     }
 }
 
@@ -123,8 +141,8 @@ fn process_phase_stack(tls: OpaquePointer, resume: bool) {
     collector.rendezvous();
     loop {
         let cp = get_current_phase(is_even_phase);
-        let schedule = cp.0;
-        let phase = cp.1;
+        let schedule = cp.schedule;
+        let phase = cp.phase;
         if phase == Phase::Empty {
             break;
         }
@@ -168,7 +186,7 @@ fn process_phase_stack(tls: OpaquePointer, resume: bool) {
 
         if primary {
             let next = get_next_phase();
-            let needs_reset_rendezvous = next.1 != Phase::Empty && (schedule == Schedule::Mutator && next.0 == Schedule::Mutator);
+            let needs_reset_rendezvous = next.phase != Phase::Empty && (schedule == Schedule::Mutator && next.schedule == Schedule::Mutator);
             set_next_phase(is_even_phase, next, needs_reset_rendezvous);
         }
 
@@ -197,7 +215,7 @@ fn process_phase_stack(tls: OpaquePointer, resume: bool) {
     }
 }
 
-fn get_current_phase(is_even_phase: bool) -> (Schedule, Phase) {
+fn get_current_phase(is_even_phase: bool) -> ScheduledPhase {
     if is_even_phase {
         (*EVEN_SCHEDULED_PHASE.lock().unwrap()).clone()
     } else {
@@ -205,28 +223,28 @@ fn get_current_phase(is_even_phase: bool) -> (Schedule, Phase) {
     }
 }
 
-fn get_next_phase() -> (Schedule, Phase) {
+fn get_next_phase() -> ScheduledPhase {
     let mut stack = PHASE_STACK.lock().unwrap();
     while !stack.is_empty() {
-        let (schedule, mut phase) = stack.pop().unwrap();
-        match schedule {
+        let mut scheduled_phase = stack.pop().unwrap();
+        match scheduled_phase.schedule {
             Schedule::Placeholder => {}
             Schedule::Global => {
-                return (schedule, phase);
+                return scheduled_phase;
             }
             Schedule::Collector => {
-                return (schedule, phase);
+                return scheduled_phase;
             }
             Schedule::Mutator => {
-                return (schedule, phase);
+                return scheduled_phase;
             }
             Schedule::Concurrent => {
                 unimplemented!()
             }
             Schedule::Complex => {
-                let mut internal_phase = (Schedule::Empty, Phase::Empty);
+                let mut internal_phase = ScheduledPhase::empty();
                 // FIXME start complex timer
-                if let Phase::Complex(ref v, ref mut cursor, ref timer_id) = phase {
+                if let Phase::Complex(ref v, ref mut cursor, ref timer_id) = scheduled_phase.phase {
                     trace!("Complex phase: {:?} with cursor: {:?}", v, cursor);
                     if *cursor == 0 {
                         if let Some(id) = timer_id {
@@ -247,8 +265,8 @@ fn get_next_phase() -> (Schedule, Phase) {
                 } else {
                     panic!("Complex schedule should be paired with complex phase");
                 }
-                if internal_phase.1 != Phase::Empty {
-                    stack.push((schedule, phase));
+                if internal_phase.phase != Phase::Empty {
+                    stack.push(scheduled_phase);
                     stack.push(internal_phase);
                 }
                 // FIXME stop complex timer
@@ -258,11 +276,11 @@ fn get_next_phase() -> (Schedule, Phase) {
             }
         }
     }
-    (Schedule::Empty, Phase::Empty)
+    ScheduledPhase::empty()
 }
 
 fn set_next_phase(is_even_phase: bool,
-                  scheduled_phase: (Schedule, Phase),
+                  scheduled_phase: ScheduledPhase,
                   needs_reset_rendezvous: bool) {
     if is_even_phase {
         *ODD_SCHEDULED_PHASE.lock().unwrap() = scheduled_phase;
@@ -273,7 +291,7 @@ fn set_next_phase(is_even_phase: bool,
     }
 }
 
-pub fn push_scheduled_phase(scheduled_phase: (Schedule, Phase)) {
+pub fn push_scheduled_phase(scheduled_phase: ScheduledPhase) {
     PHASE_STACK.lock().unwrap().push(scheduled_phase);
 }
 
