@@ -2,7 +2,7 @@ pub mod plan;
 pub mod tracelocal;
 pub mod transitive_closure;
 pub mod controller_collector_context;
-mod phase;
+pub mod phase;
 mod trace;
 pub mod mutator_context;
 pub mod collector_context;

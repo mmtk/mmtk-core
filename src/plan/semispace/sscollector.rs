@@ -5,6 +5,7 @@ use ::plan::ParallelCollector;
 use ::plan::ParallelCollectorGroup;
 use ::plan::semispace;
 use ::plan::TraceLocal;
+use ::plan::phase::PhaseManager;
 use ::policy::copyspace::CopySpace;
 use ::policy::largeobjectspace::LargeObjectSpace;
 use ::util::{Address, ObjectReference};
@@ -35,11 +36,12 @@ pub struct SSCollector {
     worker_ordinal: usize,
     group: Option<&'static ParallelCollectorGroup<SSCollector>>,
 
-    plan: &'static SemiSpace
+    plan: &'static SemiSpace,
+    phase_manager: &'static PhaseManager,
 }
 
 impl CollectorContext for SSCollector {
-    fn new(plan: &'static SelectedPlan) -> Self {
+    fn new(plan: &'static SelectedPlan, phase_manager: &'static PhaseManager) -> Self {
         SSCollector {
             tls: UNINITIALIZED_OPAQUE_POINTER,
             ss: BumpAllocator::new(UNINITIALIZED_OPAQUE_POINTER, None),
@@ -49,7 +51,7 @@ impl CollectorContext for SSCollector {
             last_trigger_count: 0,
             worker_ordinal: 0,
             group: None,
-            plan,
+            plan, phase_manager
         }
     }
 
@@ -173,7 +175,7 @@ impl ParallelCollector for SSCollector {
 
     fn collect(&self) {
         // FIXME use reference instead of cloning everything
-        phase::begin_new_phase_stack(self.tls, ScheduledPhase::new(phase::Schedule::Complex, ::plan::plan::COLLECTION.clone()))
+        self.phase_manager.begin_new_phase_stack(self.tls, ScheduledPhase::new(phase::Schedule::Complex, ::plan::plan::COLLECTION.clone()))
     }
 
     fn get_current_trace(&mut self) -> &mut SSTraceLocal {

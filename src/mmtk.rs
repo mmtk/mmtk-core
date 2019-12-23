@@ -1,5 +1,6 @@
 use crate::plan::Plan;
 use crate::plan::SelectedPlan;
+use crate::plan::phase::PhaseManager;
 
 use std::sync::Arc;
 
@@ -11,12 +12,14 @@ lazy_static!{
 
 pub struct MMTK {
     pub plan: SelectedPlan,
+    pub phase_manager: PhaseManager,
 }
 
 impl MMTK {
     pub fn new() -> Self {
         MMTK {
             plan: SelectedPlan::new(),
+            phase_manager: PhaseManager::new(),
         }
     }
 }
