@@ -10,9 +10,9 @@ use ::util::constants::*;
 use ::util::heap::PageResource;
 use ::vm::{ActivePlan, VMActivePlan, Collection, VMCollection};
 use ::plan::MutatorContext;
-use ::plan::selected_plan::PLAN;
 use ::plan::selected_plan::SelectedPlan;
 use ::plan::Plan;
+use ::util::OpaquePointer;
 
 // FIXME: Put this somewhere more appropriate
 pub const ALIGNMENT_VALUE: usize = 0xdeadbeef;
@@ -132,7 +132,7 @@ pub fn determine_collection_attempts() -> usize {
 }
 
 pub trait Allocator<PR: PageResource> {
-    fn get_tls(&self) -> *mut c_void;
+    fn get_tls(&self) -> OpaquePointer;
 
     fn get_space(&self) -> Option<&'static PR::Space>;
 

@@ -4,7 +4,6 @@ use ::plan::CollectorContext;
 use ::plan::ParallelCollector;
 use ::plan::ParallelCollectorGroup;
 use ::plan::semispace;
-use ::plan::semispace::PLAN;
 use ::plan::TraceLocal;
 use ::policy::copyspace::CopySpace;
 use ::policy::largeobjectspace::LargeObjectSpace;
@@ -18,10 +17,13 @@ use ::vm::{Scanning, VMScanning};
 use libc::c_void;
 use super::sstracelocal::SSTraceLocal;
 use ::plan::selected_plan::SelectedConstraints;
+use util::OpaquePointer;
+use plan::semispace::SelectedPlan;
+use plan::semispace::SemiSpace;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector {
-    pub tls: *mut c_void,
+    pub tls: OpaquePointer,
     // CopyLocal
     pub ss: BumpAllocator<MonotonePageResource<CopySpace>>,
     los: LargeObjectAllocator,
@@ -30,23 +32,26 @@ pub struct SSCollector {
     last_trigger_count: usize,
     worker_ordinal: usize,
     group: Option<&'static ParallelCollectorGroup<SSCollector>>,
+
+    plan: &'static SemiSpace
 }
 
 impl CollectorContext for SSCollector {
-    fn new() -> Self {
+    fn new(plan: &'static SelectedPlan) -> Self {
         SSCollector {
-            tls: 0 as *mut c_void,
-            ss: BumpAllocator::new(0 as *mut c_void, None),
-            los: LargeObjectAllocator::new(0 as *mut c_void, Some(semispace::PLAN.get_los())),
-            trace: SSTraceLocal::new(PLAN.get_sstrace()),
+            tls: OpaquePointer::UNINITIALIZED,
+            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None),
+            los: LargeObjectAllocator::new(OpaquePointer::UNINITIALIZED, Some(plan.get_los())),
+            trace: SSTraceLocal::new(plan),
 
             last_trigger_count: 0,
             worker_ordinal: 0,
             group: None,
+            plan,
         }
     }
 
-    fn init(&mut self, tls: *mut c_void) {
+    fn init(&mut self, tls: OpaquePointer) {
         self.tls = tls;
         self.ss.tls = tls;
         self.los.tls = tls;
@@ -62,7 +67,7 @@ impl CollectorContext for SSCollector {
 
     }
 
-    fn run(&mut self, tls: *mut c_void) {
+    fn run(&mut self, tls: OpaquePointer) {
         self.tls = tls;
         loop {
             self.park();
@@ -70,9 +75,9 @@ impl CollectorContext for SSCollector {
         }
     }
 
-    fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
-            &Phase::Prepare => { self.ss.rebind(Some(semispace::PLAN.tospace())) }
+            &Phase::Prepare => { self.ss.rebind(Some(self.plan.tospace())) }
             &Phase::StackRoots => {
                 trace!("Computing thread roots");
                 VMScanning::compute_thread_roots(&mut self.trace, self.tls);
@@ -139,7 +144,7 @@ impl CollectorContext for SSCollector {
         }
     }
 
-    fn get_tls(&self) -> *mut c_void {
+    fn get_tls(&self) -> OpaquePointer {
         self.tls
     }
 
@@ -148,8 +153,7 @@ impl CollectorContext for SSCollector {
         match allocator {
             ::plan::Allocator::Default => {}
             ::plan::Allocator::Los => {
-                let unsync = unsafe { &*PLAN.unsync.get() };
-                unsync.los.initialize_header(object, false);
+                self.los.get_space().unwrap().initialize_header(object, false);
             }
             _ => {
                 panic!("Currently we can't copy to other spaces other than copyspace")

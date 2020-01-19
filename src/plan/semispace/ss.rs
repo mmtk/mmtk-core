@@ -23,6 +23,7 @@ use ::util::heap::layout::Mmapper;
 use ::util::Address;
 use ::util::heap::PageResource;
 use ::util::heap::VMRequest;
+use ::util::OpaquePointer;
 
 use ::util::constants::LOG_BYTES_IN_PAGE;
 
@@ -41,10 +42,6 @@ pub type SelectedPlan = SemiSpace;
 pub const ALLOC_SS: Allocator = Allocator::Default;
 pub const SCAN_BOOT_IMAGE: bool = true;
 
-lazy_static! {
-    pub static ref PLAN: SemiSpace = SemiSpace::new();
-}
-
 pub struct SemiSpace {
     pub unsync: UnsafeCell<SemiSpaceUnsync>,
     pub ss_trace: Trace,
@@ -57,7 +54,6 @@ pub struct SemiSpaceUnsync {
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
     pub los: LargeObjectSpace,
-    sanity_checker: SanityChecker,
     // FIXME: This should be inside HeapGrowthManager
     total_pages: usize,
 
@@ -83,7 +79,6 @@ impl Plan for SemiSpace {
                 versatile_space: ImmortalSpace::new("versatile_space", true,
                                                     VMRequest::discontiguous()),
                 los: LargeObjectSpace::new("los", true, VMRequest::discontiguous()),
-                sanity_checker: SanityChecker::new(),
                 total_pages: 0,
                 collection_attempt: 0,
             }),
@@ -105,15 +100,14 @@ impl Plan for SemiSpace {
         // (Usually because it calls into VM code that accesses the TLS.)
         if !(cfg!(feature = "jikesrvm") || cfg!(feature = "openjdk")) {
             thread::spawn(|| {
-                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(0 as *mut c_void)
+                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(OpaquePointer::UNINITIALIZED)
             });
         }
     }
 
-    fn bind_mutator(&self, tls: *mut c_void) -> *mut c_void {
+    fn bind_mutator(&'static self, tls: OpaquePointer) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
-        Box::into_raw(Box::new(SSMutator::new(tls, self.tospace(),
-                                              &unsync.versatile_space, &unsync.los))) as *mut c_void
+        Box::into_raw(Box::new(SSMutator::new(tls, self))) as *mut c_void
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {
@@ -148,7 +142,7 @@ impl Plan for SemiSpace {
         return false;
     }
 
-    unsafe fn collection_phase(&self, tls: *mut c_void, phase: &Phase) {
+    unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {
         let unsync = &mut *self.unsync.get();
 
         match phase {
@@ -174,7 +168,7 @@ impl Plan for SemiSpace {
             &Phase::Prepare => {
                 if cfg!(feature = "sanity") {
                     println!("Pre GC sanity check");
-                    unsync.sanity_checker.check(tls);
+                    SanityChecker::new(tls, &self).check();
                 }
                 debug_assert!(self.ss_trace.values.is_empty());
                 debug_assert!(self.ss_trace.root_locations.is_empty());
@@ -223,9 +217,9 @@ impl Plan for SemiSpace {
             &Phase::Complete => {
                 if cfg!(feature = "sanity") {
                     println!("Post GC sanity check");
-                    unsync.sanity_checker.check(tls);
+                    SanityChecker::new(tls, &self).check();
                     println!("Post GC memory scan");
-                    memory_scan::scan_region();
+                    memory_scan::scan_region(&self);
                     println!("Finished one GC");
                 }
                 debug_assert!(self.ss_trace.values.is_empty());
@@ -318,6 +312,11 @@ impl SemiSpace {
 
     pub fn get_sstrace(&self) -> &Trace {
         &self.ss_trace
+    }
+
+    pub fn get_versatile_space(&self) -> &'static ImmortalSpace {
+        let unsync = unsafe { &*self.unsync.get() };
+        &unsync.versatile_space
     }
 
     pub fn get_los(&self) -> &'static LargeObjectSpace {

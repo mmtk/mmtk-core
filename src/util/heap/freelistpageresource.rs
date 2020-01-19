@@ -17,6 +17,7 @@ use util::heap::layout::vm_layout_constants::*;
 use util::heap::layout::heap_layout;
 use util::conversions;
 use util::constants::*;
+use util::OpaquePointer;
 use policy::space::Space;
 use vm::{VMMemory, Memory};
 use super::vmrequest::HEAP_LAYOUT_64BIT;
@@ -83,7 +84,7 @@ impl<S: Space<PR = FreeListPageResource<S>>> PageResource for FreeListPageResour
     }
 
     #[allow(mutable_transmutes)]
-    fn alloc_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, tls: *mut c_void) -> Address {
+    fn alloc_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, tls: OpaquePointer) -> Address {
         debug_assert!(self.meta_data_pages_per_region == 0 || required_pages <= PAGES_IN_CHUNK - self.meta_data_pages_per_region);
         let self_mut: &mut Self = unsafe { mem::transmute(self) };
         let mut sync = self.sync.lock().unwrap();

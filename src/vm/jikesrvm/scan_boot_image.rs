@@ -1,4 +1,5 @@
 use ::util::Address;
+use ::util::OpaquePointer;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::super::unboxed_size_constants::*;
@@ -26,7 +27,7 @@ const GUARD_REGION: usize = LONGENCODING_OFFSET_BYTES + 1; /* long offset + run 
 static ROOTS: AtomicUsize = AtomicUsize::new(0);
 static REFS: AtomicUsize = AtomicUsize::new(0);
 
-pub fn scan_boot_image<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+pub fn scan_boot_image<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
     unsafe {
         let boot_record = Address::from_usize((JTOC_BASE + THE_BOOT_RECORD_FIELD_OFFSET)
             .load::<usize>());

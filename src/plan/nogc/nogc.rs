@@ -8,16 +8,13 @@ use ::util::heap::VMRequest;
 use ::util::heap::layout::heap_layout::MMAPPER;
 use ::util::heap::layout::Mmapper;
 use ::util::Address;
+use ::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
 use std::thread;
 use libc::c_void;
 
 use std::mem::uninitialized;
-
-lazy_static! {
-    pub static ref PLAN: NoGC = NoGC::new();
-}
 
 use super::NoGCTraceLocal;
 use super::NoGCMutator;
@@ -73,12 +70,12 @@ impl Plan for NoGC {
         // (Usually because it calls into VM code that accesses the TLS.)
         if !(cfg!(feature = "jikesrvm") || cfg!(feature = "openjdk")) {
             thread::spawn(|| {
-                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(0 as *mut c_void)
+                ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(OpaquePointer::UNINITIALIZED )
             });
         }
     }
 
-    fn bind_mutator(&self, tls: *mut c_void) -> *mut c_void {
+    fn bind_mutator(&self, tls: OpaquePointer) -> *mut c_void {
         let unsync = unsafe { &*self.unsync.get() };
         Box::into_raw(Box::new(NoGCMutator::new(
             tls, &unsync.space, &unsync.los))) as *mut c_void
@@ -88,7 +85,7 @@ impl Plan for NoGC {
         true
     }
 
-    unsafe fn collection_phase(&self, tls: *mut c_void, phase: &Phase) {}
+    unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {}
 
     fn get_total_pages(&self) -> usize {
         let unsync = unsafe { &*self.unsync.get() };

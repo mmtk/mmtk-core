@@ -21,7 +21,6 @@ num_cpus = "1.8"
 default = ["nogc", "openjdk"]
 nogc = []
 semispace = []
-g1 = []
 jikesrvm = []
 openjdk = []
 sanity = []

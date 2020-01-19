@@ -10,9 +10,10 @@ use ::plan::{Plan, ParallelCollector};
 use ::plan::selected_plan::SelectedPlan;
 
 use libc::c_void;
+use util::OpaquePointer;
 
 struct RequestSync {
-    tls: *mut c_void,
+    tls: OpaquePointer,
     request_count: isize,
     last_request_count: isize,
 }
@@ -31,7 +32,7 @@ impl ControllerCollectorContext {
     pub fn new() -> Self {
         ControllerCollectorContext {
             request_sync: Mutex::new(RequestSync {
-                tls: 0 as *mut c_void,
+                tls: OpaquePointer::UNINITIALIZED,
                 request_count: 0,
                 last_request_count: -1,
             }),
@@ -42,7 +43,7 @@ impl ControllerCollectorContext {
         }
     }
 
-    pub fn run(&self, tls: *mut c_void) {
+    pub fn run(&self, tls: OpaquePointer) {
         {
             self.request_sync.lock().unwrap().tls = tls;
         }

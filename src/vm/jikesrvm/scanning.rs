@@ -16,6 +16,7 @@ use std::slice;
 use ::vm::jikesrvm::java_header::TIB_OFFSET;
 use ::vm::jikesrvm::tib_layout_constants::TIB_TYPE_INDEX;
 use ::vm::unboxed_size_constants::BYTES_IN_ADDRESS;
+use ::util::OpaquePointer;
 
 use libc::c_void;
 
@@ -26,7 +27,7 @@ pub struct VMScanning {}
 const DUMP_REF: bool = false;
 
 impl Scanning for VMScanning {
-    fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, tls: *mut c_void) {
+    fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, tls: OpaquePointer) {
         if DUMP_REF {
             let obj_ptr = object.value();
             unsafe { jtoc_call!(DUMP_REF_METHOD_OFFSET, tls, obj_ptr); }
@@ -63,7 +64,7 @@ impl Scanning for VMScanning {
         COUNTER.reset();
     }
 
-    fn notify_initial_thread_scan_complete(partial_scan: bool, tls: *mut c_void) {
+    fn notify_initial_thread_scan_complete(partial_scan: bool, tls: OpaquePointer) {
         if !partial_scan {
             unsafe {
                 jtoc_call!(SNIP_OBSOLETE_COMPILED_METHODS_METHOD_OFFSET, tls);
@@ -75,11 +76,11 @@ impl Scanning for VMScanning {
         }
     }
 
-    fn compute_static_roots<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+    fn compute_static_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
         super::scan_statics::scan_statics(trace, tls);
     }
 
-    fn compute_global_roots<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+    fn compute_global_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
         unsafe {
             let cc = VMActivePlan::collector(tls);
 
@@ -142,15 +143,15 @@ impl Scanning for VMScanning {
         }
     }
 
-    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
         Self::compute_thread_roots(trace, false, tls)
     }
 
-    fn compute_new_thread_roots<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+    fn compute_new_thread_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
         Self::compute_thread_roots(trace, true, tls)
     }
 
-    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
         super::scan_boot_image::scan_boot_image(trace, tls);
     }
 
@@ -161,7 +162,7 @@ impl Scanning for VMScanning {
 }
 
 impl VMScanning {
-    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, new_roots_sufficient: bool, tls: *mut c_void) {
+    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, new_roots_sufficient: bool, tls: OpaquePointer) {
         unsafe {
             let process_code_locations = MOVES_CODE;
 

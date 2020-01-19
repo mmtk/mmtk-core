@@ -1,10 +1,11 @@
 use super::entrypoint::*;
 use super::JTOC_BASE;
 use ::plan::{TraceLocal};
+use ::util::OpaquePointer;
 
 use libc::c_void;
 
-pub fn scan_boot_image_sanity<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+pub fn scan_boot_image_sanity<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
     trace!("scan_boot_image_sanity");
     let mut boot_image_roots: [usize; 10000] = [0; 10000];
     let addr = &boot_image_roots as *const usize;

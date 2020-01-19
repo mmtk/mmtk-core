@@ -1,7 +1,7 @@
 use ::util::ObjectReference;
 use ::util::Address;
 use ::plan::TraceLocal;
-
+use ::util::OpaquePointer;
 use libc::c_void;
 
 /**
@@ -15,5 +15,5 @@ pub trait ReferenceGlue {
     fn get_referent(object: ObjectReference) -> ObjectReference;
     fn set_referent(reff: ObjectReference, referent: ObjectReference);
 
-    fn process_reference<T: TraceLocal>(trace: &mut T, reference: ObjectReference, tls: *mut c_void) -> ObjectReference;
+    fn process_reference<T: TraceLocal>(trace: &mut T, reference: ObjectReference, tls: OpaquePointer) -> ObjectReference;
 }

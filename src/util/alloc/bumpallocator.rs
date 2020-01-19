@@ -16,6 +16,7 @@ use libc::{memset, c_void};
 use ::policy::space::Space;
 use util::conversions::bytes_to_pages;
 use ::util::constants::BYTES_IN_ADDRESS;
+use ::util::OpaquePointer;
 
 
 const BYTES_IN_PAGE: usize = 1 << 12;
@@ -29,7 +30,7 @@ const DATA_END_OFFSET: isize = NEXT_REGION_OFFSET + BYTES_IN_ADDRESS as isize;
 #[repr(C)]
 #[derive(Debug)]
 pub struct BumpAllocator<PR: PageResource> {
-    pub tls: *mut c_void,
+    pub tls: OpaquePointer,
     cursor: Address,
     limit: Address,
     space: Option<&'static PR::Space>
@@ -132,13 +133,13 @@ impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
         }
     }
 
-    fn get_tls(&self) -> *mut c_void {
+    fn get_tls(&self) -> OpaquePointer {
         self.tls
     }
 }
 
 impl<PR: PageResource> BumpAllocator<PR> {
-    pub fn new(tls: *mut c_void, space: Option<&'static PR::Space>) -> Self {
+    pub fn new(tls: OpaquePointer, space: Option<&'static PR::Space>) -> Self {
         BumpAllocator {
             tls,
             cursor: unsafe { Address::zero() },

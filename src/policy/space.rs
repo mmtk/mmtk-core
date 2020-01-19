@@ -8,7 +8,6 @@ use ::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END, AVAILABLE_
 use ::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END};
 
 use ::plan::Plan;
-use ::plan::selected_plan::PLAN;
 use ::plan::{Allocator, TransitiveClosure};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -17,21 +16,22 @@ use ::util::constants::LOG_BYTES_IN_MBYTE;
 use ::util::conversions;
 use ::util::heap::space_descriptor;
 use ::util::heap::layout::heap_layout::VM_MAP;
+use ::util::OpaquePointer;
 
 use std::fmt::Debug;
 
 use libc::c_void;
+use plan::selected_plan::SelectedPlan;
 
 pub trait Space: Sized + Debug + 'static {
     type PR: PageResource<Space = Self>;
 
     fn init(&mut self);
 
-    fn acquire(&self, tls: *mut c_void, pages: usize) -> Address {
-        trace!("Space.acquire, tls={:p}", tls);
+    fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
+        trace!("Space.acquire, tls={:?}", tls);
         // debug_assert!(tls != 0);
-        let allow_poll = unsafe { VMActivePlan::is_mutator(tls) }
-            && PLAN.is_initialized();
+        let allow_poll = unsafe { VMActivePlan::is_mutator(tls) } && SelectedPlan::is_initialized();
 
         trace!("Reserving pages");
         let pr = self.common().pr.as_ref().unwrap();

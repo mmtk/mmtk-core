@@ -6,46 +6,47 @@ use ::plan::{MutatorContext, ParallelCollector};
 use super::entrypoint::*;
 use super::JTOC_BASE;
 use libc::c_void;
+use util::OpaquePointer;
 
-pub static mut BOOT_THREAD: *mut c_void = 0 as *mut c_void;
+pub static mut BOOT_THREAD: OpaquePointer = OpaquePointer::UNINITIALIZED;
 
 pub struct VMCollection {}
 
 // FIXME: Shouldn't these all be unsafe because of tls?
 impl Collection for VMCollection {
     #[inline(always)]
-    fn stop_all_mutators(tls: *mut c_void) {
+    fn stop_all_mutators(tls: OpaquePointer) {
         unsafe {
             jtoc_call!(BLOCK_ALL_MUTATORS_FOR_GC_METHOD_OFFSET, tls);
         }
     }
 
     #[inline(always)]
-    fn resume_mutators(tls: *mut c_void) {
+    fn resume_mutators(tls: OpaquePointer) {
         unsafe {
             jtoc_call!(UNBLOCK_ALL_MUTATORS_FOR_GC_METHOD_OFFSET, tls);
         }
     }
 
     #[inline(always)]
-    fn block_for_gc(tls: *mut c_void) {
+    fn block_for_gc(tls: OpaquePointer) {
         unsafe {
             jtoc_call!(BLOCK_FOR_GC_METHOD_OFFSET, tls);
         }
     }
 
     #[inline(always)]
-    unsafe fn spawn_worker_thread<T: ParallelCollector>(tls: *mut c_void, ctx: *mut T) {
+    unsafe fn spawn_worker_thread<T: ParallelCollector>(tls: OpaquePointer, ctx: *mut T) {
         jtoc_call!(SPAWN_COLLECTOR_THREAD_METHOD_OFFSET, tls, ctx);
     }
 
-    fn prepare_mutator<T: MutatorContext>(tls: *mut c_void, m: &T) {
+    fn prepare_mutator<T: MutatorContext>(tls: OpaquePointer, m: &T) {
         unsafe {
             jtoc_call!(PREPARE_MUTATOR_METHOD_OFFSET, tls, tls);
         }
     }
 
-    fn out_of_memory(tls: *mut c_void) {
+    fn out_of_memory(tls: OpaquePointer) {
         unsafe {
             jtoc_call!(OUT_OF_MEMORY_METHOD_OFFSET, tls);
         }

@@ -17,7 +17,7 @@ use super::super::ActivePlan;
 use super::active_plan::VMActivePlan;
 
 use ::vm::object_model::ObjectModel;
-use ::util::{Address, ObjectReference};
+use ::util::{Address, ObjectReference, OpaquePointer};
 use ::util::alloc::allocator::fill_alignment_gap;
 use ::util::constants::{};
 use ::plan::{Allocator, CollectorContext};
@@ -46,7 +46,7 @@ pub struct VMObjectModel {}
 
 impl ObjectModel for VMObjectModel {
     #[inline(always)]
-    fn copy(from: ObjectReference, allocator: Allocator, tls: *mut c_void) -> ObjectReference {
+    fn copy(from: ObjectReference, allocator: Allocator, tls: OpaquePointer) -> ObjectReference {
         trace!("ObjectModel.copy");
         unsafe {
             trace!("getting tib");
@@ -364,7 +364,7 @@ impl ObjectModel for VMObjectModel {
 impl VMObjectModel {
     #[inline(always)]
     fn copy_scalar(from: ObjectReference, tib: Address, rvm_type: Address,
-                   immut_allocator: Allocator, tls: *mut c_void) -> ObjectReference {
+                   immut_allocator: Allocator, tls: OpaquePointer) -> ObjectReference {
         trace!("VMObjectModel.copy_scalar");
         let bytes = Self::bytes_required_when_copied_class(from, rvm_type);
         let align = Self::get_alignment_class(rvm_type);
@@ -381,7 +381,7 @@ impl VMObjectModel {
 
     #[inline(always)]
     fn copy_array(from: ObjectReference, tib: Address, rvm_type: Address,
-                  immut_allocator: Allocator, tls: *mut c_void) -> ObjectReference {
+                  immut_allocator: Allocator, tls: OpaquePointer) -> ObjectReference {
         trace!("VMObjectModel.copy_array");
         let bytes = Self::bytes_required_when_copied_array(from, rvm_type);
         let align = Self::get_alignment_array(rvm_type);
