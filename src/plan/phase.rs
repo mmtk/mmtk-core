@@ -76,15 +76,13 @@ pub struct ScheduledPhase {
 }
 
 impl ScheduledPhase {
+    pub const EMPTY: Self = ScheduledPhase {
+        schedule: Schedule::Empty,
+        phase: Phase::Empty,
+    };
+
     pub fn new(schedule: Schedule, phase: Phase) -> Self {
         ScheduledPhase { schedule, phase }
-    }
-
-    pub fn empty() -> Self {
-        ScheduledPhase {
-            schedule: Schedule::Empty,
-            phase: Phase::Empty,
-        }
     }
 }
 
@@ -109,8 +107,8 @@ impl PhaseManager {
             complex_phase_cursor: AtomicUsize::new(0),
 
             phase_stack: Mutex::new(vec![]),
-            even_scheduled_phase: Mutex::new(ScheduledPhase::empty()),
-            odd_scheduled_phase: Mutex::new(ScheduledPhase::empty()),
+            even_scheduled_phase: Mutex::new(ScheduledPhase::EMPTY),
+            odd_scheduled_phase: Mutex::new(ScheduledPhase::EMPTY),
             start_complex_timer: Mutex::new(None),
             stop_complex_timer: Mutex::new(None),
             phase_timer: PhaseTimer::new(),
@@ -258,7 +256,7 @@ impl PhaseManager {
                     unimplemented!()
                 }
                 Schedule::Complex => {
-                    let mut internal_phase = ScheduledPhase::empty();
+                    let mut internal_phase = ScheduledPhase::EMPTY;
                     // FIXME start complex timer
                     if let Phase::Complex(ref v, ref mut cursor, ref timer_id) = scheduled_phase.phase {
                         trace!("Complex phase: {:?} with cursor: {:?}", v, cursor);
@@ -292,7 +290,7 @@ impl PhaseManager {
                 }
             }
         }
-        ScheduledPhase::empty()
+        ScheduledPhase::EMPTY
     }
 
     fn set_next_phase(&self, is_even_phase: bool,
