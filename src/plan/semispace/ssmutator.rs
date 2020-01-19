@@ -11,20 +11,23 @@ use ::plan::Allocator as AllocationType;
 use ::plan::plan;
 use ::vm::{Collection, VMCollection};
 use ::util::heap::{PageResource, MonotonePageResource};
-use ::plan::semispace::PLAN;
+use ::util::OpaquePointer;
 
 use libc::c_void;
+use plan::semispace::SemiSpace;
 
 #[repr(C)]
 pub struct SSMutator {
     // CopyLocal
     ss: BumpAllocator<MonotonePageResource<CopySpace>>,
     vs: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
-    los: LargeObjectAllocator
+    los: LargeObjectAllocator,
+
+    plan: &'static SemiSpace
 }
 
 impl MutatorContext for SSMutator {
-    fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
             &Phase::PrepareStacks => {
                 if !plan::stacks_prepared() {
@@ -35,7 +38,7 @@ impl MutatorContext for SSMutator {
             &Phase::Prepare => {}
             &Phase::Release => {
                 // rebind the allocation bump pointer to the appropriate semispace
-                self.ss.rebind(Some(semispace::PLAN.tospace()));
+                self.ss.rebind(Some(self.plan.tospace()));
             }
             _ => {
                 panic!("Per-mutator phase not handled!")
@@ -45,11 +48,11 @@ impl MutatorContext for SSMutator {
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         trace!("MutatorContext.alloc({}, {}, {}, {:?})", size, align, offset, allocator);
-        debug_assert!(self.ss.get_space().unwrap() as *const _ == PLAN.tospace() as *const _,
+        debug_assert!(self.ss.get_space().unwrap() as *const _ == self.plan.tospace() as *const _,
                       "bumpallocator {:?} holds wrong space, ss.space: {:?}, tospace: {:?}",
                       self as *const _,
                       self.ss.get_space().unwrap() as *const _,
-                      PLAN.tospace() as *const _);
+                      self.plan.tospace() as *const _);
         match allocator {
             AllocationType::Default => { self.ss.alloc(size, align, offset) }
             AllocationType::Los => { self.los.alloc(size, align, offset) }
@@ -59,11 +62,11 @@ impl MutatorContext for SSMutator {
 
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         trace!("MutatorContext.alloc_slow({}, {}, {}, {:?})", size, align, offset, allocator);
-        debug_assert!(self.ss.get_space().unwrap() as *const _ == PLAN.tospace() as *const _,
+        debug_assert!(self.ss.get_space().unwrap() as *const _ == self.plan.tospace() as *const _,
                       "bumpallocator {:?} holds wrong space, ss.space: {:?}, tospace: {:?}",
                       self as *const _,
                       self.ss.get_space().unwrap() as *const _,
-                      PLAN.tospace() as *const _);
+                      self.plan.tospace() as *const _);
         match allocator {
             AllocationType::Default => { self.ss.alloc_slow(size, align, offset) }
             AllocationType::Los => { self.los.alloc(size, align, offset) }
@@ -72,23 +75,21 @@ impl MutatorContext for SSMutator {
     }
 
     fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
-        debug_assert!(self.ss.get_space().unwrap() as *const _ == PLAN.tospace() as *const _);
+        debug_assert!(self.ss.get_space().unwrap() as *const _ == self.plan.tospace() as *const _);
         match allocator {
             AllocationType::Default => {}
             AllocationType::Los => {
                 // FIXME: data race on immortalspace.mark_state !!!
-                let unsync = unsafe { &*PLAN.unsync.get() };
-                unsync.los.initialize_header(refer, true);
+                self.los.get_space().unwrap().initialize_header(refer, true);
             }
             _ => {
                 // FIXME: data race on immortalspace.mark_state !!!
-                let unsync = unsafe { &*PLAN.unsync.get() };
-                unsync.versatile_space.initialize_header(refer);
+                self.vs.get_space().unwrap().initialize_header(refer);
             }
         }
     }
 
-    fn get_tls(&self) -> *mut c_void {
+    fn get_tls(&self) -> OpaquePointer {
         debug_assert!(self.ss.tls == self.vs.tls);
         debug_assert!(self.ss.tls == self.los.tls);
         self.ss.tls
@@ -96,11 +97,12 @@ impl MutatorContext for SSMutator {
 }
 
 impl SSMutator {
-    pub fn new(tls: *mut c_void, space: &'static CopySpace, versatile_space: &'static ImmortalSpace, los: &'static LargeObjectSpace) -> Self {
+    pub fn new(tls: OpaquePointer, plan: &'static SemiSpace) -> Self {
         SSMutator {
-            ss: BumpAllocator::new(tls, Some(space)),
-            vs: BumpAllocator::new(tls, Some(versatile_space)),
-            los: LargeObjectAllocator::new(tls, Some(los))
+            ss: BumpAllocator::new(tls, Some(plan.tospace())),
+            vs: BumpAllocator::new(tls, Some(plan.get_versatile_space())),
+            los: LargeObjectAllocator::new(tls, Some(plan.get_los())),
+            plan
         }
     }
 }

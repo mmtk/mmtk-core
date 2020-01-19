@@ -1,12 +1,12 @@
 use util::Address;
 use util::ObjectReference;
 
-use ::plan::selected_plan::PLAN;
+use ::plan::SelectedPlan;
 use ::plan::Plan;
 
 use std;
 
-pub fn scan_region(){
+pub fn scan_region(plan: &SelectedPlan){
     loop {
         let mut buf = String::new();
         println!("start end <value>");
@@ -25,7 +25,7 @@ pub fn scan_region(){
             let slot = unsafe {Address::from_usize(start)};
             let object: ObjectReference = unsafe {slot.load()};
             if value.is_none() {
-                if PLAN.is_bad_ref(object) {
+                if plan.is_bad_ref(object) {
                     println!("{} REF: {}", slot, object);
                 }
             } else {

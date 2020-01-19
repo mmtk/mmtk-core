@@ -23,7 +23,7 @@ macro_rules! jikesrvm_call {
     ($call_addr:expr, $tls:expr $(, $arg:ident)*) => ({
         use ::vm::jikesrvm::collection::VMCollection as _VMCollection;
         use libc::c_void;
-        debug_assert!($tls != 0 as *mut c_void);
+        debug_assert!(!$tls.is_null());
 
         let ret: usize;
         let rvm_thread = $tls;

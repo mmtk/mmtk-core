@@ -5,16 +5,17 @@ use ::policy::space::Space;
 use ::util::{Address, ObjectReference};
 use ::util::alloc::{allocator, Allocator};
 use ::util::heap::{FreeListPageResource, PageResource};
+use ::util::OpaquePointer;
 
 #[repr(C)]
 #[derive(Debug)]
 pub struct LargeObjectAllocator {
-    pub tls: *mut c_void,
+    pub tls: OpaquePointer,
     space: Option<&'static LargeObjectSpace>,
 }
 
 impl Allocator<FreeListPageResource<LargeObjectSpace>> for LargeObjectAllocator {
-    fn get_tls(&self) -> *mut c_void {
+    fn get_tls(&self) -> OpaquePointer {
         self.tls
     }
 
@@ -45,7 +46,7 @@ impl Allocator<FreeListPageResource<LargeObjectSpace>> for LargeObjectAllocator 
 }
 
 impl LargeObjectAllocator {
-    pub fn new(tls: *mut c_void, space: Option<&'static LargeObjectSpace>) -> Self {
+    pub fn new(tls: OpaquePointer, space: Option<&'static LargeObjectSpace>) -> Self {
         LargeObjectAllocator {
             tls,
             space,

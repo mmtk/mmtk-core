@@ -4,6 +4,7 @@ use super::entrypoint::*;
 use ::plan::TraceLocal;
 
 use ::util::reference_processor::*;
+use ::util::OpaquePointer;
 
 use libc::c_void;
 
@@ -38,7 +39,7 @@ impl ReferenceGlue for VMReferenceGlue {
      * @return an updated reference (e.g. with a new address) if the reference
      *  is still live, {@code ObjectReference.nullReference()} otherwise
      */
-    fn process_reference<T: TraceLocal>(trace: &mut T, reference: ObjectReference, tls: *mut c_void) -> ObjectReference {
+    fn process_reference<T: TraceLocal>(trace: &mut T, reference: ObjectReference, tls: OpaquePointer) -> ObjectReference {
         debug_assert!(!reference.is_null());
 
         if TRACE_DETAIL { trace!("Processing reference: {:?}", reference); }

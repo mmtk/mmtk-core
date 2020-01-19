@@ -2,6 +2,7 @@ use std::sync::Mutex;
 use std::cell::UnsafeCell;
 use std::vec::Vec;
 
+use ::util::OpaquePointer;
 use ::util::{Address, ObjectReference};
 use ::util::options::OPTION_MAP;
 use ::vm::{ActivePlan, VMActivePlan, ReferenceGlue, VMReferenceGlue};
@@ -137,7 +138,7 @@ impl ReferenceProcessor {
         sync.unforwarded_references = None;
     }
 
-    fn scan<T: TraceLocal>(&self, trace: &mut T, nursery: bool, retain: bool, tls: *mut c_void) {
+    fn scan<T: TraceLocal>(&self, trace: &mut T, nursery: bool, retain: bool, tls: OpaquePointer) {
         let sync = unsafe { self.sync_mut() };
         sync.unforwarded_references = Some(sync.references.clone());
         let references: &mut Vec<Address> = &mut sync.references;
@@ -229,15 +230,15 @@ pub fn forward_refs<T: TraceLocal>(trace: &mut T) {
     PHANTOM_REFERENCE_PROCESSOR.forward(trace, false);
 }
 
-pub fn scan_weak_refs<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+pub fn scan_weak_refs<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
     SOFT_REFERENCE_PROCESSOR.scan(trace, false, false, tls);
     WEAK_REFERENCE_PROCESSOR.scan(trace, false, false, tls);
 }
 
-pub fn scan_soft_refs<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+pub fn scan_soft_refs<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
     SOFT_REFERENCE_PROCESSOR.scan(trace, false, false, tls);
 }
 
-pub fn scan_phantom_refs<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+pub fn scan_phantom_refs<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
     PHANTOM_REFERENCE_PROCESSOR.scan(trace, false, false, tls);
 }

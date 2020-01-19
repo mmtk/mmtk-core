@@ -1,11 +1,13 @@
 use ::vm::ActivePlan;
 use ::plan::{Plan, SelectedPlan};
 use ::util::{Address, SynchronizedCounter};
+use ::util::OpaquePointer;
 
 use super::entrypoint::*;
 use super::collection::VMCollection;
 use super::JTOC_BASE;
 
+use std::mem;
 use libc::c_void;
 
 static MUTATOR_COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
@@ -14,8 +16,8 @@ pub struct VMActivePlan<> {}
 
 impl ActivePlan for VMActivePlan {
     // XXX: Are they actually static
-    unsafe fn collector(tls: *mut c_void) -> &'static mut <SelectedPlan as Plan>::CollectorT {
-        let thread = Address::from_mut_ptr(tls);
+    unsafe fn collector(tls: OpaquePointer) -> &'static mut <SelectedPlan as Plan>::CollectorT {
+        let thread: Address = unsafe { mem::transmute(tls) };
         let system_thread = Address::from_usize(
             (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
         let cc = &mut *((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
@@ -24,14 +26,14 @@ impl ActivePlan for VMActivePlan {
         cc
     }
 
-    unsafe fn is_mutator(tls: *mut c_void) -> bool {
-        let thread = Address::from_mut_ptr(tls);
+    unsafe fn is_mutator(tls: OpaquePointer) -> bool {
+        let thread: Address = unsafe { mem::transmute(tls) };
         !(thread + IS_COLLECTOR_FIELD_OFFSET).load::<bool>()
     }
 
     // XXX: Are they actually static
-    unsafe fn mutator(tls: *mut c_void) -> &'static mut <SelectedPlan as Plan>::MutatorT {
-        let thread = Address::from_mut_ptr(tls);
+    unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan as Plan>::MutatorT {
+        let thread: Address = unsafe { mem::transmute(tls) };
         let mutator = (thread + MMTK_HANDLE_FIELD_OFFSET).load::<usize>();
         &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)
     }

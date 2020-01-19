@@ -33,6 +33,8 @@ use util::constants::LOG_BYTES_IN_PAGE;
 use util::heap::layout::vm_layout_constants::HEAP_START;
 use util::heap::layout::vm_layout_constants::HEAP_END;
 use ::util::sanity::sanity_checker::{INSIDE_SANITY, SanityChecker};
+use util::OpaquePointer;
+use crate::mmtk::SINGLETON;
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
@@ -40,9 +42,8 @@ pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     ::util::logger::init().unwrap();
     JTOC_BASE = Address::from_mut_ptr(jtoc);
     ::vm::jikesrvm::BOOT_THREAD
-        = ::vm::jikesrvm::collection::VMCollection::thread_from_id(1)
-        .as_usize() as *mut c_void;
-    selected_plan::PLAN.gc_init(heap_size);
+        = OpaquePointer::from_address(::vm::jikesrvm::collection::VMCollection::thread_from_id(1));
+    SINGLETON.plan.gc_init(heap_size);
     debug_assert!(54 == ::vm::JikesRVM::test(44));
     debug_assert!(112 == ::vm::JikesRVM::test2(45, 67));
     debug_assert!(731 == ::vm::JikesRVM::test3(21, 34, 9, 8));
@@ -56,8 +57,8 @@ pub unsafe extern fn jikesrvm_gc_init(_jtoc: *mut c_void, _heap_size: usize) {
 
 #[repr(C)]
 pub struct OpenJDK_Upcalls {
-    pub stop_all_mutators: extern "C" fn(tls: *mut c_void),
-    pub resume_mutators: extern "C" fn(tls: *mut c_void),
+    pub stop_all_mutators: extern "C" fn(tls: OpaquePointer),
+    pub resume_mutators: extern "C" fn(tls: OpaquePointer),
 }
 
 #[no_mangle]
@@ -65,7 +66,7 @@ pub struct OpenJDK_Upcalls {
 pub unsafe extern fn openjdk_gc_init(calls: *const OpenJDK_Upcalls, heap_size: usize) {
     ::util::logger::init().unwrap();
     UPCALLS = calls;
-    selected_plan::PLAN.gc_init(heap_size);
+    SINGLETON.plan.gc_init(heap_size);
 }
 
 #[no_mangle]
@@ -76,13 +77,13 @@ pub unsafe extern fn openjdk_gc_init(calls: *const OpenJDK_Upcalls, heap_size: u
 
 #[no_mangle]
 #[cfg(any(feature = "jikesrvm", feature = "openjdk"))]
-pub extern fn start_control_collector(tls: *mut c_void) {
+pub extern fn start_control_collector(tls: OpaquePointer) {
     CONTROL_COLLECTOR_CONTEXT.run(tls);
 }
 
 #[no_mangle]
 #[cfg(not(any(feature = "jikesrvm", feature = "openjdk")))]
-pub extern fn start_control_collector(tls: *mut c_void) {
+pub extern fn start_control_collector(tls: OpaquePointer) {
     panic!("Cannot call start_control_collector when not building for JikesRVM or OpenJDK");
 }
 
@@ -95,13 +96,13 @@ pub unsafe extern fn gc_init(heap_size: usize) {
         panic!("Should be calling openjdk_gc_init instead");
     }
     ::util::logger::init().unwrap();
-    selected_plan::PLAN.gc_init(heap_size);
+    SINGLETON.plan.gc_init(heap_size);
     ::plan::plan::INITIALIZED.store(true, Ordering::SeqCst);
 }
 
 #[no_mangle]
-pub extern fn bind_mutator(tls: *mut c_void) -> *mut c_void {
-    SelectedPlan::bind_mutator(&selected_plan::PLAN, tls)
+pub extern fn bind_mutator(tls: OpaquePointer) -> *mut c_void {
+    SelectedPlan::bind_mutator(&SINGLETON.plan, tls)
 }
 
 #[no_mangle]
@@ -136,12 +137,12 @@ pub extern fn mmtk_free(_ptr: *const c_void) {}
 
 #[no_mangle]
 pub extern fn will_never_move(object: ObjectReference) -> bool {
-    selected_plan::PLAN.will_never_move(object)
+    SINGLETON.plan.will_never_move(object)
 }
 
 #[no_mangle]
 pub unsafe extern fn is_valid_ref(val: ObjectReference) -> bool {
-    selected_plan::PLAN.is_valid_ref(val)
+    SINGLETON.plan.is_valid_ref(val)
 }
 
 #[no_mangle]
@@ -190,7 +191,7 @@ pub unsafe extern fn process_interior_edge(trace_local: *mut c_void, target: *mu
 }
 
 #[no_mangle]
-pub unsafe extern fn start_worker(tls: *mut c_void, worker: *mut c_void) {
+pub unsafe extern fn start_worker(tls: OpaquePointer, worker: *mut c_void) {
     let worker_instance = &mut *(worker as *mut <SelectedPlan as Plan>::CollectorT);
     worker_instance.init(tls);
     worker_instance.run(tls);
@@ -198,8 +199,8 @@ pub unsafe extern fn start_worker(tls: *mut c_void, worker: *mut c_void) {
 
 #[no_mangle]
 #[cfg(feature = "jikesrvm")]
-pub unsafe extern fn enable_collection(tls: *mut c_void) {
-    (&mut *CONTROL_COLLECTOR_CONTEXT.workers.get()).init_group(tls);
+pub unsafe extern fn enable_collection(tls: OpaquePointer) {
+    (&mut *CONTROL_COLLECTOR_CONTEXT.workers.get()).init_group(&SINGLETON.plan, tls);
     VMCollection::spawn_worker_thread::<<SelectedPlan as Plan>::CollectorT>(tls, null_mut()); // spawn controller thread
     ::plan::plan::INITIALIZED.store(true, Ordering::SeqCst);
 }
@@ -223,13 +224,13 @@ pub extern fn process(name: *const c_char, value: *const c_char) -> bool {
 #[no_mangle]
 #[cfg(feature = "openjdk")]
 pub extern fn used_bytes() -> usize {
-    selected_plan::PLAN.get_pages_used() << LOG_BYTES_IN_PAGE
+    SINGLETON.plan.get_pages_used() << LOG_BYTES_IN_PAGE
 }
 
 
 #[no_mangle]
 pub extern fn free_bytes() -> usize {
-    selected_plan::PLAN.get_free_pages() << LOG_BYTES_IN_PAGE
+    SINGLETON.plan.get_free_pages() << LOG_BYTES_IN_PAGE
 }
 
 
@@ -251,13 +252,13 @@ pub extern fn last_heap_address() -> *mut c_void {
 
 #[no_mangle]
 pub extern fn total_bytes() -> usize {
-    selected_plan::PLAN.get_total_pages() << LOG_BYTES_IN_PAGE
+    SINGLETON.plan.get_total_pages() << LOG_BYTES_IN_PAGE
 }
 
 #[no_mangle]
 #[cfg(feature = "openjdk")]
 pub extern fn openjdk_max_capacity() -> usize {
-    selected_plan::PLAN.get_total_pages() << LOG_BYTES_IN_PAGE
+    SINGLETON.plan.get_total_pages() << LOG_BYTES_IN_PAGE
 }
 
 #[no_mangle]
@@ -280,7 +281,7 @@ pub extern fn executable() -> bool {
 
 #[no_mangle]
 pub unsafe extern fn scan_region(){
-    ::util::sanity::memory_scan::scan_region();
+    ::util::sanity::memory_scan::scan_region(&SINGLETON.plan);
 }
 
 #[no_mangle]
@@ -308,23 +309,23 @@ pub unsafe extern fn trace_retain_referent(trace_local: *mut c_void, object: Obj
 }
 
 #[no_mangle]
-pub extern fn handle_user_collection_request(tls: *mut c_void) {
+pub extern fn handle_user_collection_request(tls: OpaquePointer) {
     selected_plan::SelectedPlan::handle_user_collection_request(tls);
 }
 
 #[no_mangle]
 pub extern fn is_mapped_object(object: ObjectReference) -> bool {
-    selected_plan::PLAN.is_mapped_object(object)
+    SINGLETON.plan.is_mapped_object(object)
 }
 
 #[no_mangle]
 pub extern fn is_mapped_address(address: Address) -> bool {
-    selected_plan::PLAN.is_mapped_address(address)
+    SINGLETON.plan.is_mapped_address(address)
 }
 
 #[no_mangle]
 pub extern fn modify_check(object: ObjectReference) {
-    selected_plan::PLAN.modify_check(object);
+    SINGLETON.plan.modify_check(object);
 }
 
 #[no_mangle]
@@ -349,7 +350,7 @@ pub unsafe extern fn add_phantom_candidate(reff: *mut c_void, referent: *mut c_v
 }
 
 #[no_mangle]
-pub extern fn harness_begin(tls: *mut c_void) {
+pub extern fn harness_begin(tls: OpaquePointer) {
     ::plan::plan::harness_begin(tls);
 }
 

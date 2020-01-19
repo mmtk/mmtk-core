@@ -1,6 +1,7 @@
 use ::util::address::Address;
 use ::policy::space::Space;
 use ::vm::{ActivePlan, VMActivePlan};
+use ::util::OpaquePointer;
 
 use std::marker::PhantomData;
 use std::sync::{Mutex, MutexGuard};
@@ -17,7 +18,7 @@ pub trait PageResource: Sized + 'static + Debug {
     /// Allocate pages from this resource.
     /// Simply bump the cursor, and fail if we hit the sentinel.
     /// Return The start of the first page if successful, zero on failure.
-    fn get_new_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, tls: *mut c_void) -> Address {
+    fn get_new_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, tls: OpaquePointer) -> Address {
         self.alloc_pages(reserved_pages, required_pages, zeroed, tls)
     }
 
@@ -50,7 +51,7 @@ pub trait PageResource: Sized + 'static + Debug {
         panic!("This PageResource does not implement concurrent zeroing")
     }
 
-    fn alloc_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, tls: *mut c_void) -> Address;
+    fn alloc_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, tls: OpaquePointer) -> Address;
 
     fn adjust_for_metadata(&self, pages: usize) -> usize;
 
@@ -64,7 +65,7 @@ pub trait PageResource: Sized + 'static + Debug {
     * This *MUST* be called by each PageResource during the
     * allocPages, and the caller must hold the lock.
     */
-    fn commit_pages(&self, reserved_pages: usize, actual_pages: usize, tls: *mut c_void) {
+    fn commit_pages(&self, reserved_pages: usize, actual_pages: usize, tls: OpaquePointer) {
         let delta = actual_pages - reserved_pages;
         self.common().reserved.store(self.common().reserved.load(Ordering::Relaxed) + delta,
                                      Ordering::Relaxed);

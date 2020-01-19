@@ -2,6 +2,7 @@ use super::entrypoint::*;
 use super::JTOC_BASE;
 use super::collection::VMCollection;
 use ::util::Address;
+use ::util::OpaquePointer;
 use ::plan::{TraceLocal, SelectedPlan, Plan, ParallelCollector};
 
 use super::active_plan::VMActivePlan;
@@ -16,7 +17,7 @@ const REF_SLOT_SIZE: usize = 2;
 
 const CHUNK_SIZE_MASK: usize = 0xFFFFFFFF - (REF_SLOT_SIZE - 1);
 
-pub fn scan_statics<T: TraceLocal>(trace: &mut T, tls: *mut c_void) {
+pub fn scan_statics<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
     unsafe {
         let slots = JTOC_BASE;
         let cc = VMActivePlan::collector(tls);

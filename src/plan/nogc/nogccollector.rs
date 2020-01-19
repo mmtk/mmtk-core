@@ -5,14 +5,16 @@ use super::super::CollectorContext;
 use super::super::TraceLocal;
 use super::super::Phase;
 use super::super::Allocator;
+use plan::nogc::SelectedPlan;
 
 use std::process;
 use libc::c_void;
 
 use ::util::{Address, ObjectReference};
+use util::OpaquePointer;
 
 pub struct NoGCCollector {
-    pub tls: *mut c_void,
+    pub tls: OpaquePointer,
     trace: NoGCTraceLocal,
 
     last_trigger_count: usize,
@@ -21,9 +23,9 @@ pub struct NoGCCollector {
 }
 
 impl<'a> CollectorContext for NoGCCollector {
-    fn new() -> Self {
+    fn new(_: &'static SelectedPlan) -> Self {
         NoGCCollector {
-            tls: 0 as *mut c_void,
+            tls: OpaquePointer::UNINITIALIZED,
             trace: NoGCTraceLocal::new(),
 
             last_trigger_count: 0,
@@ -32,7 +34,7 @@ impl<'a> CollectorContext for NoGCCollector {
         }
     }
 
-    fn init(&mut self, tls: *mut c_void) {
+    fn init(&mut self, tls: OpaquePointer) {
         self.tls = tls;
     }
 
@@ -40,19 +42,19 @@ impl<'a> CollectorContext for NoGCCollector {
         unimplemented!();
     }
 
-    fn run(&mut self, tls: *mut c_void) {
+    fn run(&mut self, tls: OpaquePointer) {
         loop {
             self.park();
             self.collect();
         }
     }
 
-    fn collection_phase(&mut self, tls: *mut c_void, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         println!("GC triggered in NoGC plan");
         process::exit(128);
     }
 
-    fn get_tls(&self) -> *mut c_void {
+    fn get_tls(&self) -> OpaquePointer {
         self.tls
     }
 }

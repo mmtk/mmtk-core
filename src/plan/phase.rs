@@ -7,7 +7,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 use util::statistics::phase_timer::PhaseTimer;
-
+use ::util::OpaquePointer;
 use libc::c_void;
 
 #[derive(Clone)]
@@ -84,7 +84,7 @@ lazy_static! {
 
 // FIXME: It's probably unsafe to call most of these functions, because tls
 
-pub fn begin_new_phase_stack(tls: *mut c_void, scheduled_phase: (Schedule, Phase)) {
+pub fn begin_new_phase_stack(tls: OpaquePointer, scheduled_phase: (Schedule, Phase)) {
     let order = unsafe { VMActivePlan::collector(tls).rendezvous() };
 
     if order == 0 {
@@ -94,7 +94,7 @@ pub fn begin_new_phase_stack(tls: *mut c_void, scheduled_phase: (Schedule, Phase
     process_phase_stack(tls, false);
 }
 
-pub fn continue_phase_stack(tls: *mut c_void) {
+pub fn continue_phase_stack(tls: OpaquePointer) {
     process_phase_stack(tls, true);
 }
 
@@ -106,7 +106,7 @@ fn resume_complex_timers() {
     }
 }
 
-fn process_phase_stack(tls: *mut c_void, resume: bool) {
+fn process_phase_stack(tls: OpaquePointer, resume: bool) {
     let mut resume = resume;
     let plan = VMActivePlan::global();
     let collector = unsafe { VMActivePlan::collector(tls) };
