@@ -78,11 +78,13 @@ pub fn is_contiguous_hi(descriptor: usize) -> bool {
     ((descriptor & TYPE_MASK) == TYPE_CONTIGUOUS_HI)
 }
 
-#[allow(exceeding_bitshifts)]
+#[cfg(target_pointer_width = "64")]
 pub fn get_start(descriptor: usize) -> Address {
-    if cfg!(target_pointer_width = "64") {
-      return unsafe { Address::from_usize(get_index(descriptor) << heap_parameters::LOG_SPACE_SIZE_64) };
-    }
+    return unsafe { Address::from_usize(get_index(descriptor) << heap_parameters::LOG_SPACE_SIZE_64) };
+}
+
+#[cfg(target_pointer_width = "32")]
+pub fn get_start(descriptor: usize) -> Address {
     debug_assert!(is_contiguous(descriptor));
     let mantissa = descriptor >> MANTISSA_SHIFT;
     let exponent = (descriptor & EXPONENT_MASK) >> EXPONENT_SHIFT;
