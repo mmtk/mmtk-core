@@ -19,7 +19,6 @@ use libc::c_void;
 use super::sstracelocal::SSTraceLocal;
 use ::plan::selected_plan::SelectedConstraints;
 use util::OpaquePointer;
-use util::opaque_pointer::UNINITIALIZED_OPAQUE_POINTER;
 use plan::semispace::SelectedPlan;
 use plan::semispace::SemiSpace;
 use plan::phase::ScheduledPhase;
@@ -43,9 +42,9 @@ pub struct SSCollector {
 impl CollectorContext for SSCollector {
     fn new(plan: &'static SelectedPlan, phase_manager: &'static PhaseManager) -> Self {
         SSCollector {
-            tls: UNINITIALIZED_OPAQUE_POINTER,
-            ss: BumpAllocator::new(UNINITIALIZED_OPAQUE_POINTER, None),
-            los: LargeObjectAllocator::new(UNINITIALIZED_OPAQUE_POINTER, Some(plan.get_los())),
+            tls: OpaquePointer::UNINITIALIZED,
+            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None),
+            los: LargeObjectAllocator::new(OpaquePointer::UNINITIALIZED, Some(plan.get_los())),
             trace: SSTraceLocal::new(plan),
 
             last_trigger_count: 0,

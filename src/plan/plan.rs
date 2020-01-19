@@ -63,7 +63,7 @@ pub trait Plan: Sized {
     // unsafe because only the primary collector thread can call this
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
 
-    fn is_initialized(&self) -> bool {
+    fn is_initialized() -> bool {
         INITIALIZED.load(Ordering::SeqCst)
     }
 
