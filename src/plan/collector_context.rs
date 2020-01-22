@@ -4,9 +4,10 @@ use ::plan::selected_plan::SelectedConstraints::*;
 use ::plan::selected_plan::SelectedPlan;
 use ::util::OpaquePointer;
 use libc::c_void;
+use plan::phase::PhaseManager;
 
 pub trait CollectorContext {
-    fn new(plan: &'static SelectedPlan) -> Self;
+    fn new(plan: &'static SelectedPlan, phase_manager: &'static PhaseManager) -> Self;
     /// Notify that the collector context is registered and ready to execute.
     fn init(&mut self, tls: OpaquePointer);
     /// Allocate space for copying an object.
