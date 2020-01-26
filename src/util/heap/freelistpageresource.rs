@@ -14,7 +14,6 @@ use util::generic_freelist::GenericFreeList;
 // FIXME: Use `RawMemoryFreeList` for 64-bit machines
 use util::int_array_freelist::IntArrayFreeList as FreeList;
 use util::heap::layout::vm_layout_constants::*;
-use util::heap::layout::heap_layout;
 use util::conversions;
 use util::constants::*;
 use util::OpaquePointer;
@@ -22,8 +21,8 @@ use policy::space::Space;
 use vm::{VMMemory, Memory};
 use super::vmrequest::HEAP_LAYOUT_64BIT;
 use super::layout::Mmapper;
-use super::layout::heap_layout::MMAPPER;
 use super::PageResource;
+use util::heap::layout::heap_layout::VMMap;
 
 
 const SPACE_ALIGN: usize = 1 << 19;
@@ -114,7 +113,7 @@ impl<S: Space<PR = FreeListPageResource<S>>> PageResource for FreeListPageResour
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
         self.common().space.unwrap().grow_space(rtn, bytes, new_chunk);
-        MMAPPER.ensure_mapped(rtn, required_pages);
+        self.common().space.unwrap().common().mmapper.ensure_mapped(rtn, required_pages);
         if zeroed {
             VMMemory::zero(rtn, bytes);
         }
@@ -127,14 +126,14 @@ impl<S: Space<PR = FreeListPageResource<S>>> PageResource for FreeListPageResour
 }
 
 impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {
-    pub fn new_contiguous(space: &S, start: Address, bytes: usize, meta_data_pages_per_region: usize) -> Self {
+    pub fn new_contiguous(space: &S, start: Address, bytes: usize, meta_data_pages_per_region: usize, vm_map: &'static VMMap) -> Self {
         let pages = conversions::bytes_to_pages(bytes);
         let common_flpr = unsafe {
             let mut common_flpr = Box::new(CommonFreeListPageResource {
                 free_list: ::std::mem::uninitialized(),
                 start,
             });
-            ::std::ptr::write(&mut common_flpr.free_list, heap_layout::VM_MAP.create_parent_freelist(pages, PAGES_IN_REGION as _));
+            ::std::ptr::write(&mut common_flpr.free_list, vm_map.create_parent_freelist(pages, PAGES_IN_REGION as _));
             common_flpr
         };
         let growable = HEAP_LAYOUT_64BIT;
@@ -162,13 +161,13 @@ impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {
     }
 
 
-    pub fn new_discontiguous(meta_data_pages_per_region: usize) -> Self {
+    pub fn new_discontiguous(meta_data_pages_per_region: usize, vm_map: &'static VMMap) -> Self {
         let common_flpr = unsafe {
             let mut common_flpr = Box::new(CommonFreeListPageResource {
                 free_list: ::std::mem::uninitialized(),
                 start: AVAILABLE_START,
             });
-            ::std::ptr::write(&mut common_flpr.free_list, heap_layout::VM_MAP.create_freelist(&common_flpr));
+            ::std::ptr::write(&mut common_flpr.free_list, vm_map.create_freelist(&common_flpr));
             common_flpr
         };
         FreeListPageResource {
@@ -223,7 +222,7 @@ impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {
 
     #[allow(mutable_transmutes)]
     fn free_contiguous_chunk(&mut self, chunk: Address) {
-        let num_chunks = heap_layout::VM_MAP.get_contiguous_region_chunks(chunk);
+        let num_chunks = self.vm_map().get_contiguous_region_chunks(chunk);
         debug_assert!(num_chunks == 1 || self.meta_data_pages_per_region == 0);
         /* nail down all pages associated with the chunk, so it is no longer on our free list */
         let mut chunk_start = conversions::bytes_to_pages(chunk - self.start);

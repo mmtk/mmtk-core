@@ -15,18 +15,19 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use ::util::constants::LOG_BYTES_IN_MBYTE;
 use ::util::conversions;
 use ::util::heap::space_descriptor;
-use ::util::heap::layout::heap_layout::VM_MAP;
 use ::util::OpaquePointer;
 
 use std::fmt::Debug;
 
 use libc::c_void;
+use util::heap::layout::heap_layout::VMMap;
+use util::heap::layout::heap_layout::Mmapper;
 use plan::selected_plan::SelectedPlan;
 
 pub trait Space: Sized + Debug + 'static {
     type PR: PageResource<Space = Self>;
 
-    fn init(&mut self);
+    fn init(&mut self, vm_map: &'static VMMap);
 
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
@@ -70,7 +71,7 @@ pub trait Space: Sized + Debug + 'static {
     fn in_space(&self, object: ObjectReference) -> bool {
         let start = VMObjectModel::ref_to_address(object);
         if !space_descriptor::is_contiguous(self.common().descriptor) {
-            VM_MAP.get_descriptor_for_address(start) == self.common().descriptor
+            self.common().vm_map().get_descriptor_for_address(start) == self.common().descriptor
         } else {
             start.as_usize() >= self.common().start.as_usize()
                 && start.as_usize() < self.common().start.as_usize() + self.common().extent
@@ -80,7 +81,7 @@ pub trait Space: Sized + Debug + 'static {
     // UNSAFE: potential data race as this mutates 'common'
     unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
         // FIXME
-        let new_head: Address = VM_MAP.allocate_contiguous_chunks(self.common().descriptor, chunks, self.common().head_discontiguous_region);
+        let new_head: Address = self.common().vm_map().allocate_contiguous_chunks(self.common().descriptor, chunks, self.common().head_discontiguous_region);
         if new_head.is_zero() {
             return unsafe{Address::zero()};
         }
@@ -124,15 +125,15 @@ pub trait Space: Sized + Debug + 'static {
     fn release_discontiguous_chunks(&mut self, chunk: Address) {
         debug_assert!(chunk == conversions::chunk_align(chunk, true));
         if chunk == self.common().head_discontiguous_region {
-            self.common_mut().head_discontiguous_region = VM_MAP.get_next_contiguous_region(chunk);
+            self.common_mut().head_discontiguous_region = self.common().vm_map().get_next_contiguous_region(chunk);
         }
-        VM_MAP.free_contiguous_chunks(chunk);
+        self.common().vm_map().free_contiguous_chunks(chunk);
     }
 
     fn release_multiple_pages(&mut self, start: Address);
 
     unsafe fn release_all_chunks(&self) {
-        VM_MAP.free_all_chunks(self.common().head_discontiguous_region);
+        self.common().vm_map().free_all_chunks(self.common().head_discontiguous_region);
         self.unsafe_common_mut().head_discontiguous_region = Address::zero();
     }
 
@@ -164,8 +165,8 @@ pub trait Space: Sized + Debug + 'static {
         } else {
             let mut a = common.head_discontiguous_region;
             while !a.is_zero() {
-                print!("{}->{}", a, a + VM_MAP.get_contiguous_region_size(a) - 1);
-                a = VM_MAP.get_next_contiguous_region(a);
+                print!("{}->{}", a, a + self.common().vm_map().get_contiguous_region_size(a) - 1);
+                a = self.common().vm_map().get_next_contiguous_region(a);
                 if !a.is_zero() {
                     print!(" ");
                 }
@@ -192,6 +193,9 @@ pub struct CommonSpace<PR: PageResource> {
     pub start: Address,
     pub extent: usize,
     pub head_discontiguous_region: Address,
+
+    pub vm_map: &'static VMMap,
+    pub mmapper: &'static Mmapper
 }
 
 // FIXME replace with atomic ints
@@ -203,7 +207,7 @@ const DEBUG: bool = false;
 
 impl<PR: PageResource> CommonSpace<PR> {
     pub fn new(name: &'static str, movable: bool, immortal: bool, zeroed: bool,
-               vmrequest: VMRequest) -> Self {
+               vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
         let mut rtn = CommonSpace {
             name,
             name_length: name.len(),
@@ -218,6 +222,8 @@ impl<PR: PageResource> CommonSpace<PR> {
             start: unsafe{Address::zero()},
             extent: 0,
             head_discontiguous_region: unsafe{Address::zero()},
+            vm_map,
+            mmapper,
         };
 
         if vmrequest.is_discontiguous() {
@@ -272,13 +278,17 @@ impl<PR: PageResource> CommonSpace<PR> {
         // FIXME
         rtn.descriptor = space_descriptor::create_descriptor_from_heap_range(start, start + extent);
         // VM.memory.setHeapRange(index, start, start.plus(extent));
-        ::util::heap::layout::heap_layout::VM_MAP.insert(start, extent, rtn.descriptor);
+        vm_map.insert(start, extent, rtn.descriptor);
 
         if DEBUG {
             println!("{} {} {} {}", name, start, start + extent, extent);
         }
 
         rtn
+    }
+
+    pub fn vm_map(&self) -> &'static VMMap {
+        self.vm_map
     }
 }
 

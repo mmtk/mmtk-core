@@ -18,8 +18,7 @@ use ::util::ObjectReference;
 use ::util::alloc::allocator::determine_collection_attempts;
 use ::util::sanity::sanity_checker::SanityChecker;
 use ::util::sanity::memory_scan;
-use ::util::heap::layout::heap_layout::MMAPPER;
-use ::util::heap::layout::Mmapper;
+use ::util::heap::layout::Mmapper as IMmapper;
 use ::util::Address;
 use ::util::heap::PageResource;
 use ::util::heap::VMRequest;
@@ -36,6 +35,8 @@ use std::thread;
 use util::conversions::bytes_to_pages;
 use plan::plan::create_vm_space;
 use plan::plan::EMERGENCY_COLLECTION;
+use util::heap::layout::heap_layout::VMMap;
+use util::heap::layout::heap_layout::Mmapper;
 
 pub type SelectedPlan = SemiSpace;
 
@@ -54,6 +55,7 @@ pub struct SemiSpaceUnsync {
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
     pub los: LargeObjectSpace,
+    pub mmapper: &'static Mmapper,
     // FIXME: This should be inside HeapGrowthManager
     total_pages: usize,
 
@@ -67,18 +69,19 @@ impl Plan for SemiSpace {
     type TraceLocalT = SSTraceLocal;
     type CollectorT = SSCollector;
 
-    fn new() -> Self {
+    fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
         SemiSpace {
             unsync: UnsafeCell::new(SemiSpaceUnsync {
                 hi: false,
-                vm_space: create_vm_space(),
+                vm_space: create_vm_space(vm_map, mmapper),
                 copyspace0: CopySpace::new("copyspace0", false, true,
-                                           VMRequest::discontiguous()),
+                                           VMRequest::discontiguous(), vm_map, mmapper),
                 copyspace1: CopySpace::new("copyspace1", true, true,
-                                           VMRequest::discontiguous()),
+                                           VMRequest::discontiguous(), vm_map, mmapper),
                 versatile_space: ImmortalSpace::new("versatile_space", true,
-                                                    VMRequest::discontiguous()),
-                los: LargeObjectSpace::new("los", true, VMRequest::discontiguous()),
+                                                    VMRequest::discontiguous(), vm_map, mmapper),
+                los: LargeObjectSpace::new("los", true, VMRequest::discontiguous(), vm_map, mmapper),
+                mmapper,
                 total_pages: 0,
                 collection_attempt: 0,
             }),
@@ -86,15 +89,15 @@ impl Plan for SemiSpace {
         }
     }
 
-    unsafe fn gc_init(&self, heap_size: usize) {
-        ::util::heap::layout::heap_layout::VM_MAP.finalize_static_space_map();
+    unsafe fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+        vm_map.finalize_static_space_map();
         let unsync = &mut *self.unsync.get();
         unsync.total_pages = bytes_to_pages(heap_size);
-        unsync.vm_space.init();
-        unsync.copyspace0.init();
-        unsync.copyspace1.init();
-        unsync.versatile_space.init();
-        unsync.los.init();
+        unsync.vm_space.init(vm_map);
+        unsync.copyspace0.init(vm_map);
+        unsync.copyspace1.init(vm_map);
+        unsync.versatile_space.init(vm_map);
+        unsync.los.init(vm_map);
 
         // These VMs require that the controller thread is started by the VM itself.
         // (Usually because it calls into VM code that accesses the TLS.)
@@ -103,6 +106,11 @@ impl Plan for SemiSpace {
                 ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(OpaquePointer::UNINITIALIZED)
             });
         }
+    }
+
+    fn mmapper(&self) -> &'static Mmapper {
+        let unsync = unsafe { &*self.unsync.get() };
+        unsync.mmapper
     }
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> *mut c_void {
@@ -282,7 +290,7 @@ impl Plan for SemiSpace {
             unsync.copyspace1.in_space(address.to_object_reference()) ||
             unsync.los.in_space(address.to_object_reference())
         } {
-            return MMAPPER.address_is_mapped(address);
+            return unsync.mmapper.address_is_mapped(address);
         } else {
             return false;
         }

@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::fmt::Debug;
 
 use libc::c_void;
+use util::heap::layout::heap_layout::VMMap;
 
 static CUMULATIVE_COMMITTED: AtomicUsize = AtomicUsize::new(0);
 
@@ -95,6 +96,9 @@ pub trait PageResource: Sized + 'static + Debug {
 
     fn common(&self) -> &CommonPageResource<Self>;
     fn common_mut(&mut self) -> &mut CommonPageResource<Self>;
+    fn vm_map(&self) -> &'static VMMap {
+        self.common().space.unwrap().common().vm_map()
+    }
 }
 
 pub fn cumulative_committed_pages() -> usize {

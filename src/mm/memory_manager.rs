@@ -43,7 +43,7 @@ pub unsafe extern fn jikesrvm_gc_init(jtoc: *mut c_void, heap_size: usize) {
     JTOC_BASE = Address::from_mut_ptr(jtoc);
     ::vm::jikesrvm::BOOT_THREAD
         = OpaquePointer::from_address(::vm::jikesrvm::collection::VMCollection::thread_from_id(1));
-    SINGLETON.plan.gc_init(heap_size);
+    SINGLETON.plan.gc_init(heap_size, &SINGLETON.vm_map);
     debug_assert!(54 == ::vm::JikesRVM::test(44));
     debug_assert!(112 == ::vm::JikesRVM::test2(45, 67));
     debug_assert!(731 == ::vm::JikesRVM::test3(21, 34, 9, 8));
@@ -66,7 +66,7 @@ pub struct OpenJDK_Upcalls {
 pub unsafe extern fn openjdk_gc_init(calls: *const OpenJDK_Upcalls, heap_size: usize) {
     ::util::logger::init().unwrap();
     UPCALLS = calls;
-    SINGLETON.plan.gc_init(heap_size);
+    SINGLETON.plan.gc_init(heap_size, &SINGLETON.vm_map);
 }
 
 #[no_mangle]
@@ -96,7 +96,7 @@ pub unsafe extern fn gc_init(heap_size: usize) {
         panic!("Should be calling openjdk_gc_init instead");
     }
     ::util::logger::init().unwrap();
-    SINGLETON.plan.gc_init(heap_size);
+    SINGLETON.plan.gc_init(heap_size, &SINGLETON.vm_map);
     ::plan::plan::INITIALIZED.store(true, Ordering::SeqCst);
 }
 
