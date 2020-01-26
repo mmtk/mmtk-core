@@ -12,6 +12,7 @@ use ::plan::TransitiveClosure;
 use ::util::header_byte;
 
 use std::cell::UnsafeCell;
+use util::heap::layout::heap_layout::{VMMap, Mmapper};
 
 #[derive(Debug)]
 pub struct ImmortalSpace {
@@ -34,18 +35,19 @@ impl Space for ImmortalSpace {
         &mut *self.common.get()
     }
 
-    fn init(&mut self) {
+    fn init(&mut self, vm_map: &'static VMMap) {
         // Borrow-checker fighting so that we can have a cyclic reference
         let me = unsafe { &*(self as *const Self) };
 
         let common_mut = self.common_mut();
         if common_mut.vmrequest.is_discontiguous() {
             common_mut.pr = Some(MonotonePageResource::new_discontiguous(
-                META_DATA_PAGES_PER_REGION));
+                META_DATA_PAGES_PER_REGION, vm_map));
         } else {
             common_mut.pr = Some(MonotonePageResource::new_contiguous(common_mut.start,
                                                                       common_mut.extent,
-                                                                      META_DATA_PAGES_PER_REGION));
+                                                                      META_DATA_PAGES_PER_REGION,
+                                                                      vm_map));
         }
         common_mut.pr.as_mut().unwrap().bind_space(me);
     }
@@ -64,9 +66,9 @@ impl Space for ImmortalSpace {
 }
 
 impl ImmortalSpace {
-    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest) -> Self {
+    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
         ImmortalSpace {
-            common: UnsafeCell::new(CommonSpace::new(name, false, true, zeroed, vmrequest)),
+            common: UnsafeCell::new(CommonSpace::new(name, false, true, zeroed, vmrequest, vm_map, mmapper)),
             mark_state: 0,
         }
     }

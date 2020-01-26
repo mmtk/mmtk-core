@@ -8,6 +8,7 @@ use ::util::header_byte;
 use ::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use ::util::treadmill::TreadMill;
 use ::vm::{ObjectModel, VMObjectModel};
+use util::heap::layout::heap_layout::{VMMap, Mmapper};
 
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
 const MARK_BIT: u8 = 0b01;
@@ -25,15 +26,15 @@ pub struct LargeObjectSpace {
 impl Space for LargeObjectSpace {
     type PR = FreeListPageResource<LargeObjectSpace>;
 
-    fn init(&mut self) {
+    fn init(&mut self, vm_map: &'static VMMap) {
         let me = unsafe { &*(self as *const Self) };
 
         let common_mut = self.common_mut();
 
         if common_mut.vmrequest.is_discontiguous() {
-            common_mut.pr = Some(FreeListPageResource::new_discontiguous(0));
+            common_mut.pr = Some(FreeListPageResource::new_discontiguous(0, vm_map));
         } else {
-            common_mut.pr = Some(FreeListPageResource::new_contiguous(me, common_mut.start, common_mut.extent, 0));
+            common_mut.pr = Some(FreeListPageResource::new_contiguous(me, common_mut.start, common_mut.extent, 0, vm_map));
         }
 
         common_mut.pr.as_mut().unwrap().bind_space(me);
@@ -61,9 +62,9 @@ impl Space for LargeObjectSpace {
 }
 
 impl LargeObjectSpace {
-    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest) -> Self {
+    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
         LargeObjectSpace {
-            common: UnsafeCell::new(CommonSpace::new(name, false, false, zeroed, vmrequest)),
+            common: UnsafeCell::new(CommonSpace::new(name, false, false, zeroed, vmrequest, vm_map, mmapper)),
             mark_state: 0,
             in_nursery_GC: false,
             treadmill: TreadMill::new()

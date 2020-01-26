@@ -19,6 +19,7 @@ const NON_MAP_FRACTION: f64 = 1.0 - 8.0 / 4096.0;
 #[cfg(target_pointer_width = "32")]
 const MAP_BASE_ADDRESS: Address = Address(0);
 
+#[derive(Debug)]
 pub struct Map32 {
     prev_link: Vec<i32>,
     next_link: Vec<i32>,

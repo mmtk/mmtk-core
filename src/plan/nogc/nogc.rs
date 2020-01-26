@@ -5,8 +5,7 @@ use ::plan::controller_collector_context::ControllerCollectorContext;
 use ::plan::{Plan, Phase};
 use ::util::ObjectReference;
 use ::util::heap::VMRequest;
-use ::util::heap::layout::heap_layout::MMAPPER;
-use ::util::heap::layout::Mmapper;
+use ::util::heap::layout::Mmapper as IMmapper;
 use ::util::Address;
 use ::util::OpaquePointer;
 
@@ -21,6 +20,8 @@ use super::NoGCMutator;
 use super::NoGCCollector;
 use util::conversions::bytes_to_pages;
 use plan::plan::create_vm_space;
+use util::heap::layout::heap_layout::VMMap;
+use util::heap::layout::heap_layout::Mmapper;
 
 pub type SelectedPlan = NoGC;
 
@@ -35,6 +36,7 @@ pub struct NoGCUnsync {
     vm_space: ImmortalSpace,
     pub space: ImmortalSpace,
     pub los: LargeObjectSpace,
+    pub mmapper: &'static Mmapper,
     pub total_pages: usize,
 }
 
@@ -43,28 +45,29 @@ impl Plan for NoGC {
     type TraceLocalT = NoGCTraceLocal;
     type CollectorT = NoGCCollector;
 
-    fn new() -> Self {
+    fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
         NoGC {
             control_collector_context: ControllerCollectorContext::new(),
             unsync: UnsafeCell::new(NoGCUnsync {
-                vm_space: create_vm_space(),
+                vm_space: create_vm_space(vm_map, mmapper),
                 space: ImmortalSpace::new("nogc_space", true,
-                                          VMRequest::discontiguous()),
-                los: LargeObjectSpace::new("los", true, VMRequest::discontiguous()),
+                                          VMRequest::discontiguous(), vm_map, mmapper),
+                los: LargeObjectSpace::new("los", true, VMRequest::discontiguous(), vm_map, mmapper),
+                mmapper,
                 total_pages: 0,
             }
             ),
         }
     }
 
-    unsafe fn gc_init(&self, heap_size: usize) {
-        ::util::heap::layout::heap_layout::VM_MAP.finalize_static_space_map();
+    unsafe fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+        vm_map.finalize_static_space_map();
         let unsync = &mut *self.unsync.get();
         unsync.total_pages = bytes_to_pages(heap_size);
         // FIXME correctly initialize spaces based on options
-        unsync.vm_space.init();
-        unsync.space.init();
-        unsync.los.init();
+        unsync.vm_space.init(vm_map);
+        unsync.space.init(vm_map);
+        unsync.los.init(vm_map);
 
         // These VMs require that the controller thread is started by the VM itself.
         // (Usually because it calls into VM code that accesses the TLS.)
@@ -73,6 +76,11 @@ impl Plan for NoGC {
                 ::plan::plan::CONTROL_COLLECTOR_CONTEXT.run(OpaquePointer::UNINITIALIZED )
             });
         }
+    }
+
+    fn mmapper(&self) -> &'static Mmapper {
+        let unsync = unsafe { &*self.unsync.get() };
+        unsync.mmapper
     }
 
     fn bind_mutator(&self, tls: OpaquePointer) -> *mut c_void {
@@ -122,7 +130,7 @@ impl Plan for NoGC {
             unsync.vm_space.in_space(address.to_object_reference()) ||
             unsync.los.in_space(address.to_object_reference())
         } {
-            return MMAPPER.address_is_mapped(address);
+            return unsync.mmapper.address_is_mapped(address);
         } else {
             return false;
         }

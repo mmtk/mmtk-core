@@ -16,13 +16,13 @@ use ::util::alloc::embedded_meta_data::*;
 use ::util::OpaquePointer;
 
 use super::layout::Mmapper;
-use super::layout::heap_layout::MMAPPER;
 use ::util::heap::layout::heap_layout;
 
 use super::PageResource;
 use std::sync::atomic::Ordering;
 
 use libc::{c_void, memset};
+use util::heap::layout::heap_layout::VMMap;
 
 const SPACE_ALIGN: usize = 1 << 19;
 
@@ -139,7 +139,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResour
             self.commit_pages(reserved_pages, required_pages, tls);
             self.common().space.unwrap().grow_space(old, bytes, new_chunk);
 
-            MMAPPER.ensure_mapped(old, required_pages);
+            self.common().space.unwrap().common().mmapper.ensure_mapped(old, required_pages);
 
             // FIXME: concurrent zeroing
             if zeroed {
@@ -167,7 +167,8 @@ impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResour
 
 impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
     pub fn new_contiguous(start: Address, bytes: usize,
-                          meta_data_pages_per_region: usize) -> Self {
+                          meta_data_pages_per_region: usize,
+                          vm_map: &'static VMMap) -> Self {
         let sentinel = start + bytes;
 
         MonotonePageResource {
@@ -193,7 +194,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
         }
     }
 
-    pub fn new_discontiguous(meta_data_pages_per_region: usize) -> Self {
+    pub fn new_discontiguous(meta_data_pages_per_region: usize, vm_map: &'static VMMap) -> Self {
         MonotonePageResource {
             common: CommonPageResource {
                 reserved: AtomicUsize::new(0),
@@ -302,11 +303,11 @@ impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
     }
 
     fn move_to_next_chunk(&self, guard: &mut MutexGuard<MonotonePageResourceSync>) -> bool{
-        guard.current_chunk = heap_layout::VM_MAP.get_next_contiguous_region(guard.current_chunk);
+        guard.current_chunk = self.vm_map().get_next_contiguous_region(guard.current_chunk);
         if guard.current_chunk.is_zero() {
             false
         } else {
-            guard.cursor = guard.current_chunk + heap_layout::VM_MAP.get_contiguous_region_size(guard.current_chunk);
+            guard.cursor = guard.current_chunk + self.vm_map().get_contiguous_region_size(guard.current_chunk);
             true
         }
     }

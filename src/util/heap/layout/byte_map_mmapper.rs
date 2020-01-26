@@ -2,6 +2,7 @@ use super::Mmapper;
 use ::util::{Address, ObjectReference};
 
 use ::util::constants::*;
+use std::fmt;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
@@ -26,6 +27,12 @@ pub const VERBOSE: bool = true;
 pub struct ByteMapMmapper {
     lock: Mutex<()>,
     mapped: [AtomicU8; MMAP_NUM_CHUNKS],
+}
+
+impl fmt::Debug for ByteMapMmapper {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ByteMapMmapper({})", MMAP_NUM_CHUNKS)
+    }
 }
 
 impl Mmapper for ByteMapMmapper {
