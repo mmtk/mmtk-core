@@ -22,6 +22,8 @@ use util::conversions::bytes_to_pages;
 use plan::plan::create_vm_space;
 use util::heap::layout::heap_layout::VMMap;
 use util::heap::layout::heap_layout::Mmapper;
+use util::options::{Options, UnsafeOptionsWrapper};
+use std::sync::Arc;
 
 pub type SelectedPlan = NoGC;
 
@@ -37,6 +39,7 @@ pub struct NoGCUnsync {
     pub space: ImmortalSpace,
     pub los: LargeObjectSpace,
     pub mmapper: &'static Mmapper,
+    pub options: Arc<UnsafeOptionsWrapper>,
     pub total_pages: usize,
 }
 
@@ -45,7 +48,7 @@ impl Plan for NoGC {
     type TraceLocalT = NoGCTraceLocal;
     type CollectorT = NoGCCollector;
 
-    fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
+    fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>) -> Self {
         NoGC {
             control_collector_context: ControllerCollectorContext::new(),
             unsync: UnsafeCell::new(NoGCUnsync {
@@ -54,6 +57,7 @@ impl Plan for NoGC {
                                           VMRequest::discontiguous(), vm_map, mmapper),
                 los: LargeObjectSpace::new("los", true, VMRequest::discontiguous(), vm_map, mmapper),
                 mmapper,
+                options,
                 total_pages: 0,
             }
             ),
@@ -81,6 +85,11 @@ impl Plan for NoGC {
     fn mmapper(&self) -> &'static Mmapper {
         let unsync = unsafe { &*self.unsync.get() };
         unsync.mmapper
+    }
+
+    fn options(&self) -> &Options {
+        let unsync = unsafe { &*self.unsync.get() };
+        &unsync.options
     }
 
     fn bind_mutator(&self, tls: OpaquePointer) -> *mut c_void {

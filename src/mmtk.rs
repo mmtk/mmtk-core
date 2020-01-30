@@ -4,6 +4,15 @@ use crate::plan::phase::PhaseManager;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::heap_layout::Mmapper;
 
+use std::default::Default;
+use util::reference_processor::{Semantics, ReferenceProcessors};
+use util::options::{UnsafeOptionsWrapper, Options};
+use std::sync::atomic::{Ordering, AtomicBool};
+
+use util::statistics::stats::STATS;
+use util::OpaquePointer;
+use std::sync::Arc;
+
 // TODO: remove this singleton at some point to allow multiple instances of MMTK
 // This helps refactoring.
 lazy_static!{
@@ -26,15 +35,35 @@ pub struct MMTK {
     pub phase_manager: PhaseManager,
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
+    pub reference_processors: ReferenceProcessors,
+    pub options: Arc<UnsafeOptionsWrapper>,
+
+    inside_harness: AtomicBool,
 }
 
 impl MMTK {
     pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
+        let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
         MMTK {
-            plan: SelectedPlan::new(vm_map, mmapper),
+            plan: SelectedPlan::new(vm_map, mmapper, options.clone()),
             phase_manager: PhaseManager::new(),
             vm_map,
-            mmapper
+            mmapper,
+            reference_processors: ReferenceProcessors::new(),
+            options,
+            inside_harness: AtomicBool::new(false),
         }
+    }
+
+    pub fn harness_begin(&self, tls: OpaquePointer) {
+        // FIXME Do a full heap GC if we have generational GC
+        self.plan.handle_user_collection_request(tls, true);
+        self.inside_harness.store(true, Ordering::SeqCst);
+        STATS.lock().unwrap().start_all();
+    }
+
+    pub fn harness_end(&self) {
+        STATS.lock().unwrap().stop_all();
+        self.inside_harness.store(false, Ordering::SeqCst);
     }
 }

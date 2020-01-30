@@ -5,9 +5,10 @@ use ::plan::selected_plan::SelectedPlan;
 use ::util::OpaquePointer;
 use libc::c_void;
 use plan::phase::PhaseManager;
+use mmtk::MMTK;
 
 pub trait CollectorContext {
-    fn new(plan: &'static SelectedPlan, phase_manager: &'static PhaseManager) -> Self;
+    fn new(mmtk: &'static MMTK) -> Self;
     /// Notify that the collector context is registered and ready to execute.
     fn init(&mut self, tls: OpaquePointer);
     /// Allocate space for copying an object.
