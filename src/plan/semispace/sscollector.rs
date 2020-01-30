@@ -22,6 +22,7 @@ use util::OpaquePointer;
 use plan::semispace::SelectedPlan;
 use plan::semispace::SemiSpace;
 use plan::phase::ScheduledPhase;
+use mmtk::MMTK;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector {
@@ -37,20 +38,23 @@ pub struct SSCollector {
 
     plan: &'static SemiSpace,
     phase_manager: &'static PhaseManager,
+    reference_processors: &'static ReferenceProcessors,
 }
 
 impl CollectorContext for SSCollector {
-    fn new(plan: &'static SelectedPlan, phase_manager: &'static PhaseManager) -> Self {
+    fn new(mmtk: &'static MMTK) -> Self {
         SSCollector {
             tls: OpaquePointer::UNINITIALIZED,
             ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None),
-            los: LargeObjectAllocator::new(OpaquePointer::UNINITIALIZED, Some(plan.get_los())),
-            trace: SSTraceLocal::new(plan),
+            los: LargeObjectAllocator::new(OpaquePointer::UNINITIALIZED, Some(mmtk.plan.get_los())),
+            trace: SSTraceLocal::new(&mmtk.plan),
 
             last_trigger_count: 0,
             worker_ordinal: 0,
             group: None,
-            plan, phase_manager
+            plan: &mmtk.plan,
+            phase_manager: &mmtk.phase_manager,
+            reference_processors: &mmtk.reference_processors,
         }
     }
 
@@ -101,13 +105,13 @@ impl CollectorContext for SSCollector {
             &Phase::SoftRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    scan_soft_refs(&mut self.trace, self.tls)
+                    self.reference_processors.scan_soft_refs(&mut self.trace, self.tls)
                 }
             }
             &Phase::WeakRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    scan_weak_refs(&mut self.trace, self.tls)
+                    self.reference_processors.scan_weak_refs(&mut self.trace, self.tls)
                 }
             }
             &Phase::Finalizable => {
@@ -118,12 +122,12 @@ impl CollectorContext for SSCollector {
             &Phase::PhantomRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    scan_phantom_refs(&mut self.trace, self.tls)
+                    self.reference_processors.scan_phantom_refs(&mut self.trace, self.tls)
                 }
             }
             &Phase::ForwardRefs => {
                 if primary && SelectedConstraints::NEEDS_FORWARD_AFTER_LIVENESS {
-                    forward_refs(&mut self.trace)
+                    self.reference_processors.forward_refs(&mut self.trace)
                 }
             }
             &Phase::ForwardFinalizable => {

@@ -6,7 +6,6 @@ use std::sync::atomic::{self, AtomicUsize, AtomicBool, Ordering};
 use ::util::OpaquePointer;
 use ::policy::space::Space;
 use ::util::heap::PageResource;
-use ::util::options::OPTION_MAP;
 use ::vm::{Collection, VMCollection, ActivePlan, VMActivePlan};
 use super::controller_collector_context::ControllerCollectorContext;
 use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
@@ -25,6 +24,9 @@ use util::statistics::counter::MonotoneNanoTime;
 use util::heap::layout::heap_layout::VMMap;
 use util::heap::layout::heap_layout::Mmapper;
 use util::heap::layout::Mmapper as IMmapper;
+use util::options::{Options, UnsafeOptionsWrapper};
+use std::rc::Rc;
+use std::sync::Arc;
 
 pub static EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
 pub static USER_TRIGGERED_COLLECTION: AtomicBool = AtomicBool::new(false);
@@ -56,8 +58,9 @@ pub trait Plan: Sized {
     type TraceLocalT: TraceLocal;
     type CollectorT: ParallelCollector;
 
-    fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self;
+    fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>) -> Self;
     fn mmapper(&self) -> &'static Mmapper;
+    fn options(&self) -> &Options;
     // unsafe because this can only be called once by the init thread
     unsafe fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
     fn bind_mutator(&'static self, tls: OpaquePointer) -> *mut c_void;
@@ -103,9 +106,7 @@ pub trait Plan: Sized {
     }
 
     fn log_poll<PR: PageResource>(&self, space: &'static PR::Space, message: &'static str) {
-        if OPTION_MAP.verbose >= 5 {
-            println!("  [POLL] {}: {}", space.get_name(), message);
-        }
+        info!("  [POLL] {}: {}", space.get_name(), message);
     }
 
     /**
@@ -154,7 +155,7 @@ pub trait Plan: Sized {
 
         if INITIALIZED.load(Ordering::Relaxed)
             && (pages ^ LAST_STRESS_PAGES.load(Ordering::Relaxed)
-            > OPTION_MAP.stress_factor) {
+            > self.options().stress_factor) {
 
             LAST_STRESS_PAGES.store(pages, Ordering::Relaxed);
             trace!("Doing stress GC");
@@ -181,8 +182,8 @@ pub trait Plan: Sized {
 
     fn is_bad_ref(&self, object: ObjectReference) -> bool;
 
-    fn handle_user_collection_request(tls: OpaquePointer) {
-        if !OPTION_MAP.ignore_system_g_c {
+    fn handle_user_collection_request(&self, tls: OpaquePointer, force: bool) {
+        if force || !self.options().ignore_system_g_c {
             USER_TRIGGERED_COLLECTION.store(true, Ordering::Relaxed);
             CONTROL_COLLECTOR_CONTEXT.request();
             VMCollection::block_for_gc(tls);
@@ -372,25 +373,4 @@ pub fn gc_in_progress() -> bool {
 
 pub fn gc_in_progress_proper() -> bool {
     unsafe { GC_STATUS == GcStatus::GcProper }
-}
-
-static INSIDE_HARNESS: AtomicBool = AtomicBool::new(false);
-
-pub fn harness_begin(tls: OpaquePointer) {
-    // FIXME Do a full heap GC if we have generational GC
-    let old_ignore = OPTION_MAP.ignore_system_g_c;
-    unsafe { OPTION_MAP.process("ignoreSystemGC", "false"); }
-    ::plan::selected_plan::SelectedPlan::handle_user_collection_request(tls);
-    if old_ignore {
-        unsafe { OPTION_MAP.process("ignoreSystemGC", "true"); }
-    } else {
-        unsafe { OPTION_MAP.process("ignoreSystemGC", "false"); }
-    }
-    INSIDE_HARNESS.store(true, Ordering::SeqCst);
-    STATS.lock().unwrap().start_all();
-}
-
-pub fn harness_end() {
-    STATS.lock().unwrap().stop_all();
-    INSIDE_HARNESS.store(false, Ordering::SeqCst);
 }

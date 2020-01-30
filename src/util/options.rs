@@ -7,54 +7,7 @@ use std::fmt;
 use std::ops::Deref;
 use std::str::FromStr;
 use util::constants::LOG_BYTES_IN_PAGE;
-
-/*
-// Boolean Options
-pub static mut ProtectOnRelease : bool = false;
-pub static mut EagerCompleteSweep : bool = false;
-pub static mut print_phase_stats : bool = false;
-pub static mut xml_stats : bool = false;
-pub static mut verbose_timing : bool = false;
-pub static mut no_finalizer : bool = false;
-pub static mut no_reference_types : bool = false;
-pub static mut full_heap_system_gc : bool = false;
-pub static mut ignore_system_gc : bool = false;
-pub static mut variable_size_heap : bool = true;
-pub static mut eager_mmap_spaces : bool = false;
-pub static mut use_return_barrier : bool = false;
-pub static mut use_short_stack_scans : bool = false;
-
-// Int Options
-pub static mut verbose : usize = 0;
-pub static mut mark_sweep_mark_bits : usize = 4;
-pub static mut threads : usize = 1;
-
-// Byte Options
-pub static mut stress_factor : usize = 2147479552;
-pub static mut meta_data_limit : usize = 16777216;
-pub static mut bounded_nursery : usize = 33554432;
-pub static mut fixed_nursery : usize = 2097152;
-pub static mut cycle_trigger_threshold : usize = 4194304;
-
-// Address Options
-pub static mut debug_address : Address = Address::zero();
-
-// Float Options
-pub static mut pretenure_threshold_fraction : f32 = 0.5;
-
-// String Options
-pub static mut perf_events : &str = "";
-
-// Enum Options
-pub static mut NurseryZeroing : NurseryZeroingOptions = temporal;
-
-enum NurseryZeroingOptions {
-    Temporal,
-    Nontemporal,
-    Concurrent,
-    Adaptive
-}
-*/
+use std::default::Default;
 
 custom_derive! {
     #[derive(Copy, Clone, EnumFromStr)]
@@ -95,23 +48,25 @@ macro_rules! options {
         pub struct Options {
             $(pub $name: $type),*
         }
-        fn set_from_str(o: &mut Options, s: &str, val: &str)->bool {
-            match s {
-                $(stringify!($name) => if let Ok(val) = val.parse() {
-                    o.$name = val;
-                    ($validator)(val)
-                } else {
-                    false
-                })*
-                _ => panic!("Invalid Options key")
+        impl Options {
+            pub fn set_from_str(&mut self, s: &str, val: &str)->bool {
+                match s {
+                    $(stringify!($name) => if let Ok(val) = val.parse() {
+                        self.$name = val;
+                        ($validator)(val)
+                    } else {
+                        false
+                    })*
+                    _ => panic!("Invalid Options key")
+                }
             }
         }
-        lazy_static!{
-            pub static ref OPTION_MAP: UnsafeOptionsWrapper = UnsafeOptionsWrapper::new(
-                Options {
+        impl Default for Options {
+            fn default() -> Self {
+                 Options {
                     $($name: $default),*
                 }
-            );
+            }
         }
     ]
 }
@@ -126,6 +81,8 @@ options!{
     no_finalizer:          bool                 [always_valid] = false,
     no_reference_types:    bool                 [always_valid] = false,
     nursery_zeroing:       NurseryZeroingOptions[always_valid] = NurseryZeroingOptions::Temporal,
+    // Note: This gets ignored. Use RUST_LOG to specify log level.
+    // TODO: Delete this option.
     verbose:               usize                [always_valid] = 0,
     stress_factor:         usize                [always_valid] = usize::max_value() >> LOG_BYTES_IN_PAGE,
 }
@@ -146,7 +103,7 @@ impl Options {
             }
         }
 
-        let result = set_from_str(self, sr.as_str(), val);
+        let result = self.set_from_str(sr.as_str(), val);
 
         trace!("Trying to process option pair: ({})", sr);
 

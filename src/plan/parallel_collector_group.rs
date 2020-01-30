@@ -7,10 +7,9 @@ use super::ParallelCollector;
 use ::vm::{VMCollection, Collection};
 use plan::selected_plan::SelectedPlan;
 
-use ::util::options::OPTION_MAP;
-
 use libc::c_void;
 use plan::phase::PhaseManager;
+use mmtk::MMTK;
 
 pub struct ParallelCollectorGroup<C: ParallelCollector> {
     //name: String,
@@ -48,15 +47,15 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         self.contexts.len()
     }
 
-    pub fn init_group(&mut self, plan: &'static SelectedPlan, phase_manager: &'static PhaseManager, tls: OpaquePointer) {
+    pub fn init_group(&mut self, mmtk: &'static MMTK, tls: OpaquePointer) {
         {
             let inner = self.sync.get_mut().unwrap();
             inner.trigger_count = 1;
         }
-        let size = OPTION_MAP.threads;
+        let size = mmtk.options.threads;
         self.contexts = Vec::<C>::with_capacity(size);
         for i in 0..size {
-            self.contexts.push(C::new(plan, phase_manager));
+            self.contexts.push(C::new(mmtk));
             // XXX: Borrow-checker fighting. I _believe_ this is unavoidable
             //      because we have a circular dependency here, but I'd very
             //      much like to be wrong.
