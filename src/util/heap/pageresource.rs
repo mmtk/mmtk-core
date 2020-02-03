@@ -11,8 +11,6 @@ use std::fmt::Debug;
 use libc::c_void;
 use util::heap::layout::heap_layout::VMMap;
 
-static CUMULATIVE_COMMITTED: AtomicUsize = AtomicUsize::new(0);
-
 pub trait PageResource: Sized + 'static + Debug {
     type Space: Space<PR = Self>;
 
@@ -68,12 +66,10 @@ pub trait PageResource: Sized + 'static + Debug {
     */
     fn commit_pages(&self, reserved_pages: usize, actual_pages: usize, tls: OpaquePointer) {
         let delta = actual_pages - reserved_pages;
-        self.common().reserved.store(self.common().reserved.load(Ordering::Relaxed) + delta,
-                                     Ordering::Relaxed);
-        self.common().committed.store(self.common().committed.load(Ordering::Relaxed) + actual_pages,
-                                      Ordering::Relaxed);
+        self.common().reserved.fetch_add(delta, Ordering::Relaxed);
+        self.common().committed.fetch_add(actual_pages, Ordering::Relaxed);
         if unsafe{VMActivePlan::is_mutator(tls)} {
-            Self::add_to_committed(actual_pages);
+            self.vm_map().add_to_cumulative_committed_pages(actual_pages);
         }
     }
 
@@ -85,11 +81,6 @@ pub trait PageResource: Sized + 'static + Debug {
         self.common().committed.load(Ordering::Relaxed)
     }
 
-    fn add_to_committed(pages: usize) {
-        CUMULATIVE_COMMITTED.fetch_add(pages, Ordering::Relaxed);
-    }
-
-
     fn bind_space(&mut self, space: &'static Self::Space) {
         self.common_mut().space = Some(space);
     }
@@ -99,10 +90,6 @@ pub trait PageResource: Sized + 'static + Debug {
     fn vm_map(&self) -> &'static VMMap {
         self.common().space.unwrap().common().vm_map()
     }
-}
-
-pub fn cumulative_committed_pages() -> usize {
-    CUMULATIVE_COMMITTED.load(Ordering::Relaxed)
 }
 
 #[derive(Debug)]

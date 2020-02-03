@@ -9,6 +9,7 @@ use ::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use ::util::treadmill::TreadMill;
 use ::vm::{ObjectModel, VMObjectModel};
 use util::heap::layout::heap_layout::{VMMap, Mmapper};
+use util::heap::HeapMeta;
 
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
 const MARK_BIT: u8 = 0b01;
@@ -62,9 +63,9 @@ impl Space for LargeObjectSpace {
 }
 
 impl LargeObjectSpace {
-    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
+    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
         LargeObjectSpace {
-            common: UnsafeCell::new(CommonSpace::new(name, false, false, zeroed, vmrequest, vm_map, mmapper)),
+            common: UnsafeCell::new(CommonSpace::new(name, false, false, zeroed, vmrequest, vm_map, mmapper, heap)),
             mark_state: 0,
             in_nursery_GC: false,
             treadmill: TreadMill::new()

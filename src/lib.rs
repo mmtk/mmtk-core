@@ -17,6 +17,8 @@ extern crate lazy_static;
 extern crate log;
 extern crate crossbeam_deque;
 extern crate num_cpus;
+#[macro_use]
+extern crate derivative;
 
 #[macro_use]
 pub mod util;

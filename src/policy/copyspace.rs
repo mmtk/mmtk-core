@@ -16,6 +16,7 @@ use ::plan::Allocator;
 use std::cell::UnsafeCell;
 use libc::{c_void, mprotect, PROT_NONE, PROT_EXEC, PROT_WRITE, PROT_READ};
 use util::heap::layout::heap_layout::{VMMap, Mmapper};
+use util::heap::HeapMeta;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -66,9 +67,9 @@ impl Space for CopySpace {
 }
 
 impl CopySpace {
-    pub fn new(name: &'static str, from_space: bool, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
+    pub fn new(name: &'static str, from_space: bool, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
         CopySpace {
-            common: UnsafeCell::new(CommonSpace::new(name, true, false, zeroed, vmrequest, vm_map, mmapper)),
+            common: UnsafeCell::new(CommonSpace::new(name, true, false, zeroed, vmrequest, vm_map, mmapper, heap)),
             from_space,
         }
     }

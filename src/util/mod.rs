@@ -10,6 +10,7 @@ pub mod forwarding_word;
 pub mod header_byte;
 pub mod logger;
 pub mod constants;
+#[cfg(feature = "sanity")]
 pub mod sanity;
 pub mod statistics;
 pub mod queue;

@@ -6,17 +6,24 @@ use ::util::{Address, ObjectReference};
 use ::util::alloc::{allocator, Allocator};
 use ::util::heap::{FreeListPageResource, PageResource};
 use ::util::OpaquePointer;
+use ::plan::selected_plan::SelectedPlan;
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct LargeObjectAllocator {
     pub tls: OpaquePointer,
     space: Option<&'static LargeObjectSpace>,
+    #[derivative(Debug="ignore")]
+    plan: &'static SelectedPlan,
 }
 
 impl Allocator<FreeListPageResource<LargeObjectSpace>> for LargeObjectAllocator {
     fn get_tls(&self) -> OpaquePointer {
         self.tls
+    }
+    fn get_plan(&self) -> &'static SelectedPlan {
+        self.plan
     }
 
     fn get_space(&self) -> Option<&'static LargeObjectSpace> {
@@ -46,10 +53,10 @@ impl Allocator<FreeListPageResource<LargeObjectSpace>> for LargeObjectAllocator 
 }
 
 impl LargeObjectAllocator {
-    pub fn new(tls: OpaquePointer, space: Option<&'static LargeObjectSpace>) -> Self {
+    pub fn new(tls: OpaquePointer, space: Option<&'static LargeObjectSpace>, plan: &'static SelectedPlan) -> Self {
         LargeObjectAllocator {
             tls,
-            space,
+            space, plan,
         }
     }
 }

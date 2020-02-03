@@ -60,7 +60,9 @@ impl ControllerCollectorContext {
             VMCollection::stop_all_mutators(tls);
 
             // For heap growth logic
-            let user_triggered_collection: bool = SelectedPlan::is_user_triggered_collection();
+            // FIXME: This is not used. However, we probably want to set a 'user_triggered' flag
+            // when GC is requested.
+            // let user_triggered_collection: bool = SelectedPlan::is_user_triggered_collection();
 
             self.clear_request();
 
