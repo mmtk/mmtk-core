@@ -56,9 +56,6 @@ pub struct SemiSpaceUnsync {
     pub copyspace1: CopySpace,
     pub versatile_space: ImmortalSpace,
     pub los: LargeObjectSpace,
-
-    // TODO: Check if we really need this. We have collection_attempt in CommonPlan.
-    collection_attempt: usize,
 }
 
 unsafe impl Sync for SemiSpace {}
@@ -82,7 +79,6 @@ impl Plan for SemiSpace {
                 versatile_space: ImmortalSpace::new("versatile_space", true,
                                                     VMRequest::discontiguous(), vm_map, mmapper, &mut heap),
                 los: LargeObjectSpace::new("los", true, VMRequest::discontiguous(), vm_map, mmapper, &mut heap),
-                collection_attempt: 0,
             }),
             ss_trace: Trace::new(),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
@@ -146,15 +142,14 @@ impl Plan for SemiSpace {
 
         match phase {
             &Phase::SetCollectionKind => {
-                let unsync = &mut *self.unsync.get();
-                unsync.collection_attempt = if self.is_user_triggered_collection() {
+                self.common.cur_collection_attempts.store(if self.is_user_triggered_collection() {
                     1
                 } else {
                     self.determine_collection_attempts()
-                };
+                }, Ordering::Relaxed);
 
                 let emergency_collection = !self.is_internal_triggered_collection()
-                    && self.last_collection_was_exhaustive() && unsync.collection_attempt > 1;
+                    && self.last_collection_was_exhaustive() && self.common.cur_collection_attempts.load(Ordering::Relaxed) > 1;
                 self.common().emergency_collection.store(emergency_collection, Ordering::Relaxed);
 
                 if emergency_collection {
