@@ -200,13 +200,13 @@ pub trait Plan: Sized {
 
     fn determine_collection_attempts(&self) -> usize {
         if !self.common().allocation_success.load(Ordering::Relaxed) {
-            self.common().collection_attempts.fetch_add(1, Ordering::Relaxed);
+            self.common().max_collection_attempts.fetch_add(1, Ordering::Relaxed);
         } else {
             self.common().allocation_success.store(false, Ordering::Relaxed);
-            self.common().collection_attempts.store(1, Ordering::Relaxed);
+            self.common().max_collection_attempts.store(1, Ordering::Relaxed);
         }
 
-        self.common().collection_attempts.load(Ordering::Relaxed)
+        self.common().max_collection_attempts.load(Ordering::Relaxed)
     }
 
     fn is_mapped_object(&self, object: ObjectReference) -> bool {
@@ -254,8 +254,13 @@ pub struct CommonPlan {
     pub stacks_prepared: AtomicBool,
     pub emergency_collection: AtomicBool,
     pub user_triggered_collection: AtomicBool,
+    // Has an allocation succeeded since the emergency collection?
     pub allocation_success: AtomicBool,
-    pub collection_attempts: AtomicUsize,
+    // Maximum number of failed attempts by a single thread
+    pub max_collection_attempts: AtomicUsize,
+    // Current collection attempt
+    pub cur_collection_attempts: AtomicUsize,
+    // Lock used for out of memory handling
     pub oom_lock: Mutex<()>,
 
     pub control_collector_context: ControllerCollectorContext,
@@ -275,7 +280,8 @@ impl CommonPlan {
             emergency_collection: AtomicBool::new(false),
             user_triggered_collection: AtomicBool::new(false),
             allocation_success: AtomicBool::new(false),
-            collection_attempts: AtomicUsize::new(0),
+            max_collection_attempts: AtomicUsize::new(0),
+            cur_collection_attempts: AtomicUsize::new(0),
             oom_lock: Mutex::new(()),
             control_collector_context: ControllerCollectorContext::new(),
 
