@@ -17,7 +17,7 @@ use ::policy::space::Space;
 use util::conversions::bytes_to_pages;
 use ::util::constants::BYTES_IN_ADDRESS;
 use ::util::OpaquePointer;
-
+use ::plan::selected_plan::SelectedPlan;
 
 const BYTES_IN_PAGE: usize = 1 << 12;
 const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
@@ -28,12 +28,15 @@ const NEXT_REGION_OFFSET: isize = REGION_LIMIT_OFFSET + BYTES_IN_ADDRESS as isiz
 const DATA_END_OFFSET: isize = NEXT_REGION_OFFSET + BYTES_IN_ADDRESS as isize;
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct BumpAllocator<PR: PageResource> {
     pub tls: OpaquePointer,
     cursor: Address,
     limit: Address,
-    space: Option<&'static PR::Space>
+    space: Option<&'static PR::Space>,
+    #[derivative(Debug="ignore")]
+    plan: &'static SelectedPlan,
 }
 
 impl<PR: PageResource> BumpAllocator<PR> {
@@ -98,6 +101,9 @@ impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
     fn get_space(&self) -> Option<&'static PR::Space> {
         self.space
     }
+    fn get_plan(&self) -> &'static SelectedPlan {
+        self.plan
+    }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc");
@@ -139,12 +145,12 @@ impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
 }
 
 impl<PR: PageResource> BumpAllocator<PR> {
-    pub fn new(tls: OpaquePointer, space: Option<&'static PR::Space>) -> Self {
+    pub fn new(tls: OpaquePointer, space: Option<&'static PR::Space>, plan: &'static SelectedPlan) -> Self {
         BumpAllocator {
             tls,
             cursor: unsafe { Address::zero() },
             limit: unsafe { Address::zero() },
-            space,
+            space, plan,
         }
     }
 }

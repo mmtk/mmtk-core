@@ -45,8 +45,8 @@ impl CollectorContext for SSCollector {
     fn new(mmtk: &'static MMTK) -> Self {
         SSCollector {
             tls: OpaquePointer::UNINITIALIZED,
-            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None),
-            los: LargeObjectAllocator::new(OpaquePointer::UNINITIALIZED, Some(mmtk.plan.get_los())),
+            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
+            los: LargeObjectAllocator::new(OpaquePointer::UNINITIALIZED, Some(mmtk.plan.get_los()), &mmtk.plan),
             trace: SSTraceLocal::new(&mmtk.plan),
 
             last_trigger_count: 0,

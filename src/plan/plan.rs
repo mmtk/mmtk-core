@@ -10,14 +10,13 @@ use ::vm::{Collection, VMCollection, ActivePlan, VMActivePlan};
 use super::controller_collector_context::ControllerCollectorContext;
 use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use util::constants::LOG_BYTES_IN_MBYTE;
-use util::heap::VMRequest;
+use util::heap::{VMRequest, HeapMeta};
 use policy::immortalspace::ImmortalSpace;
 #[cfg(feature = "jikesrvm")]
 use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_END;
 #[cfg(feature = "jikesrvm")]
 use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
 use util::Address;
-use util::heap::pageresource::cumulative_committed_pages;
 use util::statistics::stats::{STATS, get_gathering_stats, new_counter};
 use util::statistics::counter::{Counter, LongCounter};
 use util::statistics::counter::MonotoneNanoTime;
@@ -26,31 +25,25 @@ use util::heap::layout::heap_layout::Mmapper;
 use util::heap::layout::Mmapper as IMmapper;
 use util::options::{Options, UnsafeOptionsWrapper};
 use std::rc::Rc;
-use std::sync::Arc;
-
-pub static EMERGENCY_COLLECTION: AtomicBool = AtomicBool::new(false);
-pub static USER_TRIGGERED_COLLECTION: AtomicBool = AtomicBool::new(false);
-
-lazy_static! {
-    pub static ref CONTROL_COLLECTOR_CONTEXT: ControllerCollectorContext = ControllerCollectorContext::new();
-}
+use std::sync::{Arc, Mutex};
+use mmtk::MMTK;
 
 // FIXME: Move somewhere more appropriate
 #[cfg(feature = "jikesrvm")]
-pub fn create_vm_space(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> ImmortalSpace {
+pub fn create_vm_space(vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> ImmortalSpace {
     let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
 
     let boot_segment_mb = unsafe{Address::from_usize(boot_segment_bytes)}
         .align_up(BYTES_IN_CHUNK).as_usize() >> LOG_BYTES_IN_MBYTE;
 
-    ImmortalSpace::new("boot", false, VMRequest::fixed_size(boot_segment_mb), vm_map, mmapper)
+    ImmortalSpace::new("boot", false, VMRequest::fixed_size(boot_segment_mb), vm_map, mmapper, heap)
 }
 
 #[cfg(feature = "openjdk")]
-pub fn create_vm_space(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> ImmortalSpace {
+pub fn create_vm_space(vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> ImmortalSpace {
     // FIXME: Does OpenJDK care?
-    ImmortalSpace::new("boot", false, VMRequest::fixed_size(0), vm_map, mmapper)
+    ImmortalSpace::new("boot", false, VMRequest::fixed_size(0), vm_map, mmapper, heap)
 }
 
 pub trait Plan: Sized {
@@ -59,8 +52,13 @@ pub trait Plan: Sized {
     type CollectorT: ParallelCollector;
 
     fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>) -> Self;
-    fn mmapper(&self) -> &'static Mmapper;
-    fn options(&self) -> &Options;
+    fn common(&self) -> &CommonPlan;
+    fn mmapper(&self) -> &'static Mmapper {
+        self.common().mmapper
+    }
+    fn options(&self) -> &Options {
+        &self.common().options
+    }
     // unsafe because this can only be called once by the init thread
     unsafe fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
     fn bind_mutator(&'static self, tls: OpaquePointer) -> *mut c_void;
@@ -68,8 +66,8 @@ pub trait Plan: Sized {
     // unsafe because only the primary collector thread can call this
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
 
-    fn is_initialized() -> bool {
-        INITIALIZED.load(Ordering::SeqCst)
+    fn is_initialized(&self) -> bool {
+        self.common().initialized.load(Ordering::SeqCst)
     }
 
     fn poll<PR: PageResource>(&self, space_full: bool, space: &'static PR::Space) -> bool {
@@ -85,7 +83,7 @@ pub trait Plan: Sized {
                 return false;
             }*/
             self.log_poll::<PR>(space, "Triggering collection");
-            CONTROL_COLLECTOR_CONTEXT.request();
+            self.common().control_collector_context.request();
             return true;
         }
 
@@ -130,7 +128,9 @@ pub trait Plan: Sized {
         self.get_pages_used() + self.get_collection_reserve()
     }
 
-    fn get_total_pages(&self) -> usize;
+    fn get_total_pages(&self) -> usize {
+        self.common().heap.get_total_pages()
+    }
 
     fn get_pages_avail(&self) -> usize {
         self.get_total_pages() - self.get_pages_reserved()
@@ -142,22 +142,22 @@ pub trait Plan: Sized {
 
     fn get_pages_used(&self) -> usize;
 
-    fn is_emergency_collection() -> bool {
-        EMERGENCY_COLLECTION.load(Ordering::Relaxed)
+    fn is_emergency_collection(&self) -> bool {
+        self.common().emergency_collection.load(Ordering::Relaxed)
     }
 
     fn get_free_pages(&self) -> usize { self.get_total_pages() - self.get_pages_used() }
 
     #[inline]
     fn stress_test_gc_required(&self) -> bool {
-        let pages = cumulative_committed_pages();
+        let pages = self.common().vm_map.get_cumulative_committed_pages();
         trace!("pages={}", pages);
 
-        if INITIALIZED.load(Ordering::Relaxed)
-            && (pages ^ LAST_STRESS_PAGES.load(Ordering::Relaxed)
+        if self.is_initialized()
+            && (pages ^ self.common().last_stress_pages.load(Ordering::Relaxed)
             > self.options().stress_factor) {
 
-            LAST_STRESS_PAGES.store(pages, Ordering::Relaxed);
+            self.common().last_stress_pages.store(pages, Ordering::Relaxed);
             trace!("Doing stress GC");
             true
         } else {
@@ -165,7 +165,7 @@ pub trait Plan: Sized {
         }
     }
 
-    fn is_internal_triggered_collection() -> bool {
+    fn is_internal_triggered_collection(&self) -> bool {
         // FIXME
         false
     }
@@ -184,18 +184,29 @@ pub trait Plan: Sized {
 
     fn handle_user_collection_request(&self, tls: OpaquePointer, force: bool) {
         if force || !self.options().ignore_system_g_c {
-            USER_TRIGGERED_COLLECTION.store(true, Ordering::Relaxed);
-            CONTROL_COLLECTOR_CONTEXT.request();
+            self.common().user_triggered_collection.store(true, Ordering::Relaxed);
+            self.common().control_collector_context.request();
             VMCollection::block_for_gc(tls);
         }
     }
 
-    fn is_user_triggered_collection() -> bool {
-        return USER_TRIGGERED_COLLECTION.load(Ordering::Relaxed);
+    fn is_user_triggered_collection(&self) -> bool {
+        self.common().user_triggered_collection.load(Ordering::Relaxed)
     }
 
-    fn reset_collection_trigger() {
-        USER_TRIGGERED_COLLECTION.store(false, Ordering::Relaxed)
+    fn reset_collection_trigger(&self) {
+        self.common().user_triggered_collection.store(false, Ordering::Relaxed)
+    }
+
+    fn determine_collection_attempts(&self) -> usize {
+        if !self.common().allocation_success.load(Ordering::Relaxed) {
+            self.common().collection_attempts.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.common().allocation_success.store(false, Ordering::Relaxed);
+            self.common().collection_attempts.store(1, Ordering::Relaxed);
+        }
+
+        self.common().collection_attempts.load(Ordering::Relaxed)
     }
 
     fn is_mapped_object(&self, object: ObjectReference) -> bool {
@@ -214,7 +225,7 @@ pub trait Plan: Sized {
     fn is_mapped_address(&self, address: Address) -> bool;
 
     fn modify_check(&self, object: ObjectReference) {
-        if gc_in_progress_proper() {
+        if self.common().gc_in_progress_proper() {
             if self.is_movable(object) {
                 panic!("GC modifying a potentially moving object via Java (i.e. not magic) obj= {}", object);
             }
@@ -231,12 +242,91 @@ pub enum GcStatus {
     GcProper,
 }
 
-pub static INITIALIZED: AtomicBool = AtomicBool::new(false);
-// FIXME should probably not use static mut
-static mut GC_STATUS: GcStatus = GcStatus::NotInGC;
-static LAST_STRESS_PAGES: AtomicUsize = AtomicUsize::new(0);
-pub static STACKS_PREPARED: AtomicBool = AtomicBool::new(false);
+pub struct CommonPlan {
+    pub vm_map: &'static VMMap,
+    pub mmapper: &'static Mmapper,
+    pub options: Arc<UnsafeOptionsWrapper>,
+    pub heap: HeapMeta,
 
+    pub initialized: AtomicBool,
+    pub gc_status: Mutex<GcStatus>,
+    pub last_stress_pages: AtomicUsize,
+    pub stacks_prepared: AtomicBool,
+    pub emergency_collection: AtomicBool,
+    pub user_triggered_collection: AtomicBool,
+    pub allocation_success: AtomicBool,
+    pub collection_attempts: AtomicUsize,
+    pub oom_lock: Mutex<()>,
+
+    pub control_collector_context: ControllerCollectorContext,
+
+    #[cfg(feature = "sanity")]
+    pub inside_sanity: AtomicBool,
+}
+
+impl CommonPlan {
+    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>, heap: HeapMeta) -> CommonPlan {
+        CommonPlan {
+            vm_map, mmapper, options, heap,
+            initialized: AtomicBool::new(false),
+            gc_status: Mutex::new(GcStatus::NotInGC),
+            last_stress_pages: AtomicUsize::new(0),
+            stacks_prepared: AtomicBool::new(false),
+            emergency_collection: AtomicBool::new(false),
+            user_triggered_collection: AtomicBool::new(false),
+            allocation_success: AtomicBool::new(false),
+            collection_attempts: AtomicUsize::new(0),
+            oom_lock: Mutex::new(()),
+            control_collector_context: ControllerCollectorContext::new(),
+
+            #[cfg(feature = "sanity")]
+            inside_sanity: AtomicBool::new(false),
+        }
+    }
+
+    pub fn set_gc_status(&self, s: GcStatus) {
+        let mut gc_status = self.gc_status.lock().unwrap();
+        if *gc_status == GcStatus::NotInGC {
+            self.stacks_prepared.store(false, Ordering::SeqCst);
+            // FIXME stats
+            STATS.lock().unwrap().start_gc();
+        }
+        *gc_status = s;
+        if *gc_status == GcStatus::NotInGC {
+            // FIXME stats
+            if get_gathering_stats() {
+                STATS.lock().unwrap().end_gc();
+            }
+        }
+    }
+
+    pub fn stacks_prepared(&self) -> bool {
+        self.stacks_prepared.load(Ordering::SeqCst)
+    }
+
+    pub fn gc_in_progress(&self) -> bool {
+        *self.gc_status.lock().unwrap() != GcStatus::NotInGC
+    }
+
+    pub fn gc_in_progress_proper(&self) -> bool {
+        *self.gc_status.lock().unwrap() == GcStatus::GcProper
+    }
+
+    #[cfg(feature = "sanity")]
+    pub fn enter_sanity(&self) {
+        self.inside_sanity.store(true, Ordering::Relaxed)
+    }
+
+    #[cfg(feature = "sanity")]
+    pub fn leave_sanity(&self) {
+        self.inside_sanity.store(false, Ordering::Relaxed)
+    }
+
+    #[cfg(feature = "sanity")]
+    pub fn is_in_sanity(&self) -> bool {
+        self.inside_sanity.load(Ordering::Relaxed)
+    }
+}
 
 lazy_static! {
     pub static ref PREPARE_STACKS: Phase = Phase::Complex(vec![
@@ -345,32 +435,4 @@ pub enum Allocator {
     LargeCode = 8,
     Allocators = 9,
     DefaultSite = -1,
-}
-
-pub fn set_gc_status(s: GcStatus) {
-    if unsafe { GC_STATUS == GcStatus::NotInGC } {
-        STACKS_PREPARED.store(false, Ordering::SeqCst);
-        // FIXME stats
-        STATS.lock().unwrap().start_gc();
-
-    }
-    unsafe { GC_STATUS = s };
-    if unsafe { GC_STATUS == GcStatus::NotInGC } {
-        // FIXME stats
-        if get_gathering_stats() {
-            STATS.lock().unwrap().end_gc();
-        }
-    }
-}
-
-pub fn stacks_prepared() -> bool {
-    STACKS_PREPARED.load(Ordering::SeqCst)
-}
-
-pub fn gc_in_progress() -> bool {
-    unsafe { GC_STATUS != GcStatus::NotInGC }
-}
-
-pub fn gc_in_progress_proper() -> bool {
-    unsafe { GC_STATUS == GcStatus::GcProper }
 }

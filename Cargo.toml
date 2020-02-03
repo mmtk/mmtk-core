@@ -16,6 +16,7 @@ lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
 num_cpus = "1.8"
+derivative = "1.0.3"
 
 [features]
 default = ["nogc", "openjdk"]

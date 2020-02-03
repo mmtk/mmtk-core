@@ -23,6 +23,8 @@ use libc::c_void;
 use util::heap::layout::heap_layout::VMMap;
 use util::heap::layout::heap_layout::Mmapper;
 use plan::selected_plan::SelectedPlan;
+use util::heap::HeapMeta;
+use util::heap::space_descriptor::SpaceDescriptor;
 
 pub trait Space: Sized + Debug + 'static {
     type PR: PageResource<Space = Self>;
@@ -32,7 +34,7 @@ pub trait Space: Sized + Debug + 'static {
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
         // debug_assert!(tls != 0);
-        let allow_poll = unsafe { VMActivePlan::is_mutator(tls) } && SelectedPlan::is_initialized();
+        let allow_poll = unsafe { VMActivePlan::is_mutator(tls) } && VMActivePlan::global().is_initialized();
 
         trace!("Reserving pages");
         let pr = self.common().pr.as_ref().unwrap();
@@ -70,7 +72,7 @@ pub trait Space: Sized + Debug + 'static {
 
     fn in_space(&self, object: ObjectReference) -> bool {
         let start = VMObjectModel::ref_to_address(object);
-        if !space_descriptor::is_contiguous(self.common().descriptor) {
+        if !self.common().descriptor.is_contiguous() {
             self.common().vm_map().get_descriptor_for_address(start) == self.common().descriptor
         } else {
             start.as_usize() >= self.common().start.as_usize()
@@ -180,7 +182,7 @@ pub trait Space: Sized + Debug + 'static {
 pub struct CommonSpace<PR: PageResource> {
     pub name: &'static str,
     name_length: usize,
-    pub descriptor: usize,
+    pub descriptor: SpaceDescriptor,
     index: usize,
     pub vmrequest: VMRequest,
 
@@ -198,21 +200,16 @@ pub struct CommonSpace<PR: PageResource> {
     pub mmapper: &'static Mmapper
 }
 
-// FIXME replace with atomic ints
-static mut SPACE_COUNT: usize = 0;
-static mut HEAP_CURSOR: Address = HEAP_START;
-static mut HEAP_LIMIT: Address = HEAP_END;
-
 const DEBUG: bool = false;
 
 impl<PR: PageResource> CommonSpace<PR> {
     pub fn new(name: &'static str, movable: bool, immortal: bool, zeroed: bool,
-               vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
+               vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
         let mut rtn = CommonSpace {
             name,
             name_length: name.len(),
-            descriptor: 0,
-            index: unsafe { let tmp = SPACE_COUNT; SPACE_COUNT += 1; tmp },
+            descriptor: SpaceDescriptor::UNINITIALIZED,
+            index: heap.new_space_index(),
             vmrequest,
             immortal,
             movable,
@@ -229,7 +226,7 @@ impl<PR: PageResource> CommonSpace<PR> {
         if vmrequest.is_discontiguous() {
             rtn.contiguous = false;
             // FIXME
-            rtn.descriptor = space_descriptor::create_descriptor();
+            rtn.descriptor = SpaceDescriptor::create_descriptor();
             // VM.memory.setHeapRange(index, HEAP_START, HEAP_END);
             return rtn;
         }
@@ -251,32 +248,17 @@ impl<PR: PageResource> CommonSpace<PR> {
             if start.as_usize() != chunk_align(start, false).as_usize() {
                 panic!("{} starting on non-aligned boundary: {} bytes", name, start.as_usize());
             }
-        } else if top {
+        } else {
             // FIXME
             //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
-            unsafe {
-                HEAP_LIMIT -= extent;
-                start = HEAP_LIMIT;
-            }
-        } else {
-            unsafe {
-                start = HEAP_CURSOR;
-                HEAP_CURSOR += extent;
-            }
-        }
-
-        unsafe {
-            if HEAP_CURSOR > HEAP_LIMIT {
-                panic!("Out of virtual address space allocating \"{}\" at {} ({} > {})", name,
-                       HEAP_CURSOR - extent, HEAP_CURSOR, HEAP_LIMIT);
-            }
+            start = heap.reserve(extent, top);
         }
 
         rtn.contiguous = true;
         rtn.start = start;
         rtn.extent = extent;
         // FIXME
-        rtn.descriptor = space_descriptor::create_descriptor_from_heap_range(start, start + extent);
+        rtn.descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
         // VM.memory.setHeapRange(index, start, start.plus(extent));
         vm_map.insert(start, extent, rtn.descriptor);
 
@@ -290,14 +272,6 @@ impl<PR: PageResource> CommonSpace<PR> {
     pub fn vm_map(&self) -> &'static VMMap {
         self.vm_map
     }
-}
-
-pub fn get_discontig_start() -> Address {
-    unsafe { HEAP_CURSOR }
-}
-
-pub fn get_discontig_end() -> Address {
-    unsafe { HEAP_LIMIT - 1 }
 }
 
 fn get_frac_available(frac: f32) -> usize {

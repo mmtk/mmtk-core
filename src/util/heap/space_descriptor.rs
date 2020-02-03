@@ -25,83 +25,94 @@ const BASE_EXPONENT: usize = BITS_IN_INT - MANTISSA_BITS;
 const INDEX_MASK: usize = !TYPE_MASK;
 const INDEX_SHIFT: usize = TYPE_BITS;
 
-lazy_static! {
-    static ref DISCONTIGUOUS_SPACE_INDEX: AtomicUsize = AtomicUsize::default();
-}
-
-  // private static int discontiguousSpaceIndex = 0;
+static DISCONTIGUOUS_SPACE_INDEX: AtomicUsize = AtomicUsize::new(0);
 const DISCONTIG_INDEX_INCREMENT: usize = 1 << TYPE_BITS;
 
-pub fn create_descriptor_from_heap_range(start: Address, end: Address) -> usize {
-    let top = end == vm_layout_constants::HEAP_END;
-    if HEAP_LAYOUT_64BIT {
-        let space_index = if start > vm_layout_constants::HEAP_END { ::std::usize::MAX } else { start.0 >> vm_layout_constants::SPACE_SHIFT_64 };
-        return space_index << INDEX_SHIFT |
-            (if top { TYPE_CONTIGUOUS_HI } else { TYPE_CONTIGUOUS });
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct SpaceDescriptor(usize);
+
+impl SpaceDescriptor {
+    pub const UNINITIALIZED: Self = SpaceDescriptor(0);
+
+    pub fn create_descriptor_from_heap_range(start: Address, end: Address) -> SpaceDescriptor {
+        let top = end == vm_layout_constants::HEAP_END;
+        if HEAP_LAYOUT_64BIT {
+            let space_index = if start > vm_layout_constants::HEAP_END { ::std::usize::MAX } else { start.0 >> vm_layout_constants::SPACE_SHIFT_64 };
+            return SpaceDescriptor(space_index << INDEX_SHIFT |
+                (if top { TYPE_CONTIGUOUS_HI } else { TYPE_CONTIGUOUS }));
+        }
+        let chunks = (end - start) >> vm_layout_constants::LOG_BYTES_IN_CHUNK;
+        if cfg!(debug) {
+            // if (!start.isZero() && (chunks <= 0 || chunks >= (1 << SIZE_BITS))) {
+            //   Log.write("SpaceDescriptor.createDescriptor(", start);
+            //   Log.write(",", end);
+            //   Log.writeln(")");
+            //   Log.writeln("chunks = ", chunks);
+            // }
+            debug_assert!(!start.is_zero() && chunks > 0 && chunks < (1 << SIZE_BITS));
+        }
+        let mut tmp = start.0;
+        tmp = tmp >> BASE_EXPONENT;
+        let mut exponent = 0;
+        while (tmp != 0) && ((tmp & 1) == 0) {
+            tmp = tmp >> 1;
+            exponent += 1;
+        }
+        let mantissa = tmp;
+        debug_assert!((tmp << (BASE_EXPONENT + exponent)) == start.0);
+        return SpaceDescriptor(
+            (mantissa << MANTISSA_SHIFT) |
+            (exponent << EXPONENT_SHIFT) |
+            (chunks << SIZE_SHIFT) |
+            (if top { TYPE_CONTIGUOUS_HI } else { TYPE_CONTIGUOUS }));
     }
-    let chunks = (end - start) >> vm_layout_constants::LOG_BYTES_IN_CHUNK;
-    if cfg!(debug) {
-      // if (!start.isZero() && (chunks <= 0 || chunks >= (1 << SIZE_BITS))) {
-      //   Log.write("SpaceDescriptor.createDescriptor(", start);
-      //   Log.write(",", end);
-      //   Log.writeln(")");
-      //   Log.writeln("chunks = ", chunks);
-      // }
-        debug_assert!(!start.is_zero() && chunks > 0 && chunks < (1 << SIZE_BITS));
+
+    pub fn create_descriptor() -> SpaceDescriptor {
+        let next = DISCONTIGUOUS_SPACE_INDEX.fetch_add(DISCONTIG_INDEX_INCREMENT, Ordering::Relaxed);
+        let ret = SpaceDescriptor(next);
+        debug_assert!(!ret.is_contiguous());
+        return ret;
     }
-    let mut tmp = start.0;
-    tmp = tmp >> BASE_EXPONENT;
-    let mut exponent = 0;
-    while (tmp != 0) && ((tmp & 1) == 0) {
-        tmp = tmp >> 1;
-        exponent += 1;
+
+    pub fn is_empty(&self) -> bool {
+        self.0 == SpaceDescriptor::UNINITIALIZED.0
     }
-    let mantissa = tmp;
-    debug_assert!((tmp << (BASE_EXPONENT + exponent)) == start.0);
-    return (mantissa << MANTISSA_SHIFT) |
-           (exponent << EXPONENT_SHIFT) |
-           (chunks << SIZE_SHIFT) |
-           (if top { TYPE_CONTIGUOUS_HI } else { TYPE_CONTIGUOUS });
-}
 
-pub fn create_descriptor() -> usize {
-    DISCONTIGUOUS_SPACE_INDEX.store(DISCONTIGUOUS_SPACE_INDEX.load(Ordering::Relaxed) + DISCONTIG_INDEX_INCREMENT, Ordering::Relaxed);
-    debug_assert!((DISCONTIGUOUS_SPACE_INDEX.load(Ordering::Relaxed) & TYPE_CONTIGUOUS) != TYPE_CONTIGUOUS);
-    return DISCONTIGUOUS_SPACE_INDEX.load(Ordering::Relaxed);
-}
-
-pub fn is_contiguous(descriptor: usize) -> bool {
-    ((descriptor & TYPE_CONTIGUOUS) == TYPE_CONTIGUOUS)
-}
-
-pub fn is_contiguous_hi(descriptor: usize) -> bool {
-    ((descriptor & TYPE_MASK) == TYPE_CONTIGUOUS_HI)
-}
-
-#[cfg(target_pointer_width = "64")]
-pub fn get_start(descriptor: usize) -> Address {
-    return unsafe { Address::from_usize(get_index(descriptor) << heap_parameters::LOG_SPACE_SIZE_64) };
-}
-
-#[cfg(target_pointer_width = "32")]
-pub fn get_start(descriptor: usize) -> Address {
-    debug_assert!(is_contiguous(descriptor));
-    let mantissa = descriptor >> MANTISSA_SHIFT;
-    let exponent = (descriptor & EXPONENT_MASK) >> EXPONENT_SHIFT;
-    unsafe { Address::from_usize(mantissa << (BASE_EXPONENT + exponent)) }
-}
-
-pub fn get_extent(descriptor: usize) -> usize {
-    if HEAP_LAYOUT_64BIT {
-      return vm_layout_constants::SPACE_SIZE_64;
+    pub fn is_contiguous(&self) -> bool {
+        ((self.0 & TYPE_CONTIGUOUS) == TYPE_CONTIGUOUS)
     }
-    debug_assert!(is_contiguous(descriptor));
-    let chunks = (descriptor & SIZE_MASK) >> SIZE_SHIFT;
-    let size = chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK;
-    return size;
-}
 
-pub fn get_index(descriptor: usize) -> usize {
-    debug_assert!(HEAP_LAYOUT_64BIT);
-    return (descriptor & INDEX_MASK) >> INDEX_SHIFT;
+    pub fn is_contiguous_hi(&self) -> bool {
+        ((self.0 & TYPE_MASK) == TYPE_CONTIGUOUS_HI)
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    pub fn get_start(&self) -> Address {
+        return unsafe { Address::from_usize(self.get_index() << heap_parameters::LOG_SPACE_SIZE_64) };
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    pub fn get_start(&self) -> Address {
+        debug_assert!(self.is_contiguous());
+
+        let descriptor = self.0;
+        let mantissa = descriptor >> MANTISSA_SHIFT;
+        let exponent = (descriptor & EXPONENT_MASK) >> EXPONENT_SHIFT;
+        unsafe { Address::from_usize(mantissa << (BASE_EXPONENT + exponent)) }
+    }
+
+    pub fn get_extent(&self) -> usize {
+        if HEAP_LAYOUT_64BIT {
+            return vm_layout_constants::SPACE_SIZE_64;
+        }
+        debug_assert!(self.is_contiguous());
+        let chunks = (self.0 & SIZE_MASK) >> SIZE_SHIFT;
+        let size = chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK;
+        return size;
+    }
+
+    pub fn get_index(&self) -> usize {
+        debug_assert!(HEAP_LAYOUT_64BIT);
+        return (self.0 & INDEX_MASK) >> INDEX_SHIFT;
+    }
 }

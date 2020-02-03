@@ -12,8 +12,6 @@ use ::plan::SelectedPlan;
 
 use libc::c_void;
 
-pub static INSIDE_SANITY: AtomicBool = AtomicBool::new(false);
-
 pub struct SanityChecker<'a> {
     roots: Vec<Address>,
     values: LinkedList<ObjectReference>,
@@ -34,7 +32,8 @@ impl<'a> SanityChecker<'a> {
     }
 
     pub fn check(&mut self) {
-        INSIDE_SANITY.store(true, Ordering::Relaxed);
+        self.plan.common().enter_sanity();
+
         println!("Sanity stackroots, collector");
         VMScanning::compute_thread_roots(self, self.tls);
         println!("Sanity stackroots, global");
@@ -53,7 +52,7 @@ impl<'a> SanityChecker<'a> {
         self.values.clear();
         self.refs.clear();
 
-        INSIDE_SANITY.store(false, Ordering::Relaxed);
+        self.plan.common().leave_sanity();
     }
 }
 

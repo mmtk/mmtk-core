@@ -25,12 +25,6 @@ pub const MAX_ALIGNMENT_SHIFT: usize = 0 + LOG_BYTES_IN_LONG as usize - LOG_BYTE
 
 pub const MAX_ALIGNMENT: usize = MIN_ALIGNMENT << MAX_ALIGNMENT_SHIFT;
 
-static ALLOCATION_SUCCESS: AtomicBool = AtomicBool::new(false);
-static COLLECTION_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
-lazy_static! {
-    static ref OOM_LOCK: Mutex<()> = Mutex::new(());
-}
-
 #[inline(always)]
 pub fn align_allocation_no_fill(
     region: Address,
@@ -119,22 +113,11 @@ pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: 
     }
 }
 
-pub fn determine_collection_attempts() -> usize {
-    if !ALLOCATION_SUCCESS.load(Ordering::Relaxed) {
-        COLLECTION_ATTEMPTS.store(COLLECTION_ATTEMPTS.load(Ordering::Relaxed) + 1,
-                                  Ordering::Relaxed);
-    } else {
-        ALLOCATION_SUCCESS.store(false, Ordering::Relaxed);
-        COLLECTION_ATTEMPTS.store(1, Ordering::Relaxed);
-    }
-
-    COLLECTION_ATTEMPTS.load(Ordering::Relaxed)
-}
-
 pub trait Allocator<PR: PageResource> {
     fn get_tls(&self) -> OpaquePointer;
 
     fn get_space(&self) -> Option<&'static PR::Space>;
+    fn get_plan(&self) -> &'static SelectedPlan;
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 
@@ -160,14 +143,19 @@ pub trait Allocator<PR: PageResource> {
                 return result;
             }
 
+            let plan = self.get_plan().common();
             if !result.is_zero() {
+                // TODO: Check if we need oom lock.
+                // It seems the lock only protects access to the atomic boolean. We could possibly do
+                // so with compare and swap
+
                 // Report allocation success to assist OutOfMemory handling.
-                if !ALLOCATION_SUCCESS.load(Ordering::Relaxed) {
+                if !plan.allocation_success.load(Ordering::Relaxed) {
                     // XXX: Can we replace this with:
                     // ALLOCATION_SUCCESS.store(1, Ordering::SeqCst);
                     // (and get rid of the lock)
-                    let guard = OOM_LOCK.lock().unwrap();
-                    ALLOCATION_SUCCESS.store(true, Ordering::Relaxed);
+                    let guard = plan.oom_lock.lock().unwrap();
+                    plan.allocation_success.store(true, Ordering::Relaxed);
                     drop(guard);
                 }
                 return result;
@@ -176,10 +164,10 @@ pub trait Allocator<PR: PageResource> {
             if emergency_collection {
                 trace!("Emergency collection");
                 // Report allocation success to assist OutOfMemory handling.
-                let guard = OOM_LOCK.lock().unwrap();
-                let fail_with_oom = !ALLOCATION_SUCCESS.load(Ordering::Relaxed);
+                let guard = plan.oom_lock.lock().unwrap();
+                let fail_with_oom = !plan.allocation_success.load(Ordering::Relaxed);
                 // This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)
-                ALLOCATION_SUCCESS.store(true, Ordering::Relaxed);
+                plan.allocation_success.store(true, Ordering::Relaxed);
                 drop(guard);
                 trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
@@ -203,7 +191,7 @@ pub trait Allocator<PR: PageResource> {
              * If so, we make one more attempt to allocate before we signal
              * an OOM.
              */
-            emergency_collection = <SelectedPlan as Plan>::is_emergency_collection();
+            emergency_collection = self.get_plan().is_emergency_collection();
             trace!("Got emergency collection as {}", emergency_collection);
         }
     }

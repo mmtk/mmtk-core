@@ -10,12 +10,13 @@ use ::util::heap::MonotonePageResource;
 use ::mmtk::SINGLETON;
 use ::util::OpaquePointer;
 use libc::c_void;
+use plan::nogc::NoGC;
 
 #[repr(C)]
 pub struct NoGCMutator {
     // ImmortalLocal
     nogc: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
-    los: LargeObjectAllocator
+    los: LargeObjectAllocator,
 }
 
 impl MutatorContext for NoGCMutator {
@@ -56,10 +57,10 @@ impl MutatorContext for NoGCMutator {
 }
 
 impl NoGCMutator {
-    pub fn new(tls: OpaquePointer, space: &'static ImmortalSpace, los: &'static LargeObjectSpace) -> Self {
+    pub fn new(tls: OpaquePointer, plan: &'static NoGC) -> Self {
         NoGCMutator {
-            nogc: BumpAllocator::new(tls, Some(space)),
-            los: LargeObjectAllocator::new(tls, Some(los))
+            nogc: BumpAllocator::new(tls, Some(plan.get_immortal_space()), plan),
+            los: LargeObjectAllocator::new(tls, Some(plan.get_los()), plan),
         }
     }
 }
