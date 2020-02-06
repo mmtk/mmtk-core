@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
-
-use super::stats::{get_gathering_stats, get_phase};
+use util::statistics::stats::SharedStats;
+use std::sync::Arc;
+use std::fmt;
 
 pub trait Counter {
     fn start(&mut self);
@@ -10,12 +11,7 @@ pub trait Counter {
     fn print_total(&self, mutator: Option<bool>);
     fn print_min(&self, mutator: bool);
     fn print_max(&self, mutator: bool);
-    fn print_last(&self) {
-        let phase = get_phase();
-        if phase > 0 {
-            self.print_count(phase - 1);
-        }
-    }
+    fn print_last(&self);
     fn merge_phases(&self) -> bool;
     fn implicitly_start(&self) -> bool;
     fn name(&self) -> &String;
@@ -54,12 +50,19 @@ pub struct LongCounter<T: Diffable> {
     count: Box<[u64; super::stats::MAX_PHASES]>, // FIXME make this resizable
     start_value: Option<T::Val>,
     total_count: u64,
-    running: bool
+    running: bool,
+    stats: Arc<SharedStats>
+}
+
+impl<T: Diffable> fmt::Debug for LongCounter<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LongCounter({})", self.name)
+    }
 }
 
 impl<T: Diffable> Counter for LongCounter<T> {
     fn start(&mut self) {
-        if !get_gathering_stats() {
+        if !self.stats.get_gathering_stats() {
             return;
         }
         debug_assert!(!self.running);
@@ -68,13 +71,13 @@ impl<T: Diffable> Counter for LongCounter<T> {
     }
 
     fn stop(&mut self) {
-        if !get_gathering_stats() {
+        if !self.stats.get_gathering_stats() {
             return;
         }
         debug_assert!(self.running);
         self.running = false;
         let delta = T::diff(&T::current_value(), self.start_value.as_ref().unwrap());
-        self.count[get_phase()] += delta;
+        self.count[self.stats.get_phase()] += delta;
         self.total_count += delta;
     }
 
@@ -103,7 +106,7 @@ impl<T: Diffable> Counter for LongCounter<T> {
             Some(m) => {
                 let mut total = 0;
                 let mut p = if m { 0 } else { 1 };
-                while p <= get_phase() {
+                while p <= self.stats.get_phase() {
                     total += self.count[p];
                     p += 2;
                 }
@@ -115,7 +118,7 @@ impl<T: Diffable> Counter for LongCounter<T> {
     fn print_min(&self, mutator: bool) {
         let mut p = if mutator { 0 } else { 1 };
         let mut min = self.count[p];
-        while p < get_phase() {
+        while p < self.stats.get_phase() {
             if self.count[p] < min {
                 min = self.count[p];
                 p += 2;
@@ -127,13 +130,20 @@ impl<T: Diffable> Counter for LongCounter<T> {
     fn print_max(&self, mutator: bool) {
         let mut p = if mutator { 0 } else { 1 };
         let mut max = self.count[p];
-        while p < get_phase() {
+        while p < self.stats.get_phase() {
             if self.count[p] > max {
                 max = self.count[p];
                 p += 2;
             }
         }
         self.print_value(max);
+    }
+
+    fn print_last(&self) {
+        let phase = self.stats.get_phase();
+        if phase > 0 {
+            self.print_count(phase - 1);
+        }
     }
 
     fn merge_phases(&self) -> bool {
@@ -150,7 +160,7 @@ impl<T: Diffable> Counter for LongCounter<T> {
 }
 
 impl<T: Diffable> LongCounter<T>{
-    pub fn new(name: String, implicitly_start: bool, merge_phases: bool) -> Self {
+    pub fn new(name: String, stats: Arc<SharedStats>, implicitly_start: bool, merge_phases: bool) -> Self {
         LongCounter {
             name,
             implicitly_start,
@@ -158,7 +168,8 @@ impl<T: Diffable> LongCounter<T>{
             count: box [0; super::stats::MAX_PHASES],
             start_value: None,
             total_count: 0,
-            running: false
+            running: false,
+            stats
         }
     }
 

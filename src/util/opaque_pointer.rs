@@ -1,6 +1,12 @@
 use libc::c_void;
 use ::util::Address;
 
+// This is mainly used to represent TLS.
+// OpaquePointer does not provide any method for dereferencing, as we should not dereference it in MMTk.
+// However, there are occurrences that we may need to dereference tls in the VM binding code.
+// In JikesRVM's implementation of ActivePlan, we need to dereference tls to get mutator and collector context.
+// This is done by transmute (unsafe).
+#[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct OpaquePointer(*mut c_void);
 

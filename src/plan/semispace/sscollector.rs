@@ -178,7 +178,7 @@ impl ParallelCollector for SSCollector {
 
     fn collect(&self) {
         // FIXME use reference instead of cloning everything
-        self.phase_manager.begin_new_phase_stack(self.tls, ScheduledPhase::new(phase::Schedule::Complex, ::plan::plan::COLLECTION.clone()))
+        self.phase_manager.begin_new_phase_stack(self.tls, ScheduledPhase::new(phase::Schedule::Complex, self.phase_manager.collection_phase.clone()))
     }
 
     fn get_current_trace(&mut self) -> &mut SSTraceLocal {
