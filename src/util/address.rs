@@ -13,7 +13,7 @@ pub type ByteOffset = isize;
 /// mark some operations as unsafe. This type needs to be zero overhead
 /// (memory wise and time wise). The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash)]
 pub struct Address(pub usize);
 
@@ -226,6 +226,7 @@ impl fmt::Debug for Address {
 /// operations allowed on ObjectReference are very limited. No address arithmetics
 /// are allowed for ObjectReference. The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
+#[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash)]
 pub struct ObjectReference(usize);
 

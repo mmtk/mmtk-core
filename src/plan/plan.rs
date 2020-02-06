@@ -17,7 +17,7 @@ use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_END;
 #[cfg(feature = "jikesrvm")]
 use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
 use util::Address;
-use util::statistics::stats::{STATS, get_gathering_stats, new_counter};
+use util::statistics::stats::Stats;
 use util::statistics::counter::{Counter, LongCounter};
 use util::statistics::counter::MonotoneNanoTime;
 use util::heap::layout::heap_layout::VMMap;
@@ -246,6 +246,7 @@ pub struct CommonPlan {
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
     pub options: Arc<UnsafeOptionsWrapper>,
+    pub stats: Stats,
     pub heap: HeapMeta,
 
     pub initialized: AtomicBool,
@@ -273,6 +274,7 @@ impl CommonPlan {
     pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>, heap: HeapMeta) -> CommonPlan {
         CommonPlan {
             vm_map, mmapper, options, heap,
+            stats: Stats::new(),
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),
             last_stress_pages: AtomicUsize::new(0),
@@ -295,13 +297,13 @@ impl CommonPlan {
         if *gc_status == GcStatus::NotInGC {
             self.stacks_prepared.store(false, Ordering::SeqCst);
             // FIXME stats
-            STATS.lock().unwrap().start_gc();
+            self.stats.start_gc();
         }
         *gc_status = s;
         if *gc_status == GcStatus::NotInGC {
             // FIXME stats
-            if get_gathering_stats() {
-                STATS.lock().unwrap().end_gc();
+            if self.stats.get_gathering_stats() {
+                self.stats.end_gc();
             }
         }
     }
@@ -332,99 +334,6 @@ impl CommonPlan {
     pub fn is_in_sanity(&self) -> bool {
         self.inside_sanity.load(Ordering::Relaxed)
     }
-}
-
-lazy_static! {
-    pub static ref PREPARE_STACKS: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Mutator, Phase::PrepareStacks),
-        ScheduledPhase::new(Schedule::Global, Phase::PrepareStacks)
-    ], 0, None);
-
-    pub static ref SANITY_BUILD_PHASE: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Global, Phase::SanityPrepare),
-        ScheduledPhase::new(Schedule::Collector, Phase::SanityPrepare),
-        ScheduledPhase::new(Schedule::Complex, PREPARE_STACKS.clone()),
-        ScheduledPhase::new(Schedule::Collector, Phase::SanityRoots),
-        ScheduledPhase::new(Schedule::Global, Phase::SanityRoots),
-        ScheduledPhase::new(Schedule::Collector, Phase::SanityCopyRoots),
-        ScheduledPhase::new(Schedule::Global, Phase::SanityBuildTable)
-    ], 0, None);
-
-    pub static ref SANITY_CHECK_PHASE: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Global, Phase::SanityCheckTable),
-        ScheduledPhase::new(Schedule::Collector, Phase::SanityRelease),
-        ScheduledPhase::new(Schedule::Global, Phase::SanityRelease)
-    ], 0, None);
-
-    pub static ref INIT_PHASE: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Global, Phase::SetCollectionKind),
-        ScheduledPhase::new(Schedule::Global, Phase::Initiate),
-        ScheduledPhase::new(Schedule::Placeholder, Phase::PreSanityPlaceholder)
-    ], 0, Some(new_counter(LongCounter::<MonotoneNanoTime>::new("init".to_string(), false, true))));
-
-    pub static ref ROOT_CLOSURE_PHASE: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Mutator, Phase::Prepare),
-        ScheduledPhase::new(Schedule::Global, Phase::Prepare),
-        ScheduledPhase::new(Schedule::Collector, Phase::Prepare),
-        ScheduledPhase::new(Schedule::Complex, PREPARE_STACKS.clone()),
-        ScheduledPhase::new(Schedule::Collector, Phase::StackRoots),
-        ScheduledPhase::new(Schedule::Global, Phase::StackRoots),
-        ScheduledPhase::new(Schedule::Collector, Phase::Roots),
-        ScheduledPhase::new(Schedule::Global, Phase::Roots),
-        ScheduledPhase::new(Schedule::Global, Phase::Closure),
-        ScheduledPhase::new(Schedule::Collector, Phase::Closure)
-    ], 0, None);
-
-    pub static ref REF_TYPE_CLOSURE_PHASE: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Collector, Phase::SoftRefs),
-        ScheduledPhase::new(Schedule::Global, Phase::Closure),
-        ScheduledPhase::new(Schedule::Collector, Phase::Closure),
-        ScheduledPhase::new(Schedule::Collector, Phase::WeakRefs),
-        ScheduledPhase::new(Schedule::Collector, Phase::Finalizable),
-        ScheduledPhase::new(Schedule::Global, Phase::Closure),
-        ScheduledPhase::new(Schedule::Collector, Phase::Closure),
-        ScheduledPhase::new(Schedule::Placeholder, Phase::WeakTrackRefs),
-        ScheduledPhase::new(Schedule::Collector, Phase::PhantomRefs)
-    ], 0, None);
-
-    pub static ref FORWARD_PHASE: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Placeholder, Phase::Forward),
-        ScheduledPhase::new(Schedule::Collector, Phase::ForwardRefs),
-        ScheduledPhase::new(Schedule::Collector, Phase::ForwardFinalizable)
-    ], 0, None);
-
-    pub static ref COMPLETE_CLOSURE_PHASE: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Mutator, Phase::Release),
-        ScheduledPhase::new(Schedule::Collector, Phase::Release),
-        ScheduledPhase::new(Schedule::Global, Phase::Release)
-    ], 0, None);
-
-    pub static ref FINISH_PHASE: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Placeholder, Phase::PostSanityPlaceholder),
-        ScheduledPhase::new(Schedule::Collector, Phase::Complete),
-        ScheduledPhase::new(Schedule::Global, Phase::Complete)
-    ], 0, Some(new_counter(LongCounter::<MonotoneNanoTime>::new("finish".to_string(), false, true))));
-
-    pub static ref COLLECTION: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Complex, INIT_PHASE.clone()),
-        ScheduledPhase::new(Schedule::Complex, ROOT_CLOSURE_PHASE.clone()),
-        ScheduledPhase::new(Schedule::Complex, REF_TYPE_CLOSURE_PHASE.clone()),
-        ScheduledPhase::new(Schedule::Complex, FORWARD_PHASE.clone()),
-        ScheduledPhase::new(Schedule::Complex, COMPLETE_CLOSURE_PHASE.clone()),
-        ScheduledPhase::new(Schedule::Complex, FINISH_PHASE.clone())
-    ], 0, None);
-
-    pub static ref PRE_SANITY_PHASE: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Global, Phase::SanitySetPreGC),
-        ScheduledPhase::new(Schedule::Complex, SANITY_BUILD_PHASE.clone()),
-        ScheduledPhase::new(Schedule::Complex, SANITY_CHECK_PHASE.clone())
-    ], 0, None);
-
-    pub static ref POST_SANITY_PHASE: Phase = Phase::Complex(vec![
-        ScheduledPhase::new(Schedule::Global, Phase::SanitySetPostGC),
-        ScheduledPhase::new(Schedule::Complex, SANITY_BUILD_PHASE.clone()),
-        ScheduledPhase::new(Schedule::Complex, SANITY_CHECK_PHASE.clone())
-    ], 0, None);
 }
 
 #[repr(i32)]

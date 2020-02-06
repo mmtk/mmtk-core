@@ -9,7 +9,6 @@ use util::reference_processor::{Semantics, ReferenceProcessors};
 use util::options::{UnsafeOptionsWrapper, Options};
 use std::sync::atomic::{Ordering, AtomicBool};
 
-use util::statistics::stats::STATS;
 use util::OpaquePointer;
 use std::sync::Arc;
 
@@ -44,9 +43,11 @@ pub struct MMTK {
 impl MMTK {
     pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
+        let plan = SelectedPlan::new(vm_map, mmapper, options.clone());
+        let phase_manager = PhaseManager::new(&plan.common().stats);
         MMTK {
-            plan: SelectedPlan::new(vm_map, mmapper, options.clone()),
-            phase_manager: PhaseManager::new(),
+            plan,
+            phase_manager,
             vm_map,
             mmapper,
             reference_processors: ReferenceProcessors::new(),
@@ -59,11 +60,11 @@ impl MMTK {
         // FIXME Do a full heap GC if we have generational GC
         self.plan.handle_user_collection_request(tls, true);
         self.inside_harness.store(true, Ordering::SeqCst);
-        STATS.lock().unwrap().start_all();
+        self.plan.common().stats.start_all();
     }
 
     pub fn harness_end(&self) {
-        STATS.lock().unwrap().stop_all();
+        self.plan.common().stats.stop_all();
         self.inside_harness.store(false, Ordering::SeqCst);
     }
 }
