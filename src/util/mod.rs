@@ -20,6 +20,7 @@ pub mod generic_freelist;
 pub mod int_array_freelist;
 pub mod treadmill;
 pub mod opaque_pointer;
+pub mod memory;
 
 pub use self::opaque_pointer::OpaquePointer;
 pub use self::address::Address;

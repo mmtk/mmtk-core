@@ -2,7 +2,6 @@ use super::generic_freelist::*;
 use ::util::constants::*;
 use ::util::Address;
 use ::util::conversions;
-use ::vm::{VMMemory, Memory};
 use std::mem;
 use ::plan::selected_plan;
 use ::plan::plan::Plan;

@@ -42,14 +42,6 @@ pub trait Mmapper {
     fn ensure_mapped(&self, start: Address, pages: usize);
 
     /**
-     * Is the page occupied by this object mapped ?
-     * @param object Object in question
-     * @return {@code true} if the page occupied by the start of the object
-     * is mapped.
-     */
-    fn object_is_mapped(&self, object: ObjectReference) -> bool;
-
-    /**
      * Is the page pointed to by this address mapped ?
      * @param addr Address in question
      * @return {@code true} if the page at the given address is mapped.
