@@ -100,16 +100,6 @@ impl Mmapper for ByteMapMmapper {
     }
 
     /**
-     * Return {@code true} if the given object has been mmapped
-     *
-     * @param object The object in question.
-     * @return {@code true} if the given object has been mmapped
-     */
-    fn object_is_mapped(&self, object: ObjectReference) -> bool {
-        self.address_is_mapped(VMObjectModel::ref_to_address(object))
-    }
-
-    /**
      * Return {@code true} if the given address has been mmapped
      *
      * @param addr The address in question.
