@@ -1,4 +1,3 @@
-
 use std::marker::PhantomData;
 
 pub const FAILURE: i32 = -1;
@@ -85,9 +84,11 @@ pub trait GenericFreeList: Sized {
 
   fn initialize_heap(&mut self, units: i32, grain: i32) {
     // Initialize the sentinels
+    // Set top sentinels per heads
     for i in 1..(self.heads() + 1) {
       self.set_sentinel(-i);
     }
+    // Set bottom sentinel
     self.set_sentinel(units);
 
     // create the free list item
@@ -186,6 +187,7 @@ pub trait GenericFreeList: Sized {
     self.set_hi_entry(unit, new_value);
   }
 
+  // Return the previous link. If no previous link, return head
   fn get_prev(&self, unit: i32) -> i32 {
     let prev = self.get_lo_entry(unit) & PREV_MASK;
     if prev <= MAX_UNITS {
@@ -202,6 +204,7 @@ pub trait GenericFreeList: Sized {
     self.set_lo_entry(unit, new_value);
   }
 
+  // Return the left unit. If it is a multi unit, return the start of the unit.
   fn get_left(&self, unit: i32) -> i32 {
     if (self.get_hi_entry(unit - 1) & MULTI_MASK) == MULTI_MASK {
       unit - (self.get_hi_entry(unit - 1) & SIZE_MASK)
@@ -224,12 +227,12 @@ pub trait GenericFreeList: Sized {
     self.set_lo_entry(unit, lo | COALESC_MASK);
   }
 
-  fn is_multi(&mut self, i: i32) -> bool {
+  fn is_multi(&self, i: i32) -> bool {
     let hi = self.get_hi_entry(i);
     (hi & MULTI_MASK) == MULTI_MASK
   }
 
-  fn is_free(&mut self, i: i32) -> bool {
+  fn is_free(&self, i: i32) -> bool {
     let lo = self.get_lo_entry(i);
     (lo & FREE_MASK) == FREE_MASK
   }
@@ -291,4 +294,3 @@ pub trait GenericFreeList: Sized {
     self.set_prev(next, prev);
   }
 }
-
