@@ -177,7 +177,7 @@ impl Map32 {
         let pages = (1 + last_chunk - first_chunk) * PAGES_IN_CHUNK;
         // start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
         // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912
-        self_mut.global_page_map.resize_parent_freelist(pages, pages as _);
+        self_mut.global_page_map.resize_freelist(pages, pages as _);
         for fl in &mut self_mut.shared_fl_map {
             if let Some(fl) = fl {
                 let fl_mut: &mut CommonFreeListPageResource = unsafe { mem::transmute(fl) };
