@@ -18,6 +18,9 @@ crossbeam-deque = "0.6"
 num_cpus = "1.8"
 derivative = "1.0.3"
 
+[dev-dependencies]
+crossbeam = "0.7.3"
+
 [features]
 default = ["nogc", "openjdk"]
 nogc = []
