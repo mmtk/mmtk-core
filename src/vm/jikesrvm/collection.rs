@@ -57,13 +57,11 @@ impl Collection<JikesRVM> for VMCollection {
 impl VMCollection {
     #[inline(always)]
     pub unsafe fn thread_from_id(thread_id: usize) -> Address {
-        Address::from_usize(Address::from_usize((JTOC_BASE + THREAD_BY_SLOT_FIELD_OFFSET)
-            .load::<usize>() + 4 * thread_id).load::<usize>())
+        ((JTOC_BASE + THREAD_BY_SLOT_FIELD_OFFSET).load::<Address>() + 4 * thread_id).load::<Address>()
     }
 
     #[inline(always)]
     pub unsafe fn thread_from_index(thread_index: usize) -> Address {
-        Address::from_usize(Address::from_usize((JTOC_BASE + THREADS_FIELD_OFFSET)
-            .load::<usize>() + 4 * thread_index).load::<usize>())
+        ((JTOC_BASE + THREADS_FIELD_OFFSET).load::<Address>() + 4 * thread_index).load::<Address>()
     }
 }

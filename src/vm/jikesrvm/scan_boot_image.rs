@@ -1,5 +1,6 @@
 use ::util::Address;
 use ::util::OpaquePointer;
+use ::util::conversions;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::super::unboxed_size_constants::*;
@@ -30,14 +31,10 @@ static REFS: AtomicUsize = AtomicUsize::new(0);
 
 pub fn scan_boot_image<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
     unsafe {
-        let boot_record = Address::from_usize((JTOC_BASE + THE_BOOT_RECORD_FIELD_OFFSET)
-            .load::<usize>());
-        let map_start = Address::from_usize((boot_record + BOOT_IMAGE_R_MAP_START_OFFSET)
-            .load::<usize>());
-        let map_end = Address::from_usize((boot_record + BOOT_IMAGE_R_MAP_END_OFFSET)
-            .load::<usize>());
-        let image_start = Address::from_usize((boot_record + BOOT_IMAGE_DATA_START_FIELD_OFFSET)
-            .load::<usize>());
+        let boot_record = (JTOC_BASE + THE_BOOT_RECORD_FIELD_OFFSET).load::<Address>();
+        let map_start = (boot_record + BOOT_IMAGE_R_MAP_START_OFFSET).load::<Address>();
+        let map_end = ((boot_record + BOOT_IMAGE_R_MAP_END_OFFSET).load::<Address>());
+        let image_start = (boot_record + BOOT_IMAGE_DATA_START_FIELD_OFFSET).load::<Address>();
 
         let collector = VMActivePlan::collector(tls);
 
@@ -82,13 +79,13 @@ fn process_chunk<T: TraceLocal>(chunk_start: Address, image_start: Address,
                 cursor += 1isize;
             }
             /* enqueue the specified slot or slots */
-            debug_assert!(is_address_aligned(Address::from_usize(offset)));
+            debug_assert!(conversions::is_address_aligned(Address::from_usize(offset)));
             let mut slot: Address = image_start + offset;
             if cfg!(feature = "debug") {
                 REFS.fetch_add(1, Ordering::Relaxed);
             }
 
-            if !FILTER || slot.load::<usize>() > map_end.as_usize() {
+            if !FILTER || slot.load::<Address>() > map_end {
                 if cfg!(feature = "debug") {
                     ROOTS.fetch_add(1, Ordering::Relaxed);
                 }
@@ -98,11 +95,11 @@ fn process_chunk<T: TraceLocal>(chunk_start: Address, image_start: Address,
                 for i in 0..runlength {
                     offset += BYTES_IN_ADDRESS;
                     slot = image_start + offset;
-                    debug_assert!(is_address_aligned(slot));
+                    debug_assert!(conversions::is_address_aligned(slot));
                     if cfg!(feature = "debug") {
                         REFS.fetch_add(1, Ordering::Relaxed);
                     }
-                    if !FILTER || slot.load::<usize>() > map_end.as_usize() {
+                    if !FILTER || slot.load::<Address>() > map_end {
                         if cfg!(feature = "debug") {
                             ROOTS.fetch_add(1, Ordering::Relaxed);
                         }
@@ -125,8 +122,3 @@ fn decode_long_encoding(cursor: Address) -> usize {
         value
     }
 }
-
-fn is_address_aligned(offset: Address) -> bool {
-    offset.as_usize() % BYTES_IN_ADDRESS == 0
-}
-

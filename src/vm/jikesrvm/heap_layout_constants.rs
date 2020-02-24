@@ -29,10 +29,10 @@ pub const BOOT_IMAGE_RMAP_START: Address = unsafe { Address::from_usize(0x670000
 pub const MAXIMUM_MAPPABLE: Address = unsafe { Address::from_usize(0xb0000000) };
 
 /** The current boot image data size */
-pub const BOOT_IMAGE_DATA_SIZE: usize = BOOT_IMAGE_CODE_START.as_usize() - BOOT_IMAGE_DATA_START.as_usize();
+pub const BOOT_IMAGE_DATA_SIZE: usize = BOOT_IMAGE_CODE_START.get_extent(BOOT_IMAGE_DATA_START);
 
 /** The current boot image code size */
-pub const BOOT_IMAGE_CODE_SIZE: usize = BOOT_IMAGE_RMAP_START.as_usize() - BOOT_IMAGE_CODE_START.as_usize();
+pub const BOOT_IMAGE_CODE_SIZE: usize = BOOT_IMAGE_RMAP_START.get_extent(BOOT_IMAGE_CODE_START);
 
 /**
  * Limit for boot image data size: fail the build if
@@ -56,16 +56,13 @@ pub const BAD_MAP_COMPRESSION: usize = 5;  // conservative heuristic
 pub const MAX_BOOT_IMAGE_RMAP_SIZE: usize = BOOT_IMAGE_DATA_SIZE/BAD_MAP_COMPRESSION;
 
 /** The address of the end of the data section of the boot image. */
-pub const BOOT_IMAGE_DATA_END: Address = unsafe {
-    Address::from_usize(BOOT_IMAGE_DATA_START.as_usize() + BOOT_IMAGE_DATA_SIZE)
-};
+pub const BOOT_IMAGE_DATA_END: Address = BOOT_IMAGE_DATA_START.add(BOOT_IMAGE_DATA_SIZE);
+
 /** The address of the end of the code section of the boot image. */
-pub const BOOT_IMAGE_CODE_END: Address = unsafe {
-    Address::from_usize(BOOT_IMAGE_CODE_START.as_usize() + BOOT_IMAGE_CODE_SIZE)
-};
+pub const BOOT_IMAGE_CODE_END: Address = BOOT_IMAGE_CODE_START.add( BOOT_IMAGE_CODE_SIZE);
+
 /** The address of the end of the ref map section of the boot image. */
-pub const BOOT_IMAGE_RMAP_END: Address = unsafe {
-    Address::from_usize(BOOT_IMAGE_RMAP_START.as_usize() + MAX_BOOT_IMAGE_RMAP_SIZE)
-};
+pub const BOOT_IMAGE_RMAP_END: Address = BOOT_IMAGE_RMAP_START.add(MAX_BOOT_IMAGE_RMAP_SIZE);
+
 /** The address of the end of the boot image. */
 pub const BOOT_IMAGE_END: Address = BOOT_IMAGE_RMAP_END;

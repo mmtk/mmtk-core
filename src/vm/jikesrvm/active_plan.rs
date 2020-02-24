@@ -23,8 +23,7 @@ impl ActivePlan<JikesRVM> for VMActivePlan {
     // XXX: Are they actually static
     unsafe fn collector(tls: OpaquePointer) -> &'static mut <SelectedPlan<JikesRVM> as Plan<JikesRVM>>::CollectorT {
         let thread: Address = unsafe { mem::transmute(tls) };
-        let system_thread = Address::from_usize(
-            (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
+        let system_thread = (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<Address>();
         let cc = &mut *((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
             .load::<*mut <SelectedPlan<JikesRVM> as Plan<JikesRVM>>::CollectorT>());
 

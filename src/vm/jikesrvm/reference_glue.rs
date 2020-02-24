@@ -21,8 +21,7 @@ impl ReferenceGlue<JikesRVM> for VMReferenceGlue {
     fn get_referent(object: ObjectReference) -> ObjectReference {
         debug_assert!(!object.is_null());
         unsafe {
-            Address::from_usize((object.to_address() + REFERENCE_REFERENT_FIELD_OFFSET)
-                .load::<usize>()).to_object_reference()
+            (object.to_address() + REFERENCE_REFERENT_FIELD_OFFSET).load::<ObjectReference>()
         }
     }
 

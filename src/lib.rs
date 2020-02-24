@@ -20,6 +20,7 @@ extern crate crossbeam_deque;
 extern crate num_cpus;
 #[macro_use]
 extern crate derivative;
+extern crate atomic_traits;
 
 #[macro_use]
 pub mod util;

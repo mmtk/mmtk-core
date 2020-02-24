@@ -170,5 +170,5 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 }
 
 fn get_super_page(cell: Address) -> Address {
-    unsafe { Address::from_usize(cell.as_usize() & PAGE_MASK) }
+    cell.align_down(BYTES_IN_PAGE)
 }

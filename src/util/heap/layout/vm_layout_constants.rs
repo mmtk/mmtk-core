@@ -4,6 +4,7 @@ use super::heap_parameters::*;
 
 ///////// FIXME ////////////
 use super::super::vmrequest::{HEAP_LAYOUT_32BIT, HEAP_LAYOUT_64BIT};
+use util::conversions::{chunk_align_down, chunk_align_up};
 
 /**
  * Enable messages in the BootImageWriter log file
@@ -49,28 +50,28 @@ pub const MAX_SPACE_EXTENT: usize = 1 << LOG_SPACE_EXTENT;
 
 // FIXME: HEAP_START, HEAP_END are VM-dependent
 /** Lowest virtual address used by the virtual machine */
-pub const HEAP_START: Address = unsafe{Address::from_usize(chunk_align!(0x60000000, true))};
+pub const HEAP_START: Address = chunk_align_down(unsafe{ Address::from_usize(0x60000000) });
 
 /** Highest virtual address used by the virtual machine */
-pub const HEAP_END: Address = unsafe{Address::from_usize(chunk_align!(0xb0000000, false))};
+pub const HEAP_END: Address = chunk_align_up(unsafe{ Address::from_usize(0xb0000000) });
 
 /**
  * Lowest virtual address available for MMTk to manage.  The address space between
  * HEAP_START and AVAILABLE_START comprises memory directly managed by the VM,
  * and not available to MMTk.
  */
-pub const AVAILABLE_START: Address = unsafe{Address::from_usize(
-    chunk_align!(0x67000000 + (0x64000000 - 0x60000000)/5, false))};
+pub const AVAILABLE_START: Address = chunk_align_up(unsafe{ Address::from_usize(
+    (0x67000000 + (0x64000000 - 0x60000000)/5)) });
 
 /**
  * Highest virtual address available for MMTk to manage.  The address space between
  * HEAP_END and AVAILABLE_END comprises memory directly managed by the VM,
  * and not available to MMTk.
 */
-pub const AVAILABLE_END: Address = unsafe{Address::from_usize(chunk_align!(0xb0000000, true))};
+pub const AVAILABLE_END: Address = chunk_align_down(unsafe{ Address::from_usize(0xb0000000) });
 
 /** Size of the address space available to the MMTk heap. */
-pub const AVAILABLE_BYTES: usize = AVAILABLE_END.as_usize() - AVAILABLE_START.as_usize();
+pub const AVAILABLE_BYTES: usize = AVAILABLE_END.get_extent(AVAILABLE_START);
 
 /** Granularity at which we map and unmap virtual address space in the heap */
 pub const LOG_MMAP_CHUNK_BYTES: usize = 20;

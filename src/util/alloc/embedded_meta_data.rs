@@ -10,10 +10,10 @@ pub const PAGES_IN_REGION: usize = 1 << LOG_PAGES_IN_REGION;
 
 #[inline]
 pub fn get_metadata_base(address: Address) -> Address {
-    unsafe { Address::from_usize(address.0 & !REGION_MASK) }
+    address.align_down(BYTES_IN_REGION)
 }
 
 #[inline]
 pub fn get_metadata_offset(address: Address, log_coverage: usize, log_align: usize) -> usize {
-    ((address.0 & REGION_MASK) >> (log_coverage + log_align)) << log_align
+    ((address & REGION_MASK) >> (log_coverage + log_align)) << log_align
 }

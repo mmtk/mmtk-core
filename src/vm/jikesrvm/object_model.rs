@@ -20,6 +20,7 @@ use ::vm::object_model::ObjectModel;
 use ::util::{Address, ObjectReference, OpaquePointer};
 use ::util::alloc::allocator::fill_alignment_gap;
 use ::util::constants::{};
+use ::util::conversions;
 use ::plan::{Allocator, CollectorContext};
 use std::mem::size_of;
 use std::sync::atomic::{AtomicUsize, AtomicU8, Ordering};
@@ -45,51 +46,57 @@ const PACKED: bool = true;
 
 pub struct VMObjectModel {}
 
+impl VMObjectModel {
+    #[inline(always)]
+    pub fn load_rvm_type(object: ObjectReference) -> Address {
+        unsafe {
+            let tib = (object.to_address() + TIB_OFFSET).load::<Address>();
+            (tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS).load::<Address>()
+        }
+    }
+    #[inline(always)]
+    pub fn load_tib(object: ObjectReference) -> Address {
+        unsafe { (object.to_address() + TIB_OFFSET).load::<Address>() }
+    }
+}
+
 impl ObjectModel<JikesRVM> for VMObjectModel {
     #[inline(always)]
     fn copy(from: ObjectReference, allocator: Allocator, tls: OpaquePointer) -> ObjectReference {
         trace!("ObjectModel.copy");
-        unsafe {
-            trace!("getting tib");
-            let tib = Address::from_usize((from.to_address() + TIB_OFFSET).load::<usize>());
-            trace!("getting type, tib={:?}", tib);
-            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
-                .load::<usize>());
+        let tib = Self::load_tib(from);
+        let rvm_type = Self::load_rvm_type(from);
 
-            trace!("Is it a class?");
-            if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
-                trace!("... yes");
-                Self::copy_scalar(from, tib, rvm_type, allocator, tls)
-            } else {
-                trace!("... no");
-                Self::copy_array(from, tib, rvm_type, allocator, tls)
-            }
+        trace!("Is it a class?");
+        if unsafe { (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() } {
+            trace!("... yes");
+            Self::copy_scalar(from, tib, rvm_type, allocator, tls)
+        } else {
+            trace!("... no");
+            Self::copy_array(from, tib, rvm_type, allocator, tls)
         }
     }
 
     #[inline(always)]
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address {
         trace!("ObjectModel.copy_to");
-        unsafe {
-            let tib = Address::from_usize((from.to_address() + TIB_OFFSET).load::<usize>());
-            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
-                .load::<usize>());
-            let mut bytes: usize = 0;
+        let tib = Self::load_tib(from);
+        let rvm_type = Self::load_rvm_type(from);
+        let mut bytes: usize = 0;
 
-            let copy = from != to;
+        let copy = from != to;
 
-            if copy {
-                bytes = Self::bytes_required_when_copied(from, rvm_type);
-                Self::move_object(Address::zero(), from, to, bytes, rvm_type);
-            } else {
-                bytes = Self::bytes_used(from, rvm_type);
-            }
-
-            let start = Self::object_start_ref(to);
-            fill_alignment_gap(region, start);
-
-            start + bytes
+        if copy {
+            bytes = Self::bytes_required_when_copied(from, rvm_type);
+            Self::move_object(unsafe { Address::zero() }, from, to, bytes, rvm_type);
+        } else {
+            bytes = Self::bytes_used(from, rvm_type);
         }
+
+        let start = Self::object_start_ref(to);
+        fill_alignment_gap(region, start);
+
+        start + bytes
     }
 
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference {
@@ -110,54 +117,38 @@ impl ObjectModel<JikesRVM> for VMObjectModel {
 
     fn get_size_when_copied(object: ObjectReference) -> usize {
         trace!("ObjectModel.get_size_when_copied");
-        unsafe {
-            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
-            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
-                .load::<usize>());
+        let rvm_type = Self::load_rvm_type(object);
 
-            Self::bytes_required_when_copied(object, rvm_type)
-        }
+        Self::bytes_required_when_copied(object, rvm_type)
     }
 
     fn get_align_when_copied(object: ObjectReference) -> usize {
         trace!("ObjectModel.get_align_when_copied");
-        unsafe {
-            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
-            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
-                .load::<usize>());
+        let rvm_type = Self::load_rvm_type(object);
 
-            if (rvm_type + IS_ARRAY_TYPE_FIELD_OFFSET).load::<bool>() {
-                Self::get_alignment_array(rvm_type)
-            } else {
-                Self::get_alignment_class(rvm_type)
-            }
+        if unsafe { (rvm_type + IS_ARRAY_TYPE_FIELD_OFFSET).load::<bool>() } {
+            Self::get_alignment_array(rvm_type)
+        } else {
+            Self::get_alignment_class(rvm_type)
         }
     }
 
     fn get_align_offset_when_copied(object: ObjectReference) -> isize {
         trace!("ObjectModel.get_align_offset_when_copied");
-        unsafe {
-            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
-            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
-                .load::<usize>());
+        let rvm_type = Self::load_rvm_type(object);
 
-            if (rvm_type + IS_ARRAY_TYPE_FIELD_OFFSET).load::<bool>() {
-                Self::get_offset_for_alignment_array(object, rvm_type)
-            } else {
-                Self::get_offset_for_alignment_class(object, rvm_type)
-            }
+        if unsafe { (rvm_type + IS_ARRAY_TYPE_FIELD_OFFSET).load::<bool>() } {
+            Self::get_offset_for_alignment_array(object, rvm_type)
+        } else {
+            Self::get_offset_for_alignment_class(object, rvm_type)
         }
     }
 
     fn get_current_size(object: ObjectReference) -> usize {
         trace!("ObjectModel.get_current_size");
-        unsafe {
-            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
-            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
-                .load::<usize>());
+        let rvm_type = Self::load_rvm_type(object);
 
-            Self::bytes_used(object, rvm_type)
-        }
+        Self::bytes_used(object, rvm_type)
     }
 
     fn get_next_object(object: ObjectReference) -> ObjectReference {
@@ -183,9 +174,7 @@ impl ObjectModel<JikesRVM> for VMObjectModel {
     fn get_object_end_address(object: ObjectReference) -> Address {
         trace!("ObjectModel.get_object_end_address");
         unsafe {
-            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
-            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
-                .load::<usize>());
+            let rvm_type = Self::load_rvm_type(object);
 
             let mut size = if (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>() {
                 (rvm_type + INSTANCE_SIZE_FIELD_OFFSET).load::<usize>()
@@ -203,7 +192,7 @@ impl ObjectModel<JikesRVM> for VMObjectModel {
                 }
             }
             object.to_address()
-                + Address::from_usize(size).align_up(BYTES_IN_INT).as_usize()
+                + conversions::raw_align_up(size, BYTES_IN_INT)
                 + (-OBJECT_REF_OFFSET)
         }
     }
@@ -215,9 +204,7 @@ impl ObjectModel<JikesRVM> for VMObjectModel {
     fn is_array(object: ObjectReference) -> bool {
         trace!("ObjectModel.is_array");
         unsafe {
-            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
-            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
-                .load::<usize>());
+            let rvm_type = Self::load_rvm_type(object);
             (rvm_type + IS_ARRAY_TYPE_FIELD_OFFSET).load::<bool>()
         }
     }
@@ -244,22 +231,20 @@ impl ObjectModel<JikesRVM> for VMObjectModel {
 
     fn attempt_available_bits(object: ObjectReference, old: usize, new: usize) -> bool {
         trace!("ObjectModel.attempt_available_bits");
-        let loc = unsafe {
-            &*((object.to_address() + STATUS_OFFSET).as_usize() as *const AtomicUsize)
-        };
         // XXX: Relaxed in OK on failure, right??
         // FIXME: [ZC] What about weak/strong compare_exchange?
         // And what about CAS?
         // We use this function in a loop, where the weaker version might be more suitable
-        loc.compare_exchange(old, new, Ordering::SeqCst, Ordering::SeqCst).is_ok()
+        unsafe {
+            (object.to_address() + STATUS_OFFSET).compare_exchange::<AtomicUsize>(old, new, Ordering::SeqCst, Ordering::SeqCst).is_ok()
+        }
     }
 
     fn prepare_available_bits(object: ObjectReference) -> usize {
         trace!("ObjectModel.prepare_available_bits");
-        let loc = unsafe {
-            &*((object.to_address() + STATUS_OFFSET).as_usize() as *const AtomicUsize)
-        };
-        loc.load(Ordering::SeqCst)
+        unsafe {
+            (object.to_address() + STATUS_OFFSET).atomic_load::<AtomicUsize>(Ordering::SeqCst)
+        }
     }
 
     // XXX: Supposedly none of the 4 methods below need to use atomic loads/stores
@@ -269,34 +254,30 @@ impl ObjectModel<JikesRVM> for VMObjectModel {
     // Common subexpression elimination might also combine multiple reads into one
     fn write_available_byte(object: ObjectReference, val: u8) {
         trace!("ObjectModel.write_available_byte");
-        let loc = unsafe {
-            &*((object.to_address() + AVAILABLE_BITS_OFFSET).as_usize() as *const AtomicU8)
-        };
-        loc.store(val, Ordering::SeqCst);
+        unsafe {
+            (object.to_address() + AVAILABLE_BITS_OFFSET).atomic_store::<AtomicU8>(val, Ordering::SeqCst)
+        }
     }
 
     fn read_available_byte(object: ObjectReference) -> u8 {
         trace!("ObjectModel.read_available_byte");
-        let loc = unsafe {
-            &*((object.to_address() + AVAILABLE_BITS_OFFSET).as_usize() as *const AtomicU8)
-        };
-        loc.load(Ordering::SeqCst)
+        unsafe {
+            (object.to_address() + AVAILABLE_BITS_OFFSET).atomic_load::<AtomicU8>(Ordering::SeqCst)
+        }
     }
 
     fn write_available_bits_word(object: ObjectReference, val: usize) {
         trace!("ObjectModel.write_available_bits_word");
-        let loc = unsafe {
-            &*((object.to_address() + STATUS_OFFSET).as_usize() as *const AtomicUsize)
-        };
-        loc.store(val, Ordering::SeqCst);
+        unsafe {
+            (object.to_address() + STATUS_OFFSET).atomic_store::<AtomicUsize>(val, Ordering::SeqCst)
+        }
     }
 
     fn read_available_bits_word(object: ObjectReference) -> usize {
         trace!("ObjectModel.read_available_bits_word");
-        let loc = unsafe {
-            &*((object.to_address() + STATUS_OFFSET).as_usize() as *const AtomicUsize)
-        };
-        loc.load(Ordering::SeqCst)
+        unsafe {
+            (object.to_address() + STATUS_OFFSET).atomic_load::<AtomicUsize>(Ordering::SeqCst)
+        }
     }
 
     fn GC_HEADER_OFFSET() -> isize {
@@ -327,9 +308,7 @@ impl ObjectModel<JikesRVM> for VMObjectModel {
     fn is_acyclic(typeref: ObjectReference) -> bool {
         trace!("ObjectModel.is_acyclic");
         unsafe {
-            let tib = Address::from_usize((typeref.to_address() + TIB_OFFSET).load::<usize>());
-            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
-                .load::<usize>());
+            let rvm_type = Self::load_rvm_type(typeref);
 
             let is_array = (rvm_type + IS_ARRAY_TYPE_FIELD_OFFSET).load::<bool>();
             let is_class = (rvm_type + IS_CLASS_TYPE_FIELD_OFFSET).load::<bool>();
@@ -452,7 +431,7 @@ impl VMObjectModel {
             }
         }
 
-        unsafe { Address::from_usize(size).align_up(BYTES_IN_INT).as_usize() }
+        conversions::raw_align_up(size, BYTES_IN_INT)
     }
 
     #[inline(always)]
@@ -481,7 +460,7 @@ impl VMObjectModel {
             if is_class {
                 size
             } else {
-                Address::from_usize(size).align_up(BYTES_IN_INT).as_usize()
+                conversions::raw_align_up(size, BYTES_IN_INT)
             }
         }
     }
@@ -562,8 +541,8 @@ impl VMObjectModel {
         trace!("VMObjectModel.aligned_32_copy");
         //debug_assert!(copy_bytes >= 0);
         debug_assert!(copy_bytes & BYTES_IN_INT - 1 == 0);
-        debug_assert!(src.as_usize() & (BYTES_IN_INT - 1) == 0);
-        debug_assert!(src.as_usize() & (BYTES_IN_INT - 1) == 0);
+        debug_assert!(src.is_aligned_to(BYTES_IN_INT));
+        debug_assert!(src.is_aligned_to(BYTES_IN_INT));
         debug_assert!(src + copy_bytes <= dst || src >= dst + BYTES_IN_INT);
 
         let cnt = copy_bytes;
@@ -571,11 +550,9 @@ impl VMObjectModel {
         let dst_end = dst + cnt;
         let overlap = !(src_end <= dst) && !(dst_end <= src);
         if overlap {
-            memmove(dst.as_usize() as *mut c_void,
-                    src.as_usize() as *mut c_void, cnt);
+            memmove(dst.to_mut_ptr(), src.to_mut_ptr(), cnt);
         } else {
-            memcpy(dst.as_usize() as *mut c_void,
-                   src.as_usize() as *mut c_void, cnt);
+            memcpy(dst.to_mut_ptr(), src.to_mut_ptr(), cnt);
         }
     }
 

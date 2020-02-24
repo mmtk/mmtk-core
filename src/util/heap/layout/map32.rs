@@ -18,7 +18,7 @@ use util::heap::space_descriptor::SpaceDescriptor;
 
 const NON_MAP_FRACTION: f64 = 1.0 - 8.0 / 4096.0;
 #[cfg(target_pointer_width = "32")]
-const MAP_BASE_ADDRESS: Address = Address(0);
+const MAP_BASE_ADDRESS: Address = Address::ZERO;
 
 pub struct Map32 {
     prev_link: Vec<i32>,
@@ -100,7 +100,7 @@ impl Map32 {
     }
 
     pub fn get_next_contiguous_region(&self, start: Address) -> Address {
-        debug_assert!(start == conversions::chunk_align(start, true));
+        debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = self.get_chunk_index(start);
         if chunk == 0 {
             unsafe { Address::zero() }
@@ -113,7 +113,7 @@ impl Map32 {
     }
 
     pub fn get_contiguous_region_chunks(&self, start: Address) -> usize {
-        debug_assert!(start == conversions::chunk_align(start, true));
+        debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = self.get_chunk_index(start);
         self.region_map.size(chunk as i32) as _
     }
@@ -124,7 +124,7 @@ impl Map32 {
 
     pub fn free_all_chunks(&self, any_chunk: Address) {
         let sync = self.sync.lock().unwrap();
-        debug_assert!(any_chunk == conversions::chunk_align(any_chunk, true));
+        debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
         if !any_chunk.is_zero() {
             let chunk = self.get_chunk_index(any_chunk);
             while self.next_link[chunk] != 0 {
@@ -141,7 +141,7 @@ impl Map32 {
 
     pub fn free_contiguous_chunks(&self, start: Address) -> usize {
         let sync = self.sync.lock().unwrap();
-        debug_assert!(start == conversions::chunk_align(start, true));
+        debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = self.get_chunk_index(start);
         self.free_contiguous_chunks_no_lock(chunk as _)
     }
@@ -230,7 +230,7 @@ impl Map32 {
     }
 
     fn get_chunk_index(&self, address: Address) -> usize {
-        address.0 >> LOG_BYTES_IN_CHUNK
+        address >> LOG_BYTES_IN_CHUNK
     }
 
     fn address_for_chunk_index(&self, chunk: usize) -> Address {

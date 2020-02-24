@@ -54,9 +54,7 @@ pub fn align_allocation(
     debug_assert!(!(fillalignmentgap && region.is_zero()));
     debug_assert!(alignment <= MAX_ALIGNMENT);
     debug_assert!(offset >= 0);
-    debug_assert!((
-        (region.as_usize() as isize) & ((MIN_ALIGNMENT - 1) as isize)
-    ) == 0);
+    debug_assert!(region.is_aligned_to(MIN_ALIGNMENT));
     debug_assert!((alignment & (MIN_ALIGNMENT - 1)) == 0);
     debug_assert!((offset & (MIN_ALIGNMENT - 1) as isize) == 0);
 

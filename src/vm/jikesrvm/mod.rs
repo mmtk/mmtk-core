@@ -29,7 +29,7 @@ use ::util::address::Address;
 use plan::TraceLocal;
 use vm::VMBinding;
 
-pub static mut JTOC_BASE: Address = Address(0);
+pub static mut JTOC_BASE: Address = Address::ZERO;
 
 pub struct JikesRVM;
 

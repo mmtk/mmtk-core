@@ -79,22 +79,21 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> PageResource
              * to the next chunk.
              */
             if sync.current_chunk > sync.cursor
-                || (chunk_align(sync.cursor, true).as_usize() != sync.current_chunk.as_usize()
-                    && chunk_align(sync.cursor, true).as_usize() != sync.current_chunk.as_usize()
+                || (chunk_align_down(sync.cursor) != sync.current_chunk
+                    && chunk_align_down(sync.cursor) != sync.current_chunk
                         + BYTES_IN_CHUNK) {
                 self.log_chunk_fields("MonotonePageResource.alloc_pages:fail");
             }
             assert!(sync.current_chunk <= sync.cursor);
             assert!(sync.cursor.is_zero() ||
-                chunk_align(sync.cursor, true).as_usize() == sync.current_chunk.as_usize() ||
-                chunk_align(sync.cursor, true).as_usize() == (sync.current_chunk + BYTES_IN_CHUNK)
-                    .as_usize());
+                chunk_align_down(sync.cursor) == sync.current_chunk ||
+                chunk_align_down(sync.cursor) == (sync.current_chunk + BYTES_IN_CHUNK));
         }
 
         if self.meta_data_pages_per_region != 0 {
             /* adjust allocation for metadata */
             let region_start = Self::get_region_start(sync.cursor + pages_to_bytes(required_pages));
-            let region_delta = region_start.as_usize() as isize - sync.cursor.as_usize() as isize;
+            let region_delta = region_start.get_offset(sync.cursor);
             if region_delta >= 0 {
                 /* start new region, so adjust pages and return address accordingly */
                 required_pages += bytes_to_pages(region_delta as usize) + self.meta_data_pages_per_region;
@@ -131,8 +130,8 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> PageResource
             sync.cursor = tmp;
 
             /* In a contiguous space we can bump along into the next chunk, so preserve the currentChunk invariant */
-            if self.common().contiguous && chunk_align(sync.cursor, true).as_usize() != sync.current_chunk.as_usize() {
-                sync.current_chunk = chunk_align(sync.cursor, true);
+            if self.common().contiguous && chunk_align_down(sync.cursor) != sync.current_chunk {
+                sync.current_chunk = chunk_align_down(sync.cursor);
             }
             self.commit_pages(reserved_pages, required_pages, tls);
             self.common().space.unwrap().grow_space(old, bytes, new_chunk);
@@ -141,7 +140,7 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> PageResource
 
             // FIXME: concurrent zeroing
             if zeroed {
-                unsafe {memset(old.to_ptr_mut() as *mut c_void, 0, bytes);}
+                unsafe {memset(old.to_mut_ptr() as *mut c_void, 0, bytes);}
             }
             /*
             if zeroed {
@@ -181,7 +180,7 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> MonotonePage
             meta_data_pages_per_region,
             sync: Mutex::new(MonotonePageResourceSync {
                 cursor: start,
-                current_chunk: unsafe{Address::from_usize(chunk_align!(start.as_usize(), true))},
+                current_chunk: chunk_align_down(start),
                 sentinel,
                 conditional: MonotonePageResourceConditional::Contiguous {
                     start,
@@ -216,13 +215,11 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> MonotonePage
         let sync = self.sync.lock().unwrap();
         debug!("[{}]{}: cursor={}, current_chunk={}, delta={}",
                self.common().space.unwrap().common().name,
-               site, sync.cursor.as_usize(), sync.current_chunk, sync.cursor - sync.current_chunk);
+               site, sync.cursor, sync.current_chunk, sync.cursor - sync.current_chunk);
     }
 
     fn get_region_start(addr: Address) -> Address {
-        unsafe{
-            Address::from_usize(addr.as_usize() & !(BYTES_IN_REGION - 1))
-        }
+        addr.align_down(BYTES_IN_REGION)
     }
 
     pub unsafe fn reset(&self) {

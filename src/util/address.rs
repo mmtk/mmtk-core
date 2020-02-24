@@ -2,6 +2,8 @@ use std::cmp;
 use std::fmt;
 use std::mem;
 use std::ops::*;
+use std::sync::atomic::{AtomicUsize, AtomicU8, Ordering};
+use atomic_traits::Atomic;
 
 /// size in bytes
 pub type ByteSize = usize;
@@ -15,7 +17,7 @@ pub type ByteOffset = isize;
 /// High-level Low-level Programming (VEE09) and JikesRVM.
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash)]
-pub struct Address(pub usize);
+pub struct Address(usize);
 
 /// Address + ByteSize (positive)
 impl Add<ByteSize> for Address {
@@ -71,7 +73,49 @@ impl Sub<Address> for Address {
     }
 }
 
+/// Address & mask
+impl BitAnd<usize> for Address {
+    type Output = usize;
+    fn bitand(self, other: usize) -> usize {
+        self.0 & other
+    }
+}
+// Be careful about the return type here. Address & u8 = u8
+// This is different from Address | u8 = usize
+impl BitAnd<u8> for Address {
+    type Output = u8;
+    fn bitand(self, other: u8) -> u8 {
+        (self.0 as u8) & other
+    }
+}
+
+/// Address | mask
+impl BitOr<usize> for Address {
+    type Output = usize;
+    fn bitor(self, other: usize) -> usize {
+        self.0 | other
+    }
+}
+// Be careful about the return type here. Address | u8 = size
+// This is different from Address & u8 = u8
+impl BitOr<u8> for Address {
+    type Output = usize;
+    fn bitor(self, other: u8) -> usize {
+        self.0 | (other as usize)
+    }
+}
+
+/// Address >> shift (get an index)
+impl Shr<usize> for Address {
+    type Output = usize;
+    fn shr(self, shift: usize) -> usize {
+        self.0 >> shift
+    }
+}
+
 impl Address {
+    pub const ZERO: Self = Address(0);
+
     /// creates Address from a pointer
     #[inline(always)]
     pub fn from_ptr<T>(ptr: *const T) -> Address {
@@ -92,7 +136,7 @@ impl Address {
     /// creates a null Address (0)
     /// It is unsafe and the user needs to be aware that they are creating an invalid address.
     #[inline(always)]
-    pub unsafe fn zero() -> Address {
+    pub const unsafe fn zero() -> Address {
         Address(0)
     }
 
@@ -117,6 +161,24 @@ impl Address {
         self + mem::size_of::<T>() as isize * offset
     }
 
+    // These const functions are duplicated with the operator traits. But we need them,
+    // as we need them to declare constants.
+
+    #[inline(always)]
+    pub const fn get_extent(self, other: Address) -> ByteSize {
+        self.0 - other.0
+    }
+
+    #[inline(always)]
+    pub const fn get_offset(self, other: Address) -> ByteOffset {
+        self.0 as isize - other.0 as isize
+    }
+
+    #[inline(always)]
+    pub const fn add(self, size: usize) -> Address {
+        Address(self.0 + size)
+    }
+
     /// loads a value of type T from the address
     #[inline(always)]
     pub unsafe fn load<T: Copy>(&self) -> T {
@@ -129,6 +191,30 @@ impl Address {
         *(self.0 as *mut T) = value;
     }
 
+    /// atomic operation: load
+    pub unsafe fn atomic_load<T: Atomic>(&self, order: Ordering) -> T::Type {
+        let loc = unsafe {
+            &*(self.0 as *const T)
+        };
+        loc.load(order)
+    }
+
+    /// atomic operation: store
+    pub unsafe fn atomic_store<T: Atomic>(&self, val: T::Type, order: Ordering) {
+        let loc = unsafe {
+            &*(self.0 as *const T)
+        };
+        loc.store(val, order)
+    }
+
+    /// atomic operation: compare and exchange usize
+    pub unsafe fn compare_exchange<T: Atomic>(&self, old: T::Type, new: T::Type, success: Ordering, failure: Ordering) -> Result<T::Type, T::Type> {
+        let loc = unsafe {
+            &*(self.0 as *const T)
+        };
+        loc.compare_exchange(old, new, success, failure)
+    }
+
     /// is this address zero?
     #[inline(always)]
     pub fn is_zero(&self) -> bool {
@@ -137,13 +223,22 @@ impl Address {
 
     /// aligns up the address to the given alignment
     #[inline(always)]
-    pub fn align_up(&self, align: ByteSize) -> Address {
-        Address((self.0 + align - 1) & !(align - 1))
+    pub const fn align_up(&self, align: ByteSize) -> Address {
+        use util::conversions;
+        Address(conversions::raw_align_up(self.0, align))
+    }
+
+    /// aligns down the address to the given alignment
+    #[inline(always)]
+    pub const fn align_down(&self, align: ByteSize) -> Address {
+        use util::conversions;
+        Address(conversions::raw_align_down(self.0, align))
     }
 
     /// is this address aligned to the given alignment
     pub fn is_aligned_to(&self, align: usize) -> bool {
-        self.0 % align == 0
+        use util::conversions;
+        conversions::raw_is_aligned(self.0, align)
     }
 
     /// converts the Address into an ObjectReference
@@ -163,7 +258,7 @@ impl Address {
 
     /// converts the Address to a mutable pointer
     #[inline(always)]
-    pub fn to_ptr_mut<T>(&self) -> *mut T {
+    pub fn to_mut_ptr<T>(&self) -> *mut T {
         unsafe { mem::transmute(self.0) }
     }
 
@@ -219,6 +314,55 @@ impl fmt::Display for Address {
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:#x}", self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use util::Address;
+
+    #[test]
+    fn align_up() {
+        unsafe {
+            assert_eq!(Address::from_usize(0x10).align_up(0x10), Address::from_usize(0x10));
+            assert_eq!(Address::from_usize(0x11).align_up(0x10), Address::from_usize(0x20));
+            assert_eq!(Address::from_usize(0x20).align_up(0x10), Address::from_usize(0x20));
+        }
+    }
+
+    #[test]
+    fn align_down() {
+        unsafe {
+            assert_eq!(Address::from_usize(0x10).align_down(0x10), Address::from_usize(0x10));
+            assert_eq!(Address::from_usize(0x11).align_down(0x10), Address::from_usize(0x10));
+            assert_eq!(Address::from_usize(0x20).align_down(0x10), Address::from_usize(0x20));
+        }
+    }
+
+    #[test]
+    fn is_aligned_to() {
+        unsafe {
+            assert_eq!(Address::from_usize(0x10).is_aligned_to(0x10), true);
+            assert_eq!(Address::from_usize(0x11).is_aligned_to(0x10), false);
+            assert_eq!(Address::from_usize(0x10).is_aligned_to(0x8), true);
+            assert_eq!(Address::from_usize(0x10).is_aligned_to(0x20), false);
+        }
+    }
+
+    #[test]
+    fn bit_and() {
+        unsafe {
+            assert_eq!(Address::from_usize(0b1111_1111_1100usize) & 0b1010u8, 0b1000u8);
+            assert_eq!(Address::from_usize(0b1111_1111_1100usize) & 0b1000_0000_1010usize, 0b1000_0000_1000usize);
+        }
+    }
+
+    #[test]
+    fn bit_or() {
+        unsafe {
+            assert_eq!(Address::from_usize(0b1111_1111_1100usize) | 0b1010u8, 0b1111_1111_1110usize);
+            assert_eq!(Address::from_usize(0b1111_1111_1100usize) | 0b1000_0000_1010usize, 0b1111_1111_1110usize);
+        }
     }
 }
 
