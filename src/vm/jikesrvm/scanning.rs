@@ -38,9 +38,7 @@ impl Scanning<JikesRVM> for VMScanning {
         }
         trace!("Getting reference array");
         let elt0_ptr: usize = unsafe {
-            let tib = Address::from_usize((object.to_address() + TIB_OFFSET).load::<usize>());
-            let rvm_type = Address::from_usize((tib + TIB_TYPE_INDEX * BYTES_IN_ADDRESS)
-                .load::<usize>());
+            let rvm_type = VMObjectModel::load_rvm_type(object);
             (rvm_type + REFERENCE_OFFSETS_FIELD_OFFSET).load::<usize>()
         };
         trace!("elt0_ptr: {}", elt0_ptr);
@@ -88,7 +86,7 @@ impl Scanning<JikesRVM> for VMScanning {
         unsafe {
             let cc = VMActivePlan::collector(tls);
 
-            let jni_functions = Address::from_usize((JTOC_BASE + JNI_FUNCTIONS_FIELD_OFFSET).load::<usize>());
+            let jni_functions = (JTOC_BASE + JNI_FUNCTIONS_FIELD_OFFSET).load::<Address>();
             trace!("jni_functions: {:?}", jni_functions);
 
             let threads = cc.parallel_worker_count();
@@ -117,16 +115,14 @@ impl Scanning<JikesRVM> for VMScanning {
                 }
             }
 
-            let linkage_triplets = Address::from_usize(
-                (JTOC_BASE + LINKAGE_TRIPLETS_FIELD_OFFSET).load::<usize>());
+            let linkage_triplets = (JTOC_BASE + LINKAGE_TRIPLETS_FIELD_OFFSET).load::<Address>();
             if !linkage_triplets.is_zero() {
                 for i in start..end {
                     trace.process_root_edge(linkage_triplets + i * 4, true);
                 }
             }
 
-            let jni_global_refs = Address::from_usize(
-                (JTOC_BASE + JNI_GLOBAL_REFS_FIELD2_OFFSET).load::<usize>());
+            let jni_global_refs = (JTOC_BASE + JNI_GLOBAL_REFS_FIELD2_OFFSET).load::<Address>();
             trace!("jni_global_refs address: {:?}", jni_global_refs);
             size = (jni_global_refs - 4).load::<usize>();
             trace!("jni_global_refs size: {:?}", size);

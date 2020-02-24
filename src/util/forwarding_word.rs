@@ -45,12 +45,12 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(object: ObjectReference, sta
 
 pub fn forward_object<VM: VMBinding>(object: ObjectReference, allocator: Allocator, tls: OpaquePointer) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, allocator, tls);
-    VM::VMObjectModel::write_available_bits_word(object, new_object.to_address().as_usize() | FORWARDED as usize);
+    VM::VMObjectModel::write_available_bits_word(object, new_object.to_address() | FORWARDED);
     new_object
 }
 
 pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: ObjectReference) {
-    VM::VMObjectModel::write_available_bits_word(object, ptr.to_address().as_usize() | FORWARDED as usize);
+    VM::VMObjectModel::write_available_bits_word(object, ptr.to_address() | FORWARDED);
 }
 
 pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {

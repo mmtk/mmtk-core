@@ -37,7 +37,7 @@ impl SpaceDescriptor {
     pub fn create_descriptor_from_heap_range(start: Address, end: Address) -> SpaceDescriptor {
         let top = end == vm_layout_constants::HEAP_END;
         if HEAP_LAYOUT_64BIT {
-            let space_index = if start > vm_layout_constants::HEAP_END { ::std::usize::MAX } else { start.0 >> vm_layout_constants::SPACE_SHIFT_64 };
+            let space_index = if start > vm_layout_constants::HEAP_END { ::std::usize::MAX } else { start >> vm_layout_constants::SPACE_SHIFT_64 };
             return SpaceDescriptor(space_index << INDEX_SHIFT |
                 (if top { TYPE_CONTIGUOUS_HI } else { TYPE_CONTIGUOUS }));
         }
@@ -51,15 +51,14 @@ impl SpaceDescriptor {
             // }
             debug_assert!(!start.is_zero() && chunks > 0 && chunks < (1 << SIZE_BITS));
         }
-        let mut tmp = start.0;
-        tmp = tmp >> BASE_EXPONENT;
+        let mut tmp = start >> BASE_EXPONENT;
         let mut exponent = 0;
         while (tmp != 0) && ((tmp & 1) == 0) {
             tmp = tmp >> 1;
             exponent += 1;
         }
         let mantissa = tmp;
-        debug_assert!((tmp << (BASE_EXPONENT + exponent)) == start.0);
+        debug_assert!((tmp << (BASE_EXPONENT + exponent)) == start.as_usize());
         return SpaceDescriptor(
             (mantissa << MANTISSA_SHIFT) |
             (exponent << EXPONENT_SHIFT) |

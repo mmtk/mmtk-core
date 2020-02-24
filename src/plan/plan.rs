@@ -12,7 +12,7 @@ use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use util::constants::LOG_BYTES_IN_MBYTE;
 use util::heap::{VMRequest, HeapMeta};
 use policy::immortalspace::ImmortalSpace;
-use util::Address;
+use util::{Address, conversions};
 use util::statistics::stats::Stats;
 use util::statistics::counter::{Counter, LongCounter};
 use util::statistics::counter::MonotoneNanoTime;
@@ -30,8 +30,7 @@ pub fn create_vm_space<VM: VMBinding>(vm_map: &'static VMMap, mmapper: &'static 
 //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
 
-    let boot_segment_mb = unsafe{Address::from_usize(boot_segment_bytes)}
-        .align_up(BYTES_IN_CHUNK).as_usize() >> LOG_BYTES_IN_MBYTE;
+    let boot_segment_mb = conversions::raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
 
     ImmortalSpace::new("boot", false, VMRequest::fixed_size(boot_segment_mb), vm_map, mmapper, heap)
 }

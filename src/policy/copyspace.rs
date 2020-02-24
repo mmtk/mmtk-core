@@ -120,10 +120,10 @@ impl<VM: VMBinding> CopySpace<VM> {
         if !self.common().contiguous {
             panic!("Implement Options.protectOnRelease for MonotonePageResource.release_pages_extent")
         }
-        let start = self.common().start.as_usize();
+        let start = self.common().start;
         let extent = self.common().extent;
         unsafe {
-            mprotect(start as *mut c_void, extent, PROT_NONE);
+            mprotect(start.to_mut_ptr(), extent, PROT_NONE);
         }
         trace!("Protect {:x} {:x}", start, start + extent);
     }
@@ -132,10 +132,10 @@ impl<VM: VMBinding> CopySpace<VM> {
         if !self.common().contiguous {
             panic!("Implement Options.protectOnRelease for MonotonePageResource.release_pages_extent")
         }
-        let start = self.common().start.as_usize();
+        let start = self.common().start;
         let extent = self.common().extent;
         unsafe {
-            mprotect(start as *mut c_void, extent, PROT_READ | PROT_WRITE | PROT_EXEC);
+            mprotect(start.to_mut_ptr(), extent, PROT_READ | PROT_WRITE | PROT_EXEC);
         }
         trace!("Unprotect {:x} {:x}", start, start + extent);
     }

@@ -17,7 +17,7 @@ impl OpaquePointer {
     pub const UNINITIALIZED: Self = Self(0 as *mut c_void);
 
     pub fn from_address(addr: Address) -> Self {
-        OpaquePointer(addr.to_ptr_mut::<c_void>())
+        OpaquePointer(addr.to_mut_ptr::<c_void>())
     }
 
     pub fn is_null(&self) -> bool {

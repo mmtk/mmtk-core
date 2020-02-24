@@ -36,7 +36,7 @@ pub struct CommonFreeListPageResource {
 impl CommonFreeListPageResource {
     pub fn resize_freelist(&mut self, start_address: Address) {
         // debug_assert!((HEAP_LAYOUT_64BIT || !contiguous) && !Plan.isInitialized());
-        self.start = conversions::align_up(start_address, LOG_BYTES_IN_REGION);
+        self.start = start_address.align_up(BYTES_IN_REGION);
         // self.free_list.resize_freelist();
     }
 }
@@ -245,7 +245,7 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
     fn reserve_metadata(&mut self, extent: usize) {
         let _highwater_mark = 0;
         if self.meta_data_pages_per_region > 0 {
-            debug_assert!(((self.start.0 >> LOG_BYTES_IN_REGION) << LOG_BYTES_IN_REGION) == self.start.0);
+            debug_assert!(self.start.is_aligned_to(BYTES_IN_REGION));
             let size = (extent >> LOG_BYTES_IN_REGION) << LOG_BYTES_IN_REGION;
             let mut cursor = self.start + size;
             while cursor > self.start {
@@ -289,7 +289,7 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
         
         if self.meta_data_pages_per_region > 0 {       // can only be a single chunk
             if pages_freed == (PAGES_IN_CHUNK - self.meta_data_pages_per_region) {
-                self.free_contiguous_chunk(conversions::chunk_align(freed_page, true));
+                self.free_contiguous_chunk(conversions::chunk_align_down(freed_page));
             }
         } else {                                // may be multiple chunks
             if pages_freed % PAGES_IN_CHUNK == 0 {    // necessary, but not sufficient condition

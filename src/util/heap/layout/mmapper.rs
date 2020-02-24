@@ -54,26 +54,4 @@ pub trait Mmapper {
      * @param pages Number of pages to be protected
      */
     fn protect(&self, start: Address, pages: usize);
-
-    /**
-     * Return a given address rounded up to an mmap chunk size
-     *
-     * @param addr The address to be aligned
-     * @return The given address rounded up to an mmap chunk size
-     */
-    #[inline(always)]
-    fn chunk_align_up(addr: Address) -> Address {
-        Self::chunk_align_down(addr + MMAP_CHUNK_MASK)
-    }
-
-    /**
-     * Return a given address rounded down to an mmap chunk size
-     *
-     * @param addr The address to be aligned
-     * @return The given address rounded down to an mmap chunk size
-     */
-    #[inline(always)]
-    fn chunk_align_down(addr: Address) -> Address {
-        unsafe{Address::from_usize(addr.as_usize() & !MMAP_CHUNK_MASK)}
-    }
 }
