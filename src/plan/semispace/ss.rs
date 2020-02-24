@@ -27,7 +27,7 @@ use libc::{c_void, memset};
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 
-use ::vm::{Scanning, VMScanning};
+use ::vm::Scanning;
 use std::thread;
 use util::conversions::bytes_to_pages;
 use plan::plan::{create_vm_space, CommonPlan};
@@ -37,33 +37,34 @@ use util::options::{Options, UnsafeOptionsWrapper};
 use std::sync::Arc;
 use util::heap::HeapMeta;
 use util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END};
+use vm::VMBinding;
 
-pub type SelectedPlan = SemiSpace;
+pub type SelectedPlan<VM> = SemiSpace<VM>;
 
 pub const ALLOC_SS: Allocator = Allocator::Default;
 pub const SCAN_BOOT_IMAGE: bool = true;
 
-pub struct SemiSpace {
-    pub unsync: UnsafeCell<SemiSpaceUnsync>,
+pub struct SemiSpace<VM: VMBinding> {
+    pub unsync: UnsafeCell<SemiSpaceUnsync<VM>>,
     pub ss_trace: Trace,
-    pub common: CommonPlan,
+    pub common: CommonPlan<VM>,
 }
 
-pub struct SemiSpaceUnsync {
+pub struct SemiSpaceUnsync<VM: VMBinding> {
     pub hi: bool,
-    pub vm_space: ImmortalSpace,
-    pub copyspace0: CopySpace,
-    pub copyspace1: CopySpace,
-    pub versatile_space: ImmortalSpace,
-    pub los: LargeObjectSpace,
+    pub vm_space: Option<ImmortalSpace<VM>>,
+    pub copyspace0: CopySpace<VM>,
+    pub copyspace1: CopySpace<VM>,
+    pub versatile_space: ImmortalSpace<VM>,
+    pub los: LargeObjectSpace<VM>,
 }
 
-unsafe impl Sync for SemiSpace {}
+unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
 
-impl Plan for SemiSpace {
-    type MutatorT = SSMutator;
-    type TraceLocalT = SSTraceLocal;
-    type CollectorT = SSCollector;
+impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
+    type MutatorT = SSMutator<VM>;
+    type TraceLocalT = SSTraceLocal<VM>;
+    type CollectorT = SSCollector<VM>;
 
     fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
@@ -71,7 +72,11 @@ impl Plan for SemiSpace {
         SemiSpace {
             unsync: UnsafeCell::new(SemiSpaceUnsync {
                 hi: false,
-                vm_space: create_vm_space(vm_map, mmapper, &mut heap),
+                vm_space: if options.vm_space {
+                    Some(create_vm_space(vm_map, mmapper, &mut heap, options.vm_space_size))
+                } else {
+                    None
+                },
                 copyspace0: CopySpace::new("copyspace0", false, true,
                                            VMRequest::discontiguous(), vm_map, mmapper, &mut heap),
                 copyspace1: CopySpace::new("copyspace1", true, true,
@@ -85,19 +90,21 @@ impl Plan for SemiSpace {
         }
     }
 
-    unsafe fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+    fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
         vm_map.finalize_static_space_map(self.common.heap.get_discontig_start(), self.common.heap.get_discontig_end());
 
-        let unsync = &mut *self.unsync.get();
+        let unsync = unsafe { &mut *self.unsync.get() };
         self.common.heap.total_pages.store(bytes_to_pages(heap_size), Ordering::Relaxed);
-        unsync.vm_space.init(vm_map);
+        if unsync.vm_space.is_some() {
+            unsync.vm_space.as_mut().unwrap().init(vm_map);
+        }
         unsync.copyspace0.init(vm_map);
         unsync.copyspace1.init(vm_map);
         unsync.versatile_space.init(vm_map);
         unsync.los.init(vm_map);
     }
 
-    fn common(&self) -> &CommonPlan {
+    fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
 
@@ -125,7 +132,7 @@ impl Plan for SemiSpace {
         if unsync.versatile_space.in_space(object) {
             return true;
         }
-        if unsync.vm_space.in_space(object) {
+        if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
             return true;
         }
         if self.tospace().in_space(object) {
@@ -181,15 +188,17 @@ impl Plan for SemiSpace {
                 unsync.copyspace0.prepare(unsync.hi);
                 unsync.copyspace1.prepare(!unsync.hi);
                 unsync.versatile_space.prepare();
-                unsync.vm_space.prepare();
+                if unsync.vm_space.is_some() {
+                    unsync.vm_space.as_mut().unwrap().prepare();
+                }
                 unsync.los.prepare(true);
             }
             &Phase::StackRoots => {
-                VMScanning::notify_initial_thread_scan_complete(false, tls);
+                VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
                 self.common.set_gc_status(plan::GcStatus::GcProper);
             }
             &Phase::Roots => {
-                VMScanning::reset_thread_counter();
+                VM::VMScanning::reset_thread_counter();
                 self.common.set_gc_status(plan::GcStatus::GcProper);
             }
             &Phase::Closure => {}
@@ -214,7 +223,9 @@ impl Plan for SemiSpace {
                     unsafe { unsync.copyspace1.release() };
                 }
                 unsync.versatile_space.release();
-                unsync.vm_space.release();
+                if unsync.vm_space.is_some() {
+                    unsync.vm_space.as_mut().unwrap().release();
+                }
                 unsync.los.release(true);
             }
             &Phase::Complete => {
@@ -259,8 +270,8 @@ impl Plan for SemiSpace {
 
     fn is_movable(&self, object: ObjectReference) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
-        if unsync.vm_space.in_space(object) {
-            return unsync.vm_space.is_movable();
+        if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
+            return unsync.vm_space.as_ref().unwrap().is_movable();
         }
         if unsync.copyspace0.in_space(object) {
             return unsync.copyspace0.is_movable();
@@ -280,7 +291,7 @@ impl Plan for SemiSpace {
     fn is_mapped_address(&self, address: Address) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
         if unsafe{
-            unsync.vm_space.in_space(address.to_object_reference())  ||
+            (unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(address.to_object_reference()))  ||
             unsync.versatile_space.in_space(address.to_object_reference()) ||
             unsync.copyspace0.in_space(address.to_object_reference()) ||
             unsync.copyspace1.in_space(address.to_object_reference()) ||
@@ -293,8 +304,8 @@ impl Plan for SemiSpace {
     }
 }
 
-impl SemiSpace {
-    pub fn tospace(&self) -> &'static CopySpace {
+impl<VM: VMBinding> SemiSpace<VM> {
+    pub fn tospace(&self) -> &'static CopySpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };
 
         if unsync.hi {
@@ -304,7 +315,7 @@ impl SemiSpace {
         }
     }
 
-    pub fn fromspace(&self) -> &'static CopySpace {
+    pub fn fromspace(&self) -> &'static CopySpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };
 
         if unsync.hi {
@@ -318,12 +329,12 @@ impl SemiSpace {
         &self.ss_trace
     }
 
-    pub fn get_versatile_space(&self) -> &'static ImmortalSpace {
+    pub fn get_versatile_space(&self) -> &'static ImmortalSpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };
         &unsync.versatile_space
     }
 
-    pub fn get_los(&self) -> &'static LargeObjectSpace {
+    pub fn get_los(&self) -> &'static LargeObjectSpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };
 
         &unsync.los

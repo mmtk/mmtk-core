@@ -4,20 +4,20 @@ use ::policy::space::Space;
 use ::util::{Address, ObjectReference};
 use ::util::queue::LocalQueue;
 use ::vm::Scanning;
-use ::vm::VMScanning;
 use libc::c_void;
 use super::ss;
 use util::OpaquePointer;
 use plan::semispace::SemiSpace;
+use vm::VMBinding;
 
-pub struct SSTraceLocal {
+pub struct SSTraceLocal<VM: VMBinding> {
     tls: OpaquePointer,
     values: LocalQueue<'static, ObjectReference>,
     root_locations: LocalQueue<'static, Address>,
-    plan: &'static SemiSpace
+    plan: &'static SemiSpace<VM>
 }
 
-impl TransitiveClosure for SSTraceLocal {
+impl<VM: VMBinding> TransitiveClosure for SSTraceLocal<VM> {
     fn process_edge(&mut self, slot: Address) {
         trace!("process_edge({:?})", slot);
         let object: ObjectReference = unsafe { slot.load() };
@@ -33,7 +33,7 @@ impl TransitiveClosure for SSTraceLocal {
     }
 }
 
-impl TraceLocal for SSTraceLocal {
+impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
     fn process_roots(&mut self) {
         loop {
             match self.root_locations.dequeue() {
@@ -78,9 +78,9 @@ impl TraceLocal for SSTraceLocal {
             trace!("trace_object: object in versatile_space");
             return plan_unsync.versatile_space.trace_object(self, object);
         }
-        if plan_unsync.vm_space.in_space(object) {
+        if plan_unsync.vm_space.is_some() && plan_unsync.vm_space.as_ref().unwrap().in_space(object) {
             trace!("trace_object: object in boot space");
-            return plan_unsync.vm_space.trace_object(self, object);
+            return plan_unsync.vm_space.as_ref().unwrap().trace_object(self, object);
         }
         if plan_unsync.los.in_space(object) {
             trace!("trace_object: object in los");
@@ -98,7 +98,7 @@ impl TraceLocal for SSTraceLocal {
         loop {
             match self.values.dequeue() {
                 Some(object) => {
-                    VMScanning::scan_object(self, object, id);
+                    VM::VMScanning::scan_object(self, object, id);
                 }
                 None => {
                     break;
@@ -158,7 +158,7 @@ impl TraceLocal for SSTraceLocal {
         if unsync.versatile_space.in_space(object) {
             return true;
         }
-        if unsync.vm_space.in_space(object) {
+        if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
             return true;
         }
         if unsync.los.in_space(object) {
@@ -168,8 +168,8 @@ impl TraceLocal for SSTraceLocal {
     }
 }
 
-impl SSTraceLocal {
-    pub fn new(ss: &'static SemiSpace) -> Self {
+impl<VM: VMBinding> SSTraceLocal<VM> {
+    pub fn new(ss: &'static SemiSpace<VM>) -> Self {
         let ss_trace = ss.get_sstrace();
         SSTraceLocal {
             tls: OpaquePointer::UNINITIALIZED,

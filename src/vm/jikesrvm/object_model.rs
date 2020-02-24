@@ -23,6 +23,7 @@ use ::util::constants::{};
 use ::plan::{Allocator, CollectorContext};
 use std::mem::size_of;
 use std::sync::atomic::{AtomicUsize, AtomicU8, Ordering};
+use vm::jikesrvm::JikesRVM;
 
 /** Should we gather stats on hash code state transitions for address-based hashing? */
 const HASH_STATS: bool = false;
@@ -44,7 +45,7 @@ const PACKED: bool = true;
 
 pub struct VMObjectModel {}
 
-impl ObjectModel for VMObjectModel {
+impl ObjectModel<JikesRVM> for VMObjectModel {
     #[inline(always)]
     fn copy(from: ObjectReference, allocator: Allocator, tls: OpaquePointer) -> ObjectReference {
         trace!("ObjectModel.copy");

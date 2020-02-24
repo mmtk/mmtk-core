@@ -4,20 +4,24 @@ use ::util::OpaquePointer;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::ParallelCollector;
-use ::vm::{VMCollection, Collection};
+use ::vm::Collection;
 use plan::selected_plan::SelectedPlan;
 
 use libc::c_void;
 use plan::phase::PhaseManager;
 use mmtk::MMTK;
+use vm::VMBinding;
+use std::marker::PhantomData;
 
-pub struct ParallelCollectorGroup<C: ParallelCollector> {
+pub struct ParallelCollectorGroup<VM: VMBinding, C: ParallelCollector<VM>> {
     //name: String,
     contexts: Vec<C>,
     sync: Mutex<ParallelCollectorGroupSync>,
     condvar: Condvar,
 
     aborted: AtomicBool,
+
+    p: PhantomData<VM>,
 }
 
 struct ParallelCollectorGroupSync {
@@ -27,7 +31,7 @@ struct ParallelCollectorGroupSync {
     current_rendezvous_counter: usize,
 }
 
-impl<C: ParallelCollector> ParallelCollectorGroup<C> {
+impl<VM: VMBinding, C: ParallelCollector<VM>> ParallelCollectorGroup<VM, C> {
     pub fn new() -> Self {
         Self {
             contexts: Vec::<C>::new(),
@@ -40,6 +44,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
             condvar: Condvar::new(),
 
             aborted: AtomicBool::new(false),
+            p: PhantomData,
         }
     }
 
@@ -47,7 +52,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
         self.contexts.len()
     }
 
-    pub fn init_group(&mut self, mmtk: &'static MMTK, tls: OpaquePointer) {
+    pub fn init_group(&mut self, mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
         {
             let inner = self.sync.get_mut().unwrap();
             inner.trigger_count = 1;
@@ -63,7 +68,7 @@ impl<C: ParallelCollector> ParallelCollectorGroup<C> {
             self.contexts[i].set_group(self_ptr);
             self.contexts[i].set_worker_ordinal(i);
             unsafe {
-                VMCollection::spawn_worker_thread(tls, &mut self.contexts[i] as *mut C);
+                VM::VMCollection::spawn_worker_thread(tls, &mut self.contexts[i] as *mut C);
             }
         }
     }

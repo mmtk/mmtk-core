@@ -9,7 +9,8 @@ use super::JTOC_BASE;
 use ::plan::{TraceLocal, Plan, SelectedPlan, ParallelCollector};
 
 use super::collection::VMCollection;
-use super::super::{ActivePlan, VMActivePlan};
+use super::active_plan::VMActivePlan;
+use vm::active_plan::ActivePlan;
 
 use libc::c_void;
 

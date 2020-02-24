@@ -1,5 +1,6 @@
 use ::util::ObjectReference;
+use vm::VMBinding;
 
 pub trait LinearScan{
-    fn scan(&self, object: ObjectReference);
+    fn scan<VM: VMBinding>(&self, object: ObjectReference);
 }

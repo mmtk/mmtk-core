@@ -23,19 +23,18 @@ use std::sync::atomic::Ordering;
 
 use libc::{c_void, memset};
 use util::heap::layout::heap_layout::VMMap;
+use vm::VMBinding;
 
 const SPACE_ALIGN: usize = 1 << 19;
 
-#[derive(Debug)]
-pub struct MonotonePageResource<S: Space<PR = MonotonePageResource<S>>> {
-    common: CommonPageResource<MonotonePageResource<S>>,
+pub struct MonotonePageResource<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> {
+    common: CommonPageResource<VM, MonotonePageResource<VM, S>>,
 
     /** Number of pages to reserve at the start of every allocation */
     meta_data_pages_per_region: usize,
     sync: Mutex<MonotonePageResourceSync>,
 }
 
-#[derive(Debug)]
 struct MonotonePageResourceSync {
     /** Pointer to the next block to be allocated. */
     cursor: Address,
@@ -46,7 +45,6 @@ struct MonotonePageResourceSync {
     conditional: MonotonePageResourceConditional,
 }
 
-#[derive(Debug)]
 pub enum MonotonePageResourceConditional {
     Contiguous {
         start: Address,
@@ -57,13 +55,13 @@ pub enum MonotonePageResourceConditional {
     },
     Discontiguous,
 }
-impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResource<S> {
+impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> PageResource<VM> for MonotonePageResource<VM, S> {
     type Space = S;
 
-    fn common(&self) -> &CommonPageResource<Self> {
+    fn common(&self) -> &CommonPageResource<VM, Self> {
         &self.common
     }
-    fn common_mut(&mut self) -> &mut CommonPageResource<Self> {
+    fn common_mut(&mut self) -> &mut CommonPageResource<VM, Self> {
         &mut self.common
     }
 
@@ -165,7 +163,7 @@ impl<S: Space<PR = MonotonePageResource<S>>> PageResource for MonotonePageResour
     }
 }
 
-impl<S: Space<PR = MonotonePageResource<S>>> MonotonePageResource<S> {
+impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> MonotonePageResource<VM, S> {
     pub fn new_contiguous(start: Address, bytes: usize,
                           meta_data_pages_per_region: usize,
                           vm_map: &'static VMMap) -> Self {

@@ -6,7 +6,6 @@ use std::fmt;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
-use vm::{ObjectModel, VMObjectModel};
 use util::heap::layout::vm_layout_constants::*;
 use util::conversions::pages_to_bytes;
 

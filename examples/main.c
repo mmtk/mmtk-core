@@ -2,7 +2,7 @@
 #include "mmtk.h"
 
 int main(int argc, char* argv[]){
-    openjdk_gc_init(NULL, 1024*1024);
+    gc_init(1024*1024);
 
     MMTk_Mutator handle = bind_mutator(0);
     

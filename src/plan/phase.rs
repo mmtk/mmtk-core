@@ -1,6 +1,6 @@
 use ::plan;
 use ::plan::{CollectorContext, MutatorContext, ParallelCollector, Plan, SelectedPlan};
-use ::vm::{ActivePlan, VMActivePlan};
+use ::vm::ActivePlan;
 use std::sync::{atomic, Arc};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicUsize;
@@ -15,6 +15,7 @@ use util::statistics::stats::Stats;
 use std::collections::HashMap;
 use plan::phase::Schedule::*;
 use plan::phase::Phase::*;
+use vm::VMBinding;
 
 #[derive(Clone)]
 #[derive(PartialEq)]
@@ -250,18 +251,18 @@ impl PhaseManager {
     }
 
     // FIXME: It's probably unsafe to call most of these functions, because tls
-    pub fn begin_new_phase_stack(&self, tls: OpaquePointer, scheduled_phase: ScheduledPhase) {
-        let order = unsafe { VMActivePlan::collector(tls).rendezvous() };
+    pub fn begin_new_phase_stack<VM: VMBinding>(&self, tls: OpaquePointer, scheduled_phase: ScheduledPhase) {
+        let order = unsafe { VM::VMActivePlan::collector(tls).rendezvous() };
 
         if order == 0 {
             self.push_scheduled_phase(scheduled_phase);
         }
 
-        self.process_phase_stack(tls, false);
+        self.process_phase_stack::<VM>(tls, false);
     }
 
-    pub fn continue_phase_stack(&self, tls: OpaquePointer) {
-        self.process_phase_stack(tls, true);
+    pub fn continue_phase_stack<VM: VMBinding>(&self, tls: OpaquePointer) {
+        self.process_phase_stack::<VM>(tls, true);
     }
 
     fn resume_complex_timers(&self) {
@@ -271,10 +272,10 @@ impl PhaseManager {
         }
     }
 
-    fn process_phase_stack(&self, tls: OpaquePointer, resume: bool) {
+    fn process_phase_stack<VM: VMBinding>(&self, tls: OpaquePointer, resume: bool) {
         let mut resume = resume;
-        let plan = VMActivePlan::global();
-        let collector = unsafe { VMActivePlan::collector(tls) };
+        let plan = VM::VMActivePlan::global();
+        let collector = unsafe { VM::VMActivePlan::collector(tls) };
         let order = collector.rendezvous();
         let primary = order == 0;
         if primary && resume {
@@ -320,7 +321,7 @@ impl PhaseManager {
                 }
                 Schedule::Mutator => {
                     debug!("Execute {:?} as Mutator...", phase);
-                    while let Some(mutator) = VMActivePlan::get_next_mutator() {
+                    while let Some(mutator) = VM::VMActivePlan::get_next_mutator() {
                         mutator.collection_phase(tls, &phase, primary);
                     }
                 }
@@ -341,7 +342,7 @@ impl PhaseManager {
             collector.rendezvous();
 
             if primary && schedule == Schedule::Mutator {
-                VMActivePlan::reset_mutator_iterator();
+                VM::VMActivePlan::reset_mutator_iterator();
             }
 
             if self.needs_mutator_reset_rendevous(is_even_phase) {

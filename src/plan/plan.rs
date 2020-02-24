@@ -6,16 +6,12 @@ use std::sync::atomic::{self, AtomicUsize, AtomicBool, Ordering};
 use ::util::OpaquePointer;
 use ::policy::space::Space;
 use ::util::heap::PageResource;
-use ::vm::{Collection, VMCollection, ActivePlan, VMActivePlan, ObjectModel, VMObjectModel};
+use ::vm::{Collection, ActivePlan, ObjectModel};
 use super::controller_collector_context::ControllerCollectorContext;
 use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use util::constants::LOG_BYTES_IN_MBYTE;
 use util::heap::{VMRequest, HeapMeta};
 use policy::immortalspace::ImmortalSpace;
-#[cfg(feature = "jikesrvm")]
-use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_END;
-#[cfg(feature = "jikesrvm")]
-use vm::jikesrvm::heap_layout_constants::BOOT_IMAGE_DATA_START;
 use util::Address;
 use util::statistics::stats::Stats;
 use util::statistics::counter::{Counter, LongCounter};
@@ -27,11 +23,11 @@ use util::options::{Options, UnsafeOptionsWrapper};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use mmtk::MMTK;
+use vm::VMBinding;
 
 // FIXME: Move somewhere more appropriate
-#[cfg(feature = "jikesrvm")]
-pub fn create_vm_space(vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> ImmortalSpace {
-    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
+pub fn create_vm_space<VM: VMBinding>(vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta, boot_segment_bytes: usize) -> ImmortalSpace<VM> {
+//    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
 
     let boot_segment_mb = unsafe{Address::from_usize(boot_segment_bytes)}
@@ -40,19 +36,13 @@ pub fn create_vm_space(vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: 
     ImmortalSpace::new("boot", false, VMRequest::fixed_size(boot_segment_mb), vm_map, mmapper, heap)
 }
 
-#[cfg(feature = "openjdk")]
-pub fn create_vm_space(vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> ImmortalSpace {
-    // FIXME: Does OpenJDK care?
-    ImmortalSpace::new("boot", false, VMRequest::fixed_size(0), vm_map, mmapper, heap)
-}
-
-pub trait Plan: Sized {
+pub trait Plan<VM: VMBinding>: Sized {
     type MutatorT: MutatorContext;
     type TraceLocalT: TraceLocal;
-    type CollectorT: ParallelCollector;
+    type CollectorT: ParallelCollector<VM>;
 
     fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>) -> Self;
-    fn common(&self) -> &CommonPlan;
+    fn common(&self) -> &CommonPlan<VM>;
     fn mmapper(&self) -> &'static Mmapper {
         self.common().mmapper
     }
@@ -60,7 +50,7 @@ pub trait Plan: Sized {
         &self.common().options
     }
     // unsafe because this can only be called once by the init thread
-    unsafe fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
+    fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
     fn bind_mutator(&'static self, tls: OpaquePointer) -> *mut c_void;
     fn will_never_move(&self, object: ObjectReference) -> bool;
     // unsafe because only the primary collector thread can call this
@@ -70,7 +60,7 @@ pub trait Plan: Sized {
         self.common().initialized.load(Ordering::SeqCst)
     }
 
-    fn poll<PR: PageResource>(&self, space_full: bool, space: &'static PR::Space) -> bool {
+    fn poll<PR: PageResource<VM>>(&self, space_full: bool, space: &'static PR::Space) -> bool {
         if self.collection_required::<PR>(space_full, space) {
             // FIXME
             /*if space == META_DATA_SPACE {
@@ -103,7 +93,7 @@ pub trait Plan: Sized {
         return false;
     }
 
-    fn log_poll<PR: PageResource>(&self, space: &'static PR::Space, message: &'static str) {
+    fn log_poll<PR: PageResource<VM>>(&self, space: &'static PR::Space, message: &'static str) {
         info!("  [POLL] {}: {}", space.get_name(), message);
     }
 
@@ -115,7 +105,7 @@ pub trait Plan: Sized {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required<PR: PageResource>(&self, space_full: bool, space: &'static PR::Space) -> bool where Self: Sized {
+    fn collection_required<PR: PageResource<VM>>(&self, space_full: bool, space: &'static PR::Space) -> bool where Self: Sized {
         let stress_force_gc = self.stress_test_gc_required();
         trace!("self.get_pages_reserved()={}, self.get_total_pages()={}",
                self.get_pages_reserved(), self.get_total_pages());
@@ -186,7 +176,7 @@ pub trait Plan: Sized {
         if force || !self.options().ignore_system_g_c {
             self.common().user_triggered_collection.store(true, Ordering::Relaxed);
             self.common().control_collector_context.request();
-            VMCollection::block_for_gc(tls);
+            VM::VMCollection::block_for_gc(tls);
         }
     }
 
@@ -216,7 +206,7 @@ pub trait Plan: Sized {
         if !self.is_valid_ref(object) {
             return false;
         }
-        if !self.mmapper().address_is_mapped(VMObjectModel::ref_to_address(object)) {
+        if !self.mmapper().address_is_mapped(VM::VMObjectModel::ref_to_address(object)) {
             return false;
         }
         true
@@ -242,7 +232,7 @@ pub enum GcStatus {
     GcProper,
 }
 
-pub struct CommonPlan {
+pub struct CommonPlan<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
     pub options: Arc<UnsafeOptionsWrapper>,
@@ -264,14 +254,14 @@ pub struct CommonPlan {
     // Lock used for out of memory handling
     pub oom_lock: Mutex<()>,
 
-    pub control_collector_context: ControllerCollectorContext,
+    pub control_collector_context: ControllerCollectorContext<VM>,
 
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
 }
 
-impl CommonPlan {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>, heap: HeapMeta) -> CommonPlan {
+impl<VM: VMBinding> CommonPlan<VM> {
+    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>, heap: HeapMeta) -> CommonPlan<VM> {
         CommonPlan {
             vm_map, mmapper, options, heap,
             stats: Stats::new(),

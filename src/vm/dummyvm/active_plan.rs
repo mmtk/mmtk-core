@@ -2,16 +2,16 @@ use ::plan::{Plan, SelectedPlan};
 use super::super::ActivePlan;
 use ::util::OpaquePointer;
 use libc::c_void;
-use vm::openjdk::OpenJDK;
+use vm::dummyvm::DummyVM;
 
 pub struct VMActivePlan<> {}
 
-impl ActivePlan<OpenJDK> for VMActivePlan {
-    fn global() -> &'static SelectedPlan<OpenJDK> {
+impl ActivePlan<DummyVM> for VMActivePlan {
+    fn global() -> &'static SelectedPlan<DummyVM> {
         &::mmtk::SINGLETON.plan
     }
 
-    unsafe fn collector(tls: OpaquePointer) -> &'static mut <SelectedPlan<OpenJDK> as Plan<OpenJDK>>::CollectorT {
+    unsafe fn collector(tls: OpaquePointer) -> &'static mut <SelectedPlan<DummyVM> as Plan<DummyVM>>::CollectorT {
         unimplemented!()
     }
 
@@ -20,7 +20,7 @@ impl ActivePlan<OpenJDK> for VMActivePlan {
         true
     }
 
-    unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan<OpenJDK> as Plan<OpenJDK>>::MutatorT {
+    unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan<DummyVM> as Plan<DummyVM>>::MutatorT {
         unimplemented!()
     }
 
@@ -32,7 +32,7 @@ impl ActivePlan<OpenJDK> for VMActivePlan {
         unimplemented!()
     }
 
-    fn get_next_mutator() -> Option<&'static mut <SelectedPlan<OpenJDK> as Plan<OpenJDK>>::MutatorT> {
+    fn get_next_mutator() -> Option<&'static mut <SelectedPlan<DummyVM> as Plan<DummyVM>>::MutatorT> {
         unimplemented!()
     }
 }

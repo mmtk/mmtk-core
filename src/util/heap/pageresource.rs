@@ -1,6 +1,6 @@
 use ::util::address::Address;
 use ::policy::space::Space;
-use ::vm::{ActivePlan, VMActivePlan};
+use ::vm::ActivePlan;
 use ::util::OpaquePointer;
 
 use std::marker::PhantomData;
@@ -10,9 +10,10 @@ use std::fmt::Debug;
 
 use libc::c_void;
 use util::heap::layout::heap_layout::VMMap;
+use vm::VMBinding;
 
-pub trait PageResource: Sized + 'static + Debug {
-    type Space: Space<PR = Self>;
+pub trait PageResource<VM: VMBinding>: Sized + 'static {
+    type Space: Space<VM, PR = Self>;
 
     /// Allocate pages from this resource.
     /// Simply bump the cursor, and fail if we hit the sentinel.
@@ -68,7 +69,7 @@ pub trait PageResource: Sized + 'static + Debug {
         let delta = actual_pages - reserved_pages;
         self.common().reserved.fetch_add(delta, Ordering::Relaxed);
         self.common().committed.fetch_add(actual_pages, Ordering::Relaxed);
-        if unsafe{VMActivePlan::is_mutator(tls)} {
+        if unsafe{VM::VMActivePlan::is_mutator(tls)} {
             self.vm_map().add_to_cumulative_committed_pages(actual_pages);
         }
     }
@@ -85,15 +86,14 @@ pub trait PageResource: Sized + 'static + Debug {
         self.common_mut().space = Some(space);
     }
 
-    fn common(&self) -> &CommonPageResource<Self>;
-    fn common_mut(&mut self) -> &mut CommonPageResource<Self>;
+    fn common(&self) -> &CommonPageResource<VM, Self>;
+    fn common_mut(&mut self) -> &mut CommonPageResource<VM, Self>;
     fn vm_map(&self) -> &'static VMMap {
         self.common().space.unwrap().common().vm_map()
     }
 }
 
-#[derive(Debug)]
-pub struct CommonPageResource<PR: PageResource> {
+pub struct CommonPageResource<VM: VMBinding, PR: PageResource<VM>> {
     pub reserved: AtomicUsize,
     pub committed: AtomicUsize,
 

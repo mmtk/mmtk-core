@@ -6,9 +6,10 @@ use ::util::OpaquePointer;
 use libc::c_void;
 use plan::phase::PhaseManager;
 use mmtk::MMTK;
+use vm::VMBinding;
 
-pub trait CollectorContext {
-    fn new(mmtk: &'static MMTK) -> Self;
+pub trait CollectorContext<VM: VMBinding> {
+    fn new(mmtk: &'static MMTK<VM>) -> Self;
     /// Notify that the collector context is registered and ready to execute.
     fn init(&mut self, tls: OpaquePointer);
     /// Allocate space for copying an object.
