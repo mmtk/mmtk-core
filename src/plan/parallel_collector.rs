@@ -1,8 +1,9 @@
 use super::ParallelCollectorGroup;
 use super::CollectorContext;
 use super::TraceLocal;
+use vm::VMBinding;
 
-pub trait ParallelCollector: CollectorContext + Sized {
+pub trait ParallelCollector<VM: VMBinding>: CollectorContext<VM> + Sized {
     type T: TraceLocal;
 
     fn park(&mut self);
@@ -16,6 +17,6 @@ pub trait ParallelCollector: CollectorContext + Sized {
     fn set_last_trigger_count(&mut self, val: usize);
     fn increment_last_trigger_count(&mut self);
 
-    fn set_group(&mut self, group: *const ParallelCollectorGroup<Self>);
+    fn set_group(&mut self, group: *const ParallelCollectorGroup<VM, Self>);
     fn set_worker_ordinal(&mut self, ordinal: usize);
 }

@@ -3,9 +3,10 @@ use ::plan::Allocator;
 use ::util::OpaquePointer;
 
 use libc::c_void;
+use vm::VMBinding;
 
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/vm/ObjectModel.java
-pub trait ObjectModel {
+pub trait ObjectModel<VM: VMBinding> {
     fn copy(from: ObjectReference, allocator: Allocator, tls: OpaquePointer) -> ObjectReference;
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address;
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference;

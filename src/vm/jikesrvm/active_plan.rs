@@ -9,19 +9,24 @@ use super::JTOC_BASE;
 
 use std::mem;
 use libc::c_void;
+use vm::jikesrvm::JikesRVM;
 
 static MUTATOR_COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
 pub struct VMActivePlan<> {}
 
-impl ActivePlan for VMActivePlan {
+impl ActivePlan<JikesRVM> for VMActivePlan {
+    fn global() -> &'static SelectedPlan<JikesRVM> {
+        &::mmtk::SINGLETON.plan
+    }
+
     // XXX: Are they actually static
-    unsafe fn collector(tls: OpaquePointer) -> &'static mut <SelectedPlan as Plan>::CollectorT {
+    unsafe fn collector(tls: OpaquePointer) -> &'static mut <SelectedPlan<JikesRVM> as Plan<JikesRVM>>::CollectorT {
         let thread: Address = unsafe { mem::transmute(tls) };
         let system_thread = Address::from_usize(
             (thread + SYSTEM_THREAD_FIELD_OFFSET).load::<usize>());
         let cc = &mut *((system_thread + WORKER_INSTANCE_FIELD_OFFSET)
-            .load::<*mut <SelectedPlan as Plan>::CollectorT>());
+            .load::<*mut <SelectedPlan<JikesRVM> as Plan<JikesRVM>>::CollectorT>());
 
         cc
     }
@@ -32,10 +37,10 @@ impl ActivePlan for VMActivePlan {
     }
 
     // XXX: Are they actually static
-    unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan as Plan>::MutatorT {
+    unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan<JikesRVM> as Plan<JikesRVM>>::MutatorT {
         let thread: Address = unsafe { mem::transmute(tls) };
         let mutator = (thread + MMTK_HANDLE_FIELD_OFFSET).load::<usize>();
-        &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT)
+        &mut *(mutator as *mut <SelectedPlan<JikesRVM> as Plan<JikesRVM>>::MutatorT)
     }
 
     fn collector_count() -> usize {
@@ -46,7 +51,7 @@ impl ActivePlan for VMActivePlan {
         MUTATOR_COUNTER.reset();
     }
 
-    fn get_next_mutator() -> Option<&'static mut <SelectedPlan as Plan>::MutatorT> {
+    fn get_next_mutator() -> Option<&'static mut <SelectedPlan<JikesRVM> as Plan<JikesRVM>>::MutatorT> {
         loop {
             let idx = MUTATOR_COUNTER.increment();
             let num_threads = unsafe { (JTOC_BASE + NUM_THREADS_FIELD_OFFSET).load::<usize>() };
@@ -60,7 +65,7 @@ impl ActivePlan for VMActivePlan {
                     unsafe {
                         let mutator = (t + MMTK_HANDLE_FIELD_OFFSET).load::<usize>();
                         let ret =
-                            &mut *(mutator as *mut <SelectedPlan as Plan>::MutatorT);
+                            &mut *(mutator as *mut <SelectedPlan<JikesRVM> as Plan<JikesRVM>>::MutatorT);
                         return Some(ret);
                     }
                 }

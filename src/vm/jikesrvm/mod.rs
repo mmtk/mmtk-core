@@ -23,13 +23,23 @@ pub mod heap_layout_constants;
 pub mod boot_image_size;
 pub mod scan_sanity;
 pub mod reference_glue;
+pub mod api;
 
 use ::util::address::Address;
 use plan::TraceLocal;
+use vm::VMBinding;
 
 pub static mut JTOC_BASE: Address = Address(0);
 
-pub struct JikesRVM {}
+pub struct JikesRVM;
+
+impl VMBinding for JikesRVM {
+    type VMObjectModel = object_model::VMObjectModel;
+    type VMScanning = scanning::VMScanning;
+    type VMCollection = collection::VMCollection;
+    type VMActivePlan = active_plan::VMActivePlan;
+    type VMReferenceGlue = reference_glue::VMReferenceGlue;
+}
 
 impl JikesRVM {
     #[inline(always)]

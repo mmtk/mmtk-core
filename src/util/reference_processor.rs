@@ -4,11 +4,12 @@ use std::vec::Vec;
 
 use ::util::OpaquePointer;
 use ::util::{Address, ObjectReference};
-use ::vm::{ActivePlan, VMActivePlan, ReferenceGlue, VMReferenceGlue};
+use ::vm::{ActivePlan, ReferenceGlue};
 use ::plan::{Plan, TraceLocal, MutatorContext};
 use ::plan::selected_plan::SelectedPlan;
 
 use libc::c_void;
+use vm::VMBinding;
 
 pub struct ReferenceProcessors {
     soft: ReferenceProcessor,
@@ -33,35 +34,35 @@ impl ReferenceProcessors {
         }
     }
 
-    pub fn add_soft_candidate(&self, reff: ObjectReference, referent: ObjectReference) {
-        self.soft.add_candidate(reff, referent);
+    pub fn add_soft_candidate<VM: VMBinding>(&self, reff: ObjectReference, referent: ObjectReference) {
+        self.soft.add_candidate::<VM>(reff, referent);
     }
 
-    pub fn add_weak_candidate(&self, reff: ObjectReference, referent: ObjectReference) {
-        self.weak.add_candidate(reff, referent);
+    pub fn add_weak_candidate<VM: VMBinding>(&self, reff: ObjectReference, referent: ObjectReference) {
+        self.weak.add_candidate::<VM>(reff, referent);
     }
 
-    pub fn add_phantom_candidate(&self, reff: ObjectReference, referent: ObjectReference) {
-        self.phantom.add_candidate(reff, referent);
+    pub fn add_phantom_candidate<VM: VMBinding>(&self, reff: ObjectReference, referent: ObjectReference) {
+        self.phantom.add_candidate::<VM>(reff, referent);
     }
 
-    pub fn forward_refs<T: TraceLocal>(&self, trace: &mut T) {
-        self.soft.forward(trace, false);
-        self.weak.forward(trace, false);
-        self.phantom.forward(trace, false);
+    pub fn forward_refs<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T) {
+        self.soft.forward::<VM, T>(trace, false);
+        self.weak.forward::<VM, T>(trace, false);
+        self.phantom.forward::<VM, T>(trace, false);
     }
 
-    pub fn scan_weak_refs<T: TraceLocal>(&self, trace: &mut T, tls: OpaquePointer) {
-        self.soft.scan(trace, false, false, tls);
-        self.weak.scan(trace, false, false, tls);
+    pub fn scan_weak_refs<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, tls: OpaquePointer) {
+        self.soft.scan::<VM, T>(trace, false, false, tls);
+        self.weak.scan::<VM, T>(trace, false, false, tls);
     }
 
-    pub fn scan_soft_refs<T: TraceLocal>(&self, trace: &mut T, tls: OpaquePointer) {
-        self.soft.scan(trace, false, false, tls);
+    pub fn scan_soft_refs<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, tls: OpaquePointer) {
+        self.soft.scan::<VM, T>(trace, false, false, tls);
     }
 
-    pub fn scan_phantom_refs<T: TraceLocal>(&self, trace: &mut T, tls: OpaquePointer) {
-        self.phantom.scan(trace, false, false, tls);
+    pub fn scan_phantom_refs<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, tls: OpaquePointer) {
+        self.phantom.scan::<VM, T>(trace, false, false, tls);
     }
 }
 
@@ -147,13 +148,13 @@ impl ReferenceProcessor {
         (&mut *self.sync.get()).get_mut().unwrap()
     }
 
-    pub fn add_candidate(&self, reff: ObjectReference, referent: ObjectReference) {
+    pub fn add_candidate<VM: VMBinding>(&self, reff: ObjectReference, referent: ObjectReference) {
         let mut sync = self.sync().lock().unwrap();
-        VMReferenceGlue::set_referent(reff, referent);
+        VM::VMReferenceGlue::set_referent(reff, referent);
         sync.references.push(reff.to_address());
     }
 
-    pub fn forward<T: TraceLocal>(&self, trace: &mut T, nursery: bool) {
+    pub fn forward<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, nursery: bool) {
         let mut sync = unsafe { self.sync_mut() };
         let references: &mut Vec<Address> = &mut sync.references;
         // XXX: Copies `unforwarded_references` out. Should be fine since it's not accessed
@@ -168,8 +169,8 @@ impl ReferenceProcessor {
         for i in 0 .. references.len() {
             let reference = unsafe { unforwarded_references[i].to_object_reference() };
             if TRACE_DETAIL { trace!("slot {:?}: forwarding {:?}", i, reference); }
-            VMReferenceGlue::set_referent(reference, trace.get_forwarded_referent(
-                VMReferenceGlue::get_referent(reference)));
+            VM::VMReferenceGlue::set_referent(reference, trace.get_forwarded_referent(
+                VM::VMReferenceGlue::get_referent(reference)));
             let new_reference = trace.get_forwarded_reference(reference);
             unforwarded_references[i] = new_reference.to_address();
         }
@@ -178,7 +179,7 @@ impl ReferenceProcessor {
         sync.unforwarded_references = None;
     }
 
-    fn scan<T: TraceLocal>(&self, trace: &mut T, nursery: bool, retain: bool, tls: OpaquePointer) {
+    fn scan<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, nursery: bool, retain: bool, tls: OpaquePointer) {
         let sync = unsafe { self.sync_mut() };
         sync.unforwarded_references = Some(sync.references.clone());
         let references: &mut Vec<Address> = &mut sync.references;
@@ -190,14 +191,14 @@ impl ReferenceProcessor {
         if retain {
             for from_index in to_index .. references.len() {
                 let reference = unsafe { references[from_index].to_object_reference() };
-                self.retain_referent(trace, reference);
+                self.retain_referent::<VM, T>(trace, reference);
             }
         } else {
             for from_index in to_index .. references.len() {
                 let reference = unsafe { references[from_index].to_object_reference() };
 
                 /* Determine liveness (and forward if necessary) the reference */
-                let new_reference = VMReferenceGlue::process_reference(trace, reference, tls);
+                let new_reference = VM::VMReferenceGlue::process_reference(trace, reference, tls);
                 if !new_reference.is_null() {
                     references[to_index] = new_reference.to_address();
                     to_index += 1;
@@ -214,7 +215,7 @@ impl ReferenceProcessor {
         }
 
         /* flush out any remset entries generated during the above activities */
-        unsafe { VMActivePlan::mutator(tls).flush_remembered_sets(); }
+        unsafe { VM::VMActivePlan::mutator(tls).flush_remembered_sets(); }
         if TRACE { trace!("Ending ReferenceProcessor.scan({:?})", self.semantics); }
     }
 
@@ -225,7 +226,7 @@ impl ReferenceProcessor {
      * be the address of a heap object, depending on the VM.
      * @param trace the thread local trace element.
      */
-    fn retain_referent<T: TraceLocal>(&self, trace: &mut T, reference: ObjectReference) {
+    fn retain_referent<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, reference: ObjectReference) {
         debug_assert!(!reference.is_null());
         debug_assert!(self.semantics == Semantics::SOFT);
 
@@ -242,7 +243,7 @@ impl ReferenceProcessor {
         /*
          * Reference is definitely reachable.  Retain the referent.
          */
-        let referent = VMReferenceGlue::get_referent(reference);
+        let referent = VM::VMReferenceGlue::get_referent(reference);
         if !referent.is_null() {
             trace.retain_referent(referent);
         }

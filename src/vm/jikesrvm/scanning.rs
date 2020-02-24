@@ -8,9 +8,12 @@ use ::util::{ObjectReference, Address, SynchronizedCounter};
 use ::vm::jikesrvm::entrypoint::*;
 use super::JTOC_BASE;
 use super::super::unboxed_size_constants::LOG_BYTES_IN_ADDRESS;
-use super::super::{ObjectModel, VMObjectModel};
-use super::super::{ActivePlan, VMActivePlan};
-use super::collection::VMCollection;
+use vm::jikesrvm::object_model::VMObjectModel;
+use vm::ObjectModel;
+use vm::jikesrvm::active_plan::VMActivePlan;
+use vm::ActivePlan;
+use vm::jikesrvm::collection::VMCollection;
+use vm::Collection;
 use std::mem::size_of;
 use std::slice;
 use ::vm::jikesrvm::java_header::TIB_OFFSET;
@@ -19,6 +22,7 @@ use ::vm::unboxed_size_constants::BYTES_IN_ADDRESS;
 use ::util::OpaquePointer;
 
 use libc::c_void;
+use vm::jikesrvm::JikesRVM;
 
 static COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
@@ -26,7 +30,7 @@ pub struct VMScanning {}
 
 const DUMP_REF: bool = false;
 
-impl Scanning for VMScanning {
+impl Scanning<JikesRVM> for VMScanning {
     fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, tls: OpaquePointer) {
         if DUMP_REF {
             let obj_ptr = object.value();

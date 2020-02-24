@@ -4,13 +4,14 @@ use std::cell::UnsafeCell;
 use std::sync::{Mutex, Condvar};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use ::vm::{Collection, VMCollection};
+use ::vm::Collection;
 
 use ::plan::{Plan, ParallelCollector};
 use ::plan::selected_plan::SelectedPlan;
 
 use libc::c_void;
 use util::OpaquePointer;
+use vm::VMBinding;
 
 struct RequestSync {
     tls: OpaquePointer,
@@ -18,17 +19,17 @@ struct RequestSync {
     last_request_count: isize,
 }
 
-pub struct ControllerCollectorContext {
+pub struct ControllerCollectorContext<VM: VMBinding> {
     request_sync: Mutex<RequestSync>,
     request_condvar: Condvar,
 
-    pub workers: UnsafeCell<ParallelCollectorGroup<<SelectedPlan as Plan>::CollectorT>>,
+    pub workers: UnsafeCell<ParallelCollectorGroup<VM, <SelectedPlan<VM> as Plan<VM>>::CollectorT>>,
     request_flag: AtomicBool,
 }
 
-unsafe impl Sync for ControllerCollectorContext {}
+unsafe impl<VM: VMBinding> Sync for ControllerCollectorContext<VM> {}
 
-impl ControllerCollectorContext {
+impl<VM: VMBinding> ControllerCollectorContext<VM> {
     pub fn new() -> Self {
         ControllerCollectorContext {
             request_sync: Mutex::new(RequestSync {
@@ -38,7 +39,7 @@ impl ControllerCollectorContext {
             }),
             request_condvar: Condvar::new(),
 
-            workers: UnsafeCell::new(ParallelCollectorGroup::<<SelectedPlan as Plan>::CollectorT>::new()),
+            workers: UnsafeCell::new(ParallelCollectorGroup::<VM, <SelectedPlan<VM> as Plan<VM>>::CollectorT>::new()),
             request_flag: AtomicBool::new(false),
         }
     }
@@ -57,7 +58,7 @@ impl ControllerCollectorContext {
             self.wait_for_request();
             debug!("[STWController: Request recieved.]");
             debug!("[STWController: Stopping the world...]");
-            VMCollection::stop_all_mutators(tls);
+            VM::VMCollection::stop_all_mutators(tls);
 
             // For heap growth logic
             // FIXME: This is not used. However, we probably want to set a 'user_triggered' flag
@@ -72,7 +73,7 @@ impl ControllerCollectorContext {
             workers.wait_for_cycle();
             debug!("[STWController: Worker threads complete!]");
             debug!("[STWController: Resuming mutators...]");
-            VMCollection::resume_mutators(tls);
+            VM::VMCollection::resume_mutators(tls);
         }
     }
 

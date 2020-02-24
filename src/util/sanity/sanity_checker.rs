@@ -1,6 +1,5 @@
 use ::plan::{TransitiveClosure, TraceLocal};
 use ::util::{Address, ObjectReference};
-use ::vm::VMScanning;
 use ::vm::Scanning;
 use ::policy::space::Space;
 use ::util::OpaquePointer;
@@ -11,17 +10,18 @@ use ::plan::Plan;
 use ::plan::SelectedPlan;
 
 use libc::c_void;
+use vm::VMBinding;
 
-pub struct SanityChecker<'a> {
+pub struct SanityChecker<'a, VM: VMBinding> {
     roots: Vec<Address>,
     values: LinkedList<ObjectReference>,
     refs: HashSet<ObjectReference>,
     tls: OpaquePointer,
-    plan: &'a SelectedPlan,
+    plan: &'a SelectedPlan<VM>,
 }
 
-impl<'a> SanityChecker<'a> {
-    pub fn new(tls: OpaquePointer, plan: &'a SelectedPlan) -> Self {
+impl<'a, VM: VMBinding> SanityChecker<'a, VM> {
+    pub fn new(tls: OpaquePointer, plan: &'a SelectedPlan<VM>) -> Self {
         SanityChecker {
             roots: Vec::new(),
             values: LinkedList::new(),
@@ -35,15 +35,15 @@ impl<'a> SanityChecker<'a> {
         self.plan.common().enter_sanity();
 
         println!("Sanity stackroots, collector");
-        VMScanning::compute_thread_roots(self, self.tls);
+        VM::VMScanning::compute_thread_roots(self, self.tls);
         println!("Sanity stackroots, global");
-        VMScanning::notify_initial_thread_scan_complete(false, self.tls);
+        VM::VMScanning::notify_initial_thread_scan_complete(false, self.tls);
         println!("Sanity roots, collector");
-        VMScanning::compute_global_roots(self, self.tls);
-        VMScanning::compute_static_roots(self, self.tls);
-        VMScanning::compute_bootimage_roots(self, self.tls);
+        VM::VMScanning::compute_global_roots(self, self.tls);
+        VM::VMScanning::compute_static_roots(self, self.tls);
+        VM::VMScanning::compute_bootimage_roots(self, self.tls);
         println!("Sanity roots, global");
-        VMScanning::reset_thread_counter();
+        VM::VMScanning::reset_thread_counter();
 
         self.process_roots();
         self.complete_trace();
@@ -56,7 +56,7 @@ impl<'a> SanityChecker<'a> {
     }
 }
 
-impl<'a> TransitiveClosure for SanityChecker<'a> {
+impl<'a, VM: VMBinding> TransitiveClosure for SanityChecker<'a, VM> {
     fn process_edge(&mut self, slot: Address) {
         trace!("process_edge({:?})", slot);
         let object: ObjectReference = unsafe { slot.load() };
@@ -71,7 +71,7 @@ impl<'a> TransitiveClosure for SanityChecker<'a> {
     }
 }
 
-impl<'a> TraceLocal for SanityChecker<'a> {
+impl<'a, VM: VMBinding> TraceLocal for SanityChecker<'a, VM> {
     fn process_roots(&mut self) {
         loop {
             if self.roots.is_empty() {
@@ -117,7 +117,7 @@ impl<'a> TraceLocal for SanityChecker<'a> {
 
             let object = self.values.pop_front().unwrap();
             let tls = self.tls;
-            VMScanning::scan_object(self, object, tls);
+            VM::VMScanning::scan_object(self, object, tls);
         }
     }
 

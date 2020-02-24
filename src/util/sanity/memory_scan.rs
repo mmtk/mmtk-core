@@ -5,8 +5,9 @@ use ::plan::SelectedPlan;
 use ::plan::Plan;
 
 use std;
+use vm::VMBinding;
 
-pub fn scan_region(plan: &SelectedPlan){
+pub fn scan_region<VM: VMBinding>(plan: &SelectedPlan<VM>){
     loop {
         let mut buf = String::new();
         println!("start end <value>");

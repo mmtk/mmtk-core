@@ -3,12 +3,13 @@ use ::util::Address;
 use ::plan::TraceLocal;
 use ::util::OpaquePointer;
 use libc::c_void;
+use vm::VMBinding;
 
 /**
  * VM-specific stuff for util::ReferenceProcessor
  * a.k.a Pavel gets fed up with OOP
  */
-pub trait ReferenceGlue {
+pub trait ReferenceGlue<VM: VMBinding> {
     fn clear_referent(new_reference: ObjectReference) {
         Self::set_referent(new_reference, unsafe { Address::zero().to_object_reference() });
     }

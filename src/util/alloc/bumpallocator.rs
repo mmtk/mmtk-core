@@ -7,7 +7,6 @@ use ::util::alloc::linear_scan::LinearScan;
 use ::util::alloc::dump_linear_scan::DumpLinearScan;
 
 use ::vm::ObjectModel;
-use ::vm::VMObjectModel;
 
 use std::marker::PhantomData;
 
@@ -18,6 +17,7 @@ use util::conversions::bytes_to_pages;
 use ::util::constants::BYTES_IN_ADDRESS;
 use ::util::OpaquePointer;
 use ::plan::selected_plan::SelectedPlan;
+use vm::VMBinding;
 
 const BYTES_IN_PAGE: usize = 1 << 12;
 const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
@@ -28,18 +28,15 @@ const NEXT_REGION_OFFSET: isize = REGION_LIMIT_OFFSET + BYTES_IN_ADDRESS as isiz
 const DATA_END_OFFSET: isize = NEXT_REGION_OFFSET + BYTES_IN_ADDRESS as isize;
 
 #[repr(C)]
-#[derive(Derivative)]
-#[derivative(Debug)]
-pub struct BumpAllocator<PR: PageResource> {
+pub struct BumpAllocator<VM: VMBinding, PR: PageResource<VM>> {
     pub tls: OpaquePointer,
     cursor: Address,
     limit: Address,
     space: Option<&'static PR::Space>,
-    #[derivative(Debug="ignore")]
-    plan: &'static SelectedPlan,
+    plan: &'static SelectedPlan<VM>,
 }
 
-impl<PR: PageResource> BumpAllocator<PR> {
+impl<VM: VMBinding, PR: PageResource<VM>> BumpAllocator<VM, PR> {
     pub fn set_limit(&mut self, cursor: Address, limit: Address) {
         self.cursor = cursor;
         self.limit = limit;
@@ -68,7 +65,7 @@ impl<PR: PageResource> BumpAllocator<PR> {
         let current_limit = if end.is_zero() { self.cursor } else { end };
 
         let mut current: ObjectReference = unsafe {
-            VMObjectModel::get_object_from_start_address(start)
+            VM::VMObjectModel::get_object_from_start_address(start)
         };
 
         println!("start: {}, first object: {}", start, current);
@@ -76,9 +73,9 @@ impl<PR: PageResource> BumpAllocator<PR> {
         /* Loop through each object up to the limit */
         loop {
             /* Read end address first, as scan may be destructive */
-            let current_object_end: Address = VMObjectModel::get_object_end_address(current);
+            let current_object_end: Address = VM::VMObjectModel::get_object_end_address(current);
             println!("current object: {} end: {}", current, current_object_end);
-            scanner.scan(current);
+            scanner.scan::<VM>(current);
             if current_object_end > current_limit {
                 /* We have scanned the last object */
                 break;
@@ -86,7 +83,7 @@ impl<PR: PageResource> BumpAllocator<PR> {
 
             /* Find the next object from the start address (dealing with alignment gaps, etc.) */
             let next: ObjectReference = unsafe {
-                VMObjectModel::get_object_from_start_address(current_object_end)
+                VM::VMObjectModel::get_object_from_start_address(current_object_end)
             };
             println!("next object: {}", next);
             /* Must be monotonically increasing */
@@ -97,11 +94,11 @@ impl<PR: PageResource> BumpAllocator<PR> {
     }
 }
 
-impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
+impl<VM: VMBinding, PR: PageResource<VM>> Allocator<VM, PR> for BumpAllocator<VM, PR> {
     fn get_space(&self) -> Option<&'static PR::Space> {
         self.space
     }
-    fn get_plan(&self) -> &'static SelectedPlan {
+    fn get_plan(&self) -> &'static SelectedPlan<VM> {
         self.plan
     }
 
@@ -144,8 +141,8 @@ impl<PR: PageResource> Allocator<PR> for BumpAllocator<PR> {
     }
 }
 
-impl<PR: PageResource> BumpAllocator<PR> {
-    pub fn new(tls: OpaquePointer, space: Option<&'static PR::Space>, plan: &'static SelectedPlan) -> Self {
+impl<VM: VMBinding, PR: PageResource<VM>> BumpAllocator<VM, PR> {
+    pub fn new(tls: OpaquePointer, space: Option<&'static PR::Space>, plan: &'static SelectedPlan<VM>) -> Self {
         BumpAllocator {
             tls,
             cursor: unsafe { Address::zero() },

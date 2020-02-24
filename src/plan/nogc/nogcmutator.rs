@@ -11,15 +11,16 @@ use ::mmtk::SINGLETON;
 use ::util::OpaquePointer;
 use libc::c_void;
 use plan::nogc::NoGC;
+use vm::VMBinding;
 
 #[repr(C)]
-pub struct NoGCMutator {
+pub struct NoGCMutator<VM: VMBinding> {
     // ImmortalLocal
-    nogc: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
-    los: LargeObjectAllocator,
+    nogc: BumpAllocator<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>,
+    los: LargeObjectAllocator<VM>,
 }
 
-impl MutatorContext for NoGCMutator {
+impl<VM: VMBinding> MutatorContext for NoGCMutator<VM> {
     fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         unimplemented!();
     }
@@ -56,8 +57,8 @@ impl MutatorContext for NoGCMutator {
     }
 }
 
-impl NoGCMutator {
-    pub fn new(tls: OpaquePointer, plan: &'static NoGC) -> Self {
+impl<VM: VMBinding> NoGCMutator<VM> {
+    pub fn new(tls: OpaquePointer, plan: &'static NoGC<VM>) -> Self {
         NoGCMutator {
             nogc: BumpAllocator::new(tls, Some(plan.get_immortal_space()), plan),
             los: LargeObjectAllocator::new(tls, Some(plan.get_los()), plan),

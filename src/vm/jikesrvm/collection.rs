@@ -7,13 +7,14 @@ use super::entrypoint::*;
 use super::JTOC_BASE;
 use libc::c_void;
 use util::OpaquePointer;
+use vm::jikesrvm::JikesRVM;
 
 pub static mut BOOT_THREAD: OpaquePointer = OpaquePointer::UNINITIALIZED;
 
 pub struct VMCollection {}
 
 // FIXME: Shouldn't these all be unsafe because of tls?
-impl Collection for VMCollection {
+impl Collection<JikesRVM> for VMCollection {
     #[inline(always)]
     fn stop_all_mutators(tls: OpaquePointer) {
         unsafe {
@@ -36,7 +37,7 @@ impl Collection for VMCollection {
     }
 
     #[inline(always)]
-    unsafe fn spawn_worker_thread<T: ParallelCollector>(tls: OpaquePointer, ctx: *mut T) {
+    unsafe fn spawn_worker_thread<T: ParallelCollector<JikesRVM>>(tls: OpaquePointer, ctx: *mut T) {
         jtoc_call!(SPAWN_COLLECTOR_THREAD_METHOD_OFFSET, tls, ctx);
     }
 

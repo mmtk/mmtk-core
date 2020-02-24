@@ -9,29 +9,30 @@ use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
 use ::plan::plan;
-use ::vm::{Collection, VMCollection};
+use ::vm::Collection;
 use ::util::heap::{PageResource, MonotonePageResource};
 use ::util::OpaquePointer;
 
 use libc::c_void;
 use plan::semispace::SemiSpace;
+use vm::VMBinding;
 
 #[repr(C)]
-pub struct SSMutator {
+pub struct SSMutator<VM: VMBinding> {
     // CopyLocal
-    ss: BumpAllocator<MonotonePageResource<CopySpace>>,
-    vs: BumpAllocator<MonotonePageResource<ImmortalSpace>>,
-    los: LargeObjectAllocator,
+    ss: BumpAllocator<VM, MonotonePageResource<VM, CopySpace<VM>>>,
+    vs: BumpAllocator<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>,
+    los: LargeObjectAllocator<VM>,
 
-    plan: &'static SemiSpace
+    plan: &'static SemiSpace<VM>
 }
 
-impl MutatorContext for SSMutator {
+impl<VM: VMBinding> MutatorContext for SSMutator<VM> {
     fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
             &Phase::PrepareStacks => {
                 if !self.plan.common.stacks_prepared() {
-                    VMCollection::prepare_mutator(self.ss.tls, self);
+                    VM::VMCollection::prepare_mutator(self.ss.tls, self);
                 }
                 self.flush_remembered_sets();
             }
@@ -96,8 +97,8 @@ impl MutatorContext for SSMutator {
     }
 }
 
-impl SSMutator {
-    pub fn new(tls: OpaquePointer, plan: &'static SemiSpace) -> Self {
+impl<VM: VMBinding> SSMutator<VM> {
+    pub fn new(tls: OpaquePointer, plan: &'static SemiSpace<VM>) -> Self {
         SSMutator {
             ss: BumpAllocator::new(tls, Some(plan.tospace()), plan),
             vs: BumpAllocator::new(tls, Some(plan.get_versatile_space()), plan),

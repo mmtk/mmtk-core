@@ -14,7 +14,7 @@ use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
 use ::util::forwarding_word::clear_forwarding_bits;
 use ::util::heap::{MonotonePageResource, PageResource};
 use ::util::reference_processor::*;
-use ::vm::{Scanning, VMScanning};
+use ::vm::Scanning;
 use libc::c_void;
 use super::sstracelocal::SSTraceLocal;
 use ::plan::selected_plan::SelectedConstraints;
@@ -23,26 +23,27 @@ use plan::semispace::SelectedPlan;
 use plan::semispace::SemiSpace;
 use plan::phase::ScheduledPhase;
 use mmtk::MMTK;
+use vm::VMBinding;
 
 /// per-collector thread behavior and state for the SS plan
-pub struct SSCollector {
+pub struct SSCollector<VM: VMBinding> {
     pub tls: OpaquePointer,
     // CopyLocal
-    pub ss: BumpAllocator<MonotonePageResource<CopySpace>>,
-    los: LargeObjectAllocator,
-    trace: SSTraceLocal,
+    pub ss: BumpAllocator<VM, MonotonePageResource<VM, CopySpace<VM>>>,
+    los: LargeObjectAllocator<VM>,
+    trace: SSTraceLocal<VM>,
 
     last_trigger_count: usize,
     worker_ordinal: usize,
-    group: Option<&'static ParallelCollectorGroup<SSCollector>>,
+    group: Option<&'static ParallelCollectorGroup<VM, SSCollector<VM>>>,
 
-    plan: &'static SemiSpace,
+    plan: &'static SemiSpace<VM>,
     phase_manager: &'static PhaseManager,
     reference_processors: &'static ReferenceProcessors,
 }
 
-impl CollectorContext for SSCollector {
-    fn new(mmtk: &'static MMTK) -> Self {
+impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
+    fn new(mmtk: &'static MMTK<VM>) -> Self {
         SSCollector {
             tls: OpaquePointer::UNINITIALIZED,
             ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
@@ -87,31 +88,31 @@ impl CollectorContext for SSCollector {
             &Phase::Prepare => { self.ss.rebind(Some(self.plan.tospace())) }
             &Phase::StackRoots => {
                 trace!("Computing thread roots");
-                VMScanning::compute_thread_roots(&mut self.trace, self.tls);
+                VM::VMScanning::compute_thread_roots(&mut self.trace, self.tls);
                 trace!("Thread roots complete");
             }
             &Phase::Roots => {
                 trace!("Computing global roots");
-                VMScanning::compute_global_roots(&mut self.trace, self.tls);
+                VM::VMScanning::compute_global_roots(&mut self.trace, self.tls);
                 trace!("Computing static roots");
-                VMScanning::compute_static_roots(&mut self.trace, self.tls);
+                VM::VMScanning::compute_static_roots(&mut self.trace, self.tls);
                 trace!("Finished static roots");
                 if super::ss::SCAN_BOOT_IMAGE {
                     trace!("Scanning boot image");
-                    VMScanning::compute_bootimage_roots(&mut self.trace, self.tls);
+                    VM::VMScanning::compute_bootimage_roots(&mut self.trace, self.tls);
                     trace!("Finished boot image");
                 }
             }
             &Phase::SoftRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    self.reference_processors.scan_soft_refs(&mut self.trace, self.tls)
+                    self.reference_processors.scan_soft_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
                 }
             }
             &Phase::WeakRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    self.reference_processors.scan_weak_refs(&mut self.trace, self.tls)
+                    self.reference_processors.scan_weak_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
                 }
             }
             &Phase::Finalizable => {
@@ -122,12 +123,12 @@ impl CollectorContext for SSCollector {
             &Phase::PhantomRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    self.reference_processors.scan_phantom_refs(&mut self.trace, self.tls)
+                    self.reference_processors.scan_phantom_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
                 }
             }
             &Phase::ForwardRefs => {
                 if primary && SelectedConstraints::NEEDS_FORWARD_AFTER_LIVENESS {
-                    self.reference_processors.forward_refs(&mut self.trace)
+                    self.reference_processors.forward_refs::<VM, SSTraceLocal<VM>>(&mut self.trace)
                 }
             }
             &Phase::ForwardFinalizable => {
@@ -156,7 +157,7 @@ impl CollectorContext for SSCollector {
     }
 
     fn post_copy(&self, object: ObjectReference, rvm_type: Address, bytes: usize, allocator: ::plan::Allocator) {
-        clear_forwarding_bits(object);
+        clear_forwarding_bits::<VM>(object);
         match allocator {
             ::plan::Allocator::Default => {}
             ::plan::Allocator::Los => {
@@ -169,8 +170,8 @@ impl CollectorContext for SSCollector {
     }
 }
 
-impl ParallelCollector for SSCollector {
-    type T = SSTraceLocal;
+impl<VM: VMBinding> ParallelCollector<VM> for SSCollector<VM> {
+    type T = SSTraceLocal<VM>;
 
     fn park(&mut self) {
         self.group.unwrap().park(self);
@@ -178,10 +179,10 @@ impl ParallelCollector for SSCollector {
 
     fn collect(&self) {
         // FIXME use reference instead of cloning everything
-        self.phase_manager.begin_new_phase_stack(self.tls, ScheduledPhase::new(phase::Schedule::Complex, self.phase_manager.collection_phase.clone()))
+        self.phase_manager.begin_new_phase_stack::<VM>(self.tls, ScheduledPhase::new(phase::Schedule::Complex, self.phase_manager.collection_phase.clone()))
     }
 
-    fn get_current_trace(&mut self) -> &mut SSTraceLocal {
+    fn get_current_trace(&mut self) -> &mut SSTraceLocal<VM> {
         &mut self.trace
     }
 
@@ -209,7 +210,7 @@ impl ParallelCollector for SSCollector {
         self.last_trigger_count += 1;
     }
 
-    fn set_group(&mut self, group: *const ParallelCollectorGroup<Self>) {
+    fn set_group(&mut self, group: *const ParallelCollectorGroup<VM, Self>) {
         self.group = Some(unsafe { &*group });
     }
 

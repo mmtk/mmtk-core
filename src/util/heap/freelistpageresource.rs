@@ -22,12 +22,12 @@ use super::vmrequest::HEAP_LAYOUT_64BIT;
 use super::layout::Mmapper;
 use super::PageResource;
 use util::heap::layout::heap_layout::VMMap;
+use vm::VMBinding;
 
 
 const SPACE_ALIGN: usize = 1 << 19;
 
 
-#[derive(Debug)]
 pub struct CommonFreeListPageResource {
     free_list: FreeList,
     start: Address,
@@ -41,22 +41,20 @@ impl CommonFreeListPageResource {
     }
 }
 
-#[derive(Debug)]
-pub struct FreeListPageResource<S: Space<PR = FreeListPageResource<S>>> {
-    common: CommonPageResource<FreeListPageResource<S>>,
+pub struct FreeListPageResource<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> {
+    common: CommonPageResource<VM, FreeListPageResource<VM, S>>,
     common_flpr: Box<CommonFreeListPageResource>,
     /** Number of pages to reserve at the start of every allocation */
     meta_data_pages_per_region: usize,
     sync: Mutex<FreeListPageResourceSync>,
 }
 
-#[derive(Debug)]
 struct FreeListPageResourceSync {
     pages_currently_on_freelist: usize,
     highwater_mark: i32,
 }
 
-impl <S: Space<PR = FreeListPageResource<S>>> Deref for FreeListPageResource<S> {
+impl <VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> Deref for FreeListPageResource<VM, S> {
     type Target = CommonFreeListPageResource;
 
     fn deref(&self) -> &CommonFreeListPageResource {
@@ -64,20 +62,20 @@ impl <S: Space<PR = FreeListPageResource<S>>> Deref for FreeListPageResource<S> 
     }
 }
 
-impl <S: Space<PR = FreeListPageResource<S>>> DerefMut for FreeListPageResource<S> {
+impl <VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> DerefMut for FreeListPageResource<VM, S> {
     fn deref_mut(&mut self) -> &mut CommonFreeListPageResource {
         &mut self.common_flpr
     }
 }
 
 
-impl<S: Space<PR = FreeListPageResource<S>>> PageResource for FreeListPageResource<S> {
+impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> PageResource<VM> for FreeListPageResource<VM, S> {
     type Space = S;
 
-    fn common(&self) -> &CommonPageResource<Self> {
+    fn common(&self) -> &CommonPageResource<VM, Self> {
         &self.common
     }
-    fn common_mut(&mut self) -> &mut CommonPageResource<Self> {
+    fn common_mut(&mut self) -> &mut CommonPageResource<VM, Self> {
         &mut self.common
     }
 
@@ -124,7 +122,7 @@ impl<S: Space<PR = FreeListPageResource<S>>> PageResource for FreeListPageResour
     }
 }
 
-impl<S: Space<PR = FreeListPageResource<S>>> FreeListPageResource<S> {
+impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPageResource<VM, S> {
     pub fn new_contiguous(space: &S, start: Address, bytes: usize, meta_data_pages_per_region: usize, vm_map: &'static VMMap) -> Self {
         let pages = conversions::bytes_to_pages(bytes);
         let common_flpr = unsafe {

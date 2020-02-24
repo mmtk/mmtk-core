@@ -27,33 +27,38 @@ use std::sync::Arc;
 use util::heap::HeapMeta;
 use util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END};
 use std::sync::atomic::Ordering;
+use vm::VMBinding;
 
-pub type SelectedPlan = NoGC;
+pub type SelectedPlan<VM> = NoGC<VM>;
 
-pub struct NoGC {
-    pub unsync: UnsafeCell<NoGCUnsync>,
-    pub common: CommonPlan,
+pub struct NoGC<VM: VMBinding> {
+    pub unsync: UnsafeCell<NoGCUnsync<VM>>,
+    pub common: CommonPlan<VM>,
 }
 
-unsafe impl Sync for NoGC {}
+unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
 
-pub struct NoGCUnsync {
-    vm_space: ImmortalSpace,
-    pub space: ImmortalSpace,
-    pub los: LargeObjectSpace,
+pub struct NoGCUnsync<VM: VMBinding> {
+    vm_space: Option<ImmortalSpace<VM>>,
+    pub space: ImmortalSpace<VM>,
+    pub los: LargeObjectSpace<VM>,
 }
 
-impl Plan for NoGC {
-    type MutatorT = NoGCMutator;
+impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
+    type MutatorT = NoGCMutator<VM>;
     type TraceLocalT = NoGCTraceLocal;
-    type CollectorT = NoGCCollector;
+    type CollectorT = NoGCCollector<VM>;
 
     fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         NoGC {
             unsync: UnsafeCell::new(NoGCUnsync {
-                vm_space: create_vm_space(vm_map, mmapper, &mut heap),
+                vm_space: if options.vm_space {
+                    Some(create_vm_space(vm_map, mmapper, &mut heap, options.vm_space_size))
+                } else {
+                    None
+                },
                 space: ImmortalSpace::new("nogc_space", true,
                                           VMRequest::discontiguous(), vm_map, mmapper, &mut heap),
                 los: LargeObjectSpace::new("los", true, VMRequest::discontiguous(), vm_map, mmapper, &mut heap),
@@ -62,18 +67,20 @@ impl Plan for NoGC {
         }
     }
 
-    unsafe fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+    fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
         vm_map.finalize_static_space_map(self.common.heap.get_discontig_start(), self.common.heap.get_discontig_end());
 
-        let unsync = &mut *self.unsync.get();
+        let unsync = unsafe { &mut *self.unsync.get() };
         self.common.heap.total_pages.store(bytes_to_pages(heap_size), Ordering::Relaxed);
         // FIXME correctly initialize spaces based on options
-        unsync.vm_space.init(vm_map);
+        if unsync.vm_space.is_some() {
+            unsync.vm_space.as_mut().unwrap().init(vm_map);
+        }
         unsync.space.init(vm_map);
         unsync.los.init(vm_map);
     }
 
-    fn common(&self) -> &CommonPlan {
+    fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
 
@@ -97,7 +104,7 @@ impl Plan for NoGC {
         if unsync.space.in_space(object) {
             return true;
         }
-        if unsync.vm_space.in_space(object) {
+        if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
             return true;
         }
         if unsync.los.in_space(object) {
@@ -114,7 +121,7 @@ impl Plan for NoGC {
         let unsync = unsafe { &*self.unsync.get() };
         if unsafe {
             unsync.space.in_space(address.to_object_reference()) ||
-            unsync.vm_space.in_space(address.to_object_reference()) ||
+            (unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(address.to_object_reference())) ||
             unsync.los.in_space(address.to_object_reference())
         } {
             return self.common.mmapper.address_is_mapped(address);
@@ -128,8 +135,8 @@ impl Plan for NoGC {
         if unsync.space.in_space(object) {
             return unsync.space.is_movable();
         }
-        if unsync.vm_space.in_space(object) {
-            return unsync.vm_space.is_movable();
+        if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
+            return unsync.vm_space.as_ref().unwrap().is_movable();
         }
         if unsync.los.in_space(object) {
             return unsync.los.is_movable();
@@ -138,13 +145,13 @@ impl Plan for NoGC {
     }
 }
 
-impl NoGC {
-    pub fn get_immortal_space(&self) -> &'static ImmortalSpace {
+impl<VM: VMBinding> NoGC<VM> {
+    pub fn get_immortal_space(&self) -> &'static ImmortalSpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };
         &unsync.space
     }
 
-    pub fn get_los(&self) -> &'static LargeObjectSpace {
+    pub fn get_los(&self) -> &'static LargeObjectSpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };
         &unsync.los
     }

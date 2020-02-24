@@ -11,6 +11,7 @@ use std::sync::atomic::{Ordering, AtomicBool};
 
 use util::OpaquePointer;
 use std::sync::Arc;
+use vm::VMBinding;
 
 // TODO: remove this singleton at some point to allow multiple instances of MMTK
 // This helps refactoring.
@@ -24,13 +25,31 @@ lazy_static!{
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
     pub static ref VM_MAP: VMMap = VMMap::new();
     pub static ref MMAPPER: Mmapper = Mmapper::new();
-
-    // mmtk instance
-    pub static ref SINGLETON: MMTK = MMTK::new(&VM_MAP, &MMAPPER);
 }
 
-pub struct MMTK {
-    pub plan: SelectedPlan,
+#[cfg(feature = "jikesrvm")]
+use vm::jikesrvm::JikesRVM;
+#[cfg(feature = "jikesrvm")]
+lazy_static! {
+    pub static ref SINGLETON: MMTK<JikesRVM> = MMTK::new(&VM_MAP, &MMAPPER);
+}
+
+#[cfg(feature = "openjdk")]
+use vm::openjdk::OpenJDK;
+#[cfg(feature = "openjdk")]
+lazy_static! {
+    pub static ref SINGLETON: MMTK<OpenJDK> = MMTK::new(&VM_MAP, &MMAPPER);
+}
+
+#[cfg(feature = "dummyvm")]
+use vm::dummyvm::DummyVM;
+#[cfg(feature = "dummyvm")]
+lazy_static! {
+    pub static ref SINGLETON: MMTK<DummyVM> = MMTK::new(&VM_MAP, &MMAPPER);
+}
+
+pub struct MMTK<VM: VMBinding> {
+    pub plan: SelectedPlan<VM>,
     pub phase_manager: PhaseManager,
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
@@ -40,7 +59,7 @@ pub struct MMTK {
     inside_harness: AtomicBool,
 }
 
-impl MMTK {
+impl<VM: VMBinding> MMTK<VM> {
     pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
         let plan = SelectedPlan::new(vm_map, mmapper, options.clone());

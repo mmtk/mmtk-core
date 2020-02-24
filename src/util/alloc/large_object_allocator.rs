@@ -7,26 +7,24 @@ use ::util::alloc::{allocator, Allocator};
 use ::util::heap::{FreeListPageResource, PageResource};
 use ::util::OpaquePointer;
 use ::plan::selected_plan::SelectedPlan;
+use vm::VMBinding;
 
 #[repr(C)]
-#[derive(Derivative)]
-#[derivative(Debug)]
-pub struct LargeObjectAllocator {
+pub struct LargeObjectAllocator<VM: VMBinding> {
     pub tls: OpaquePointer,
-    space: Option<&'static LargeObjectSpace>,
-    #[derivative(Debug="ignore")]
-    plan: &'static SelectedPlan,
+    space: Option<&'static LargeObjectSpace<VM>>,
+    plan: &'static SelectedPlan<VM>,
 }
 
-impl Allocator<FreeListPageResource<LargeObjectSpace>> for LargeObjectAllocator {
+impl<VM: VMBinding> Allocator<VM, FreeListPageResource<VM, LargeObjectSpace<VM>>> for LargeObjectAllocator<VM> {
     fn get_tls(&self) -> OpaquePointer {
         self.tls
     }
-    fn get_plan(&self) -> &'static SelectedPlan {
+    fn get_plan(&self) -> &'static SelectedPlan<VM> {
         self.plan
     }
 
-    fn get_space(&self) -> Option<&'static LargeObjectSpace> {
+    fn get_space(&self) -> Option<&'static LargeObjectSpace<VM>> {
         self.space
     }
 
@@ -52,8 +50,8 @@ impl Allocator<FreeListPageResource<LargeObjectSpace>> for LargeObjectAllocator 
     }
 }
 
-impl LargeObjectAllocator {
-    pub fn new(tls: OpaquePointer, space: Option<&'static LargeObjectSpace>, plan: &'static SelectedPlan) -> Self {
+impl<VM: VMBinding> LargeObjectAllocator<VM> {
+    pub fn new(tls: OpaquePointer, space: Option<&'static LargeObjectSpace<VM>>, plan: &'static SelectedPlan<VM>) -> Self {
         LargeObjectAllocator {
             tls,
             space, plan,

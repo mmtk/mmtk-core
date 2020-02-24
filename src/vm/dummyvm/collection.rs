@@ -1,32 +1,25 @@
 use super::super::Collection;
 use ::plan::{MutatorContext, ParallelCollector};
 use ::util::OpaquePointer;
-
-use super::UPCALLS;
-
 use libc::c_void;
-use vm::openjdk::OpenJDK;
+use vm::dummyvm::DummyVM;
 
 pub struct VMCollection {}
 
-impl Collection<OpenJDK> for VMCollection {
+impl Collection<DummyVM> for VMCollection {
     fn stop_all_mutators(tls: OpaquePointer) {
-        unsafe {
-            ((*UPCALLS).stop_all_mutators)(tls);
-        }
+        unimplemented!()
     }
 
     fn resume_mutators(tls: OpaquePointer) {
-        unsafe {
-            ((*UPCALLS).resume_mutators)(tls);
-        }
+        unimplemented!()
     }
 
     fn block_for_gc(tls: OpaquePointer) {
         unimplemented!();
     }
 
-    unsafe fn spawn_worker_thread<T: ParallelCollector<OpenJDK>>(tls: OpaquePointer, ctx: *mut T) {
+    unsafe fn spawn_worker_thread<T: ParallelCollector<DummyVM>>(tls: OpaquePointer, ctx: *mut T) {
         unimplemented!();
     }
 

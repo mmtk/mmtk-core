@@ -10,29 +10,28 @@ use ::util::{Address, ObjectReference};
 use ::plan::TransitiveClosure;
 use ::util::forwarding_word as ForwardingWord;
 use ::vm::ObjectModel;
-use ::vm::VMObjectModel;
 use ::plan::Allocator;
 
 use std::cell::UnsafeCell;
 use libc::{c_void, mprotect, PROT_NONE, PROT_EXEC, PROT_WRITE, PROT_READ};
 use util::heap::layout::heap_layout::{VMMap, Mmapper};
 use util::heap::HeapMeta;
+use vm::VMBinding;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
-#[derive(Debug)]
-pub struct CopySpace {
-    common: UnsafeCell<CommonSpace<MonotonePageResource<CopySpace>>>,
+pub struct CopySpace<VM: VMBinding> {
+    common: UnsafeCell<CommonSpace<VM, MonotonePageResource<VM, CopySpace<VM>>>>,
     from_space: bool,
 }
 
-impl Space for CopySpace {
-    type PR = MonotonePageResource<CopySpace>;
+impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
+    type PR = MonotonePageResource<VM, CopySpace<VM>>;
 
-    fn common(&self) -> &CommonSpace<Self::PR> {
+    fn common(&self) -> &CommonSpace<VM, Self::PR> {
         unsafe { &*self.common.get() }
     }
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<Self::PR> {
+    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR> {
         &mut *self.common.get()
     }
 
@@ -54,7 +53,7 @@ impl Space for CopySpace {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        ForwardingWord::is_forwarded(object)
+        ForwardingWord::is_forwarded::<VM>(object)
     }
 
     fn is_movable(&self) -> bool {
@@ -66,7 +65,7 @@ impl Space for CopySpace {
     }
 }
 
-impl CopySpace {
+impl<VM: VMBinding> CopySpace<VM> {
     pub fn new(name: &'static str, from_space: bool, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
         CopySpace {
             common: UnsafeCell::new(CommonSpace::new(name, true, false, zeroed, vmrequest, vm_map, mmapper, heap)),
@@ -96,20 +95,20 @@ impl CopySpace {
             return object;
         }
         trace!("attempting to forward");
-        let mut forwarding_word = ForwardingWord::attempt_to_forward(object);
+        let mut forwarding_word = ForwardingWord::attempt_to_forward::<VM>(object);
         trace!("checking if object is being forwarded");
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_word) {
             trace!("... yes it is");
             while ForwardingWord::state_is_being_forwarded(forwarding_word) {
-                forwarding_word = VMObjectModel::read_available_bits_word(object);
+                forwarding_word = VM::VMObjectModel::read_available_bits_word(object);
             }
             trace!("Returning");
             return ForwardingWord::extract_forwarding_pointer(forwarding_word);
         } else {
             trace!("... no it isn't. Copying");
-            let new_object = VMObjectModel::copy(object, allocator, tls);
+            let new_object = VM::VMObjectModel::copy(object, allocator, tls);
             trace!("Setting forwarding pointer");
-            ForwardingWord::set_forwarding_pointer(object, new_object);
+            ForwardingWord::set_forwarding_pointer::<VM>(object, new_object);
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copying [{:?} -> {:?}]", object, new_object);
