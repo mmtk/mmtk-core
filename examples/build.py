@@ -46,11 +46,13 @@ for plan in PLANS:
     cmd = ["cargo",
            "+nightly",
            "build",
+           "--manifest-path",
+           "vmbindings/dummyvm/Cargo.toml",
            "--no-default-features",
-           "--features", " ".join([plan, "dummyvm", extra_features])]
+           "--features", " ".join([plan, extra_features])]
     exec_and_redirect(cmd)
     exec_and_redirect(cmd + ["--release"])
-    shutil.copyfile("target/release/libmmtk{}".format(SUFFIX),
+    shutil.copyfile("vmbindings/dummyvm/target/release/libmmtk_dummyvm{}".format(SUFFIX),
                     "./libmmtk{}".format(SUFFIX))
 
     if system == "Linux":
@@ -58,7 +60,7 @@ for plan in PLANS:
         exec_and_redirect(
             cmd + ["--release", "--target=i686-unknown-linux-gnu"])
         shutil.copyfile(
-            "target/i686-unknown-linux-gnu/release/libmmtk{}".format(SUFFIX),
+            "vmbindings/dummyvm/target/i686-unknown-linux-gnu/release/libmmtk_dummyvm{}".format(SUFFIX),
             "./libmmtk_32{}".format(SUFFIX))
 
     exec_and_redirect([

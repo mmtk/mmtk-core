@@ -5,7 +5,7 @@ stages:
 test:
   stage: test
   script:
-    - cargo +nightly test
+    - cargo +nightly test --features nogc
 
 alloc_test_all_plans:
   stage: alloc_test_all_plans

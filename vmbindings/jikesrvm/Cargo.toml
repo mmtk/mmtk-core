@@ -1,0 +1,23 @@
+[package]
+name = "mmtk_jikesrvm"
+version = "0.0.1"
+authors = [" <>"]
+
+[lib]
+name = "mmtk_jikesrvm"
+# be careful - LTO is only allowed for certain crate types
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
+
+[dependencies]
+mmtk = { path = "../../", version = "*" }
+libc = "0.2"
+lazy_static = "1.1"
+log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
+
+[features]
+default = []
+nogc = ["mmtk/nogc"]
+semispace = ["mmtk/semispace"]

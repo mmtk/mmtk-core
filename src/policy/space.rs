@@ -22,7 +22,6 @@ use std::fmt::Debug;
 use libc::c_void;
 use util::heap::layout::heap_layout::VMMap;
 use util::heap::layout::heap_layout::Mmapper;
-use plan::selected_plan::SelectedPlan;
 use util::heap::HeapMeta;
 use util::heap::space_descriptor::SpaceDescriptor;
 use vm::VMBinding;
