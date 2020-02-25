@@ -3,13 +3,16 @@ use crate::plan::SelectedPlan;
 use crate::plan::phase::PhaseManager;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::ReferenceProcessor;
+use crate::util::ObjectReference;
+use crate::util::OpaquePointer;
+use crate::plan::TraceLocal;
 
 use std::default::Default;
 use util::reference_processor::{Semantics, ReferenceProcessors};
 use util::options::{UnsafeOptionsWrapper, Options};
 use std::sync::atomic::{Ordering, AtomicBool};
 
-use util::OpaquePointer;
 use std::sync::Arc;
 use vm::VMBinding;
 
@@ -25,27 +28,6 @@ lazy_static!{
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
     pub static ref VM_MAP: VMMap = VMMap::new();
     pub static ref MMAPPER: Mmapper = Mmapper::new();
-}
-
-#[cfg(feature = "jikesrvm")]
-use vm::jikesrvm::JikesRVM;
-#[cfg(feature = "jikesrvm")]
-lazy_static! {
-    pub static ref SINGLETON: MMTK<JikesRVM> = MMTK::new(&VM_MAP, &MMAPPER);
-}
-
-#[cfg(feature = "openjdk")]
-use vm::openjdk::OpenJDK;
-#[cfg(feature = "openjdk")]
-lazy_static! {
-    pub static ref SINGLETON: MMTK<OpenJDK> = MMTK::new(&VM_MAP, &MMAPPER);
-}
-
-#[cfg(feature = "dummyvm")]
-use vm::dummyvm::DummyVM;
-#[cfg(feature = "dummyvm")]
-lazy_static! {
-    pub static ref SINGLETON: MMTK<DummyVM> = MMTK::new(&VM_MAP, &MMAPPER);
 }
 
 pub struct MMTK<VM: VMBinding> {

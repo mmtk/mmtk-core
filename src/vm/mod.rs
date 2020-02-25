@@ -20,12 +20,3 @@ pub trait VMBinding
     type VMActivePlan: ActivePlan<Self>;
     type VMReferenceGlue: ReferenceGlue<Self>;
 }
-
-#[cfg(feature = "jikesrvm")]
-pub mod jikesrvm;
-
-#[cfg(feature = "openjdk")]
-pub mod openjdk;
-
-#[cfg(feature = "dummyvm")]
-pub mod dummyvm;

@@ -25,7 +25,6 @@ use util::constants::LOG_BYTES_IN_PAGE;
 use util::heap::layout::vm_layout_constants::HEAP_START;
 use util::heap::layout::vm_layout_constants::HEAP_END;
 use util::OpaquePointer;
-use crate::mmtk::SINGLETON;
 use vm::VMBinding;
 use mmtk::MMTK;
 
@@ -35,7 +34,7 @@ pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointe
 
 pub fn gc_init<VM: VMBinding>(mmtk: &MMTK<VM>, heap_size: usize) {
     ::util::logger::init().unwrap();
-    mmtk.plan.gc_init(heap_size, &SINGLETON.vm_map);
+    mmtk.plan.gc_init(heap_size, &mmtk.vm_map);
     mmtk.plan.common().initialized.store(true, Ordering::SeqCst);
 
     // TODO: We should have an option so we know whether we should spawn the controller.
@@ -44,8 +43,8 @@ pub fn gc_init<VM: VMBinding>(mmtk: &MMTK<VM>, heap_size: usize) {
 //    });
 }
 
-pub fn bind_mutator<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) -> *mut c_void {
-    SelectedPlan::bind_mutator(&SINGLETON.plan, tls)
+pub fn bind_mutator<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) -> *mut c_void {
+    SelectedPlan::bind_mutator(&mmtk.plan, tls)
 }
 
 pub unsafe fn alloc<VM: VMBinding>(mutator: *mut c_void, size: usize,
@@ -158,11 +157,10 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePoin
     mmtk.plan.common().initialized.store(true, Ordering::SeqCst);
 }
 
-#[no_mangle]
-pub extern fn process(name: *const c_char, value: *const c_char) -> bool {
+pub fn process<VM: VMBinding>(mmtk: &'static MMTK<VM>, name: *const c_char, value: *const c_char) -> bool {
     let name_str: &CStr = unsafe { CStr::from_ptr(name) };
     let value_str: &CStr = unsafe { CStr::from_ptr(value) };
-    let option = &SINGLETON.options;
+    let option = &mmtk.options;
     unsafe {
         option.process(name_str.to_str().unwrap(), value_str.to_str().unwrap())
     }
@@ -173,16 +171,14 @@ pub fn used_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 }
 
 pub fn free_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    SINGLETON.plan.get_free_pages() << LOG_BYTES_IN_PAGE
+    mmtk.plan.get_free_pages() << LOG_BYTES_IN_PAGE
 }
 
-#[no_mangle]
-pub extern fn starting_heap_address() -> *mut c_void {
+pub fn starting_heap_address() -> *mut c_void {
     HEAP_START.to_mut_ptr()
 }
 
-#[no_mangle]
-pub extern fn last_heap_address() -> *mut c_void {
+pub fn last_heap_address() -> *mut c_void {
     HEAP_END.to_mut_ptr()
 }
 

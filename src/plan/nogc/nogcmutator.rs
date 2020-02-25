@@ -7,7 +7,6 @@ use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
 use ::util::heap::MonotonePageResource;
-use ::mmtk::SINGLETON;
 use ::util::OpaquePointer;
 use libc::c_void;
 use plan::nogc::NoGC;
