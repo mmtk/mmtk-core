@@ -26,7 +26,5 @@ crossbeam = "0.7.3"
 default = []
 nogc = []
 semispace = []
-jikesrvm = []
-openjdk = []
 dummyvm = []
 sanity = []

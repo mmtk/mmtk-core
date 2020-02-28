@@ -1,14 +1,28 @@
 stages:
+  - build
   - test
-  - alloc_test_all_plans
 
-test:
+build-core:
+  stage: build
+  script:
+    - cargo +nightly build --features nogc
+    - cargo +nightly build --features semispace
+    - cargo +nightly build --features nogc,sanity
+    - cargo +nightly build --features semispace,sanity
+
+build-dummyvm:
+  stage: build
+  script:
+    - cargo +nightly build --manifest-path vmbindings/dummyvm/Cargo.toml --features nogc
+    - cargo +nightly build --manifest-path vmbindings/dummyvm/Cargo.toml --features semispace
+
+cargo-test:
   stage: test
   script:
     - cargo +nightly test --features nogc
 
-alloc_test_all_plans:
-  stage: alloc_test_all_plans
+alloc-test:
+  stage: test
   script:
     - cd examples
     - ./build.py
