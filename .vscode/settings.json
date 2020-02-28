@@ -1,7 +1,0 @@
-{
-    "rust.no_default_features": true,
-    "rust.features": [
-        "nogc"
-    ],
-    "rust.unstable_features": true
-}

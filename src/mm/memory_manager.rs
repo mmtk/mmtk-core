@@ -12,6 +12,7 @@ use ::plan::MutatorContext;
 use ::plan::TraceLocal;
 use ::plan::CollectorContext;
 use ::plan::ParallelCollectorGroup;
+use ::plan::transitive_closure::TransitiveClosure;
 
 use ::vm::Collection;
 
@@ -204,6 +205,17 @@ pub unsafe fn trace_get_forwarded_reference<VM: VMBinding>(trace_local: *mut c_v
 pub unsafe fn trace_is_live<VM: VMBinding>(trace_local: *mut c_void, object: ObjectReference) -> bool{
     let local = &mut *(trace_local as *mut <SelectedPlan<VM> as Plan<VM>>::TraceLocalT);
     local.is_live(object)
+}
+
+
+pub unsafe fn trace_root_object<VM: VMBinding>(trace_local: *mut c_void, object: ObjectReference) -> ObjectReference {
+    let local = &mut *(trace_local as *mut <SelectedPlan<VM> as Plan<VM>>::TraceLocalT);
+    local.trace_object(object)
+}
+
+pub unsafe extern fn process_edge<VM: VMBinding>(trace_local: *mut c_void, object: Address) {
+    let local = &mut *(trace_local as *mut <SelectedPlan<VM> as Plan<VM>>::TraceLocalT);
+    local.process_edge(object);
 }
 
 pub unsafe fn trace_retain_referent<VM: VMBinding>(trace_local: *mut c_void, object: ObjectReference) -> ObjectReference{

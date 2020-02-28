@@ -4,10 +4,17 @@ use mmtk::util::{Address, ObjectReference};
 use mmtk::Allocator;
 use mmtk::util::OpaquePointer;
 use DummyVM;
+use std::sync::atomic::AtomicU8;
 
 pub struct VMObjectModel {}
 
 impl ObjectModel<DummyVM> for VMObjectModel {
+    const GC_BYTE_OFFSET: usize = 0;
+
+    fn get_gc_byte(o: ObjectReference) -> &'static AtomicU8 {
+        unimplemented!()
+    }
+
     fn copy(from: ObjectReference, allocator: Allocator, tls: OpaquePointer) -> ObjectReference {
         unimplemented!()
     }

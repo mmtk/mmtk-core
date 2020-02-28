@@ -3,23 +3,29 @@ use std::cell::UnsafeCell;
 use ::plan::TransitiveClosure;
 use ::policy::space::{CommonSpace, Space};
 use ::util::{Address, ObjectReference};
-use ::util::constants::BYTES_IN_PAGE;
+use ::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
 use ::util::header_byte;
 use ::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use ::util::treadmill::TreadMill;
 use ::vm::ObjectModel;
 use util::heap::layout::heap_layout::{VMMap, Mmapper};
 use util::heap::HeapMeta;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use util::OpaquePointer;
 use vm::VMBinding;
 
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
-const MARK_BIT: u8 = 0b01;
-const NURSERY_BIT: u8 = 0b10;
-const LOS_BIT_MASK: u8 = 0b11;
+const MARK_BIT: usize = 0b01;
+const NURSERY_BIT: usize = 0b10;
+const LOS_BIT_MASK: usize = 0b11;
+
+const USE_PRECEEDING_GC_HEADER: bool = true;
+const PRECEEDING_GC_HEADER_WORDS: usize = 1;
+const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTES_IN_WORD;
 
 pub struct LargeObjectSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM, FreeListPageResource<VM, LargeObjectSpace<VM>>>>,
-    mark_state: u8,
+    mark_state: usize,
     in_nursery_GC: bool,
     treadmill: TreadMill,
 }
@@ -114,7 +120,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         let nursery_object = self.is_in_nursery(object);
         if !self.in_nursery_GC || nursery_object {
             if self.test_and_mark(object, self.mark_state) {
-                let cell = VM::VMObjectModel::object_start_ref(object);
+                let cell = VM::VMObjectModel::object_start_ref(object) - if USE_PRECEEDING_GC_HEADER { PRECEEDING_GC_HEADER_BYTES } else { 0 };
                 self.treadmill.copy(cell, nursery_object);
                 trace.process_node(object);
             }
@@ -123,36 +129,49 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn initialize_header(&self, object: ObjectReference, alloc: bool) {
-        let old_value = VM::VMObjectModel::read_available_byte(object);
+        let old_value = Self::read_gc_word(object);
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
         if alloc {
             new_value = new_value | NURSERY_BIT;
         }
-        if header_byte::NEEDS_UNLOGGED_BIT {
-            new_value = new_value | header_byte::UNLOGGED_BIT;
-        }
-        VM::VMObjectModel::write_available_byte(object, new_value);
-        let cell = VM::VMObjectModel::object_start_ref(object);
+        Self::write_gc_word(object, new_value);
+        let cell = VM::VMObjectModel::object_start_ref(object) - if USE_PRECEEDING_GC_HEADER { PRECEEDING_GC_HEADER_BYTES } else { 0 };
         self.treadmill.add_to_treadmill(cell, alloc);
+        if header_byte::NEEDS_UNLOGGED_BIT {
+            let b = VM::VMObjectModel::read_available_byte(object);
+            VM::VMObjectModel::write_available_byte(object, b | header_byte::UNLOGGED_BIT);
+        }
     }
 
-    fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
+    pub fn allocate_pages(&self, tls: OpaquePointer, pages: usize) -> Address {
+        let start = self.acquire(tls, pages);
+        if start.is_zero() {
+            return start;
+        }
+        if USE_PRECEEDING_GC_HEADER {
+            start + PRECEEDING_GC_HEADER_BYTES
+        } else {
+            start
+        }
+    }
+
+    fn test_and_mark(&self, object: ObjectReference, value: usize) -> bool {
         let mask = if self.in_nursery_GC {
             LOS_BIT_MASK
         } else {
             MARK_BIT
         };
-        let mut old_value = VM::VMObjectModel::prepare_available_bits(object);
-        let mut mark_bit = (old_value as u8) & mask;
+        let mut old_value = Self::read_gc_word(object);
+        let mut mark_bit = old_value & mask;
         if mark_bit == value {
             return false;
         }
-        while !VM::VMObjectModel::attempt_available_bits(
+        while !Self::attempt_gc_word(
             object,
             old_value,
             old_value & (!LOS_BIT_MASK as usize) | value as usize) {
-            old_value = VM::VMObjectModel::prepare_available_bits(object);
-            mark_bit = (old_value as u8) & mask;
+            old_value = Self::read_gc_word(object);
+            mark_bit = old_value & mask;
             if mark_bit == value {
                 return false;
             }
@@ -160,12 +179,38 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         return true;
     }
 
-    fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
-        VM::VMObjectModel::read_available_byte(object) & MARK_BIT == value
+    fn test_mark_bit(&self, object: ObjectReference, value: usize) -> bool {
+        Self::read_gc_word(object) & MARK_BIT == value
     }
 
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::read_available_byte(object) & NURSERY_BIT == NURSERY_BIT
+        Self::read_gc_word(object) & NURSERY_BIT == NURSERY_BIT
+    }
+
+    fn read_gc_word(o: ObjectReference) -> usize {
+        if USE_PRECEEDING_GC_HEADER {
+            unsafe { (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES).load::<usize>() }
+        } else {
+            VM::VMObjectModel::read_available_bits_word(o)
+        }
+    }
+
+    fn write_gc_word(o: ObjectReference, value: usize) {
+        if USE_PRECEEDING_GC_HEADER {
+            unsafe { (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES).store::<usize>(value) };
+        } else {
+            VM::VMObjectModel::write_available_bits_word(o, value);
+        }
+    }
+
+    fn attempt_gc_word(o: ObjectReference, old: usize, new: usize) -> bool {
+        if USE_PRECEEDING_GC_HEADER {
+            unsafe {
+                (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES).compare_exchange::<AtomicUsize>(old, new, Ordering::SeqCst, Ordering::SeqCst).is_ok()
+            }
+        } else {
+            VM::VMObjectModel::attempt_available_bits(o, old, new)
+        }
     }
 }
 

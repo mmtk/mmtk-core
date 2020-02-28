@@ -95,20 +95,16 @@ impl<VM: VMBinding> CopySpace<VM> {
             return object;
         }
         trace!("attempting to forward");
-        let mut forwarding_word = ForwardingWord::attempt_to_forward::<VM>(object);
+        let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         trace!("checking if object is being forwarded");
-        if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_word) {
+        if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             trace!("... yes it is");
-            while ForwardingWord::state_is_being_forwarded(forwarding_word) {
-                forwarding_word = VM::VMObjectModel::read_available_bits_word(object);
-            }
+            let new_object = ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
             trace!("Returning");
-            return ForwardingWord::extract_forwarding_pointer(forwarding_word);
+            return new_object;
         } else {
             trace!("... no it isn't. Copying");
-            let new_object = VM::VMObjectModel::copy(object, allocator, tls);
-            trace!("Setting forwarding pointer");
-            ForwardingWord::set_forwarding_pointer::<VM>(object, new_object);
+            let new_object = ForwardingWord::forward_object::<VM>(object, allocator, tls);
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copying [{:?} -> {:?}]", object, new_object);

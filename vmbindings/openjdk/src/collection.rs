@@ -1,8 +1,7 @@
 use libc::c_void;
-
 use mmtk::vm::Collection;
-use mmtk::{MutatorContext, ParallelCollector};
 use mmtk::util::OpaquePointer;
+use mmtk::{MutatorContext, ParallelCollector};
 
 use OpenJDK;
 use UPCALLS;
@@ -23,14 +22,16 @@ impl Collection<OpenJDK> for VMCollection {
     }
 
     fn block_for_gc(tls: OpaquePointer) {
-        unimplemented!();
+        unsafe {
+            ((*UPCALLS).block_for_gc)();
+        }
     }
 
     unsafe fn spawn_worker_thread<T: ParallelCollector<OpenJDK>>(tls: OpaquePointer, ctx: *mut T) {
-        unimplemented!();
+        ((*UPCALLS).spawn_collector_thread)(tls, ctx as usize as _);
     }
 
     fn prepare_mutator<T: MutatorContext>(tls: OpaquePointer, m: &T) {
-        unimplemented!()
+        // unimplemented!()
     }
 }

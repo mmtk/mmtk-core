@@ -123,6 +123,16 @@ pub unsafe extern fn trace_is_live(trace_local: *mut c_void, object: ObjectRefer
 }
 
 #[no_mangle]
+pub unsafe extern fn trace_root_object(trace_local: *mut c_void, object: ObjectReference) -> ObjectReference {
+    memory_manager::trace_root_object::<OpenJDK>(trace_local, object)
+}
+
+#[no_mangle]
+pub unsafe extern fn process_edge(trace_local: *mut c_void, object: Address) {
+    memory_manager::process_edge::<OpenJDK>(trace_local, object)
+}
+
+#[no_mangle]
 pub unsafe extern fn trace_retain_referent(trace_local: *mut c_void, object: ObjectReference) -> ObjectReference{
     memory_manager::trace_retain_referent::<OpenJDK>(trace_local, object)
 }
