@@ -27,8 +27,15 @@ impl Collection<OpenJDK> for VMCollection {
         }
     }
 
-    unsafe fn spawn_worker_thread<T: ParallelCollector<OpenJDK>>(tls: OpaquePointer, ctx: *mut T) {
-        ((*UPCALLS).spawn_collector_thread)(tls, ctx as usize as _);
+    fn spawn_worker_thread<T: ParallelCollector<OpenJDK>>(tls: OpaquePointer, ctx: Option<&mut T>) {
+        let ctx_ptr = if let Some(r) = ctx {
+            r as *mut T
+        } else {
+            std::ptr::null_mut()
+        };
+        unsafe {
+            ((*UPCALLS).spawn_collector_thread)(tls, ctx_ptr as usize as _);
+        }
     }
 
     fn prepare_mutator<T: MutatorContext>(tls: OpaquePointer, m: &T) {

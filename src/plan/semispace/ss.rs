@@ -108,8 +108,8 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         &self.common
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> *mut c_void {
-        Box::into_raw(Box::new(SSMutator::new(tls, self))) as *mut c_void
+    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<SSMutator<VM>> {
+        Box::new(SSMutator::new(tls, self))
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {

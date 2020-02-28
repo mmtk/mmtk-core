@@ -32,6 +32,6 @@ mod mmtk;
 
 pub use mm::memory_manager;
 pub use plan::{TransitiveClosure, TraceLocal, Allocator, MutatorContext, CollectorContext, ParallelCollector, Plan};
-pub use plan::selected_plan::{SelectedPlan, SelectedConstraints};
+pub use plan::selected_plan::{SelectedPlan, SelectedConstraints, SelectedMutator, SelectedTraceLocal, SelectedCollector};
 pub use mmtk::MMTK;
 pub use mmtk::{VM_MAP, MMAPPER};

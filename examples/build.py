@@ -42,6 +42,8 @@ if system == "Darwin":
 elif system == "Linux":
     LIBRARY_PATH = "LD_LIBRARY_PATH"
 
+vmbinding = "vmbindings/dummyvm"
+
 for plan in PLANS:
     cmd = ["cargo",
            "+nightly",
@@ -52,7 +54,7 @@ for plan in PLANS:
            "--features", " ".join([plan, extra_features])]
     exec_and_redirect(cmd)
     exec_and_redirect(cmd + ["--release"])
-    shutil.copyfile("vmbindings/dummyvm/target/release/libmmtk_dummyvm{}".format(SUFFIX),
+    shutil.copyfile("{}/target/release/libmmtk_dummyvm{}".format(vmbinding, SUFFIX),
                     "./libmmtk{}".format(SUFFIX))
 
     if system == "Linux":
@@ -60,14 +62,14 @@ for plan in PLANS:
         exec_and_redirect(
             cmd + ["--release", "--target=i686-unknown-linux-gnu"])
         shutil.copyfile(
-            "vmbindings/dummyvm/target/i686-unknown-linux-gnu/release/libmmtk_dummyvm{}".format(SUFFIX),
+            "{}/target/i686-unknown-linux-gnu/release/libmmtk_dummyvm{}".format(vmbinding, SUFFIX),
             "./libmmtk_32{}".format(SUFFIX))
 
     exec_and_redirect([
         "clang",
         "-lmmtk",
         "-L.",
-        "-Iapi",
+        "-I{}/api".format(vmbinding),
         "-O3",
         "-o",
         "test_mmtk",
@@ -78,7 +80,7 @@ for plan in PLANS:
             "clang",
             "-lmmtk_32",
             "-L.",
-            "-Iapi",
+            "-I{}/api".format(vmbinding),
             "-O3", "-m32",
             "-o",
             "test_mmtk_32",

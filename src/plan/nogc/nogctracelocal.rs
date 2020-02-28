@@ -1,10 +1,14 @@
 use ::plan::transitive_closure::TransitiveClosure;
 use ::util::address::{Address, ObjectReference};
 use ::plan::tracelocal::TraceLocal;
+use vm::VMBinding;
+use std::marker::PhantomData;
 
-pub struct NoGCTraceLocal {}
+pub struct NoGCTraceLocal<VM: VMBinding> {
+    p: PhantomData<VM>
+}
 
-impl TransitiveClosure for NoGCTraceLocal {
+impl<VM: VMBinding> TransitiveClosure for NoGCTraceLocal<VM> {
     fn process_edge(&mut self, slot: Address) {
         unimplemented!();
     }
@@ -14,7 +18,7 @@ impl TransitiveClosure for NoGCTraceLocal {
     }
 }
 
-impl TraceLocal for NoGCTraceLocal {
+impl<VM: VMBinding> TraceLocal for NoGCTraceLocal<VM> {
     fn process_roots(&mut self) {
         unimplemented!();
     }
@@ -51,8 +55,10 @@ impl TraceLocal for NoGCTraceLocal {
     }
 }
 
-impl NoGCTraceLocal {
+impl<VM: VMBinding> NoGCTraceLocal<VM> {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            p: PhantomData
+        }
     }
 }
