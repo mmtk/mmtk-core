@@ -12,7 +12,7 @@ use ::plan::{Allocator, TransitiveClosure};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use ::util::constants::LOG_BYTES_IN_MBYTE;
+use ::util::constants::{LOG_BYTES_IN_MBYTE, BYTES_IN_PAGE, BYTES_IN_MBYTE};
 use ::util::conversions;
 use ::util::heap::space_descriptor;
 use ::util::OpaquePointer;

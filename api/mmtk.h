@@ -17,10 +17,10 @@ typedef void* MMTk_TraceLocal;
 extern MMTk_Mutator bind_mutator(void *tls);
 
 extern void* alloc(MMTk_Mutator mutator, size_t size,
-    size_t align, ssize_t offset, int allocator);
+    size_t align, size_t offset, int allocator);
 
 extern void* alloc_slow(MMTk_Mutator mutator, size_t size,
-    size_t align, ssize_t offset, int allocator);
+    size_t align, size_t offset, int allocator);
 
 extern void post_alloc(MMTk_Mutator mutator, void* refer, void* type_refer,
     int bytes, int allocator);
@@ -49,6 +49,9 @@ extern void* trace_get_forwarded_reference(MMTk_TraceLocal trace_local, void* ob
 extern void* trace_retain_referent(MMTk_TraceLocal trace_local, void* obj);
 
 extern bool trace_is_live(MMTk_TraceLocal trace_local, void* obj);
+extern void* trace_root_object(MMTk_TraceLocal trace_local, void* obj);
+
+extern void process_edge(MMTk_TraceLocal trace, void* obj);
 
 /**
  * Misc
@@ -70,10 +73,10 @@ extern void jikesrvm_gc_init(void* jtoc, size_t heap_size);
 extern void enable_collection(void *tls);
 
 extern void* jikesrvm_alloc(MMTk_Mutator mutator, size_t size,
-    size_t align, ssize_t offset, int allocator);
+    size_t align, size_t offset, int allocator);
 
 extern void* jikesrvm_alloc_slow(MMTk_Mutator mutator, size_t size,
-    size_t align, ssize_t offset, int allocator);
+    size_t align, size_t offset, int allocator);
 
 extern void jikesrvm_handle_user_collection_request(void *tls);
 
@@ -91,6 +94,19 @@ extern size_t total_bytes();
 typedef struct {
     void (*stop_all_mutators) (void *tls);
     void (*resume_mutators) (void *tls);
+    void (*spawn_collector_thread) (void *tls, void *ctx);
+    void (*block_for_gc) ();
+    void* (*active_collector) (void* tls);
+    void* (*get_next_mutator) ();
+    void (*reset_mutator_iterator) ();
+    void (*compute_static_roots) (void* trace, void* tls);
+    void (*compute_global_roots) (void* trace, void* tls);
+    void (*compute_thread_roots) (void* trace, void* tls);
+    void (*scan_object) (void* trace, void* object, void* tls);
+    void (*dump_object) (void* object);
+    size_t (*get_object_size) (void* object);
+    void* (*get_mmtk_mutator) (void* tls);
+    bool (*is_mutator) (void* tls);
 } OpenJDK_Upcalls;
 
 extern void openjdk_gc_init(OpenJDK_Upcalls *calls, size_t heap_size);
