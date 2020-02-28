@@ -68,7 +68,7 @@ impl<VM: VMBinding, C: ParallelCollector<VM>> ParallelCollectorGroup<VM, C> {
             self.contexts[i].set_group(self_ptr);
             self.contexts[i].set_worker_ordinal(i);
             unsafe {
-                VM::VMCollection::spawn_worker_thread(tls, &mut self.contexts[i] as *mut C);
+                VM::VMCollection::spawn_worker_thread(tls, Some(&mut self.contexts[i]));
             }
         }
     }

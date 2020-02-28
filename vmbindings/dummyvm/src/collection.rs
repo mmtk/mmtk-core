@@ -19,7 +19,7 @@ impl Collection<DummyVM> for VMCollection {
         unimplemented!();
     }
 
-    unsafe fn spawn_worker_thread<T: ParallelCollector<DummyVM>>(tls: OpaquePointer, ctx: *mut T) {
+    fn spawn_worker_thread<T: ParallelCollector<DummyVM>>(tls: OpaquePointer, ctx: Option<&mut T>) {
         unimplemented!();
     }
 

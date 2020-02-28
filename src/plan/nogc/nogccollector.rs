@@ -18,7 +18,7 @@ use vm::VMBinding;
 
 pub struct NoGCCollector<VM: VMBinding> {
     pub tls: OpaquePointer,
-    trace: NoGCTraceLocal,
+    trace: NoGCTraceLocal<VM>,
 
     last_trigger_count: usize,
     worker_ordinal: usize,
@@ -63,7 +63,7 @@ impl<VM: VMBinding> CollectorContext<VM> for NoGCCollector<VM> {
 }
 
 impl<VM: VMBinding> ParallelCollector<VM> for NoGCCollector<VM> {
-    type T = NoGCTraceLocal;
+    type T = NoGCTraceLocal<VM>;
 
     fn park(&mut self) {
         self.group.unwrap().park(self);
@@ -74,7 +74,7 @@ impl<VM: VMBinding> ParallelCollector<VM> for NoGCCollector<VM> {
         process::exit(128);
     }
 
-    fn get_current_trace(&mut self) -> &mut NoGCTraceLocal {
+    fn get_current_trace(&mut self) -> &mut NoGCTraceLocal<VM> {
         &mut self.trace
     }
 

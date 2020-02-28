@@ -11,3 +11,6 @@ pub use self::nogccollector::NoGCCollector;
 
 pub use self::nogc::SelectedPlan;
 pub use self::nogcconstraints as SelectedConstraints;
+pub use self::nogcmutator::NoGCMutator as SelectedMutator;
+pub use self::nogctracelocal::NoGCTraceLocal as SelectedTraceLocal;
+pub use self::nogccollector::NoGCCollector as SelectedCollector;

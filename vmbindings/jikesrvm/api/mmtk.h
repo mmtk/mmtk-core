@@ -15,6 +15,7 @@ typedef void* MMTk_TraceLocal;
  * Allocation
  */
 extern MMTk_Mutator bind_mutator(void *tls);
+extern void destroy_mutator(MMTk_Mutator mutator);
 
 extern void* alloc(MMTk_Mutator mutator, size_t size,
     size_t align, size_t offset, int allocator);
@@ -87,42 +88,9 @@ extern void jikesrvm_harness_begin(void *tls);
  */
 extern size_t free_bytes();
 extern size_t total_bytes();
-
-/**
- * OpenJDK-specific
- */
-typedef struct {
-    void (*stop_all_mutators) (void *tls);
-    void (*resume_mutators) (void *tls);
-    void (*spawn_collector_thread) (void *tls, void *ctx);
-    void (*block_for_gc) ();
-    void* (*active_collector) (void* tls);
-    void* (*get_next_mutator) ();
-    void (*reset_mutator_iterator) ();
-    void (*compute_static_roots) (void* trace, void* tls);
-    void (*compute_global_roots) (void* trace, void* tls);
-    void (*compute_thread_roots) (void* trace, void* tls);
-    void (*scan_object) (void* trace, void* object, void* tls);
-    void (*dump_object) (void* object);
-    size_t (*get_object_size) (void* object);
-    void* (*get_mmtk_mutator) (void* tls);
-    bool (*is_mutator) (void* tls);
-} OpenJDK_Upcalls;
-
-extern void openjdk_gc_init(OpenJDK_Upcalls *calls, size_t heap_size);
-
 extern size_t used_bytes();
 extern void* starting_heap_address();
 extern void* last_heap_address();
-extern void iterator(); // ???
-
-
-// (It is the total_space - capacity_of_to_space in Semispace )
-// PZ: It shouldn't be ...?
-extern size_t openjdk_max_capacity();
-extern size_t _noaccess_prefix();  // ???
-extern size_t _alignment();        // ???
-extern bool   executable();
 
 //  Last_gc_time();
 

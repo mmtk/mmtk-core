@@ -36,8 +36,15 @@ impl Collection<JikesRVM> for VMCollection {
     }
 
     #[inline(always)]
-    unsafe fn spawn_worker_thread<T: ParallelCollector<JikesRVM>>(tls: OpaquePointer, ctx: *mut T) {
-        jtoc_call!(SPAWN_COLLECTOR_THREAD_METHOD_OFFSET, tls, ctx);
+    fn spawn_worker_thread<T: ParallelCollector<JikesRVM>>(tls: OpaquePointer, ctx: Option<&mut T>) {
+        let ctx_ptr = if let Some(r) = ctx {
+            r as *mut T
+        } else {
+            std::ptr::null_mut()
+        };
+        unsafe {
+            jtoc_call!(SPAWN_COLLECTOR_THREAD_METHOD_OFFSET, tls, ctx_ptr);
+        }
     }
 
     fn prepare_mutator<T: MutatorContext>(tls: OpaquePointer, m: &T) {
