@@ -1,0 +1,29 @@
+name: Pre Code Review Checks
+
+on:
+  push:
+    branches:
+      - *
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  pre-code-review-checks:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build NoGC
+        run: cargo +nightly build --features nogc
+      - name: Build SemiSpace
+        run: cargo +nightly build --features semispace
+      - name: Build misc
+        run: |
+          cargo +nightly build --features nogc,sanity
+          cargo +nightly build --features semispace,sanity
+      - name: Cargo Tests
+        run: |
+          cargo +nightly test --features nogc
+          cargo +nightly test --features semispace
+      - name: DummyVM Tests
+        run: python examples/build.py
