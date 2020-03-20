@@ -6,6 +6,12 @@ import shutil
 import os
 import sys
 
+# check RUSTUP_TOOLCHAIN
+if "RUSTUP_TOOLCHAIN" in os.environ:
+    toolchain = os.environ["RUSTUP_TOOLCHAIN"]
+else:
+    toolchain = "+nightly"
+
 MMTk_ROOT = os.path.join(__file__, "..", "..")
 
 plan_dir = os.path.abspath(os.path.join(MMTk_ROOT, "src", "plan"))
@@ -45,13 +51,18 @@ elif system == "Linux":
 vmbinding = "vmbindings/dummyvm"
 
 for plan in PLANS:
-    cmd = ["cargo",
-           "+nightly",
-           "build",
-           "--manifest-path",
-           "vmbindings/dummyvm/Cargo.toml",
-           "--no-default-features",
-           "--features", " ".join([plan, extra_features])]
+    cmd = []
+    cmd.append("cargo")
+    if toolchain:
+        params.append(toolchain)
+    cmd.extend([
+        "build",
+        "--manifest-path",
+        "vmbindings/dummyvm/Cargo.toml",
+        "--no-default-features",
+        "--features", " ".join([plan, extra_features])
+    ])
+
     exec_and_redirect(cmd)
     exec_and_redirect(cmd + ["--release"])
     shutil.copyfile("{}/target/release/libmmtk_dummyvm{}".format(vmbinding, SUFFIX),

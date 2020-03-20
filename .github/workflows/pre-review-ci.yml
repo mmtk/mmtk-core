@@ -2,8 +2,6 @@ name: Pre Code Review Checks
 
 on:
   push:
-    branches:
-      - *
   pull_request:
     branches:
       - master
@@ -13,17 +11,27 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
-      - name: Build NoGC
-        run: cargo +nightly build --features nogc
-      - name: Build SemiSpace
-        run: cargo +nightly build --features semispace
-      - name: Build misc
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2019-08-26
+          target: i686-unknown-linux-gnu
+          # This overwrites the default toolchain with the toolchain specified above.
+          override: true
+      - name: Build plan - NoGC
+        run: cargo build --features nogc
+      - name: Build plan - SemiSpace
+        run: cargo build --features semispace
+      - name: Build features
         run: |
-          cargo +nightly build --features nogc,sanity
-          cargo +nightly build --features semispace,sanity
-      - name: Cargo Tests
+          cargo build --features nogc,sanity
+          cargo build --features semispace,sanity
+      - name: Cargo tests
         run: |
-          cargo +nightly test --features nogc
-          cargo +nightly test --features semispace
-      - name: DummyVM Tests
-        run: python examples/build.py
+          cargo test --features nogc
+          cargo test --features semispace
+      - name: DummyVM tests
+        # use default toolchain, use i386 lib
+        run: |
+          sudo apt-get install libc6-dev-i386
+          RUSTUP_TOOLCHAIN= python examples/build.py
