@@ -1,7 +1,6 @@
 name: Pre Code Review Checks
 
 on:
-  push:
   pull_request:
     branches:
       - master
