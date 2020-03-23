@@ -10,9 +10,11 @@ on:
 jobs:
   post-code-review-checks:
     runs-on: ubuntu-18.04
+    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
     steps:
-      - name: Check label and prepare repo
-        if: contains(github.event.pull_request.labels.*.name, 'approved')
+      - name: Check label
+        run: echo "${{github.event.pull_request.labels.*.name}}"
+      - name: Prepare repo
         uses: actions/checkout@v2
       - name: Test
         if: success()
