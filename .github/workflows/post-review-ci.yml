@@ -1,0 +1,21 @@
+name: Post Code Review Checks
+
+on:
+  pull_request:
+    types:
+      - labeled
+    branches:
+      - master
+
+jobs:
+  post-code-review-checks:
+    runs-on: ubuntu-18.04
+    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+    steps:
+      - name: Check label
+        run: echo "${{github.event.pull_request.labels.*.name}}"
+      - name: Prepare repo
+        uses: actions/checkout@v2
+      - name: Test
+        if: success()
+        run: echo "Do more tests here when the PR is approved"
