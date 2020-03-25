@@ -19,7 +19,7 @@ pub struct NoGCMutator<VM: VMBinding> {
 
 impl<VM: VMBinding> MutatorContext for NoGCMutator<VM> {
     fn collection_phase(&mut self, _tls: OpaquePointer, _phase: &Phase, _primary: bool) {
-        unimplemented!();
+        unreachable!()
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {

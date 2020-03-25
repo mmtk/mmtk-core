@@ -15,6 +15,8 @@ const BEING_FORWARDED: u8 = 2;
 const FORWARDED: u8 = 3;
 // ...11
 const FORWARDING_MASK: u8 = 3;
+#[allow(unused)]
+const FORWARDING_BITS: usize = 2;
 
 pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
     let gc_byte = VM::VMObjectModel::get_gc_byte(object);

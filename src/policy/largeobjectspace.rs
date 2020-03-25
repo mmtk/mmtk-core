@@ -14,6 +14,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use util::OpaquePointer;
 use vm::VMBinding;
 
+#[allow(unused)]
+const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
 const MARK_BIT: usize = 0b01;
 const NURSERY_BIT: usize = 0b10;
 const LOS_BIT_MASK: usize = 0b11;

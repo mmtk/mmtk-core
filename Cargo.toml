@@ -22,7 +22,9 @@ atomic-traits = "0.1.0"
 crossbeam = "0.7.3"
 
 [features]
-default = ["immortalspace", "largeobjectspace"]
+default = []
+
+# plans
 nogc = ["immortalspace", "largeobjectspace"]
 semispace = ["immortalspace", "largeobjectspace", "copyspace"]
 

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 
 const TYPE_BITS: usize = 2;
-#[allow(unused)] // I am not sure if we should simply remove this constant. It is unused in Java MMTk as well.
+#[allow(unused)]
 const TYPE_SHARED: usize = 0;
 const TYPE_CONTIGUOUS: usize = 1;
 const TYPE_CONTIGUOUS_HI: usize = 3;
