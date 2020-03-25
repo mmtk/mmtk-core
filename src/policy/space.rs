@@ -4,22 +4,15 @@ use ::util::conversions::*;
 
 use ::vm::{ActivePlan, Collection, ObjectModel};
 use ::util::heap::{VMRequest, PageResource};
-use ::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END, AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
+use ::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use ::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END};
 
 use ::plan::Plan;
-use ::plan::{Allocator, TransitiveClosure};
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-use ::util::constants::{LOG_BYTES_IN_MBYTE, BYTES_IN_PAGE, BYTES_IN_MBYTE};
+use ::util::constants::LOG_BYTES_IN_MBYTE;
 use ::util::conversions;
-use ::util::heap::space_descriptor;
 use ::util::OpaquePointer;
 
-use std::fmt::Debug;
-
-use libc::c_void;
 use util::heap::layout::heap_layout::VMMap;
 use util::heap::layout::heap_layout::Mmapper;
 use util::heap::HeapMeta;
@@ -87,7 +80,7 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
         // FIXME
         let new_head: Address = self.common().vm_map().allocate_contiguous_chunks(self.common().descriptor, chunks, self.common().head_discontiguous_region);
         if new_head.is_zero() {
-            return unsafe{Address::zero()};
+            return Address::zero();
         }
 
         self.unsafe_common_mut().head_discontiguous_region = new_head;
@@ -103,7 +96,7 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
      * @param bytes The size of the newly allocated space
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */
-    fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {}
+    fn grow_space(&self, _start: Address, _bytes: usize, _new_chunk: bool) {}
 
     fn reserved_pages(&self) -> usize {
         self.common().pr.as_ref().unwrap().reserved_pages()
@@ -158,10 +151,10 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
         if common.contiguous {
             print!("{}->{}", common.start, common.start+common.extent-1);
             match common.vmrequest {
-                VMRequest::RequestExtent { extent, top } => {
+                VMRequest::RequestExtent { extent, top: _ } => {
                     print!(" E {}", extent);
                 },
-                VMRequest::RequestFraction {frac, top } => {
+                VMRequest::RequestFraction { frac, top: _ } => {
                     print!(" F {}", frac);
                 },
                 _ => {}
@@ -182,9 +175,8 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
 
 pub struct CommonSpace<VM: VMBinding, PR: PageResource<VM>> {
     pub name: &'static str,
-    name_length: usize,
     pub descriptor: SpaceDescriptor,
-    index: usize,
+    pub index: usize,
     pub vmrequest: VMRequest,
 
     immortal: bool,
@@ -210,7 +202,6 @@ impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
                vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
         let mut rtn = CommonSpace {
             name,
-            name_length: name.len(),
             descriptor: SpaceDescriptor::UNINITIALIZED,
             index: heap.new_space_index(),
             vmrequest,

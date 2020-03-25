@@ -1,6 +1,6 @@
 use ::util::queue::LocalQueue;
 use std::collections::HashMap;
-use std::sync::{Condvar, Mutex};
+use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::fmt::Debug;

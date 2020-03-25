@@ -2,17 +2,13 @@ use super::NoGCTraceLocal;
 use super::super::ParallelCollectorGroup;
 use super::super::ParallelCollector;
 use super::super::CollectorContext;
-use super::super::TraceLocal;
 use super::super::Phase;
 use super::super::Allocator;
-use plan::nogc::SelectedPlan;
 
 use std::process;
-use libc::c_void;
 
 use ::util::{Address, ObjectReference};
 use util::OpaquePointer;
-use plan::phase::PhaseManager;
 use mmtk::MMTK;
 use vm::VMBinding;
 
@@ -41,18 +37,18 @@ impl<VM: VMBinding> CollectorContext<VM> for NoGCCollector<VM> {
         self.tls = tls;
     }
 
-    fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: Allocator) -> Address {
-        unimplemented!();
+    fn alloc_copy(&mut self, _original: ObjectReference, _bytes: usize, _align: usize, _offset: isize, _allocator: Allocator) -> Address {
+        unreachable!()
     }
 
-    fn run(&mut self, tls: OpaquePointer) {
+    fn run(&mut self, _tls: OpaquePointer) {
         loop {
             self.park();
             self.collect();
         }
     }
 
-    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, _tls: OpaquePointer, _phase: &Phase, _primary: bool) {
         println!("GC triggered in NoGC plan");
         process::exit(128);
     }

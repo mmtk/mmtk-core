@@ -1,19 +1,15 @@
 use ::policy::copyspace::CopySpace;
 use ::policy::immortalspace::ImmortalSpace;
 use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
-use ::policy::largeobjectspace::LargeObjectSpace;
 use ::plan::mutator_context::MutatorContext;
 use ::plan::Phase;
-use ::plan::semispace;
 use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
-use ::plan::plan;
 use ::vm::Collection;
-use ::util::heap::{PageResource, MonotonePageResource};
+use ::util::heap::MonotonePageResource;
 use ::util::OpaquePointer;
 
-use libc::c_void;
 use plan::semispace::SemiSpace;
 use vm::VMBinding;
 
@@ -28,7 +24,7 @@ pub struct SSMutator<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> MutatorContext for SSMutator<VM> {
-    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, _tls: OpaquePointer, phase: &Phase, _primary: bool) {
         match phase {
             &Phase::PrepareStacks => {
                 if !self.plan.common.stacks_prepared() {
@@ -75,7 +71,7 @@ impl<VM: VMBinding> MutatorContext for SSMutator<VM> {
         }
     }
 
-    fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
+    fn post_alloc(&mut self, refer: ObjectReference, _type_refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
         debug_assert!(self.ss.get_space().unwrap() as *const _ == self.plan.tospace() as *const _);
         match allocator {
             AllocationType::Default => {}

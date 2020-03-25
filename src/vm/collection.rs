@@ -1,7 +1,5 @@
 use ::plan::{MutatorContext, ParallelCollector};
 use ::util::OpaquePointer;
-
-use libc::c_void;
 use vm::VMBinding;
 
 pub trait Collection<VM: VMBinding> {
@@ -10,7 +8,7 @@ pub trait Collection<VM: VMBinding> {
     fn block_for_gc(tls: OpaquePointer);
     fn spawn_worker_thread<T: ParallelCollector<VM>>(tls: OpaquePointer, ctx: Option<&mut T>);
     fn prepare_mutator<T: MutatorContext>(tls: OpaquePointer, m: &T);
-    fn out_of_memory(tls: OpaquePointer) {
+    fn out_of_memory(_tls: OpaquePointer) {
         panic!("Out of memory!");
     }
 }

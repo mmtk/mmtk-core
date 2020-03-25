@@ -2,7 +2,7 @@ use std::cmp;
 use std::fmt;
 use std::mem;
 use std::ops::*;
-use std::sync::atomic::{AtomicUsize, AtomicU8, Ordering};
+use std::sync::atomic::Ordering;
 use atomic_traits::Atomic;
 
 /// size in bytes
@@ -193,25 +193,19 @@ impl Address {
 
     /// atomic operation: load
     pub unsafe fn atomic_load<T: Atomic>(&self, order: Ordering) -> T::Type {
-        let loc = unsafe {
-            &*(self.0 as *const T)
-        };
+        let loc = &*(self.0 as *const T);
         loc.load(order)
     }
 
     /// atomic operation: store
     pub unsafe fn atomic_store<T: Atomic>(&self, val: T::Type, order: Ordering) {
-        let loc = unsafe {
-            &*(self.0 as *const T)
-        };
+        let loc = &*(self.0 as *const T);
         loc.store(val, order)
     }
 
     /// atomic operation: compare and exchange usize
     pub unsafe fn compare_exchange<T: Atomic>(&self, old: T::Type, new: T::Type, success: Ordering, failure: Ordering) -> Result<T::Type, T::Type> {
-        let loc = unsafe {
-            &*(self.0 as *const T)
-        };
+        let loc = &*(self.0 as *const T);
         loc.compare_exchange(old, new, success, failure)
     }
 

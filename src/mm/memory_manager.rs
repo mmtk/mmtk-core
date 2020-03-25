@@ -1,17 +1,9 @@
-use std::ptr::null_mut;
-use libc::c_void;
-use libc::c_char;
-
-use std::ffi::CStr;
-use std::{str, thread};
-
 use std::sync::atomic::Ordering;
 
 use plan::Plan;
 use ::plan::MutatorContext;
 use ::plan::TraceLocal;
 use ::plan::CollectorContext;
-use ::plan::ParallelCollectorGroup;
 use ::plan::transitive_closure::TransitiveClosure;
 
 use ::vm::Collection;

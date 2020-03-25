@@ -1,8 +1,5 @@
 use ::util::{Address, ObjectReference};
 use ::util::queue::SharedQueue;
-use crossbeam_deque::Stealer;
-use std::sync::mpsc::Sender;
-use std::thread::JoinHandle;
 
 pub struct Trace {
     pub values: SharedQueue<ObjectReference>,
@@ -10,6 +7,8 @@ pub struct Trace {
 }
 
 impl Trace {
+    // It is possible that a plan does not use Trace (such as NoGC)
+    #[allow(unused)]
     pub fn new() -> Self {
         Trace {
             values: SharedQueue::new(),
@@ -17,5 +16,9 @@ impl Trace {
         }
     }
 
-    pub fn prepare(&mut self) {}
+    // FIXME: temporarily disable the warning. I will do a separte PR for this.
+    #[allow(unused)]
+    pub fn prepare(&mut self) {
+        // TODO: we should reset shared queue here, and we should call prepare() in prepare phase
+    }
 }

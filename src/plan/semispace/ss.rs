@@ -4,8 +4,6 @@ use super::SSMutator;
 use super::SSTraceLocal;
 use super::SSCollector;
 
-use ::plan::controller_collector_context::ControllerCollectorContext;
-
 use ::plan::plan;
 use ::plan::Plan;
 use ::plan::Allocator;
@@ -17,23 +15,18 @@ use ::plan::trace::Trace;
 use ::util::ObjectReference;
 use ::util::heap::layout::Mmapper as IMmapper;
 use ::util::Address;
-use ::util::heap::PageResource;
 use ::util::heap::VMRequest;
 use ::util::OpaquePointer;
 
-use ::util::constants::LOG_BYTES_IN_PAGE;
-
-use libc::{c_void, memset};
 use std::cell::UnsafeCell;
-use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{self, Ordering};
 
 use ::vm::Scanning;
-use std::thread;
 use util::conversions::bytes_to_pages;
 use plan::plan::{create_vm_space, CommonPlan};
 use util::heap::layout::heap_layout::VMMap;
 use util::heap::layout::heap_layout::Mmapper;
-use util::options::{Options, UnsafeOptionsWrapper};
+use util::options::UnsafeOptionsWrapper;
 use std::sync::Arc;
 use util::heap::HeapMeta;
 use util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END};
@@ -205,7 +198,9 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
             &Phase::Release => {
                 #[cfg(feature = "sanity")]
                 {
-                    use ::util::sanity::sanity_checker::SanityChecker;
+                    use ::util::constants::LOG_BYTES_IN_PAGE;
+                    use libc::memset;
+                    use ::util::heap::PageResource;
                     if self.fromspace().common().contiguous {
                         let fromspace_start = self.fromspace().common().start;
                         let fromspace_commited = self.fromspace().common().pr.as_ref().unwrap().common().committed.load(Ordering::Relaxed);
@@ -218,9 +213,9 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 }
                 // release the collected region
                 if unsync.hi {
-                    unsafe { unsync.copyspace0.release() };
+                    unsync.copyspace0.release();
                 } else {
-                    unsafe { unsync.copyspace1.release() };
+                    unsync.copyspace1.release();
                 }
                 unsync.versatile_space.release();
                 if unsync.vm_space.is_some() {
@@ -255,7 +250,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
     }
 
     fn get_collection_reserve(&self) -> usize {
-        let unsync = unsafe{&*self.unsync.get()};
         self.tospace().reserved_pages()
     }
 

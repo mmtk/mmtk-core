@@ -2,7 +2,6 @@ use ::util::{Address, ObjectReference};
 use ::plan::Allocator;
 use ::util::OpaquePointer;
 use std::sync::atomic::AtomicU8;
-use libc::c_void;
 use vm::VMBinding;
 
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/vm/ObjectModel.java
@@ -24,20 +23,18 @@ pub trait ObjectModel<VM: VMBinding> {
     fn is_array(object: ObjectReference) -> bool;
     fn is_primitive_array(object: ObjectReference) -> bool;
     fn get_array_length(object: ObjectReference) -> usize;
-    #[deprecated(note = "Will be replaced with a getter of `&AtomicUsize`")]
+
+    // TODO: The methods below should be replaced with a getter of `&AtomicUsize` or `&AtomicU8`,
+    // following the pattern of get_gc_byte()
     fn attempt_available_bits(object: ObjectReference, old: usize, new: usize) -> bool;
-    #[deprecated(note = "Will be replaced with a getter of `&AtomicUsize`")]
     fn prepare_available_bits(object: ObjectReference) -> usize;
-    #[deprecated(note = "Will be replaced with a getter of `&AtomicU8`")]
     fn write_available_byte(object: ObjectReference, val: u8);
-    #[deprecated(note = "Will be replaced with a getter of `&AtomicU8`")]
     fn read_available_byte(object: ObjectReference) -> u8;
-    #[deprecated(note = "Will be replaced with a getter of `&AtomicUsize`")]
     fn write_available_bits_word(object: ObjectReference, val: usize);
-    #[deprecated(note = "Will be replaced with a getter of `&AtomicUsize`")]
     fn read_available_bits_word(object: ObjectReference) -> usize;
+
     // Offset
-    fn GC_HEADER_OFFSET() -> isize;
+    fn gc_header_offset() -> isize;
     fn object_start_ref(object: ObjectReference) -> Address;
     fn ref_to_address(object: ObjectReference) -> Address;
     fn is_acyclic(typeref: ObjectReference) -> bool;

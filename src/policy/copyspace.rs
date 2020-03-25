@@ -1,5 +1,3 @@
-use std::sync::Mutex;
-
 use ::util::heap::PageResource;
 use ::util::heap::MonotonePageResource;
 use ::util::heap::VMRequest;
@@ -9,11 +7,10 @@ use ::policy::space::{Space, CommonSpace};
 use ::util::{Address, ObjectReference};
 use ::plan::TransitiveClosure;
 use ::util::forwarding_word as ForwardingWord;
-use ::vm::ObjectModel;
 use ::plan::Allocator;
 
 use std::cell::UnsafeCell;
-use libc::{c_void, mprotect, PROT_NONE, PROT_EXEC, PROT_WRITE, PROT_READ};
+use libc::{mprotect, PROT_NONE, PROT_EXEC, PROT_WRITE, PROT_READ};
 use util::heap::layout::heap_layout::{VMMap, Mmapper};
 use util::heap::HeapMeta;
 use vm::VMBinding;
@@ -60,7 +57,7 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         true
     }
 
-    fn release_multiple_pages(&mut self, start: Address) {
+    fn release_multiple_pages(&mut self, _start: Address) {
         panic!("copyspace only releases pages enmasse")
     }
 }

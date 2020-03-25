@@ -1,15 +1,12 @@
 use ::plan::{TransitiveClosure, TraceLocal};
 use ::util::{Address, ObjectReference};
 use ::vm::Scanning;
-use ::policy::space::Space;
 use ::util::OpaquePointer;
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::collections::{HashSet, LinkedList};
 use ::plan::Plan;
 use ::plan::SelectedPlan;
 
-use libc::c_void;
 use vm::VMBinding;
 
 pub struct SanityChecker<'a, VM: VMBinding> {
@@ -125,7 +122,7 @@ impl<'a, VM: VMBinding> TraceLocal for SanityChecker<'a, VM> {
         unimplemented!()
     }
 
-    fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, root: bool) {
+    fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, _root: bool) {
         let interior_ref: Address = unsafe { slot.load() };
         let offset = interior_ref - target.to_address();
         let new_target = self.trace_object(target);
@@ -142,11 +139,11 @@ impl<'a, VM: VMBinding> TraceLocal for SanityChecker<'a, VM> {
         self.roots.push(slot);
     }
 
-    fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool {
+    fn will_not_move_in_current_collection(&self, _obj: ObjectReference) -> bool {
         return true;
     }
 
-    fn is_live(&self, object: ObjectReference) -> bool {
+    fn is_live(&self, _object: ObjectReference) -> bool {
         unimplemented!()
     }
 }

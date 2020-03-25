@@ -1,3 +1,7 @@
+// Specific plans may 'pub use' the constraints here, and overwrites some. In that case,
+// the constants that get overwritten are unused.
+#![allow(unused)]
+
 use ::util::constants::*;
 
 pub const MOVES_OBJECTS: bool = false;

@@ -3,13 +3,10 @@ use crate::plan::SelectedPlan;
 use crate::plan::phase::PhaseManager;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::ReferenceProcessor;
-use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
-use crate::plan::TraceLocal;
 
 use std::default::Default;
-use util::reference_processor::{Semantics, ReferenceProcessors};
+use util::reference_processor::ReferenceProcessors;
 use util::options::{UnsafeOptionsWrapper, Options};
 use std::sync::atomic::{Ordering, AtomicBool};
 

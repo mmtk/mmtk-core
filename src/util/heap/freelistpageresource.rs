@@ -3,7 +3,6 @@ use std::sync::atomic::AtomicUsize;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
-use libc::{c_void, memset};
 
 use util::address::Address;
 use util::heap::pageresource::CommonPageResource;
@@ -23,10 +22,7 @@ use super::layout::Mmapper;
 use super::PageResource;
 use util::heap::layout::heap_layout::VMMap;
 use vm::VMBinding;
-
-
-const SPACE_ALIGN: usize = 1 << 19;
-
+use std::mem::MaybeUninit;
 
 pub struct CommonFreeListPageResource {
     free_list: FreeList,
@@ -127,7 +123,7 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
         let pages = conversions::bytes_to_pages(bytes);
         let common_flpr = unsafe {
             let mut common_flpr = Box::new(CommonFreeListPageResource {
-                free_list: ::std::mem::uninitialized(),
+                free_list: MaybeUninit::uninit().assume_init(),
                 start,
             });
             ::std::ptr::write(&mut common_flpr.free_list, vm_map.create_parent_freelist(pages, PAGES_IN_REGION as _));
@@ -161,7 +157,7 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
     pub fn new_discontiguous(meta_data_pages_per_region: usize, vm_map: &'static VMMap) -> Self {
         let common_flpr = unsafe {
             let mut common_flpr = Box::new(CommonFreeListPageResource {
-                free_list: ::std::mem::uninitialized(),
+                free_list: MaybeUninit::uninit().assume_init(),
                 start: AVAILABLE_START,
             });
             ::std::ptr::write(&mut common_flpr.free_list, vm_map.create_freelist(&common_flpr));
@@ -198,7 +194,7 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
             self.free_list.set_uncoalescable(region_start as _);
             self.free_list.set_uncoalescable(region_end as i32 + 1);
             for p in (region_start..region_end).step_by(PAGES_IN_CHUNK) {
-                let mut liberated;
+                let liberated;
                 if p != region_start {
                     self.free_list.clear_uncoalescable(p as _);
                 }
@@ -297,13 +293,14 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
                 let mut region_start = page_offset & !(PAGES_IN_CHUNK - 1);
                 let mut next_region_start = region_start + PAGES_IN_CHUNK;
                 /* now try to grow (end point pages are marked as non-coalescing) */
-                while region_start >= 0 && self.free_list.is_coalescable(region_start as _) {
+                while self.free_list.is_coalescable(region_start as _) {
+                    // region_start is guaranteed to be positive. Otherwise this line will fail due to subtraction overflow.
                     region_start -= PAGES_IN_CHUNK;
                 }
                 while next_region_start < generic_freelist::MAX_UNITS as usize && self.free_list.is_coalescable(next_region_start as _) {
                     next_region_start += PAGES_IN_CHUNK;
                 }
-                debug_assert!(region_start >= 0 && next_region_start < generic_freelist::MAX_UNITS as usize);
+                debug_assert!(next_region_start < generic_freelist::MAX_UNITS as usize);
                 if pages_freed == next_region_start - region_start {
                     let start = self.start;
                     self.free_contiguous_chunk(start + conversions::pages_to_bytes(region_start));

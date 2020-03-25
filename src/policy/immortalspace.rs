@@ -1,5 +1,3 @@
-use std::sync::Mutex;
-
 use ::policy::space::{Space, CommonSpace};
 use ::util::heap::{PageResource, MonotonePageResource, VMRequest};
 use ::util::address::Address;
@@ -53,7 +51,7 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
         common_mut.pr.as_mut().unwrap().bind_space(me);
     }
 
-    fn is_live(&self, object: ObjectReference) -> bool {
+    fn is_live(&self, _object: ObjectReference) -> bool {
         return true;
     }
 
@@ -61,7 +59,7 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
         false
     }
 
-    fn release_multiple_pages(&mut self, start: Address) {
+    fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")
     }
 }

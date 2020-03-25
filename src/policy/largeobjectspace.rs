@@ -14,7 +14,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use util::OpaquePointer;
 use vm::VMBinding;
 
-const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
 const MARK_BIT: usize = 0b01;
 const NURSERY_BIT: usize = 0b10;
 const LOS_BIT_MASK: usize = 0b11;
@@ -26,7 +25,7 @@ const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTE
 pub struct LargeObjectSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM, FreeListPageResource<VM, LargeObjectSpace<VM>>>>,
     mark_state: usize,
-    in_nursery_GC: bool,
+    in_nursery_gc: bool,
     treadmill: TreadMill,
 }
 
@@ -73,7 +72,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         LargeObjectSpace {
             common: UnsafeCell::new(CommonSpace::new(name, false, false, zeroed, vmrequest, vm_map, mmapper, heap)),
             mark_state: 0,
-            in_nursery_GC: false,
+            in_nursery_gc: false,
             treadmill: TreadMill::new()
         }
     }
@@ -84,7 +83,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             self.mark_state = MARK_BIT - self.mark_state;
         }
         self.treadmill.flip(full_heap);
-        self.in_nursery_GC = !full_heap;
+        self.in_nursery_gc = !full_heap;
     }
 
     pub fn release(&mut self, full_heap: bool) {
@@ -118,7 +117,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         let nursery_object = self.is_in_nursery(object);
-        if !self.in_nursery_GC || nursery_object {
+        if !self.in_nursery_gc || nursery_object {
             if self.test_and_mark(object, self.mark_state) {
                 let cell = VM::VMObjectModel::object_start_ref(object) - if USE_PRECEEDING_GC_HEADER { PRECEEDING_GC_HEADER_BYTES } else { 0 };
                 self.treadmill.copy(cell, nursery_object);
@@ -156,7 +155,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     fn test_and_mark(&self, object: ObjectReference, value: usize) -> bool {
-        let mask = if self.in_nursery_GC {
+        let mask = if self.in_nursery_gc {
             LOS_BIT_MASK
         } else {
             MARK_BIT

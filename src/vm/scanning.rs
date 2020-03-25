@@ -1,7 +1,6 @@
 use ::plan::{TransitiveClosure, TraceLocal};
 use ::util::ObjectReference;
 use ::util::OpaquePointer;
-use libc::c_void;
 use vm::VMBinding;
 
 pub trait Scanning<VM: VMBinding> {

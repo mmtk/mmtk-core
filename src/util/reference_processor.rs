@@ -5,10 +5,7 @@ use std::vec::Vec;
 use ::util::OpaquePointer;
 use ::util::{Address, ObjectReference};
 use ::vm::{ActivePlan, ReferenceGlue};
-use ::plan::{Plan, TraceLocal, MutatorContext};
-use ::plan::selected_plan::SelectedPlan;
-
-use libc::c_void;
+use ::plan::{TraceLocal, MutatorContext};
 use vm::VMBinding;
 
 pub struct ReferenceProcessors {
@@ -154,7 +151,7 @@ impl ReferenceProcessor {
         sync.references.push(reff.to_address());
     }
 
-    pub fn forward<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, nursery: bool) {
+    pub fn forward<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, _nursery: bool) {
         let mut sync = unsafe { self.sync_mut() };
         let references: &mut Vec<Address> = &mut sync.references;
         // XXX: Copies `unforwarded_references` out. Should be fine since it's not accessed

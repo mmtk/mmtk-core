@@ -1,5 +1,4 @@
 use util::Address;
-use policy::space::CommonSpace;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 

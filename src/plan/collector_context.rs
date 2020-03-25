@@ -1,10 +1,7 @@
 use ::util::{Address, ObjectReference};
 use ::plan::{Phase, Allocator};
 use ::plan::selected_plan::SelectedConstraints::*;
-use ::plan::selected_plan::SelectedPlan;
 use ::util::OpaquePointer;
-use libc::c_void;
-use plan::phase::PhaseManager;
 use mmtk::MMTK;
 use vm::VMBinding;
 
@@ -21,14 +18,15 @@ pub trait CollectorContext<VM: VMBinding> {
     /// Unique identifier for this collector context.
     fn get_tls(&self) -> OpaquePointer;
 
-    fn copy_check_allocator(&self, from: ObjectReference, bytes: usize, align: usize,
+    fn copy_check_allocator(&self, _from: ObjectReference, bytes: usize, align: usize,
                             allocator: Allocator) -> Allocator {
         let large = ::util::alloc::allocator::get_maximum_aligned_size(bytes, align,
             ::util::alloc::allocator::MIN_ALIGNMENT) > MAX_NON_LOS_COPY_BYTES;
         if large { Allocator::Los } else { allocator }
     }
 
-    fn post_copy(&self, obj: ObjectReference, tib: Address, bytes: usize, allocator: Allocator) {
-        unimplemented!()
+    // TODO: the parameter tib seems quite JikesRVM specific?
+    fn post_copy(&self, _obj: ObjectReference, _tib: Address, _bytes: usize, _allocator: Allocator) {
+        unreachable!()
     }
 }

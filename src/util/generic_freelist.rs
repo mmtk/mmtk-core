@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 pub const FAILURE: i32 = -1;
   
 pub const MAX_HEADS: i32 = 128; // somewhat arbitrary
@@ -48,9 +46,8 @@ pub trait GenericFreeList: Sized {
   }
 
   fn alloc_from_unit(&mut self, size: i32, unit: i32) -> i32 {
-    let mut s = 0;
     if self.get_free(unit) {
-      s = self.get_size(unit);
+      let s = self.get_size(unit);
       if s >= size {
         return self.__alloc(size, unit, s)
       }
