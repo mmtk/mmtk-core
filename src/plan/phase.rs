@@ -208,6 +208,49 @@ impl PhaseManager {
         ], 0, None)
     }
 
+    // It seems we never use the following functions for defining sanity checking phases.
+    // FIXME: We need to check if sanity cehcking works or not.
+
+    #[allow(unused)]
+    fn define_phase_sanity_build(stats: &Stats) -> Phase {
+        Phase::Complex(vec![
+            ScheduledPhase::new(Global, SanityPrepare),
+            ScheduledPhase::new(Collector, SanityPrepare),
+            ScheduledPhase::new(Schedule::Complex, PhaseManager::define_phase_prepare_stacks(stats)),
+            ScheduledPhase::new(Collector, SanityRoots),
+            ScheduledPhase::new(Global, SanityRoots),
+            ScheduledPhase::new(Collector, SanityCopyRoots),
+            ScheduledPhase::new(Global, SanityBuildTable)
+        ], 0, None)
+    }
+
+    #[allow(unused)]
+    fn define_phase_sanity_check(stats: &Stats) -> Phase {
+        Phase::Complex(vec![
+            ScheduledPhase::new(Global, SanityCheckTable),
+            ScheduledPhase::new(Collector, SanityRelease),
+            ScheduledPhase::new(Global, SanityRelease)
+        ], 0, None)
+    }
+
+    #[allow(unused)]
+    fn define_phase_pre_sanity(stats: &Stats) -> Phase {
+        Phase::Complex(vec![
+            ScheduledPhase::new(Global, SanitySetPreGC),
+            ScheduledPhase::new(Schedule::Complex, PhaseManager::define_phase_sanity_build(stats)),
+            ScheduledPhase::new(Schedule::Complex, PhaseManager::define_phase_sanity_check(stats)),
+        ], 0, None)
+    }
+
+    #[allow(unused)]
+    fn define_phase_post_sanity(stats: &Stats) -> Phase {
+        Phase::Complex(vec![
+            ScheduledPhase::new(Global, SanitySetPostGC),
+            ScheduledPhase::new(Schedule::Complex, PhaseManager::define_phase_sanity_build(stats)),
+            ScheduledPhase::new(Schedule::Complex, PhaseManager::define_phase_sanity_check(stats)),
+        ], 0, None)
+    }
+
     // FIXME: It's probably unsafe to call most of these functions, because tls
     pub fn begin_new_phase_stack<VM: VMBinding>(&self, tls: OpaquePointer, scheduled_phase: ScheduledPhase) {
         let order = unsafe { VM::VMActivePlan::collector(tls).rendezvous() };
