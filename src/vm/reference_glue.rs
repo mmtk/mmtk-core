@@ -2,7 +2,6 @@ use ::util::ObjectReference;
 use ::util::Address;
 use ::plan::TraceLocal;
 use ::util::OpaquePointer;
-use libc::c_void;
 use vm::VMBinding;
 
 /**

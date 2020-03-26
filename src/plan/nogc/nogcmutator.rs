@@ -1,5 +1,4 @@
 use ::policy::immortalspace::ImmortalSpace;
-use ::policy::largeobjectspace::LargeObjectSpace;
 use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
 use ::plan::mutator_context::MutatorContext;
 use ::plan::Phase;
@@ -8,7 +7,6 @@ use ::util::alloc::Allocator;
 use ::plan::Allocator as AllocationType;
 use ::util::heap::MonotonePageResource;
 use ::util::OpaquePointer;
-use libc::c_void;
 use plan::nogc::NoGC;
 use vm::VMBinding;
 
@@ -20,8 +18,8 @@ pub struct NoGCMutator<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> MutatorContext for NoGCMutator<VM> {
-    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
-        unimplemented!();
+    fn collection_phase(&mut self, _tls: OpaquePointer, _phase: &Phase, _primary: bool) {
+        unreachable!()
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
@@ -40,7 +38,7 @@ impl<VM: VMBinding> MutatorContext for NoGCMutator<VM> {
         }
     }
 
-    fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
+    fn post_alloc(&mut self, refer: ObjectReference, _type_refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
         match allocator {
             AllocationType::Los => {
                 // FIXME: data race on immortalspace.mark_state !!!

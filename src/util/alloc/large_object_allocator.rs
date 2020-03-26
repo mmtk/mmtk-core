@@ -1,10 +1,7 @@
-use libc::c_void;
-
 use ::policy::largeobjectspace::LargeObjectSpace;
-use ::policy::space::Space;
-use ::util::{Address, ObjectReference};
+use ::util::Address;
 use ::util::alloc::{allocator, Allocator};
-use ::util::heap::{FreeListPageResource, PageResource};
+use ::util::heap::FreeListPageResource;
 use ::util::OpaquePointer;
 use ::plan::selected_plan::SelectedPlan;
 use vm::VMBinding;
@@ -37,7 +34,7 @@ impl<VM: VMBinding> Allocator<VM, FreeListPageResource<VM, LargeObjectSpace<VM>>
         self.alloc_slow_inline(size, align, offset)
     }
 
-    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: isize) -> Address {
         let header = 0; // HashSet is used instead of DoublyLinkedList
         let maxbytes = allocator::get_maximum_aligned_size(size + header, align, allocator::MIN_ALIGNMENT);
         let pages = ::util::conversions::bytes_to_pages_up(maxbytes);

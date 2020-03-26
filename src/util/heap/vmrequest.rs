@@ -1,6 +1,5 @@
 use ::util::Address;
 use ::util::constants::*;
-use super::layout::heap_parameters::*;
 use super::layout::vm_layout_constants::*;
 
 ////////// FIXME //////////////

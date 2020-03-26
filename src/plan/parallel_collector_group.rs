@@ -5,10 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::ParallelCollector;
 use ::vm::Collection;
-use plan::selected_plan::SelectedPlan;
 
-use libc::c_void;
-use plan::phase::PhaseManager;
 use mmtk::MMTK;
 use vm::VMBinding;
 use std::marker::PhantomData;
@@ -67,9 +64,7 @@ impl<VM: VMBinding, C: ParallelCollector<VM>> ParallelCollectorGroup<VM, C> {
             let self_ptr = self as *const Self;
             self.contexts[i].set_group(self_ptr);
             self.contexts[i].set_worker_ordinal(i);
-            unsafe {
-                VM::VMCollection::spawn_worker_thread(tls, Some(&mut self.contexts[i]));
-            }
+            VM::VMCollection::spawn_worker_thread(tls, Some(&mut self.contexts[i]));
         }
     }
 
@@ -117,7 +112,7 @@ impl<VM: VMBinding, C: ParallelCollector<VM>> ParallelCollectorGroup<VM, C> {
     }
 
     pub fn is_member(&self, context: &C) -> bool {
-        if let Some(i) = self.contexts.iter().position(|ref c| c.get_tls() == context.get_tls()) {
+        if self.contexts.iter().find(|ref c| c.get_tls() == context.get_tls()).is_some() {
             true
         } else {
             false

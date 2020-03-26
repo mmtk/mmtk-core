@@ -1,5 +1,5 @@
 use super::Mmapper;
-use ::util::{Address, ObjectReference};
+use ::util::Address;
 
 use ::util::constants::*;
 use std::fmt;
@@ -11,7 +11,6 @@ use util::conversions::pages_to_bytes;
 
 use super::mmapper::MMAP_CHUNK_BYTES;
 
-use libc::*;
 use std::mem::transmute;
 use util::memory::{dzmmap, munprotect, mprotect};
 
@@ -36,7 +35,7 @@ impl fmt::Debug for ByteMapMmapper {
 }
 
 impl Mmapper for ByteMapMmapper {
-    fn eagerly_mmap_all_spaces(&self, space_map: &[Address]) {
+    fn eagerly_mmap_all_spaces(&self, _space_map: &[Address]) {
         unimplemented!()
     }
 
@@ -63,7 +62,7 @@ impl Mmapper for ByteMapMmapper {
             // might have become MAPPED here
             if self.mapped[chunk].load(Ordering::Relaxed) == UNMAPPED {
                 match dzmmap(mmap_start, MMAP_CHUNK_BYTES) {
-                    Ok(ret) => {
+                    Ok(_) => {
                         if VERBOSE {
                             trace!("mmap succeeded at chunk {}  {} with len = {}", chunk,
                                    mmap_start, MMAP_CHUNK_BYTES);
@@ -126,7 +125,7 @@ impl Mmapper for ByteMapMmapper {
                     }
                     Err(e) => {
                         drop(guard);
-                        panic!("Mmapper.mprotect failed");
+                        panic!("Mmapper.mprotect failed: {}", e);
                     }
                 }
                 self.mapped[chunk].store(PROTECTED, Ordering::Relaxed);

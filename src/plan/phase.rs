@@ -1,18 +1,14 @@
 use ::plan;
-use ::plan::{CollectorContext, MutatorContext, ParallelCollector, Plan, SelectedPlan};
+use ::plan::{CollectorContext, MutatorContext, ParallelCollector, Plan};
 use ::vm::ActivePlan;
-use std::sync::{atomic, Arc};
+use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 use util::statistics::phase_timer::PhaseTimer;
 use ::util::OpaquePointer;
-use libc::c_void;
 use util::statistics::{Counter, Timer};
-use std::fmt;
 use util::statistics::stats::Stats;
-use std::collections::HashMap;
 use plan::phase::Schedule::*;
 use plan::phase::Phase::*;
 use vm::VMBinding;
@@ -104,7 +100,6 @@ impl ScheduledPhase {
 pub struct PhaseManager {
     even_mutator_reset_rendezvous: AtomicBool,
     odd_mutator_reset_rendezvous: AtomicBool,
-    complex_phase_cursor: AtomicUsize,
 
     phase_stack: Mutex<Vec<ScheduledPhase>>,
     even_scheduled_phase: Mutex<ScheduledPhase>,
@@ -122,7 +117,6 @@ impl PhaseManager {
         PhaseManager {
             even_mutator_reset_rendezvous: AtomicBool::new(false),
             odd_mutator_reset_rendezvous: AtomicBool::new(false),
-            complex_phase_cursor: AtomicUsize::new(0),
 
             phase_stack: Mutex::new(vec![]),
             even_scheduled_phase: Mutex::new(ScheduledPhase::EMPTY),
@@ -139,26 +133,6 @@ impl PhaseManager {
         Phase::Complex(vec![
             ScheduledPhase::new(Mutator, PrepareStacks),
             ScheduledPhase::new(Global, PrepareStacks)
-        ], 0, None)
-    }
-
-    fn define_phase_sanity_build(stats: &Stats) -> Phase {
-        Phase::Complex(vec![
-            ScheduledPhase::new(Global, SanityPrepare),
-            ScheduledPhase::new(Collector, SanityPrepare),
-            ScheduledPhase::new(Schedule::Complex, PhaseManager::define_phase_prepare_stacks(stats)),
-            ScheduledPhase::new(Collector, SanityRoots),
-            ScheduledPhase::new(Global, SanityRoots),
-            ScheduledPhase::new(Collector, SanityCopyRoots),
-            ScheduledPhase::new(Global, SanityBuildTable)
-        ], 0, None)
-    }
-
-    fn define_phase_sanity_check(stats: &Stats) -> Phase {
-        Phase::Complex(vec![
-            ScheduledPhase::new(Global, SanityCheckTable),
-            ScheduledPhase::new(Collector, SanityRelease),
-            ScheduledPhase::new(Global, SanityRelease)
         ], 0, None)
     }
 
@@ -234,6 +208,32 @@ impl PhaseManager {
         ], 0, None)
     }
 
+    // It seems we never use the following functions for defining sanity checking phases.
+    // FIXME: We need to check if sanity cehcking works or not.
+
+    #[allow(unused)]
+    fn define_phase_sanity_build(stats: &Stats) -> Phase {
+        Phase::Complex(vec![
+            ScheduledPhase::new(Global, SanityPrepare),
+            ScheduledPhase::new(Collector, SanityPrepare),
+            ScheduledPhase::new(Schedule::Complex, PhaseManager::define_phase_prepare_stacks(stats)),
+            ScheduledPhase::new(Collector, SanityRoots),
+            ScheduledPhase::new(Global, SanityRoots),
+            ScheduledPhase::new(Collector, SanityCopyRoots),
+            ScheduledPhase::new(Global, SanityBuildTable)
+        ], 0, None)
+    }
+
+    #[allow(unused)]
+    fn define_phase_sanity_check(stats: &Stats) -> Phase {
+        Phase::Complex(vec![
+            ScheduledPhase::new(Global, SanityCheckTable),
+            ScheduledPhase::new(Collector, SanityRelease),
+            ScheduledPhase::new(Global, SanityRelease)
+        ], 0, None)
+    }
+
+    #[allow(unused)]
     fn define_phase_pre_sanity(stats: &Stats) -> Phase {
         Phase::Complex(vec![
             ScheduledPhase::new(Global, SanitySetPreGC),
@@ -242,6 +242,7 @@ impl PhaseManager {
         ], 0, None)
     }
 
+    #[allow(unused)]
     fn define_phase_post_sanity(stats: &Stats) -> Phase {
         Phase::Complex(vec![
             ScheduledPhase::new(Global, SanitySetPostGC),

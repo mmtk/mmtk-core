@@ -1,7 +1,8 @@
-use ::util::{Address, ObjectReference};
+use ::util::Address;
 use ::util::heap::layout::vm_layout_constants::*;
 
 pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES;   // the granularity VMResource operates at
+#[allow(unused)]
 pub const MMAP_CHUNK_MASK: usize = MMAP_CHUNK_BYTES - 1;
 
 pub trait Mmapper {

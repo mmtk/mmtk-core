@@ -3,23 +3,19 @@ use ::plan::Allocator as AllocationType;
 use ::plan::CollectorContext;
 use ::plan::ParallelCollector;
 use ::plan::ParallelCollectorGroup;
-use ::plan::semispace;
 use ::plan::TraceLocal;
 use ::plan::phase::PhaseManager;
 use ::policy::copyspace::CopySpace;
-use ::policy::largeobjectspace::LargeObjectSpace;
 use ::util::{Address, ObjectReference};
 use ::util::alloc::Allocator;
 use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
 use ::util::forwarding_word::clear_forwarding_bits;
-use ::util::heap::{MonotonePageResource, PageResource};
+use ::util::heap::MonotonePageResource;
 use ::util::reference_processor::*;
 use ::vm::Scanning;
-use libc::c_void;
 use super::sstracelocal::SSTraceLocal;
 use ::plan::selected_plan::SelectedConstraints;
 use util::OpaquePointer;
-use plan::semispace::SelectedPlan;
 use plan::semispace::SemiSpace;
 use plan::phase::ScheduledPhase;
 use mmtk::MMTK;
@@ -66,7 +62,7 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         self.trace.init(tls);
     }
 
-    fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize,
+    fn alloc_copy(&mut self, _original: ObjectReference, bytes: usize, align: usize, offset: isize,
                   allocator: AllocationType) -> Address {
         match allocator {
             ::plan::Allocator::Los => self.los.alloc(bytes, align, offset),
@@ -83,7 +79,7 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         }
     }
 
-    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, _tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
             &Phase::Prepare => { self.ss.rebind(Some(self.plan.tospace())) }
             &Phase::StackRoots => {
@@ -156,7 +152,7 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         self.tls
     }
 
-    fn post_copy(&self, object: ObjectReference, rvm_type: Address, bytes: usize, allocator: ::plan::Allocator) {
+    fn post_copy(&self, object: ObjectReference, _rvm_type: Address, _bytes: usize, allocator: ::plan::Allocator) {
         clear_forwarding_bits::<VM>(object);
         match allocator {
             ::plan::Allocator::Default => {}

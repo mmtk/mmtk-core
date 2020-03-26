@@ -6,10 +6,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use ::vm::Collection;
 
-use ::plan::{Plan, ParallelCollector};
+use ::plan::Plan;
 use ::plan::selected_plan::SelectedPlan;
 
-use libc::c_void;
 use util::OpaquePointer;
 use vm::VMBinding;
 

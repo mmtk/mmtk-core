@@ -2,7 +2,6 @@ use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use std::sync::Mutex;
 use util::statistics::Timer;
 use util::statistics::counter::{Counter, LongCounter};
-use util::statistics::counter::MonotoneNanoTime;
 use std::sync::Arc;
 
 pub const MAX_PHASES: usize = 1 << 12;
@@ -37,7 +36,7 @@ pub struct Stats {
     total_time: Arc<Mutex<Timer>>,
 
     pub shared: Arc<SharedStats>,
-    counters: Mutex<Vec<Arc<Mutex<Counter + Send>>>>,
+    counters: Mutex<Vec<Arc<Mutex<dyn Counter + Send>>>>,
     exceeded_phase_limit: AtomicBool,
 }
 
@@ -135,7 +134,7 @@ impl Stats {
     }
 
     pub fn start_all(&self) {
-        let mut counter = self.counters.lock().unwrap();
+        let _counter = self.counters.lock().unwrap();
         if self.get_gathering_stats() {
             println!("Error: calling Stats.startAll() while stats running");
             println!("       verbosity > 0 and the harness mechanism may be conflicting");
@@ -155,7 +154,7 @@ impl Stats {
     }
 
     fn stop_all_counters(&self) {
-        let mut counter = self.counters.lock().unwrap();
+        let _counter = self.counters.lock().unwrap();
         self.total_time.lock().unwrap().stop();
         self.shared.set_gathering_stats(false);
     }

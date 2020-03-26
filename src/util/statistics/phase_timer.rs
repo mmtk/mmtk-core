@@ -1,5 +1,4 @@
 use util::statistics::stats::Stats;
-use util::statistics::counter::{LongCounter, MonotoneNanoTime};
 use plan::Phase::{self, *};
 use std::sync::{Arc, Mutex};
 use util::statistics::{Timer, Counter};

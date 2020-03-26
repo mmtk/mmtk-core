@@ -1,5 +1,5 @@
 use ::util::alloc::linear_scan::LinearScan;
-use ::util::{Address, ObjectReference};
+use ::util::ObjectReference;
 
 use ::vm::ObjectModel;
 use vm::VMBinding;

@@ -1,7 +1,6 @@
 use ::policy::space::Space;
 use ::policy::immortalspace::ImmortalSpace;
 use ::policy::largeobjectspace::LargeObjectSpace;
-use ::plan::controller_collector_context::ControllerCollectorContext;
 use ::plan::{Plan, Phase};
 use ::util::ObjectReference;
 use ::util::heap::VMRequest;
@@ -10,10 +9,6 @@ use ::util::Address;
 use ::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
-use std::thread;
-use libc::c_void;
-
-use std::mem::uninitialized;
 
 use super::NoGCTraceLocal;
 use super::NoGCMutator;
@@ -22,7 +17,7 @@ use util::conversions::bytes_to_pages;
 use plan::plan::{create_vm_space, CommonPlan};
 use util::heap::layout::heap_layout::VMMap;
 use util::heap::layout::heap_layout::Mmapper;
-use util::options::{Options, UnsafeOptionsWrapper};
+use util::options::UnsafeOptionsWrapper;
 use std::sync::Arc;
 use util::heap::HeapMeta;
 use util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END};
@@ -88,11 +83,13 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         Box::new(NoGCMutator::new(tls, self))
     }
 
-    fn will_never_move(&self, object: ObjectReference) -> bool {
+    fn will_never_move(&self, _object: ObjectReference) -> bool {
         true
     }
 
-    unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {}
+    unsafe fn collection_phase(&self, _tls: OpaquePointer, _phase: &Phase) {
+        unreachable!()
+    }
 
     fn get_pages_used(&self) -> usize {
         let unsync = unsafe { &*self.unsync.get() };
@@ -113,7 +110,7 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         return false;
     }
 
-    fn is_bad_ref(&self, object: ObjectReference) -> bool {
+    fn is_bad_ref(&self, _object: ObjectReference) -> bool {
         false
     }
 

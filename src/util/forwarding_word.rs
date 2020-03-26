@@ -3,7 +3,6 @@ use ::util::{Address, ObjectReference};
 use ::vm::ObjectModel;
 use ::util::OpaquePointer;
 use std::sync::atomic::Ordering;
-use libc::c_void;
 
 use ::plan::Allocator;
 use vm::VMBinding;
@@ -16,6 +15,7 @@ const BEING_FORWARDED: u8 = 2;
 const FORWARDED: u8 = 3;
 // ...11
 const FORWARDING_MASK: u8 = 3;
+#[allow(unused)]
 const FORWARDING_BITS: usize = 2;
 
 pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
@@ -44,8 +44,7 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(object: ObjectReference, gc_
         let a = status_word & !((FORWARDING_MASK as usize) << VM::VMObjectModel::GC_BYTE_OFFSET);
         unsafe { Address::from_usize(a).to_object_reference() }
     } else {
-        panic!("Invalid header value 0x{:x} 0x{:x}", gc_byte, VM::VMObjectModel::read_available_bits_word(object));
-        object
+        panic!("Invalid header value 0x{:x} 0x{:x}", gc_byte, VM::VMObjectModel::read_available_bits_word(object))
     }
 }
 

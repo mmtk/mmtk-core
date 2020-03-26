@@ -1,22 +1,15 @@
 use ::util::conversions;
 use ::util::heap::layout::vm_layout_constants::*;
-use ::util::constants::*;
 use ::util::heap::layout::heap_parameters::*;
 use ::util::Address;
 use ::util::int_array_freelist::IntArrayFreeList;
-use ::util::heap::PageResource;
-use ::util::heap::FreeListPageResource;
 use ::util::heap::freelistpageresource::CommonFreeListPageResource;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use ::policy::space::Space;
 use ::util::generic_freelist::GenericFreeList;
 use std::mem;
 use util::heap::space_descriptor::SpaceDescriptor;
 
-// use ::util::free::IntArrayFreeList;
-
-const NON_MAP_FRACTION: f64 = 1.0 - 8.0 / 4096.0;
 #[cfg(target_pointer_width = "32")]
 const MAP_BASE_ADDRESS: Address = Address::ZERO;
 
@@ -80,7 +73,7 @@ impl Map32 {
     #[allow(mutable_transmutes)]
     pub fn allocate_contiguous_chunks(&self, descriptor: SpaceDescriptor, chunks: usize, head: Address) -> Address {
         let self_mut: &mut Self = unsafe { mem::transmute(self) };
-        let sync = self.sync.lock().unwrap();
+        let _sync = self.sync.lock().unwrap();
         let chunk = self_mut.region_map.alloc(chunks as _);
         debug_assert!(chunk != 0);
         if chunk == -1 {
@@ -123,7 +116,7 @@ impl Map32 {
     }
 
     pub fn free_all_chunks(&self, any_chunk: Address) {
-        let sync = self.sync.lock().unwrap();
+        let _sync = self.sync.lock().unwrap();
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
         if !any_chunk.is_zero() {
             let chunk = self.get_chunk_index(any_chunk);
@@ -140,7 +133,7 @@ impl Map32 {
     }
 
     pub fn free_contiguous_chunks(&self, start: Address) -> usize {
-        let sync = self.sync.lock().unwrap();
+        let _sync = self.sync.lock().unwrap();
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = self.get_chunk_index(start);
         self.free_contiguous_chunks_no_lock(chunk as _)
@@ -193,11 +186,11 @@ impl Map32 {
         //  2051: 1024
         // ]
         /* set up the region map free list */
-        let mut alloced_chunk = self_mut.region_map.alloc(first_chunk as _);       // block out entire bottom of address range
-        for chunk_index in first_chunk..(last_chunk + 1) {
-            alloced_chunk = self_mut.region_map.alloc(1);
+        self_mut.region_map.alloc(first_chunk as _);       // block out entire bottom of address range
+        for _ in first_chunk..(last_chunk + 1) {
+            self_mut.region_map.alloc(1);
         }
-        alloced_chunk = self_mut.region_map.alloc(trailing_chunks as _);
+        let alloced_chunk = self_mut.region_map.alloc(trailing_chunks as _);
         debug_assert!(alloced_chunk == unavail_start_chunk as i32, "{} != {}", alloced_chunk, unavail_start_chunk);
         /* set up the global page map and place chunks on free list */
         let mut first_page = 0;

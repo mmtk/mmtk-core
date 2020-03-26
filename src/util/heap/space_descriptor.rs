@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 
 const TYPE_BITS: usize = 2;
+#[allow(unused)]
 const TYPE_SHARED: usize = 0;
 const TYPE_CONTIGUOUS: usize = 1;
 const TYPE_CONTIGUOUS_HI: usize = 3;
@@ -16,6 +17,7 @@ const SIZE_BITS: usize = 10;
 const SIZE_MASK: usize = ((1 << SIZE_BITS) - 1) << SIZE_SHIFT;
 const EXPONENT_SHIFT: usize = SIZE_SHIFT + SIZE_BITS;
 const EXPONENT_BITS: usize = 5;
+#[cfg(target_pointer_width = "32")]
 const EXPONENT_MASK: usize = ((1 << EXPONENT_BITS) - 1) << EXPONENT_SHIFT;
 const MANTISSA_SHIFT: usize = EXPONENT_SHIFT + EXPONENT_BITS;
 const MANTISSA_BITS: usize = 14;

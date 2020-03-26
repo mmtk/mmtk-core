@@ -1,6 +1,5 @@
 use ::plan::{Plan, SelectedPlan};
 use ::util::OpaquePointer;
-use libc::c_void;
 use vm::VMBinding;
 
 pub trait ActivePlan<VM: VMBinding> {

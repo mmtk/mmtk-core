@@ -2,7 +2,6 @@ use ::plan::Phase;
 use ::util::{Address, ObjectReference};
 use ::plan::Allocator;
 use ::util::OpaquePointer;
-use libc::c_void;
 
 pub trait MutatorContext {
     fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool);

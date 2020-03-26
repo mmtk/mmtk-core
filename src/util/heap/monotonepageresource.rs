@@ -1,8 +1,5 @@
-use std::ptr::null_mut;
 use std::sync::{Mutex, MutexGuard};
 use std::sync::atomic::AtomicUsize;
-use std::marker::PhantomData;
-
 use ::util::address::Address;
 use ::util::conversions::*;
 use ::policy::space::Space;
@@ -16,7 +13,6 @@ use ::util::alloc::embedded_meta_data::*;
 use ::util::OpaquePointer;
 
 use super::layout::Mmapper;
-use ::util::heap::layout::heap_layout;
 
 use super::PageResource;
 use std::sync::atomic::Ordering;
@@ -24,8 +20,6 @@ use std::sync::atomic::Ordering;
 use libc::{c_void, memset};
 use util::heap::layout::heap_layout::VMMap;
 use vm::VMBinding;
-
-const SPACE_ALIGN: usize = 1 << 19;
 
 pub struct MonotonePageResource<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> {
     common: CommonPageResource<VM, MonotonePageResource<VM, S>>,
@@ -165,7 +159,7 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> PageResource
 impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> MonotonePageResource<VM, S> {
     pub fn new_contiguous(start: Address, bytes: usize,
                           meta_data_pages_per_region: usize,
-                          vm_map: &'static VMMap) -> Self {
+                          _vm_map: &'static VMMap) -> Self {
         let sentinel = start + bytes;
 
         MonotonePageResource {
@@ -191,7 +185,7 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> MonotonePage
         }
     }
 
-    pub fn new_discontiguous(meta_data_pages_per_region: usize, vm_map: &'static VMMap) -> Self {
+    pub fn new_discontiguous(meta_data_pages_per_region: usize, _vm_map: &'static VMMap) -> Self {
         MonotonePageResource {
             common: CommonPageResource {
                 reserved: AtomicUsize::new(0),
@@ -274,22 +268,22 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> MonotonePage
             };
         } else {
             if !guard.cursor.is_zero() {
-                let mut bytes = guard.cursor - guard.current_chunk;
+                let bytes = guard.cursor - guard.current_chunk;
                 self.release_pages_extent(guard.current_chunk, bytes);
                 while self.move_to_next_chunk(guard) {
-                    let mut bytes = guard.cursor - guard.current_chunk;
+                    let bytes = guard.cursor - guard.current_chunk;
                     self.release_pages_extent(guard.current_chunk, bytes);
                 }
 
-                guard.current_chunk = unsafe {Address::zero()};
-                guard.sentinel = unsafe {Address::zero()};
-                guard.cursor = unsafe {Address::zero()};
+                guard.current_chunk = Address::zero();
+                guard.sentinel = Address::zero();
+                guard.cursor = Address::zero();
                 self.common().space.as_ref().unwrap().release_all_chunks();
             }
         }
     }
 
-    fn release_pages_extent(&self, first: Address, bytes: usize) {
+    fn release_pages_extent(&self, _first: Address, bytes: usize) {
         let pages = ::util::conversions::bytes_to_pages(bytes);
         debug_assert!(bytes == ::util::conversions::pages_to_bytes(pages));
         // FIXME ZERO_PAGES_ON_RELEASE

@@ -1,15 +1,10 @@
 use ::util::address::Address;
 
-use ::policy::space::Space;
-
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Mutex;
-use libc::c_void;
+use std::sync::atomic::Ordering;
 
 use ::util::constants::*;
 use ::util::heap::PageResource;
 use ::vm::{ActivePlan, Collection};
-use ::plan::MutatorContext;
 use ::plan::selected_plan::SelectedPlan;
 use ::plan::Plan;
 use ::util::OpaquePointer;
@@ -128,8 +123,6 @@ pub trait Allocator<VM: VMBinding, PR: PageResource<VM>> {
     #[inline(always)]
     fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let tls = self.get_tls();
-        let tmp = self.get_space();
-        let space = tmp.as_ref().unwrap();
 
         // Information about the previous collection.
         let mut emergency_collection = false;

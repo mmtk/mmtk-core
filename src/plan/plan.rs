@@ -1,12 +1,11 @@
-use libc::c_void;
 use ::util::ObjectReference;
-use super::{MutatorContext, CollectorContext, ParallelCollector, TraceLocal};
-use plan::phase::{Phase, Schedule, ScheduledPhase};
-use std::sync::atomic::{self, AtomicUsize, AtomicBool, Ordering};
+use super::{MutatorContext, ParallelCollector, TraceLocal};
+use plan::phase::Phase;
+use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use ::util::OpaquePointer;
 use ::policy::space::Space;
 use ::util::heap::PageResource;
-use ::vm::{Collection, ActivePlan, ObjectModel};
+use ::vm::{Collection, ObjectModel};
 use super::controller_collector_context::ControllerCollectorContext;
 use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use util::constants::LOG_BYTES_IN_MBYTE;
@@ -14,15 +13,11 @@ use util::heap::{VMRequest, HeapMeta};
 use policy::immortalspace::ImmortalSpace;
 use util::{Address, conversions};
 use util::statistics::stats::Stats;
-use util::statistics::counter::{Counter, LongCounter};
-use util::statistics::counter::MonotoneNanoTime;
 use util::heap::layout::heap_layout::VMMap;
 use util::heap::layout::heap_layout::Mmapper;
 use util::heap::layout::Mmapper as IMmapper;
 use util::options::{Options, UnsafeOptionsWrapper};
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use mmtk::MMTK;
 use vm::VMBinding;
 
 // FIXME: Move somewhere more appropriate
@@ -104,7 +99,7 @@ pub trait Plan<VM: VMBinding>: Sized {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required<PR: PageResource<VM>>(&self, space_full: bool, space: &'static PR::Space) -> bool where Self: Sized {
+    fn collection_required<PR: PageResource<VM>>(&self, space_full: bool, _space: &'static PR::Space) -> bool where Self: Sized {
         let stress_force_gc = self.stress_test_gc_required();
         trace!("self.get_pages_reserved()={}, self.get_total_pages()={}",
                self.get_pages_reserved(), self.get_total_pages());

@@ -1,9 +1,8 @@
-use std::collections::hash_set::Iter;
 use std::collections::HashSet;
 use std::mem::swap;
 use std::sync::Mutex;
 
-use ::util::{Address, ObjectReference};
+use ::util::Address;
 
 #[derive(Debug)]
 pub struct TreadMill {

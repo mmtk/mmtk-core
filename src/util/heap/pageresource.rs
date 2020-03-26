@@ -3,12 +3,8 @@ use ::policy::space::Space;
 use ::vm::ActivePlan;
 use ::util::OpaquePointer;
 
-use std::marker::PhantomData;
-use std::sync::{Mutex, MutexGuard};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::fmt::Debug;
 
-use libc::c_void;
 use util::heap::layout::heap_layout::VMMap;
 use vm::VMBinding;
 
@@ -34,7 +30,7 @@ pub trait PageResource<VM: VMBinding>: Sized + 'static {
         self.common().reserved.fetch_sub(reserved_pages, Ordering::Relaxed);
     }
 
-    fn update_zeroing_approach(&self, nontemporal: bool, concurrent: bool) {
+    fn update_zeroing_approach(&self, _nontemporal: bool, concurrent: bool) {
         debug_assert!(!concurrent || self.common().contiguous);
         unimplemented!()
     }

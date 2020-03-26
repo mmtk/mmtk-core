@@ -7,15 +7,3 @@ pub trait TransitiveClosure {
     fn process_edge(&mut self, slot: Address);
     fn process_node(&mut self, object: ObjectReference);
 }
-
-pub struct VirtualTransitiveClosure {}
-
-impl TransitiveClosure for VirtualTransitiveClosure {
-    fn process_edge(&mut self, slot: Address) {
-        trace!("process_edge(slot: {:#?})", slot);
-    }
-
-    fn process_node(&mut self, object: ObjectReference) {
-        trace!("process_node(object: {:#?})", object);
-    }
-}

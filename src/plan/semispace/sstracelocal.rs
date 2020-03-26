@@ -1,10 +1,8 @@
 use ::plan::{TraceLocal, TransitiveClosure};
-use ::plan::trace::Trace;
 use ::policy::space::Space;
 use ::util::{Address, ObjectReference};
 use ::util::queue::LocalQueue;
 use ::vm::Scanning;
-use libc::c_void;
 use super::ss;
 use util::OpaquePointer;
 use plan::semispace::SemiSpace;
@@ -115,7 +113,7 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
         self.values.reset();
     }
 
-    fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, root: bool) {
+    fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, _root: bool) {
         let interior_ref: Address = unsafe { slot.load() };
         let offset = interior_ref - target.to_address();
         let new_target = self.trace_object(target);

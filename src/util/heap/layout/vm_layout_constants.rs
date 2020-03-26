@@ -6,11 +6,6 @@ use super::heap_parameters::*;
 use super::super::vmrequest::{HEAP_LAYOUT_32BIT, HEAP_LAYOUT_64BIT};
 use util::conversions::{chunk_align_down, chunk_align_up};
 
-/**
- * Enable messages in the BootImageWriter log file
- */
-const VERBOSE_BUILD: bool = true;
-
 /** log_2 of the addressable virtual space */
 pub const LOG_ADDRESS_SPACE: usize = if_then_else_usize!(HEAP_LAYOUT_32BIT, 32,
     LOG_SPACE_SIZE_64 + LOG_MAX_SPACES);
@@ -61,7 +56,7 @@ pub const HEAP_END: Address = chunk_align_up(unsafe{ Address::from_usize(0xb0000
  * and not available to MMTk.
  */
 pub const AVAILABLE_START: Address = chunk_align_up(unsafe{ Address::from_usize(
-    (0x67000000 + (0x64000000 - 0x60000000)/5)) });
+    0x67000000 + (0x64000000 - 0x60000000)/5) });
 
 /**
  * Highest virtual address available for MMTk to manage.  The address space between
