@@ -176,7 +176,6 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
 pub struct CommonSpace<VM: VMBinding, PR: PageResource<VM>> {
     pub name: &'static str,
     pub descriptor: SpaceDescriptor,
-    pub index: usize,
     pub vmrequest: VMRequest,
 
     immortal: bool,
@@ -203,7 +202,6 @@ impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
         let mut rtn = CommonSpace {
             name,
             descriptor: SpaceDescriptor::UNINITIALIZED,
-            index: heap.new_space_index(),
             vmrequest,
             immortal,
             movable,

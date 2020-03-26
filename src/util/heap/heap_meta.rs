@@ -3,7 +3,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 pub struct HeapMeta {
-    pub space_count: usize,
     pub heap_cursor: Address,
     pub heap_limit: Address,
     pub total_pages: AtomicUsize,
@@ -12,17 +11,10 @@ pub struct HeapMeta {
 impl HeapMeta {
     pub fn new(start: Address, end: Address) -> Self {
         HeapMeta {
-            space_count: 0,
             heap_cursor: start,
             heap_limit: end,
             total_pages: AtomicUsize::new(0)
         }
-    }
-
-    pub fn new_space_index(&mut self) -> usize {
-        let ret = self.space_count;
-        self.space_count += 1;
-        ret
     }
 
     pub fn reserve(&mut self, extent: usize, top: bool) -> Address {
