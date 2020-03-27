@@ -114,6 +114,7 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
 
     // UNSAFE: This get's a mutable reference from self
     // (i.e. make sure their are no concurrent accesses through self when calling this)_
+    #[allow(clippy::mut_from_ref)]
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR>;
 
     fn is_live(&self, object: ObjectReference) -> bool;

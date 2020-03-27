@@ -95,9 +95,7 @@ impl Map32 {
     pub fn get_next_contiguous_region(&self, start: Address) -> Address {
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = self.get_chunk_index(start);
-        if chunk == 0 {
-            unsafe { Address::zero() }
-        } else if self.next_link[chunk] == 0 {
+        if chunk == 0 || self.next_link[chunk] == 0 {
             unsafe { Address::zero() }
         } else {
             let a = self.next_link[chunk];
@@ -115,6 +113,11 @@ impl Map32 {
         self.get_contiguous_region_chunks(start) << LOG_BYTES_IN_CHUNK
     }
 
+    // The two while loops appear to not mutate the loop condition. However,
+    // free_contiguous_chunks_no_lock() in the loop actually unsafely mutates the while loop condition.
+    // The two while loops can end.
+    // TODO: We need to check the correctness, especially thread safety.
+    #[allow(clippy::while_immutable_condition)]
     pub fn free_all_chunks(&self, any_chunk: Address) {
         let _sync = self.sync.lock().unwrap();
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));

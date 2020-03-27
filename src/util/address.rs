@@ -1,4 +1,3 @@
-use std::cmp;
 use std::fmt;
 use std::mem;
 use std::ops::*;
@@ -16,7 +15,7 @@ pub type ByteOffset = isize;
 /// (memory wise and time wise). The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
 pub struct Address(usize);
 
 /// Address + ByteSize (positive)
@@ -119,18 +118,18 @@ impl Address {
     /// creates Address from a pointer
     #[inline(always)]
     pub fn from_ptr<T>(ptr: *const T) -> Address {
-        unsafe { mem::transmute(ptr) }
+        Address(ptr as usize)
     }
 
     #[inline(always)]
     pub fn from_ref<T>(r: &T) -> Address {
-        unsafe { mem::transmute(r) }
+        Address(r as *const T as usize)
     }
 
     /// creates Address from a mutable pointer
     #[inline(always)]
     pub fn from_mut_ptr<T>(ptr: *mut T) -> Address {
-        unsafe { mem::transmute(ptr) }
+        Address(ptr as usize)
     }
 
     /// creates a null Address (0)
@@ -263,26 +262,6 @@ impl Address {
     }
 }
 
-/// allows comparison between Address
-impl PartialOrd for Address {
-    #[inline(always)]
-    fn partial_cmp(&self, other: &Address) -> Option<cmp::Ordering> {
-        Some(self.0.cmp(&other.0))
-    }
-}
-
-/// allows equal test between Address
-impl PartialEq for Address {
-    #[inline(always)]
-    fn eq(&self, other: &Address) -> bool {
-        self.0 == other.0
-    }
-    #[inline(always)]
-    fn ne(&self, other: &Address) -> bool {
-        self.0 != other.0
-    }
-}
-
 /// allows print Address as upper-case hex value
 impl fmt::UpperHex for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -365,7 +344,7 @@ mod tests {
 /// are allowed for ObjectReference. The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
 pub struct ObjectReference(usize);
 
 impl ObjectReference {
@@ -384,18 +363,6 @@ impl ObjectReference {
     /// returns the ObjectReference
     pub fn value(&self) -> usize {
         self.0
-    }
-}
-
-/// allows equal test between Address
-impl PartialEq for ObjectReference {
-    #[inline(always)]
-    fn eq(&self, other: &ObjectReference) -> bool {
-        self.0 == other.0
-    }
-    #[inline(always)]
-    fn ne(&self, other: &ObjectReference) -> bool {
-        self.0 != other.0
     }
 }
 

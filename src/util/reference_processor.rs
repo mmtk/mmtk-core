@@ -141,6 +141,9 @@ impl ReferenceProcessor {
     }
 
     // UNSAFE: Bypasses mutex
+    // It is designed to allow getting mut ref from UnsafeCell.
+    // TODO: We may need to rework on this to remove the unsafety.
+    #[allow(clippy::mut_from_ref)]
     unsafe fn sync_mut(&self) -> &mut ReferenceProcessorSync {
         (&mut *self.sync.get()).get_mut().unwrap()
     }
