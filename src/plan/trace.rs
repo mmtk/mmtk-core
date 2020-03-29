@@ -22,3 +22,9 @@ impl Trace {
         // TODO: we should reset shared queue here, and we should call prepare() in prepare phase
     }
 }
+
+impl Default for Trace {
+    fn default() -> Self {
+        Self::new()
+    }
+}

@@ -104,14 +104,14 @@ impl<VM: VMBinding> CopySpace<VM> {
             trace!("... yes it is");
             let new_object = ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
             trace!("Returning");
-            return new_object;
+            new_object
         } else {
             trace!("... no it isn't. Copying");
             let new_object = ForwardingWord::forward_object::<VM>(object, allocator, tls);
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copying [{:?} -> {:?}]", object, new_object);
-            return new_object;
+            new_object
         }
     }
 

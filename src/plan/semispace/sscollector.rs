@@ -81,13 +81,13 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
 
     fn collection_phase(&mut self, _tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
-            &Phase::Prepare => { self.ss.rebind(Some(self.plan.tospace())) }
-            &Phase::StackRoots => {
+            Phase::Prepare => { self.ss.rebind(Some(self.plan.tospace())) }
+            Phase::StackRoots => {
                 trace!("Computing thread roots");
                 VM::VMScanning::compute_thread_roots(&mut self.trace, self.tls);
                 trace!("Thread roots complete");
             }
-            &Phase::Roots => {
+            Phase::Roots => {
                 trace!("Computing global roots");
                 VM::VMScanning::compute_global_roots(&mut self.trace, self.tls);
                 trace!("Computing static roots");
@@ -99,47 +99,47 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
                     trace!("Finished boot image");
                 }
             }
-            &Phase::SoftRefs => {
+            Phase::SoftRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
                     self.reference_processors.scan_soft_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
                 }
             }
-            &Phase::WeakRefs => {
+            Phase::WeakRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
                     self.reference_processors.scan_weak_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
                 }
             }
-            &Phase::Finalizable => {
+            Phase::Finalizable => {
                 if primary {
                     // FIXME
                 }
             }
-            &Phase::PhantomRefs => {
+            Phase::PhantomRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
                     self.reference_processors.scan_phantom_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
                 }
             }
-            &Phase::ForwardRefs => {
+            Phase::ForwardRefs => {
                 if primary && SelectedConstraints::NEEDS_FORWARD_AFTER_LIVENESS {
                     self.reference_processors.forward_refs::<VM, SSTraceLocal<VM>>(&mut self.trace)
                 }
             }
-            &Phase::ForwardFinalizable => {
+            Phase::ForwardFinalizable => {
                 if primary {
                     // FIXME
                 }
             }
-            &Phase::Complete => {
+            Phase::Complete => {
                 debug_assert!(self.trace.is_empty());
             }
-            &Phase::Closure => {
+            Phase::Closure => {
                 self.trace.complete_trace();
                 debug_assert!(self.trace.is_empty());
             }
-            &Phase::Release => {
+            Phase::Release => {
                 debug_assert!(self.trace.is_empty());
                 self.trace.release();
                 debug_assert!(self.trace.is_empty());
