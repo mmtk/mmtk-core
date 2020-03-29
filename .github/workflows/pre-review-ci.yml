@@ -14,16 +14,12 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly-2019-08-26
+          components: clippy
           target: i686-unknown-linux-gnu
           # This overwrites the default toolchain with the toolchain specified above.
           override: true
 
       # Build
-      - name: Set up building environments
-        uses: allenevans/set-env@v1.0.0
-        with:
-          # Deny warnings
-          RUSTFLAGS: '-D warnings'
       - name: Build plan - NoGC
         run: cargo build --features nogc
       - name: Build plan - SemiSpace
@@ -34,12 +30,6 @@ jobs:
           cargo build --features semispace,sanity
 
       # Test
-      - name: Set up testing environments
-        uses: allenevans/set-env@v1.0.0
-        with:
-          overwrite: true
-          # No Rust flags (allow warnings in the tests)
-          RUSTFLAGS: ''
       - name: Cargo tests
         run: |
           cargo test --features nogc
@@ -49,3 +39,12 @@ jobs:
         run: |
           sudo apt-get install libc6-dev-i386
           RUSTUP_TOOLCHAIN= python examples/build.py
+
+      # Linter
+      - name: Lint checks
+        run: |
+          export RUSTFLAGS="-D warnings"
+          cargo clippy --features nogc
+          cargo clippy --features semispace
+          cargo clippy --features nogc,sanity
+          cargo clippy --features semispace,sanity
