@@ -11,13 +11,13 @@ use ::util::OpaquePointer;
 use vm::VMBinding;
 
 // FIXME: Put this somewhere more appropriate
-pub const ALIGNMENT_VALUE: usize = 0xdeadbeef;
+pub const ALIGNMENT_VALUE: usize = 0xdead_beef;
 pub const LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
 pub const MIN_ALIGNMENT: usize = 1 << LOG_MIN_ALIGNMENT;
 #[cfg(target_arch = "x86")]
 pub const MAX_ALIGNMENT_SHIFT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
 #[cfg(target_arch = "x86_64")]
-pub const MAX_ALIGNMENT_SHIFT: usize = 0 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
+pub const MAX_ALIGNMENT_SHIFT: usize = LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
 
 pub const MAX_ALIGNMENT: usize = MIN_ALIGNMENT << MAX_ALIGNMENT_SHIFT;
 
@@ -27,13 +27,13 @@ pub fn align_allocation_no_fill(
     alignment: usize,
     offset: isize,
 ) -> Address {
-    return align_allocation(
+    align_allocation(
         region,
         alignment,
         offset,
         MIN_ALIGNMENT,
         false,
-    );
+    )
 }
 
 #[inline(always)]
@@ -45,7 +45,9 @@ pub fn align_allocation(
     fillalignmentgap: bool,
 ) -> Address {
     debug_assert!(known_alignment >= MIN_ALIGNMENT);
-    debug_assert!(MIN_ALIGNMENT >= BYTES_IN_INT);
+    // Make sure MIN_ALIGNMENT is reasonable.
+    #[allow(clippy::assertions_on_constants)]
+    { debug_assert!(MIN_ALIGNMENT >= BYTES_IN_INT); }
     debug_assert!(!(fillalignmentgap && region.is_zero()));
     debug_assert!(alignment <= MAX_ALIGNMENT);
     debug_assert!(offset >= 0);
@@ -101,9 +103,9 @@ pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: 
     debug_assert!(known_alignment >= MIN_ALIGNMENT);
 
     if MAX_ALIGNMENT <= MIN_ALIGNMENT || alignment <= known_alignment {
-        return size;
+        size
     } else {
-        return size + alignment - known_alignment;
+        size + alignment - known_alignment
     }
 }
 

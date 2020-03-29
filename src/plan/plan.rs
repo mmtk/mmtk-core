@@ -84,7 +84,7 @@ pub trait Plan<VM: VMBinding>: Sized {
             return true;
         }*/
 
-        return false;
+        false
     }
 
     fn log_poll<PR: PageResource<VM>>(&self, space: &'static PR::Space, message: &'static str) {
@@ -209,10 +209,8 @@ pub trait Plan<VM: VMBinding>: Sized {
     fn is_mapped_address(&self, address: Address) -> bool;
 
     fn modify_check(&self, object: ObjectReference) {
-        if self.common().gc_in_progress_proper() {
-            if self.is_movable(object) {
-                panic!("GC modifying a potentially moving object via Java (i.e. not magic) obj= {}", object);
-            }
+        if self.common().gc_in_progress_proper() && self.is_movable(object) {
+            panic!("GC modifying a potentially moving object via Java (i.e. not magic) obj= {}", object);
         }
     }
 

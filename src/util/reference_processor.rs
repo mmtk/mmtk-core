@@ -63,6 +63,12 @@ impl ReferenceProcessors {
     }
 }
 
+impl Default for ReferenceProcessors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Debug flags
 pub const TRACE: bool = false;
 pub const TRACE_UNREACHABLE: bool = false;
@@ -166,13 +172,13 @@ impl ReferenceProcessor {
             trace!("{:?} unforwardedReferences is {:?}", self.semantics, unforwarded_references);
         }
 
-        for i in 0 .. references.len() {
-            let reference = unsafe { unforwarded_references[i].to_object_reference() };
+        for (i, unforwarded_ref) in  unforwarded_references.iter_mut().enumerate().take(references.len()) {
+            let reference = unsafe { unforwarded_ref.to_object_reference() };
             if TRACE_DETAIL { trace!("slot {:?}: forwarding {:?}", i, reference); }
             VM::VMReferenceGlue::set_referent(reference, trace.get_forwarded_referent(
                 VM::VMReferenceGlue::get_referent(reference)));
             let new_reference = trace.get_forwarded_reference(reference);
-            unforwarded_references[i] = new_reference.to_address();
+            *unforwarded_ref = new_reference.to_address();
         }
 
         if TRACE { trace!("Ending ReferenceProcessor.forward({:?})", self.semantics) }
@@ -186,16 +192,17 @@ impl ReferenceProcessor {
 
         if TRACE { trace!("Starting ReferenceProcessor.scan({:?})", self.semantics); }
         let mut to_index = if nursery { sync.nursery_index } else { 0 };
+        let from_index = to_index;
 
         if TRACE_DETAIL { trace!("{:?} Reference table is {:?}", self.semantics, references); }
         if retain {
-            for from_index in to_index .. references.len() {
-                let reference = unsafe { references[from_index].to_object_reference() };
+            for addr in references.iter().skip(from_index) {
+                let reference = unsafe { addr.to_object_reference() };
                 self.retain_referent::<VM, T>(trace, reference);
             }
         } else {
-            for from_index in to_index .. references.len() {
-                let reference = unsafe { references[from_index].to_object_reference() };
+            for i in from_index .. references.len() {
+                let reference = unsafe { references[i].to_object_reference() };
 
                 /* Determine liveness (and forward if necessary) the reference */
                 let new_reference = VM::VMReferenceGlue::process_reference(trace, reference, tls);

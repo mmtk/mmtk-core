@@ -73,8 +73,8 @@ pub enum Phase {
 
 impl Phase {
     pub fn is_empty(&self) -> bool {
-        match self {
-            &Phase::Empty => true,
+        match *self {
+            Phase::Empty => true,
             _ => false,
         }
     }

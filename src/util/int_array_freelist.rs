@@ -54,11 +54,13 @@ impl IntArrayFreeList {
             None => self.table.as_ref().unwrap()
         }
     }
-    #[allow(mutable_transmutes)]
+
+    // FIXME: We need a safe implementation
+    #[allow(clippy::cast_ref_to_mut)]
     fn table_mut(&mut self) -> &mut Vec<i32> {
         match self.parent {
             Some(p) => {
-                let parent_mut: &mut Self = unsafe { mem::transmute(p) };
+                let parent_mut: &mut Self = unsafe { &mut *(p as *const IntArrayFreeList as *mut IntArrayFreeList) };
                 parent_mut.table_mut()
             },
             None => self.table.as_mut().unwrap()

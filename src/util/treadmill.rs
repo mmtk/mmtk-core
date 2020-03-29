@@ -34,7 +34,7 @@ impl TreadMill {
 
     pub fn collect_nursery(&self) -> Vec<Address> {
         let mut guard = self.collect_nursery.lock().unwrap();
-        let vals = guard.iter().map(|x|*x).collect();
+        let vals = guard.iter().copied().collect();
         guard.clear();
         drop(guard);
         vals
@@ -42,7 +42,7 @@ impl TreadMill {
 
     pub fn collect(&self) -> Vec<Address> {
         let mut guard = self.from_space.lock().unwrap();
-        let vals = guard.iter().map(|x|*x).collect();
+        let vals = guard.iter().copied().collect();
         guard.clear();
         drop(guard);
         vals
@@ -82,5 +82,11 @@ impl TreadMill {
             swap(&mut self.from_space, &mut self.to_space);
             // println!("fs <-> ts");
         }
+    }
+}
+
+impl Default for TreadMill {
+    fn default() -> Self {
+        Self::new()
     }
 }

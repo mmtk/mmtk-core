@@ -112,11 +112,7 @@ impl<VM: VMBinding, C: ParallelCollector<VM>> ParallelCollectorGroup<VM, C> {
     }
 
     pub fn is_member(&self, context: &C) -> bool {
-        if self.contexts.iter().find(|ref c| c.get_tls() == context.get_tls()).is_some() {
-            true
-        } else {
-            false
-        }
+        self.contexts.iter().any(|ref c| c.get_tls() == context.get_tls())
     }
 
     pub fn rendezvous(&self) -> usize {
@@ -137,5 +133,11 @@ impl<VM: VMBinding, C: ParallelCollector<VM>> ParallelCollectorGroup<VM, C> {
             }
         }
         me
+    }
+}
+
+impl<VM: VMBinding, C: ParallelCollector<VM>> Default for ParallelCollectorGroup<VM, C> {
+    fn default() -> Self {
+        Self::new()
     }
 }

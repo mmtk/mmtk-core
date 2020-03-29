@@ -72,11 +72,9 @@ impl Stats {
         if self.get_phase() < MAX_PHASES - 1 {
             self.total_time.lock().unwrap().phase_change(self.get_phase());
             self.shared.increment_phase();
-        } else {
-            if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
-                println!("Warning: number of GC phases exceeds MAX_PHASES");
-                self.exceeded_phase_limit.store(true, Ordering::SeqCst);
-            }
+        } else if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
+            println!("Warning: number of GC phases exceeds MAX_PHASES");
+            self.exceeded_phase_limit.store(true, Ordering::SeqCst);
         }
     }
 
@@ -87,11 +85,9 @@ impl Stats {
         if self.get_phase() < MAX_PHASES - 1 {
             self.total_time.lock().unwrap().phase_change(self.get_phase());
             self.shared.increment_phase();
-        } else {
-            if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
-                println!("Warning: number of GC phases exceeds MAX_PHASES");
-                self.exceeded_phase_limit.store(true, Ordering::SeqCst);
-            }
+        } else if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
+            println!("Warning: number of GC phases exceeds MAX_PHASES");
+            self.exceeded_phase_limit.store(true, Ordering::SeqCst);
         }
     }
 
@@ -130,7 +126,7 @@ impl Stats {
                 print!("{}.mu\t{}.gc\t", c.name(), c.name());
             }
         }
-        print!("\n");
+        println!();
     }
 
     pub fn start_all(&self) {
@@ -165,5 +161,11 @@ impl Stats {
 
     pub fn get_gathering_stats(&self) -> bool {
         self.shared.get_gathering_stats()
+    }
+}
+
+impl Default for Stats {
+    fn default() -> Self {
+        Self::new()
     }
 }

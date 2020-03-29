@@ -35,7 +35,7 @@ impl Diffable for MonotoneNanoTime {
 
     fn diff(current: &Instant, earlier: &Instant) -> u64 {
         let delta = current.duration_since(*earlier);
-        delta.as_secs() * 1_000_000_000 + delta.subsec_nanos() as u64
+        delta.as_secs() * 1_000_000_000 + u64::from(delta.subsec_nanos())
     }
 
     fn print_diff(val: u64) {

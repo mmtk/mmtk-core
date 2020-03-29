@@ -13,6 +13,7 @@ use util::heap::HeapMeta;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use util::OpaquePointer;
 use vm::VMBinding;
+use policy::space::SpaceOptions;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -72,7 +73,12 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 impl<VM: VMBinding> LargeObjectSpace<VM> {
     pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
         LargeObjectSpace {
-            common: UnsafeCell::new(CommonSpace::new(name, false, false, zeroed, vmrequest, vm_map, mmapper, heap)),
+            common: UnsafeCell::new(CommonSpace::new(SpaceOptions {
+                name,
+                movable: false,
+                immortal: false,
+                zeroed,
+            }, vmrequest, vm_map, mmapper, heap)),
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new()
@@ -119,21 +125,19 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         let nursery_object = self.is_in_nursery(object);
-        if !self.in_nursery_gc || nursery_object {
-            if self.test_and_mark(object, self.mark_state) {
-                let cell = VM::VMObjectModel::object_start_ref(object) - if USE_PRECEEDING_GC_HEADER { PRECEEDING_GC_HEADER_BYTES } else { 0 };
-                self.treadmill.copy(cell, nursery_object);
-                trace.process_node(object);
-            }
+        if (!self.in_nursery_gc || nursery_object) && self.test_and_mark(object, self.mark_state) {
+            let cell = VM::VMObjectModel::object_start_ref(object) - if USE_PRECEEDING_GC_HEADER { PRECEEDING_GC_HEADER_BYTES } else { 0 };
+            self.treadmill.copy(cell, nursery_object);
+            trace.process_node(object);
         }
-        return object;
+        object
     }
 
     pub fn initialize_header(&self, object: ObjectReference, alloc: bool) {
         let old_value = Self::read_gc_word(object);
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
         if alloc {
-            new_value = new_value | NURSERY_BIT;
+            new_value |= NURSERY_BIT;
         }
         Self::write_gc_word(object, new_value);
         let cell = VM::VMObjectModel::object_start_ref(object) - if USE_PRECEEDING_GC_HEADER { PRECEEDING_GC_HEADER_BYTES } else { 0 };
@@ -177,7 +181,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 return false;
             }
         }
-        return true;
+        true
     }
 
     fn test_mark_bit(&self, object: ObjectReference, value: usize) -> bool {

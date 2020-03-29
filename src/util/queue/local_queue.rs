@@ -38,12 +38,12 @@ impl<'a, T> LocalQueue<'a, T> where T: Debug {
             if TRACE_QUEUE {
                 println!("lde {:?}", result);
             }
-            return result;
+            result
         } else {
             match self.queue.spin(self.id) {
                 Some(b) => {
                     self.buffer = b;
-                    return self.dequeue();
+                    self.dequeue()
                 }
                 None => None
             }
