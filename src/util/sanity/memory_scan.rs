@@ -25,15 +25,13 @@ pub fn scan_region<VM: VMBinding>(plan: &SelectedPlan<VM>){
         while start < end {
             let slot = unsafe {Address::from_usize(start)};
             let object: ObjectReference = unsafe {slot.load()};
-            if value.is_none() {
-                if plan.is_bad_ref(object) {
-                    println!("{} REF: {}", slot, object);
-                }
-            } else {
-                let value = usize::from_str_radix(&value.unwrap()[2..], 16).unwrap();
+            if let Some(value) = value {
+                let value = usize::from_str_radix(&value[2..], 16).unwrap();
                 if object.to_address() ==  unsafe {Address::from_usize(value)} {
                     println!("{} REF: {}", slot, object);
                 }
+            } else if plan.is_bad_ref(object) {
+                println!("{} REF: {}", slot, object);
             }
 
             start += std::mem::size_of::<usize>();
