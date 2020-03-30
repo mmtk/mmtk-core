@@ -3,24 +3,24 @@ use std::sync::atomic::AtomicUsize;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
 
-use util::address::Address;
-use util::heap::pageresource::CommonPageResource;
-use util::alloc::embedded_meta_data::*;
-use util::{generic_freelist, memory};
-use util::generic_freelist::GenericFreeList;
+use crate::util::address::Address;
+use crate::util::heap::pageresource::CommonPageResource;
+use crate::util::alloc::embedded_meta_data::*;
+use crate::util::{generic_freelist, memory};
+use crate::util::generic_freelist::GenericFreeList;
 // #[cfg(target_pointer_width = "32")]
 // FIXME: Use `RawMemoryFreeList` for 64-bit machines
-use util::int_array_freelist::IntArrayFreeList as FreeList;
-use util::heap::layout::vm_layout_constants::*;
-use util::conversions;
-use util::constants::*;
-use util::OpaquePointer;
-use policy::space::Space;
+use crate::util::int_array_freelist::IntArrayFreeList as FreeList;
+use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::conversions;
+use crate::util::constants::*;
+use crate::util::OpaquePointer;
+use crate::policy::space::Space;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
 use super::layout::Mmapper;
 use super::PageResource;
-use util::heap::layout::heap_layout::VMMap;
-use vm::VMBinding;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::vm::VMBinding;
 use std::mem::MaybeUninit;
 
 pub struct CommonFreeListPageResource {
@@ -183,7 +183,7 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
     fn allocate_contiguous_chunks(&mut self, pages: usize, sync: &mut MutexGuard<FreeListPageResourceSync>) -> i32 {
         debug_assert!(self.meta_data_pages_per_region == 0 || pages <= PAGES_IN_CHUNK - self.meta_data_pages_per_region);
         let mut rtn = generic_freelist::FAILURE;
-        let required_chunks = ::policy::space::required_chunks(pages);
+        let required_chunks = crate::policy::space::required_chunks(pages);
         let region = unsafe {
             self.common.space.unwrap().grow_discontiguous_space(required_chunks)
         };

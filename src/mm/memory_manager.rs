@@ -1,25 +1,25 @@
 use std::sync::atomic::Ordering;
 
-use plan::Plan;
-use ::plan::MutatorContext;
-use ::plan::TraceLocal;
-use ::plan::CollectorContext;
-use ::plan::transitive_closure::TransitiveClosure;
+use crate::plan::Plan;
+use crate::plan::MutatorContext;
+use crate::plan::TraceLocal;
+use crate::plan::CollectorContext;
+use crate::plan::transitive_closure::TransitiveClosure;
 
-use ::vm::Collection;
+use crate::vm::Collection;
 
-use ::util::{Address, ObjectReference};
+use crate::util::{Address, ObjectReference};
 
-use ::plan::selected_plan;
+use crate::plan::selected_plan;
 use self::selected_plan::SelectedPlan;
 
-use ::plan::Allocator;
-use util::constants::LOG_BYTES_IN_PAGE;
-use util::heap::layout::vm_layout_constants::HEAP_START;
-use util::heap::layout::vm_layout_constants::HEAP_END;
-use util::OpaquePointer;
-use vm::VMBinding;
-use mmtk::MMTK;
+use crate::plan::Allocator;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::heap::layout::vm_layout_constants::HEAP_START;
+use crate::util::heap::layout::vm_layout_constants::HEAP_END;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
+use crate::mmtk::MMTK;
 use self::selected_plan::{SelectedMutator, SelectedTraceLocal, SelectedCollector};
 
 // This file provides a safe Rust API for mmtk-core.
@@ -43,7 +43,7 @@ pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointe
 }
 
 pub fn gc_init<VM: VMBinding>(mmtk: &MMTK<VM>, heap_size: usize) {
-    ::util::logger::init().unwrap();
+    crate::util::logger::init().unwrap();
     mmtk.plan.gc_init(heap_size, &mmtk.vm_map);
     mmtk.plan.common().initialized.store(true, Ordering::SeqCst);
 
@@ -92,7 +92,7 @@ pub fn is_valid_ref<VM: VMBinding>(mmtk: &MMTK<VM>, val: ObjectReference) -> boo
 // and use unsafe transmute when we know it is a SanityChcker ref.
 #[cfg(feature = "sanity")]
 pub fn report_delayed_root_edge<VM: VMBinding>(mmtk: &MMTK<VM>, trace_local: &mut SelectedTraceLocal<VM>, addr: Address) {
-    use ::util::sanity::sanity_checker::SanityChecker;
+    use crate::util::sanity::sanity_checker::SanityChecker;
     if mmtk.plan.common().is_in_sanity() {
         let sanity_checker: &mut SanityChecker<VM> = unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.report_delayed_root_edge(addr);
@@ -107,7 +107,7 @@ pub fn report_delayed_root_edge<VM: VMBinding>(_: &MMTK<VM>, trace_local: &mut S
 
 #[cfg(feature = "sanity")]
 pub fn will_not_move_in_current_collection<VM: VMBinding>(mmtk: &MMTK<VM>, trace_local: &mut SelectedTraceLocal<VM>, obj: ObjectReference) -> bool {
-    use ::util::sanity::sanity_checker::SanityChecker;
+    use crate::util::sanity::sanity_checker::SanityChecker;
     if mmtk.plan.common().is_in_sanity() {
         let sanity_checker: &mut SanityChecker<VM> = unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.will_not_move_in_current_collection(obj)
@@ -122,7 +122,7 @@ pub fn will_not_move_in_current_collection<VM: VMBinding>(_: &MMTK<VM>, trace_lo
 
 #[cfg(feature = "sanity")]
 pub fn process_interior_edge<VM: VMBinding>(mmtk: &MMTK<VM>, trace_local: &mut SelectedTraceLocal<VM>, target: ObjectReference, slot: Address, root: bool) {
-    use ::util::sanity::sanity_checker::SanityChecker;
+    use crate::util::sanity::sanity_checker::SanityChecker;
     if mmtk.plan.common().is_in_sanity() {
         let sanity_checker: &mut SanityChecker<VM> = unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.process_interior_edge(target, slot, root)
@@ -176,7 +176,7 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 
 #[cfg(feature = "sanity")]
 pub fn scan_region<VM: VMBinding>(mmtk: &MMTK<VM>){
-    ::util::sanity::memory_scan::scan_region(&mmtk.plan);
+    crate::util::sanity::memory_scan::scan_region(&mmtk.plan);
 }
 
 pub fn trace_get_forwarded_referent<VM: VMBinding>(trace_local: &mut SelectedTraceLocal<VM>, object: ObjectReference) -> ObjectReference {

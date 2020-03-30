@@ -1,6 +1,6 @@
 pub use self::local_queue::LocalQueue;
 pub use self::shared_queue::SharedQueue;
-use ::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 
 mod local_queue;
 mod shared_queue;

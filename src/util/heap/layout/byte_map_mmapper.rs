@@ -1,18 +1,18 @@
 use super::Mmapper;
-use ::util::Address;
+use crate::util::Address;
 
-use ::util::constants::*;
+use crate::util::constants::*;
 use std::fmt;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
-use util::heap::layout::vm_layout_constants::*;
-use util::conversions::pages_to_bytes;
+use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::conversions::pages_to_bytes;
 
 use super::mmapper::MMAP_CHUNK_BYTES;
 
 use std::mem::transmute;
-use util::memory::{dzmmap, munprotect, mprotect};
+use crate::util::memory::{dzmmap, munprotect, mprotect};
 
 const UNMAPPED: u8 = 0;
 const MAPPED: u8 = 1;
@@ -176,14 +176,14 @@ impl Default for ByteMapMmapper {
 
 #[cfg(test)]
 mod tests {
-    use util::heap::layout::{ByteMapMmapper, Mmapper};
-    use util::{Address, conversions};
-    use util::heap::layout::vm_layout_constants::HEAP_START;
-    use util::conversions::pages_to_bytes;
+    use crate::util::heap::layout::{ByteMapMmapper, Mmapper};
+    use crate::util::{Address, conversions};
+    
+    use crate::util::conversions::pages_to_bytes;
     use std::sync::atomic::Ordering;
-    use util::heap::layout::byte_map_mmapper::{MAPPED, PROTECTED};
-    use util::heap::layout::mmapper::MMAP_CHUNK_BYTES;
-    use util::constants::LOG_BYTES_IN_PAGE;
+    use crate::util::heap::layout::byte_map_mmapper::{MAPPED, PROTECTED};
+    use crate::util::heap::layout::mmapper::MMAP_CHUNK_BYTES;
+    use crate::util::constants::LOG_BYTES_IN_PAGE;
 
     const MEGABYTE: usize = 1 << 20;
     #[cfg(target_os="linux")]

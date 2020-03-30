@@ -1,7 +1,7 @@
-use util::statistics::stats::Stats;
-use plan::Phase::{self, *};
+use crate::util::statistics::stats::Stats;
+use crate::plan::Phase::{self, *};
 use std::sync::{Arc, Mutex};
-use util::statistics::{Timer, Counter};
+use crate::util::statistics::{Timer, Counter};
 
 pub struct PhaseTimer {
     ref_type_time: Arc<Mutex<Timer>>,

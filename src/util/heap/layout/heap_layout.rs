@@ -1,5 +1,5 @@
-use util::heap::layout::ByteMapMmapper;
-use util::heap::layout::map32::Map32;
+use crate::util::heap::layout::ByteMapMmapper;
+use crate::util::heap::layout::map32::Map32;
 
 // FIXME: Use FragmentMmapper for 64-bit heaps
 // FIXME: Use Map64 for 64-bit heaps

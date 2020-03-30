@@ -7,10 +7,10 @@ use super::super::Allocator;
 
 use std::process;
 
-use ::util::{Address, ObjectReference};
-use util::OpaquePointer;
-use mmtk::MMTK;
-use vm::VMBinding;
+use crate::util::{Address, ObjectReference};
+use crate::util::OpaquePointer;
+use crate::mmtk::MMTK;
+use crate::vm::VMBinding;
 
 pub struct NoGCCollector<VM: VMBinding> {
     pub tls: OpaquePointer,

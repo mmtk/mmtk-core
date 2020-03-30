@@ -1,14 +1,14 @@
-use ::util::address::Address;
+use crate::util::address::Address;
 
 use std::sync::atomic::Ordering;
 
-use ::util::constants::*;
-use ::util::heap::PageResource;
-use ::vm::{ActivePlan, Collection};
-use ::plan::selected_plan::SelectedPlan;
-use ::plan::Plan;
-use ::util::OpaquePointer;
-use vm::VMBinding;
+use crate::util::constants::*;
+use crate::util::heap::PageResource;
+use crate::vm::{ActivePlan, Collection};
+use crate::plan::selected_plan::SelectedPlan;
+use crate::plan::Plan;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
 
 // FIXME: Put this somewhere more appropriate
 pub const ALIGNMENT_VALUE: usize = 0xdead_beef;

@@ -1,13 +1,13 @@
-use ::plan::{TransitiveClosure, TraceLocal};
-use ::util::{Address, ObjectReference};
-use ::vm::Scanning;
-use ::util::OpaquePointer;
+use crate::plan::{TransitiveClosure, TraceLocal};
+use crate::util::{Address, ObjectReference};
+use crate::vm::Scanning;
+use crate::util::OpaquePointer;
 
 use std::collections::{HashSet, LinkedList};
-use ::plan::Plan;
-use ::plan::SelectedPlan;
+use crate::plan::Plan;
+use crate::plan::SelectedPlan;
 
-use vm::VMBinding;
+use crate::vm::VMBinding;
 
 pub struct SanityChecker<'a, VM: VMBinding> {
     roots: Vec<Address>,

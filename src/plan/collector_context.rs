@@ -1,9 +1,9 @@
-use ::util::{Address, ObjectReference};
-use ::plan::{Phase, Allocator};
-use ::plan::selected_plan::SelectedConstraints::*;
-use ::util::OpaquePointer;
-use mmtk::MMTK;
-use vm::VMBinding;
+use crate::util::{Address, ObjectReference};
+use crate::plan::{Phase, Allocator};
+use crate::plan::selected_plan::SelectedConstraints::*;
+use crate::util::OpaquePointer;
+use crate::mmtk::MMTK;
+use crate::vm::VMBinding;
 
 pub trait CollectorContext<VM: VMBinding> {
     fn new(mmtk: &'static MMTK<VM>) -> Self;
@@ -20,8 +20,8 @@ pub trait CollectorContext<VM: VMBinding> {
 
     fn copy_check_allocator(&self, _from: ObjectReference, bytes: usize, align: usize,
                             allocator: Allocator) -> Allocator {
-        let large = ::util::alloc::allocator::get_maximum_aligned_size(bytes, align,
-            ::util::alloc::allocator::MIN_ALIGNMENT) > MAX_NON_LOS_COPY_BYTES;
+        let large = crate::util::alloc::allocator::get_maximum_aligned_size(bytes, align,
+            crate::util::alloc::allocator::MIN_ALIGNMENT) > MAX_NON_LOS_COPY_BYTES;
         if large { Allocator::Los } else { allocator }
     }
 

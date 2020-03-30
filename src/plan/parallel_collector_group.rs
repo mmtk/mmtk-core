@@ -1,13 +1,13 @@
 use std::vec::Vec;
 use std::sync::{Mutex, Condvar};
-use ::util::OpaquePointer;
+use crate::util::OpaquePointer;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::ParallelCollector;
-use ::vm::Collection;
+use crate::vm::Collection;
 
-use mmtk::MMTK;
-use vm::VMBinding;
+use crate::mmtk::MMTK;
+use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
 pub struct ParallelCollectorGroup<VM: VMBinding, C: ParallelCollector<VM>> {

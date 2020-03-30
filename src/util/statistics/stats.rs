@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use std::sync::Mutex;
-use util::statistics::Timer;
-use util::statistics::counter::{Counter, LongCounter};
+use crate::util::statistics::Timer;
+use crate::util::statistics::counter::{Counter, LongCounter};
 use std::sync::Arc;
 
 pub const MAX_PHASES: usize = 1 << 12;

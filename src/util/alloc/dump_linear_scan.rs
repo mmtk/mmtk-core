@@ -1,8 +1,8 @@
-use ::util::alloc::linear_scan::LinearScan;
-use ::util::ObjectReference;
+use crate::util::alloc::linear_scan::LinearScan;
+use crate::util::ObjectReference;
 
-use ::vm::ObjectModel;
-use vm::VMBinding;
+use crate::vm::ObjectModel;
+use crate::vm::VMBinding;
 
 pub struct DumpLinearScan {}
 

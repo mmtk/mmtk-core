@@ -1,7 +1,7 @@
 use super::ParallelCollectorGroup;
 use super::CollectorContext;
 use super::TraceLocal;
-use vm::VMBinding;
+use crate::vm::VMBinding;
 
 pub trait ParallelCollector<VM: VMBinding>: CollectorContext<VM> + Sized {
     type T: TraceLocal;

@@ -1,20 +1,20 @@
-use ::util::heap::PageResource;
-use ::util::heap::MonotonePageResource;
-use ::util::heap::VMRequest;
-use ::util::constants::CARD_META_PAGES_PER_REGION;
-use ::util::OpaquePointer;
-use ::policy::space::{Space, CommonSpace};
-use ::util::{Address, ObjectReference};
-use ::plan::TransitiveClosure;
-use ::util::forwarding_word as ForwardingWord;
-use ::plan::Allocator;
+use crate::util::heap::PageResource;
+use crate::util::heap::MonotonePageResource;
+use crate::util::heap::VMRequest;
+use crate::util::constants::CARD_META_PAGES_PER_REGION;
+use crate::util::OpaquePointer;
+use crate::policy::space::{Space, CommonSpace};
+use crate::util::{Address, ObjectReference};
+use crate::plan::TransitiveClosure;
+use crate::util::forwarding_word as ForwardingWord;
+use crate::plan::Allocator;
 
 use std::cell::UnsafeCell;
 use libc::{mprotect, PROT_NONE, PROT_EXEC, PROT_WRITE, PROT_READ};
-use util::heap::layout::heap_layout::{VMMap, Mmapper};
-use util::heap::HeapMeta;
-use vm::VMBinding;
-use policy::space::SpaceOptions;
+use crate::util::heap::layout::heap_layout::{VMMap, Mmapper};
+use crate::util::heap::HeapMeta;
+use crate::vm::VMBinding;
+use crate::policy::space::SpaceOptions;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 

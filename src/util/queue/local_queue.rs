@@ -1,4 +1,4 @@
-use ::util::queue::SharedQueue;
+use crate::util::queue::SharedQueue;
 use std::fmt::Debug;
 use std::mem;
 use super::{BUFFER_SIZE, TRACE_QUEUE};
@@ -62,7 +62,7 @@ impl<'a, T> LocalQueue<'a, T> where T: Debug {
 
 #[cfg(test)]
 mod tests {
-    use util::queue::{SharedQueue, BUFFER_SIZE};
+    use crate::util::queue::{SharedQueue, BUFFER_SIZE};
 
     #[test]
     fn new_local_queues() {

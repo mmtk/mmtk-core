@@ -1,4 +1,4 @@
-use util::Address;
+use crate::util::Address;
 use std::io::{Result, Error};
 use libc::{PROT_READ, PROT_WRITE, PROT_EXEC, PROT_NONE, c_void};
 

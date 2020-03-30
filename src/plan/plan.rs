@@ -1,24 +1,24 @@
-use ::util::ObjectReference;
+use crate::util::ObjectReference;
 use super::{MutatorContext, ParallelCollector, TraceLocal};
-use plan::phase::Phase;
+use crate::plan::phase::Phase;
 use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
-use ::util::OpaquePointer;
-use ::policy::space::Space;
-use ::util::heap::PageResource;
-use ::vm::{Collection, ObjectModel};
+use crate::util::OpaquePointer;
+use crate::policy::space::Space;
+use crate::util::heap::PageResource;
+use crate::vm::{Collection, ObjectModel};
 use super::controller_collector_context::ControllerCollectorContext;
-use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use util::constants::LOG_BYTES_IN_MBYTE;
-use util::heap::{VMRequest, HeapMeta};
-use policy::immortalspace::ImmortalSpace;
-use util::{Address, conversions};
-use util::statistics::stats::Stats;
-use util::heap::layout::heap_layout::VMMap;
-use util::heap::layout::heap_layout::Mmapper;
-use util::heap::layout::Mmapper as IMmapper;
-use util::options::{Options, UnsafeOptionsWrapper};
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use crate::util::constants::LOG_BYTES_IN_MBYTE;
+use crate::util::heap::{VMRequest, HeapMeta};
+use crate::policy::immortalspace::ImmortalSpace;
+use crate::util::{Address, conversions};
+use crate::util::statistics::stats::Stats;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::Mmapper as IMmapper;
+use crate::util::options::{Options, UnsafeOptionsWrapper};
 use std::sync::{Arc, Mutex};
-use vm::VMBinding;
+use crate::vm::VMBinding;
 
 // FIXME: Move somewhere more appropriate
 pub fn create_vm_space<VM: VMBinding>(vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta, boot_segment_bytes: usize) -> ImmortalSpace<VM> {

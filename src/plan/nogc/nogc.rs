@@ -1,28 +1,28 @@
-use ::policy::space::Space;
-use ::policy::immortalspace::ImmortalSpace;
-use ::policy::largeobjectspace::LargeObjectSpace;
-use ::plan::{Plan, Phase};
-use ::util::ObjectReference;
-use ::util::heap::VMRequest;
-use ::util::heap::layout::Mmapper as IMmapper;
-use ::util::Address;
-use ::util::OpaquePointer;
+use crate::policy::space::Space;
+use crate::policy::immortalspace::ImmortalSpace;
+use crate::policy::largeobjectspace::LargeObjectSpace;
+use crate::plan::{Plan, Phase};
+use crate::util::ObjectReference;
+use crate::util::heap::VMRequest;
+use crate::util::heap::layout::Mmapper as IMmapper;
+use crate::util::Address;
+use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
 
 use super::NoGCTraceLocal;
 use super::NoGCMutator;
 use super::NoGCCollector;
-use util::conversions::bytes_to_pages;
-use plan::plan::{create_vm_space, CommonPlan};
-use util::heap::layout::heap_layout::VMMap;
-use util::heap::layout::heap_layout::Mmapper;
-use util::options::UnsafeOptionsWrapper;
+use crate::util::conversions::bytes_to_pages;
+use crate::plan::plan::{create_vm_space, CommonPlan};
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::options::UnsafeOptionsWrapper;
 use std::sync::Arc;
-use util::heap::HeapMeta;
-use util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END};
+use crate::util::heap::HeapMeta;
+use crate::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END};
 use std::sync::atomic::Ordering;
-use vm::VMBinding;
+use crate::vm::VMBinding;
 
 pub type SelectedPlan<VM> = NoGC<VM>;
 

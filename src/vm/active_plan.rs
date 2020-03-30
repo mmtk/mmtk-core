@@ -1,6 +1,6 @@
-use ::plan::{Plan, SelectedPlan};
-use ::util::OpaquePointer;
-use vm::VMBinding;
+use crate::plan::{Plan, SelectedPlan};
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
 
 pub trait ActivePlan<VM: VMBinding> {
     // TODO: I don't know how this can be implemented when we have multiple MMTk instances.

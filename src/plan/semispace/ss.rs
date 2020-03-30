@@ -1,36 +1,36 @@
-use ::policy::space::Space;
+use crate::policy::space::Space;
 
 use super::SSMutator;
 use super::SSTraceLocal;
 use super::SSCollector;
 
-use ::plan::plan;
-use ::plan::Plan;
-use ::plan::Allocator;
-use ::policy::copyspace::CopySpace;
-use ::policy::immortalspace::ImmortalSpace;
-use ::policy::largeobjectspace::LargeObjectSpace;
-use ::plan::Phase;
-use ::plan::trace::Trace;
-use ::util::ObjectReference;
-use ::util::heap::layout::Mmapper as IMmapper;
-use ::util::Address;
-use ::util::heap::VMRequest;
-use ::util::OpaquePointer;
+use crate::plan::plan;
+use crate::plan::Plan;
+use crate::plan::Allocator;
+use crate::policy::copyspace::CopySpace;
+use crate::policy::immortalspace::ImmortalSpace;
+use crate::policy::largeobjectspace::LargeObjectSpace;
+use crate::plan::Phase;
+use crate::plan::trace::Trace;
+use crate::util::ObjectReference;
+use crate::util::heap::layout::Mmapper as IMmapper;
+use crate::util::Address;
+use crate::util::heap::VMRequest;
+use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, Ordering};
 
-use ::vm::Scanning;
-use util::conversions::bytes_to_pages;
-use plan::plan::{create_vm_space, CommonPlan};
-use util::heap::layout::heap_layout::VMMap;
-use util::heap::layout::heap_layout::Mmapper;
-use util::options::UnsafeOptionsWrapper;
+use crate::vm::Scanning;
+use crate::util::conversions::bytes_to_pages;
+use crate::plan::plan::{create_vm_space, CommonPlan};
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::options::UnsafeOptionsWrapper;
 use std::sync::Arc;
-use util::heap::HeapMeta;
-use util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END};
-use vm::VMBinding;
+use crate::util::heap::HeapMeta;
+use crate::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END};
+use crate::vm::VMBinding;
 
 pub type SelectedPlan<VM> = SemiSpace<VM>;
 
@@ -165,7 +165,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
             Phase::Prepare => {
                 #[cfg(feature = "sanity")]
                 {
-                    use ::util::sanity::sanity_checker::SanityChecker;
+                    use crate::util::sanity::sanity_checker::SanityChecker;
                     println!("Pre GC sanity check");
                     SanityChecker::new(tls, &self).check();
                 }
@@ -198,9 +198,9 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
             &Phase::Release => {
                 #[cfg(feature = "sanity")]
                 {
-                    use ::util::constants::LOG_BYTES_IN_PAGE;
+                    use crate::util::constants::LOG_BYTES_IN_PAGE;
                     use libc::memset;
-                    use ::util::heap::PageResource;
+                    use crate::util::heap::PageResource;
                     if self.fromspace().common().contiguous {
                         let fromspace_start = self.fromspace().common().start;
                         let fromspace_commited = self.fromspace().common().pr.as_ref().unwrap().common().committed.load(Ordering::Relaxed);
@@ -226,8 +226,8 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
             Phase::Complete => {
                 #[cfg(feature = "sanity")]
                 {
-                    use ::util::sanity::sanity_checker::SanityChecker;
-                    use ::util::sanity::memory_scan;
+                    use crate::util::sanity::sanity_checker::SanityChecker;
+                    use crate::util::sanity::memory_scan;
                     println!("Post GC sanity check");
                     SanityChecker::new(tls, &self).check();
                     println!("Post GC memory scan");

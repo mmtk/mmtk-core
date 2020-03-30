@@ -1,7 +1,7 @@
 use num_cpus;
 use std::cell::UnsafeCell;
 use std::ops::Deref;
-use util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use std::default::Default;
 
 custom_derive! {

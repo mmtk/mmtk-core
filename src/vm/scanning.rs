@@ -1,7 +1,7 @@
-use ::plan::{TransitiveClosure, TraceLocal};
-use ::util::ObjectReference;
-use ::util::OpaquePointer;
-use vm::VMBinding;
+use crate::plan::{TransitiveClosure, TraceLocal};
+use crate::util::ObjectReference;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
 
 pub trait Scanning<VM: VMBinding> {
     fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, tls: OpaquePointer);

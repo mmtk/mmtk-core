@@ -1,13 +1,13 @@
-use ::util::conversions;
-use ::util::heap::layout::vm_layout_constants::*;
-use ::util::heap::layout::heap_parameters::*;
-use ::util::Address;
-use ::util::int_array_freelist::IntArrayFreeList;
-use ::util::heap::freelistpageresource::CommonFreeListPageResource;
+use crate::util::conversions;
+use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::heap_parameters::*;
+use crate::util::Address;
+use crate::util::int_array_freelist::IntArrayFreeList;
+use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use ::util::generic_freelist::GenericFreeList;
-use util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::generic_freelist::GenericFreeList;
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 
 #[cfg(target_pointer_width = "32")]
 const MAP_BASE_ADDRESS: Address = Address::ZERO;

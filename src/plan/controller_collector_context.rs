@@ -4,13 +4,13 @@ use std::cell::UnsafeCell;
 use std::sync::{Mutex, Condvar};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use ::vm::Collection;
+use crate::vm::Collection;
 
-use ::plan::Plan;
-use ::plan::selected_plan::SelectedPlan;
+use crate::plan::Plan;
+use crate::plan::selected_plan::SelectedPlan;
 
-use util::OpaquePointer;
-use vm::VMBinding;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
 
 struct RequestSync {
     tls: OpaquePointer,

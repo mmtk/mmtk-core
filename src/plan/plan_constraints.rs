@@ -2,7 +2,7 @@
 // the constants that get overwritten are unused.
 #![allow(unused)]
 
-use ::util::constants::*;
+use crate::util::constants::*;
 
 pub const MOVES_OBJECTS: bool = false;
 pub const NUM_SPECIALIZED_SCANS: usize = 0;

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::mem::swap;
 use std::sync::Mutex;
 
-use ::util::Address;
+use crate::util::Address;
 
 #[derive(Debug)]
 pub struct TreadMill {

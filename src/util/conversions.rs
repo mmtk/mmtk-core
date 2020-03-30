@@ -1,6 +1,6 @@
-use ::util::Address;
-use ::util::heap::layout::vm_layout_constants::*;
-use ::util::constants::*;
+use crate::util::Address;
+use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::constants::*;
 
 /* Alignment */
 
@@ -66,8 +66,8 @@ pub fn bytes_to_pages(bytes: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use util::Address;
-    use util::conversions::*;
+    use crate::util::Address;
+    use crate::util::conversions::*;
 
     #[test]
     fn test_page_align() {

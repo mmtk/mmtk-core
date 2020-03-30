@@ -1,17 +1,17 @@
-use ::policy::copyspace::CopySpace;
-use ::policy::immortalspace::ImmortalSpace;
-use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
-use ::plan::mutator_context::MutatorContext;
-use ::plan::Phase;
-use ::util::{Address, ObjectReference};
-use ::util::alloc::Allocator;
-use ::plan::Allocator as AllocationType;
-use ::vm::Collection;
-use ::util::heap::MonotonePageResource;
-use ::util::OpaquePointer;
+use crate::policy::copyspace::CopySpace;
+use crate::policy::immortalspace::ImmortalSpace;
+use crate::util::alloc::{BumpAllocator, LargeObjectAllocator};
+use crate::plan::mutator_context::MutatorContext;
+use crate::plan::Phase;
+use crate::util::{Address, ObjectReference};
+use crate::util::alloc::Allocator;
+use crate::plan::Allocator as AllocationType;
+use crate::vm::Collection;
+use crate::util::heap::MonotonePageResource;
+use crate::util::OpaquePointer;
 
-use plan::semispace::SemiSpace;
-use vm::VMBinding;
+use crate::plan::semispace::SemiSpace;
+use crate::vm::VMBinding;
 
 #[repr(C)]
 pub struct SSMutator<VM: VMBinding> {

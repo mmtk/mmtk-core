@@ -1,7 +1,7 @@
-use ::plan::SelectedConstraints;
-use ::util::ObjectReference;
-use ::vm::ObjectModel;
-use vm::VMBinding;
+use crate::plan::SelectedConstraints;
+use crate::util::ObjectReference;
+use crate::vm::ObjectModel;
+use crate::vm::VMBinding;
 
 pub const TOTAL_BITS: usize = 8;
 pub const NEEDS_UNLOGGED_BIT: bool = SelectedConstraints::NEEDS_LOG_BIT_IN_HEADER;

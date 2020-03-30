@@ -1,8 +1,8 @@
-use ::util::ObjectReference;
-use ::util::Address;
-use ::plan::TraceLocal;
-use ::util::OpaquePointer;
-use vm::VMBinding;
+use crate::util::ObjectReference;
+use crate::util::Address;
+use crate::plan::TraceLocal;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
 
 /**
  * VM-specific stuff for util::ReferenceProcessor

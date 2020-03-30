@@ -1,5 +1,5 @@
-use ::util::Address;
-use ::util::constants::*;
+use crate::util::Address;
+use crate::util::constants::*;
 use super::layout::vm_layout_constants::*;
 
 ////////// FIXME //////////////

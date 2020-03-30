@@ -1,7 +1,7 @@
-use ::plan::transitive_closure::TransitiveClosure;
-use ::util::address::{Address, ObjectReference};
-use ::plan::tracelocal::TraceLocal;
-use vm::VMBinding;
+use crate::plan::transitive_closure::TransitiveClosure;
+use crate::util::address::{Address, ObjectReference};
+use crate::plan::tracelocal::TraceLocal;
+use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
 pub struct NoGCTraceLocal<VM: VMBinding> {

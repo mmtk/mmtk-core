@@ -1,12 +1,12 @@
-use ::plan::{TraceLocal, TransitiveClosure};
-use ::policy::space::Space;
-use ::util::{Address, ObjectReference};
-use ::util::queue::LocalQueue;
-use ::vm::Scanning;
+use crate::plan::{TraceLocal, TransitiveClosure};
+use crate::policy::space::Space;
+use crate::util::{Address, ObjectReference};
+use crate::util::queue::LocalQueue;
+use crate::vm::Scanning;
 use super::ss;
-use util::OpaquePointer;
-use plan::semispace::SemiSpace;
-use vm::VMBinding;
+use crate::util::OpaquePointer;
+use crate::plan::semispace::SemiSpace;
+use crate::vm::VMBinding;
 
 pub struct SSTraceLocal<VM: VMBinding> {
     tls: OpaquePointer,

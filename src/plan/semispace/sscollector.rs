@@ -1,25 +1,25 @@
-use ::plan::{phase, Phase};
-use ::plan::Allocator as AllocationType;
-use ::plan::CollectorContext;
-use ::plan::ParallelCollector;
-use ::plan::ParallelCollectorGroup;
-use ::plan::TraceLocal;
-use ::plan::phase::PhaseManager;
-use ::policy::copyspace::CopySpace;
-use ::util::{Address, ObjectReference};
-use ::util::alloc::Allocator;
-use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
-use ::util::forwarding_word::clear_forwarding_bits;
-use ::util::heap::MonotonePageResource;
-use ::util::reference_processor::*;
-use ::vm::Scanning;
+use crate::plan::{phase, Phase};
+use crate::plan::Allocator as AllocationType;
+use crate::plan::CollectorContext;
+use crate::plan::ParallelCollector;
+use crate::plan::ParallelCollectorGroup;
+use crate::plan::TraceLocal;
+use crate::plan::phase::PhaseManager;
+use crate::policy::copyspace::CopySpace;
+use crate::util::{Address, ObjectReference};
+use crate::util::alloc::Allocator;
+use crate::util::alloc::{BumpAllocator, LargeObjectAllocator};
+use crate::util::forwarding_word::clear_forwarding_bits;
+use crate::util::heap::MonotonePageResource;
+use crate::util::reference_processor::*;
+use crate::vm::Scanning;
 use super::sstracelocal::SSTraceLocal;
-use ::plan::selected_plan::SelectedConstraints;
-use util::OpaquePointer;
-use plan::semispace::SemiSpace;
-use plan::phase::ScheduledPhase;
-use mmtk::MMTK;
-use vm::VMBinding;
+use crate::plan::selected_plan::SelectedConstraints;
+use crate::util::OpaquePointer;
+use crate::plan::semispace::SemiSpace;
+use crate::plan::phase::ScheduledPhase;
+use crate::mmtk::MMTK;
+use crate::vm::VMBinding;
 
 /// per-collector thread behavior and state for the SS plan
 pub struct SSCollector<VM: VMBinding> {
@@ -65,7 +65,7 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
     fn alloc_copy(&mut self, _original: ObjectReference, bytes: usize, align: usize, offset: isize,
                   allocator: AllocationType) -> Address {
         match allocator {
-            ::plan::Allocator::Los => self.los.alloc(bytes, align, offset),
+            crate::plan::Allocator::Los => self.los.alloc(bytes, align, offset),
             _ => self.ss.alloc(bytes, align, offset)
         }
 
@@ -152,11 +152,11 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         self.tls
     }
 
-    fn post_copy(&self, object: ObjectReference, _rvm_type: Address, _bytes: usize, allocator: ::plan::Allocator) {
+    fn post_copy(&self, object: ObjectReference, _rvm_type: Address, _bytes: usize, allocator: crate::plan::Allocator) {
         clear_forwarding_bits::<VM>(object);
         match allocator {
-            ::plan::Allocator::Default => {}
-            ::plan::Allocator::Los => {
+            crate::plan::Allocator::Default => {}
+            crate::plan::Allocator::Los => {
                 self.los.get_space().unwrap().initialize_header(object, false);
             }
             _ => {

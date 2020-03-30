@@ -1,16 +1,16 @@
 use std::sync::{Mutex, MutexGuard};
 use std::sync::atomic::AtomicUsize;
-use ::util::address::Address;
-use ::util::conversions::*;
-use ::policy::space::Space;
-use ::policy::space::required_chunks;
+use crate::util::address::Address;
+use crate::util::conversions::*;
+use crate::policy::space::Space;
+use crate::policy::space::required_chunks;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
 use super::layout::vm_layout_constants::BYTES_IN_CHUNK;
 
-use ::util::heap::pageresource::CommonPageResource;
-use ::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
-use ::util::alloc::embedded_meta_data::*;
-use ::util::OpaquePointer;
+use crate::util::heap::pageresource::CommonPageResource;
+use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
+use crate::util::alloc::embedded_meta_data::*;
+use crate::util::OpaquePointer;
 
 use super::layout::Mmapper;
 
@@ -18,8 +18,8 @@ use super::PageResource;
 use std::sync::atomic::Ordering;
 
 use libc::{c_void, memset};
-use util::heap::layout::heap_layout::VMMap;
-use vm::VMBinding;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::vm::VMBinding;
 
 pub struct MonotonePageResource<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> {
     common: CommonPageResource<VM, MonotonePageResource<VM, S>>,
@@ -282,8 +282,8 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> MonotonePage
     }
 
     fn release_pages_extent(&self, _first: Address, bytes: usize) {
-        let pages = ::util::conversions::bytes_to_pages(bytes);
-        debug_assert!(bytes == ::util::conversions::pages_to_bytes(pages));
+        let pages = crate::util::conversions::bytes_to_pages(bytes);
+        debug_assert!(bytes == crate::util::conversions::pages_to_bytes(pages));
         // FIXME ZERO_PAGES_ON_RELEASE
         // FIXME Options.protectOnRelease
         // FIXME VM.events.tracePageReleased
