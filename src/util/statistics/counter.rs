@@ -1,5 +1,5 @@
 use std::time::Instant;
-use util::statistics::stats::SharedStats;
+use crate::util::statistics::stats::SharedStats;
 use std::sync::Arc;
 use std::fmt;
 

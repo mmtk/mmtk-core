@@ -1,14 +1,14 @@
-use ::policy::immortalspace::ImmortalSpace;
-use ::util::alloc::{BumpAllocator, LargeObjectAllocator};
-use ::plan::mutator_context::MutatorContext;
-use ::plan::Phase;
-use ::util::{Address, ObjectReference};
-use ::util::alloc::Allocator;
-use ::plan::Allocator as AllocationType;
-use ::util::heap::MonotonePageResource;
-use ::util::OpaquePointer;
-use plan::nogc::NoGC;
-use vm::VMBinding;
+use crate::policy::immortalspace::ImmortalSpace;
+use crate::util::alloc::{BumpAllocator, LargeObjectAllocator};
+use crate::plan::mutator_context::MutatorContext;
+use crate::plan::Phase;
+use crate::util::{Address, ObjectReference};
+use crate::util::alloc::Allocator;
+use crate::plan::Allocator as AllocationType;
+use crate::util::heap::MonotonePageResource;
+use crate::util::OpaquePointer;
+use crate::plan::nogc::NoGC;
+use crate::vm::VMBinding;
 
 #[repr(C)]
 pub struct NoGCMutator<VM: VMBinding> {

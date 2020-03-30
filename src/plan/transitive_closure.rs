@@ -1,4 +1,4 @@
-use ::util::{Address, ObjectReference};
+use crate::util::{Address, ObjectReference};
 
 pub trait TransitiveClosure {
     // The signature of this function changes during the port

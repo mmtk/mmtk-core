@@ -1,8 +1,8 @@
-use util::Address;
-use util::heap::layout::vm_layout_constants;
-use util::heap::layout::heap_parameters;
+use crate::util::Address;
+use crate::util::heap::layout::vm_layout_constants;
+use crate::util::heap::layout::heap_parameters;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
-use util::constants::*;
+use crate::util::constants::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 

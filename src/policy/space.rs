@@ -1,25 +1,25 @@
-use ::util::Address;
-use ::util::ObjectReference;
-use ::util::conversions::*;
+use crate::util::Address;
+use crate::util::ObjectReference;
+use crate::util::conversions::*;
 
-use ::vm::{ActivePlan, Collection, ObjectModel};
-use ::util::heap::{VMRequest, PageResource};
-use ::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
-use ::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END};
+use crate::vm::{ActivePlan, Collection, ObjectModel};
+use crate::util::heap::{VMRequest, PageResource};
+use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
+use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END};
 
-use ::plan::Plan;
+use crate::plan::Plan;
 
-use ::util::constants::LOG_BYTES_IN_MBYTE;
-use ::util::conversions;
-use ::util::OpaquePointer;
+use crate::util::constants::LOG_BYTES_IN_MBYTE;
+use crate::util::conversions;
+use crate::util::OpaquePointer;
 
-use util::heap::layout::heap_layout::VMMap;
-use util::heap::layout::heap_layout::Mmapper;
-use util::heap::HeapMeta;
-use util::heap::space_descriptor::SpaceDescriptor;
-use vm::VMBinding;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::HeapMeta;
+use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::vm::VMBinding;
 use std::marker::PhantomData;
-use util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 
 pub trait Space<VM: VMBinding>: Sized + 'static {
     type PR: PageResource<VM, Space = Self>;

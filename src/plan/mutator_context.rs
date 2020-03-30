@@ -1,7 +1,7 @@
-use ::plan::Phase;
-use ::util::{Address, ObjectReference};
-use ::plan::Allocator;
-use ::util::OpaquePointer;
+use crate::plan::Phase;
+use crate::util::{Address, ObjectReference};
+use crate::plan::Allocator;
+use crate::util::OpaquePointer;
 
 pub trait MutatorContext {
     fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool);

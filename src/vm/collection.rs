@@ -1,6 +1,6 @@
-use ::plan::{MutatorContext, ParallelCollector};
-use ::util::OpaquePointer;
-use vm::VMBinding;
+use crate::plan::{MutatorContext, ParallelCollector};
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
 
 pub trait Collection<VM: VMBinding> {
     fn stop_all_mutators(tls: OpaquePointer);

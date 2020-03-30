@@ -1,19 +1,19 @@
 use std::cell::UnsafeCell;
 
-use ::plan::TransitiveClosure;
-use ::policy::space::{CommonSpace, Space};
-use ::util::{Address, ObjectReference};
-use ::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
-use ::util::header_byte;
-use ::util::heap::{FreeListPageResource, PageResource, VMRequest};
-use ::util::treadmill::TreadMill;
-use ::vm::ObjectModel;
-use util::heap::layout::heap_layout::{VMMap, Mmapper};
-use util::heap::HeapMeta;
+use crate::plan::TransitiveClosure;
+use crate::policy::space::{CommonSpace, Space};
+use crate::util::{Address, ObjectReference};
+use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
+use crate::util::header_byte;
+use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
+use crate::util::treadmill::TreadMill;
+use crate::vm::ObjectModel;
+use crate::util::heap::layout::heap_layout::{VMMap, Mmapper};
+use crate::util::heap::HeapMeta;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use util::OpaquePointer;
-use vm::VMBinding;
-use policy::space::SpaceOptions;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
+use crate::policy::space::SpaceOptions;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);

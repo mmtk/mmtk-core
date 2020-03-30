@@ -1,11 +1,11 @@
-use util::Address;
-use util::ObjectReference;
+use crate::util::Address;
+use crate::util::ObjectReference;
 
-use ::plan::SelectedPlan;
-use ::plan::Plan;
+use crate::plan::SelectedPlan;
+use crate::plan::Plan;
 
 use std;
-use vm::VMBinding;
+use crate::vm::VMBinding;
 
 pub fn scan_region<VM: VMBinding>(plan: &SelectedPlan<VM>){
     loop {

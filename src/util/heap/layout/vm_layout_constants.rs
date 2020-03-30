@@ -1,10 +1,10 @@
-use ::util::Address;
-use ::util::constants::*;
+use crate::util::Address;
+use crate::util::constants::*;
 use super::heap_parameters::*;
 
 ///////// FIXME ////////////
 use super::super::vmrequest::{HEAP_LAYOUT_32BIT, HEAP_LAYOUT_64BIT};
-use util::conversions::{chunk_align_down, chunk_align_up};
+use crate::util::conversions::{chunk_align_down, chunk_align_up};
 
 /** log_2 of the addressable virtual space */
 pub const LOG_ADDRESS_SPACE: usize = if_then_else_usize!(HEAP_LAYOUT_32BIT, 32,

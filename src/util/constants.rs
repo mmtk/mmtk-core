@@ -1,5 +1,5 @@
-use ::vm::unboxed_size_constants;
-use ::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION;
+use crate::vm::unboxed_size_constants;
+use crate::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION;
 
 /**
    * Modes.

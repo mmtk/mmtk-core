@@ -221,20 +221,20 @@ impl Address {
     /// aligns up the address to the given alignment
     #[inline(always)]
     pub const fn align_up(self, align: ByteSize) -> Address {
-        use util::conversions;
+        use crate::util::conversions;
         Address(conversions::raw_align_up(self.0, align))
     }
 
     /// aligns down the address to the given alignment
     #[inline(always)]
     pub const fn align_down(self, align: ByteSize) -> Address {
-        use util::conversions;
+        use crate::util::conversions;
         Address(conversions::raw_align_down(self.0, align))
     }
 
     /// is this address aligned to the given alignment
     pub fn is_aligned_to(self, align: usize) -> bool {
-        use util::conversions;
+        use crate::util::conversions;
         conversions::raw_is_aligned(self.0, align)
     }
 
@@ -296,7 +296,7 @@ impl fmt::Debug for Address {
 
 #[cfg(test)]
 mod tests {
-    use util::Address;
+    use crate::util::Address;
 
     #[test]
     fn align_up() {

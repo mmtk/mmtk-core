@@ -1,4 +1,4 @@
-use ::util::queue::LocalQueue;
+use crate::util::queue::LocalQueue;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
@@ -83,8 +83,8 @@ impl<T> Default for SharedQueue<T> where T: Debug {
 #[cfg(test)]
 mod tests {
     extern crate crossbeam;
-    use util::queue::SharedQueue;
-    use util::test_util::panic_after;
+    use crate::util::queue::SharedQueue;
+    use crate::util::test_util::panic_after;
 
     const SPIN_TIME_OUT: u64 = 200;
 
@@ -92,7 +92,7 @@ mod tests {
     // Calls spin() on a non-empty shared queue. It returns a block immediately.
     fn pull_block() {
         let shared = SharedQueue::<usize>::new();
-        let mut local = shared.spawn_local();
+        let _local = shared.spawn_local();
 
         shared.push(vec![42]);
         let res = shared.spin(0);
@@ -105,7 +105,7 @@ mod tests {
     // Calls spin() on an empty shared queue with no other local queue. It returns None immediately.
     fn spin_empty() {
         let shared = SharedQueue::<usize>::new();
-        let mut local = shared.spawn_local();
+        let _local = shared.spawn_local();
         // This is the only queue. And it is starved. So return None immediately.
         let res = shared.spin(0);
         assert!(res.is_none());
@@ -116,8 +116,8 @@ mod tests {
     // Calls spin() on an empty shared queue with other local queue working. It spins and waits.
     fn spin_wait() {
         let shared = SharedQueue::<usize>::new();
-        let mut local1 = shared.spawn_local();
-        let mut local2 = shared.spawn_local();
+        let _local1 = shared.spawn_local();
+        let _local2 = shared.spawn_local();
 
         panic_after(SPIN_TIME_OUT, move || {
             // Queue #0 calls spin(). However, Queue #1 is not starved. So we spin-wait here.
@@ -133,8 +133,8 @@ mod tests {
 
         panic_after(SPIN_TIME_OUT, move || {
             crossbeam::scope(|scope| {
-                let mut local1 = shared.spawn_local();
-                let mut local2 = shared.spawn_local();
+                let _local1 = shared.spawn_local();
+                let _local2 = shared.spawn_local();
                 let worker1 = scope.spawn(|_| {
                     let res = shared.spin(0);
                     assert!(res.is_none());
@@ -156,8 +156,8 @@ mod tests {
 
         panic_after(SPIN_TIME_OUT, move || {
             crossbeam::scope(|scope| {
-                let mut local1 = shared.spawn_local();
-                let mut local2 = shared.spawn_local();
+                let _local1 = shared.spawn_local();
+                let _local2 = shared.spawn_local();
 
                 let worker1 = scope.spawn(|_| {
                     let res = shared.spin(0);

@@ -1,11 +1,11 @@
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
-use ::util::{Address, ObjectReference};
-use ::vm::ObjectModel;
-use ::util::OpaquePointer;
+use crate::util::{Address, ObjectReference};
+use crate::vm::ObjectModel;
+use crate::util::OpaquePointer;
 use std::sync::atomic::Ordering;
 
-use ::plan::Allocator;
-use vm::VMBinding;
+use crate::plan::Allocator;
+use crate::vm::VMBinding;
 
 // ...00
 const FORWARDING_NOT_TRIGGERED_YET: u8 = 0;

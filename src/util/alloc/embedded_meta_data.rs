@@ -1,5 +1,5 @@
-use ::util::constants::LOG_BYTES_IN_PAGE;
-use ::util::Address;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::Address;
 
 /* The (log of the) size of each region of meta data management */
 pub const LOG_BYTES_IN_REGION: usize = 22;

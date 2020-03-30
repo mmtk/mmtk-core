@@ -1,17 +1,17 @@
-use ::plan;
-use ::plan::{CollectorContext, MutatorContext, ParallelCollector, Plan};
-use ::vm::ActivePlan;
+use crate::plan;
+use crate::plan::{CollectorContext, MutatorContext, ParallelCollector, Plan};
+use crate::vm::ActivePlan;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
-use util::statistics::phase_timer::PhaseTimer;
-use ::util::OpaquePointer;
-use util::statistics::{Counter, Timer};
-use util::statistics::stats::Stats;
-use plan::phase::Schedule::*;
-use plan::phase::Phase::*;
-use vm::VMBinding;
+use crate::util::statistics::phase_timer::PhaseTimer;
+use crate::util::OpaquePointer;
+use crate::util::statistics::{Counter, Timer};
+use crate::util::statistics::stats::Stats;
+use crate::plan::phase::Schedule::*;
+use crate::plan::phase::Phase::*;
+use crate::vm::VMBinding;
 
 #[derive(Clone)]
 #[derive(PartialEq)]

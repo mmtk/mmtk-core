@@ -6,12 +6,12 @@ use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::OpaquePointer;
 
 use std::default::Default;
-use util::reference_processor::ReferenceProcessors;
-use util::options::{UnsafeOptionsWrapper, Options};
+use crate::util::reference_processor::ReferenceProcessors;
+use crate::util::options::{UnsafeOptionsWrapper, Options};
 use std::sync::atomic::{Ordering, AtomicBool};
 
 use std::sync::Arc;
-use vm::VMBinding;
+use crate::vm::VMBinding;
 
 // TODO: remove this singleton at some point to allow multiple instances of MMTK
 // This helps refactoring.

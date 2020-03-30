@@ -2,11 +2,11 @@ use std::sync::Mutex;
 use std::cell::UnsafeCell;
 use std::vec::Vec;
 
-use ::util::OpaquePointer;
-use ::util::{Address, ObjectReference};
-use ::vm::{ActivePlan, ReferenceGlue};
-use ::plan::{TraceLocal, MutatorContext};
-use vm::VMBinding;
+use crate::util::OpaquePointer;
+use crate::util::{Address, ObjectReference};
+use crate::vm::{ActivePlan, ReferenceGlue};
+use crate::plan::{TraceLocal, MutatorContext};
+use crate::vm::VMBinding;
 
 pub struct ReferenceProcessors {
     soft: ReferenceProcessor,

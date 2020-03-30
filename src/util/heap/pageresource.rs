@@ -1,12 +1,12 @@
-use ::util::address::Address;
-use ::policy::space::Space;
-use ::vm::ActivePlan;
-use ::util::OpaquePointer;
+use crate::util::address::Address;
+use crate::policy::space::Space;
+use crate::vm::ActivePlan;
+use crate::util::OpaquePointer;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use util::heap::layout::heap_layout::VMMap;
-use vm::VMBinding;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::vm::VMBinding;
 
 pub trait PageResource<VM: VMBinding>: Sized + 'static {
     type Space: Space<VM, PR = Self>;

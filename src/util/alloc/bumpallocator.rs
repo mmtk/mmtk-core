@@ -1,18 +1,18 @@
-use ::util::{Address, ObjectReference};
+use crate::util::{Address, ObjectReference};
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
 
-use ::util::alloc::Allocator;
-use ::util::heap::PageResource;
-use ::util::alloc::linear_scan::LinearScan;
-use ::util::alloc::dump_linear_scan::DumpLinearScan;
+use crate::util::alloc::Allocator;
+use crate::util::heap::PageResource;
+use crate::util::alloc::linear_scan::LinearScan;
+use crate::util::alloc::dump_linear_scan::DumpLinearScan;
 
-use ::vm::ObjectModel;
+use crate::vm::ObjectModel;
 
-use ::policy::space::Space;
-use util::conversions::bytes_to_pages;
-use ::util::OpaquePointer;
-use ::plan::selected_plan::SelectedPlan;
-use vm::VMBinding;
+use crate::policy::space::Space;
+use crate::util::conversions::bytes_to_pages;
+use crate::util::OpaquePointer;
+use crate::plan::selected_plan::SelectedPlan;
+use crate::vm::VMBinding;
 
 const BYTES_IN_PAGE: usize = 1 << 12;
 const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;

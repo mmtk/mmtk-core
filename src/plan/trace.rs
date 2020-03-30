@@ -1,5 +1,5 @@
-use ::util::{Address, ObjectReference};
-use ::util::queue::SharedQueue;
+use crate::util::{Address, ObjectReference};
+use crate::util::queue::SharedQueue;
 
 pub struct Trace {
     pub values: SharedQueue<ObjectReference>,

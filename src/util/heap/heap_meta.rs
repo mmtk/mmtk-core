@@ -1,4 +1,4 @@
-use util::Address;
+use crate::util::Address;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 

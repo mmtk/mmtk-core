@@ -1,19 +1,19 @@
-use ::policy::space::{Space, CommonSpace};
-use ::util::heap::{PageResource, MonotonePageResource, VMRequest};
-use ::util::address::Address;
+use crate::policy::space::{Space, CommonSpace};
+use crate::util::heap::{PageResource, MonotonePageResource, VMRequest};
+use crate::util::address::Address;
 
-use ::util::ObjectReference;
-use ::util::constants::CARD_META_PAGES_PER_REGION;
+use crate::util::ObjectReference;
+use crate::util::constants::CARD_META_PAGES_PER_REGION;
 
-use ::vm::ObjectModel;
-use ::plan::TransitiveClosure;
-use ::util::header_byte;
+use crate::vm::ObjectModel;
+use crate::plan::TransitiveClosure;
+use crate::util::header_byte;
 
 use std::cell::UnsafeCell;
-use util::heap::layout::heap_layout::{VMMap, Mmapper};
-use util::heap::HeapMeta;
-use vm::VMBinding;
-use policy::space::SpaceOptions;
+use crate::util::heap::layout::heap_layout::{VMMap, Mmapper};
+use crate::util::heap::HeapMeta;
+use crate::vm::VMBinding;
+use crate::policy::space::SpaceOptions;
 
 pub struct ImmortalSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>>,
