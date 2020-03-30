@@ -71,7 +71,8 @@ impl<VM: VMBinding> CopySpace<VM> {
                 movable: true,
                 immortal: false,
                 zeroed,
-            }, vmrequest, vm_map, mmapper, heap)),
+                vmrequest,
+            }, vm_map, mmapper, heap)),
             from_space,
         }
     }

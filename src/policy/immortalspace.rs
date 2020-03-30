@@ -73,7 +73,8 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 movable: false,
                 immortal: true,
                 zeroed,
-            }, vmrequest, vm_map, mmapper, heap)),
+                vmrequest,
+            }, vm_map, mmapper, heap)),
             mark_state: 0,
         }
     }

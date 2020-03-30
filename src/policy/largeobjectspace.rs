@@ -78,7 +78,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 movable: false,
                 immortal: false,
                 zeroed,
-            }, vmrequest, vm_map, mmapper, heap)),
+                vmrequest,
+            }, vm_map, mmapper, heap)),
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new()
@@ -119,16 +120,22 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
+    // Allow nested-if for this function to make it clear that test_and_mark() is only executed
+    // for the outer condition is met.
+    #[allow(clippy::collapsible_if)]
     pub fn trace_object<T: TransitiveClosure>(
         &self,
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
         let nursery_object = self.is_in_nursery(object);
-        if (!self.in_nursery_gc || nursery_object) && self.test_and_mark(object, self.mark_state) {
-            let cell = VM::VMObjectModel::object_start_ref(object) - if USE_PRECEEDING_GC_HEADER { PRECEEDING_GC_HEADER_BYTES } else { 0 };
-            self.treadmill.copy(cell, nursery_object);
-            trace.process_node(object);
+        if !self.in_nursery_gc || nursery_object {
+            // Note that test_and_mark() has side effects
+            if self.test_and_mark(object, self.mark_state) {
+                let cell = VM::VMObjectModel::object_start_ref(object) - if USE_PRECEEDING_GC_HEADER { PRECEEDING_GC_HEADER_BYTES } else { 0 };
+                self.treadmill.copy(cell, nursery_object);
+                trace.process_node(object);
+            }
         }
         object
     }

@@ -200,17 +200,17 @@ pub struct SpaceOptions {
     pub movable: bool,
     pub immortal: bool,
     pub zeroed: bool,
+    pub vmrequest: VMRequest,
 }
 
 const DEBUG: bool = false;
 
 impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
-    pub fn new(opt: SpaceOptions,
-               vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
+    pub fn new(opt: SpaceOptions, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
         let mut rtn = CommonSpace {
             name: opt.name,
             descriptor: SpaceDescriptor::UNINITIALIZED,
-            vmrequest,
+            vmrequest: opt.vmrequest,
             immortal: opt.immortal,
             movable: opt.movable,
             contiguous: true,
@@ -224,6 +224,7 @@ impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
             p: PhantomData,
         };
 
+        let vmrequest = opt.vmrequest;
         if vmrequest.is_discontiguous() {
             rtn.contiguous = false;
             // FIXME

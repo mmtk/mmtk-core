@@ -73,8 +73,8 @@ pub const BYTES_IN_LONG: usize = 1 << LOG_BYTES_IN_LONG;
 pub const LOG_BITS_IN_LONG: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_LONG;
 pub const BITS_IN_LONG: usize = 1 << LOG_BITS_IN_LONG;
 
-pub const MAX_INT: usize = 0x7fff_ffff;
-pub const MIN_INT: usize = 0x8000_0000;
+pub const MAX_INT: usize = i32::max_value() as usize; // 0x7fff_ffff
+pub const MIN_INT: usize = i32::min_value() as u32 as usize; // 0x8000_0000
 
 /****************************************************************************
  *
