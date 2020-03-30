@@ -7,7 +7,6 @@ use ::util::heap::freelistpageresource::CommonFreeListPageResource;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use ::util::generic_freelist::GenericFreeList;
-use std::mem;
 use util::heap::space_descriptor::SpaceDescriptor;
 
 #[cfg(target_pointer_width = "32")]
@@ -49,9 +48,17 @@ impl Map32 {
         }
     }
 
-    #[allow(mutable_transmutes)]
+    // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
+    // of the same unsafe code.
+    // FIXME: We need a safe implementation.
+    #[allow(clippy::cast_ref_to_mut)]
+    #[allow(clippy::mut_from_ref)]
+    unsafe fn mut_self(&self) -> &mut Self {
+        &mut *(self as *const _ as *mut _)
+    }
+
     pub fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
-        let self_mut: &mut Self = unsafe { mem::transmute(self) };
+        let self_mut: &mut Self = unsafe { self.mut_self() };
         let mut e = 0;
         while e < extent {
             let index = self.get_chunk_index(start + e);
@@ -70,9 +77,8 @@ impl Map32 {
         IntArrayFreeList::new(units, grain, 1)
     }
 
-    #[allow(mutable_transmutes)]
     pub fn allocate_contiguous_chunks(&self, descriptor: SpaceDescriptor, chunks: usize, head: Address) -> Address {
-        let self_mut: &mut Self = unsafe { mem::transmute(self) };
+        let self_mut: &mut Self = unsafe { self.mut_self() };
         let _sync = self.sync.lock().unwrap();
         let chunk = self_mut.region_map.alloc(chunks as _);
         debug_assert!(chunk != 0);
@@ -95,9 +101,7 @@ impl Map32 {
     pub fn get_next_contiguous_region(&self, start: Address) -> Address {
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = self.get_chunk_index(start);
-        if chunk == 0 {
-            unsafe { Address::zero() }
-        } else if self.next_link[chunk] == 0 {
+        if chunk == 0 || self.next_link[chunk] == 0 {
             unsafe { Address::zero() }
         } else {
             let a = self.next_link[chunk];
@@ -115,6 +119,11 @@ impl Map32 {
         self.get_contiguous_region_chunks(start) << LOG_BYTES_IN_CHUNK
     }
 
+    // The two while loops appear to not mutate the loop condition. However,
+    // free_contiguous_chunks_no_lock() in the loop actually unsafely mutates the while loop condition.
+    // The two while loops can end.
+    // TODO: We need to check the correctness, especially check thread safety.
+    #[allow(clippy::while_immutable_condition)]
     pub fn free_all_chunks(&self, any_chunk: Address) {
         let _sync = self.sync.lock().unwrap();
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
@@ -139,9 +148,8 @@ impl Map32 {
         self.free_contiguous_chunks_no_lock(chunk as _)
     }
 
-    #[allow(mutable_transmutes)]
     fn free_contiguous_chunks_no_lock(&self, chunk: i32) -> usize {
-        let self_mut: &mut Self = unsafe { mem::transmute(self) };
+        let self_mut: &mut Self = unsafe { self.mut_self() };
         let chunks = self_mut.region_map.free(chunk, false);
         self_mut.total_available_discontiguous_chunks += chunks as usize;
         let next = self.next_link[chunk as usize];
@@ -157,9 +165,8 @@ impl Map32 {
         chunks as _
     }
 
-    #[allow(mutable_transmutes)]
     pub fn finalize_static_space_map(&self, from: Address, to: Address) {
-        let self_mut: &mut Self = unsafe { mem::transmute(self) };
+        let self_mut: &mut Self = unsafe { self.mut_self() };
         /* establish bounds of discontiguous space */
         let start_address = from;
         let first_chunk = self.get_chunk_index(start_address);
@@ -170,9 +177,10 @@ impl Map32 {
         // start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
         // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912
         self_mut.global_page_map.resize_freelist(pages, pages as _);
-        for fl in &mut self_mut.shared_fl_map {
+        for fl in self_mut.shared_fl_map.iter() {
             if let Some(fl) = fl {
-                let fl_mut: &mut CommonFreeListPageResource = unsafe { mem::transmute(fl) };
+                #[allow(clippy::cast_ref_to_mut)]
+                let fl_mut: &mut CommonFreeListPageResource = unsafe { &mut *(fl as *const _ as *mut _) };
                 fl_mut.resize_freelist(start_address);
             }
         }
@@ -187,14 +195,14 @@ impl Map32 {
         // ]
         /* set up the region map free list */
         self_mut.region_map.alloc(first_chunk as _);       // block out entire bottom of address range
-        for _ in first_chunk..(last_chunk + 1) {
+        for _ in first_chunk..=last_chunk {
             self_mut.region_map.alloc(1);
         }
         let alloced_chunk = self_mut.region_map.alloc(trailing_chunks as _);
         debug_assert!(alloced_chunk == unavail_start_chunk as i32, "{} != {}", alloced_chunk, unavail_start_chunk);
         /* set up the global page map and place chunks on free list */
         let mut first_page = 0;
-        for chunk_index in first_chunk..(last_chunk + 1) {
+        for chunk_index in first_chunk..=last_chunk {
             self_mut.total_available_discontiguous_chunks += 1;
             self_mut.region_map.free(chunk_index as _, false);  // put this chunk on the free list
             self_mut.global_page_map.set_uncoalescable(first_page);
@@ -209,9 +217,8 @@ impl Map32 {
         self.finalized
     }
 
-    #[allow(mutable_transmutes)]
     pub fn get_discontig_freelist_pr_ordinal(&self, pr: &CommonFreeListPageResource) -> usize {
-        let self_mut: &mut Self = unsafe { mem::transmute(self) };
+        let self_mut: &mut Self = unsafe { self.mut_self() };
         self_mut.shared_fl_map[self.shared_discontig_fl_count] = Some(unsafe { &*(pr as *const CommonFreeListPageResource) });
         self_mut.shared_discontig_fl_count += 1;
         self.shared_discontig_fl_count
@@ -236,5 +243,11 @@ impl Map32 {
 
     pub fn get_cumulative_committed_pages(&self) -> usize {
         self.cumulative_committed_pages.load(Ordering::Relaxed)
+    }
+}
+
+impl Default for Map32 {
+    fn default() -> Self {
+        Self::new()
     }
 }

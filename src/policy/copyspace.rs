@@ -14,6 +14,7 @@ use libc::{mprotect, PROT_NONE, PROT_EXEC, PROT_WRITE, PROT_READ};
 use util::heap::layout::heap_layout::{VMMap, Mmapper};
 use util::heap::HeapMeta;
 use vm::VMBinding;
+use policy::space::SpaceOptions;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -65,7 +66,13 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 impl<VM: VMBinding> CopySpace<VM> {
     pub fn new(name: &'static str, from_space: bool, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
         CopySpace {
-            common: UnsafeCell::new(CommonSpace::new(name, true, false, zeroed, vmrequest, vm_map, mmapper, heap)),
+            common: UnsafeCell::new(CommonSpace::new(SpaceOptions {
+                name,
+                movable: true,
+                immortal: false,
+                zeroed,
+                vmrequest,
+            }, vm_map, mmapper, heap)),
             from_space,
         }
     }
@@ -98,14 +105,14 @@ impl<VM: VMBinding> CopySpace<VM> {
             trace!("... yes it is");
             let new_object = ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
             trace!("Returning");
-            return new_object;
+            new_object
         } else {
             trace!("... no it isn't. Copying");
             let new_object = ForwardingWord::forward_object::<VM>(object, allocator, tls);
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copying [{:?} -> {:?}]", object, new_object);
-            return new_object;
+            new_object
         }
     }
 

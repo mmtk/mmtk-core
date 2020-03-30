@@ -117,7 +117,7 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> PageResource
         debug_assert!(rtn >= sync.cursor && rtn < sync.cursor + bytes);
         if tmp > sync.sentinel {
             //debug!("tmp={:?} > sync.sentinel={:?}", tmp, sync.sentinel);
-            return unsafe{Address::zero()};
+            unsafe{ Address::zero() }
         } else {
             //debug!("tmp={:?} <= sync.sentinel={:?}", tmp, sync.sentinel);
             let old = sync.cursor;
@@ -263,23 +263,21 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> MonotonePage
         // TODO: concurrent zeroing
         if self.common().contiguous {
             guard.cursor = match guard.conditional {
-                MonotonePageResourceConditional::Contiguous { start: _start, zeroing_cursor: _, zeroing_sentinel: _ } => _start,
+                MonotonePageResourceConditional::Contiguous { start: _start, .. } => _start,
                 _ => unreachable!(),
             };
-        } else {
-            if !guard.cursor.is_zero() {
+        } else if !guard.cursor.is_zero() {
+            let bytes = guard.cursor - guard.current_chunk;
+            self.release_pages_extent(guard.current_chunk, bytes);
+            while self.move_to_next_chunk(guard) {
                 let bytes = guard.cursor - guard.current_chunk;
                 self.release_pages_extent(guard.current_chunk, bytes);
-                while self.move_to_next_chunk(guard) {
-                    let bytes = guard.cursor - guard.current_chunk;
-                    self.release_pages_extent(guard.current_chunk, bytes);
-                }
-
-                guard.current_chunk = Address::zero();
-                guard.sentinel = Address::zero();
-                guard.cursor = Address::zero();
-                self.common().space.as_ref().unwrap().release_all_chunks();
             }
+
+            guard.current_chunk = Address::zero();
+            guard.sentinel = Address::zero();
+            guard.cursor = Address::zero();
+            self.common().space.as_ref().unwrap().release_all_chunks();
         }
     }
 

@@ -33,15 +33,8 @@ impl<VM: VMBinding> TransitiveClosure for SSTraceLocal<VM> {
 
 impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
     fn process_roots(&mut self) {
-        loop {
-            match self.root_locations.dequeue() {
-                Some(slot) => {
-                    self.process_root_edge(slot, true)
-                }
-                None => {
-                    break;
-                }
-            }
+        while let Some(slot) = self.root_locations.dequeue() {
+            self.process_root_edge(slot, true);
         }
         debug_assert!(self.root_locations.is_empty());
     }
@@ -93,15 +86,8 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
 
         self.process_roots();
         debug_assert!(self.root_locations.is_empty());
-        loop {
-            match self.values.dequeue() {
-                Some(object) => {
-                    VM::VMScanning::scan_object(self, object, id);
-                }
-                None => {
-                    break;
-                }
-            }
+        while let Some(object) = self.values.dequeue() {
+            VM::VMScanning::scan_object(self, object, id);
         }
         debug_assert!(self.root_locations.is_empty());
         debug_assert!(self.values.is_empty());

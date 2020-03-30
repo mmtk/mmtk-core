@@ -103,3 +103,9 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
         }
     }
 }
+
+impl<VM: VMBinding> Default for ControllerCollectorContext<VM> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

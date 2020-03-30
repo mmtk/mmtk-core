@@ -42,7 +42,7 @@ impl Mmapper for ByteMapMmapper {
     fn mark_as_mapped(&self, start: Address, bytes: usize) {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + bytes);
-        for i in start_chunk .. end_chunk + 1 {
+        for i in start_chunk..=end_chunk {
             self.mapped[i].store(MAPPED, Ordering::Relaxed);
         }
     }
@@ -165,6 +165,12 @@ impl ByteMapMmapper {
 
     fn address_to_mmap_chunks_up(addr: Address) -> usize {
         (addr + MMAP_CHUNK_BYTES - 1) >> LOG_MMAP_CHUNK_BYTES
+    }
+}
+
+impl Default for ByteMapMmapper {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

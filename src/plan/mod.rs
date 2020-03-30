@@ -1,3 +1,7 @@
+// For each GC plan, the global Plan module may the same name as the GC plan,
+// such as plan::nogc::nogc::NoGC, plan::g1::g1::G1. This is intentional.
+#![allow(clippy::module_inception)]
+
 pub mod plan;
 pub mod tracelocal;
 pub mod transitive_closure;

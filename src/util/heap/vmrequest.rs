@@ -30,7 +30,7 @@ pub enum VMRequest {
 impl VMRequest {
     pub fn is_discontiguous(&self) -> bool {
         match self {
-            &VMRequest::RequestDiscontiguous{..} => true,
+            VMRequest::RequestDiscontiguous{..} => true,
             _ => false,
         }
     }

@@ -17,6 +17,11 @@ pub trait ParallelCollector<VM: VMBinding>: CollectorContext<VM> + Sized {
     fn set_last_trigger_count(&mut self, val: usize);
     fn increment_last_trigger_count(&mut self);
 
+    // The implementation of this function probably will dereference a pointer argument, but there
+    // is no way to guarantee the pointer is valid. Thus the function should be marked as unsafe.
+    // However, we may be able to remove the use of the raw pointer here. It was unnecessary to use
+    // raw pointers here merely to allow circular dependency. We should fix this instead.
+    // FIXME: remove the use of raw pointer here.
     fn set_group(&mut self, group: *const ParallelCollectorGroup<VM, Self>);
     fn set_worker_ordinal(&mut self, ordinal: usize);
 }

@@ -51,7 +51,7 @@ impl<VM: VMBinding> TraceLocal for NoGCTraceLocal<VM> {
     }
 
     fn is_live(&self, _object: ObjectReference) -> bool {
-        return true;
+        true
     }
 }
 
@@ -60,5 +60,11 @@ impl<VM: VMBinding> NoGCTraceLocal<VM> {
         Self {
             p: PhantomData
         }
+    }
+}
+
+impl<VM: VMBinding> Default for NoGCTraceLocal<VM> {
+    fn default() -> Self {
+        Self::new()
     }
 }

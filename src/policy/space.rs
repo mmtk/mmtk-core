@@ -114,6 +114,7 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
 
     // UNSAFE: This get's a mutable reference from self
     // (i.e. make sure their are no concurrent accesses through self when calling this)_
+    #[allow(clippy::mut_from_ref)]
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR>;
 
     fn is_live(&self, object: ObjectReference) -> bool;
@@ -151,10 +152,10 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
         if common.contiguous {
             print!("{}->{}", common.start, common.start+common.extent-1);
             match common.vmrequest {
-                VMRequest::RequestExtent { extent, top: _ } => {
+                VMRequest::RequestExtent { extent, .. } => {
                     print!(" E {}", extent);
                 },
-                VMRequest::RequestFraction { frac, top: _ } => {
+                VMRequest::RequestFraction { frac, .. } => {
                     print!(" F {}", frac);
                 },
                 _ => {}
@@ -194,19 +195,26 @@ pub struct CommonSpace<VM: VMBinding, PR: PageResource<VM>> {
     p: PhantomData<VM>,
 }
 
+pub struct SpaceOptions {
+    pub name: &'static str,
+    pub movable: bool,
+    pub immortal: bool,
+    pub zeroed: bool,
+    pub vmrequest: VMRequest,
+}
+
 const DEBUG: bool = false;
 
 impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
-    pub fn new(name: &'static str, movable: bool, immortal: bool, zeroed: bool,
-               vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
+    pub fn new(opt: SpaceOptions, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
         let mut rtn = CommonSpace {
-            name,
+            name: opt.name,
             descriptor: SpaceDescriptor::UNINITIALIZED,
-            vmrequest,
-            immortal,
-            movable,
+            vmrequest: opt.vmrequest,
+            immortal: opt.immortal,
+            movable: opt.movable,
             contiguous: true,
-            zeroed,
+            zeroed: opt.zeroed,
             pr: None,
             start: unsafe{Address::zero()},
             extent: 0,
@@ -216,6 +224,7 @@ impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
             p: PhantomData,
         };
 
+        let vmrequest = opt.vmrequest;
         if vmrequest.is_discontiguous() {
             rtn.contiguous = false;
             // FIXME
@@ -227,19 +236,19 @@ impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
         let (extent, top) = match vmrequest {
             VMRequest::RequestFraction{frac, top: _top}                   => (get_frac_available(frac), _top),
             VMRequest::RequestExtent{extent: _extent, top: _top}          => (_extent, _top),
-            VMRequest::RequestFixed{start: _, extent: _extent, top: _top} => (_extent, _top),
+            VMRequest::RequestFixed{extent: _extent, top: _top, .. } => (_extent, _top),
             _                                                             => unreachable!(),
         };
 
         if extent != raw_align_up(extent, BYTES_IN_CHUNK) {
-            panic!("{} requested non-aligned extent: {} bytes", name, extent);
+            panic!("{} requested non-aligned extent: {} bytes", rtn.name, extent);
         }
 
         let start: Address;
-        if let VMRequest::RequestFixed{start: _start, extent: _, top: _} = vmrequest {
+        if let VMRequest::RequestFixed{start: _start, .. } = vmrequest {
             start = _start;
             if start != chunk_align_up(start) {
-                panic!("{} starting on non-aligned boundary: {}", name, start);
+                panic!("{} starting on non-aligned boundary: {}", rtn.name, start);
             }
         } else {
             // FIXME
@@ -256,7 +265,7 @@ impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
         vm_map.insert(start, extent, rtn.descriptor);
 
         if DEBUG {
-            println!("{} {} {} {}", name, start, start + extent, extent);
+            println!("{} {} {} {}", rtn.name, start, start + extent, extent);
         }
 
         rtn

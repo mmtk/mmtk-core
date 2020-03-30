@@ -98,6 +98,8 @@ impl<VM: VMBinding> ParallelCollector<VM> for NoGCCollector<VM> {
         self.last_trigger_count += 1;
     }
 
+    // See ParallelCollector.set_group()
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     fn set_group(&mut self, group: *const ParallelCollectorGroup<VM, Self>) {
         self.group = Some ( unsafe {&*group} );
     }

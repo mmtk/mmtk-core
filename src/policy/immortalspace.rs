@@ -13,6 +13,7 @@ use std::cell::UnsafeCell;
 use util::heap::layout::heap_layout::{VMMap, Mmapper};
 use util::heap::HeapMeta;
 use vm::VMBinding;
+use policy::space::SpaceOptions;
 
 pub struct ImmortalSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>>,
@@ -52,7 +53,7 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     }
 
     fn is_live(&self, _object: ObjectReference) -> bool {
-        return true;
+        true
     }
 
     fn is_movable(&self) -> bool {
@@ -67,7 +68,13 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
 impl<VM: VMBinding> ImmortalSpace<VM> {
     pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
         ImmortalSpace {
-            common: UnsafeCell::new(CommonSpace::new(name, false, true, zeroed, vmrequest, vm_map, mmapper, heap)),
+            common: UnsafeCell::new(CommonSpace::new(SpaceOptions {
+                name,
+                movable: false,
+                immortal: true,
+                zeroed,
+                vmrequest,
+            }, vm_map, mmapper, heap)),
             mark_state: 0,
         }
     }
@@ -87,7 +94,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 return false;
             }
         }
-        return true;
+        true
     }
 
     pub fn trace_object<T: TransitiveClosure>(
@@ -98,14 +105,14 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         if ImmortalSpace::<VM>::test_and_mark(object, self.mark_state) {
             trace.process_node(object);
         }
-        return object;
+        object
     }
 
     pub fn initialize_header(&self, object: ObjectReference) {
         let old_value = VM::VMObjectModel::read_available_byte(object);
         let mut new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
         if header_byte::NEEDS_UNLOGGED_BIT {
-            new_value = new_value | header_byte::UNLOGGED_BIT;
+            new_value |= header_byte::UNLOGGED_BIT;
         }
         VM::VMObjectModel::write_available_byte(object, new_value);
     }

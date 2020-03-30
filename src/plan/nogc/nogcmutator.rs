@@ -38,6 +38,8 @@ impl<VM: VMBinding> MutatorContext for NoGCMutator<VM> {
         }
     }
 
+    // We may match other patterns in the future, so temporarily disable this check
+    #[allow(clippy::single_match)]
     fn post_alloc(&mut self, refer: ObjectReference, _type_refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
         match allocator {
             AllocationType::Los => {

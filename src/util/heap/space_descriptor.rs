@@ -56,44 +56,44 @@ impl SpaceDescriptor {
         let mut tmp = start >> BASE_EXPONENT;
         let mut exponent = 0;
         while (tmp != 0) && ((tmp & 1) == 0) {
-            tmp = tmp >> 1;
+            tmp >>= 1;
             exponent += 1;
         }
         let mantissa = tmp;
         debug_assert!((tmp << (BASE_EXPONENT + exponent)) == start.as_usize());
-        return SpaceDescriptor(
+        SpaceDescriptor(
             (mantissa << MANTISSA_SHIFT) |
             (exponent << EXPONENT_SHIFT) |
             (chunks << SIZE_SHIFT) |
-            (if top { TYPE_CONTIGUOUS_HI } else { TYPE_CONTIGUOUS }));
+            (if top { TYPE_CONTIGUOUS_HI } else { TYPE_CONTIGUOUS }))
     }
 
     pub fn create_descriptor() -> SpaceDescriptor {
         let next = DISCONTIGUOUS_SPACE_INDEX.fetch_add(DISCONTIG_INDEX_INCREMENT, Ordering::Relaxed);
         let ret = SpaceDescriptor(next);
         debug_assert!(!ret.is_contiguous());
-        return ret;
+        ret
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.0 == SpaceDescriptor::UNINITIALIZED.0
     }
 
-    pub fn is_contiguous(&self) -> bool {
+    pub fn is_contiguous(self) -> bool {
         ((self.0 & TYPE_CONTIGUOUS) == TYPE_CONTIGUOUS)
     }
 
-    pub fn is_contiguous_hi(&self) -> bool {
+    pub fn is_contiguous_hi(self) -> bool {
         ((self.0 & TYPE_MASK) == TYPE_CONTIGUOUS_HI)
     }
 
     #[cfg(target_pointer_width = "64")]
-    pub fn get_start(&self) -> Address {
-        return unsafe { Address::from_usize(self.get_index() << heap_parameters::LOG_SPACE_SIZE_64) };
+    pub fn get_start(self) -> Address {
+        unsafe { Address::from_usize(self.get_index() << heap_parameters::LOG_SPACE_SIZE_64) }
     }
 
     #[cfg(target_pointer_width = "32")]
-    pub fn get_start(&self) -> Address {
+    pub fn get_start(self) -> Address {
         debug_assert!(self.is_contiguous());
 
         let descriptor = self.0;
@@ -102,18 +102,21 @@ impl SpaceDescriptor {
         unsafe { Address::from_usize(mantissa << (BASE_EXPONENT + exponent)) }
     }
 
-    pub fn get_extent(&self) -> usize {
+    pub fn get_extent(self) -> usize {
         if HEAP_LAYOUT_64BIT {
             return vm_layout_constants::SPACE_SIZE_64;
         }
         debug_assert!(self.is_contiguous());
         let chunks = (self.0 & SIZE_MASK) >> SIZE_SHIFT;
-        let size = chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK;
-        return size;
+        chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK
     }
 
-    pub fn get_index(&self) -> usize {
+    // FIXME: This function should only work for 64 bit heap.
+    // However, HEAP_LAYOUT_64BIT is a constant at the moment (which is not correct), and
+    // we do want this function failed the assertion if HEAP_LAYOUT_64BIT is no longer constantly true.
+    #[allow(clippy::assertions_on_constants)]
+    pub fn get_index(self) -> usize {
         debug_assert!(HEAP_LAYOUT_64BIT);
-        return (self.0 & INDEX_MASK) >> INDEX_SHIFT;
+        (self.0 & INDEX_MASK) >> INDEX_SHIFT
     }
 }

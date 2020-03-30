@@ -82,7 +82,7 @@ pub trait GenericFreeList: Sized {
   fn initialize_heap(&mut self, units: i32, grain: i32) {
     // Initialize the sentinels
     // Set top sentinels per heads
-    for i in 1..(self.heads() + 1) {
+    for i in 1..=self.heads() {
       self.set_sentinel(-i);
     }
     // Set bottom sentinel

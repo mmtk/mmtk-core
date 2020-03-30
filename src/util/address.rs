@@ -1,4 +1,3 @@
-use std::cmp;
 use std::fmt;
 use std::mem;
 use std::ops::*;
@@ -16,7 +15,7 @@ pub type ByteOffset = isize;
 /// (memory wise and time wise). The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
 pub struct Address(usize);
 
 /// Address + ByteSize (positive)
@@ -119,18 +118,18 @@ impl Address {
     /// creates Address from a pointer
     #[inline(always)]
     pub fn from_ptr<T>(ptr: *const T) -> Address {
-        unsafe { mem::transmute(ptr) }
+        Address(ptr as usize)
     }
 
     #[inline(always)]
     pub fn from_ref<T>(r: &T) -> Address {
-        unsafe { mem::transmute(r) }
+        Address(r as *const T as usize)
     }
 
     /// creates Address from a mutable pointer
     #[inline(always)]
     pub fn from_mut_ptr<T>(ptr: *mut T) -> Address {
-        unsafe { mem::transmute(ptr) }
+        Address(ptr as usize)
     }
 
     /// creates a null Address (0)
@@ -174,6 +173,10 @@ impl Address {
         self.0 as isize - other.0 as isize
     }
 
+    // We implemented the Add trait but we still keep this add function.
+    // The add() function is const fn, and we can use it to declare Address constants.
+    // The Add trait function cannot be const.
+    #[allow(clippy::should_implement_trait)]
     #[inline(always)]
     pub const fn add(self, size: usize) -> Address {
         Address(self.0 + size)
@@ -181,56 +184,56 @@ impl Address {
 
     /// loads a value of type T from the address
     #[inline(always)]
-    pub unsafe fn load<T: Copy>(&self) -> T {
+    pub unsafe fn load<T: Copy>(self) -> T {
         *(self.0 as *mut T)
     }
 
     /// stores a value of type T to the address
     #[inline(always)]
-    pub unsafe fn store<T>(&self, value: T) {
+    pub unsafe fn store<T>(self, value: T) {
         *(self.0 as *mut T) = value;
     }
 
     /// atomic operation: load
-    pub unsafe fn atomic_load<T: Atomic>(&self, order: Ordering) -> T::Type {
+    pub unsafe fn atomic_load<T: Atomic>(self, order: Ordering) -> T::Type {
         let loc = &*(self.0 as *const T);
         loc.load(order)
     }
 
     /// atomic operation: store
-    pub unsafe fn atomic_store<T: Atomic>(&self, val: T::Type, order: Ordering) {
+    pub unsafe fn atomic_store<T: Atomic>(self, val: T::Type, order: Ordering) {
         let loc = &*(self.0 as *const T);
         loc.store(val, order)
     }
 
     /// atomic operation: compare and exchange usize
-    pub unsafe fn compare_exchange<T: Atomic>(&self, old: T::Type, new: T::Type, success: Ordering, failure: Ordering) -> Result<T::Type, T::Type> {
+    pub unsafe fn compare_exchange<T: Atomic>(self, old: T::Type, new: T::Type, success: Ordering, failure: Ordering) -> Result<T::Type, T::Type> {
         let loc = &*(self.0 as *const T);
         loc.compare_exchange(old, new, success, failure)
     }
 
     /// is this address zero?
     #[inline(always)]
-    pub fn is_zero(&self) -> bool {
+    pub fn is_zero(self) -> bool {
         self.0 == 0
     }
 
     /// aligns up the address to the given alignment
     #[inline(always)]
-    pub const fn align_up(&self, align: ByteSize) -> Address {
+    pub const fn align_up(self, align: ByteSize) -> Address {
         use util::conversions;
         Address(conversions::raw_align_up(self.0, align))
     }
 
     /// aligns down the address to the given alignment
     #[inline(always)]
-    pub const fn align_down(&self, align: ByteSize) -> Address {
+    pub const fn align_down(self, align: ByteSize) -> Address {
         use util::conversions;
         Address(conversions::raw_align_down(self.0, align))
     }
 
     /// is this address aligned to the given alignment
-    pub fn is_aligned_to(&self, align: usize) -> bool {
+    pub fn is_aligned_to(self, align: usize) -> bool {
         use util::conversions;
         conversions::raw_is_aligned(self.0, align)
     }
@@ -240,46 +243,26 @@ impl Address {
     /// but an arbitrary Address may reside an object, this conversion is unsafe,
     /// and it is the user's responsibility to ensure the safety.
     #[inline(always)]
-    pub unsafe fn to_object_reference(&self) -> ObjectReference {
+    pub unsafe fn to_object_reference(self) -> ObjectReference {
         mem::transmute(self.0)
     }
 
     /// converts the Address to a pointer
     #[inline(always)]
-    pub fn to_ptr<T>(&self) -> *const T {
-        unsafe { mem::transmute(self.0) }
+    pub fn to_ptr<T>(self) -> *const T {
+        self.0 as *const T
     }
 
     /// converts the Address to a mutable pointer
     #[inline(always)]
-    pub fn to_mut_ptr<T>(&self) -> *mut T {
-        unsafe { mem::transmute(self.0) }
+    pub fn to_mut_ptr<T>(self) -> *mut T {
+        self.0 as *mut T
     }
 
     /// converts the Address to a pointer-sized integer
     #[inline(always)]
-    pub const fn as_usize(&self) -> usize {
+    pub const fn as_usize(self) -> usize {
         self.0
-    }
-}
-
-/// allows comparison between Address
-impl PartialOrd for Address {
-    #[inline(always)]
-    fn partial_cmp(&self, other: &Address) -> Option<cmp::Ordering> {
-        Some(self.0.cmp(&other.0))
-    }
-}
-
-/// allows equal test between Address
-impl PartialEq for Address {
-    #[inline(always)]
-    fn eq(&self, other: &Address) -> bool {
-        self.0 == other.0
-    }
-    #[inline(always)]
-    fn ne(&self, other: &Address) -> bool {
-        self.0 != other.0
     }
 }
 
@@ -365,37 +348,25 @@ mod tests {
 /// are allowed for ObjectReference. The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
 pub struct ObjectReference(usize);
 
 impl ObjectReference {
     /// converts the ObjectReference to an Address
     #[inline(always)]
-    pub fn to_address(&self) -> Address {
+    pub fn to_address(self) -> Address {
         Address(self.0)
     }
 
     /// is this object reference null reference?
     #[inline(always)]
-    pub fn is_null(&self) -> bool {
+    pub fn is_null(self) -> bool {
         self.0 == 0
     }
 
     /// returns the ObjectReference
-    pub fn value(&self) -> usize {
+    pub fn value(self) -> usize {
         self.0
-    }
-}
-
-/// allows equal test between Address
-impl PartialEq for ObjectReference {
-    #[inline(always)]
-    fn eq(&self, other: &ObjectReference) -> bool {
-        self.0 == other.0
-    }
-    #[inline(always)]
-    fn ne(&self, other: &ObjectReference) -> bool {
-        self.0 != other.0
     }
 }
 

@@ -107,7 +107,7 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         if unsync.los.in_space(object) {
             return true;
         }
-        return false;
+        false
     }
 
     fn is_bad_ref(&self, _object: ObjectReference) -> bool {
@@ -121,9 +121,9 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
             (unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(address.to_object_reference())) ||
             unsync.los.in_space(address.to_object_reference())
         } {
-            return self.common.mmapper.address_is_mapped(address);
+            self.common.mmapper.address_is_mapped(address)
         } else {
-            return false;
+            false
         }
     }
 
@@ -138,7 +138,7 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         if unsync.los.in_space(object) {
             return unsync.los.is_movable();
         }
-        return true;
+        true
     }
 }
 

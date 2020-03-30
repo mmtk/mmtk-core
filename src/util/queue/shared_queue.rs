@@ -53,7 +53,7 @@ impl<T> SharedQueue<T> where T: Debug {
             }
         }
         // Everyone is done
-        return None;
+        None
     }
 
     pub fn push(&self, b: Block<T>) {
@@ -71,6 +71,12 @@ impl<T> SharedQueue<T> where T: Debug {
     pub fn is_empty(&self) -> bool {
         let blocks = self.blocks.lock().unwrap();
         blocks.is_empty()
+    }
+}
+
+impl<T> Default for SharedQueue<T> where T: Debug {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

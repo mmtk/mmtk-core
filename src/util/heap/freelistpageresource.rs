@@ -1,6 +1,5 @@
 use std::sync::{Mutex, MutexGuard};
 use std::sync::atomic::AtomicUsize;
-use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
 
@@ -75,10 +74,11 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> PageResource
         &mut self.common
     }
 
-    #[allow(mutable_transmutes)]
     fn alloc_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, tls: OpaquePointer) -> Address {
         debug_assert!(self.meta_data_pages_per_region == 0 || required_pages <= PAGES_IN_CHUNK - self.meta_data_pages_per_region);
-        let self_mut: &mut Self = unsafe { mem::transmute(self) };
+        // FIXME: We need a safe implementation
+        #[allow(clippy::cast_ref_to_mut)]
+        let self_mut: &mut Self = unsafe { &mut *(self as *const _ as *mut _) };
         let mut sync = self.sync.lock().unwrap();
         let mut new_chunk = false;
         let mut page_offset = self_mut.free_list.alloc(required_pages as _);
@@ -213,7 +213,6 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
         rtn
     }
 
-    #[allow(mutable_transmutes)]
     fn free_contiguous_chunk(&mut self, chunk: Address) {
         let num_chunks = self.vm_map().get_contiguous_region_chunks(chunk);
         debug_assert!(num_chunks == 1 || self.meta_data_pages_per_region == 0);
@@ -234,7 +233,9 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
             }
         }
         /* now return the address space associated with the chunk for global reuse */
-        let space: &mut S = unsafe { mem::transmute(self.common.space.unwrap()) };
+        // FIXME: We need a safe implementation
+        #[allow(clippy::cast_ref_to_mut)]
+        let space: &mut S = unsafe { &mut *(self.common.space.unwrap() as *const S as *mut S) };
         space.release_discontiguous_chunks(chunk);
     }
 
@@ -245,7 +246,7 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
             let size = (extent >> LOG_BYTES_IN_REGION) << LOG_BYTES_IN_REGION;
             let mut cursor = self.start + size;
             while cursor > self.start {
-                cursor = cursor - BYTES_IN_REGION;
+                cursor -= BYTES_IN_REGION;
                 let unit = (cursor - self.start) >> LOG_BYTES_IN_PAGE;
                 let meta_data_pages_per_region = self.meta_data_pages_per_region;
                 let tmp = self.free_list.alloc_from_unit(meta_data_pages_per_region as _, unit as _) as usize;

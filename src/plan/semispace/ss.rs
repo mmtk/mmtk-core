@@ -134,14 +134,14 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         if unsync.los.in_space(object) {
             return true;
         }
-        return false;
+        false
     }
 
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {
         let unsync = &mut *self.unsync.get();
 
         match phase {
-            &Phase::SetCollectionKind => {
+            Phase::SetCollectionKind => {
                 self.common.cur_collection_attempts.store(if self.is_user_triggered_collection() {
                     1
                 } else {
@@ -156,13 +156,13 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                     self.force_full_heap_collection();
                 }
             }
-            &Phase::Initiate => {
+            Phase::Initiate => {
                 self.common.set_gc_status(plan::GcStatus::GcPrepare);
             }
-            &Phase::PrepareStacks => {
+            Phase::PrepareStacks => {
                 self.common.stacks_prepared.store(true, atomic::Ordering::SeqCst);
             }
-            &Phase::Prepare => {
+            Phase::Prepare => {
                 #[cfg(feature = "sanity")]
                 {
                     use ::util::sanity::sanity_checker::SanityChecker;
@@ -223,7 +223,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 }
                 unsync.los.release(true);
             }
-            &Phase::Complete => {
+            Phase::Complete => {
                 #[cfg(feature = "sanity")]
                 {
                     use ::util::sanity::sanity_checker::SanityChecker;
@@ -279,7 +279,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         if unsync.los.in_space(object) {
             return unsync.los.is_movable();
         }
-        return true;
+        true
     }
 
     fn is_mapped_address(&self, address: Address) -> bool {
@@ -291,9 +291,9 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
             unsync.copyspace1.in_space(address.to_object_reference()) ||
             unsync.los.in_space(address.to_object_reference())
         } {
-            return self.common.mmapper.address_is_mapped(address);
+            self.common.mmapper.address_is_mapped(address)
         } else {
-            return false;
+            false
         }
     }
 }

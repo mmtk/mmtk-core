@@ -26,14 +26,14 @@ pub struct SSMutator<VM: VMBinding> {
 impl<VM: VMBinding> MutatorContext for SSMutator<VM> {
     fn collection_phase(&mut self, _tls: OpaquePointer, phase: &Phase, _primary: bool) {
         match phase {
-            &Phase::PrepareStacks => {
+            Phase::PrepareStacks => {
                 if !self.plan.common.stacks_prepared() {
                     VM::VMCollection::prepare_mutator(self.ss.tls, self);
                 }
                 self.flush_remembered_sets();
             }
-            &Phase::Prepare => {}
-            &Phase::Release => {
+            Phase::Prepare => {}
+            Phase::Release => {
                 // rebind the allocation bump pointer to the appropriate semispace
                 self.ss.rebind(Some(self.plan.tospace()));
             }

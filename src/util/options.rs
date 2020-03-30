@@ -48,7 +48,8 @@ macro_rules! options {
                 match s {
                     $(stringify!($name) => if let Ok(val) = val.parse() {
                         self.$name = val;
-                        ($validator)(val)
+                        let validate_fn = $validator;
+                        validate_fn(val)
                     } else {
                         false
                     })*
@@ -84,7 +85,7 @@ options!{
     // FIXME: These options are set for JikesRVM. We need a proper way to set options.
     //   We need to set these values programmatically in VM specific code.
     vm_space:              bool                 [always_valid] = true,
-    vm_space_size:         usize                [|v| v > 0]    = 130862284,
+    vm_space_size:         usize                [|v| v > 0]    = 0x7cc_cccc,
 }
 
 impl Options {

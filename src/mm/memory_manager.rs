@@ -94,7 +94,7 @@ pub fn is_valid_ref<VM: VMBinding>(mmtk: &MMTK<VM>, val: ObjectReference) -> boo
 pub fn report_delayed_root_edge<VM: VMBinding>(mmtk: &MMTK<VM>, trace_local: &mut SelectedTraceLocal<VM>, addr: Address) {
     use ::util::sanity::sanity_checker::SanityChecker;
     if mmtk.plan.common().is_in_sanity() {
-        let sanity_checker: &mut SanityChecker<VM> = unsafe { std::mem::transmute(trace_local) };
+        let sanity_checker: &mut SanityChecker<VM> = unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.report_delayed_root_edge(addr);
     } else {
         trace_local.report_delayed_root_edge(addr)
@@ -109,7 +109,7 @@ pub fn report_delayed_root_edge<VM: VMBinding>(_: &MMTK<VM>, trace_local: &mut S
 pub fn will_not_move_in_current_collection<VM: VMBinding>(mmtk: &MMTK<VM>, trace_local: &mut SelectedTraceLocal<VM>, obj: ObjectReference) -> bool {
     use ::util::sanity::sanity_checker::SanityChecker;
     if mmtk.plan.common().is_in_sanity() {
-        let sanity_checker: &mut SanityChecker<VM> = unsafe { std::mem::transmute(trace_local) };
+        let sanity_checker: &mut SanityChecker<VM> = unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.will_not_move_in_current_collection(obj)
     } else {
         trace_local.will_not_move_in_current_collection(obj)
@@ -124,7 +124,7 @@ pub fn will_not_move_in_current_collection<VM: VMBinding>(_: &MMTK<VM>, trace_lo
 pub fn process_interior_edge<VM: VMBinding>(mmtk: &MMTK<VM>, trace_local: &mut SelectedTraceLocal<VM>, target: ObjectReference, slot: Address, root: bool) {
     use ::util::sanity::sanity_checker::SanityChecker;
     if mmtk.plan.common().is_in_sanity() {
-        let sanity_checker: &mut SanityChecker<VM> = unsafe { std::mem::transmute(trace_local) };
+        let sanity_checker: &mut SanityChecker<VM> = unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.process_interior_edge(target, slot, root)
     } else {
         trace_local.process_interior_edge(target, slot, root)

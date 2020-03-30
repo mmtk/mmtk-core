@@ -30,7 +30,7 @@ pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
             return old_value;
         }
     }
-    return old_value;
+    old_value
 }
 
 pub fn spin_and_get_forwarded_object<VM: VMBinding>(object: ObjectReference, gc_byte: u8) -> ObjectReference {
