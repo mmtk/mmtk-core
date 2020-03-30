@@ -1,20 +1,20 @@
-use crate::util::heap::PageResource;
-use crate::util::heap::MonotonePageResource;
-use crate::util::heap::VMRequest;
-use crate::util::constants::CARD_META_PAGES_PER_REGION;
-use crate::util::OpaquePointer;
-use crate::policy::space::{Space, CommonSpace};
-use crate::util::{Address, ObjectReference};
-use crate::plan::TransitiveClosure;
-use crate::util::forwarding_word as ForwardingWord;
 use crate::plan::Allocator;
+use crate::plan::TransitiveClosure;
+use crate::policy::space::{CommonSpace, Space};
+use crate::util::constants::CARD_META_PAGES_PER_REGION;
+use crate::util::forwarding_word as ForwardingWord;
+use crate::util::heap::MonotonePageResource;
+use crate::util::heap::PageResource;
+use crate::util::heap::VMRequest;
+use crate::util::OpaquePointer;
+use crate::util::{Address, ObjectReference};
 
-use std::cell::UnsafeCell;
-use libc::{mprotect, PROT_NONE, PROT_EXEC, PROT_WRITE, PROT_READ};
-use crate::util::heap::layout::heap_layout::{VMMap, Mmapper};
+use crate::policy::space::SpaceOptions;
+use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
-use crate::policy::space::SpaceOptions;
+use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
+use std::cell::UnsafeCell;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -40,12 +40,16 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         let common_mut = self.common_mut();
         if common_mut.vmrequest.is_discontiguous() {
             common_mut.pr = Some(MonotonePageResource::new_discontiguous(
-                META_DATA_PAGES_PER_REGION, vm_map));
+                META_DATA_PAGES_PER_REGION,
+                vm_map,
+            ));
         } else {
-            common_mut.pr = Some(MonotonePageResource::new_contiguous(common_mut.start,
-                                                                      common_mut.extent,
-                                                                      META_DATA_PAGES_PER_REGION,
-                                                                      vm_map));
+            common_mut.pr = Some(MonotonePageResource::new_contiguous(
+                common_mut.start,
+                common_mut.extent,
+                META_DATA_PAGES_PER_REGION,
+                vm_map,
+            ));
         }
         common_mut.pr.as_mut().unwrap().bind_space(me);
     }
@@ -64,15 +68,28 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 }
 
 impl<VM: VMBinding> CopySpace<VM> {
-    pub fn new(name: &'static str, from_space: bool, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
+    pub fn new(
+        name: &'static str,
+        from_space: bool,
+        zeroed: bool,
+        vmrequest: VMRequest,
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        heap: &mut HeapMeta,
+    ) -> Self {
         CopySpace {
-            common: UnsafeCell::new(CommonSpace::new(SpaceOptions {
-                name,
-                movable: true,
-                immortal: false,
-                zeroed,
-                vmrequest,
-            }, vm_map, mmapper, heap)),
+            common: UnsafeCell::new(CommonSpace::new(
+                SpaceOptions {
+                    name,
+                    movable: true,
+                    immortal: false,
+                    zeroed,
+                    vmrequest,
+                },
+                vm_map,
+                mmapper,
+                heap,
+            )),
             from_space,
         }
     }
@@ -92,9 +109,13 @@ impl<VM: VMBinding> CopySpace<VM> {
         object: ObjectReference,
         allocator: Allocator,
         tls: OpaquePointer,
-    ) -> ObjectReference
-    {
-        trace!("copyspace.trace_object(, {:?}, {:?}, {:?})", object, allocator, tls);
+    ) -> ObjectReference {
+        trace!(
+            "copyspace.trace_object(, {:?}, {:?}, {:?})",
+            object,
+            allocator,
+            tls
+        );
         if !self.from_space {
             return object;
         }
@@ -103,7 +124,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         trace!("checking if object is being forwarded");
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             trace!("... yes it is");
-            let new_object = ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
+            let new_object =
+                ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
             trace!("Returning");
             new_object
         } else {
@@ -118,7 +140,9 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn protect(&self) {
         if !self.common().contiguous {
-            panic!("Implement Options.protectOnRelease for MonotonePageResource.release_pages_extent")
+            panic!(
+                "Implement Options.protectOnRelease for MonotonePageResource.release_pages_extent"
+            )
         }
         let start = self.common().start;
         let extent = self.common().extent;
@@ -130,12 +154,18 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn unprotect(&self) {
         if !self.common().contiguous {
-            panic!("Implement Options.protectOnRelease for MonotonePageResource.release_pages_extent")
+            panic!(
+                "Implement Options.protectOnRelease for MonotonePageResource.release_pages_extent"
+            )
         }
         let start = self.common().start;
         let extent = self.common().extent;
         unsafe {
-            mprotect(start.to_mut_ptr(), extent, PROT_READ | PROT_WRITE | PROT_EXEC);
+            mprotect(
+                start.to_mut_ptr(),
+                extent,
+                PROT_READ | PROT_WRITE | PROT_EXEC,
+            );
         }
         trace!("Unprotect {:x} {:x}", start, start + extent);
     }

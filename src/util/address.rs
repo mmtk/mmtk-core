@@ -1,8 +1,8 @@
+use atomic_traits::Atomic;
 use std::fmt;
 use std::mem;
 use std::ops::*;
 use std::sync::atomic::Ordering;
-use atomic_traits::Atomic;
 
 /// size in bytes
 pub type ByteSize = usize;
@@ -67,7 +67,10 @@ impl SubAssign<ByteSize> for Address {
 impl Sub<Address> for Address {
     type Output = ByteSize;
     fn sub(self, other: Address) -> ByteSize {
-        debug_assert!(self.0 >= other.0, "for (addr_a - addr_b), a needs to be larger than b");
+        debug_assert!(
+            self.0 >= other.0,
+            "for (addr_a - addr_b), a needs to be larger than b"
+        );
         self.0 - other.0
     }
 }
@@ -207,7 +210,13 @@ impl Address {
     }
 
     /// atomic operation: compare and exchange usize
-    pub unsafe fn compare_exchange<T: Atomic>(self, old: T::Type, new: T::Type, success: Ordering, failure: Ordering) -> Result<T::Type, T::Type> {
+    pub unsafe fn compare_exchange<T: Atomic>(
+        self,
+        old: T::Type,
+        new: T::Type,
+        success: Ordering,
+        failure: Ordering,
+    ) -> Result<T::Type, T::Type> {
         let loc = &*(self.0 as *const T);
         loc.compare_exchange(old, new, success, failure)
     }
@@ -301,18 +310,36 @@ mod tests {
     #[test]
     fn align_up() {
         unsafe {
-            assert_eq!(Address::from_usize(0x10).align_up(0x10), Address::from_usize(0x10));
-            assert_eq!(Address::from_usize(0x11).align_up(0x10), Address::from_usize(0x20));
-            assert_eq!(Address::from_usize(0x20).align_up(0x10), Address::from_usize(0x20));
+            assert_eq!(
+                Address::from_usize(0x10).align_up(0x10),
+                Address::from_usize(0x10)
+            );
+            assert_eq!(
+                Address::from_usize(0x11).align_up(0x10),
+                Address::from_usize(0x20)
+            );
+            assert_eq!(
+                Address::from_usize(0x20).align_up(0x10),
+                Address::from_usize(0x20)
+            );
         }
     }
 
     #[test]
     fn align_down() {
         unsafe {
-            assert_eq!(Address::from_usize(0x10).align_down(0x10), Address::from_usize(0x10));
-            assert_eq!(Address::from_usize(0x11).align_down(0x10), Address::from_usize(0x10));
-            assert_eq!(Address::from_usize(0x20).align_down(0x10), Address::from_usize(0x20));
+            assert_eq!(
+                Address::from_usize(0x10).align_down(0x10),
+                Address::from_usize(0x10)
+            );
+            assert_eq!(
+                Address::from_usize(0x11).align_down(0x10),
+                Address::from_usize(0x10)
+            );
+            assert_eq!(
+                Address::from_usize(0x20).align_down(0x10),
+                Address::from_usize(0x20)
+            );
         }
     }
 
@@ -329,16 +356,28 @@ mod tests {
     #[test]
     fn bit_and() {
         unsafe {
-            assert_eq!(Address::from_usize(0b1111_1111_1100usize) & 0b1010u8, 0b1000u8);
-            assert_eq!(Address::from_usize(0b1111_1111_1100usize) & 0b1000_0000_1010usize, 0b1000_0000_1000usize);
+            assert_eq!(
+                Address::from_usize(0b1111_1111_1100usize) & 0b1010u8,
+                0b1000u8
+            );
+            assert_eq!(
+                Address::from_usize(0b1111_1111_1100usize) & 0b1000_0000_1010usize,
+                0b1000_0000_1000usize
+            );
         }
     }
 
     #[test]
     fn bit_or() {
         unsafe {
-            assert_eq!(Address::from_usize(0b1111_1111_1100usize) | 0b1010u8, 0b1111_1111_1110usize);
-            assert_eq!(Address::from_usize(0b1111_1111_1100usize) | 0b1000_0000_1010usize, 0b1111_1111_1110usize);
+            assert_eq!(
+                Address::from_usize(0b1111_1111_1100usize) | 0b1010u8,
+                0b1111_1111_1110usize
+            );
+            assert_eq!(
+                Address::from_usize(0b1111_1111_1100usize) | 0b1000_0000_1010usize,
+                0b1111_1111_1110usize
+            );
         }
     }
 }

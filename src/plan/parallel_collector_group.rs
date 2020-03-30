@@ -1,7 +1,7 @@
-use std::vec::Vec;
-use std::sync::{Mutex, Condvar};
 use crate::util::OpaquePointer;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Condvar, Mutex};
+use std::vec::Vec;
 
 use super::ParallelCollector;
 use crate::vm::Collection;
@@ -89,7 +89,11 @@ impl<VM: VMBinding, C: ParallelCollector<VM>> ParallelCollectorGroup<VM, C> {
     pub fn wait_for_cycle(&self) {
         let mut inner = self.sync.lock().unwrap();
         while inner.contexts_parked < self.contexts.len() {
-            debug!("Inside wait_for_cycle loop, with {}/{} contexts parked", inner.contexts_parked, self.contexts.len());
+            debug!(
+                "Inside wait_for_cycle loop, with {}/{} contexts parked",
+                inner.contexts_parked,
+                self.contexts.len()
+            );
             inner = self.condvar.wait(inner).unwrap();
         }
     }
@@ -112,7 +116,9 @@ impl<VM: VMBinding, C: ParallelCollector<VM>> ParallelCollectorGroup<VM, C> {
     }
 
     pub fn is_member(&self, context: &C) -> bool {
-        self.contexts.iter().any(|ref c| c.get_tls() == context.get_tls())
+        self.contexts
+            .iter()
+            .any(|ref c| c.get_tls() == context.get_tls())
     }
 
     pub fn rendezvous(&self) -> usize {

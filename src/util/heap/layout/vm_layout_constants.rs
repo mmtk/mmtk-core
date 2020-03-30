@@ -1,14 +1,14 @@
-use crate::util::Address;
-use crate::util::constants::*;
 use super::heap_parameters::*;
+use crate::util::constants::*;
+use crate::util::Address;
 
 ///////// FIXME ////////////
 use super::super::vmrequest::{HEAP_LAYOUT_32BIT, HEAP_LAYOUT_64BIT};
 use crate::util::conversions::{chunk_align_down, chunk_align_up};
 
 /** log_2 of the addressable virtual space */
-pub const LOG_ADDRESS_SPACE: usize = if_then_else_usize!(HEAP_LAYOUT_32BIT, 32,
-    LOG_SPACE_SIZE_64 + LOG_MAX_SPACES);
+pub const LOG_ADDRESS_SPACE: usize =
+    if_then_else_usize!(HEAP_LAYOUT_32BIT, 32, LOG_SPACE_SIZE_64 + LOG_MAX_SPACES);
 /**
  * log_2 of the coarsest unit of address space allocation.
  * <p>
@@ -45,25 +45,25 @@ pub const MAX_SPACE_EXTENT: usize = 1 << LOG_SPACE_EXTENT;
 
 // FIXME: HEAP_START, HEAP_END are VM-dependent
 /** Lowest virtual address used by the virtual machine */
-pub const HEAP_START: Address = chunk_align_down(unsafe{ Address::from_usize(0x6000_0000) });
+pub const HEAP_START: Address = chunk_align_down(unsafe { Address::from_usize(0x6000_0000) });
 
 /** Highest virtual address used by the virtual machine */
-pub const HEAP_END: Address = chunk_align_up(unsafe{ Address::from_usize(0xb000_0000) });
+pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0xb000_0000) });
 
 /**
  * Lowest virtual address available for MMTk to manage.  The address space between
  * HEAP_START and AVAILABLE_START comprises memory directly managed by the VM,
  * and not available to MMTk.
  */
-pub const AVAILABLE_START: Address = chunk_align_up(unsafe{ Address::from_usize(
-    0x6700_0000 + (0x6400_0000 - 0x6000_0000)/5) });
+pub const AVAILABLE_START: Address =
+    chunk_align_up(unsafe { Address::from_usize(0x6700_0000 + (0x6400_0000 - 0x6000_0000) / 5) });
 
 /**
  * Highest virtual address available for MMTk to manage.  The address space between
  * HEAP_END and AVAILABLE_END comprises memory directly managed by the VM,
  * and not available to MMTk.
 */
-pub const AVAILABLE_END: Address = chunk_align_down(unsafe{ Address::from_usize(0xb000_0000) });
+pub const AVAILABLE_END: Address = chunk_align_down(unsafe { Address::from_usize(0xb000_0000) });
 
 /** Size of the address space available to the MMTk heap. */
 pub const AVAILABLE_BYTES: usize = AVAILABLE_END.get_extent(AVAILABLE_START);
@@ -100,8 +100,10 @@ pub const SPACE_SHIFT_64: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT, LOG_SPA
  * We can't express this constant in a 32-bit environment, hence the
  * conditional definition.
  */
-pub const SPACE_MASK_64: usize = if_then_else_zero_usize!(HEAP_LAYOUT_64BIT,
-    ((1 << LOG_MAX_SPACES) - 1) << SPACE_SHIFT_64);
+pub const SPACE_MASK_64: usize = if_then_else_zero_usize!(
+    HEAP_LAYOUT_64BIT,
+    ((1 << LOG_MAX_SPACES) - 1) << SPACE_SHIFT_64
+);
 
 /*
  * Size of each space in the 64-bit memory layout

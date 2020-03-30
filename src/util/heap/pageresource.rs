@@ -1,7 +1,7 @@
-use crate::util::address::Address;
 use crate::policy::space::Space;
-use crate::vm::ActivePlan;
+use crate::util::address::Address;
 use crate::util::OpaquePointer;
+use crate::vm::ActivePlan;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -14,7 +14,13 @@ pub trait PageResource<VM: VMBinding>: Sized + 'static {
     /// Allocate pages from this resource.
     /// Simply bump the cursor, and fail if we hit the sentinel.
     /// Return The start of the first page if successful, zero on failure.
-    fn get_new_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, tls: OpaquePointer) -> Address {
+    fn get_new_pages(
+        &self,
+        reserved_pages: usize,
+        required_pages: usize,
+        zeroed: bool,
+        tls: OpaquePointer,
+    ) -> Address {
         self.alloc_pages(reserved_pages, required_pages, zeroed, tls)
     }
 
@@ -22,12 +28,16 @@ pub trait PageResource<VM: VMBinding>: Sized + 'static {
     //      acquired a lock.
     fn reserve_pages(&self, pages: usize) -> usize {
         let adj_pages = self.adjust_for_metadata(pages);
-        self.common().reserved.fetch_add(adj_pages, Ordering::Relaxed);
+        self.common()
+            .reserved
+            .fetch_add(adj_pages, Ordering::Relaxed);
         adj_pages
     }
 
     fn clear_request(&self, reserved_pages: usize) {
-        self.common().reserved.fetch_sub(reserved_pages, Ordering::Relaxed);
+        self.common()
+            .reserved
+            .fetch_sub(reserved_pages, Ordering::Relaxed);
     }
 
     fn update_zeroing_approach(&self, _nontemporal: bool, concurrent: bool) {
@@ -47,26 +57,35 @@ pub trait PageResource<VM: VMBinding>: Sized + 'static {
         panic!("This PageResource does not implement concurrent zeroing")
     }
 
-    fn alloc_pages(&self, reserved_pages: usize, required_pages: usize, zeroed: bool, tls: OpaquePointer) -> Address;
+    fn alloc_pages(
+        &self,
+        reserved_pages: usize,
+        required_pages: usize,
+        zeroed: bool,
+        tls: OpaquePointer,
+    ) -> Address;
 
     fn adjust_for_metadata(&self, pages: usize) -> usize;
 
     /**
-    * Commit pages to the page budget.  This is called after
-    * successfully determining that the request can be satisfied by
-    * both the page budget and virtual memory.  This simply accounts
-    * for the discrepancy between <code>committed</code> and
-    * <code>reserved</code> while the request was pending.
-    *
-    * This *MUST* be called by each PageResource during the
-    * allocPages, and the caller must hold the lock.
-    */
+     * Commit pages to the page budget.  This is called after
+     * successfully determining that the request can be satisfied by
+     * both the page budget and virtual memory.  This simply accounts
+     * for the discrepancy between <code>committed</code> and
+     * <code>reserved</code> while the request was pending.
+     *
+     * This *MUST* be called by each PageResource during the
+     * allocPages, and the caller must hold the lock.
+     */
     fn commit_pages(&self, reserved_pages: usize, actual_pages: usize, tls: OpaquePointer) {
         let delta = actual_pages - reserved_pages;
         self.common().reserved.fetch_add(delta, Ordering::Relaxed);
-        self.common().committed.fetch_add(actual_pages, Ordering::Relaxed);
-        if unsafe{VM::VMActivePlan::is_mutator(tls)} {
-            self.vm_map().add_to_cumulative_committed_pages(actual_pages);
+        self.common()
+            .committed
+            .fetch_add(actual_pages, Ordering::Relaxed);
+        if unsafe { VM::VMActivePlan::is_mutator(tls) } {
+            self.vm_map()
+                .add_to_cumulative_committed_pages(actual_pages);
         }
     }
 

@@ -1,13 +1,13 @@
-use std::time::Duration;
 use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
 
 // https://github.com/rust-lang/rfcs/issues/2798#issuecomment-552949300
 pub fn panic_after<T, F>(millis: u64, f: F) -> T
-    where
-        T: Send + 'static,
-        F: FnOnce() -> T,
-        F: Send + 'static,
+where
+    T: Send + 'static,
+    F: FnOnce() -> T,
+    F: Send + 'static,
 {
     let (done_tx, done_rx) = mpsc::channel();
     let handle = thread::spawn(move || {

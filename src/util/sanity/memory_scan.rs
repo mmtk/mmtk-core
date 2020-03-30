@@ -1,13 +1,13 @@
 use crate::util::Address;
 use crate::util::ObjectReference;
 
-use crate::plan::SelectedPlan;
 use crate::plan::Plan;
+use crate::plan::SelectedPlan;
 
-use std;
 use crate::vm::VMBinding;
+use std;
 
-pub fn scan_region<VM: VMBinding>(plan: &SelectedPlan<VM>){
+pub fn scan_region<VM: VMBinding>(plan: &SelectedPlan<VM>) {
     loop {
         let mut buf = String::new();
         println!("start end <value>");
@@ -23,11 +23,11 @@ pub fn scan_region<VM: VMBinding>(plan: &SelectedPlan<VM>){
         let end = usize::from_str_radix(&end.unwrap()[2..], 16).unwrap();
 
         while start < end {
-            let slot = unsafe {Address::from_usize(start)};
-            let object: ObjectReference = unsafe {slot.load()};
+            let slot = unsafe { Address::from_usize(start) };
+            let object: ObjectReference = unsafe { slot.load() };
             if let Some(value) = value {
                 let value = usize::from_str_radix(&value[2..], 16).unwrap();
-                if object.to_address() ==  unsafe {Address::from_usize(value)} {
+                if object.to_address() == unsafe { Address::from_usize(value) } {
                     println!("{} REF: {}", slot, object);
                 }
             } else if plan.is_bad_ref(object) {

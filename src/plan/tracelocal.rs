@@ -1,5 +1,5 @@
 use crate::plan::TransitiveClosure;
-use crate::util::{ObjectReference, Address};
+use crate::util::{Address, ObjectReference};
 
 pub trait TraceLocal: TransitiveClosure {
     fn process_roots(&mut self);

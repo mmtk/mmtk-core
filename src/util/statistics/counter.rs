@@ -1,7 +1,7 @@
-use std::time::Instant;
 use crate::util::statistics::stats::SharedStats;
-use std::sync::Arc;
 use std::fmt;
+use std::sync::Arc;
+use std::time::Instant;
 
 pub trait Counter {
     fn start(&mut self);
@@ -51,7 +51,7 @@ pub struct LongCounter<T: Diffable> {
     start_value: Option<T::Val>,
     total_count: u64,
     running: bool,
-    stats: Arc<SharedStats>
+    stats: Arc<SharedStats>,
 }
 
 impl<T: Diffable> fmt::Debug for LongCounter<T> {
@@ -102,7 +102,7 @@ impl<T: Diffable> Counter for LongCounter<T> {
 
     fn print_total(&self, mutator: Option<bool>) {
         match mutator {
-            None => { self.print_value(self.total_count) },
+            None => self.print_value(self.total_count),
             Some(m) => {
                 let mut total = 0;
                 let mut p = if m { 0 } else { 1 };
@@ -159,8 +159,13 @@ impl<T: Diffable> Counter for LongCounter<T> {
     }
 }
 
-impl<T: Diffable> LongCounter<T>{
-    pub fn new(name: String, stats: Arc<SharedStats>, implicitly_start: bool, merge_phases: bool) -> Self {
+impl<T: Diffable> LongCounter<T> {
+    pub fn new(
+        name: String,
+        stats: Arc<SharedStats>,
+        implicitly_start: bool,
+        merge_phases: bool,
+    ) -> Self {
         LongCounter {
             name,
             implicitly_start,
@@ -169,7 +174,7 @@ impl<T: Diffable> LongCounter<T>{
             start_value: None,
             total_count: 0,
             running: false,
-            stats
+            stats,
         }
     }
 

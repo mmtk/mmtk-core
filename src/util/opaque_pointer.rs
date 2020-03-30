@@ -1,5 +1,5 @@
-use libc::c_void;
 use crate::util::Address;
+use libc::c_void;
 
 // This is mainly used to represent TLS.
 // OpaquePointer does not provide any method for dereferencing, as we should not dereference it in MMTk.

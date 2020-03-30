@@ -48,3 +48,5 @@ jobs:
           cargo clippy --features semispace
           cargo clippy --features nogc,sanity
           cargo clippy --features semispace,sanity
+      - name: Rustfmt
+        run: cargo fmt -- --check

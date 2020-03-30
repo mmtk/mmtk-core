@@ -15,20 +15,25 @@ extern crate libc;
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
+extern crate atomic_traits;
 extern crate crossbeam_deque;
 extern crate num_cpus;
-extern crate atomic_traits;
 
 #[macro_use]
 pub mod util;
-pub mod vm;
-mod policy;
-mod plan;
 mod mm;
 mod mmtk;
+mod plan;
+mod policy;
+pub mod vm;
 
 pub use crate::mm::memory_manager;
-pub use crate::plan::{TransitiveClosure, TraceLocal, Allocator, MutatorContext, CollectorContext, ParallelCollector, Plan};
-pub use crate::plan::selected_plan::{SelectedPlan, SelectedConstraints, SelectedMutator, SelectedTraceLocal, SelectedCollector};
 pub use crate::mmtk::MMTK;
-pub use crate::mmtk::{VM_MAP, MMAPPER};
+pub use crate::mmtk::{MMAPPER, VM_MAP};
+pub use crate::plan::selected_plan::{
+    SelectedCollector, SelectedConstraints, SelectedMutator, SelectedPlan, SelectedTraceLocal,
+};
+pub use crate::plan::{
+    Allocator, CollectorContext, MutatorContext, ParallelCollector, Plan, TraceLocal,
+    TransitiveClosure,
+};

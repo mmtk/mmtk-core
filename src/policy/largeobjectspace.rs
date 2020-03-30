@@ -1,19 +1,19 @@
 use std::cell::UnsafeCell;
 
 use crate::plan::TransitiveClosure;
+use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
-use crate::util::{Address, ObjectReference};
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
 use crate::util::header_byte;
+use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
+use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use crate::util::treadmill::TreadMill;
-use crate::vm::ObjectModel;
-use crate::util::heap::layout::heap_layout::{VMMap, Mmapper};
-use crate::util::heap::HeapMeta;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::util::OpaquePointer;
+use crate::util::{Address, ObjectReference};
+use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use crate::policy::space::SpaceOptions;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -43,7 +43,13 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
         if common_mut.vmrequest.is_discontiguous() {
             common_mut.pr = Some(FreeListPageResource::new_discontiguous(0, vm_map));
         } else {
-            common_mut.pr = Some(FreeListPageResource::new_contiguous(me, common_mut.start, common_mut.extent, 0, vm_map));
+            common_mut.pr = Some(FreeListPageResource::new_contiguous(
+                me,
+                common_mut.start,
+                common_mut.extent,
+                0,
+                vm_map,
+            ));
         }
 
         common_mut.pr.as_mut().unwrap().bind_space(me);
@@ -71,18 +77,30 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 }
 
 impl<VM: VMBinding> LargeObjectSpace<VM> {
-    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
+    pub fn new(
+        name: &'static str,
+        zeroed: bool,
+        vmrequest: VMRequest,
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        heap: &mut HeapMeta,
+    ) -> Self {
         LargeObjectSpace {
-            common: UnsafeCell::new(CommonSpace::new(SpaceOptions {
-                name,
-                movable: false,
-                immortal: false,
-                zeroed,
-                vmrequest,
-            }, vm_map, mmapper, heap)),
+            common: UnsafeCell::new(CommonSpace::new(
+                SpaceOptions {
+                    name,
+                    movable: false,
+                    immortal: false,
+                    zeroed,
+                    vmrequest,
+                },
+                vm_map,
+                mmapper,
+                heap,
+            )),
             mark_state: 0,
             in_nursery_gc: false,
-            treadmill: TreadMill::new()
+            treadmill: TreadMill::new(),
         }
     }
 
@@ -110,12 +128,20 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
-                (unsafe { &mut *self.common.get() }).pr.as_mut().unwrap().release_pages(get_super_page(cell));
+                (unsafe { &mut *self.common.get() })
+                    .pr
+                    .as_mut()
+                    .unwrap()
+                    .release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
-                (unsafe { &mut *self.common.get() }).pr.as_mut().unwrap().release_pages(get_super_page(cell));
+                (unsafe { &mut *self.common.get() })
+                    .pr
+                    .as_mut()
+                    .unwrap()
+                    .release_pages(get_super_page(cell));
             }
         }
     }
@@ -132,7 +158,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects
             if self.test_and_mark(object, self.mark_state) {
-                let cell = VM::VMObjectModel::object_start_ref(object) - if USE_PRECEEDING_GC_HEADER { PRECEEDING_GC_HEADER_BYTES } else { 0 };
+                let cell = VM::VMObjectModel::object_start_ref(object)
+                    - if USE_PRECEEDING_GC_HEADER {
+                        PRECEEDING_GC_HEADER_BYTES
+                    } else {
+                        0
+                    };
                 self.treadmill.copy(cell, nursery_object);
                 trace.process_node(object);
             }
@@ -147,7 +178,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             new_value |= NURSERY_BIT;
         }
         Self::write_gc_word(object, new_value);
-        let cell = VM::VMObjectModel::object_start_ref(object) - if USE_PRECEEDING_GC_HEADER { PRECEEDING_GC_HEADER_BYTES } else { 0 };
+        let cell = VM::VMObjectModel::object_start_ref(object)
+            - if USE_PRECEEDING_GC_HEADER {
+                PRECEEDING_GC_HEADER_BYTES
+            } else {
+                0
+            };
         self.treadmill.add_to_treadmill(cell, alloc);
         if header_byte::NEEDS_UNLOGGED_BIT {
             let b = VM::VMObjectModel::read_available_byte(object);
@@ -181,7 +217,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         while !Self::attempt_gc_word(
             object,
             old_value,
-            old_value & (!LOS_BIT_MASK as usize) | value as usize) {
+            old_value & (!LOS_BIT_MASK as usize) | value as usize,
+        ) {
             old_value = Self::read_gc_word(object);
             mark_bit = old_value & mask;
             if mark_bit == value {
@@ -201,7 +238,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     fn read_gc_word(o: ObjectReference) -> usize {
         if USE_PRECEEDING_GC_HEADER {
-            unsafe { (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES).load::<usize>() }
+            unsafe {
+                (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
+                    .load::<usize>()
+            }
         } else {
             VM::VMObjectModel::read_available_bits_word(o)
         }
@@ -209,7 +249,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     fn write_gc_word(o: ObjectReference, value: usize) {
         if USE_PRECEEDING_GC_HEADER {
-            unsafe { (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES).store::<usize>(value) };
+            unsafe {
+                (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
+                    .store::<usize>(value)
+            };
         } else {
             VM::VMObjectModel::write_available_bits_word(o, value);
         }
@@ -218,7 +261,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     fn attempt_gc_word(o: ObjectReference, old: usize, new: usize) -> bool {
         if USE_PRECEEDING_GC_HEADER {
             unsafe {
-                (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES).compare_exchange::<AtomicUsize>(old, new, Ordering::SeqCst, Ordering::SeqCst).is_ok()
+                (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
+                    .compare_exchange::<AtomicUsize>(old, new, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
             }
         } else {
             VM::VMObjectModel::attempt_available_bits(o, old, new)

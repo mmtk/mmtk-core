@@ -1,6 +1,6 @@
-use crate::util::Address;
-use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::constants::*;
+use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::Address;
 
 /* Alignment */
 
@@ -55,10 +55,14 @@ pub fn bytes_to_pages(bytes: usize) -> usize {
     if cfg!(debug = "true") {
         let computed_extent = pages << LOG_BYTES_IN_PAGE;
         let bytes_match_pages = computed_extent == bytes;
-        assert!(bytes_match_pages, "ERROR: number of bytes computed from pages must match original byte amount!\
-                                           bytes = {}\
-                                           pages = {}\
-                                           bytes computed from pages = {}", bytes, pages, computed_extent);
+        assert!(
+            bytes_match_pages,
+            "ERROR: number of bytes computed from pages must match original byte amount!\
+             bytes = {}\
+             pages = {}\
+             bytes computed from pages = {}",
+            bytes, pages, computed_extent
+        );
     }
 
     pages
@@ -66,13 +70,15 @@ pub fn bytes_to_pages(bytes: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::Address;
     use crate::util::conversions::*;
+    use crate::util::Address;
 
     #[test]
     fn test_page_align() {
         let addr = unsafe { Address::from_usize(0x123456789) };
-        assert_eq!(page_align_down(addr), unsafe { Address::from_usize(0x123456000) });
+        assert_eq!(page_align_down(addr), unsafe {
+            Address::from_usize(0x123456000)
+        });
         assert!(!is_page_aligned(addr));
         assert!(is_page_aligned(page_align_down(addr)));
     }
@@ -80,7 +86,11 @@ mod tests {
     #[test]
     fn test_chunk_align() {
         let addr = unsafe { Address::from_usize(0x123456789) };
-        assert_eq!(chunk_align_down(addr),  unsafe { Address::from_usize(0x123400000) });
-        assert_eq!(chunk_align_up(addr), unsafe { Address::from_usize(0x123800000) });
+        assert_eq!(chunk_align_down(addr), unsafe {
+            Address::from_usize(0x123400000)
+        });
+        assert_eq!(chunk_align_up(addr), unsafe {
+            Address::from_usize(0x123800000)
+        });
     }
 }

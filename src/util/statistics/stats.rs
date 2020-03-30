@@ -1,8 +1,8 @@
-use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
-use std::sync::Mutex;
-use crate::util::statistics::Timer;
 use crate::util::statistics::counter::{Counter, LongCounter};
+use crate::util::statistics::Timer;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex;
 
 pub const MAX_PHASES: usize = 1 << 12;
 pub const MAX_COUNTERS: usize = 100;
@@ -46,7 +46,12 @@ impl Stats {
             phase: AtomicUsize::new(0),
             gathering_stats: AtomicBool::new(false),
         });
-        let t = Arc::new(Mutex::new(LongCounter::new("time".to_string(), shared.clone(), true, false)));
+        let t = Arc::new(Mutex::new(LongCounter::new(
+            "time".to_string(),
+            shared.clone(),
+            true,
+            false,
+        )));
         Stats {
             gc_count: AtomicUsize::new(0),
             total_time: t.clone(),
@@ -57,9 +62,19 @@ impl Stats {
         }
     }
 
-    pub fn new_timer(&self, name: &str, implicit_start: bool, merge_phases: bool) -> Arc<Mutex<Timer>> {
+    pub fn new_timer(
+        &self,
+        name: &str,
+        implicit_start: bool,
+        merge_phases: bool,
+    ) -> Arc<Mutex<Timer>> {
         let mut guard = self.counters.lock().unwrap();
-        let counter = Arc::new(Mutex::new(Timer::new(name.to_string(), self.shared.clone(), implicit_start, merge_phases)));
+        let counter = Arc::new(Mutex::new(Timer::new(
+            name.to_string(),
+            self.shared.clone(),
+            implicit_start,
+            merge_phases,
+        )));
         guard.push(counter.clone());
         counter
     }
@@ -70,7 +85,10 @@ impl Stats {
             return;
         }
         if self.get_phase() < MAX_PHASES - 1 {
-            self.total_time.lock().unwrap().phase_change(self.get_phase());
+            self.total_time
+                .lock()
+                .unwrap()
+                .phase_change(self.get_phase());
             self.shared.increment_phase();
         } else if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
             println!("Warning: number of GC phases exceeds MAX_PHASES");
@@ -83,7 +101,10 @@ impl Stats {
             return;
         }
         if self.get_phase() < MAX_PHASES - 1 {
-            self.total_time.lock().unwrap().phase_change(self.get_phase());
+            self.total_time
+                .lock()
+                .unwrap()
+                .phase_change(self.get_phase());
             self.shared.increment_phase();
         } else if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
             println!("Warning: number of GC phases exceeds MAX_PHASES");
@@ -92,7 +113,9 @@ impl Stats {
     }
 
     pub fn print_stats(&self) {
-        println!("============================ MMTk Statistics Totals ============================");
+        println!(
+            "============================ MMTk Statistics Totals ============================"
+        );
         self.print_column_names();
         print!("{}\t", self.get_phase() / 2);
         let counter = self.counters.lock().unwrap();

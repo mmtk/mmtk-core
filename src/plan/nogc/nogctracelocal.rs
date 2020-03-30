@@ -1,11 +1,11 @@
+use crate::plan::tracelocal::TraceLocal;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::util::address::{Address, ObjectReference};
-use crate::plan::tracelocal::TraceLocal;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
 pub struct NoGCTraceLocal<VM: VMBinding> {
-    p: PhantomData<VM>
+    p: PhantomData<VM>,
 }
 
 impl<VM: VMBinding> TransitiveClosure for NoGCTraceLocal<VM> {
@@ -57,9 +57,7 @@ impl<VM: VMBinding> TraceLocal for NoGCTraceLocal<VM> {
 
 impl<VM: VMBinding> NoGCTraceLocal<VM> {
     pub fn new() -> Self {
-        Self {
-            p: PhantomData
-        }
+        Self { p: PhantomData }
     }
 }
 

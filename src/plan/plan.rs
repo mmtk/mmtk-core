@@ -1,33 +1,46 @@
-use crate::util::ObjectReference;
+use super::controller_collector_context::ControllerCollectorContext;
 use super::{MutatorContext, ParallelCollector, TraceLocal};
 use crate::plan::phase::Phase;
-use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
-use crate::util::OpaquePointer;
-use crate::policy::space::Space;
-use crate::util::heap::PageResource;
-use crate::vm::{Collection, ObjectModel};
-use super::controller_collector_context::ControllerCollectorContext;
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::constants::LOG_BYTES_IN_MBYTE;
-use crate::util::heap::{VMRequest, HeapMeta};
 use crate::policy::immortalspace::ImmortalSpace;
-use crate::util::{Address, conversions};
-use crate::util::statistics::stats::Stats;
-use crate::util::heap::layout::heap_layout::VMMap;
+use crate::policy::space::Space;
+use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::layout::Mmapper as IMmapper;
+use crate::util::heap::PageResource;
+use crate::util::heap::{HeapMeta, VMRequest};
 use crate::util::options::{Options, UnsafeOptionsWrapper};
-use std::sync::{Arc, Mutex};
+use crate::util::statistics::stats::Stats;
+use crate::util::ObjectReference;
+use crate::util::OpaquePointer;
+use crate::util::{conversions, Address};
 use crate::vm::VMBinding;
+use crate::vm::{Collection, ObjectModel};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 // FIXME: Move somewhere more appropriate
-pub fn create_vm_space<VM: VMBinding>(vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta, boot_segment_bytes: usize) -> ImmortalSpace<VM> {
-//    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
+pub fn create_vm_space<VM: VMBinding>(
+    vm_map: &'static VMMap,
+    mmapper: &'static Mmapper,
+    heap: &mut HeapMeta,
+    boot_segment_bytes: usize,
+) -> ImmortalSpace<VM> {
+    //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
 
-    let boot_segment_mb = conversions::raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
+    let boot_segment_mb =
+        conversions::raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
 
-    ImmortalSpace::new("boot", false, VMRequest::fixed_size(boot_segment_mb), vm_map, mmapper, heap)
+    ImmortalSpace::new(
+        "boot",
+        false,
+        VMRequest::fixed_size(boot_segment_mb),
+        vm_map,
+        mmapper,
+        heap,
+    )
 }
 
 pub trait Plan<VM: VMBinding>: Sized {
@@ -35,7 +48,11 @@ pub trait Plan<VM: VMBinding>: Sized {
     type TraceLocalT: TraceLocal;
     type CollectorT: ParallelCollector<VM>;
 
-    fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>) -> Self;
+    fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+    ) -> Self;
     fn common(&self) -> &CommonPlan<VM>;
     fn mmapper(&self) -> &'static Mmapper {
         self.common().mmapper
@@ -99,10 +116,20 @@ pub trait Plan<VM: VMBinding>: Sized {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required<PR: PageResource<VM>>(&self, space_full: bool, _space: &'static PR::Space) -> bool where Self: Sized {
+    fn collection_required<PR: PageResource<VM>>(
+        &self,
+        space_full: bool,
+        _space: &'static PR::Space,
+    ) -> bool
+    where
+        Self: Sized,
+    {
         let stress_force_gc = self.stress_test_gc_required();
-        trace!("self.get_pages_reserved()={}, self.get_total_pages()={}",
-               self.get_pages_reserved(), self.get_total_pages());
+        trace!(
+            "self.get_pages_reserved()={}, self.get_total_pages()={}",
+            self.get_pages_reserved(),
+            self.get_total_pages()
+        );
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
 
         space_full || stress_force_gc || heap_full
@@ -130,7 +157,9 @@ pub trait Plan<VM: VMBinding>: Sized {
         self.common().emergency_collection.load(Ordering::Relaxed)
     }
 
-    fn get_free_pages(&self) -> usize { self.get_total_pages() - self.get_pages_used() }
+    fn get_free_pages(&self) -> usize {
+        self.get_total_pages() - self.get_pages_used()
+    }
 
     #[inline]
     fn stress_test_gc_required(&self) -> bool {
@@ -139,9 +168,11 @@ pub trait Plan<VM: VMBinding>: Sized {
 
         if self.is_initialized()
             && (pages ^ self.common().last_stress_pages.load(Ordering::Relaxed)
-            > self.options().stress_factor) {
-
-            self.common().last_stress_pages.store(pages, Ordering::Relaxed);
+                > self.options().stress_factor)
+        {
+            self.common()
+                .last_stress_pages
+                .store(pages, Ordering::Relaxed);
             trace!("Doing stress GC");
             true
         } else {
@@ -158,9 +189,7 @@ pub trait Plan<VM: VMBinding>: Sized {
         true
     }
 
-    fn force_full_heap_collection(&self) {
-
-    }
+    fn force_full_heap_collection(&self) {}
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool;
 
@@ -168,29 +197,43 @@ pub trait Plan<VM: VMBinding>: Sized {
 
     fn handle_user_collection_request(&self, tls: OpaquePointer, force: bool) {
         if force || !self.options().ignore_system_g_c {
-            self.common().user_triggered_collection.store(true, Ordering::Relaxed);
+            self.common()
+                .user_triggered_collection
+                .store(true, Ordering::Relaxed);
             self.common().control_collector_context.request();
             VM::VMCollection::block_for_gc(tls);
         }
     }
 
     fn is_user_triggered_collection(&self) -> bool {
-        self.common().user_triggered_collection.load(Ordering::Relaxed)
+        self.common()
+            .user_triggered_collection
+            .load(Ordering::Relaxed)
     }
 
     fn reset_collection_trigger(&self) {
-        self.common().user_triggered_collection.store(false, Ordering::Relaxed)
+        self.common()
+            .user_triggered_collection
+            .store(false, Ordering::Relaxed)
     }
 
     fn determine_collection_attempts(&self) -> usize {
         if !self.common().allocation_success.load(Ordering::Relaxed) {
-            self.common().max_collection_attempts.fetch_add(1, Ordering::Relaxed);
+            self.common()
+                .max_collection_attempts
+                .fetch_add(1, Ordering::Relaxed);
         } else {
-            self.common().allocation_success.store(false, Ordering::Relaxed);
-            self.common().max_collection_attempts.store(1, Ordering::Relaxed);
+            self.common()
+                .allocation_success
+                .store(false, Ordering::Relaxed);
+            self.common()
+                .max_collection_attempts
+                .store(1, Ordering::Relaxed);
         }
 
-        self.common().max_collection_attempts.load(Ordering::Relaxed)
+        self.common()
+            .max_collection_attempts
+            .load(Ordering::Relaxed)
     }
 
     fn is_mapped_object(&self, object: ObjectReference) -> bool {
@@ -200,7 +243,10 @@ pub trait Plan<VM: VMBinding>: Sized {
         if !self.is_valid_ref(object) {
             return false;
         }
-        if !self.mmapper().address_is_mapped(VM::VMObjectModel::ref_to_address(object)) {
+        if !self
+            .mmapper()
+            .address_is_mapped(VM::VMObjectModel::ref_to_address(object))
+        {
             return false;
         }
         true
@@ -210,7 +256,10 @@ pub trait Plan<VM: VMBinding>: Sized {
 
     fn modify_check(&self, object: ObjectReference) {
         if self.common().gc_in_progress_proper() && self.is_movable(object) {
-            panic!("GC modifying a potentially moving object via Java (i.e. not magic) obj= {}", object);
+            panic!(
+                "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
+                object
+            );
         }
     }
 
@@ -253,9 +302,17 @@ pub struct CommonPlan<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> CommonPlan<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>, heap: HeapMeta) -> CommonPlan<VM> {
+    pub fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+        heap: HeapMeta,
+    ) -> CommonPlan<VM> {
         CommonPlan {
-            vm_map, mmapper, options, heap,
+            vm_map,
+            mmapper,
+            options,
+            heap,
             stats: Stats::new(),
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),

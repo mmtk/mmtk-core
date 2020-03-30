@@ -1,7 +1,7 @@
+use super::{BUFFER_SIZE, TRACE_QUEUE};
 use crate::util::queue::SharedQueue;
 use std::fmt::Debug;
 use std::mem;
-use super::{BUFFER_SIZE, TRACE_QUEUE};
 
 pub struct LocalQueue<'a, T: 'a> {
     queue: &'a SharedQueue<T>,
@@ -9,7 +9,10 @@ pub struct LocalQueue<'a, T: 'a> {
     id: usize,
 }
 
-impl<'a, T> LocalQueue<'a, T> where T: Debug {
+impl<'a, T> LocalQueue<'a, T>
+where
+    T: Debug,
+{
     pub fn new(id: usize, queue: &'a SharedQueue<T>) -> Self {
         LocalQueue {
             queue,
@@ -45,7 +48,7 @@ impl<'a, T> LocalQueue<'a, T> where T: Debug {
                     self.buffer = b;
                     self.dequeue()
                 }
-                None => None
+                None => None,
             }
         }
     }
@@ -58,7 +61,6 @@ impl<'a, T> LocalQueue<'a, T> where T: Debug {
         self.buffer.clear();
     }
 }
-
 
 #[cfg(test)]
 mod tests {

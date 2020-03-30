@@ -1,2 +1,2 @@
-pub mod sanity_checker;
 pub mod memory_scan;
+pub mod sanity_checker;

@@ -1,5 +1,5 @@
-use super::ParallelCollectorGroup;
 use super::CollectorContext;
+use super::ParallelCollectorGroup;
 use super::TraceLocal;
 use crate::vm::VMBinding;
 

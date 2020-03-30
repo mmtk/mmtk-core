@@ -1,6 +1,6 @@
-use crate::util::Address;
-use crate::util::constants::*;
 use super::layout::vm_layout_constants::*;
+use crate::util::constants::*;
+use crate::util::Address;
 
 ////////// FIXME //////////////
 #[cfg(target_pointer_width = "32")]
@@ -30,7 +30,7 @@ pub enum VMRequest {
 impl VMRequest {
     pub fn is_discontiguous(&self) -> bool {
         match self {
-            VMRequest::RequestDiscontiguous{..} => true,
+            VMRequest::RequestDiscontiguous { .. } => true,
             _ => false,
         }
     }
@@ -54,10 +54,7 @@ impl VMRequest {
     }
 
     pub fn fraction(frac: f32) -> Self {
-        VMRequest::RequestFraction {
-            frac,
-            top: false,
-        }
+        VMRequest::RequestFraction { frac, top: false }
     }
 
     pub fn high_fixed_size(mb: usize) -> Self {
@@ -68,10 +65,6 @@ impl VMRequest {
     }
 
     pub fn fixed_extent(extent: usize, top: bool) -> Self {
-        VMRequest::RequestExtent {
-            extent,
-            top,
-        }
+        VMRequest::RequestExtent { extent, top }
     }
 }
-

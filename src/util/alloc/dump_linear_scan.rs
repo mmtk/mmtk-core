@@ -8,9 +8,10 @@ pub struct DumpLinearScan {}
 
 impl LinearScan for DumpLinearScan {
     fn scan<VM: VMBinding>(&self, object: ObjectReference) {
-        println!("[{}], SIZE = {}",
-                 object.to_address(),
-                 VM::VMObjectModel::get_current_size(object)
+        println!(
+            "[{}], SIZE = {}",
+            object.to_address(),
+            VM::VMObjectModel::get_current_size(object)
         );
     }
 }

@@ -1,36 +1,36 @@
 use crate::policy::space::Space;
 
+use super::SSCollector;
 use super::SSMutator;
 use super::SSTraceLocal;
-use super::SSCollector;
 
 use crate::plan::plan;
-use crate::plan::Plan;
+use crate::plan::trace::Trace;
 use crate::plan::Allocator;
+use crate::plan::Phase;
+use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
-use crate::plan::Phase;
-use crate::plan::trace::Trace;
-use crate::util::ObjectReference;
 use crate::util::heap::layout::Mmapper as IMmapper;
-use crate::util::Address;
 use crate::util::heap::VMRequest;
+use crate::util::Address;
+use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, Ordering};
 
-use crate::vm::Scanning;
-use crate::util::conversions::bytes_to_pages;
 use crate::plan::plan::{create_vm_space, CommonPlan};
-use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::options::UnsafeOptionsWrapper;
-use std::sync::Arc;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_START, HEAP_END};
+use crate::util::options::UnsafeOptionsWrapper;
+use crate::vm::Scanning;
 use crate::vm::VMBinding;
+use std::sync::Arc;
 
 pub type SelectedPlan<VM> = SemiSpace<VM>;
 
@@ -59,24 +59,60 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
     type TraceLocalT = SSTraceLocal<VM>;
     type CollectorT = SSCollector<VM>;
 
-    fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<UnsafeOptionsWrapper>) -> Self {
+    fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+    ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         SemiSpace {
             unsync: UnsafeCell::new(SemiSpaceUnsync {
                 hi: false,
                 vm_space: if options.vm_space {
-                    Some(create_vm_space(vm_map, mmapper, &mut heap, options.vm_space_size))
+                    Some(create_vm_space(
+                        vm_map,
+                        mmapper,
+                        &mut heap,
+                        options.vm_space_size,
+                    ))
                 } else {
                     None
                 },
-                copyspace0: CopySpace::new("copyspace0", false, true,
-                                           VMRequest::discontiguous(), vm_map, mmapper, &mut heap),
-                copyspace1: CopySpace::new("copyspace1", true, true,
-                                           VMRequest::discontiguous(), vm_map, mmapper, &mut heap),
-                versatile_space: ImmortalSpace::new("versatile_space", true,
-                                                    VMRequest::discontiguous(), vm_map, mmapper, &mut heap),
-                los: LargeObjectSpace::new("los", true, VMRequest::discontiguous(), vm_map, mmapper, &mut heap),
+                copyspace0: CopySpace::new(
+                    "copyspace0",
+                    false,
+                    true,
+                    VMRequest::discontiguous(),
+                    vm_map,
+                    mmapper,
+                    &mut heap,
+                ),
+                copyspace1: CopySpace::new(
+                    "copyspace1",
+                    true,
+                    true,
+                    VMRequest::discontiguous(),
+                    vm_map,
+                    mmapper,
+                    &mut heap,
+                ),
+                versatile_space: ImmortalSpace::new(
+                    "versatile_space",
+                    true,
+                    VMRequest::discontiguous(),
+                    vm_map,
+                    mmapper,
+                    &mut heap,
+                ),
+                los: LargeObjectSpace::new(
+                    "los",
+                    true,
+                    VMRequest::discontiguous(),
+                    vm_map,
+                    mmapper,
+                    &mut heap,
+                ),
             }),
             ss_trace: Trace::new(),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
@@ -84,10 +120,16 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
     }
 
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
-        vm_map.finalize_static_space_map(self.common.heap.get_discontig_start(), self.common.heap.get_discontig_end());
+        vm_map.finalize_static_space_map(
+            self.common.heap.get_discontig_start(),
+            self.common.heap.get_discontig_end(),
+        );
 
         let unsync = unsafe { &mut *self.unsync.get() };
-        self.common.heap.total_pages.store(bytes_to_pages(heap_size), Ordering::Relaxed);
+        self.common
+            .heap
+            .total_pages
+            .store(bytes_to_pages(heap_size), Ordering::Relaxed);
         if unsync.vm_space.is_some() {
             unsync.vm_space.as_mut().unwrap().init(vm_map);
         }
@@ -142,15 +184,21 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
 
         match phase {
             Phase::SetCollectionKind => {
-                self.common.cur_collection_attempts.store(if self.is_user_triggered_collection() {
-                    1
-                } else {
-                    self.determine_collection_attempts()
-                }, Ordering::Relaxed);
+                self.common.cur_collection_attempts.store(
+                    if self.is_user_triggered_collection() {
+                        1
+                    } else {
+                        self.determine_collection_attempts()
+                    },
+                    Ordering::Relaxed,
+                );
 
                 let emergency_collection = !self.is_internal_triggered_collection()
-                    && self.last_collection_was_exhaustive() && self.common.cur_collection_attempts.load(Ordering::Relaxed) > 1;
-                self.common().emergency_collection.store(emergency_collection, Ordering::Relaxed);
+                    && self.last_collection_was_exhaustive()
+                    && self.common.cur_collection_attempts.load(Ordering::Relaxed) > 1;
+                self.common()
+                    .emergency_collection
+                    .store(emergency_collection, Ordering::Relaxed);
 
                 if emergency_collection {
                     self.force_full_heap_collection();
@@ -160,7 +208,9 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 self.common.set_gc_status(plan::GcStatus::GcPrepare);
             }
             Phase::PrepareStacks => {
-                self.common.stacks_prepared.store(true, atomic::Ordering::SeqCst);
+                self.common
+                    .stacks_prepared
+                    .store(true, atomic::Ordering::SeqCst);
             }
             Phase::Prepare => {
                 #[cfg(feature = "sanity")]
@@ -177,7 +227,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 }
 
                 unsync.hi = !unsync.hi; // flip the semi-spaces
-                // prepare each of the collected regions
+                                        // prepare each of the collected regions
                 unsync.copyspace0.prepare(unsync.hi);
                 unsync.copyspace1.prepare(!unsync.hi);
                 unsync.versatile_space.prepare();
@@ -199,13 +249,25 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 #[cfg(feature = "sanity")]
                 {
                     use crate::util::constants::LOG_BYTES_IN_PAGE;
-                    use libc::memset;
                     use crate::util::heap::PageResource;
+                    use libc::memset;
                     if self.fromspace().common().contiguous {
                         let fromspace_start = self.fromspace().common().start;
-                        let fromspace_commited = self.fromspace().common().pr.as_ref().unwrap().common().committed.load(Ordering::Relaxed);
+                        let fromspace_commited = self
+                            .fromspace()
+                            .common()
+                            .pr
+                            .as_ref()
+                            .unwrap()
+                            .common()
+                            .committed
+                            .load(Ordering::Relaxed);
                         let commited_bytes = fromspace_commited * (1 << LOG_BYTES_IN_PAGE);
-                        println!("Destroying fromspace {}~{}", fromspace_start, fromspace_start + commited_bytes);
+                        println!(
+                            "Destroying fromspace {}~{}",
+                            fromspace_start,
+                            fromspace_start + commited_bytes
+                        );
                         memset(fromspace_start.to_mut_ptr(), 0xFF, commited_bytes);
                     } else {
                         println!("Fromspace is discontiguous, not destroying")
@@ -226,8 +288,8 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
             Phase::Complete => {
                 #[cfg(feature = "sanity")]
                 {
-                    use crate::util::sanity::sanity_checker::SanityChecker;
                     use crate::util::sanity::memory_scan;
+                    use crate::util::sanity::sanity_checker::SanityChecker;
                     println!("Post GC sanity check");
                     SanityChecker::new(tls, &self).check();
                     println!("Post GC memory scan");
@@ -243,9 +305,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
 
                 self.common.set_gc_status(plan::GcStatus::NotInGC);
             }
-            _ => {
-                panic!("Global phase not handled!")
-            }
+            _ => panic!("Global phase not handled!"),
         }
     }
 
@@ -254,8 +314,10 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        let unsync = unsafe{&*self.unsync.get()};
-        self.tospace().reserved_pages() + unsync.versatile_space.reserved_pages() + unsync.los.reserved_pages()
+        let unsync = unsafe { &*self.unsync.get() };
+        self.tospace().reserved_pages()
+            + unsync.versatile_space.reserved_pages()
+            + unsync.los.reserved_pages()
     }
 
     fn is_bad_ref(&self, object: ObjectReference) -> bool {
@@ -284,12 +346,19 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
 
     fn is_mapped_address(&self, address: Address) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
-        if unsafe{
-            (unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(address.to_object_reference()))  ||
-            unsync.versatile_space.in_space(address.to_object_reference()) ||
-            unsync.copyspace0.in_space(address.to_object_reference()) ||
-            unsync.copyspace1.in_space(address.to_object_reference()) ||
-            unsync.los.in_space(address.to_object_reference())
+        if unsafe {
+            (unsync.vm_space.is_some()
+                && unsync
+                    .vm_space
+                    .as_ref()
+                    .unwrap()
+                    .in_space(address.to_object_reference()))
+                || unsync
+                    .versatile_space
+                    .in_space(address.to_object_reference())
+                || unsync.copyspace0.in_space(address.to_object_reference())
+                || unsync.copyspace1.in_space(address.to_object_reference())
+                || unsync.los.in_space(address.to_object_reference())
         } {
             self.common.mmapper.address_is_mapped(address)
         } else {
