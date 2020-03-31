@@ -1,9 +1,9 @@
+use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
-use crate::util::Address;
 use crate::util::alloc::{allocator, Allocator};
 use crate::util::heap::FreeListPageResource;
+use crate::util::Address;
 use crate::util::OpaquePointer;
-use crate::plan::selected_plan::SelectedPlan;
 use crate::vm::VMBinding;
 
 #[repr(C)]
@@ -13,7 +13,9 @@ pub struct LargeObjectAllocator<VM: VMBinding> {
     plan: &'static SelectedPlan<VM>,
 }
 
-impl<VM: VMBinding> Allocator<VM, FreeListPageResource<VM, LargeObjectSpace<VM>>> for LargeObjectAllocator<VM> {
+impl<VM: VMBinding> Allocator<VM, FreeListPageResource<VM, LargeObjectSpace<VM>>>
+    for LargeObjectAllocator<VM>
+{
     fn get_tls(&self) -> OpaquePointer {
         self.tls
     }
@@ -36,7 +38,8 @@ impl<VM: VMBinding> Allocator<VM, FreeListPageResource<VM, LargeObjectSpace<VM>>
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: isize) -> Address {
         let header = 0; // HashSet is used instead of DoublyLinkedList
-        let maxbytes = allocator::get_maximum_aligned_size(size + header, align, allocator::MIN_ALIGNMENT);
+        let maxbytes =
+            allocator::get_maximum_aligned_size(size + header, align, allocator::MIN_ALIGNMENT);
         let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
         let sp = self.space.unwrap().allocate_pages(self.tls, pages);
         if sp.is_zero() {
@@ -48,10 +51,11 @@ impl<VM: VMBinding> Allocator<VM, FreeListPageResource<VM, LargeObjectSpace<VM>>
 }
 
 impl<VM: VMBinding> LargeObjectAllocator<VM> {
-    pub fn new(tls: OpaquePointer, space: Option<&'static LargeObjectSpace<VM>>, plan: &'static SelectedPlan<VM>) -> Self {
-        LargeObjectAllocator {
-            tls,
-            space, plan,
-        }
+    pub fn new(
+        tls: OpaquePointer,
+        space: Option<&'static LargeObjectSpace<VM>>,
+        plan: &'static SelectedPlan<VM>,
+    ) -> Self {
+        LargeObjectAllocator { tls, space, plan }
     }
 }

@@ -1,12 +1,12 @@
-use std::sync::Mutex;
 use std::cell::UnsafeCell;
+use std::sync::Mutex;
 use std::vec::Vec;
 
+use crate::plan::{MutatorContext, TraceLocal};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
-use crate::vm::{ActivePlan, ReferenceGlue};
-use crate::plan::{TraceLocal, MutatorContext};
 use crate::vm::VMBinding;
+use crate::vm::{ActivePlan, ReferenceGlue};
 
 pub struct ReferenceProcessors {
     soft: ReferenceProcessor,
@@ -31,15 +31,27 @@ impl ReferenceProcessors {
         }
     }
 
-    pub fn add_soft_candidate<VM: VMBinding>(&self, reff: ObjectReference, referent: ObjectReference) {
+    pub fn add_soft_candidate<VM: VMBinding>(
+        &self,
+        reff: ObjectReference,
+        referent: ObjectReference,
+    ) {
         self.soft.add_candidate::<VM>(reff, referent);
     }
 
-    pub fn add_weak_candidate<VM: VMBinding>(&self, reff: ObjectReference, referent: ObjectReference) {
+    pub fn add_weak_candidate<VM: VMBinding>(
+        &self,
+        reff: ObjectReference,
+        referent: ObjectReference,
+    ) {
         self.weak.add_candidate::<VM>(reff, referent);
     }
 
-    pub fn add_phantom_candidate<VM: VMBinding>(&self, reff: ObjectReference, referent: ObjectReference) {
+    pub fn add_phantom_candidate<VM: VMBinding>(
+        &self,
+        reff: ObjectReference,
+        referent: ObjectReference,
+    ) {
         self.phantom.add_candidate::<VM>(reff, referent);
     }
 
@@ -58,7 +70,11 @@ impl ReferenceProcessors {
         self.soft.scan::<VM, T>(trace, false, false, tls);
     }
 
-    pub fn scan_phantom_refs<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, tls: OpaquePointer) {
+    pub fn scan_phantom_refs<VM: VMBinding, T: TraceLocal>(
+        &self,
+        trace: &mut T,
+        tls: OpaquePointer,
+    ) {
         self.phantom.scan::<VM, T>(trace, false, false, tls);
     }
 }
@@ -141,9 +157,7 @@ impl ReferenceProcessor {
     }
 
     fn sync(&self) -> &Mutex<ReferenceProcessorSync> {
-        unsafe {
-            &*self.sync.get()
-        }
+        unsafe { &*self.sync.get() }
     }
 
     // UNSAFE: Bypasses mutex
@@ -166,42 +180,68 @@ impl ReferenceProcessor {
         // XXX: Copies `unforwarded_references` out. Should be fine since it's not accessed
         //      concurrently & it's set to `None` at the end anyway..
         let mut unforwarded_references: Vec<Address> = sync.unforwarded_references.clone().unwrap();
-        if TRACE { trace!("Starting ReferenceProcessor.forward({:?})", self.semantics); }
+        if TRACE {
+            trace!("Starting ReferenceProcessor.forward({:?})", self.semantics);
+        }
         if TRACE_DETAIL {
             trace!("{:?} Reference table is {:?}", self.semantics, references);
-            trace!("{:?} unforwardedReferences is {:?}", self.semantics, unforwarded_references);
+            trace!(
+                "{:?} unforwardedReferences is {:?}",
+                self.semantics,
+                unforwarded_references
+            );
         }
 
-        for (i, unforwarded_ref) in  unforwarded_references.iter_mut().enumerate().take(references.len()) {
+        for (i, unforwarded_ref) in unforwarded_references
+            .iter_mut()
+            .enumerate()
+            .take(references.len())
+        {
             let reference = unsafe { unforwarded_ref.to_object_reference() };
-            if TRACE_DETAIL { trace!("slot {:?}: forwarding {:?}", i, reference); }
-            VM::VMReferenceGlue::set_referent(reference, trace.get_forwarded_referent(
-                VM::VMReferenceGlue::get_referent(reference)));
+            if TRACE_DETAIL {
+                trace!("slot {:?}: forwarding {:?}", i, reference);
+            }
+            VM::VMReferenceGlue::set_referent(
+                reference,
+                trace.get_forwarded_referent(VM::VMReferenceGlue::get_referent(reference)),
+            );
             let new_reference = trace.get_forwarded_reference(reference);
             *unforwarded_ref = new_reference.to_address();
         }
 
-        if TRACE { trace!("Ending ReferenceProcessor.forward({:?})", self.semantics) }
+        if TRACE {
+            trace!("Ending ReferenceProcessor.forward({:?})", self.semantics)
+        }
         sync.unforwarded_references = None;
     }
 
-    fn scan<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, nursery: bool, retain: bool, tls: OpaquePointer) {
+    fn scan<VM: VMBinding, T: TraceLocal>(
+        &self,
+        trace: &mut T,
+        nursery: bool,
+        retain: bool,
+        tls: OpaquePointer,
+    ) {
         let sync = unsafe { self.sync_mut() };
         sync.unforwarded_references = Some(sync.references.clone());
         let references: &mut Vec<Address> = &mut sync.references;
 
-        if TRACE { trace!("Starting ReferenceProcessor.scan({:?})", self.semantics); }
+        if TRACE {
+            trace!("Starting ReferenceProcessor.scan({:?})", self.semantics);
+        }
         let mut to_index = if nursery { sync.nursery_index } else { 0 };
         let from_index = to_index;
 
-        if TRACE_DETAIL { trace!("{:?} Reference table is {:?}", self.semantics, references); }
+        if TRACE_DETAIL {
+            trace!("{:?} Reference table is {:?}", self.semantics, references);
+        }
         if retain {
             for addr in references.iter().skip(from_index) {
                 let reference = unsafe { addr.to_object_reference() };
                 self.retain_referent::<VM, T>(trace, reference);
             }
         } else {
-            for i in from_index .. references.len() {
+            for i in from_index..references.len() {
                 let reference = unsafe { references[i].to_object_reference() };
 
                 /* Determine liveness (and forward if necessary) the reference */
@@ -211,19 +251,32 @@ impl ReferenceProcessor {
                     to_index += 1;
                     if TRACE_DETAIL {
                         let index = to_index - 1;
-                        trace!("SCANNED {} {:?} -> {:?}", index, references[index],
-                               unsafe { references[index].to_object_reference() });
+                        trace!(
+                            "SCANNED {} {:?} -> {:?}",
+                            index,
+                            references[index],
+                            unsafe { references[index].to_object_reference() }
+                        );
                     }
                 }
             }
-            trace!("{:?} references: {} -> {}", self.semantics, references.len(), to_index);
+            trace!(
+                "{:?} references: {} -> {}",
+                self.semantics,
+                references.len(),
+                to_index
+            );
             sync.nursery_index = to_index;
             references.truncate(to_index);
         }
 
         /* flush out any remset entries generated during the above activities */
-        unsafe { VM::VMActivePlan::mutator(tls).flush_remembered_sets(); }
-        if TRACE { trace!("Ending ReferenceProcessor.scan({:?})", self.semantics); }
+        unsafe {
+            VM::VMActivePlan::mutator(tls).flush_remembered_sets();
+        }
+        if TRACE {
+            trace!("Ending ReferenceProcessor.scan({:?})", self.semantics);
+        }
     }
 
     /**
@@ -233,11 +286,17 @@ impl ReferenceProcessor {
      * be the address of a heap object, depending on the VM.
      * @param trace the thread local trace element.
      */
-    fn retain_referent<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, reference: ObjectReference) {
+    fn retain_referent<VM: VMBinding, T: TraceLocal>(
+        &self,
+        trace: &mut T,
+        reference: ObjectReference,
+    ) {
         debug_assert!(!reference.is_null());
         debug_assert!(self.semantics == Semantics::SOFT);
 
-        if TRACE_DETAIL { trace!("Processing reference: {:?}", reference); }
+        if TRACE_DETAIL {
+            trace!("Processing reference: {:?}", reference);
+        }
 
         if !trace.is_live(reference) {
             /*
@@ -254,6 +313,8 @@ impl ReferenceProcessor {
         if !referent.is_null() {
             trace.retain_referent(referent);
         }
-        if TRACE_DETAIL { trace!(" ~> {:?} (retained)", referent.to_address()); }
+        if TRACE_DETAIL {
+            trace!(" ~> {:?} (retained)", referent.to_address());
+        }
     }
 }

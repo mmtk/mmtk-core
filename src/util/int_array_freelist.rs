@@ -51,7 +51,7 @@ impl IntArrayFreeList {
     fn table(&self) -> &Vec<i32> {
         match self.parent {
             Some(p) => p.table(),
-            None => self.table.as_ref().unwrap()
+            None => self.table.as_ref().unwrap(),
         }
     }
 
@@ -60,10 +60,11 @@ impl IntArrayFreeList {
     fn table_mut(&mut self) -> &mut Vec<i32> {
         match self.parent {
             Some(p) => {
-                let parent_mut: &mut Self = unsafe { &mut *(p as *const IntArrayFreeList as *mut IntArrayFreeList) };
+                let parent_mut: &mut Self =
+                    unsafe { &mut *(p as *const IntArrayFreeList as *mut IntArrayFreeList) };
                 parent_mut.table_mut()
-            },
-            None => self.table.as_mut().unwrap()
+            }
+            None => self.table.as_mut().unwrap(),
         }
     }
     pub fn resize_freelist(&mut self, units: usize, grain: i32) {
@@ -75,9 +76,8 @@ impl IntArrayFreeList {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::GenericFreeList;
-    
+    use super::*;
 
     const LIST_SIZE: usize = 5;
     const TOP_SENTINEL: i32 = -1;

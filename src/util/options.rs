@@ -1,8 +1,8 @@
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use num_cpus;
 use std::cell::UnsafeCell;
-use std::ops::Deref;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
 use std::default::Default;
+use std::ops::Deref;
 
 custom_derive! {
     #[derive(Copy, Clone, EnumFromStr)]
@@ -66,7 +66,7 @@ macro_rules! options {
         }
     ]
 }
-options!{
+options! {
     threads:               usize                [|v| v > 0]    = num_cpus::get(),
     use_short_stack_scans: bool                 [always_valid] = false,
     use_return_barrier:    bool                 [always_valid] = false,

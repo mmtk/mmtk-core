@@ -1,11 +1,11 @@
+use crate::util::conversions::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::conversions::*;
 
-use crate::vm::{ActivePlan, Collection, ObjectModel};
-use crate::util::heap::{VMRequest, PageResource};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
-use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END};
+use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
+use crate::util::heap::{PageResource, VMRequest};
+use crate::vm::{ActivePlan, Collection, ObjectModel};
 
 use crate::plan::Plan;
 
@@ -13,13 +13,13 @@ use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
 use crate::util::OpaquePointer;
 
-use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::HeapMeta;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 
 pub trait Space<VM: VMBinding>: Sized + 'static {
     type PR: PageResource<VM, Space = Self>;
@@ -29,7 +29,8 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
         // debug_assert!(tls != 0);
-        let allow_poll = unsafe { VM::VMActivePlan::is_mutator(tls) } && VM::VMActivePlan::global().is_initialized();
+        let allow_poll = unsafe { VM::VMActivePlan::is_mutator(tls) }
+            && VM::VMActivePlan::global().is_initialized();
 
         trace!("Reserving pages");
         let pr = self.common().pr.as_ref().unwrap();
@@ -70,15 +71,18 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
         if !self.common().descriptor.is_contiguous() {
             self.common().vm_map().get_descriptor_for_address(start) == self.common().descriptor
         } else {
-            start >= self.common().start
-                && start < self.common().start + self.common().extent
+            start >= self.common().start && start < self.common().start + self.common().extent
         }
     }
 
     // UNSAFE: potential data race as this mutates 'common'
     unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
         // FIXME
-        let new_head: Address = self.common().vm_map().allocate_contiguous_chunks(self.common().descriptor, chunks, self.common().head_discontiguous_region);
+        let new_head: Address = self.common().vm_map().allocate_contiguous_chunks(
+            self.common().descriptor,
+            chunks,
+            self.common().head_discontiguous_region,
+        );
         if new_head.is_zero() {
             return Address::zero();
         }
@@ -109,7 +113,7 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
     fn common(&self) -> &CommonSpace<VM, Self::PR>;
     fn common_mut(&mut self) -> &mut CommonSpace<VM, Self::PR> {
         // SAFE: Reference is exclusive
-        unsafe {self.unsafe_common_mut()}
+        unsafe { self.unsafe_common_mut() }
     }
 
     // UNSAFE: This get's a mutable reference from self
@@ -123,7 +127,8 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
     fn release_discontiguous_chunks(&mut self, chunk: Address) {
         debug_assert!(chunk == conversions::chunk_align_down(chunk));
         if chunk == self.common().head_discontiguous_region {
-            self.common_mut().head_discontiguous_region = self.common().vm_map().get_next_contiguous_region(chunk);
+            self.common_mut().head_discontiguous_region =
+                self.common().vm_map().get_next_contiguous_region(chunk);
         }
         self.common().vm_map().free_contiguous_chunks(chunk);
     }
@@ -131,7 +136,9 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
     fn release_multiple_pages(&mut self, start: Address);
 
     unsafe fn release_all_chunks(&self) {
-        self.common().vm_map().free_all_chunks(self.common().head_discontiguous_region);
+        self.common()
+            .vm_map()
+            .free_all_chunks(self.common().head_discontiguous_region);
         self.unsafe_common_mut().head_discontiguous_region = Address::zero();
     }
 
@@ -150,20 +157,24 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
         }
         print!(" ");
         if common.contiguous {
-            print!("{}->{}", common.start, common.start+common.extent-1);
+            print!("{}->{}", common.start, common.start + common.extent - 1);
             match common.vmrequest {
                 VMRequest::RequestExtent { extent, .. } => {
                     print!(" E {}", extent);
-                },
+                }
                 VMRequest::RequestFraction { frac, .. } => {
                     print!(" F {}", frac);
-                },
+                }
                 _ => {}
             }
         } else {
             let mut a = common.head_discontiguous_region;
             while !a.is_zero() {
-                print!("{}->{}", a, a + self.common().vm_map().get_contiguous_region_size(a) - 1);
+                print!(
+                    "{}->{}",
+                    a,
+                    a + self.common().vm_map().get_contiguous_region_size(a) - 1
+                );
                 a = self.common().vm_map().get_next_contiguous_region(a);
                 if !a.is_zero() {
                     print!(" ");
@@ -206,7 +217,12 @@ pub struct SpaceOptions {
 const DEBUG: bool = false;
 
 impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
-    pub fn new(opt: SpaceOptions, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
+    pub fn new(
+        opt: SpaceOptions,
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        heap: &mut HeapMeta,
+    ) -> Self {
         let mut rtn = CommonSpace {
             name: opt.name,
             descriptor: SpaceDescriptor::UNINITIALIZED,
@@ -216,9 +232,9 @@ impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
             contiguous: true,
             zeroed: opt.zeroed,
             pr: None,
-            start: unsafe{Address::zero()},
+            start: unsafe { Address::zero() },
             extent: 0,
-            head_discontiguous_region: unsafe{Address::zero()},
+            head_discontiguous_region: unsafe { Address::zero() },
             vm_map,
             mmapper,
             p: PhantomData,
@@ -234,18 +250,28 @@ impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
         }
 
         let (extent, top) = match vmrequest {
-            VMRequest::RequestFraction{frac, top: _top}                   => (get_frac_available(frac), _top),
-            VMRequest::RequestExtent{extent: _extent, top: _top}          => (_extent, _top),
-            VMRequest::RequestFixed{extent: _extent, top: _top, .. } => (_extent, _top),
-            _                                                             => unreachable!(),
+            VMRequest::RequestFraction { frac, top: _top } => (get_frac_available(frac), _top),
+            VMRequest::RequestExtent {
+                extent: _extent,
+                top: _top,
+            } => (_extent, _top),
+            VMRequest::RequestFixed {
+                extent: _extent,
+                top: _top,
+                ..
+            } => (_extent, _top),
+            _ => unreachable!(),
         };
 
         if extent != raw_align_up(extent, BYTES_IN_CHUNK) {
-            panic!("{} requested non-aligned extent: {} bytes", rtn.name, extent);
+            panic!(
+                "{} requested non-aligned extent: {} bytes",
+                rtn.name, extent
+            );
         }
 
         let start: Address;
-        if let VMRequest::RequestFixed{start: _start, .. } = vmrequest {
+        if let VMRequest::RequestFixed { start: _start, .. } = vmrequest {
             start = _start;
             if start != chunk_align_up(start) {
                 panic!("{} starting on non-aligned boundary: {}", rtn.name, start);

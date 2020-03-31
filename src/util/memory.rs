@@ -1,6 +1,6 @@
 use crate::util::Address;
-use std::io::{Result, Error};
-use libc::{PROT_READ, PROT_WRITE, PROT_EXEC, PROT_NONE, c_void};
+use libc::{c_void, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
+use std::io::{Error, Result};
 
 pub fn zero(start: Address, len: usize) {
     unsafe {
@@ -24,7 +24,8 @@ pub fn dzmmap(start: Address, size: usize) -> Result<Address> {
 }
 
 pub fn munprotect(start: Address, size: usize) -> Result<()> {
-    let result = unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_READ | PROT_WRITE | PROT_EXEC) };
+    let result =
+        unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_READ | PROT_WRITE | PROT_EXEC) };
     if result == 0 {
         Ok(())
     } else {

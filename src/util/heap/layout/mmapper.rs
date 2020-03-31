@@ -1,7 +1,7 @@
-use crate::util::Address;
 use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::Address;
 
-pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES;   // the granularity VMResource operates at
+pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES; // the granularity VMResource operates at
 #[allow(unused)]
 pub const MMAP_CHUNK_MASK: usize = MMAP_CHUNK_BYTES - 1;
 

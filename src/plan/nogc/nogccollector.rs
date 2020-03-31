@@ -1,15 +1,15 @@
-use super::NoGCTraceLocal;
-use super::super::ParallelCollectorGroup;
-use super::super::ParallelCollector;
-use super::super::CollectorContext;
-use super::super::Phase;
 use super::super::Allocator;
+use super::super::CollectorContext;
+use super::super::ParallelCollector;
+use super::super::ParallelCollectorGroup;
+use super::super::Phase;
+use super::NoGCTraceLocal;
 
 use std::process;
 
-use crate::util::{Address, ObjectReference};
-use crate::util::OpaquePointer;
 use crate::mmtk::MMTK;
+use crate::util::OpaquePointer;
+use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
 pub struct NoGCCollector<VM: VMBinding> {
@@ -37,7 +37,14 @@ impl<VM: VMBinding> CollectorContext<VM> for NoGCCollector<VM> {
         self.tls = tls;
     }
 
-    fn alloc_copy(&mut self, _original: ObjectReference, _bytes: usize, _align: usize, _offset: isize, _allocator: Allocator) -> Address {
+    fn alloc_copy(
+        &mut self,
+        _original: ObjectReference,
+        _bytes: usize,
+        _align: usize,
+        _offset: isize,
+        _allocator: Allocator,
+    ) -> Address {
         unreachable!()
     }
 
@@ -101,7 +108,7 @@ impl<VM: VMBinding> ParallelCollector<VM> for NoGCCollector<VM> {
     // See ParallelCollector.set_group()
     #[allow(clippy::not_unsafe_ptr_arg_deref)]
     fn set_group(&mut self, group: *const ParallelCollectorGroup<VM, Self>) {
-        self.group = Some ( unsafe {&*group} );
+        self.group = Some(unsafe { &*group });
     }
 
     fn set_worker_ordinal(&mut self, ordinal: usize) {

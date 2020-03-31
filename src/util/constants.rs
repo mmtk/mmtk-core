@@ -1,12 +1,11 @@
-use crate::vm::unboxed_size_constants;
 use crate::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION;
+use crate::vm::unboxed_size_constants;
 
 /**
-   * Modes.
-   */
+ * Modes.
+ */
 pub const INSTANCE_FIELD: usize = 0;
 pub const ARRAY_ELEMENT: usize = 1;
-
 
 /****************************************************************************
  *
@@ -30,14 +29,14 @@ pub const BYTES_IN_KBYTE: usize = 1 << LOG_BYTES_IN_KBYTE;
  */
 
 pub const SUPPORT_CARD_SCANNING: bool = false;
-pub const LOG_CARD_META_SIZE: usize = 2;// each card consumes four bytes of metadata
-pub const LOG_CARD_UNITS: usize = 10;  // number of units tracked per card
-pub const LOG_CARD_GRAIN: usize = 0;   // track at byte grain, save shifting
+pub const LOG_CARD_META_SIZE: usize = 2; // each card consumes four bytes of metadata
+pub const LOG_CARD_UNITS: usize = 10; // number of units tracked per card
+pub const LOG_CARD_GRAIN: usize = 0; // track at byte grain, save shifting
 pub const LOG_CARD_BYTES: usize = LOG_CARD_UNITS + LOG_CARD_GRAIN;
 pub const LOG_CARD_META_BYTES: usize = LOG_BYTES_IN_REGION - LOG_CARD_BYTES + LOG_CARD_META_SIZE;
 pub const LOG_CARD_META_PAGES: usize = LOG_CARD_META_BYTES - LOG_BYTES_IN_PAGE as usize;
-pub const CARD_META_PAGES_PER_REGION: usize = if_then_else_usize!(SUPPORT_CARD_SCANNING,
-    1 << LOG_CARD_META_PAGES, 0);
+pub const CARD_META_PAGES_PER_REGION: usize =
+    if_then_else_usize!(SUPPORT_CARD_SCANNING, 1 << LOG_CARD_META_PAGES, 0);
 pub const CARD_MASK: usize = (1 << LOG_CARD_BYTES) - 1;
 
 /**

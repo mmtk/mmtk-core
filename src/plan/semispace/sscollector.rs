@@ -1,24 +1,24 @@
-use crate::plan::{phase, Phase};
+use super::sstracelocal::SSTraceLocal;
+use crate::mmtk::MMTK;
+use crate::plan::phase::PhaseManager;
+use crate::plan::phase::ScheduledPhase;
+use crate::plan::selected_plan::SelectedConstraints;
+use crate::plan::semispace::SemiSpace;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::CollectorContext;
 use crate::plan::ParallelCollector;
 use crate::plan::ParallelCollectorGroup;
 use crate::plan::TraceLocal;
-use crate::plan::phase::PhaseManager;
+use crate::plan::{phase, Phase};
 use crate::policy::copyspace::CopySpace;
-use crate::util::{Address, ObjectReference};
 use crate::util::alloc::Allocator;
 use crate::util::alloc::{BumpAllocator, LargeObjectAllocator};
 use crate::util::forwarding_word::clear_forwarding_bits;
 use crate::util::heap::MonotonePageResource;
 use crate::util::reference_processor::*;
-use crate::vm::Scanning;
-use super::sstracelocal::SSTraceLocal;
-use crate::plan::selected_plan::SelectedConstraints;
 use crate::util::OpaquePointer;
-use crate::plan::semispace::SemiSpace;
-use crate::plan::phase::ScheduledPhase;
-use crate::mmtk::MMTK;
+use crate::util::{Address, ObjectReference};
+use crate::vm::Scanning;
 use crate::vm::VMBinding;
 
 /// per-collector thread behavior and state for the SS plan
@@ -43,7 +43,11 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         SSCollector {
             tls: OpaquePointer::UNINITIALIZED,
             ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
-            los: LargeObjectAllocator::new(OpaquePointer::UNINITIALIZED, Some(mmtk.plan.get_los()), &mmtk.plan),
+            los: LargeObjectAllocator::new(
+                OpaquePointer::UNINITIALIZED,
+                Some(mmtk.plan.get_los()),
+                &mmtk.plan,
+            ),
             trace: SSTraceLocal::new(&mmtk.plan),
 
             last_trigger_count: 0,
@@ -62,13 +66,18 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         self.trace.init(tls);
     }
 
-    fn alloc_copy(&mut self, _original: ObjectReference, bytes: usize, align: usize, offset: isize,
-                  allocator: AllocationType) -> Address {
+    fn alloc_copy(
+        &mut self,
+        _original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+        allocator: AllocationType,
+    ) -> Address {
         match allocator {
             crate::plan::Allocator::Los => self.los.alloc(bytes, align, offset),
-            _ => self.ss.alloc(bytes, align, offset)
+            _ => self.ss.alloc(bytes, align, offset),
         }
-
     }
 
     fn run(&mut self, tls: OpaquePointer) {
@@ -81,7 +90,7 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
 
     fn collection_phase(&mut self, _tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
-            Phase::Prepare => { self.ss.rebind(Some(self.plan.tospace())) }
+            Phase::Prepare => self.ss.rebind(Some(self.plan.tospace())),
             Phase::StackRoots => {
                 trace!("Computing thread roots");
                 VM::VMScanning::compute_thread_roots(&mut self.trace, self.tls);
@@ -102,13 +111,15 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
             Phase::SoftRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    self.reference_processors.scan_soft_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
+                    self.reference_processors
+                        .scan_soft_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
                 }
             }
             Phase::WeakRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    self.reference_processors.scan_weak_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
+                    self.reference_processors
+                        .scan_weak_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
                 }
             }
             Phase::Finalizable => {
@@ -119,12 +130,14 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
             Phase::PhantomRefs => {
                 if primary {
                     // FIXME Clear refs if noReferenceTypes is true
-                    self.reference_processors.scan_phantom_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
+                    self.reference_processors
+                        .scan_phantom_refs::<VM, SSTraceLocal<VM>>(&mut self.trace, self.tls)
                 }
             }
             Phase::ForwardRefs => {
                 if primary && SelectedConstraints::NEEDS_FORWARD_AFTER_LIVENESS {
-                    self.reference_processors.forward_refs::<VM, SSTraceLocal<VM>>(&mut self.trace)
+                    self.reference_processors
+                        .forward_refs::<VM, SSTraceLocal<VM>>(&mut self.trace)
                 }
             }
             Phase::ForwardFinalizable => {
@@ -144,7 +157,7 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
                 self.trace.release();
                 debug_assert!(self.trace.is_empty());
             }
-            _ => { panic!("Per-collector phase not handled") }
+            _ => panic!("Per-collector phase not handled"),
         }
     }
 
@@ -152,16 +165,23 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         self.tls
     }
 
-    fn post_copy(&self, object: ObjectReference, _rvm_type: Address, _bytes: usize, allocator: crate::plan::Allocator) {
+    fn post_copy(
+        &self,
+        object: ObjectReference,
+        _rvm_type: Address,
+        _bytes: usize,
+        allocator: crate::plan::Allocator,
+    ) {
         clear_forwarding_bits::<VM>(object);
         match allocator {
             crate::plan::Allocator::Default => {}
             crate::plan::Allocator::Los => {
-                self.los.get_space().unwrap().initialize_header(object, false);
+                self.los
+                    .get_space()
+                    .unwrap()
+                    .initialize_header(object, false);
             }
-            _ => {
-                panic!("Currently we can't copy to other spaces other than copyspace")
-            }
+            _ => panic!("Currently we can't copy to other spaces other than copyspace"),
         }
     }
 }
@@ -175,7 +195,13 @@ impl<VM: VMBinding> ParallelCollector<VM> for SSCollector<VM> {
 
     fn collect(&self) {
         // FIXME use reference instead of cloning everything
-        self.phase_manager.begin_new_phase_stack::<VM>(self.tls, ScheduledPhase::new(phase::Schedule::Complex, self.phase_manager.collection_phase.clone()))
+        self.phase_manager.begin_new_phase_stack::<VM>(
+            self.tls,
+            ScheduledPhase::new(
+                phase::Schedule::Complex,
+                self.phase_manager.collection_phase.clone(),
+            ),
+        )
     }
 
     fn get_current_trace(&mut self) -> &mut SSTraceLocal<VM> {

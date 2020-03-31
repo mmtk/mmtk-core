@@ -1,8 +1,8 @@
-use crate::util::{Address, ObjectReference};
 use crate::plan::Allocator;
 use crate::util::OpaquePointer;
-use std::sync::atomic::AtomicU8;
+use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
+use std::sync::atomic::AtomicU8;
 
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/vm/ObjectModel.java
 pub trait ObjectModel<VM: VMBinding> {

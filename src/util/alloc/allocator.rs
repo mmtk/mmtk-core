@@ -2,13 +2,13 @@ use crate::util::address::Address;
 
 use std::sync::atomic::Ordering;
 
-use crate::util::constants::*;
-use crate::util::heap::PageResource;
-use crate::vm::{ActivePlan, Collection};
 use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Plan;
+use crate::util::constants::*;
+use crate::util::heap::PageResource;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+use crate::vm::{ActivePlan, Collection};
 
 // FIXME: Put this somewhere more appropriate
 pub const ALIGNMENT_VALUE: usize = 0xdead_beef;
@@ -22,18 +22,8 @@ pub const MAX_ALIGNMENT_SHIFT: usize = LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN
 pub const MAX_ALIGNMENT: usize = MIN_ALIGNMENT << MAX_ALIGNMENT_SHIFT;
 
 #[inline(always)]
-pub fn align_allocation_no_fill(
-    region: Address,
-    alignment: usize,
-    offset: isize,
-) -> Address {
-    align_allocation(
-        region,
-        alignment,
-        offset,
-        MIN_ALIGNMENT,
-        false,
-    )
+pub fn align_allocation_no_fill(region: Address, alignment: usize, offset: isize) -> Address {
+    align_allocation(region, alignment, offset, MIN_ALIGNMENT, false)
 }
 
 #[inline(always)]
@@ -47,7 +37,9 @@ pub fn align_allocation(
     debug_assert!(known_alignment >= MIN_ALIGNMENT);
     // Make sure MIN_ALIGNMENT is reasonable.
     #[allow(clippy::assertions_on_constants)]
-    { debug_assert!(MIN_ALIGNMENT >= BYTES_IN_INT); }
+    {
+        debug_assert!(MIN_ALIGNMENT >= BYTES_IN_INT);
+    }
     debug_assert!(!(fillalignmentgap && region.is_zero()));
     debug_assert!(alignment <= MAX_ALIGNMENT);
     debug_assert!(offset >= 0);
@@ -97,8 +89,13 @@ pub fn fill_alignment_gap(immut_start: Address, end: Address) {
 
 #[inline(always)]
 pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: usize) -> usize {
-    trace!("size={}, alignment={}, known_alignment={}, MIN_ALIGNMENT={}", size, alignment,
-           known_alignment, MIN_ALIGNMENT);
+    trace!(
+        "size={}, alignment={}, known_alignment={}, MIN_ALIGNMENT={}",
+        size,
+        alignment,
+        known_alignment,
+        MIN_ALIGNMENT
+    );
     debug_assert!(size == size & !(known_alignment - 1));
     debug_assert!(known_alignment >= MIN_ALIGNMENT);
 

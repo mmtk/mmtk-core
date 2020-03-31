@@ -1,10 +1,9 @@
-use crate::util::Address;
-use crate::util::heap::layout::vm_layout_constants;
-use crate::util::heap::layout::heap_parameters;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
 use crate::util::constants::*;
+use crate::util::heap::layout::heap_parameters;
+use crate::util::heap::layout::vm_layout_constants;
+use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
-
 
 const TYPE_BITS: usize = 2;
 #[allow(unused)]
@@ -23,7 +22,7 @@ const MANTISSA_SHIFT: usize = EXPONENT_SHIFT + EXPONENT_BITS;
 const MANTISSA_BITS: usize = 14;
 const BASE_EXPONENT: usize = BITS_IN_INT - MANTISSA_BITS;
 
-  /* 64-bit */
+/* 64-bit */
 const INDEX_MASK: usize = !TYPE_MASK;
 const INDEX_SHIFT: usize = TYPE_BITS;
 
@@ -39,9 +38,19 @@ impl SpaceDescriptor {
     pub fn create_descriptor_from_heap_range(start: Address, end: Address) -> SpaceDescriptor {
         let top = end == vm_layout_constants::HEAP_END;
         if HEAP_LAYOUT_64BIT {
-            let space_index = if start > vm_layout_constants::HEAP_END { ::std::usize::MAX } else { start >> vm_layout_constants::SPACE_SHIFT_64 };
-            return SpaceDescriptor(space_index << INDEX_SHIFT |
-                (if top { TYPE_CONTIGUOUS_HI } else { TYPE_CONTIGUOUS }));
+            let space_index = if start > vm_layout_constants::HEAP_END {
+                ::std::usize::MAX
+            } else {
+                start >> vm_layout_constants::SPACE_SHIFT_64
+            };
+            return SpaceDescriptor(
+                space_index << INDEX_SHIFT
+                    | (if top {
+                        TYPE_CONTIGUOUS_HI
+                    } else {
+                        TYPE_CONTIGUOUS
+                    }),
+            );
         }
         let chunks = (end - start) >> vm_layout_constants::LOG_BYTES_IN_CHUNK;
         if cfg!(debug) {
@@ -62,14 +71,20 @@ impl SpaceDescriptor {
         let mantissa = tmp;
         debug_assert!((tmp << (BASE_EXPONENT + exponent)) == start.as_usize());
         SpaceDescriptor(
-            (mantissa << MANTISSA_SHIFT) |
-            (exponent << EXPONENT_SHIFT) |
-            (chunks << SIZE_SHIFT) |
-            (if top { TYPE_CONTIGUOUS_HI } else { TYPE_CONTIGUOUS }))
+            (mantissa << MANTISSA_SHIFT)
+                | (exponent << EXPONENT_SHIFT)
+                | (chunks << SIZE_SHIFT)
+                | (if top {
+                    TYPE_CONTIGUOUS_HI
+                } else {
+                    TYPE_CONTIGUOUS
+                }),
+        )
     }
 
     pub fn create_descriptor() -> SpaceDescriptor {
-        let next = DISCONTIGUOUS_SPACE_INDEX.fetch_add(DISCONTIG_INDEX_INCREMENT, Ordering::Relaxed);
+        let next =
+            DISCONTIGUOUS_SPACE_INDEX.fetch_add(DISCONTIG_INDEX_INCREMENT, Ordering::Relaxed);
         let ret = SpaceDescriptor(next);
         debug_assert!(!ret.is_contiguous());
         ret

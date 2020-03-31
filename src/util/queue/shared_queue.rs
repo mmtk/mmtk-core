@@ -1,9 +1,9 @@
 use crate::util::queue::LocalQueue;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::fmt::Debug;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
-use std::fmt::Debug;
+use std::sync::Mutex;
 
 type Block<T> = Vec<T>;
 
@@ -14,7 +14,10 @@ pub struct SharedQueue<T> {
     bitmap: Mutex<HashMap<usize, bool>>,
 }
 
-impl<T> SharedQueue<T> where T: Debug {
+impl<T> SharedQueue<T>
+where
+    T: Debug,
+{
     pub fn new() -> Self {
         SharedQueue {
             blocks: Mutex::new(Vec::new()),
@@ -74,7 +77,10 @@ impl<T> SharedQueue<T> where T: Debug {
     }
 }
 
-impl<T> Default for SharedQueue<T> where T: Debug {
+impl<T> Default for SharedQueue<T>
+where
+    T: Debug,
+{
     fn default() -> Self {
         Self::new()
     }

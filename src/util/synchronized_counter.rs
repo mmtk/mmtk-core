@@ -1,5 +1,5 @@
-use std::usize;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::usize;
 
 pub struct SynchronizedCounter {
     count: AtomicUsize,

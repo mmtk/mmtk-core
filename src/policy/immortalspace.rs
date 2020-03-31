@@ -1,19 +1,19 @@
-use crate::policy::space::{Space, CommonSpace};
-use crate::util::heap::{PageResource, MonotonePageResource, VMRequest};
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
+use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
 
-use crate::util::ObjectReference;
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
+use crate::util::ObjectReference;
 
-use crate::vm::ObjectModel;
 use crate::plan::TransitiveClosure;
 use crate::util::header_byte;
+use crate::vm::ObjectModel;
 
-use std::cell::UnsafeCell;
-use crate::util::heap::layout::heap_layout::{VMMap, Mmapper};
+use crate::policy::space::SpaceOptions;
+use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
-use crate::policy::space::SpaceOptions;
+use std::cell::UnsafeCell;
 
 pub struct ImmortalSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>>,
@@ -29,7 +29,7 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     type PR = MonotonePageResource<VM, ImmortalSpace<VM>>;
 
     fn common(&self) -> &CommonSpace<VM, Self::PR> {
-        unsafe {&*self.common.get()}
+        unsafe { &*self.common.get() }
     }
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR> {
         &mut *self.common.get()
@@ -42,12 +42,16 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
         let common_mut = self.common_mut();
         if common_mut.vmrequest.is_discontiguous() {
             common_mut.pr = Some(MonotonePageResource::new_discontiguous(
-                META_DATA_PAGES_PER_REGION, vm_map));
+                META_DATA_PAGES_PER_REGION,
+                vm_map,
+            ));
         } else {
-            common_mut.pr = Some(MonotonePageResource::new_contiguous(common_mut.start,
-                                                                      common_mut.extent,
-                                                                      META_DATA_PAGES_PER_REGION,
-                                                                      vm_map));
+            common_mut.pr = Some(MonotonePageResource::new_contiguous(
+                common_mut.start,
+                common_mut.extent,
+                META_DATA_PAGES_PER_REGION,
+                vm_map,
+            ));
         }
         common_mut.pr.as_mut().unwrap().bind_space(me);
     }
@@ -66,15 +70,27 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> ImmortalSpace<VM> {
-    pub fn new(name: &'static str, zeroed: bool, vmrequest: VMRequest, vm_map: &'static VMMap, mmapper: &'static Mmapper, heap: &mut HeapMeta) -> Self {
+    pub fn new(
+        name: &'static str,
+        zeroed: bool,
+        vmrequest: VMRequest,
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        heap: &mut HeapMeta,
+    ) -> Self {
         ImmortalSpace {
-            common: UnsafeCell::new(CommonSpace::new(SpaceOptions {
-                name,
-                movable: false,
-                immortal: true,
-                zeroed,
-                vmrequest,
-            }, vm_map, mmapper, heap)),
+            common: UnsafeCell::new(CommonSpace::new(
+                SpaceOptions {
+                    name,
+                    movable: false,
+                    immortal: true,
+                    zeroed,
+                    vmrequest,
+                },
+                vm_map,
+                mmapper,
+                heap,
+            )),
             mark_state: 0,
         }
     }
@@ -85,9 +101,11 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         if mark_bit == value {
             return false;
         }
-        while !VM::VMObjectModel::attempt_available_bits(object,
-                                                     old_value,
-                                                     old_value ^ (GC_MARK_BIT_MASK as usize)) {
+        while !VM::VMObjectModel::attempt_available_bits(
+            object,
+            old_value,
+            old_value ^ (GC_MARK_BIT_MASK as usize),
+        ) {
             old_value = VM::VMObjectModel::prepare_available_bits(object);
             mark_bit = (old_value as u8) & GC_MARK_BIT_MASK;
             if mark_bit == value {

@@ -1,18 +1,18 @@
+use super::ss;
+use crate::plan::semispace::SemiSpace;
 use crate::plan::{TraceLocal, TransitiveClosure};
 use crate::policy::space::Space;
-use crate::util::{Address, ObjectReference};
 use crate::util::queue::LocalQueue;
-use crate::vm::Scanning;
-use super::ss;
 use crate::util::OpaquePointer;
-use crate::plan::semispace::SemiSpace;
+use crate::util::{Address, ObjectReference};
+use crate::vm::Scanning;
 use crate::vm::VMBinding;
 
 pub struct SSTraceLocal<VM: VMBinding> {
     tls: OpaquePointer,
     values: LocalQueue<'static, ObjectReference>,
     root_locations: LocalQueue<'static, Address>,
-    plan: &'static SemiSpace<VM>
+    plan: &'static SemiSpace<VM>,
 }
 
 impl<VM: VMBinding> TransitiveClosure for SSTraceLocal<VM> {
@@ -59,19 +59,28 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
         }
         if plan_unsync.copyspace0.in_space(object) {
             trace!("trace_object: object in copyspace0");
-            return plan_unsync.copyspace0.trace_object(self, object, ss::ALLOC_SS, tls);
+            return plan_unsync
+                .copyspace0
+                .trace_object(self, object, ss::ALLOC_SS, tls);
         }
         if plan_unsync.copyspace1.in_space(object) {
             trace!("trace_object: object in copyspace1");
-            return plan_unsync.copyspace1.trace_object(self, object, ss::ALLOC_SS, tls);
+            return plan_unsync
+                .copyspace1
+                .trace_object(self, object, ss::ALLOC_SS, tls);
         }
         if plan_unsync.versatile_space.in_space(object) {
             trace!("trace_object: object in versatile_space");
             return plan_unsync.versatile_space.trace_object(self, object);
         }
-        if plan_unsync.vm_space.is_some() && plan_unsync.vm_space.as_ref().unwrap().in_space(object) {
+        if plan_unsync.vm_space.is_some() && plan_unsync.vm_space.as_ref().unwrap().in_space(object)
+        {
             trace!("trace_object: object in boot space");
-            return plan_unsync.vm_space.as_ref().unwrap().trace_object(self, object);
+            return plan_unsync
+                .vm_space
+                .as_ref()
+                .unwrap()
+                .trace_object(self, object);
         }
         if plan_unsync.los.in_space(object) {
             trace!("trace_object: object in los");
@@ -115,8 +124,8 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
 
     fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool {
         let unsync = unsafe { &(*self.plan.unsync.get()) };
-        (unsync.hi && !unsync.copyspace0.in_space(obj)) ||
-            (!unsync.hi && !unsync.copyspace1.in_space(obj))
+        (unsync.hi && !unsync.copyspace0.in_space(obj))
+            || (!unsync.hi && !unsync.copyspace1.in_space(obj))
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {

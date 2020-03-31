@@ -13,7 +13,7 @@ impl HeapMeta {
         HeapMeta {
             heap_cursor: start,
             heap_limit: end,
-            total_pages: AtomicUsize::new(0)
+            total_pages: AtomicUsize::new(0),
         }
     }
 
@@ -28,8 +28,12 @@ impl HeapMeta {
         };
 
         if self.heap_cursor > self.heap_limit {
-            panic!("Out of virtual address space at {} ({} > {})",
-                   self.heap_cursor - extent, self.heap_cursor, self.heap_limit);
+            panic!(
+                "Out of virtual address space at {} ({} > {})",
+                self.heap_cursor - extent,
+                self.heap_cursor,
+                self.heap_limit
+            );
         }
 
         ret

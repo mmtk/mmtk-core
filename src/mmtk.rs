@@ -1,21 +1,21 @@
+use crate::plan::phase::PhaseManager;
 use crate::plan::Plan;
 use crate::plan::SelectedPlan;
-use crate::plan::phase::PhaseManager;
-use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::OpaquePointer;
 
-use std::default::Default;
+use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::reference_processor::ReferenceProcessors;
-use crate::util::options::{UnsafeOptionsWrapper, Options};
-use std::sync::atomic::{Ordering, AtomicBool};
+use std::default::Default;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use std::sync::Arc;
 use crate::vm::VMBinding;
+use std::sync::Arc;
 
 // TODO: remove this singleton at some point to allow multiple instances of MMTK
 // This helps refactoring.
-lazy_static!{
+lazy_static! {
     // I am not sure if we should include these mmappers as part of MMTk struct.
     // The considerations are:
     // 1. We need VMMap and Mmapper to create spaces. It is natural that the mappers are not

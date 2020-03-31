@@ -1,7 +1,7 @@
-use crate::util::statistics::stats::Stats;
 use crate::plan::Phase::{self, *};
+use crate::util::statistics::stats::Stats;
+use crate::util::statistics::{Counter, Timer};
 use std::sync::{Arc, Mutex};
-use crate::util::statistics::{Timer, Counter};
 
 pub struct PhaseTimer {
     ref_type_time: Arc<Mutex<Timer>>,
@@ -11,20 +11,20 @@ pub struct PhaseTimer {
     stacks_time: Arc<Mutex<Timer>>,
     root_time: Arc<Mutex<Timer>>,
     forward_time: Arc<Mutex<Timer>>,
-    release_time: Arc<Mutex<Timer>>
+    release_time: Arc<Mutex<Timer>>,
 }
 
-impl PhaseTimer{
+impl PhaseTimer {
     pub fn new(stats: &Stats) -> Self {
         PhaseTimer {
             ref_type_time: stats.new_timer("refType", false, true),
-            scan_time:     stats.new_timer("scan", false, true),
+            scan_time: stats.new_timer("scan", false, true),
             finalize_time: stats.new_timer("finalize", false, true),
-            prepare_time:  stats.new_timer("prepare", false, true),
-            stacks_time:   stats.new_timer("stacks", false, true),
-            root_time:     stats.new_timer("root", false, true),
-            release_time:  stats.new_timer("release", false, true),
-            forward_time:  stats.new_timer("forward", false, true),
+            prepare_time: stats.new_timer("prepare", false, true),
+            stacks_time: stats.new_timer("stacks", false, true),
+            root_time: stats.new_timer("root", false, true),
+            release_time: stats.new_timer("release", false, true),
+            forward_time: stats.new_timer("forward", false, true),
         }
     }
 
@@ -44,7 +44,7 @@ impl PhaseTimer{
             Forward => Some(&self.forward_time),
             Release => Some(&self.release_time),
             Complex(_, _, Some(ref t)) => Some(t),
-            _ => None
+            _ => None,
         }
     }
 

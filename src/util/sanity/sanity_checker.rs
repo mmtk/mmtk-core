@@ -1,11 +1,11 @@
-use crate::plan::{TransitiveClosure, TraceLocal};
+use crate::plan::{TraceLocal, TransitiveClosure};
+use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Scanning;
-use crate::util::OpaquePointer;
 
-use std::collections::{HashSet, LinkedList};
 use crate::plan::Plan;
 use crate::plan::SelectedPlan;
+use std::collections::{HashSet, LinkedList};
 
 use crate::vm::VMBinding;
 

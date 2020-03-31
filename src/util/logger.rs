@@ -1,4 +1,4 @@
-use log::{self, Log, Record, Metadata, SetLoggerError, LevelFilter};
+use log::{self, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use std::env;
 use std::thread;
 
@@ -14,12 +14,14 @@ impl Log for MMTkLogger {
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            println!("{:?}[{}:{}:{}] {}",
-                     thread::current().id(),
-                     record.level(),
-                     record.file().unwrap(),
-                     record.line().unwrap(),
-                     record.args());
+            println!(
+                "{:?}[{}:{}:{}] {}",
+                thread::current().id(),
+                record.level(),
+                record.file().unwrap(),
+                record.line().unwrap(),
+                record.args()
+            );
         }
     }
 
@@ -38,8 +40,8 @@ pub fn init() -> Result<(), SetLoggerError> {
             "DEBUG" => log::set_max_level(LevelFilter::Debug),
             "TRACE" => log::set_max_level(LevelFilter::Trace),
             _ => log::set_max_level(LevelFilter::Info),
-        }
-        Err(_) => log::set_max_level(LevelFilter::Info)
+        },
+        Err(_) => log::set_max_level(LevelFilter::Info),
     }
     log::set_logger(&LOGGER)
 }

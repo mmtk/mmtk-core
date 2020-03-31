@@ -1,13 +1,13 @@
 use crate::util::conversions;
-use crate::util::heap::layout::vm_layout_constants::*;
-use crate::util::heap::layout::heap_parameters::*;
-use crate::util::Address;
-use crate::util::int_array_freelist::IntArrayFreeList;
-use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::util::generic_freelist::GenericFreeList;
+use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
+use crate::util::heap::layout::heap_parameters::*;
+use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::int_array_freelist::IntArrayFreeList;
+use crate::util::Address;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 #[cfg(target_pointer_width = "32")]
 const MAP_BASE_ADDRESS: Address = Address::ZERO;
@@ -62,7 +62,10 @@ impl Map32 {
         let mut e = 0;
         while e < extent {
             let index = self.get_chunk_index(start + e);
-            assert!(self.descriptor_map[index].is_empty(), "Conflicting virtual address request");
+            assert!(
+                self.descriptor_map[index].is_empty(),
+                "Conflicting virtual address request"
+            );
             self_mut.descriptor_map[index] = descriptor;
             //   VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, index, space);
             e += BYTES_IN_CHUNK;
@@ -70,14 +73,22 @@ impl Map32 {
     }
 
     pub fn create_freelist(&self, pr: &CommonFreeListPageResource) -> IntArrayFreeList {
-        IntArrayFreeList::from_parent(&self.global_page_map, self.get_discontig_freelist_pr_ordinal(pr) as _)
+        IntArrayFreeList::from_parent(
+            &self.global_page_map,
+            self.get_discontig_freelist_pr_ordinal(pr) as _,
+        )
     }
 
     pub fn create_parent_freelist(&self, units: usize, grain: i32) -> IntArrayFreeList {
         IntArrayFreeList::new(units, grain, 1)
     }
 
-    pub fn allocate_contiguous_chunks(&self, descriptor: SpaceDescriptor, chunks: usize, head: Address) -> Address {
+    pub fn allocate_contiguous_chunks(
+        &self,
+        descriptor: SpaceDescriptor,
+        chunks: usize,
+        head: Address,
+    ) -> Address {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         let _sync = self.sync.lock().unwrap();
         let chunk = self_mut.region_map.alloc(chunks as _);
@@ -114,7 +125,7 @@ impl Map32 {
         let chunk = self.get_chunk_index(start);
         self.region_map.size(chunk as i32) as _
     }
-    
+
     pub fn get_contiguous_region_size(&self, start: Address) -> usize {
         self.get_contiguous_region_chunks(start) << LOG_BYTES_IN_CHUNK
     }
@@ -154,8 +165,12 @@ impl Map32 {
         self_mut.total_available_discontiguous_chunks += chunks as usize;
         let next = self.next_link[chunk as usize];
         let prev = self.prev_link[chunk as usize];
-        if next != 0 { self_mut.prev_link[next as usize] = prev };
-        if prev != 0 { self_mut.next_link[prev as usize] = next };
+        if next != 0 {
+            self_mut.prev_link[next as usize] = prev
+        };
+        if prev != 0 {
+            self_mut.next_link[prev as usize] = next
+        };
         self_mut.prev_link[chunk as usize] = 0;
         self_mut.next_link[chunk as usize] = 0;
         for offset in 0..chunks {
@@ -180,7 +195,8 @@ impl Map32 {
         for fl in self_mut.shared_fl_map.iter() {
             if let Some(fl) = fl {
                 #[allow(clippy::cast_ref_to_mut)]
-                let fl_mut: &mut CommonFreeListPageResource = unsafe { &mut *(fl as *const _ as *mut _) };
+                let fl_mut: &mut CommonFreeListPageResource =
+                    unsafe { &mut *(fl as *const _ as *mut _) };
                 fl_mut.resize_freelist(start_address);
             }
         }
@@ -194,24 +210,29 @@ impl Map32 {
         //  2051: 1024
         // ]
         /* set up the region map free list */
-        self_mut.region_map.alloc(first_chunk as _);       // block out entire bottom of address range
+        self_mut.region_map.alloc(first_chunk as _); // block out entire bottom of address range
         for _ in first_chunk..=last_chunk {
             self_mut.region_map.alloc(1);
         }
         let alloced_chunk = self_mut.region_map.alloc(trailing_chunks as _);
-        debug_assert!(alloced_chunk == unavail_start_chunk as i32, "{} != {}", alloced_chunk, unavail_start_chunk);
+        debug_assert!(
+            alloced_chunk == unavail_start_chunk as i32,
+            "{} != {}",
+            alloced_chunk,
+            unavail_start_chunk
+        );
         /* set up the global page map and place chunks on free list */
         let mut first_page = 0;
         for chunk_index in first_chunk..=last_chunk {
             self_mut.total_available_discontiguous_chunks += 1;
-            self_mut.region_map.free(chunk_index as _, false);  // put this chunk on the free list
+            self_mut.region_map.free(chunk_index as _, false); // put this chunk on the free list
             self_mut.global_page_map.set_uncoalescable(first_page);
             let alloced_pages = self_mut.global_page_map.alloc(PAGES_IN_CHUNK as _); // populate the global page map
             debug_assert!(alloced_pages == first_page);
             first_page += PAGES_IN_CHUNK as i32;
         }
         self_mut.finalized = true;
-    } 
+    }
 
     pub fn is_finalized(&self) -> bool {
         self.finalized
@@ -219,7 +240,8 @@ impl Map32 {
 
     pub fn get_discontig_freelist_pr_ordinal(&self, pr: &CommonFreeListPageResource) -> usize {
         let self_mut: &mut Self = unsafe { self.mut_self() };
-        self_mut.shared_fl_map[self.shared_discontig_fl_count] = Some(unsafe { &*(pr as *const CommonFreeListPageResource) });
+        self_mut.shared_fl_map[self.shared_discontig_fl_count] =
+            Some(unsafe { &*(pr as *const CommonFreeListPageResource) });
         self_mut.shared_discontig_fl_count += 1;
         self.shared_discontig_fl_count
     }
@@ -238,7 +260,8 @@ impl Map32 {
     }
 
     pub fn add_to_cumulative_committed_pages(&self, pages: usize) {
-        self.cumulative_committed_pages.fetch_add(pages, Ordering::Relaxed);
+        self.cumulative_committed_pages
+            .fetch_add(pages, Ordering::Relaxed);
     }
 
     pub fn get_cumulative_committed_pages(&self) -> usize {

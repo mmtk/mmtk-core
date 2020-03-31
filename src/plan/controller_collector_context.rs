@@ -1,13 +1,13 @@
 use super::ParallelCollectorGroup;
 
 use std::cell::UnsafeCell;
-use std::sync::{Mutex, Condvar};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Condvar, Mutex};
 
 use crate::vm::Collection;
 
-use crate::plan::Plan;
 use crate::plan::selected_plan::SelectedPlan;
+use crate::plan::Plan;
 
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
@@ -38,7 +38,10 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
             }),
             request_condvar: Condvar::new(),
 
-            workers: UnsafeCell::new(ParallelCollectorGroup::<VM, <SelectedPlan<VM> as Plan<VM>>::CollectorT>::new()),
+            workers: UnsafeCell::new(ParallelCollectorGroup::<
+                VM,
+                <SelectedPlan<VM> as Plan<VM>>::CollectorT,
+            >::new()),
             request_flag: AtomicBool::new(false),
         }
     }
