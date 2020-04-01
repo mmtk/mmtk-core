@@ -4,7 +4,7 @@ use super::SSCollector;
 use super::SSMutator;
 use super::SSTraceLocal;
 
-use crate::plan::plan;
+use crate::plan::global;
 use crate::plan::trace::Trace;
 use crate::plan::Allocator;
 use crate::plan::Phase;
@@ -21,7 +21,7 @@ use crate::util::OpaquePointer;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, Ordering};
 
-use crate::plan::plan::{create_vm_space, CommonPlan};
+use crate::plan::global::{create_vm_space, CommonPlan};
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -205,7 +205,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 }
             }
             Phase::Initiate => {
-                self.common.set_gc_status(plan::GcStatus::GcPrepare);
+                self.common.set_gc_status(global::GcStatus::GcPrepare);
             }
             Phase::PrepareStacks => {
                 self.common
@@ -238,11 +238,11 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
             }
             &Phase::StackRoots => {
                 VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
-                self.common.set_gc_status(plan::GcStatus::GcProper);
+                self.common.set_gc_status(global::GcStatus::GcProper);
             }
             &Phase::Roots => {
                 VM::VMScanning::reset_thread_counter();
-                self.common.set_gc_status(plan::GcStatus::GcProper);
+                self.common.set_gc_status(global::GcStatus::GcProper);
             }
             &Phase::Closure => {}
             &Phase::Release => {
@@ -303,7 +303,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                     self.fromspace().protect();
                 }
 
-                self.common.set_gc_status(plan::GcStatus::NotInGC);
+                self.common.set_gc_status(global::GcStatus::NotInGC);
             }
             _ => panic!("Global phase not handled!"),
         }

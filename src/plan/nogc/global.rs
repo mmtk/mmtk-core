@@ -13,7 +13,7 @@ use std::cell::UnsafeCell;
 use super::NoGCCollector;
 use super::NoGCMutator;
 use super::NoGCTraceLocal;
-use crate::plan::plan::{create_vm_space, CommonPlan};
+use crate::plan::global::{create_vm_space, CommonPlan};
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;

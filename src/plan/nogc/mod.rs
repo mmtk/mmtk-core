@@ -1,16 +1,16 @@
-mod nogc;
-mod nogccollector;
-pub mod nogcconstraints;
-mod nogcmutator;
-mod nogctracelocal;
+mod global;
+mod collector;
+pub mod constraints;
+mod mutator;
+mod tracelocal;
 
-pub use self::nogc::NoGC;
-pub use self::nogccollector::NoGCCollector;
-pub use self::nogcmutator::NoGCMutator;
-pub use self::nogctracelocal::NoGCTraceLocal;
+pub use self::global::NoGC;
+pub use self::collector::NoGCCollector;
+pub use self::mutator::NoGCMutator;
+pub use self::tracelocal::NoGCTraceLocal;
 
-pub use self::nogc::SelectedPlan;
-pub use self::nogccollector::NoGCCollector as SelectedCollector;
-pub use self::nogcconstraints as SelectedConstraints;
-pub use self::nogcmutator::NoGCMutator as SelectedMutator;
-pub use self::nogctracelocal::NoGCTraceLocal as SelectedTraceLocal;
+pub use self::global::SelectedPlan;
+pub use self::collector::NoGCCollector as SelectedCollector;
+pub use self::constraints as SelectedConstraints;
+pub use self::mutator::NoGCMutator as SelectedMutator;
+pub use self::tracelocal::NoGCTraceLocal as SelectedTraceLocal;

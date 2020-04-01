@@ -1,16 +1,16 @@
-mod ss;
-mod sscollector;
-pub mod ssconstraints;
-mod ssmutator;
-mod sstracelocal;
+mod global;
+mod collector;
+pub mod constraints;
+mod mutator;
+mod tracelocal;
 
-pub use self::ss::SemiSpace;
-pub use self::sscollector::SSCollector;
-pub use self::ssmutator::SSMutator;
-pub use self::sstracelocal::SSTraceLocal;
+pub use self::global::SemiSpace;
+pub use self::collector::SSCollector;
+pub use self::mutator::SSMutator;
+pub use self::tracelocal::SSTraceLocal;
 
-pub use self::ss::SelectedPlan;
-pub use self::sscollector::SSCollector as SelectedCollector;
-pub use self::ssconstraints as SelectedConstraints;
-pub use self::ssmutator::SSMutator as SelectedMutator;
-pub use self::sstracelocal::SSTraceLocal as SelectedTraceLocal;
+pub use self::global::SelectedPlan;
+pub use self::collector::SSCollector as SelectedCollector;
+pub use self::constraints as SelectedConstraints;
+pub use self::mutator::SSMutator as SelectedMutator;
+pub use self::tracelocal::SSTraceLocal as SelectedTraceLocal;

@@ -1,14 +1,10 @@
-// For each GC plan, the global Plan module may the same name as the GC plan,
-// such as plan::nogc::nogc::NoGC, plan::g1::g1::G1. This is intentional.
-#![allow(clippy::module_inception)]
-
 pub mod collector_context;
 pub mod controller_collector_context;
 pub mod mutator_context;
 pub mod parallel_collector;
 mod parallel_collector_group;
 pub mod phase;
-pub mod plan;
+pub mod global;
 pub mod plan_constraints;
 mod trace;
 pub mod tracelocal;
@@ -19,8 +15,8 @@ pub use self::mutator_context::MutatorContext;
 pub use self::parallel_collector::ParallelCollector;
 pub use self::parallel_collector_group::ParallelCollectorGroup;
 pub use self::phase::Phase;
-pub use self::plan::Allocator;
-pub use self::plan::Plan;
+pub use self::global::Allocator;
+pub use self::global::Plan;
 pub use self::tracelocal::TraceLocal;
 pub use self::transitive_closure::TransitiveClosure;
 
