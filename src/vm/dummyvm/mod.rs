@@ -1,20 +1,15 @@
-extern crate mmtk;
-extern crate libc;
-#[macro_use]
-extern crate lazy_static;
-
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
+use crate::MMTK;
+use crate::{MMAPPER, VM_MAP};
 use std::ptr::null_mut;
-use mmtk::vm::VMBinding;
-use mmtk::util::OpaquePointer;
-use mmtk::MMTK;
-use mmtk::{VM_MAP, MMAPPER};
 
-pub mod scanning;
+pub mod active_plan;
+pub mod api;
 pub mod collection;
 pub mod object_model;
-pub mod active_plan;
 pub mod reference_glue;
-pub mod api;
+pub mod scanning;
 
 pub struct DummyVM;
 

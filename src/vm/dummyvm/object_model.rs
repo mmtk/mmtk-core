@@ -1,9 +1,9 @@
+use super::DummyVM;
+use crate::util::OpaquePointer;
+use crate::util::{Address, ObjectReference};
+use crate::vm::ObjectModel;
+use crate::Allocator;
 use libc::c_void;
-use mmtk::vm::ObjectModel;
-use mmtk::util::{Address, ObjectReference};
-use mmtk::Allocator;
-use mmtk::util::OpaquePointer;
-use DummyVM;
 use std::sync::atomic::AtomicU8;
 
 pub struct VMObjectModel {}

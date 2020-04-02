@@ -48,24 +48,25 @@ if system == "Darwin":
 elif system == "Linux":
     LIBRARY_PATH = "LD_LIBRARY_PATH"
 
-vmbinding = "vmbindings/dummyvm"
+vmbinding = "."
+vmbinding_crate = "mmtk"
 
 for plan in PLANS:
     cmd = []
     cmd.append("cargo")
     if toolchain:
-        params.append(toolchain)
+        cmd.append(toolchain)
     cmd.extend([
         "build",
         "--manifest-path",
-        "vmbindings/dummyvm/Cargo.toml",
+        "{}/Cargo.toml".format(vmbinding),
         "--no-default-features",
-        "--features", " ".join([plan, extra_features])
+        "--features", " ".join([plan, "dummyvm", extra_features])
     ])
 
     exec_and_redirect(cmd)
     exec_and_redirect(cmd + ["--release"])
-    shutil.copyfile("{}/target/release/libmmtk_dummyvm{}".format(vmbinding, SUFFIX),
+    shutil.copyfile("{}/target/release/lib{}{}".format(vmbinding, vmbinding_crate, SUFFIX),
                     "./libmmtk{}".format(SUFFIX))
 
     if system == "Linux":
@@ -73,7 +74,7 @@ for plan in PLANS:
         exec_and_redirect(
             cmd + ["--release", "--target=i686-unknown-linux-gnu"])
         shutil.copyfile(
-            "{}/target/i686-unknown-linux-gnu/release/libmmtk_dummyvm{}".format(vmbinding, SUFFIX),
+            "{}/target/i686-unknown-linux-gnu/release/lib{}{}".format(vmbinding, vmbinding_crate, SUFFIX),
             "./libmmtk_32{}".format(SUFFIX))
 
     exec_and_redirect([

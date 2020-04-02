@@ -1,9 +1,9 @@
+use super::DummyVM;
+use crate::util::ObjectReference;
+use crate::util::OpaquePointer;
+use crate::vm::ReferenceGlue;
+use crate::TraceLocal;
 use libc::c_void;
-use mmtk::vm::ReferenceGlue;
-use mmtk::util::ObjectReference;
-use mmtk::TraceLocal;
-use mmtk::util::OpaquePointer;
-use DummyVM;
 
 pub struct VMReferenceGlue {}
 
@@ -14,7 +14,11 @@ impl ReferenceGlue<DummyVM> for VMReferenceGlue {
     fn get_referent(object: ObjectReference) -> ObjectReference {
         unimplemented!()
     }
-    fn process_reference<T: TraceLocal>(trace: &mut T, reference: ObjectReference, tls: OpaquePointer) -> ObjectReference {
+    fn process_reference<T: TraceLocal>(
+        trace: &mut T,
+        reference: ObjectReference,
+        tls: OpaquePointer,
+    ) -> ObjectReference {
         unimplemented!()
     }
 }

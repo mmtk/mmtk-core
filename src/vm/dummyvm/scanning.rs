@@ -1,16 +1,20 @@
+use super::DummyVM;
+use crate::util::OpaquePointer;
+use crate::util::{ObjectReference, SynchronizedCounter};
+use crate::vm::Scanning;
+use crate::{TraceLocal, TransitiveClosure};
 use libc::c_void;
-use mmtk::vm::Scanning;
-use mmtk::{TransitiveClosure, TraceLocal};
-use mmtk::util::{ObjectReference, SynchronizedCounter};
-use mmtk::util::OpaquePointer;
-use crate::DummyVM;
 
 static COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
 pub struct VMScanning {}
 
 impl Scanning<DummyVM> for VMScanning {
-    fn scan_object<T: TransitiveClosure>(trace: &mut T, object: ObjectReference, tls: OpaquePointer) {
+    fn scan_object<T: TransitiveClosure>(
+        trace: &mut T,
+        object: ObjectReference,
+        tls: OpaquePointer,
+    ) {
         unimplemented!()
     }
 

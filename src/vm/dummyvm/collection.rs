@@ -1,8 +1,8 @@
+use super::DummyVM;
+use crate::util::OpaquePointer;
+use crate::vm::Collection;
+use crate::{MutatorContext, ParallelCollector};
 use libc::c_void;
-use mmtk::vm::Collection;
-use mmtk::{MutatorContext, ParallelCollector};
-use mmtk::util::OpaquePointer;
-use DummyVM;
 
 pub struct VMCollection {}
 
