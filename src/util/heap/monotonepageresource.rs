@@ -344,12 +344,13 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> MonotonePage
 #[cfg(test)]
 mod tests {
     use crate::mmtk::VM_MAP;
+    use crate::policy::immortalspace::ImmortalSpace;
     use crate::util::heap::MonotonePageResource;
     use crate::vm::dummyvm::DummyVM;
-    use crate::policy::immortalspace::ImmortalSpace;
 
     #[test]
     fn new_monotone_pageresource() {
-        let _pr = MonotonePageResource::<DummyVM, ImmortalSpace<DummyVM>>::new_discontiguous(0, &VM_MAP);
+        let _pr =
+            MonotonePageResource::<DummyVM, ImmortalSpace<DummyVM>>::new_discontiguous(0, &VM_MAP);
     }
 }
