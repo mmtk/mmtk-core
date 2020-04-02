@@ -3,7 +3,6 @@ use super::SINGLETON;
 use crate::util::OpaquePointer;
 use crate::vm::ActivePlan;
 use crate::{Plan, SelectedPlan};
-use libc::c_void;
 
 pub struct VMActivePlan {}
 
@@ -13,18 +12,18 @@ impl ActivePlan<DummyVM> for VMActivePlan {
     }
 
     unsafe fn collector(
-        tls: OpaquePointer,
+        _tls: OpaquePointer,
     ) -> &'static mut <SelectedPlan<DummyVM> as Plan<DummyVM>>::CollectorT {
         unimplemented!()
     }
 
-    unsafe fn is_mutator(tls: OpaquePointer) -> bool {
+    unsafe fn is_mutator(_tls: OpaquePointer) -> bool {
         // FIXME
         true
     }
 
     unsafe fn mutator(
-        tls: OpaquePointer,
+        _tls: OpaquePointer,
     ) -> &'static mut <SelectedPlan<DummyVM> as Plan<DummyVM>>::MutatorT {
         unimplemented!()
     }

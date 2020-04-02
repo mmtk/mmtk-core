@@ -1,8 +1,6 @@
-use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::{MMAPPER, VM_MAP};
-use std::ptr::null_mut;
 
 pub mod active_plan;
 pub mod api;

@@ -3,12 +3,11 @@ use super::SINGLETON;
 use crate::memory_manager;
 use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::Allocator;
-use crate::Plan;
+
 use crate::{SelectedCollector, SelectedMutator, SelectedTraceLocal};
 use libc::c_char;
-use libc::c_void;
+
 use std::ffi::CStr;
-use std::ptr::null_mut;
 
 #[no_mangle]
 pub extern "C" fn gc_init(heap_size: usize) {
@@ -219,7 +218,7 @@ pub extern "C" fn harness_begin(tls: OpaquePointer) {
 }
 
 #[no_mangle]
-pub extern "C" fn harness_end(tls: OpaquePointer) {
+pub extern "C" fn harness_end(_tls: OpaquePointer) {
     memory_manager::harness_end(&SINGLETON)
 }
 

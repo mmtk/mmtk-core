@@ -28,6 +28,10 @@ jobs:
         run: |
           cargo build --features nogc,sanity
           cargo build --features semispace,sanity
+      - name: Build DummyVM
+        run: |
+          cargo build --features nogc,dummyvm
+          cargo build --features semispace,dummyvm
 
       # Test
       - name: Cargo tests

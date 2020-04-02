@@ -133,6 +133,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(unused)]
     // All local queues call spin(). It returns None immediately.
     fn spin_done() {
         let shared = SharedQueue::<usize>::new();
@@ -156,6 +157,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(unused)]
     // One local queue calls spin() and waits until it gets some new work.
     fn spin_return() {
         let shared = SharedQueue::<usize>::new();

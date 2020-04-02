@@ -3,7 +3,6 @@ use crate::util::OpaquePointer;
 use crate::util::{ObjectReference, SynchronizedCounter};
 use crate::vm::Scanning;
 use crate::{TraceLocal, TransitiveClosure};
-use libc::c_void;
 
 static COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
@@ -11,9 +10,9 @@ pub struct VMScanning {}
 
 impl Scanning<DummyVM> for VMScanning {
     fn scan_object<T: TransitiveClosure>(
-        trace: &mut T,
-        object: ObjectReference,
-        tls: OpaquePointer,
+        _trace: &mut T,
+        _object: ObjectReference,
+        _tls: OpaquePointer,
     ) {
         unimplemented!()
     }
@@ -22,27 +21,27 @@ impl Scanning<DummyVM> for VMScanning {
         COUNTER.reset();
     }
 
-    fn notify_initial_thread_scan_complete(partial_scan: bool, tls: OpaquePointer) {
+    fn notify_initial_thread_scan_complete(_partial_scan: bool, _tls: OpaquePointer) {
         unimplemented!()
     }
 
-    fn compute_static_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
+    fn compute_static_roots<T: TraceLocal>(_trace: &mut T, _tls: OpaquePointer) {
         unimplemented!()
     }
 
-    fn compute_global_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
+    fn compute_global_roots<T: TraceLocal>(_trace: &mut T, _tls: OpaquePointer) {
         unimplemented!()
     }
 
-    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
+    fn compute_thread_roots<T: TraceLocal>(_trace: &mut T, _tls: OpaquePointer) {
         unimplemented!()
     }
 
-    fn compute_new_thread_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
+    fn compute_new_thread_roots<T: TraceLocal>(_trace: &mut T, _tls: OpaquePointer) {
         unimplemented!()
     }
 
-    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer) {
+    fn compute_bootimage_roots<T: TraceLocal>(_trace: &mut T, _tls: OpaquePointer) {
         unimplemented!()
     }
 
