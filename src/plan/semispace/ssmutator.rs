@@ -69,34 +69,6 @@ impl<VM: VMBinding> MutatorContext for SSMutator<VM> {
         }
     }
 
-    fn alloc_slow(
-        &mut self,
-        size: usize,
-        align: usize,
-        offset: isize,
-        allocator: AllocationType,
-    ) -> Address {
-        trace!(
-            "MutatorContext.alloc_slow({}, {}, {}, {:?})",
-            size,
-            align,
-            offset,
-            allocator
-        );
-        debug_assert!(
-            self.ss.get_space().unwrap() as *const _ == self.plan.tospace() as *const _,
-            "bumpallocator {:?} holds wrong space, ss.space: {:?}, tospace: {:?}",
-            self as *const _,
-            self.ss.get_space().unwrap() as *const _,
-            self.plan.tospace() as *const _
-        );
-        match allocator {
-            AllocationType::Default => self.ss.alloc_slow(size, align, offset),
-            AllocationType::Los => self.los.alloc(size, align, offset),
-            _ => self.vs.alloc_slow(size, align, offset),
-        }
-    }
-
     fn post_alloc(
         &mut self,
         refer: ObjectReference,

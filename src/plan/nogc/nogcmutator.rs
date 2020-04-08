@@ -38,23 +38,6 @@ impl<VM: VMBinding> MutatorContext for NoGCMutator<VM> {
         self.nogc.alloc(size, align, offset)
     }
 
-    fn alloc_slow(
-        &mut self,
-        size: usize,
-        align: usize,
-        offset: isize,
-        allocator: AllocationType,
-    ) -> Address {
-        trace!(
-            "MutatorContext.alloc_slow({}, {}, {}, {:?})",
-            size,
-            align,
-            offset,
-            allocator
-        );
-        self.nogc.alloc(size, align, offset)
-    }
-
     // We may match other patterns in the future, so temporarily disable this check
     #[allow(clippy::single_match)]
     fn post_alloc(
