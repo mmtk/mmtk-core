@@ -4,7 +4,7 @@ use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::util::alloc::Allocator;
-use crate::util::alloc::{BumpAllocator, LargeObjectAllocator};
+use crate::util::alloc::{BumpAllocator};
 use crate::util::heap::MonotonePageResource;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
@@ -14,7 +14,6 @@ use crate::vm::VMBinding;
 pub struct NoGCMutator<VM: VMBinding> {
     // ImmortalLocal
     nogc: BumpAllocator<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>,
-    los: LargeObjectAllocator<VM>,
 }
 
 impl<VM: VMBinding> MutatorContext for NoGCMutator<VM> {
@@ -36,10 +35,7 @@ impl<VM: VMBinding> MutatorContext for NoGCMutator<VM> {
             offset,
             allocator
         );
-        match allocator {
-            AllocationType::Los => self.los.alloc(size, align, offset),
-            _ => self.nogc.alloc(size, align, offset),
-        }
+        self.nogc.alloc(size, align, offset)
     }
 
     fn alloc_slow(
@@ -56,26 +52,19 @@ impl<VM: VMBinding> MutatorContext for NoGCMutator<VM> {
             offset,
             allocator
         );
-        match allocator {
-            AllocationType::Los => self.los.alloc(size, align, offset),
-            _ => self.nogc.alloc(size, align, offset),
-        }
+        self.nogc.alloc(size, align, offset)
     }
 
     // We may match other patterns in the future, so temporarily disable this check
     #[allow(clippy::single_match)]
     fn post_alloc(
         &mut self,
-        refer: ObjectReference,
+        _refer: ObjectReference,
         _type_refer: ObjectReference,
         _bytes: usize,
         allocator: AllocationType,
     ) {
         match allocator {
-            AllocationType::Los => {
-                // FIXME: data race on immortalspace.mark_state !!!
-                self.los.get_space().unwrap().initialize_header(refer, true);
-            }
             // FIXME: other allocation types
             _ => {}
         }
@@ -90,7 +79,6 @@ impl<VM: VMBinding> NoGCMutator<VM> {
     pub fn new(tls: OpaquePointer, plan: &'static NoGC<VM>) -> Self {
         NoGCMutator {
             nogc: BumpAllocator::new(tls, Some(plan.get_immortal_space()), plan),
-            los: LargeObjectAllocator::new(tls, Some(plan.get_los()), plan),
         }
     }
 }
