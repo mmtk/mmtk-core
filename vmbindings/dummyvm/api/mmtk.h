@@ -20,9 +20,6 @@ extern void destroy_mutator(MMTk_Mutator mutator);
 extern void* alloc(MMTk_Mutator mutator, size_t size,
     size_t align, ssize_t offset, int allocator);
 
-extern void* alloc_slow(MMTk_Mutator mutator, size_t size,
-    size_t align, ssize_t offset, int allocator);
-
 extern void post_alloc(MMTk_Mutator mutator, void* refer, void* type_refer,
     int bytes, int allocator);
 
