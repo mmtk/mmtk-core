@@ -37,6 +37,7 @@ jobs:
       - name: DummyVM tests
         # use default toolchain, use i386 lib
         run: |
+          sudo apt-get update
           sudo apt-get install libc6-dev-i386
           RUSTUP_TOOLCHAIN= python examples/build.py
 
