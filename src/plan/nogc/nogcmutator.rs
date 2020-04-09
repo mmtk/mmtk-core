@@ -4,7 +4,7 @@ use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::util::alloc::Allocator;
-use crate::util::alloc::{BumpAllocator};
+use crate::util::alloc::BumpAllocator;
 use crate::util::heap::MonotonePageResource;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
