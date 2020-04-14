@@ -74,17 +74,6 @@ pub fn alloc<VM: VMBinding>(
     mutator.alloc(size, align, offset, allocator)
 }
 
-#[inline(never)]
-pub fn alloc_slow<VM: VMBinding>(
-    mutator: &mut SelectedMutator<VM>,
-    size: usize,
-    align: usize,
-    offset: isize,
-    allocator: Allocator,
-) -> Address {
-    mutator.alloc_slow(size, align, offset, allocator)
-}
-
 pub fn post_alloc<VM: VMBinding>(
     mutator: &mut SelectedMutator<VM>,
     refer: ObjectReference,

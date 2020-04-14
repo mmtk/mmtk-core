@@ -6,13 +6,6 @@ use crate::util::{Address, ObjectReference};
 pub trait MutatorContext {
     fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool);
     fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: Allocator) -> Address;
-    fn alloc_slow(
-        &mut self,
-        size: usize,
-        align: usize,
-        offset: isize,
-        allocator: Allocator,
-    ) -> Address;
     fn post_alloc(
         &mut self,
         refer: ObjectReference,
