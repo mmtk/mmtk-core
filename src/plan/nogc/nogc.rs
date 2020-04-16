@@ -12,7 +12,7 @@ use std::cell::UnsafeCell;
 use super::NoGCCollector;
 use super::NoGCMutator;
 use super::NoGCTraceLocal;
-use crate::plan::plan::{create_vm_space, CommonPlan};
+use crate::plan::plan::CommonPlan;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -33,7 +33,6 @@ pub struct NoGC<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
 
 pub struct NoGCUnsync<VM: VMBinding> {
-    vm_space: Option<ImmortalSpace<VM>>,
     pub space: ImmortalSpace<VM>,
 }
 
@@ -51,16 +50,6 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
 
         NoGC {
             unsync: UnsafeCell::new(NoGCUnsync {
-                vm_space: if options.vm_space {
-                    Some(create_vm_space(
-                        vm_map,
-                        mmapper,
-                        &mut heap,
-                        options.vm_space_size,
-                    ))
-                } else {
-                    None
-                },
                 space: ImmortalSpace::new(
                     "nogc_space",
                     true,
@@ -80,16 +69,14 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
             self.common.heap.get_discontig_end(),
         );
 
-        let unsync = unsafe { &mut *self.unsync.get() };
         self.common
             .heap
             .total_pages
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);
         // FIXME correctly initialize spaces based on options
-        if unsync.vm_space.is_some() {
-            unsync.vm_space.as_mut().unwrap().init(vm_map);
-        }
+        let unsync = unsafe { &mut *self.unsync.get() };
         unsync.space.init(vm_map);
+        self.common.gc_init(heap_size, vm_map)
     }
 
     fn common(&self) -> &CommonPlan<VM> {
@@ -116,12 +103,10 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
     fn is_valid_ref(&self, object: ObjectReference) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
         if unsync.space.in_space(object) {
-            return true;
+            true
+        } else {
+            self.common.is_valid_ref(object)
         }
-        if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
-            return true;
-        }
-        false
     }
 
     fn is_bad_ref(&self, _object: ObjectReference) -> bool {
@@ -130,30 +115,15 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
 
     fn is_mapped_address(&self, address: Address) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
-        if unsafe {
-            unsync.space.in_space(address.to_object_reference())
-                || (unsync.vm_space.is_some()
-                    && unsync
-                        .vm_space
-                        .as_ref()
-                        .unwrap()
-                        .in_space(address.to_object_reference()))
-        } {
+        if unsafe { unsync.space.in_space(address.to_object_reference()) } {
             self.common.mmapper.address_is_mapped(address)
         } else {
-            false
+            self.common.is_mapped_address(address)
         }
     }
 
-    fn is_movable(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        if unsync.space.in_space(object) {
-            return unsync.space.is_movable();
-        }
-        if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
-            return unsync.vm_space.as_ref().unwrap().is_movable();
-        }
-        true
+    fn is_movable(&self, _object: ObjectReference) -> bool {
+        false // By definition no objects are movable in NoGC
     }
 }
 
