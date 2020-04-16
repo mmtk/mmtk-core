@@ -20,34 +20,17 @@ jobs:
           override: true
 
       # Build
-      - name: Build plan - NoGC
-        run: cargo build --features nogc
-      - name: Build plan - SemiSpace
-        run: cargo build --features semispace
-      - name: Build features
-        run: |
-          cargo build --features nogc,sanity
-          cargo build --features semispace,sanity
+      - name: Build
+        run: ./.github/scripts/ci-build.sh
 
       # Test
-      - name: Cargo tests
-        run: |
-          cargo test --features nogc
-          cargo test --features semispace
-      - name: DummyVM tests
-        # use default toolchain, use i386 lib
+      - name: Test
         run: |
           sudo apt-get update
           sudo apt-get install libc6-dev-i386
-          RUSTUP_TOOLCHAIN= python examples/build.py
+          export RUSTUP_TOOLCHAIN=
+          ./.github/scripts/ci-test.sh
 
-      # Linter
-      - name: Lint checks
-        run: |
-          export RUSTFLAGS="-D warnings"
-          cargo clippy --features nogc
-          cargo clippy --features semispace
-          cargo clippy --features nogc,sanity
-          cargo clippy --features semispace,sanity
-      - name: Rustfmt
-        run: cargo fmt -- --check
+      # Style checks
+      - name: Style checks
+        run: ./.github/scripts/ci-style.sh
