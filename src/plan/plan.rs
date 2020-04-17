@@ -15,6 +15,8 @@ use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::vm::{Collection, ObjectModel};
+#[cfg(feature = "vmspace")]
+use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -383,9 +385,8 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn is_valid_ref(&self, _object: ObjectReference) -> bool {
         #[cfg(feature = "vmspace")]
         {
-            let unsync_c = unsafe { &mut *self.unsync.get() };
-            if unsync_c.vm_space.is_some() && unsync_c.vm_space.as_ref().unwrap().in_space(_object)
-            {
+            let unsync = unsafe { &mut *self.unsync.get() };
+            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object) {
                 return true;
             }
         }
@@ -457,8 +458,8 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub unsafe fn collection_phase(&self, _tls: OpaquePointer, _phase: &Phase) {
         #[cfg(feature = "vmspace")]
         {
-            let unsync = unsafe { &mut *self.unsync.get() };
-            match phase {
+            let unsync = &mut *self.unsync.get();
+            match _phase {
                 Phase::Prepare => {
                     if unsync.vm_space.is_some() {
                         unsync.vm_space.as_mut().unwrap().prepare();
