@@ -30,6 +30,7 @@ nogc = ["immortalspace", "largeobjectspace"]
 semispace = ["immortalspace", "largeobjectspace", "copyspace"]
 
 # spaces
+vmspace = []
 immortalspace = []
 copyspace = []
 largeobjectspace = []
