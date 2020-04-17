@@ -8,14 +8,36 @@ on:
       - master
 
 jobs:
-  post-code-review-checks:
+  jikesrvm-binding-test:
     runs-on: ubuntu-18.04
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
     steps:
-      - name: Check label
-        run: echo "${{github.event.pull_request.labels.*.name}}"
-      - name: Prepare repo
+      - name: Checkout MMTk Core
         uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout JikesRVM Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-jikesrvm
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-jikesrvm
+          submodules: true
+      - name: Overwrite MMTk core in JikesRVM binding
+        run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
+      - name: Setup
+        run: |
+          cd mmtk-jikesrvm
+          ./.github/scripts/ci-setup.sh
       - name: Test
-        if: success()
-        run: echo "Do more tests here when the PR is approved"
+        run: |
+          cd mmtk-jikesrvm
+          ./.github/scripts/ci-test.sh
+      # This step is not quite useful, comment it out for now.
+#      - name: Result
+#        if: always()
+#        uses: thollander/actions-comment-pull-request@master
+#        with:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#          message: |
+#            '${{ github.job }}' for ${{ github.sha }}: [${{ job.status }}](https://github.com/mmtk/mmtk-core/actions/runs/${{ github.run_id }})
