@@ -2,15 +2,15 @@ name: Post Code Review Checks
 
 on:
   pull_request:
-#    types:
-#      - labeled
+    types:
+      - labeled
     branches:
       - master
 
 jobs:
   jikesrvm-binding-test:
     runs-on: ubuntu-18.04
-#    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -24,21 +24,20 @@ jobs:
           path: mmtk-jikesrvm
           submodules: true
       - name: Overwrite MMTk core in JikesRVM binding
-        run: |
-          set -x
-          ls -l mmtk-core
-          cat mmtk-core/src/mm/memory_manager.rs
-          ls -l mmtk-jikesrvm/repos/mmtk-core
-          cat mmtk-jikesrvm/repos/mmtk-core/src/mm/memory_manager.rs
-          rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
-          ls -l mmtk-jikesrvm/repos/mmtk-core
-          cat mmtk-jikesrvm/repos/mmtk-core/src/mm/memory_manager.rs
+        run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
       - name: Setup
         run: |
           cd mmtk-jikesrvm
-          ls
           ./.github/scripts/ci-setup.sh
       - name: Test
         run: |
           cd mmtk-jikesrvm
           ./.github/scripts/ci-test.sh
+      # This step is not quite useful, comment it out for now.
+#      - name: Result
+#        if: always()
+#        uses: thollander/actions-comment-pull-request@master
+#        with:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#          message: |
+#            '${{ github.job }}' for ${{ github.sha }}: [${{ job.status }}](https://github.com/mmtk/mmtk-core/actions/runs/${{ github.run_id }})
