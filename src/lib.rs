@@ -24,7 +24,7 @@ pub mod util;
 mod mm;
 mod mmtk;
 mod plan;
-mod policy;
+pub mod policy;
 pub mod vm;
 
 pub use crate::mm::memory_manager;
