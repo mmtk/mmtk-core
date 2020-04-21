@@ -26,7 +26,6 @@ pub struct SSCollector<VM: VMBinding> {
     pub tls: OpaquePointer,
     // CopyLocal
     pub ss: BumpAllocator<VM, MonotonePageResource<VM, CopySpace<VM>>>,
-    los: LargeObjectAllocator<VM>,
     trace: SSTraceLocal<VM>,
 
     last_trigger_count: usize,
@@ -43,11 +42,6 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         SSCollector {
             tls: OpaquePointer::UNINITIALIZED,
             ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
-            los: LargeObjectAllocator::new(
-                OpaquePointer::UNINITIALIZED,
-                Some(mmtk.plan.get_los()),
-                &mmtk.plan,
-            ),
             trace: SSTraceLocal::new(&mmtk.plan),
 
             last_trigger_count: 0,
@@ -62,7 +56,6 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
     fn init(&mut self, tls: OpaquePointer) {
         self.tls = tls;
         self.ss.tls = tls;
-        self.los.tls = tls;
         self.trace.init(tls);
     }
 
@@ -75,7 +68,6 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         allocator: AllocationType,
     ) -> Address {
         match allocator {
-            crate::plan::Allocator::Los => self.los.alloc(bytes, align, offset),
             _ => self.ss.alloc(bytes, align, offset),
         }
     }
@@ -175,12 +167,6 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         clear_forwarding_bits::<VM>(object);
         match allocator {
             crate::plan::Allocator::Default => {}
-            crate::plan::Allocator::Los => {
-                self.los
-                    .get_space()
-                    .unwrap()
-                    .initialize_header(object, false);
-            }
             _ => panic!("Currently we can't copy to other spaces other than copyspace"),
         }
     }

@@ -69,14 +69,6 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
                 .copyspace1
                 .trace_object(self, object, ss::ALLOC_SS, tls);
         }
-        if plan_unsync.versatile_space.in_space(object) {
-            trace!("trace_object: object in versatile_space");
-            return plan_unsync.versatile_space.trace_object(self, object);
-        }
-        if plan_unsync.los.in_space(object) {
-            trace!("trace_object: object in los");
-            return plan_unsync.los.trace_object(self, object);
-        }
         self.plan.common.trace_object(self, object)
     }
 
@@ -137,14 +129,6 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
                 return unsync.copyspace1.is_live(object);
             }
         }
-        // FIXME is it actually alive?
-        if unsync.versatile_space.in_space(object) {
-            return true;
-        }
-        if unsync.los.in_space(object) {
-            return true;
-        }
-
         self.plan.common.is_live(object)
     }
 }
