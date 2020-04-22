@@ -2,7 +2,6 @@ use crate::plan::mutator_context::{CommonMutatorContext, MutatorContext};
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
 use crate::policy::copyspace::CopySpace;
-use crate::policy::immortalspace::ImmortalSpace;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::heap::MonotonePageResource;
@@ -25,7 +24,7 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
         &self.common
     }
 
-    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
+    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, _primary: bool) {
         match phase {
             Phase::PrepareStacks => {
                 if !self.plan.common.stacks_prepared() {

@@ -29,7 +29,6 @@ use crate::vm::VMBinding;
 use std::sync::Arc;
 
 pub type SelectedPlan<VM> = SemiSpace<VM>;
-pub type SelectedMutator<VM> = SSMutator<VM>;
 
 pub const ALLOC_SS: Allocator = Allocator::Default;
 pub const SCAN_BOOT_IMAGE: bool = true;
@@ -110,7 +109,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
         if self.tospace().in_space(object) || self.fromspace().in_space(object) {
             return false;
         }
@@ -118,7 +116,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
     }
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
         if self.tospace().in_space(object) {
             return true;
         }
