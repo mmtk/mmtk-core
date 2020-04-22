@@ -5,11 +5,10 @@ use crate::plan::transitive_closure::TransitiveClosure;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-use crate::util::conversions::{raw_align_up,bytes_to_pages};
+use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::Mmapper as IMmapper;
-use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
@@ -272,7 +271,9 @@ pub fn create_vm_space<VM: VMBinding>(
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
 
+    use crate::util::conversions::raw_align_up;
     use crate::util::constants::LOG_BYTES_IN_MBYTE;
+    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     let boot_segment_mb =
         raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
 

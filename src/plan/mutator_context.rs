@@ -1,5 +1,5 @@
 use crate::plan::plan::CommonPlan;
-use crate::plan::selected_plan::{SelectedMutator, SelectedPlan};
+use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -7,7 +7,6 @@ use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator};
 use crate::util::heap::MonotonePageResource;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
-use crate::vm::Collection;
 use crate::vm::VMBinding;
 
 pub trait MutatorContext<VM: VMBinding> {
@@ -34,7 +33,6 @@ pub trait MutatorContext<VM: VMBinding> {
 pub struct CommonMutatorContext<VM: VMBinding> {
     immortal: BumpAllocator<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>,
     los: LargeObjectAllocator<VM>,
-    common_plan: &'static CommonPlan<VM>,
 }
 
 impl<VM: VMBinding> CommonMutatorContext<VM> {
@@ -46,7 +44,6 @@ impl<VM: VMBinding> CommonMutatorContext<VM> {
         CommonMutatorContext {
             immortal: BumpAllocator::new(tls, Some(common_plan.get_immortal()), plan),
             los: LargeObjectAllocator::new(tls, Some(common_plan.get_los()), plan),
-            common_plan: common_plan,
         }
     }
 
