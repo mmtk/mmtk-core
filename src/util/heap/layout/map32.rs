@@ -9,9 +9,6 @@ use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
-#[cfg(target_pointer_width = "32")]
-const MAP_BASE_ADDRESS: Address = Address::ZERO;
-
 pub struct Map32 {
     prev_link: Vec<i32>,
     next_link: Vec<i32>,
