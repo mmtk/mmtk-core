@@ -5,10 +5,11 @@ use crate::plan::transitive_closure::TransitiveClosure;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-use crate::util::conversions::bytes_to_pages;
+use crate::util::conversions::{raw_align_up,bytes_to_pages};
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::Mmapper as IMmapper;
+use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
@@ -43,10 +44,18 @@ pub trait Plan<VM: VMBinding>: Sized {
     }
     // unsafe because this can only be called once by the init thread
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
+
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::MutatorT>;
     fn will_never_move(&self, object: ObjectReference) -> bool;
     // unsafe because only the primary collector thread can call this
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
+
+    #[cfg(feature = "sanity")]
+    fn enter_sanity(&self) {}
+    #[cfg(feature = "sanity")]
+    fn leave_sanity(&self) {}
+    #[cfg(feature = "sanity")]
+    fn is_in_sanity(&self) -> bool { false }
 
     fn is_initialized(&self) -> bool {
         self.common().initialized.load(Ordering::SeqCst)
@@ -244,9 +253,6 @@ pub struct CommonPlan<VM: VMBinding> {
     pub oom_lock: Mutex<()>,
 
     pub control_collector_context: ControllerCollectorContext<VM>,
-
-    #[cfg(feature = "sanity")]
-    pub inside_sanity: AtomicBool,
 }
 
 pub struct CommonUnsync<VM: VMBinding> {
@@ -266,8 +272,9 @@ pub fn create_vm_space<VM: VMBinding>(
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
 
+    use crate::util::constants::LOG_BYTES_IN_MBYTE;
     let boot_segment_mb =
-        conversions::raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
+        raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
 
     ImmortalSpace::new(
         "boot",
@@ -333,9 +340,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
             cur_collection_attempts: AtomicUsize::new(0),
             oom_lock: Mutex::new(()),
             control_collector_context: ControllerCollectorContext::new(),
-
-            #[cfg(feature = "sanity")]
-            inside_sanity: AtomicBool::new(false),
         }
     }
 
@@ -354,7 +358,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         #[cfg(feature = "vmspace")]
         {
             if unsync.vm_space.is_some() {
-                unsync.vm_space.as_mut().unwrap().init(_vm_map);
+                unsync.vm_space.as_mut().unwrap().init(vm_map);
             }
         }
     }
@@ -501,14 +505,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
         {
             let unsync = unsafe { &*self.unsync.get() };
             unsafe {
-                if unsync_c.vm_space.is_some()
-                    && unsync_c
+                if unsync.vm_space.is_some()
+                    && unsync
                         .vm_space
                         .as_ref()
                         .unwrap()
                         .in_space(_address.to_object_reference())
                 {
-                    true
+                    return true;
                 }
             }
         }
@@ -559,12 +563,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     self.stacks_prepared.store(true, atomic::Ordering::SeqCst);
                 }
                 Phase::Prepare => {
-                    #[cfg(feature = "sanity")]
-                    {
-                        use crate::util::sanity::sanity_checker::SanityChecker;
-                        println!("Pre GC sanity check");
-                        SanityChecker::new(tls, &self).check();
-                    }
                     unsync.immortal.prepare();
                     unsync.los.prepare(major);
                     #[cfg(feature = "vmspace")]
@@ -612,20 +610,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         *self.gc_status.lock().unwrap() == GcStatus::GcProper
     }
 
-    #[cfg(feature = "sanity")]
-    pub fn enter_sanity(&self) {
-        self.inside_sanity.store(true, Ordering::Relaxed)
-    }
-
-    #[cfg(feature = "sanity")]
-    pub fn leave_sanity(&self) {
-        self.inside_sanity.store(false, Ordering::Relaxed)
-    }
-
-    #[cfg(feature = "sanity")]
-    pub fn is_in_sanity(&self) -> bool {
-        self.inside_sanity.load(Ordering::Relaxed)
-    }
 
     pub fn get_immortal(&self) -> &'static ImmortalSpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };

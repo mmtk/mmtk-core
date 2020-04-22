@@ -18,6 +18,8 @@ use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, Ordering};
+#[cfg(feature = "sanity")]
+use std::sync::atomic::{AtomicBool};
 
 use crate::plan::plan::CommonPlan;
 use crate::util::conversions::bytes_to_pages;
@@ -40,6 +42,9 @@ pub struct SemiSpace<VM: VMBinding> {
     pub unsync: UnsafeCell<SemiSpaceUnsync<VM>>,
     pub ss_trace: Trace,
     pub common: CommonPlan<VM>,
+
+    #[cfg(feature = "sanity")]
+    pub inside_sanity: AtomicBool,
 }
 
 pub struct SemiSpaceUnsync<VM: VMBinding> {
@@ -86,6 +91,9 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
             }),
             ss_trace: Trace::new(),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
+
+            #[cfg(feature = "sanity")]
+            inside_sanity: AtomicBool::new(false),
         }
     }
 
@@ -135,7 +143,14 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 unsync.hi = !unsync.hi; // flip the semi-spaces
                                         // prepare each of the collected regions
                 unsync.copyspace0.prepare(unsync.hi);
-                unsync.copyspace1.prepare(!unsync.hi)
+                unsync.copyspace1.prepare(!unsync.hi);
+
+                #[cfg(feature = "sanity")]
+                {
+                    use crate::util::sanity::sanity_checker::SanityChecker;
+                    println!("Pre GC sanity check");
+                    SanityChecker::new(tls, &self).check();
+                }
             }
             &Phase::Release => {
                 self.common.collection_phase(tls, phase, true);
@@ -229,6 +244,21 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         } else {
             self.common.is_mapped_address(address)
         }
+    }
+
+    #[cfg(feature = "sanity")]
+    fn enter_sanity(&self) {
+        self.inside_sanity.store(true, Ordering::Relaxed)
+    }
+
+    #[cfg(feature = "sanity")]
+    fn leave_sanity(&self) {
+        self.inside_sanity.store(false, Ordering::Relaxed)
+    }
+
+    #[cfg(feature = "sanity")]
+    fn is_in_sanity(&self) -> bool {
+        self.inside_sanity.load(Ordering::Relaxed)
     }
 }
 

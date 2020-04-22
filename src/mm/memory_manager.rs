@@ -104,7 +104,7 @@ pub fn report_delayed_root_edge<VM: VMBinding>(
     addr: Address,
 ) {
     use crate::util::sanity::sanity_checker::SanityChecker;
-    if mmtk.plan.common().is_in_sanity() {
+    if mmtk.plan.is_in_sanity() {
         let sanity_checker: &mut SanityChecker<VM> =
             unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.report_delayed_root_edge(addr);
@@ -128,7 +128,7 @@ pub fn will_not_move_in_current_collection<VM: VMBinding>(
     obj: ObjectReference,
 ) -> bool {
     use crate::util::sanity::sanity_checker::SanityChecker;
-    if mmtk.plan.common().is_in_sanity() {
+    if mmtk.plan.is_in_sanity() {
         let sanity_checker: &mut SanityChecker<VM> =
             unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.will_not_move_in_current_collection(obj)
@@ -154,7 +154,7 @@ pub fn process_interior_edge<VM: VMBinding>(
     root: bool,
 ) {
     use crate::util::sanity::sanity_checker::SanityChecker;
-    if mmtk.plan.common().is_in_sanity() {
+    if mmtk.plan.is_in_sanity() {
         let sanity_checker: &mut SanityChecker<VM> =
             unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.process_interior_edge(target, slot, root)
