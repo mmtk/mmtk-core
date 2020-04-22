@@ -4,7 +4,6 @@ use super::SSCollector;
 use super::SSMutator;
 use super::SSTraceLocal;
 
-use crate::plan::plan;
 use crate::plan::trace::Trace;
 use crate::plan::Allocator;
 use crate::plan::Phase;
@@ -17,18 +16,15 @@ use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
-use std::sync::atomic::{self, Ordering};
 #[cfg(feature = "sanity")]
-use std::sync::atomic::{AtomicBool};
+use std::sync::atomic::{AtomicBool,Ordering};
 
 use crate::plan::plan::CommonPlan;
-use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::vm::Scanning;
 use crate::vm::VMBinding;
 use std::sync::Arc;
 

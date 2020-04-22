@@ -12,7 +12,7 @@ use crate::plan::TraceLocal;
 use crate::plan::{phase, Phase};
 use crate::policy::copyspace::CopySpace;
 use crate::util::alloc::Allocator;
-use crate::util::alloc::{BumpAllocator, LargeObjectAllocator};
+use crate::util::alloc::BumpAllocator;
 use crate::util::forwarding_word::clear_forwarding_bits;
 use crate::util::heap::MonotonePageResource;
 use crate::util::reference_processor::*;

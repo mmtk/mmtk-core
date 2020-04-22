@@ -1,11 +1,10 @@
-use crate::plan::mutator_context::CommonMutatorContext;
-use crate::plan::mutator_context::MutatorContext;
+use crate::plan::mutator_context::{CommonMutatorContext, MutatorContext};
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::util::alloc::Allocator;
-use crate::util::alloc::{BumpAllocator, LargeObjectAllocator};
+use crate::util::alloc::BumpAllocator;
 use crate::util::heap::MonotonePageResource;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
