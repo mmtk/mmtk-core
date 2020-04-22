@@ -56,8 +56,8 @@ impl<VM: VMBinding> CommonMutatorContext<VM> {
     ) -> Address {
         match allocator {
             AllocationType::Los => self.los.alloc(size, align, offset),
-           AllocationType::Immortal => self.immortal.alloc(size, align, offset),
-           _ => unreachable!(),
+            AllocationType::Immortal => self.immortal.alloc(size, align, offset),
+            _ => unreachable!(),
         }
     }
 
@@ -70,16 +70,15 @@ impl<VM: VMBinding> CommonMutatorContext<VM> {
     ) {
         match allocator {
             AllocationType::Los => {
-                // FIXME: data race on immortalspace.mark_state !!!
                 self.los
                     .get_space()
                     .unwrap()
                     .initialize_header(object, true);
             }
-            _ => {
-                // FIXME: data race on immortalspace.mark_state !!!
-                self.immortal.get_space().unwrap().initialize_header(object);
+            AllocationType::Immortal => {
+                self.immortal.get_space().unwrap().initialize_header(object)
             }
+            _ => unreachable!(),
         }
     }
 }

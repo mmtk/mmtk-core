@@ -502,7 +502,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         panic!("No special case for space in trace_object");
     }
 
-    fn is_vmspace(&self, _address: Address) -> bool {
+    fn is_in_vmspace(&self, _address: Address) -> bool {
         #[cfg(feature = "vmspace")]
         {
             let unsync = unsafe { &*self.unsync.get() };
@@ -526,7 +526,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         if unsafe {
             unsync.immortal.in_space(address.to_object_reference())
                 || unsync.los.in_space(address.to_object_reference())
-                || self.is_vmspace(address)
+                || self.is_in_vmspace(address)
         } {
             self.mmapper.address_is_mapped(address)
         } else {
@@ -534,7 +534,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
-    pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, major: bool) {
+    pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         {
             let unsync = &mut *self.unsync.get();
             match phase {
@@ -566,7 +566,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 }
                 Phase::Prepare => {
                     unsync.immortal.prepare();
-                    unsync.los.prepare(major);
+                    unsync.los.prepare(primary);
                     #[cfg(feature = "vmspace")]
                     {
                         if unsync.vm_space.is_some() {
