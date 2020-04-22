@@ -56,7 +56,8 @@ impl<VM: VMBinding> CommonMutatorContext<VM> {
     ) -> Address {
         match allocator {
             AllocationType::Los => self.los.alloc(size, align, offset),
-            _ => self.immortal.alloc(size, align, offset),
+           AllocationType::Immortal => self.immortal.alloc(size, align, offset),
+           _ => unreachable!(),
         }
     }
 
