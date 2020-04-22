@@ -1,4 +1,3 @@
-use libc::c_void;
 use mmtk::vm::ReferenceGlue;
 use mmtk::util::ObjectReference;
 use mmtk::TraceLocal;

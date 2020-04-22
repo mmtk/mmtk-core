@@ -86,7 +86,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         unimplemented!()
     }
 
-    fn write_available_bits_word(_object: ObjectReference, val: usize) {
+    fn write_available_bits_word(_object: ObjectReference, _val: usize) {
         unimplemented!()
     }
 

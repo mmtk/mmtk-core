@@ -1,4 +1,3 @@
-use libc::c_void;
 use libc::c_char;
 use std::ffi::CStr;
 use mmtk::memory_manager;

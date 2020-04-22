@@ -1,5 +1,4 @@
 use crate::util::constants::LOG_BYTES_IN_PAGE;
-use num_cpus;
 use std::cell::UnsafeCell;
 use std::default::Default;
 use std::ops::Deref;
