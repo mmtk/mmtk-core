@@ -535,7 +535,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, major: bool) {
         {
-            let unsync = unsafe { &mut *self.unsync.get() };
+            let unsync = &mut *self.unsync.get();
             match phase {
                 Phase::SetCollectionKind => {
                     self.cur_collection_attempts.store(
