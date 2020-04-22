@@ -54,7 +54,9 @@ pub trait Plan<VM: VMBinding>: Sized {
     #[cfg(feature = "sanity")]
     fn leave_sanity(&self) {}
     #[cfg(feature = "sanity")]
-    fn is_in_sanity(&self) -> bool { false }
+    fn is_in_sanity(&self) -> bool {
+        false
+    }
 
     fn is_initialized(&self) -> bool {
         self.common().initialized.load(Ordering::SeqCst)
@@ -271,11 +273,10 @@ pub fn create_vm_space<VM: VMBinding>(
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
 
-    use crate::util::conversions::raw_align_up;
     use crate::util::constants::LOG_BYTES_IN_MBYTE;
+    use crate::util::conversions::raw_align_up;
     use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-    let boot_segment_mb =
-        raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
+    let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
 
     ImmortalSpace::new(
         "boot",
@@ -610,7 +611,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn gc_in_progress_proper(&self) -> bool {
         *self.gc_status.lock().unwrap() == GcStatus::GcProper
     }
-
 
     pub fn get_immortal(&self) -> &'static ImmortalSpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };

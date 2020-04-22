@@ -17,7 +17,7 @@ use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
 #[cfg(feature = "sanity")]
-use std::sync::atomic::{AtomicBool,Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::plan::plan::CommonPlan;
 use crate::util::heap::layout::heap_layout::Mmapper;
