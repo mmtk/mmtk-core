@@ -1,5 +1,6 @@
 use super::vmrequest::HEAP_LAYOUT_64BIT;
 use crate::util::constants::*;
+#[cfg(target_pointer_width = "64")]
 use crate::util::heap::layout::heap_parameters;
 use crate::util::heap::layout::vm_layout_constants;
 use crate::util::Address;
