@@ -95,11 +95,11 @@ impl SpaceDescriptor {
     }
 
     pub fn is_contiguous(self) -> bool {
-        ((self.0 & TYPE_CONTIGUOUS) == TYPE_CONTIGUOUS)
+        (self.0 & TYPE_CONTIGUOUS) == TYPE_CONTIGUOUS
     }
 
     pub fn is_contiguous_hi(self) -> bool {
-        ((self.0 & TYPE_MASK) == TYPE_CONTIGUOUS_HI)
+        (self.0 & TYPE_MASK) == TYPE_CONTIGUOUS_HI
     }
 
     #[cfg(target_pointer_width = "64")]

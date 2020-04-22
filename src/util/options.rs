@@ -28,7 +28,7 @@ impl UnsafeOptionsWrapper {
 impl Deref for UnsafeOptionsWrapper {
     type Target = Options;
     fn deref(&self) -> &Options {
-        unsafe { (&*self.0.get()) }
+        unsafe { &*self.0.get() }
     }
 }
 
