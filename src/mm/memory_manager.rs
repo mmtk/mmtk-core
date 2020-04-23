@@ -180,8 +180,7 @@ pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &mut SelectedColl
 
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
     unsafe {
-        { (&mut *mmtk.plan.common().control_collector_context.workers.get()) }
-            .init_group(mmtk, tls);
+        { &mut *mmtk.plan.common().control_collector_context.workers.get() }.init_group(mmtk, tls);
         {
             VM::VMCollection::spawn_worker_thread::<<SelectedPlan<VM> as Plan<VM>>::CollectorT>(
                 tls, None,

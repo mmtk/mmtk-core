@@ -1,12 +1,12 @@
-use libc::c_void;
+// All functions here are extern function. There is no point for marking them as unsafe.
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 use libc::c_char;
 use std::ffi::CStr;
-use std::ptr::null_mut;
 use mmtk::memory_manager;
 use mmtk::Allocator;
 use mmtk::util::{ObjectReference, OpaquePointer, Address};
 use mmtk::{SelectedMutator, SelectedTraceLocal, SelectedCollector};
-use mmtk::Plan;
 use DummyVM;
 use SINGLETON;
 
@@ -159,7 +159,7 @@ pub extern "C" fn harness_begin(tls: OpaquePointer) {
 }
 
 #[no_mangle]
-pub extern "C" fn harness_end(tls: OpaquePointer) {
+pub extern "C" fn harness_end(_tls: OpaquePointer) {
     memory_manager::harness_end(&SINGLETON)
 }
 

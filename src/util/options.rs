@@ -1,5 +1,4 @@
 use crate::util::constants::LOG_BYTES_IN_PAGE;
-use num_cpus;
 use std::cell::UnsafeCell;
 use std::default::Default;
 use std::ops::Deref;
@@ -28,7 +27,7 @@ impl UnsafeOptionsWrapper {
 impl Deref for UnsafeOptionsWrapper {
     type Target = Options;
     fn deref(&self) -> &Options {
-        unsafe { (&*self.0.get()) }
+        unsafe { &*self.0.get() }
     }
 }
 

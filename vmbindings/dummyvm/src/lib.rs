@@ -3,9 +3,7 @@ extern crate libc;
 #[macro_use]
 extern crate lazy_static;
 
-use std::ptr::null_mut;
 use mmtk::vm::VMBinding;
-use mmtk::util::OpaquePointer;
 use mmtk::MMTK;
 use mmtk::{VM_MAP, MMAPPER};
 

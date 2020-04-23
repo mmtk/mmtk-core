@@ -209,10 +209,10 @@ mod tests {
     const MEGABYTE: usize = 1 << 20;
     #[cfg(target_os = "linux")]
     const FIXED_ADDRESS: Address =
-        unsafe { conversions::chunk_align_down(Address::from_usize(0x60000000)) };
+        unsafe { conversions::chunk_align_down(Address::from_usize(0x6000_0000)) };
     #[cfg(target_os = "macos")]
     const FIXED_ADDRESS: Address =
-        unsafe { conversions::chunk_align_down(Address::from_usize(0x135000000)) };
+        unsafe { conversions::chunk_align_down(Address::from_usize(0x0001_3500_0000)) };
 
     #[test]
     fn address_to_mmap_chunks() {
