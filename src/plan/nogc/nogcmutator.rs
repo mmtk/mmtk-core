@@ -1,4 +1,4 @@
-use crate::plan::mutator_context::MutatorContext;
+use crate::plan::mutator_context::{CommonMutatorContext, MutatorContext};
 use crate::plan::nogc::NoGC;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
@@ -14,9 +14,14 @@ use crate::vm::VMBinding;
 pub struct NoGCMutator<VM: VMBinding> {
     // ImmortalLocal
     nogc: BumpAllocator<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>,
+    common: CommonMutatorContext<VM>,
 }
 
-impl<VM: VMBinding> MutatorContext for NoGCMutator<VM> {
+impl<VM: VMBinding> MutatorContext<VM> for NoGCMutator<VM> {
+    fn common(&self) -> &CommonMutatorContext<VM> {
+        &self.common
+    }
+
     fn collection_phase(&mut self, _tls: OpaquePointer, _phase: &Phase, _primary: bool) {
         unreachable!()
     }
@@ -62,6 +67,7 @@ impl<VM: VMBinding> NoGCMutator<VM> {
     pub fn new(tls: OpaquePointer, plan: &'static NoGC<VM>) -> Self {
         NoGCMutator {
             nogc: BumpAllocator::new(tls, Some(plan.get_immortal_space()), plan),
+            common: CommonMutatorContext::<VM>::new(tls, plan, &plan.common),
         }
     }
 }

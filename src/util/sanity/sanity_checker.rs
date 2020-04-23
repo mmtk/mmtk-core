@@ -29,7 +29,7 @@ impl<'a, VM: VMBinding> SanityChecker<'a, VM> {
     }
 
     pub fn check(&mut self) {
-        self.plan.common().enter_sanity();
+        self.plan.enter_sanity();
 
         println!("Sanity stackroots, collector");
         VM::VMScanning::compute_thread_roots(self, self.tls);
@@ -49,7 +49,7 @@ impl<'a, VM: VMBinding> SanityChecker<'a, VM> {
         self.values.clear();
         self.refs.clear();
 
-        self.plan.common().leave_sanity();
+        self.plan.leave_sanity();
     }
 }
 
