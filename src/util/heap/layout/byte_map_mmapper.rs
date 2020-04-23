@@ -212,7 +212,7 @@ mod tests {
         unsafe { conversions::chunk_align_down(Address::from_usize(0x60000000)) };
     #[cfg(target_os = "macos")]
     const FIXED_ADDRESS: Address =
-        unsafe { conversions::chunk_align_down(Address::from_usize(0x135000000)) };
+        unsafe { conversions::chunk_align_down(Address::from_usize(0x0001_3500_0000)) };
 
     #[test]
     fn address_to_mmap_chunks() {
