@@ -191,6 +191,12 @@ pub trait Plan<VM: VMBinding>: Sized {
         }
     }
 
+    fn reset_collection_trigger(&self) {
+        self.common()
+            .user_triggered_collection
+            .store(false, Ordering::Relaxed)
+    }
+
     fn is_mapped_object(&self, object: ObjectReference) -> bool {
         if object.is_null() {
             return false;
@@ -603,11 +609,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     fn is_user_triggered_collection(&self) -> bool {
         self.user_triggered_collection.load(Ordering::Relaxed)
-    }
-
-    fn reset_collection_trigger(&self) {
-        self.user_triggered_collection
-            .store(false, Ordering::Relaxed)
     }
 
     fn determine_collection_attempts(&self) -> usize {
