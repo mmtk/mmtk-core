@@ -84,12 +84,13 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 ),
             }),
             ss_trace: Trace::new(),
-            base: BasePlan::new(),
+            base: BasePlan::new(heap),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
         }
     }
 
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+        self.base.gc_init(heap_size, vm_map);
         self.common.gc_init(heap_size, vm_map);
 
         let unsync = unsafe { &mut *self.unsync.get() };

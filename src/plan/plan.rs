@@ -138,7 +138,7 @@ pub trait Plan<VM: VMBinding>: Sized {
     }
 
     fn get_total_pages(&self) -> usize {
-        self.common().heap.get_total_pages()
+        self.base().heap.get_total_pages()
     }
 
     fn get_pages_avail(&self) -> usize {
@@ -252,10 +252,12 @@ pub struct BasePlan<VM: VMBinding> {
     pub oom_lock: Mutex<()>,
     pub control_collector_context: ControllerCollectorContext<VM>,
     pub stats: Stats,
+    pub heap: HeapMeta,
 }
 
 impl<VM: VMBinding> BasePlan<VM> {
-    pub fn new() -> BasePlan<VM> {
+    pub fn new(        mut heap: HeapMeta,
+    ) -> BasePlan<VM> {
         BasePlan {
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),
@@ -269,7 +271,18 @@ impl<VM: VMBinding> BasePlan<VM> {
             oom_lock: Mutex::new(()),
             control_collector_context: ControllerCollectorContext::new(),
             stats: Stats::new(),
+            heap,
         }
+    }
+
+    pub fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+        vm_map.finalize_static_space_map(
+            self.heap.get_discontig_start(),
+            self.heap.get_discontig_end(),
+        );
+        self.heap
+            .total_pages
+            .store(bytes_to_pages(heap_size), Ordering::Relaxed);
     }
 
     pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, primary: bool) {
@@ -382,7 +395,6 @@ pub struct CommonPlan<VM: VMBinding> {
     pub mmapper: &'static Mmapper,
     pub options: Arc<UnsafeOptionsWrapper>,
     pub unsync: UnsafeCell<CommonUnsync<VM>>,
-    pub heap: HeapMeta,
 
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
@@ -459,23 +471,13 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     None
                 },
             }),
-
             options,
-            heap,
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
         }
     }
 
     pub fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
-        vm_map.finalize_static_space_map(
-            self.heap.get_discontig_start(),
-            self.heap.get_discontig_end(),
-        );
-        self.heap
-            .total_pages
-            .store(bytes_to_pages(heap_size), Ordering::Relaxed);
-
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.immortal.init(vm_map);
         unsync.los.init(vm_map);

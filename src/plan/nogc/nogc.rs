@@ -61,18 +61,18 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
                     &mut heap,
                 ),
             }),
-            base: BasePlan::new(),
+            base: BasePlan::new(heap),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
         }
     }
 
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
         vm_map.finalize_static_space_map(
-            self.common.heap.get_discontig_start(),
-            self.common.heap.get_discontig_end(),
+            self.base.heap.get_discontig_start(),
+            self.base.heap.get_discontig_end(),
         );
 
-        self.common
+        self.base
             .heap
             .total_pages
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);
