@@ -4,14 +4,11 @@ use super::SSCollector;
 use super::SSMutator;
 use super::SSTraceLocal;
 
-use crate::plan::plan;
 use crate::plan::trace::Trace;
 use crate::plan::Allocator;
 use crate::plan::Phase;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
-use crate::policy::immortalspace::ImmortalSpace;
-use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::VMRequest;
 use crate::util::Address;
@@ -19,16 +16,15 @@ use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
-use std::sync::atomic::{self, Ordering};
+#[cfg(feature = "sanity")]
+use std::sync::atomic::Ordering;
 
 use crate::plan::plan::CommonPlan;
-use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::vm::Scanning;
 use crate::vm::VMBinding;
 use std::sync::Arc;
 
@@ -47,8 +43,6 @@ pub struct SemiSpaceUnsync<VM: VMBinding> {
     pub hi: bool,
     pub copyspace0: CopySpace<VM>,
     pub copyspace1: CopySpace<VM>,
-    pub versatile_space: ImmortalSpace<VM>,
-    pub los: LargeObjectSpace<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
@@ -86,22 +80,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                     mmapper,
                     &mut heap,
                 ),
-                versatile_space: ImmortalSpace::new(
-                    "versatile_space",
-                    true,
-                    VMRequest::discontiguous(),
-                    vm_map,
-                    mmapper,
-                    &mut heap,
-                ),
-                los: LargeObjectSpace::new(
-                    "los",
-                    true,
-                    VMRequest::discontiguous(),
-                    vm_map,
-                    mmapper,
-                    &mut heap,
-                ),
             }),
             ss_trace: Trace::new(),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
@@ -109,21 +87,11 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
     }
 
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
-        vm_map.finalize_static_space_map(
-            self.common.heap.get_discontig_start(),
-            self.common.heap.get_discontig_end(),
-        );
+        self.common.gc_init(heap_size, vm_map);
 
         let unsync = unsafe { &mut *self.unsync.get() };
-        self.common
-            .heap
-            .total_pages
-            .store(bytes_to_pages(heap_size), Ordering::Relaxed);
         unsync.copyspace0.init(vm_map);
         unsync.copyspace1.init(vm_map);
-        unsync.versatile_space.init(vm_map);
-        unsync.los.init(vm_map);
-        self.common.gc_init(heap_size, vm_map);
     }
 
     fn common(&self) -> &CommonPlan<VM> {
@@ -135,75 +103,24 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
     }
 
     fn will_never_move(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-
         if self.tospace().in_space(object) || self.fromspace().in_space(object) {
             return false;
         }
-
-        if unsync.versatile_space.in_space(object) || unsync.los.in_space(object) {
-            return true;
-        }
-
-        // this preserves correctness over efficiency
-        false
+        self.common.will_never_move(object)
     }
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        if unsync.versatile_space.in_space(object) {
-            return true;
-        }
         if self.tospace().in_space(object) {
-            return true;
-        }
-        if unsync.los.in_space(object) {
             return true;
         }
         self.common.is_valid_ref(object)
     }
 
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {
-        self.common.collection_phase(tls, phase);
-
         let unsync = &mut *self.unsync.get();
         match phase {
-            Phase::SetCollectionKind => {
-                self.common.cur_collection_attempts.store(
-                    if self.is_user_triggered_collection() {
-                        1
-                    } else {
-                        self.determine_collection_attempts()
-                    },
-                    Ordering::Relaxed,
-                );
-
-                let emergency_collection = !self.is_internal_triggered_collection()
-                    && self.last_collection_was_exhaustive()
-                    && self.common.cur_collection_attempts.load(Ordering::Relaxed) > 1;
-                self.common
-                    .emergency_collection
-                    .store(emergency_collection, Ordering::Relaxed);
-
-                if emergency_collection {
-                    self.force_full_heap_collection();
-                }
-            }
-            Phase::Initiate => {
-                self.common.set_gc_status(plan::GcStatus::GcPrepare);
-            }
-            Phase::PrepareStacks => {
-                self.common
-                    .stacks_prepared
-                    .store(true, atomic::Ordering::SeqCst);
-            }
             Phase::Prepare => {
-                #[cfg(feature = "sanity")]
-                {
-                    use crate::util::sanity::sanity_checker::SanityChecker;
-                    println!("Pre GC sanity check");
-                    SanityChecker::new(tls, &self).check();
-                }
+                self.common.collection_phase(tls, phase, true);
                 debug_assert!(self.ss_trace.values.is_empty());
                 debug_assert!(self.ss_trace.root_locations.is_empty());
                 #[cfg(feature = "sanity")]
@@ -214,19 +131,16 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                                         // prepare each of the collected regions
                 unsync.copyspace0.prepare(unsync.hi);
                 unsync.copyspace1.prepare(!unsync.hi);
-                unsync.versatile_space.prepare();
-                unsync.los.prepare(true);
+
+                #[cfg(feature = "sanity")]
+                {
+                    use crate::util::sanity::sanity_checker::SanityChecker;
+                    println!("Pre GC sanity check");
+                    SanityChecker::new(tls, &self).check();
+                }
             }
-            &Phase::StackRoots => {
-                VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
-                self.common.set_gc_status(plan::GcStatus::GcProper);
-            }
-            &Phase::Roots => {
-                VM::VMScanning::reset_thread_counter();
-                self.common.set_gc_status(plan::GcStatus::GcProper);
-            }
-            &Phase::Closure => {}
             &Phase::Release => {
+                self.common.collection_phase(tls, phase, true);
                 #[cfg(feature = "sanity")]
                 {
                     use crate::util::constants::LOG_BYTES_IN_PAGE;
@@ -260,8 +174,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 } else {
                     unsync.copyspace1.release();
                 }
-                unsync.versatile_space.release();
-                unsync.los.release(true);
             }
             Phase::Complete => {
                 #[cfg(feature = "sanity")]
@@ -280,10 +192,9 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 {
                     self.fromspace().protect();
                 }
-
-                self.common.set_gc_status(plan::GcStatus::NotInGC);
+                self.common.collection_phase(tls, phase, true);
             }
-            _ => panic!("Global phase not handled!"),
+            _ => self.common.collection_phase(tls, phase, true),
         }
     }
 
@@ -292,10 +203,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        let unsync = unsafe { &*self.unsync.get() };
-        self.tospace().reserved_pages()
-            + unsync.versatile_space.reserved_pages()
-            + unsync.los.reserved_pages()
+        self.tospace().reserved_pages() + self.common.get_pages_used()
     }
 
     fn is_bad_ref(&self, object: ObjectReference) -> bool {
@@ -310,24 +218,14 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         if unsync.copyspace1.in_space(object) {
             return unsync.copyspace1.is_movable();
         }
-        if unsync.versatile_space.in_space(object) {
-            return unsync.versatile_space.is_movable();
-        }
-        if unsync.los.in_space(object) {
-            return unsync.los.is_movable();
-        }
         self.common.is_movable(object)
     }
 
     fn is_mapped_address(&self, address: Address) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
         if unsafe {
-            unsync
-                .versatile_space
-                .in_space(address.to_object_reference())
-                || unsync.copyspace0.in_space(address.to_object_reference())
+            unsync.copyspace0.in_space(address.to_object_reference())
                 || unsync.copyspace1.in_space(address.to_object_reference())
-                || unsync.los.in_space(address.to_object_reference())
         } {
             self.common.mmapper.address_is_mapped(address)
         } else {
@@ -359,16 +257,5 @@ impl<VM: VMBinding> SemiSpace<VM> {
 
     pub fn get_sstrace(&self) -> &Trace {
         &self.ss_trace
-    }
-
-    pub fn get_versatile_space(&self) -> &'static ImmortalSpace<VM> {
-        let unsync = unsafe { &*self.unsync.get() };
-        &unsync.versatile_space
-    }
-
-    pub fn get_los(&self) -> &'static LargeObjectSpace<VM> {
-        let unsync = unsafe { &*self.unsync.get() };
-
-        &unsync.los
     }
 }
