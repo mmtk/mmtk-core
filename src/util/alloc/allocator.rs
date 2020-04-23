@@ -134,7 +134,7 @@ pub trait Allocator<VM: VMBinding, PR: PageResource<VM>> {
                 return result;
             }
 
-            let plan = self.get_plan().common();
+            let plan = self.get_plan().base();
             if !result.is_zero() {
                 // TODO: Check if we need oom lock.
                 // It seems the lock only protects access to the atomic boolean. We could possibly do

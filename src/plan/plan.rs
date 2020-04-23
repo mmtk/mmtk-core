@@ -34,6 +34,7 @@ pub trait Plan<VM: VMBinding>: Sized {
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self;
+    fn base(&self) -> &BasePlan<VM>;
     fn common(&self) -> &CommonPlan<VM>;
     fn mmapper(&self) -> &'static Mmapper {
         self.common().mmapper
@@ -65,7 +66,7 @@ pub trait Plan<VM: VMBinding>: Sized {
     }
 
     fn is_initialized(&self) -> bool {
-        self.common().initialized.load(Ordering::SeqCst)
+        self.base().initialized.load(Ordering::SeqCst)
     }
 
     fn poll<PR: PageResource<VM>>(&self, space_full: bool, space: &'static PR::Space) -> bool {
@@ -81,7 +82,7 @@ pub trait Plan<VM: VMBinding>: Sized {
                 return false;
             }*/
             self.log_poll::<PR>(space, "Triggering collection");
-            self.common().control_collector_context.request();
+            self.base().control_collector_context.request();
             return true;
         }
 
@@ -151,7 +152,7 @@ pub trait Plan<VM: VMBinding>: Sized {
     fn get_pages_used(&self) -> usize;
 
     fn is_emergency_collection(&self) -> bool {
-        self.common().emergency_collection.load(Ordering::Relaxed)
+        self.base().emergency_collection.load(Ordering::Relaxed)
     }
 
     fn get_free_pages(&self) -> usize {
@@ -164,10 +165,10 @@ pub trait Plan<VM: VMBinding>: Sized {
         trace!("pages={}", pages);
 
         if self.is_initialized()
-            && (pages ^ self.common().last_stress_pages.load(Ordering::Relaxed)
+            && (pages ^ self.base().last_stress_pages.load(Ordering::Relaxed)
                 > self.options().stress_factor)
         {
-            self.common()
+            self.base()
                 .last_stress_pages
                 .store(pages, Ordering::Relaxed);
             trace!("Doing stress GC");
@@ -183,16 +184,16 @@ pub trait Plan<VM: VMBinding>: Sized {
 
     fn handle_user_collection_request(&self, tls: OpaquePointer, force: bool) {
         if force || !self.options().ignore_system_g_c {
-            self.common()
+            self.base()
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
-            self.common().control_collector_context.request();
+            self.base().control_collector_context.request();
             VM::VMCollection::block_for_gc(tls);
         }
     }
 
     fn reset_collection_trigger(&self) {
-        self.common()
+        self.base()
             .user_triggered_collection
             .store(false, Ordering::Relaxed)
     }
@@ -216,7 +217,7 @@ pub trait Plan<VM: VMBinding>: Sized {
     fn is_mapped_address(&self, address: Address) -> bool;
 
     fn modify_check(&self, object: ObjectReference) {
-        if self.common().gc_in_progress_proper() && self.is_movable(object) {
+        if self.base().gc_in_progress_proper() && self.is_movable(object) {
             panic!(
                 "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
                 object
@@ -234,16 +235,7 @@ pub enum GcStatus {
     GcProper,
 }
 
-pub struct CommonPlan<VM: VMBinding> {
-    pub vm_map: &'static VMMap,
-    pub mmapper: &'static Mmapper,
-    pub options: Arc<UnsafeOptionsWrapper>,
-
-    pub unsync: UnsafeCell<CommonUnsync<VM>>,
-
-    pub stats: Stats,
-    pub heap: HeapMeta,
-
+pub struct BasePlan<VM: VMBinding> {
     pub initialized: AtomicBool,
     pub gc_status: Mutex<GcStatus>,
     pub last_stress_pages: AtomicUsize,
@@ -258,8 +250,139 @@ pub struct CommonPlan<VM: VMBinding> {
     pub cur_collection_attempts: AtomicUsize,
     // Lock used for out of memory handling
     pub oom_lock: Mutex<()>,
-
     pub control_collector_context: ControllerCollectorContext<VM>,
+    pub stats: Stats,
+}
+
+impl<VM: VMBinding> BasePlan<VM> {
+    pub fn new() -> BasePlan<VM> {
+        BasePlan {
+            initialized: AtomicBool::new(false),
+            gc_status: Mutex::new(GcStatus::NotInGC),
+            last_stress_pages: AtomicUsize::new(0),
+            stacks_prepared: AtomicBool::new(false),
+            emergency_collection: AtomicBool::new(false),
+            user_triggered_collection: AtomicBool::new(false),
+            allocation_success: AtomicBool::new(false),
+            max_collection_attempts: AtomicUsize::new(0),
+            cur_collection_attempts: AtomicUsize::new(0),
+            oom_lock: Mutex::new(()),
+            control_collector_context: ControllerCollectorContext::new(),
+            stats: Stats::new(),
+        }
+    }
+
+    pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, primary: bool) {
+        {
+    //        let unsync = &mut *self.unsync.get();
+            match phase {
+                Phase::SetCollectionKind => {
+                    self.cur_collection_attempts.store(
+                        if self.is_user_triggered_collection() {
+                            1
+                        } else {
+                            self.determine_collection_attempts()
+                        },
+                        Ordering::Relaxed,
+                    );
+
+                    let emergency_collection = !self.is_internal_triggered_collection()
+                        && self.last_collection_was_exhaustive()
+                        && self.cur_collection_attempts.load(Ordering::Relaxed) > 1;
+                    self.emergency_collection
+                        .store(emergency_collection, Ordering::Relaxed);
+
+                    if emergency_collection {
+                        self.force_full_heap_collection();
+                    }
+                }
+                Phase::Initiate => {
+                    self.set_gc_status(GcStatus::GcPrepare);
+                }
+                Phase::PrepareStacks => {
+                    self.stacks_prepared.store(true, atomic::Ordering::SeqCst);
+                }
+                Phase::Prepare => {}
+                &Phase::StackRoots => {
+                    VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
+                    self.set_gc_status(GcStatus::GcProper);
+                }
+                &Phase::Roots => {
+                    VM::VMScanning::reset_thread_counter();
+                    self.set_gc_status(GcStatus::GcProper);
+                }
+                &Phase::Release => {
+                }
+                Phase::Complete => {
+                    self.set_gc_status(GcStatus::NotInGC);
+                }
+                _ => panic!("Global phase not handled!"),
+            }
+        }
+    }
+
+    pub fn set_gc_status(&self, s: GcStatus) {
+        let mut gc_status = self.gc_status.lock().unwrap();
+        if *gc_status == GcStatus::NotInGC {
+            self.stacks_prepared.store(false, Ordering::SeqCst);
+            // FIXME stats
+            self.stats.start_gc();
+        }
+        *gc_status = s;
+        if *gc_status == GcStatus::NotInGC {
+            // FIXME stats
+            if self.stats.get_gathering_stats() {
+                self.stats.end_gc();
+            }
+        }
+    }
+
+    pub fn stacks_prepared(&self) -> bool {
+        self.stacks_prepared.load(Ordering::SeqCst)
+    }
+
+    pub fn gc_in_progress(&self) -> bool {
+        *self.gc_status.lock().unwrap() != GcStatus::NotInGC
+    }
+
+    pub fn gc_in_progress_proper(&self) -> bool {
+        *self.gc_status.lock().unwrap() == GcStatus::GcProper
+    }
+
+
+    fn is_user_triggered_collection(&self) -> bool {
+        self.user_triggered_collection.load(Ordering::Relaxed)
+    }
+
+    fn determine_collection_attempts(&self) -> usize {
+        if !self.allocation_success.load(Ordering::Relaxed) {
+            self.max_collection_attempts.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.allocation_success.store(false, Ordering::Relaxed);
+            self.max_collection_attempts.store(1, Ordering::Relaxed);
+        }
+
+        self.max_collection_attempts.load(Ordering::Relaxed)
+    }
+
+    fn is_internal_triggered_collection(&self) -> bool {
+        // FIXME
+        false
+    }
+
+    fn last_collection_was_exhaustive(&self) -> bool {
+        true
+    }
+
+    fn force_full_heap_collection(&self) {}
+}
+
+pub struct CommonPlan<VM: VMBinding> {
+    pub vm_map: &'static VMMap,
+    pub mmapper: &'static Mmapper,
+    pub options: Arc<UnsafeOptionsWrapper>,
+    pub unsync: UnsafeCell<CommonUnsync<VM>>,
+    pub heap: HeapMeta,
 
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
@@ -339,18 +462,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
             options,
             heap,
-            stats: Stats::new(),
-            initialized: AtomicBool::new(false),
-            gc_status: Mutex::new(GcStatus::NotInGC),
-            last_stress_pages: AtomicUsize::new(0),
-            stacks_prepared: AtomicBool::new(false),
-            emergency_collection: AtomicBool::new(false),
-            user_triggered_collection: AtomicBool::new(false),
-            allocation_success: AtomicBool::new(false),
-            max_collection_attempts: AtomicUsize::new(0),
-            cur_collection_attempts: AtomicUsize::new(0),
-            oom_lock: Mutex::new(()),
-            control_collector_context: ControllerCollectorContext::new(),
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
         }
@@ -372,22 +483,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         {
             if unsync.vm_space.is_some() {
                 unsync.vm_space.as_mut().unwrap().init(vm_map);
-            }
-        }
-    }
-
-    pub fn set_gc_status(&self, s: GcStatus) {
-        let mut gc_status = self.gc_status.lock().unwrap();
-        if *gc_status == GcStatus::NotInGC {
-            self.stacks_prepared.store(false, Ordering::SeqCst);
-            // FIXME stats
-            self.stats.start_gc();
-        }
-        *gc_status = s;
-        if *gc_status == GcStatus::NotInGC {
-            // FIXME stats
-            if self.stats.get_gathering_stats() {
-                self.stats.end_gc();
             }
         }
     }
@@ -523,32 +618,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         {
             let unsync = &mut *self.unsync.get();
             match phase {
-                Phase::SetCollectionKind => {
-                    self.cur_collection_attempts.store(
-                        if self.is_user_triggered_collection() {
-                            1
-                        } else {
-                            self.determine_collection_attempts()
-                        },
-                        Ordering::Relaxed,
-                    );
-
-                    let emergency_collection = !self.is_internal_triggered_collection()
-                        && self.last_collection_was_exhaustive()
-                        && self.cur_collection_attempts.load(Ordering::Relaxed) > 1;
-                    self.emergency_collection
-                        .store(emergency_collection, Ordering::Relaxed);
-
-                    if emergency_collection {
-                        self.force_full_heap_collection();
-                    }
-                }
-                Phase::Initiate => {
-                    self.set_gc_status(GcStatus::GcPrepare);
-                }
-                Phase::PrepareStacks => {
-                    self.stacks_prepared.store(true, atomic::Ordering::SeqCst);
-                }
                 Phase::Prepare => {
                     unsync.immortal.prepare();
                     unsync.los.prepare(primary);
@@ -558,14 +627,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
                             unsync.vm_space.as_mut().unwrap().prepare();
                         }
                     }
-                }
-                &Phase::StackRoots => {
-                    VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
-                    self.set_gc_status(GcStatus::GcProper);
-                }
-                &Phase::Roots => {
-                    VM::VMScanning::reset_thread_counter();
-                    self.set_gc_status(GcStatus::GcProper);
                 }
                 &Phase::Release => {
                     unsync.immortal.release();
@@ -577,24 +638,9 @@ impl<VM: VMBinding> CommonPlan<VM> {
                         }
                     }
                 }
-                Phase::Complete => {
-                    self.set_gc_status(GcStatus::NotInGC);
-                }
-                _ => panic!("Global phase not handled!"),
+                _ => {},
             }
         }
-    }
-
-    pub fn stacks_prepared(&self) -> bool {
-        self.stacks_prepared.load(Ordering::SeqCst)
-    }
-
-    pub fn gc_in_progress(&self) -> bool {
-        *self.gc_status.lock().unwrap() != GcStatus::NotInGC
-    }
-
-    pub fn gc_in_progress_proper(&self) -> bool {
-        *self.gc_status.lock().unwrap() == GcStatus::GcProper
     }
 
     pub fn get_immortal(&self) -> &'static ImmortalSpace<VM> {
@@ -606,32 +652,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         let unsync = unsafe { &*self.unsync.get() };
         &unsync.los
     }
-
-    fn is_user_triggered_collection(&self) -> bool {
-        self.user_triggered_collection.load(Ordering::Relaxed)
-    }
-
-    fn determine_collection_attempts(&self) -> usize {
-        if !self.allocation_success.load(Ordering::Relaxed) {
-            self.max_collection_attempts.fetch_add(1, Ordering::Relaxed);
-        } else {
-            self.allocation_success.store(false, Ordering::Relaxed);
-            self.max_collection_attempts.store(1, Ordering::Relaxed);
-        }
-
-        self.max_collection_attempts.load(Ordering::Relaxed)
-    }
-
-    fn is_internal_triggered_collection(&self) -> bool {
-        // FIXME
-        false
-    }
-
-    fn last_collection_was_exhaustive(&self) -> bool {
-        true
-    }
-
-    fn force_full_heap_collection(&self) {}
 }
 
 #[repr(i32)]

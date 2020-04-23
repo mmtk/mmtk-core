@@ -12,6 +12,7 @@ use std::cell::UnsafeCell;
 use super::NoGCCollector;
 use super::NoGCMutator;
 use super::NoGCTraceLocal;
+use crate::plan::plan::BasePlan;
 use crate::plan::plan::CommonPlan;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -27,6 +28,7 @@ pub type SelectedPlan<VM> = NoGC<VM>;
 
 pub struct NoGC<VM: VMBinding> {
     pub unsync: UnsafeCell<NoGCUnsync<VM>>,
+    pub base: BasePlan<VM>,
     pub common: CommonPlan<VM>,
 }
 
@@ -59,6 +61,7 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
                     &mut heap,
                 ),
             }),
+            base: BasePlan::new(),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
         }
     }
@@ -77,6 +80,10 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.space.init(vm_map);
         self.common.gc_init(heap_size, vm_map)
+    }
+
+    fn base(&self) -> &BasePlan<VM> {
+        &self.base
     }
 
     fn common(&self) -> &CommonPlan<VM> {

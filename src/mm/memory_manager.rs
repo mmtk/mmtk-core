@@ -39,13 +39,13 @@ use crate::vm::VMBinding;
 // * TraceLocal: Scanning::* as &mut TraceLocal
 
 pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
-    mmtk.plan.common().control_collector_context.run(tls);
+    mmtk.plan.base().control_collector_context.run(tls);
 }
 
 pub fn gc_init<VM: VMBinding>(mmtk: &MMTK<VM>, heap_size: usize) {
     crate::util::logger::init().unwrap();
     mmtk.plan.gc_init(heap_size, &mmtk.vm_map);
-    mmtk.plan.common().initialized.store(true, Ordering::SeqCst);
+    mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
 
     // TODO: We should have an option so we know whether we should spawn the controller.
     //    thread::spawn(|| {
@@ -180,13 +180,13 @@ pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &mut SelectedColl
 
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
     unsafe {
-        { &mut *mmtk.plan.common().control_collector_context.workers.get() }.init_group(mmtk, tls);
+        { &mut *mmtk.plan.base().control_collector_context.workers.get() }.init_group(mmtk, tls);
         {
             VM::VMCollection::spawn_worker_thread::<<SelectedPlan<VM> as Plan<VM>>::CollectorT>(
                 tls, None,
             );
         } // spawn controller thread
-        mmtk.plan.common().initialized.store(true, Ordering::SeqCst);
+        mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
     }
 }
 

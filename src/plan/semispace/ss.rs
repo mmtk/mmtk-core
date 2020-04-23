@@ -19,6 +19,7 @@ use std::cell::UnsafeCell;
 #[cfg(feature = "sanity")]
 use std::sync::atomic::Ordering;
 
+use crate::plan::plan::BasePlan;
 use crate::plan::plan::CommonPlan;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -36,6 +37,7 @@ pub const SCAN_BOOT_IMAGE: bool = true;
 pub struct SemiSpace<VM: VMBinding> {
     pub unsync: UnsafeCell<SemiSpaceUnsync<VM>>,
     pub ss_trace: Trace,
+    pub base: BasePlan<VM>,
     pub common: CommonPlan<VM>,
 }
 
@@ -82,6 +84,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 ),
             }),
             ss_trace: Trace::new(),
+            base: BasePlan::new(),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
         }
     }
@@ -92,6 +95,10 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.copyspace0.init(vm_map);
         unsync.copyspace1.init(vm_map);
+    }
+
+    fn base(&self) -> &BasePlan<VM> {
+        &self.base
     }
 
     fn common(&self) -> &CommonPlan<VM> {
@@ -120,6 +127,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         let unsync = &mut *self.unsync.get();
         match phase {
             Phase::Prepare => {
+                self.base.collection_phase(tls, phase, true);
                 self.common.collection_phase(tls, phase, true);
                 debug_assert!(self.ss_trace.values.is_empty());
                 debug_assert!(self.ss_trace.root_locations.is_empty());
@@ -140,6 +148,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 }
             }
             &Phase::Release => {
+                self.base.collection_phase(tls, phase, true);
                 self.common.collection_phase(tls, phase, true);
                 #[cfg(feature = "sanity")]
                 {
@@ -193,8 +202,12 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                     self.fromspace().protect();
                 }
                 self.common.collection_phase(tls, phase, true);
+                self.base.collection_phase(tls, phase, true);
             }
-            _ => self.common.collection_phase(tls, phase, true),
+            _ => {
+                self.base.collection_phase(tls, phase, true);
+                self.common.collection_phase(tls, phase, true);
+            }
         }
     }
 
