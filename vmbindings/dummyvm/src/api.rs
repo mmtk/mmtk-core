@@ -1,3 +1,6 @@
+// All functions here are extern function. There is no point for marking them as unsafe.
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 use libc::c_char;
 use std::ffi::CStr;
 use mmtk::memory_manager;
