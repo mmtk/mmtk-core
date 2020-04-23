@@ -50,12 +50,18 @@ pub trait Plan<VM: VMBinding>: Sized {
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
 
     #[cfg(feature = "sanity")]
-    fn enter_sanity(&self) {}
+    fn enter_sanity(&self) {
+        self.common().inside_sanity.store(true, Ordering::Relaxed)
+    }
+
     #[cfg(feature = "sanity")]
-    fn leave_sanity(&self) {}
+    fn leave_sanity(&self) {
+        self.common().inside_sanity.store(false, Ordering::Relaxed)
+    }
+
     #[cfg(feature = "sanity")]
     fn is_in_sanity(&self) -> bool {
-        false
+        self.common().inside_sanity.load(Ordering::Relaxed)
     }
 
     fn is_initialized(&self) -> bool {
@@ -254,6 +260,9 @@ pub struct CommonPlan<VM: VMBinding> {
     pub oom_lock: Mutex<()>,
 
     pub control_collector_context: ControllerCollectorContext<VM>,
+
+    #[cfg(feature = "sanity")]
+    pub inside_sanity: AtomicBool,
 }
 
 pub struct CommonUnsync<VM: VMBinding> {
@@ -342,6 +351,8 @@ impl<VM: VMBinding> CommonPlan<VM> {
             cur_collection_attempts: AtomicUsize::new(0),
             oom_lock: Mutex::new(()),
             control_collector_context: ControllerCollectorContext::new(),
+            #[cfg(feature = "sanity")]
+            inside_sanity: AtomicBool::new(false),
         }
     }
 
@@ -381,30 +392,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
-    fn is_user_triggered_collection(&self) -> bool {
-        self.user_triggered_collection.load(Ordering::Relaxed)
-    }
-
-    fn is_internal_triggered_collection(&self) -> bool {
-        // FIXME
-        false
-    }
-
-    fn determine_collection_attempts(&self) -> usize {
-        if !self.allocation_success.load(Ordering::Relaxed) {
-            self.max_collection_attempts.fetch_add(1, Ordering::Relaxed);
-        } else {
-            self.allocation_success.store(false, Ordering::Relaxed);
-            self.max_collection_attempts.store(1, Ordering::Relaxed);
-        }
-
-        self.max_collection_attempts.load(Ordering::Relaxed)
-    }
-
-    fn last_collection_was_exhaustive(&self) -> bool {
-        true
-    }
-
     pub fn will_never_move(&self, object: ObjectReference) -> bool {
         let unsync = unsafe { &mut *self.unsync.get() };
         if unsync.immortal.in_space(object) || unsync.los.in_space(object) {
@@ -412,8 +399,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
         false // preserve correctness over efficiency
     }
-
-    fn force_full_heap_collection(&self) {}
 
     pub fn is_valid_ref(&self, object: ObjectReference) -> bool {
         let unsync = unsafe { &mut *self.unsync.get() };
@@ -621,6 +606,37 @@ impl<VM: VMBinding> CommonPlan<VM> {
         let unsync = unsafe { &*self.unsync.get() };
         &unsync.los
     }
+
+    fn is_user_triggered_collection(&self) -> bool {
+        self.user_triggered_collection.load(Ordering::Relaxed)
+    }
+
+    fn reset_collection_trigger(&self) {
+        self.user_triggered_collection
+            .store(false, Ordering::Relaxed)
+    }
+
+    fn determine_collection_attempts(&self) -> usize {
+        if !self.allocation_success.load(Ordering::Relaxed) {
+            self.max_collection_attempts.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.allocation_success.store(false, Ordering::Relaxed);
+            self.max_collection_attempts.store(1, Ordering::Relaxed);
+        }
+
+        self.max_collection_attempts.load(Ordering::Relaxed)
+    }
+
+    fn is_internal_triggered_collection(&self) -> bool {
+        // FIXME
+        false
+    }
+
+    fn last_collection_was_exhaustive(&self) -> bool {
+        true
+    }
+
+    fn force_full_heap_collection(&self) {}
 }
 
 #[repr(i32)]

@@ -17,7 +17,7 @@ use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
 #[cfg(feature = "sanity")]
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 
 use crate::plan::plan::CommonPlan;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -37,9 +37,6 @@ pub struct SemiSpace<VM: VMBinding> {
     pub unsync: UnsafeCell<SemiSpaceUnsync<VM>>,
     pub ss_trace: Trace,
     pub common: CommonPlan<VM>,
-
-    #[cfg(feature = "sanity")]
-    pub inside_sanity: AtomicBool,
 }
 
 pub struct SemiSpaceUnsync<VM: VMBinding> {
@@ -86,9 +83,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
             }),
             ss_trace: Trace::new(),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
-
-            #[cfg(feature = "sanity")]
-            inside_sanity: AtomicBool::new(false),
         }
     }
 
@@ -237,21 +231,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         } else {
             self.common.is_mapped_address(address)
         }
-    }
-
-    #[cfg(feature = "sanity")]
-    fn enter_sanity(&self) {
-        self.inside_sanity.store(true, Ordering::Relaxed)
-    }
-
-    #[cfg(feature = "sanity")]
-    fn leave_sanity(&self) {
-        self.inside_sanity.store(false, Ordering::Relaxed)
-    }
-
-    #[cfg(feature = "sanity")]
-    fn is_in_sanity(&self) -> bool {
-        self.inside_sanity.load(Ordering::Relaxed)
     }
 }
 
