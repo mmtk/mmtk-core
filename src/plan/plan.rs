@@ -191,12 +191,6 @@ pub trait Plan<VM: VMBinding>: Sized {
         }
     }
 
-    fn reset_collection_trigger(&self) {
-        self.common()
-            .user_triggered_collection
-            .store(false, Ordering::Relaxed)
-    }
-
     fn is_mapped_object(&self, object: ObjectReference) -> bool {
         if object.is_null() {
             return false;
