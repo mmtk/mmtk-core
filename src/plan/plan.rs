@@ -42,7 +42,7 @@ pub trait Plan<VM: VMBinding>: Sized {
         self.base().mmapper
     }
     fn options(&self) -> &Options {
-        &self.common().options
+        &self.base().options
     }
     // unsafe because this can only be called once by the init thread
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
@@ -163,7 +163,7 @@ pub trait Plan<VM: VMBinding>: Sized {
 
     #[inline]
     fn stress_test_gc_required(&self) -> bool {
-        let pages = self.common().vm_map.get_cumulative_committed_pages();
+        let pages = self.base().vm_map.get_cumulative_committed_pages();
         trace!("pages={}", pages);
 
         if self.is_initialized()
@@ -262,6 +262,8 @@ pub struct BasePlan<VM: VMBinding> {
     pub control_collector_context: ControllerCollectorContext<VM>,
     pub stats: Stats,
     mmapper: &'static Mmapper,
+    pub vm_map: &'static VMMap,
+    pub options: Arc<UnsafeOptionsWrapper>,
     pub heap: HeapMeta,
     #[cfg(feature = "vmspace")]
     pub unsync: UnsafeCell<BaseUnsync<VM>>,
@@ -301,20 +303,20 @@ pub fn create_vm_space<VM: VMBinding>(
 
 impl<VM: VMBinding> BasePlan<VM> {
     pub fn new(
-        _vm_map: &'static VMMap,
+        vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
-        _options: Arc<UnsafeOptionsWrapper>,
+        options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
     ) -> BasePlan<VM> {
         BasePlan {
             #[cfg(feature = "vmspace")]
             unsync: UnsafeCell::new(BaseUnsync {
-                vm_space: if _options.vm_space {
+                vm_space: if options.vm_space {
                     Some(create_vm_space(
-                        _vm_map,
+                        vm_map,
                         mmapper,
                         &mut heap,
-                        _options.vm_space_size,
+                        options.vm_space_size,
                     ))
                 } else {
                     None
@@ -334,6 +336,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             stats: Stats::new(),
             mmapper,
             heap,
+            vm_map,
+            options,
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
         }
@@ -561,8 +565,6 @@ impl<VM: VMBinding> BasePlan<VM> {
 }
 
 pub struct CommonPlan<VM: VMBinding> {
-    pub vm_map: &'static VMMap,
-    pub options: Arc<UnsafeOptionsWrapper>,
     pub unsync: UnsafeCell<CommonUnsync<VM>>,
 }
 
@@ -575,11 +577,9 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
         heap: &mut HeapMeta,
     ) -> CommonPlan<VM> {
         CommonPlan {
-            vm_map,
             unsync: UnsafeCell::new(CommonUnsync {
                 immortal: ImmortalSpace::new(
                     "immortal",
@@ -598,7 +598,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     heap,
                 ),
             }),
-            options,
         }
     }
 

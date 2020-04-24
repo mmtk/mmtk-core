@@ -83,8 +83,8 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 ),
             }),
             ss_trace: Trace::new(),
-            common: CommonPlan::new(vm_map, mmapper, options.clone(), &mut heap),
-            base: BasePlan::new(vm_map, mmapper, options.clone(), heap),
+            common: CommonPlan::new(vm_map, mmapper, &mut heap),
+            base: BasePlan::new(vm_map, mmapper, options, heap),
         }
     }
 
