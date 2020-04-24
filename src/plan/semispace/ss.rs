@@ -84,7 +84,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 ),
             }),
             ss_trace: Trace::new(),
-            base: BasePlan::new(heap),
+            base: BasePlan::new(vm_map, mmapper, options, heap),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
         }
     }
@@ -114,14 +114,20 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         if self.tospace().in_space(object) || self.fromspace().in_space(object) {
             return false;
         }
-        self.common.will_never_move(object)
+        if self.common().in_common_space(object) {
+            return self.common.will_never_move(object);
+        }
+        return self.base().will_never_move(object);
     }
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool {
         if self.tospace().in_space(object) {
             return true;
         }
-        self.common.is_valid_ref(object)
+        if self.common().in_common_space(object) {
+            return self.common.is_valid_ref(object);
+        }
+        return self.base.is_valid_ref(object);
     }
 
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {
@@ -232,7 +238,10 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         if unsync.copyspace1.in_space(object) {
             return unsync.copyspace1.is_movable();
         }
-        self.common.is_movable(object)
+        if self.common.in_common_space(object) {
+            return self.common.is_movable(object);
+        }
+        self.base.is_movable(object)
     }
 
     fn is_mapped_address(&self, address: Address) -> bool {
@@ -241,10 +250,12 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
             unsync.copyspace0.in_space(address.to_object_reference())
                 || unsync.copyspace1.in_space(address.to_object_reference())
         } {
-            self.common.mmapper.address_is_mapped(address)
-        } else {
-            self.common.is_mapped_address(address)
+            return self.common.mmapper.address_is_mapped(address);
+        } 
+        if self.common.in_common_space(address.to_object_reference()) {
+            return self.common.is_mapped_address(address);
         }
+        self.base.is_mapped_address(address)
     }
 }
 

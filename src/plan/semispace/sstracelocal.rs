@@ -69,7 +69,10 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
                 .copyspace1
                 .trace_object(self, object, ss::ALLOC_SS, tls);
         }
-        self.plan.common.trace_object(self, object)
+        if self.plan.common.in_common_space(object) {
+            return self.plan.common.trace_object(self, object);
+        }
+        self.plan.base.trace_object(self, object)
     }
 
     fn complete_trace(&mut self) {
@@ -129,7 +132,10 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
                 return unsync.copyspace1.is_live(object);
             }
         }
-        self.plan.common.is_live(object)
+        if self.plan.common.in_common_space(object) {
+            return self.plan.common.is_live(object);
+        }
+        self.plan.base.is_live(object)
     }
 }
 

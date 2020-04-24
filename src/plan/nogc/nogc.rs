@@ -13,7 +13,6 @@ use super::NoGCCollector;
 use super::NoGCMutator;
 use super::NoGCTraceLocal;
 use crate::plan::plan::BasePlan;
-use crate::plan::plan::CommonPlan;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -29,7 +28,6 @@ pub type SelectedPlan<VM> = NoGC<VM>;
 pub struct NoGC<VM: VMBinding> {
     pub unsync: UnsafeCell<NoGCUnsync<VM>>,
     pub base: BasePlan<VM>,
-    pub common: CommonPlan<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
@@ -62,7 +60,6 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
                 ),
             }),
             base: BasePlan::new(heap),
-            common: CommonPlan::new(vm_map, mmapper, options, heap),
         }
     }
 
@@ -79,15 +76,11 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         // FIXME correctly initialize spaces based on options
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.space.init(vm_map);
-        self.common.gc_init(heap_size, vm_map)
+        self.base.gc_init(heap_size, vm_map)
     }
 
     fn base(&self) -> &BasePlan<VM> {
         &self.base
-    }
-
-    fn common(&self) -> &CommonPlan<VM> {
-        &self.common
     }
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<NoGCMutator<VM>> {
@@ -112,7 +105,7 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         if unsync.space.in_space(object) {
             true
         } else {
-            self.common.is_valid_ref(object)
+            self.base.is_valid_ref(object)
         }
     }
 
@@ -123,9 +116,9 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
     fn is_mapped_address(&self, address: Address) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
         if unsafe { unsync.space.in_space(address.to_object_reference()) } {
-            self.common.mmapper.address_is_mapped(address)
+            self.base.mmapper.address_is_mapped(address)
         } else {
-            self.common.is_mapped_address(address)
+            self.base.is_mapped_address(address)
         }
     }
 

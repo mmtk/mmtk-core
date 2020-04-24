@@ -252,13 +252,63 @@ pub struct BasePlan<VM: VMBinding> {
     pub oom_lock: Mutex<()>,
     pub control_collector_context: ControllerCollectorContext<VM>,
     pub stats: Stats,
+    mmapper: &'static Mmapper,
     pub heap: HeapMeta,
+    #[cfg(feature = "vmspace")]
+    pub unsync: UnsafeCell<BaseUnsync<VM>>,
+}
+
+#[cfg(feature = "vmspace")]
+pub struct BaseUnsync<VM: VMBinding> {
+    pub vm_space: Option<ImmortalSpace<VM>>,
+}
+
+#[cfg(feature = "vmspace")]
+pub fn create_vm_space<VM: VMBinding>(
+    vm_map: &'static VMMap,
+    mmapper: &'static Mmapper,
+    heap: &mut HeapMeta,
+    boot_segment_bytes: usize,
+) -> ImmortalSpace<VM> {
+    //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
+    debug_assert!(boot_segment_bytes > 0);
+
+    use crate::util::constants::LOG_BYTES_IN_MBYTE;
+    use crate::util::conversions::raw_align_up;
+    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+    let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
+
+    ImmortalSpace::new(
+        "boot",
+        false,
+        VMRequest::fixed_size(boot_segment_mb),
+        vm_map,
+        mmapper,
+        heap,
+    )
 }
 
 impl<VM: VMBinding> BasePlan<VM> {
-    pub fn new(        mut heap: HeapMeta,
+    pub fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+        mut heap: HeapMeta,
     ) -> BasePlan<VM> {
         BasePlan {
+            #[cfg(feature = "vmspace")]
+            unsync: UnsafeCell::new(BaseUnsync {
+                vm_space: if options.vm_space {
+                    Some(create_vm_space(
+                        vm_map,
+                        mmapper,
+                        &mut heap,
+                        options.vm_space_size,
+                    ))
+                } else {
+                    None
+                },
+            }),
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),
             last_stress_pages: AtomicUsize::new(0),
@@ -271,6 +321,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             oom_lock: Mutex::new(()),
             control_collector_context: ControllerCollectorContext::new(),
             stats: Stats::new(),
+            mmapper,
             heap,
         }
     }
@@ -283,11 +334,118 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.heap
             .total_pages
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);
+        #[cfg(feature = "vmspace")]
+        {
+            let unsync = unsafe { &mut *self.unsync.get() };
+            if unsync.vm_space.is_some() {
+                unsync.vm_space.as_mut().unwrap().init(vm_map);
+            }
+        }
+    }
+
+    pub fn will_never_move(&self, object: ObjectReference) -> bool {
+        true
+    }
+
+    pub fn is_valid_ref(&self, object: ObjectReference) -> bool {
+        #[cfg(feature = "vmspace")]
+        {
+            let unsync = unsafe { &mut *self.unsync.get() };
+            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn is_movable(&self, object: ObjectReference) -> bool {
+        #[cfg(feature = "vmspace")]
+        {
+            let unsync = unsafe { &*self.unsync.get() };
+            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
+                return unsync.vm_space.as_ref().unwrap().is_movable();
+            }
+        }
+        true
+    }
+
+    // FIXME: Move into space
+    pub fn is_live(&self, object: ObjectReference) -> bool {
+        #[cfg(feature = "vmspace")]
+        {
+            let unsync = unsafe { &*self.unsync.get() };
+            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
+                return true;
+            }
+        }
+        panic!("Invalid space")
+    }
+
+    fn is_in_vmspace(&self, _address: Address) -> bool {
+        #[cfg(feature = "vmspace")]
+        {
+            let unsync = unsafe { &*self.unsync.get() };
+            unsafe {
+                if unsync.vm_space.is_some()
+                    && unsync
+                        .vm_space
+                        .as_ref()
+                        .unwrap()
+                        .in_space(_address.to_object_reference())
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub fn is_mapped_address(&self, address: Address) -> bool {
+        if self.is_in_vmspace(address) {
+            self.mmapper.address_is_mapped(address)
+        } else {
+            self.is_mapped_address(address)
+        }
+    }
+
+    pub fn trace_object<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+    ) -> ObjectReference {
+        #[cfg(feature = "vmspace")]
+        {
+            let unsync = unsafe { &*self.unsync.get() };
+            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
+                trace!("trace_object: object in boot space");
+                return unsync
+                    .vm_space
+                    .as_ref()
+                    .unwrap()
+                    .trace_object(trace, object);
+            }
+        }
+        panic!("No special case for space in trace_object");
     }
 
     pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         {
-    //        let unsync = &mut *self.unsync.get();
+            #[cfg(feature = "vmspace")]
+            {
+                let unsync = &mut *self.unsync.get();
+                match phase {
+                    Phase::Prepare =>
+                        if unsync.vm_space.is_some() {
+                            unsync.vm_space.as_mut().unwrap().prepare();
+                        }
+                    &Phase::Release =>
+                        if unsync.vm_space.is_some() {
+                            unsync.vm_space.as_mut().unwrap().release();
+                        }
+                    _ => {}
+                }
+            }
+
             match phase {
                 Phase::SetCollectionKind => {
                     self.cur_collection_attempts.store(
@@ -315,7 +473,6 @@ impl<VM: VMBinding> BasePlan<VM> {
                 Phase::PrepareStacks => {
                     self.stacks_prepared.store(true, atomic::Ordering::SeqCst);
                 }
-                Phase::Prepare => {}
                 &Phase::StackRoots => {
                     VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
                     self.set_gc_status(GcStatus::GcProper);
@@ -324,8 +481,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     VM::VMScanning::reset_thread_counter();
                     self.set_gc_status(GcStatus::GcProper);
                 }
-                &Phase::Release => {
-                }
+                &Phase::Release => {}
                 Phase::Complete => {
                     self.set_gc_status(GcStatus::NotInGC);
                 }
@@ -361,7 +517,6 @@ impl<VM: VMBinding> BasePlan<VM> {
     pub fn gc_in_progress_proper(&self) -> bool {
         *self.gc_status.lock().unwrap() == GcStatus::GcProper
     }
-
 
     fn is_user_triggered_collection(&self) -> bool {
         self.user_triggered_collection.load(Ordering::Relaxed)
@@ -403,33 +558,6 @@ pub struct CommonPlan<VM: VMBinding> {
 pub struct CommonUnsync<VM: VMBinding> {
     pub immortal: ImmortalSpace<VM>,
     pub los: LargeObjectSpace<VM>,
-    #[cfg(feature = "vmspace")]
-    pub vm_space: Option<ImmortalSpace<VM>>,
-}
-
-#[cfg(feature = "vmspace")]
-pub fn create_vm_space<VM: VMBinding>(
-    vm_map: &'static VMMap,
-    mmapper: &'static Mmapper,
-    heap: &mut HeapMeta,
-    boot_segment_bytes: usize,
-) -> ImmortalSpace<VM> {
-    //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
-    debug_assert!(boot_segment_bytes > 0);
-
-    use crate::util::constants::LOG_BYTES_IN_MBYTE;
-    use crate::util::conversions::raw_align_up;
-    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-    let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
-
-    ImmortalSpace::new(
-        "boot",
-        false,
-        VMRequest::fixed_size(boot_segment_mb),
-        vm_map,
-        mmapper,
-        heap,
-    )
 }
 
 impl<VM: VMBinding> CommonPlan<VM> {
@@ -459,17 +587,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     mmapper,
                     &mut heap,
                 ),
-                #[cfg(feature = "vmspace")]
-                vm_space: if options.vm_space {
-                    Some(create_vm_space(
-                        vm_map,
-                        mmapper,
-                        &mut heap,
-                        options.vm_space_size,
-                    ))
-                } else {
-                    None
-                },
             }),
             options,
             #[cfg(feature = "sanity")]
@@ -481,12 +598,11 @@ impl<VM: VMBinding> CommonPlan<VM> {
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.immortal.init(vm_map);
         unsync.los.init(vm_map);
-        #[cfg(feature = "vmspace")]
-        {
-            if unsync.vm_space.is_some() {
-                unsync.vm_space.as_mut().unwrap().init(vm_map);
-            }
-        }
+    }
+
+    pub fn in_common_space(&self, object: ObjectReference) -> bool {
+        let unsync = unsafe { &*self.unsync.get() };
+        unsync.immortal.in_space(object) || unsync.los.in_space(object)
     }
 
     pub fn will_never_move(&self, object: ObjectReference) -> bool {
@@ -506,12 +622,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         if unsync.los.in_space(object) {
             return true;
         }
-        #[cfg(feature = "vmspace")]
-        {
-            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
-                return true;
-            }
-        }
         false
     }
 
@@ -522,12 +632,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
         if unsync.los.in_space(object) {
             return unsync.los.is_movable();
-        }
-        #[cfg(feature = "vmspace")]
-        {
-            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
-                return unsync.vm_space.as_ref().unwrap().is_movable();
-            }
         }
         true
     }
@@ -540,12 +644,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
         if unsync.los.in_space(object) {
             return true;
-        }
-        #[cfg(feature = "vmspace")]
-        {
-            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
-                return true;
-            }
         }
         panic!("Invalid space")
     }
@@ -570,37 +668,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             trace!("trace_object: object in los");
             return unsync.los.trace_object(trace, object);
         }
-        #[cfg(feature = "vmspace")]
-        {
-            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
-                trace!("trace_object: object in boot space");
-                return unsync
-                    .vm_space
-                    .as_ref()
-                    .unwrap()
-                    .trace_object(trace, object);
-            }
-        }
         panic!("No special case for space in trace_object");
-    }
-
-    fn is_in_vmspace(&self, _address: Address) -> bool {
-        #[cfg(feature = "vmspace")]
-        {
-            let unsync = unsafe { &*self.unsync.get() };
-            unsafe {
-                if unsync.vm_space.is_some()
-                    && unsync
-                        .vm_space
-                        .as_ref()
-                        .unwrap()
-                        .in_space(_address.to_object_reference())
-                {
-                    return true;
-                }
-            }
-        }
-        false
     }
 
     pub fn is_mapped_address(&self, address: Address) -> bool {
@@ -608,7 +676,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         if unsafe {
             unsync.immortal.in_space(address.to_object_reference())
                 || unsync.los.in_space(address.to_object_reference())
-                || self.is_in_vmspace(address)
         } {
             self.mmapper.address_is_mapped(address)
         } else {
@@ -623,24 +690,12 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 Phase::Prepare => {
                     unsync.immortal.prepare();
                     unsync.los.prepare(primary);
-                    #[cfg(feature = "vmspace")]
-                    {
-                        if unsync.vm_space.is_some() {
-                            unsync.vm_space.as_mut().unwrap().prepare();
-                        }
-                    }
                 }
                 &Phase::Release => {
                     unsync.immortal.release();
                     unsync.los.release(true);
-                    #[cfg(feature = "vmspace")]
-                    {
-                        if unsync.vm_space.is_some() {
-                            unsync.vm_space.as_mut().unwrap().release();
-                        }
-                    }
                 }
-                _ => {},
+                _ => {}
             }
         }
     }
