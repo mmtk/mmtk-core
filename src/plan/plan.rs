@@ -54,17 +54,17 @@ pub trait Plan<VM: VMBinding>: Sized {
 
     #[cfg(feature = "sanity")]
     fn enter_sanity(&self) {
-        self.common().inside_sanity.store(true, Ordering::Relaxed)
+        self.base().inside_sanity.store(true, Ordering::Relaxed)
     }
 
     #[cfg(feature = "sanity")]
     fn leave_sanity(&self) {
-        self.common().inside_sanity.store(false, Ordering::Relaxed)
+        self.base().inside_sanity.store(false, Ordering::Relaxed)
     }
 
     #[cfg(feature = "sanity")]
     fn is_in_sanity(&self) -> bool {
-        self.common().inside_sanity.load(Ordering::Relaxed)
+        self.base().inside_sanity.load(Ordering::Relaxed)
     }
 
     fn is_initialized(&self) -> bool {
@@ -265,6 +265,8 @@ pub struct BasePlan<VM: VMBinding> {
     pub heap: HeapMeta,
     #[cfg(feature = "vmspace")]
     pub unsync: UnsafeCell<BaseUnsync<VM>>,
+    #[cfg(feature = "sanity")]
+    pub inside_sanity: AtomicBool,
 }
 
 #[cfg(feature = "vmspace")]
@@ -333,6 +335,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             stats: Stats::new(),
             mmapper,
             heap,
+            #[cfg(feature = "sanity")]
+            inside_sanity: AtomicBool::new(false),
         }
     }
 
@@ -561,9 +565,6 @@ pub struct CommonPlan<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub options: Arc<UnsafeOptionsWrapper>,
     pub unsync: UnsafeCell<CommonUnsync<VM>>,
-
-    #[cfg(feature = "sanity")]
-    pub inside_sanity: AtomicBool,
 }
 
 pub struct CommonUnsync<VM: VMBinding> {
@@ -599,8 +600,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 ),
             }),
             options,
-            #[cfg(feature = "sanity")]
-            inside_sanity: AtomicBool::new(false),
         }
     }
 
