@@ -9,7 +9,6 @@ use crate::plan::Allocator;
 use crate::plan::Phase;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
-use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -84,8 +83,8 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 ),
             }),
             ss_trace: Trace::new(),
-            base: BasePlan::new(vm_map, mmapper, options, heap),
-            common: CommonPlan::new(vm_map, mmapper, options, heap),
+            common: CommonPlan::new(vm_map, mmapper, options.clone(), &mut heap),
+            base: BasePlan::new(vm_map, mmapper, options.clone(), heap),
         }
     }
 
@@ -244,18 +243,13 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         self.base.is_movable(object)
     }
 
-    fn is_mapped_address(&self, address: Address) -> bool {
+    fn is_in_space(&self, address: Address) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
-        if unsafe {
-            unsync.copyspace0.in_space(address.to_object_reference())
-                || unsync.copyspace1.in_space(address.to_object_reference())
-        } {
-            return self.common.mmapper.address_is_mapped(address);
-        } 
-        if self.common.in_common_space(address.to_object_reference()) {
-            return self.common.is_mapped_address(address);
+        let addr = unsafe { address.to_object_reference() };
+        if unsync.copyspace0.in_space(addr) || unsync.copyspace1.in_space(addr) {
+            return true;
         }
-        self.base.is_mapped_address(address)
+        self.common.in_common_space(addr) || self.base.in_base_space(addr)
     }
 }
 

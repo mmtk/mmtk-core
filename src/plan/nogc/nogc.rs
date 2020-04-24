@@ -1,7 +1,6 @@
 use crate::plan::{Phase, Plan};
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
-use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -59,7 +58,7 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
                     &mut heap,
                 ),
             }),
-            base: BasePlan::new(heap),
+            base: BasePlan::new(vm_map, mmapper, options, heap),
         }
     }
 
@@ -113,13 +112,12 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         false
     }
 
-    fn is_mapped_address(&self, address: Address) -> bool {
+    fn is_in_space(&self, address: Address) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
         if unsafe { unsync.space.in_space(address.to_object_reference()) } {
-            self.base.mmapper.address_is_mapped(address)
-        } else {
-            self.base.is_mapped_address(address)
+            return true;
         }
+        unsafe { self.base.in_base_space(address.to_object_reference()) }
     }
 
     fn is_movable(&self, _object: ObjectReference) -> bool {

@@ -14,12 +14,11 @@ use crate::vm::VMBinding;
 pub struct NoGCMutator<VM: VMBinding> {
     // ImmortalLocal
     nogc: BumpAllocator<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>,
-    common: CommonMutatorContext<VM>,
 }
 
 impl<VM: VMBinding> MutatorContext<VM> for NoGCMutator<VM> {
     fn common(&self) -> &CommonMutatorContext<VM> {
-        &self.common
+        unreachable!()
     }
 
     fn collection_phase(&mut self, _tls: OpaquePointer, _phase: &Phase, _primary: bool) {
@@ -67,7 +66,6 @@ impl<VM: VMBinding> NoGCMutator<VM> {
     pub fn new(tls: OpaquePointer, plan: &'static NoGC<VM>) -> Self {
         NoGCMutator {
             nogc: BumpAllocator::new(tls, Some(plan.get_immortal_space()), plan),
-            common: CommonMutatorContext::<VM>::new(tls, plan, &plan.common),
         }
     }
 }
