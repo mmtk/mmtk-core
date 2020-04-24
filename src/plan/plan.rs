@@ -1,4 +1,3 @@
-#![feature(param_attrs)]
 use super::controller_collector_context::ControllerCollectorContext;
 use super::{MutatorContext, ParallelCollector, TraceLocal};
 use crate::plan::phase::Phase;
@@ -305,7 +304,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         _vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         _options: Arc<UnsafeOptionsWrapper>,
-        #[allow(unused_mut)] mut heap: HeapMeta,
+        mut heap: HeapMeta,
     ) -> BasePlan<VM> {
         BasePlan {
             #[cfg(feature = "vmspace")]
