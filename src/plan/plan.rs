@@ -1,3 +1,4 @@
+#![feature(param_attrs)]
 use super::controller_collector_context::ControllerCollectorContext;
 use super::{MutatorContext, ParallelCollector, TraceLocal};
 use crate::plan::phase::Phase;
