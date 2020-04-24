@@ -304,8 +304,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         _vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         _options: Arc<UnsafeOptionsWrapper>,
-        #[allow(unused_mut)]
-        mut heap: HeapMeta,
+        #[allow(unused_mut)] mut heap: HeapMeta,
     ) -> BasePlan<VM> {
         BasePlan {
             #[cfg(feature = "vmspace")]

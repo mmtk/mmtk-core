@@ -12,14 +12,12 @@ use super::NoGCCollector;
 use super::NoGCMutator;
 use super::NoGCTraceLocal;
 use crate::plan::plan::BasePlan;
-use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 pub type SelectedPlan<VM> = NoGC<VM>;
@@ -32,7 +30,7 @@ pub struct NoGC<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
 
 pub struct NoGCUnsync<VM: VMBinding> {
-    pub space: ImmortalSpace<VM>,
+    pub nogc_space: ImmortalSpace<VM>,
 }
 
 impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
@@ -49,7 +47,7 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
 
         NoGC {
             unsync: UnsafeCell::new(NoGCUnsync {
-                space: ImmortalSpace::new(
+                nogc_space: ImmortalSpace::new(
                     "nogc_space",
                     true,
                     VMRequest::discontiguous(),
@@ -63,18 +61,11 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
     }
 
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
-        vm_map.finalize_static_space_map(
-            self.base.heap.get_discontig_start(),
-            self.base.heap.get_discontig_end(),
-        );
+        self.base.gc_init(heap_size, vm_map);
 
-        self.base
-            .heap
-            .total_pages
-            .store(bytes_to_pages(heap_size), Ordering::Relaxed);
         // FIXME correctly initialize spaces based on options
         let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.space.init(vm_map);
+        unsync.nogc_space.init(vm_map);
         self.base.gc_init(heap_size, vm_map)
     }
 
@@ -96,12 +87,12 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
 
     fn get_pages_used(&self) -> usize {
         let unsync = unsafe { &*self.unsync.get() };
-        unsync.space.reserved_pages()
+        unsync.nogc_space.reserved_pages()
     }
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
-        if unsync.space.in_space(object) {
+        if unsync.nogc_space.in_space(object) {
             true
         } else {
             self.base.is_valid_ref(object)
@@ -114,7 +105,7 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
 
     fn is_in_space(&self, address: Address) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
-        if unsafe { unsync.space.in_space(address.to_object_reference()) } {
+        if unsafe { unsync.nogc_space.in_space(address.to_object_reference()) } {
             return true;
         }
         unsafe { self.base.in_base_space(address.to_object_reference()) }
@@ -128,6 +119,6 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
 impl<VM: VMBinding> NoGC<VM> {
     pub fn get_immortal_space(&self) -> &'static ImmortalSpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };
-        &unsync.space
+        &unsync.nogc_space
     }
 }
