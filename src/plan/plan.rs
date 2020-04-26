@@ -302,6 +302,7 @@ pub fn create_vm_space<VM: VMBinding>(
 }
 
 impl<VM: VMBinding> BasePlan<VM> {
+    #[allow(unused_mut)] // 'heap' only needs to be mutable for certain features
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,

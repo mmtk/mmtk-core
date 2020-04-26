@@ -116,7 +116,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         if self.common().in_common_space(object) {
             return self.common.will_never_move(object);
         }
-        return self.base().will_never_move(object);
+        self.base().will_never_move(object)
     }
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool {
@@ -126,7 +126,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         if self.common().in_common_space(object) {
             return self.common.is_valid_ref(object);
         }
-        return self.base.is_valid_ref(object);
+        self.base.is_valid_ref(object)
     }
 
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {
