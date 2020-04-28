@@ -66,7 +66,6 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         // FIXME correctly initialize spaces based on options
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.nogc_space.init(vm_map);
-        self.base.gc_init(heap_size, vm_map)
     }
 
     fn base(&self) -> &BasePlan<VM> {
