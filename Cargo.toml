@@ -31,6 +31,8 @@ semispace = ["immortalspace", "largeobjectspace", "copyspace"]
 
 # spaces
 vmspace = []
+codespace = []
+rospace = []
 immortalspace = []
 copyspace = []
 largeobjectspace = []

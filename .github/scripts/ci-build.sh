@@ -8,6 +8,8 @@ cargo build --features semispace
 
 # Build features
 cargo build --features nogc,vmspace
+cargo build --features nogc,vmspace,codespace,rospace
 cargo build --features semispace,vmspace
+cargo build --features semispace,vmspace,codespace,rospace
 cargo build --features nogc,sanity
 cargo build --features semispace,sanity

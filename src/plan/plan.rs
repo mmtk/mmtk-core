@@ -265,17 +265,17 @@ pub struct BasePlan<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub options: Arc<UnsafeOptionsWrapper>,
     pub heap: HeapMeta,
-    #[cfg(any(code, readonly, vmspace))]
+    #[cfg(any(feature = "codespace", feature = "rospace", feature = "vmspace"))]
     pub unsync: UnsafeCell<BaseUnsync<VM>>,
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
 }
 
-#[cfg(any(code, readonly, vmspace))]
+#[cfg(any(feature = "codespace", feature = "rospace", feature = "vmspace"))]
 pub struct BaseUnsync<VM: VMBinding> {
-    #[cfg(feature = "code")]
-    pub immortal: ImmortalSpace<VM>,
-    #[cfg(feature = "readonly")]
+    #[cfg(feature = "codespace")]
+    pub code: ImmortalSpace<VM>,
+    #[cfg(feature = "rospace")]
     pub readonly: ImmortalSpace<VM>,
     #[cfg(feature = "vmspace")]
     pub vm_space: Option<ImmortalSpace<VM>>,
@@ -315,20 +315,20 @@ impl<VM: VMBinding> BasePlan<VM> {
         mut heap: HeapMeta,
     ) -> BasePlan<VM> {
         BasePlan {
-            #[cfg(any(code, readonly, vmspace))]
+            #[cfg(any(feature = "codespace", feature = "rospace", feature = "vmspace"))]
             unsync: UnsafeCell::new(BaseUnsync {
-                #[cfg(feature = "code")]
-                immortal: ImmortalSpace::new(
-                    "code",
+                #[cfg(feature = "codespace")]
+                code: ImmortalSpace::new(
+                    "codespace",
                     true,
                     VMRequest::discontiguous(),
                     vm_map,
                     mmapper,
                     &mut heap,
                 ),
-                #[cfg(feature = "readonly")]
-                immortal: ImmortalSpace::new(
-                    "readonly",
+                #[cfg(feature = "rospace")]
+                readonly: ImmortalSpace::new(
+                    "rospace",
                     true,
                     VMRequest::discontiguous(),
                     vm_map,
@@ -377,13 +377,13 @@ impl<VM: VMBinding> BasePlan<VM> {
             .total_pages
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);
 
-        #[cfg(any(code, readonly, vmspace))]
+        #[cfg(any(feature = "codespace", feature = "rospace", feature = "vmspace"))]
         {
             let unsync = unsafe { &mut *self.unsync.get() };
-            #[cfg(feature = "code")]
-            unsync.immortal.init(code);
-            #[cfg(feature = "readonly")]
-            unsync.immortal.init(readonly);
+            #[cfg(feature = "codespace")]
+            unsync.code.init(vm_map);
+            #[cfg(feature = "rospace")]
+            unsync.readonly.init(vm_map);
             #[cfg(feature = "vmspace")]
             {
                 if unsync.vm_space.is_some() {
@@ -398,19 +398,19 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     pub fn is_valid_ref(&self, _object: ObjectReference) -> bool {
-        #[cfg(any(code, readonly, vmspace))]
+        #[cfg(any(feature = "codespace", feature = "rospace", feature = "vmspace"))]
         {
             let unsync = unsafe { &mut *self.unsync.get() };
 
-            #[cfg(feature = "code")]
+            #[cfg(feature = "codespace")]
             {
-                if unsync.code.in_space(object) {
+                if unsync.code.in_space(_object) {
                     return true;
                 }
             }
-            #[cfg(feature = "readonly")]
+            #[cfg(feature = "rospace")]
             {
-                if unsync.readonly.in_space(object) {
+                if unsync.readonly.in_space(_object) {
                     return true;
                 }
             }
@@ -426,21 +426,21 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     pub fn is_movable(&self, _object: ObjectReference) -> bool {
-        #[cfg(any(code, readonly, vmspace))]
+        #[cfg(any(feature = "codespace", feature = "rospace", feature = "vmspace"))]
         {
             let unsync = unsafe { &*self.unsync.get() };
 
-            #[cfg(feature = "code")]
+            #[cfg(feature = "codespace")]
             {
-                if unsync.code.in_space(object) {
+                if unsync.code.in_space(_object) {
                     return unsync.code.is_movable();
                 }
             }
 
-            #[cfg(feature = "readonly")]
+            #[cfg(feature = "rospace")]
             {
-                if unsync.readonly.in_space(object) {
-                    return readonly.code.is_movable();
+                if unsync.readonly.in_space(_object) {
+                    return unsync.readonly.is_movable();
                 }
             }
 
@@ -457,20 +457,20 @@ impl<VM: VMBinding> BasePlan<VM> {
 
     // FIXME: Move into space
     pub fn is_live(&self, _object: ObjectReference) -> bool {
-        #[cfg(any(code, readonly, vmspace))]
+        #[cfg(any(feature = "codespace", feature = "rospace", feature = "vmspace"))]
         {
             let unsync = unsafe { &*self.unsync.get() };
 
-            #[cfg(feature = "code")]
+            #[cfg(feature = "codespace")]
             {
-                if unsync.code.in_space(object) {
+                if unsync.code.in_space(_object) {
                     return true;
                 }
             }
 
-            #[cfg(feature = "readonly")]
+            #[cfg(feature = "rospace")]
             {
-                if unsync.readonly.in_space(object) {
+                if unsync.readonly.in_space(_object) {
                     return true;
                 }
             }
@@ -486,28 +486,29 @@ impl<VM: VMBinding> BasePlan<VM> {
         panic!("Invalid space")
     }
 
-    pub fn in_base_space(&self, object: ObjectReference) -> bool {
-        #[cfg(any(code, readonly, vmspace))]
+    pub fn in_base_space(&self, _object: ObjectReference) -> bool {
+        #[cfg(any(feature = "codespace", feature = "rospace", feature = "vmspace"))]
         {
             let unsync = unsafe { &*self.unsync.get() };
 
-            #[cfg(feature = "code")]
+            #[cfg(feature = "codespace")]
             {
-                if unsync.code.in_space(object) {
+                if unsync.code.in_space(_object) {
                     return true;
                 }
             }
 
-            #[cfg(feature = "readonly")]
+            #[cfg(feature = "rospace")]
             {
-                if unsync.readonly.in_space(object) {
+                if unsync.readonly.in_space(_object) {
                     return true;
                 }
             }
 
             #[cfg(feature = "vmspace")]
             {
-                if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
+                if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object)
+                {
                     return true;
                 }
             }
@@ -520,23 +521,23 @@ impl<VM: VMBinding> BasePlan<VM> {
         _trace: &mut T,
         _object: ObjectReference,
     ) -> ObjectReference {
-        #[cfg(any(code, readonly, vmspace))]
+        #[cfg(any(feature = "codespace", feature = "rospace", feature = "vmspace"))]
         {
             let unsync = unsafe { &*self.unsync.get() };
 
-            #[cfg(feature = "code")]
+            #[cfg(feature = "codespace")]
             {
-                if unsync.code.in_space(object) {
+                if unsync.code.in_space(_object) {
                     trace!("trace_object: object in code space");
-                    return unsync.code.trace_object(trace, object);
+                    return unsync.code.trace_object(_trace, _object);
                 }
             }
 
-            #[cfg(feature = "readonly")]
+            #[cfg(feature = "rospace")]
             {
-                if unsync.readonly.in_space(object) {
+                if unsync.readonly.in_space(_object) {
                     trace!("trace_object: object in readonly space");
-                    return unsync.readonly.trace_object(trace, object);
+                    return unsync.readonly.trace_object(_trace, _object);
                 }
             }
 
@@ -558,8 +559,43 @@ impl<VM: VMBinding> BasePlan<VM> {
 
     pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, _primary: bool) {
         {
-            #[cfg(any(code, readonly, vmspace))]
+            #[cfg(any(feature = "codespace", feature = "rospace", feature = "vmspace"))]
             let unsync = &mut *self.unsync.get();
+
+            #[cfg(feature = "codespace")]
+            {
+                match phase {
+                    Phase::Prepare => unsync.code.prepare(),
+                    &Phase::Release => unsync.code.release(),
+                    _ => {}
+                }
+            }
+
+            #[cfg(feature = "rospace")]
+            {
+                match phase {
+                    Phase::Prepare => unsync.readonly.prepare(),
+                    &Phase::Release => unsync.readonly.release(),
+                    _ => {}
+                }
+            }
+
+            #[cfg(feature = "vmspace")]
+            {
+                match phase {
+                    Phase::Prepare => {
+                        if unsync.vm_space.is_some() {
+                            unsync.vm_space.as_mut().unwrap().prepare();
+                        }
+                    }
+                    &Phase::Release => {
+                        if unsync.vm_space.is_some() {
+                            unsync.vm_space.as_mut().unwrap().release();
+                        }
+                    }
+                    _ => {}
+                }
+            }
 
             match phase {
                 Phase::SetCollectionKind => {
@@ -588,14 +624,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 Phase::PrepareStacks => {
                     self.stacks_prepared.store(true, atomic::Ordering::SeqCst);
                 }
-                Phase::Prepare => {
-                   #[cfg(feature = "vmspace")]
-                    {
-                        if unsync.vm_space.is_some() {
-                            unsync.vm_space.as_mut().unwrap().prepare();
-                        }
-                    }
-                }
+                Phase::Prepare => {}
                 Phase::Closure => {}
                 &Phase::StackRoots => {
                     VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
@@ -605,14 +634,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     VM::VMScanning::reset_thread_counter();
                     self.set_gc_status(GcStatus::GcProper);
                 }
-                &Phase::Release => {
-                    #[cfg(feature = "vmspace")]
-                    {
-                        if unsync.vm_space.is_some() {
-                            unsync.vm_space.as_mut().unwrap().release();
-                        }
-                    }
-                }
+                &Phase::Release => {}
                 Phase::Complete => {
                     self.set_gc_status(GcStatus::NotInGC);
                 }
