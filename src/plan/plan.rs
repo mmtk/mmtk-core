@@ -17,9 +17,9 @@ use crate::util::statistics::stats::Stats;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
+use crate::vm::Collection;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
-use crate::vm::{Collection, ObjectModel};
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -207,10 +207,7 @@ pub trait Plan<VM: VMBinding>: Sized {
         if !self.is_valid_ref(object) {
             return false;
         }
-        if !self
-            .mmapper()
-            .address_is_mapped(VM::VMObjectModel::ref_to_address(object))
-        {
+        if !self.mmapper().address_is_mapped(object.to_address()) {
             return false;
         }
         true
@@ -244,6 +241,9 @@ pub enum GcStatus {
     GcProper,
 }
 
+/**
+BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
+*/
 pub struct BasePlan<VM: VMBinding> {
     pub initialized: AtomicBool,
     pub gc_status: Mutex<GcStatus>,
@@ -419,12 +419,8 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     pub fn in_base_space(&self, object: ObjectReference) -> bool {
-        self.is_in_vmspace(VM::VMObjectModel::ref_to_address(object))
+        self.is_in_vmspace(object.to_address())
     }
-
-    // pub fn in_base_space(self, address: Address) -> bool {
-    //     self.is_in_vmspace(address)
-    // }
 
     pub fn trace_object<T: TransitiveClosure>(
         &self,
@@ -565,6 +561,9 @@ impl<VM: VMBinding> BasePlan<VM> {
     fn force_full_heap_collection(&self) {}
 }
 
+/**
+CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
+*/
 pub struct CommonPlan<VM: VMBinding> {
     pub unsync: UnsafeCell<CommonUnsync<VM>>,
 }
