@@ -489,6 +489,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 Phase::PrepareStacks => {
                     self.stacks_prepared.store(true, atomic::Ordering::SeqCst);
                 }
+                Phase::Prepare => {}
                 Phase::Closure => {}
                 &Phase::StackRoots => {
                     VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
@@ -675,7 +676,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         let unsync = unsafe { &*self.unsync.get() };
 
         if unsync.immortal.in_space(object) {
-            trace!("trace_object: object in versatile_space");
+            trace!("trace_object: object in immortal space");
             return unsync.immortal.trace_object(trace, object);
         }
         if unsync.los.in_space(object) {
@@ -685,21 +686,20 @@ impl<VM: VMBinding> CommonPlan<VM> {
         panic!("No special case for space in trace_object");
     }
 
-    pub unsafe fn collection_phase(&self, _tls: OpaquePointer, phase: &Phase, primary: bool) {
-        {
-            let unsync = &mut *self.unsync.get();
-            match phase {
-                Phase::Prepare => {
-                    unsync.immortal.prepare();
-                    unsync.los.prepare(primary);
-                }
-                &Phase::Release => {
-                    unsync.immortal.release();
-                    unsync.los.release(true);
-                }
-                _ => {}
+    pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, primary: bool) {
+        let unsync = &mut *self.unsync.get();
+        match phase {
+            Phase::Prepare => {
+                unsync.immortal.prepare();
+                unsync.los.prepare(primary);
             }
+            &Phase::Release => {
+                unsync.immortal.release();
+                unsync.los.release(true);
+            }
+            _ => {}
         }
+        self.base.collection_phase(tls, phase, primary)
     }
 
     pub fn stacks_prepared(&self) -> bool {
