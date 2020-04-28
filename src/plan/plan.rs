@@ -567,6 +567,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 */
 pub struct CommonPlan<VM: VMBinding> {
     pub unsync: UnsafeCell<CommonUnsync<VM>>,
+    pub base: BasePlan<VM>,
 }
 
 pub struct CommonUnsync<VM: VMBinding> {
@@ -578,7 +579,8 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
+        options: Arc<UnsafeOptionsWrapper>,
+        mut heap: HeapMeta,
     ) -> CommonPlan<VM> {
         CommonPlan {
             unsync: UnsafeCell::new(CommonUnsync {
@@ -588,7 +590,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     VMRequest::discontiguous(),
                     vm_map,
                     mmapper,
-                    heap,
+                    &mut heap,
                 ),
                 los: LargeObjectSpace::new(
                     "los",
@@ -596,13 +598,15 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     VMRequest::discontiguous(),
                     vm_map,
                     mmapper,
-                    heap,
+                    &mut heap,
                 ),
             }),
+            base: BasePlan::new(vm_map, mmapper, options, heap),
         }
     }
 
-    pub fn gc_init(&self, _heap_size: usize, vm_map: &'static VMMap) {
+    pub fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+        self.base.gc_init(heap_size, vm_map);
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.immortal.init(vm_map);
         unsync.los.init(vm_map);
@@ -610,7 +614,9 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     pub fn in_common_space(&self, object: ObjectReference) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
-        unsync.immortal.in_space(object) || unsync.los.in_space(object)
+        unsync.immortal.in_space(object)
+            || unsync.los.in_space(object)
+            || self.base.in_base_space(object)
     }
 
     pub fn will_never_move(&self, object: ObjectReference) -> bool {
@@ -618,7 +624,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         if unsync.immortal.in_space(object) || unsync.los.in_space(object) {
             return true;
         }
-        false // preserve correctness over efficiency
+        self.base.will_never_move(object)
     }
 
     pub fn is_valid_ref(&self, object: ObjectReference) -> bool {
@@ -630,7 +636,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         if unsync.los.in_space(object) {
             return true;
         }
-        false
+        self.base.is_valid_ref(object)
     }
 
     pub fn is_movable(&self, object: ObjectReference) -> bool {
@@ -641,7 +647,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         if unsync.los.in_space(object) {
             return unsync.los.is_movable();
         }
-        true
+        self.base.is_movable(object)
     }
 
     // FIXME: Move into space
@@ -694,6 +700,10 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 _ => {}
             }
         }
+    }
+
+    pub fn stacks_prepared(&self) -> bool {
+        self.base.stacks_prepared()
     }
 
     pub fn get_immortal(&self) -> &'static ImmortalSpace<VM> {

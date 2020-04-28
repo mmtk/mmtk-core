@@ -36,7 +36,6 @@ pub const SCAN_BOOT_IMAGE: bool = true;
 pub struct SemiSpace<VM: VMBinding> {
     pub unsync: UnsafeCell<SemiSpaceUnsync<VM>>,
     pub ss_trace: Trace,
-    pub base: BasePlan<VM>,
     pub common: CommonPlan<VM>,
 }
 
@@ -83,13 +82,11 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 ),
             }),
             ss_trace: Trace::new(),
-            common: CommonPlan::new(vm_map, mmapper, &mut heap),
-            base: BasePlan::new(vm_map, mmapper, options, heap),
+            common: CommonPlan::new(vm_map, mmapper, options, heap),
         }
     }
 
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
-        self.base.gc_init(heap_size, vm_map);
         self.common.gc_init(heap_size, vm_map);
 
         let unsync = unsafe { &mut *self.unsync.get() };
@@ -98,7 +95,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
     }
 
     fn base(&self) -> &BasePlan<VM> {
-        &self.base
+        &self.common.base
     }
 
     fn common(&self) -> &CommonPlan<VM> {
@@ -113,27 +110,20 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         if self.tospace().in_space(object) || self.fromspace().in_space(object) {
             return false;
         }
-        if self.common().in_common_space(object) {
-            return self.common.will_never_move(object);
-        }
-        self.base().will_never_move(object)
+        self.common.will_never_move(object)
     }
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool {
         if self.tospace().in_space(object) {
             return true;
         }
-        if self.common().in_common_space(object) {
-            return self.common.is_valid_ref(object);
-        }
-        self.base.is_valid_ref(object)
+        self.common.is_valid_ref(object)
     }
 
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {
         let unsync = &mut *self.unsync.get();
         match phase {
             Phase::Prepare => {
-                self.base.collection_phase(tls, phase, true);
                 self.common.collection_phase(tls, phase, true);
                 debug_assert!(self.ss_trace.values.is_empty());
                 debug_assert!(self.ss_trace.root_locations.is_empty());
@@ -154,7 +144,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 }
             }
             &Phase::Release => {
-                self.base.collection_phase(tls, phase, true);
                 self.common.collection_phase(tls, phase, true);
                 #[cfg(feature = "sanity")]
                 {
@@ -208,12 +197,8 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                     self.fromspace().protect();
                 }
                 self.common.collection_phase(tls, phase, true);
-                self.base.collection_phase(tls, phase, true);
             }
-            _ => {
-                self.base.collection_phase(tls, phase, true);
-                self.common.collection_phase(tls, phase, true);
-            }
+            _ => self.common.collection_phase(tls, phase, true),
         }
     }
 
@@ -237,10 +222,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         if unsync.copyspace1.in_space(object) {
             return unsync.copyspace1.is_movable();
         }
-        if self.common.in_common_space(object) {
-            return self.common.is_movable(object);
-        }
-        self.base.is_movable(object)
+        self.common.is_movable(object)
     }
 
     fn is_in_space(&self, address: Address) -> bool {
@@ -249,7 +231,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         if unsync.copyspace0.in_space(addr) || unsync.copyspace1.in_space(addr) {
             return true;
         }
-        self.common.in_common_space(addr) || self.base.in_base_space(addr)
+        self.common.in_common_space(addr)
     }
 }
 

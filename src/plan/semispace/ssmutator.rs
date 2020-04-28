@@ -27,7 +27,7 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
     fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, _primary: bool) {
         match phase {
             Phase::PrepareStacks => {
-                if !self.plan.base.stacks_prepared() {
+                if !self.plan.common.stacks_prepared() {
                     VM::VMCollection::prepare_mutator(tls, self);
                 }
                 self.flush_remembered_sets();
