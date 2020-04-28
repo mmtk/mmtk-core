@@ -265,14 +265,19 @@ pub struct BasePlan<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub options: Arc<UnsafeOptionsWrapper>,
     pub heap: HeapMeta,
-    #[cfg(feature = "vmspace")]
+    #[cfg(any(code, readonly, vmspace))]
     pub unsync: UnsafeCell<BaseUnsync<VM>>,
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
 }
 
-#[cfg(feature = "vmspace")]
+#[cfg(any(code, readonly, vmspace))]
 pub struct BaseUnsync<VM: VMBinding> {
+    #[cfg(feature = "code")]
+    pub immortal: ImmortalSpace<VM>,
+    #[cfg(feature = "readonly")]
+    pub readonly: ImmortalSpace<VM>,
+    #[cfg(feature = "vmspace")]
     pub vm_space: Option<ImmortalSpace<VM>>,
 }
 
@@ -310,8 +315,27 @@ impl<VM: VMBinding> BasePlan<VM> {
         mut heap: HeapMeta,
     ) -> BasePlan<VM> {
         BasePlan {
-            #[cfg(feature = "vmspace")]
+            #[cfg(any(code, readonly, vmspace))]
             unsync: UnsafeCell::new(BaseUnsync {
+                #[cfg(feature = "code")]
+                immortal: ImmortalSpace::new(
+                    "code",
+                    true,
+                    VMRequest::discontiguous(),
+                    vm_map,
+                    mmapper,
+                    &mut heap,
+                ),
+                #[cfg(feature = "readonly")]
+                immortal: ImmortalSpace::new(
+                    "readonly",
+                    true,
+                    VMRequest::discontiguous(),
+                    vm_map,
+                    mmapper,
+                    &mut heap,
+                ),
+                #[cfg(feature = "vmspace")]
                 vm_space: if options.vm_space {
                     Some(create_vm_space(
                         vm_map,
@@ -352,11 +376,19 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.heap
             .total_pages
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);
-        #[cfg(feature = "vmspace")]
+
+        #[cfg(any(code, readonly, vmspace))]
         {
             let unsync = unsafe { &mut *self.unsync.get() };
-            if unsync.vm_space.is_some() {
-                unsync.vm_space.as_mut().unwrap().init(vm_map);
+            #[cfg(feature = "code")]
+            unsync.immortal.init(code);
+            #[cfg(feature = "readonly")]
+            unsync.immortal.init(readonly);
+            #[cfg(feature = "vmspace")]
+            {
+                if unsync.vm_space.is_some() {
+                    unsync.vm_space.as_mut().unwrap().init(vm_map);
+                }
             }
         }
     }
@@ -366,50 +398,25 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     pub fn is_valid_ref(&self, _object: ObjectReference) -> bool {
-        #[cfg(feature = "vmspace")]
+        #[cfg(any(code, readonly, vmspace))]
         {
             let unsync = unsafe { &mut *self.unsync.get() };
-            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object) {
-                return true;
-            }
-        }
-        false
-    }
 
-    pub fn is_movable(&self, _object: ObjectReference) -> bool {
-        #[cfg(feature = "vmspace")]
-        {
-            let unsync = unsafe { &*self.unsync.get() };
-            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object) {
-                return unsync.vm_space.as_ref().unwrap().is_movable();
+            #[cfg(feature = "code")]
+            {
+                if unsync.code.in_space(object) {
+                    return true;
+                }
             }
-        }
-        true
-    }
-
-    // FIXME: Move into space
-    pub fn is_live(&self, _object: ObjectReference) -> bool {
-        #[cfg(feature = "vmspace")]
-        {
-            let unsync = unsafe { &*self.unsync.get() };
-            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object) {
-                return true;
+            #[cfg(feature = "readonly")]
+            {
+                if unsync.readonly.in_space(object) {
+                    return true;
+                }
             }
-        }
-        panic!("Invalid space")
-    }
-
-    fn is_in_vmspace(&self, _address: Address) -> bool {
-        #[cfg(feature = "vmspace")]
-        {
-            let unsync = unsafe { &*self.unsync.get() };
-            unsafe {
-                if unsync.vm_space.is_some()
-                    && unsync
-                        .vm_space
-                        .as_ref()
-                        .unwrap()
-                        .in_space(_address.to_object_reference())
+            #[cfg(feature = "vmspace")]
+            {
+                if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object)
                 {
                     return true;
                 }
@@ -418,8 +425,94 @@ impl<VM: VMBinding> BasePlan<VM> {
         false
     }
 
+    pub fn is_movable(&self, _object: ObjectReference) -> bool {
+        #[cfg(any(code, readonly, vmspace))]
+        {
+            let unsync = unsafe { &*self.unsync.get() };
+
+            #[cfg(feature = "code")]
+            {
+                if unsync.code.in_space(object) {
+                    return unsync.code.is_movable();
+                }
+            }
+
+            #[cfg(feature = "readonly")]
+            {
+                if unsync.readonly.in_space(object) {
+                    return readonly.code.is_movable();
+                }
+            }
+
+            #[cfg(feature = "vmspace")]
+            {
+                if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object)
+                {
+                    return unsync.vm_space.as_ref().unwrap().is_movable();
+                }
+            }
+        }
+        true
+    }
+
+    // FIXME: Move into space
+    pub fn is_live(&self, _object: ObjectReference) -> bool {
+        #[cfg(any(code, readonly, vmspace))]
+        {
+            let unsync = unsafe { &*self.unsync.get() };
+
+            #[cfg(feature = "code")]
+            {
+                if unsync.code.in_space(object) {
+                    return true;
+                }
+            }
+
+            #[cfg(feature = "readonly")]
+            {
+                if unsync.readonly.in_space(object) {
+                    return true;
+                }
+            }
+
+            #[cfg(feature = "vmspace")]
+            {
+                if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object)
+                {
+                    return true;
+                }
+            }
+        }
+        panic!("Invalid space")
+    }
+
     pub fn in_base_space(&self, object: ObjectReference) -> bool {
-        self.is_in_vmspace(object.to_address())
+        #[cfg(any(code, readonly, vmspace))]
+        {
+            let unsync = unsafe { &*self.unsync.get() };
+
+            #[cfg(feature = "code")]
+            {
+                if unsync.code.in_space(object) {
+                    return true;
+                }
+            }
+
+            #[cfg(feature = "readonly")]
+            {
+                if unsync.readonly.in_space(object) {
+                    return true;
+                }
+            }
+
+            #[cfg(feature = "vmspace")]
+            {
+                if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     pub fn trace_object<T: TransitiveClosure>(
@@ -427,16 +520,37 @@ impl<VM: VMBinding> BasePlan<VM> {
         _trace: &mut T,
         _object: ObjectReference,
     ) -> ObjectReference {
-        #[cfg(feature = "vmspace")]
+        #[cfg(any(code, readonly, vmspace))]
         {
             let unsync = unsafe { &*self.unsync.get() };
-            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object) {
-                trace!("trace_object: object in boot space");
-                return unsync
-                    .vm_space
-                    .as_ref()
-                    .unwrap()
-                    .trace_object(_trace, _object);
+
+            #[cfg(feature = "code")]
+            {
+                if unsync.code.in_space(object) {
+                    trace!("trace_object: object in code space");
+                    return unsync.code.trace_object(trace, object);
+                }
+            }
+
+            #[cfg(feature = "readonly")]
+            {
+                if unsync.readonly.in_space(object) {
+                    trace!("trace_object: object in readonly space");
+                    return unsync.readonly.trace_object(trace, object);
+                }
+            }
+
+            #[cfg(feature = "vmspace")]
+            {
+                if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object)
+                {
+                    trace!("trace_object: object in boot space");
+                    return unsync
+                        .vm_space
+                        .as_ref()
+                        .unwrap()
+                        .trace_object(_trace, _object);
+                }
             }
         }
         panic!("No special case for space in trace_object");
@@ -444,7 +558,7 @@ impl<VM: VMBinding> BasePlan<VM> {
 
     pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, _primary: bool) {
         {
-            #[cfg(feature = "vmspace")]
+            #[cfg(any(code, readonly, vmspace))]
             let unsync = &mut *self.unsync.get();
 
             match phase {
@@ -657,7 +771,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             return true;
         }
         if unsync.los.in_space(object) {
-            return true;
+            return true; // ??? is this correct?
         }
         panic!("Invalid space")
     }
