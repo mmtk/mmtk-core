@@ -445,7 +445,22 @@ impl<VM: VMBinding> BasePlan<VM> {
     pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, _primary: bool) {
         {
             #[cfg(feature = "vmspace")]
-            let unsync = &mut *self.unsync.get();
+            {
+                let unsync = &mut *self.unsync.get();
+                match phase {
+                    Phase::Prepare => {
+                        if unsync.vm_space.is_some() {
+                            unsync.vm_space.as_mut().unwrap().prepare();
+                        }
+                    }
+                    &Phase::Release => {
+                        if unsync.vm_space.is_some() {
+                            unsync.vm_space.as_mut().unwrap().release();
+                        }
+                    }
+                    _ => {}
+                }
+            }
 
             match phase {
                 Phase::SetCollectionKind => {
@@ -474,14 +489,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 Phase::PrepareStacks => {
                     self.stacks_prepared.store(true, atomic::Ordering::SeqCst);
                 }
-                Phase::Prepare => {
-                   #[cfg(feature = "vmspace")]
-                    {
-                        if unsync.vm_space.is_some() {
-                            unsync.vm_space.as_mut().unwrap().prepare();
-                        }
-                    }
-                }
+                Phase::Prepare => {}
                 Phase::Closure => {}
                 &Phase::StackRoots => {
                     VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
@@ -491,14 +499,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     VM::VMScanning::reset_thread_counter();
                     self.set_gc_status(GcStatus::GcProper);
                 }
-                &Phase::Release => {
-                    #[cfg(feature = "vmspace")]
-                    {
-                        if unsync.vm_space.is_some() {
-                            unsync.vm_space.as_mut().unwrap().release();
-                        }
-                    }
-                }
+                &Phase::Release => {}
                 Phase::Complete => {
                     self.set_gc_status(GcStatus::NotInGC);
                 }
