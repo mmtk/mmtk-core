@@ -42,7 +42,7 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
         let plan = SelectedPlan::new(vm_map, mmapper, options.clone());
-        let phase_manager = PhaseManager::new(&plan.common().stats);
+        let phase_manager = PhaseManager::new(&plan.base().stats);
         MMTK {
             plan,
             phase_manager,
@@ -58,11 +58,11 @@ impl<VM: VMBinding> MMTK<VM> {
         // FIXME Do a full heap GC if we have generational GC
         self.plan.handle_user_collection_request(tls, true);
         self.inside_harness.store(true, Ordering::SeqCst);
-        self.plan.common().stats.start_all();
+        self.plan.base().stats.start_all();
     }
 
     pub fn harness_end(&self) {
-        self.plan.common().stats.stop_all();
+        self.plan.base().stats.stop_all();
         self.inside_harness.store(false, Ordering::SeqCst);
     }
 }

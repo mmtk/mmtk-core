@@ -1,7 +1,6 @@
 use crate::plan::{Phase, Plan};
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
-use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -12,28 +11,26 @@ use std::cell::UnsafeCell;
 use super::NoGCCollector;
 use super::NoGCMutator;
 use super::NoGCTraceLocal;
-use crate::plan::plan::CommonPlan;
-use crate::util::conversions::bytes_to_pages;
+use crate::plan::plan::BasePlan;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 pub type SelectedPlan<VM> = NoGC<VM>;
 
 pub struct NoGC<VM: VMBinding> {
     pub unsync: UnsafeCell<NoGCUnsync<VM>>,
-    pub common: CommonPlan<VM>,
+    pub base: BasePlan<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
 
 pub struct NoGCUnsync<VM: VMBinding> {
-    pub space: ImmortalSpace<VM>,
+    pub nogc_space: ImmortalSpace<VM>,
 }
 
 impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
@@ -50,7 +47,7 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
 
         NoGC {
             unsync: UnsafeCell::new(NoGCUnsync {
-                space: ImmortalSpace::new(
+                nogc_space: ImmortalSpace::new(
                     "nogc_space",
                     true,
                     VMRequest::discontiguous(),
@@ -59,28 +56,20 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
                     &mut heap,
                 ),
             }),
-            common: CommonPlan::new(vm_map, mmapper, options, heap),
+            base: BasePlan::new(vm_map, mmapper, options, heap),
         }
     }
 
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
-        vm_map.finalize_static_space_map(
-            self.common.heap.get_discontig_start(),
-            self.common.heap.get_discontig_end(),
-        );
+        self.base.gc_init(heap_size, vm_map);
 
-        self.common
-            .heap
-            .total_pages
-            .store(bytes_to_pages(heap_size), Ordering::Relaxed);
         // FIXME correctly initialize spaces based on options
         let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.space.init(vm_map);
-        self.common.gc_init(heap_size, vm_map)
+        unsync.nogc_space.init(vm_map);
     }
 
-    fn common(&self) -> &CommonPlan<VM> {
-        &self.common
+    fn base(&self) -> &BasePlan<VM> {
+        &self.base
     }
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<NoGCMutator<VM>> {
@@ -97,15 +86,15 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
 
     fn get_pages_used(&self) -> usize {
         let unsync = unsafe { &*self.unsync.get() };
-        unsync.space.reserved_pages()
+        unsync.nogc_space.reserved_pages()
     }
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
-        if unsync.space.in_space(object) {
+        if unsync.nogc_space.in_space(object) {
             true
         } else {
-            self.common.is_valid_ref(object)
+            self.base.is_valid_ref(object)
         }
     }
 
@@ -113,13 +102,12 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         false
     }
 
-    fn is_mapped_address(&self, address: Address) -> bool {
+    fn is_in_space(&self, address: Address) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
-        if unsafe { unsync.space.in_space(address.to_object_reference()) } {
-            self.common.mmapper.address_is_mapped(address)
-        } else {
-            self.common.is_mapped_address(address)
+        if unsafe { unsync.nogc_space.in_space(address.to_object_reference()) } {
+            return true;
         }
+        unsafe { self.base.in_base_space(address.to_object_reference()) }
     }
 
     fn is_movable(&self, _object: ObjectReference) -> bool {
@@ -130,6 +118,6 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
 impl<VM: VMBinding> NoGC<VM> {
     pub fn get_immortal_space(&self) -> &'static ImmortalSpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };
-        &unsync.space
+        &unsync.nogc_space
     }
 }

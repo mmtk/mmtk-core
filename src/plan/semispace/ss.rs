@@ -9,7 +9,6 @@ use crate::plan::Allocator;
 use crate::plan::Phase;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
-use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -19,6 +18,7 @@ use std::cell::UnsafeCell;
 #[cfg(feature = "sanity")]
 use std::sync::atomic::Ordering;
 
+use crate::plan::plan::BasePlan;
 use crate::plan::plan::CommonPlan;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -92,6 +92,10 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.copyspace0.init(vm_map);
         unsync.copyspace1.init(vm_map);
+    }
+
+    fn base(&self) -> &BasePlan<VM> {
+        &self.common.base
     }
 
     fn common(&self) -> &CommonPlan<VM> {
@@ -221,16 +225,13 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         self.common.is_movable(object)
     }
 
-    fn is_mapped_address(&self, address: Address) -> bool {
+    fn is_in_space(&self, address: Address) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
-        if unsafe {
-            unsync.copyspace0.in_space(address.to_object_reference())
-                || unsync.copyspace1.in_space(address.to_object_reference())
-        } {
-            self.common.mmapper.address_is_mapped(address)
-        } else {
-            self.common.is_mapped_address(address)
+        let addr = unsafe { address.to_object_reference() };
+        if unsync.copyspace0.in_space(addr) || unsync.copyspace1.in_space(addr) {
+            return true;
         }
+        self.common.in_common_space(addr)
     }
 }
 
