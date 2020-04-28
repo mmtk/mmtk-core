@@ -57,7 +57,8 @@ impl<VM: VMBinding> CommonMutatorContext<VM> {
         match allocator {
             AllocationType::Los => self.los.alloc(size, align, offset),
             AllocationType::Immortal => self.immortal.alloc(size, align, offset),
-            _ => unreachable!(),
+            // FIXME: We should create spaces and allocators for NonMoving/Code/LargeCode
+            _ => self.immortal.alloc(size, align, offset),
         }
     }
 
@@ -78,7 +79,8 @@ impl<VM: VMBinding> CommonMutatorContext<VM> {
             AllocationType::Immortal => {
                 self.immortal.get_space().unwrap().initialize_header(object)
             }
-            _ => unreachable!(),
+            // FIXME: We should create spaces and allocators for NonMoving/Code/LargeCode
+            _ => self.immortal.get_space().unwrap().initialize_header(object),
         }
     }
 }
