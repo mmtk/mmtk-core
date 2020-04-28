@@ -489,6 +489,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 Phase::PrepareStacks => {
                     self.stacks_prepared.store(true, atomic::Ordering::SeqCst);
                 }
+                Phase::Closure => {}
                 &Phase::StackRoots => {
                     VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
                     self.set_gc_status(GcStatus::GcProper);
