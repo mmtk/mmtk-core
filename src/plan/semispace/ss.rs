@@ -194,6 +194,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 }
                 self.common.collection_phase(tls, phase, true);
             }
+            Phase::Closure => {}
             _ => self.common.collection_phase(tls, phase, true),
         }
     }
