@@ -278,7 +278,7 @@ pub struct BaseUnsync<VM: VMBinding> {
     #[cfg(feature = "rospace")]
     pub readonly: ImmortalSpace<VM>,
     #[cfg(feature = "vmspace")]
-    pub vm_space: Option<ImmortalSpace<VM>>,
+    pub vm_space: ImmortalSpace<VM>,
 }
 
 #[cfg(feature = "vmspace")]
@@ -336,16 +336,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     &mut heap,
                 ),
                 #[cfg(feature = "vmspace")]
-                vm_space: if options.vm_space {
-                    Some(create_vm_space(
-                        vm_map,
-                        mmapper,
-                        &mut heap,
-                        options.vm_space_size,
-                    ))
-                } else {
-                    None
-                },
+                vm_space: create_vm_space(vm_map, mmapper, &mut heap, options.vm_space_size),
             }),
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),
@@ -385,11 +376,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             #[cfg(feature = "rospace")]
             unsync.readonly.init(vm_map);
             #[cfg(feature = "vmspace")]
-            {
-                if unsync.vm_space.is_some() {
-                    unsync.vm_space.as_mut().unwrap().init(vm_map);
-                }
-            }
+            unsync.vm_space.init(vm_map);
         }
     }
 
@@ -415,7 +402,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
         #[cfg(feature = "vmspace")]
         {
-            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object) {
+            if unsync.vm_space.in_space(_object) {
                 return true;
             }
         }
@@ -443,8 +430,8 @@ impl<VM: VMBinding> BasePlan<VM> {
 
         #[cfg(feature = "vmspace")]
         {
-            if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object) {
-                return unsync.vm_space.as_ref().unwrap().is_movable();
+            if unsync.vm_space.in_space(_object) {
+                return unsync.vm_space.is_movable();
             }
         }
 
@@ -473,8 +460,7 @@ impl<VM: VMBinding> BasePlan<VM> {
 
             #[cfg(feature = "vmspace")]
             {
-                if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object)
-                {
+                if unsync.vm_space.in_space(_object) {
                     return true;
                 }
             }
@@ -503,8 +489,7 @@ impl<VM: VMBinding> BasePlan<VM> {
 
             #[cfg(feature = "vmspace")]
             {
-                if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object)
-                {
+                if unsync.vm_space.in_space(_object) {
                     return true;
                 }
             }
@@ -539,14 +524,9 @@ impl<VM: VMBinding> BasePlan<VM> {
 
             #[cfg(feature = "vmspace")]
             {
-                if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(_object)
-                {
+                if unsync.vm_space.in_space(_object) {
                     trace!("trace_object: object in boot space");
-                    return unsync
-                        .vm_space
-                        .as_ref()
-                        .unwrap()
-                        .trace_object(_trace, _object);
+                    return unsync.vm_space.trace_object(_trace, _object);
                 }
             }
         }
@@ -579,16 +559,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             #[cfg(feature = "vmspace")]
             {
                 match phase {
-                    Phase::Prepare => {
-                        if unsync.vm_space.is_some() {
-                            unsync.vm_space.as_mut().unwrap().prepare();
-                        }
-                    }
-                    &Phase::Release => {
-                        if unsync.vm_space.is_some() {
-                            unsync.vm_space.as_mut().unwrap().release();
-                        }
-                    }
+                    Phase::Prepare => unsync.vm_space.prepare(),
+                    &Phase::Release => unsync.vm_space.release(),
                     _ => {}
                 }
             }
