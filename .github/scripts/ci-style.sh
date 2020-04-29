@@ -7,8 +7,8 @@ cargo clippy --features semispace
 # check features
 cargo clippy --features nogc,sanity
 cargo clippy --features semispace,sanity
-cargo clippy --features nogc,vmspace
-cargo clippy --features semispace,vmspace
+cargo clippy --features nogc,vm_space,code_space,ro_space
+cargo clippy --features semispace,vm_space,code_space,ro_space
 # check for tests
 cargo clippy --tests --features nogc
 # check for dummyvm
