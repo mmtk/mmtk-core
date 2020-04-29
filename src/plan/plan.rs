@@ -824,14 +824,10 @@ impl<VM: VMBinding> CommonPlan<VM> {
 #[derive(Clone, Copy, Debug)]
 pub enum Allocator {
     Default = 0,
-    NonReference = 1,
-    NonMoving = 2,
-    Immortal = 3,
-    Los = 4,
-    PrimitiveLos = 5,
-    GcSpy = 6,
-    Code = 7,
-    LargeCode = 8,
-    Allocators = 9,
-    DefaultSite = -1,
+    Immortal = 1,
+    Los = 2,
+    #[cfg(feature = "code-space")]
+    Code = 3,
+    #[cfg(feature = "ro-space")]
+    ReadOnly = 4,
 }
