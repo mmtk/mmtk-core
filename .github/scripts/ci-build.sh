@@ -7,9 +7,9 @@ cargo build --features nogc
 cargo build --features semispace
 
 # Build features
-cargo build --features nogc,vmspace
-cargo build --features nogc,vmspace,codespace,rospace
-cargo build --features semispace,vmspace
-cargo build --features semispace,vmspace,codespace,rospace
+cargo build --features nogc,vm_space
+cargo build --features nogc,vm_space,code_space,ro_space
+cargo build --features semispace,vm_space
+cargo build --features semispace,vm_space,code_space,ro_space
 cargo build --features nogc,sanity
 cargo build --features semispace,sanity

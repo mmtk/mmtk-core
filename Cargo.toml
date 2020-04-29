@@ -31,9 +31,9 @@ semispace = ["immortalspace", "largeobjectspace", "copyspace"]
 
 # spaces
 base_spaces = []
-vmspace = ["base_spaces"]
-rospace = ["base_spaces"]
-codespace  = ["base_spaces"]
+vm_space = ["base_spaces"]
+ro_space = ["base_spaces"]
+code_space  = ["base_spaces"]
 
 immortalspace = []
 copyspace = []
