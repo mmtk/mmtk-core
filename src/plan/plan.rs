@@ -793,7 +793,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             return true;
         }
         if unsync.los.in_space(object) {
-            return true; // ??? is this correct?
+            return unsync.los.is_live(object);
         }
         panic!("Invalid space")
     }
