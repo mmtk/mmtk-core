@@ -9,6 +9,7 @@ use crate::plan::Allocator;
 use crate::plan::Phase;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
+use crate::policy::space::SFT;
 use crate::util::heap::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -232,6 +233,17 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
             return true;
         }
         self.common.in_common_space(addr)
+    }
+
+    fn get_sft(&self, object: ObjectReference) -> &dyn SFT {
+        let unsync = unsafe { &*self.unsync.get() };
+        if unsync.copyspace0.in_space(object) {
+            return &unsync.copyspace0;
+        }
+        if unsync.copyspace1.in_space(object) {
+            return &unsync.copyspace1;
+        }
+        self.common().get_sft(object)
     }
 }
 

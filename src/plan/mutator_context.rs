@@ -3,6 +3,7 @@ use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
 use crate::policy::immortalspace::ImmortalSpace;
+use crate::policy::space::SFT;
 use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator};
 use crate::util::heap::MonotonePageResource;
 use crate::util::OpaquePointer;
@@ -75,9 +76,11 @@ impl<VM: VMBinding> CommonMutatorContext<VM> {
                     .unwrap()
                     .initialize_header(object, true);
             }
-            AllocationType::Immortal => {
-                self.immortal.get_space().unwrap().initialize_header(object)
-            }
+            AllocationType::Immortal => self
+                .immortal
+                .get_space()
+                .unwrap()
+                .initialize_header(object, true),
             _ => unreachable!(),
         }
     }

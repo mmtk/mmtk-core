@@ -1,6 +1,6 @@
 use crate::plan::Allocator;
 use crate::plan::TransitiveClosure;
-use crate::policy::space::{CommonSpace, Space};
+use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::forwarding_word as ForwardingWord;
 use crate::util::heap::MonotonePageResource;
@@ -21,6 +21,16 @@ const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 pub struct CopySpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM, MonotonePageResource<VM, CopySpace<VM>>>>,
     from_space: bool,
+}
+
+impl<VM: VMBinding> SFT for CopySpace<VM> {
+    fn is_live(&self, object: ObjectReference) -> bool {
+        ForwardingWord::is_forwarded::<VM>(object)
+    }
+    fn is_movable(&self) -> bool {
+        true
+    }
+    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
@@ -52,14 +62,6 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
             ));
         }
         common_mut.pr.as_mut().unwrap().bind_space(me);
-    }
-
-    fn is_live(&self, object: ObjectReference) -> bool {
-        ForwardingWord::is_forwarded::<VM>(object)
-    }
-
-    fn is_movable(&self) -> bool {
-        true
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {

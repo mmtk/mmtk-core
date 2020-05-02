@@ -2,6 +2,7 @@ use super::ss;
 use crate::plan::semispace::SemiSpace;
 use crate::plan::{TraceLocal, TransitiveClosure};
 use crate::policy::space::Space;
+use crate::policy::space::SFT;
 use crate::util::queue::LocalQueue;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};

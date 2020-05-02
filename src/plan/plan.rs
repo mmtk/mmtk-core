@@ -5,6 +5,7 @@ use crate::plan::transitive_closure::TransitiveClosure;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
+use crate::policy::space::SFT;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -44,6 +45,8 @@ pub trait Plan<VM: VMBinding>: Sized {
     fn options(&self) -> &Options {
         &self.base().options
     }
+    fn get_sft(&self, _object: ObjectReference) -> &dyn SFT;
+
     // unsafe because this can only be called once by the init thread
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
 
@@ -438,6 +441,33 @@ impl<VM: VMBinding> BasePlan<VM> {
         true
     }
 
+    pub fn get_sft(&self, _object: ObjectReference) -> &dyn SFT {
+        #[cfg(feature = "base_spaces")]
+        let unsync = unsafe { &*self.unsync.get() };
+
+        #[cfg(feature = "code_space")]
+        {
+            if unsync.code_space.in_space(_object) {
+                return &unsync.code_space;
+            }
+        }
+
+        #[cfg(feature = "ro_space")]
+        {
+            if unsync.ro_space.in_space(_object) {
+                return &unsync.ro_space;
+            }
+        }
+
+        #[cfg(feature = "vm_space")]
+        {
+            if unsync.vm_space.in_space(_object) {
+                return &unsync.vm_space;
+            }
+        }
+        unreachable!()
+    }
+
     // FIXME: Move into space
     pub fn is_live(&self, _object: ObjectReference) -> bool {
         #[cfg(feature = "base_spaces")]
@@ -754,6 +784,17 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.is_movable(object)
     }
 
+    pub fn get_sft(&self, object: ObjectReference) -> &dyn SFT {
+        let unsync = unsafe { &*self.unsync.get() };
+        if unsync.immortal.in_space(object) {
+            return &unsync.immortal;
+        }
+        if unsync.los.in_space(object) {
+            return &unsync.los;
+        }
+        self.base.get_sft(object)
+    }
+
     // FIXME: Move into space
     pub fn is_live(&self, object: ObjectReference) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
@@ -761,7 +802,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             return true;
         }
         if unsync.los.in_space(object) {
-            return unsync.los.is_live(object);
+            return false; // unsync.los.is_live(object);
         }
         panic!("Invalid space")
     }

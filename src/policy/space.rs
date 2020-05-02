@@ -21,10 +21,40 @@ use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
-pub trait Space<VM: VMBinding>: Sized + 'static {
+/**
+ * Space Function Table (SFT).
+ *
+ * This trait captures functions that reflect _space-specific per-object
+ * semantics_.   These functions are implemented for each object via a special
+ * space-based dynamic dispatch mechanism where the semantics are _not_
+ * determined by the object's _type_, but rather, are determined by the _space_
+ * that the object is in.
+ *
+ * The underlying mechanism exploits the fact that spaces use the address space
+ * at an MMTk chunk granularity with the consequence that each chunk maps to
+ * exactluy one space, so knowing the chunk for an object reveals its space.
+ * The dispatch then works by performing simple address arithmetic on the object
+ * reference to find a chunk index which is used to index a table which returns
+ * the space.   The relevant function is then dispatched against that space
+ * object.
+ *
+ * We use the SFT trait to simplify typing for Rust, so our table is a
+ * table of SFT rather than Space.
+ */
+pub trait SFT {
+    fn is_live(&self, object: ObjectReference) -> bool;
+    fn is_movable(&self) -> bool;
+    fn initialize_header(&self, object: ObjectReference, alloc: bool);
+}
+
+pub trait Space<VM: VMBinding>: Sized + 'static + SFT {
     type PR: PageResource<VM, Space = Self>;
 
     fn init(&mut self, vm_map: &'static VMMap);
+
+    fn get_sft(object: ObjectReference) -> &'static dyn SFT {
+        VM::VMActivePlan::global().get_sft(object)
+    }
 
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
@@ -120,9 +150,6 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
     // (i.e. make sure their are no concurrent accesses through self when calling this)_
     #[allow(clippy::mut_from_ref)]
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR>;
-
-    fn is_live(&self, object: ObjectReference) -> bool;
-    fn is_movable(&self) -> bool;
 
     fn release_discontiguous_chunks(&mut self, chunk: Address) {
         debug_assert!(chunk == conversions::chunk_align_down(chunk));

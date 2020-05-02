@@ -1,6 +1,7 @@
 use crate::plan::{Phase, Plan};
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
+use crate::policy::space::SFT;
 use crate::util::heap::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -110,6 +111,13 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         unsafe { self.base.in_base_space(address.to_object_reference()) }
     }
 
+    fn get_sft(&self, object: ObjectReference) -> &dyn SFT {
+        let unsync = unsafe { &*self.unsync.get() };
+        if unsync.nogc_space.in_space(object) {
+            return &unsync.nogc_space;
+        }
+        self.common().get_sft(object)
+    }
     fn is_movable(&self, _object: ObjectReference) -> bool {
         false // By definition no objects are movable in NoGC
     }
