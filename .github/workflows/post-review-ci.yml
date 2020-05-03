@@ -44,25 +44,24 @@ jobs:
     runs-on: ubuntu-18.04
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
     steps:
-      steps:
-        - name: Checkout MMTk Core
-          uses: actions/checkout@v2
-          with:
-            path: mmtk-core
-        - name: Checkout OpenJDK Binding
-          uses: actions/checkout@v2
-          with:
-            repository: mmtk/mmtk-openjdk
-            token: ${{ secrets.CI_ACCESS_TOKEN }}
-            path: mmtk-openjdk
-            submodules: true
-        - name: Overwrite MMTk core in openjdk binding
-          run: rsync -avLe mmtk-core/* mmtk-openjdk/repos/mmtk-core/
-        - name: Setup
-          run: |
-            cd mmtk-openjdk
-            RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-        - name: Test
-          run: |
-            cd mmtk-openjdk
-            RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout OpenJDK Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-openjdk
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-openjdk
+          submodules: true
+      - name: Overwrite MMTk core in openjdk binding
+        run: rsync -avLe mmtk-core/* mmtk-openjdk/repos/mmtk-core/
+      - name: Setup
+        run: |
+          cd mmtk-openjdk
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+      - name: Test
+        run: |
+          cd mmtk-openjdk
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
