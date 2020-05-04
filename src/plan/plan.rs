@@ -763,11 +763,12 @@ impl<VM: VMBinding> CommonPlan<VM> {
         if unsync.los.in_space(object) {
             return unsync.los.is_live(object);
         }
-        panic!("Invalid space")
+        self.base.is_live(object)
     }
 
     pub fn get_pages_used(&self) -> usize {
         let unsync = unsafe { &*self.unsync.get() };
+        // FIXME: should we count reserved pages in BasePlan?
         unsync.immortal.reserved_pages() + unsync.los.reserved_pages()
     }
 
@@ -786,7 +787,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             trace!("trace_object: object in los");
             return unsync.los.trace_object(trace, object);
         }
-        panic!("No special case for space in trace_object");
+        self.base.trace_object(trace, object)
     }
 
     pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, primary: bool) {
