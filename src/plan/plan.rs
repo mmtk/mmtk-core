@@ -380,6 +380,30 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
+    pub fn get_pages_used(&self) -> usize {
+        #[cfg(feature = "base_spaces")]
+        {
+            let mut pages = 0;
+            let unsync = unsafe { &mut *self.unsync.get() };
+
+            #[cfg(feature = "code_space")]
+            {
+                pages += unsync.code_space.reserved_pages();
+            }
+            #[cfg(feature = "ro_space")]
+            {
+                pages += unsync.ro_space.reserved_pages();
+            }
+            #[cfg(feature = "vm_space")]
+            {
+                pages += unsync.vm_space.reserved_pages();
+            }
+            return pages;
+        }
+
+        0
+    }
+
     pub fn will_never_move(&self, _object: ObjectReference) -> bool {
         true
     }
@@ -768,8 +792,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     pub fn get_pages_used(&self) -> usize {
         let unsync = unsafe { &*self.unsync.get() };
-        // FIXME: should we count reserved pages in BasePlan?
-        unsync.immortal.reserved_pages() + unsync.los.reserved_pages()
+        unsync.immortal.reserved_pages() + unsync.los.reserved_pages() + self.base.get_pages_used()
     }
 
     pub fn trace_object<T: TransitiveClosure>(
