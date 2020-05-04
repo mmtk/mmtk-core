@@ -380,27 +380,31 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
+    #[cfg(feature = "base_spaces")]
     pub fn get_pages_used(&self) -> usize {
-        #[cfg(feature = "base_spaces")]
-        {
-            let mut pages = 0;
-            let unsync = unsafe { &mut *self.unsync.get() };
+        let mut pages = 0;
+        let unsync = unsafe { &mut *self.unsync.get() };
 
-            #[cfg(feature = "code_space")]
-            {
-                pages += unsync.code_space.reserved_pages();
-            }
-            #[cfg(feature = "ro_space")]
-            {
-                pages += unsync.ro_space.reserved_pages();
-            }
-            #[cfg(feature = "vm_space")]
-            {
-                pages += unsync.vm_space.reserved_pages();
-            }
-            return pages;
+        #[cfg(feature = "code_space")]
+        {
+            pages += unsync.code_space.reserved_pages();
+        }
+        #[cfg(feature = "ro_space")]
+        {
+            pages += unsync.ro_space.reserved_pages();
         }
 
+        // The VM space may be used as an immutable boot image, in which case, we should not count
+        // it as part of the heap size.
+        // #[cfg(feature = "vm_space")]
+        // {
+        //     pages += unsync.vm_space.reserved_pages();
+        // }
+        pages
+    }
+
+    #[cfg(not(feature = "base_spaces"))]
+    pub fn get_pages_used(&self) -> usize {
         0
     }
 
