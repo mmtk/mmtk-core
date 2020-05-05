@@ -5,7 +5,7 @@ extern crate lazy_static;
 
 use mmtk::vm::VMBinding;
 use mmtk::MMTK;
-use mmtk::{VM_MAP, MMAPPER};
+use mmtk::{VM_MAP, MMAPPER, SFT_MAP};
 
 pub mod scanning;
 pub mod collection;
@@ -26,5 +26,5 @@ impl VMBinding for DummyVM {
 
 //#[cfg(feature = "dummyvm")]
 lazy_static! {
-    pub static ref SINGLETON: MMTK<DummyVM> = MMTK::new(&VM_MAP, &MMAPPER);
+    pub static ref SINGLETON: MMTK<DummyVM> = MMTK::new(&VM_MAP, &MMAPPER, &SFT_MAP);
 }

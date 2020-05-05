@@ -4,6 +4,8 @@ use std::mem;
 use std::ops::*;
 use std::sync::atomic::Ordering;
 
+use crate::policy::space::SFTMap;
+
 /// size in bytes
 pub type ByteSize = usize;
 /// offset in byte
@@ -406,6 +408,10 @@ impl ObjectReference {
     /// returns the ObjectReference
     pub fn value(self) -> usize {
         self.0
+    }
+
+    pub fn is_live(self) -> bool {
+        SFTMap::get_sft(self).is_live(self)
     }
 }
 

@@ -76,9 +76,11 @@ impl<VM: VMBinding> CommonMutatorContext<VM> {
                     .unwrap()
                     .initialize_header(object, true);
             }
-            AllocationType::Immortal => {
-                self.immortal.get_space().unwrap().initialize_header(object)
-            }
+            AllocationType::Immortal => self
+                .immortal
+                .get_space()
+                .unwrap()
+                .initialize_header(object, true),
             _ => panic!("Unexpected allocator for post_alloc(): {:?}", allocator),
         }
     }

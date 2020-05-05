@@ -2,6 +2,7 @@ use crate::util::conversions::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
+use crate::mmtk::SFT_MAP;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
 use crate::util::heap::{PageResource, VMRequest};
@@ -16,6 +17,7 @@ use crate::util::OpaquePointer;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
@@ -47,6 +49,39 @@ pub trait SFT {
     fn initialize_header(&self, object: ObjectReference, alloc: bool);
 }
 
+//unsafe impl Sync for SFTMap {}
+
+struct EmptySpaceSFT {}
+unsafe impl Sync for EmptySpaceSFT {}
+impl SFT for EmptySpaceSFT {
+    fn is_live(&self, _object: ObjectReference) -> bool {
+        panic!("called is_live() on empty space")
+    }
+    fn is_movable(&self) -> bool {
+        panic!("called is_movable() on empty space")
+    }
+    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) -> () {
+        panic!("called initialize_header() on empty space")
+    }
+}
+
+pub struct SFTMap {
+    // sft: [&'static dyn SFT; MAX_CHUNKS]
+    sft: Vec<&'static (dyn SFT + Sync)>, //sft: Vec<&’static dyn SFT + Sync>
+}
+
+impl SFTMap {
+    pub fn new() -> Self {
+        SFTMap {
+            sft: vec![&EmptySpaceSFT {}; MAX_CHUNKS],
+        }
+    }
+
+    pub fn get_sft(object: ObjectReference) -> &'static dyn SFT {
+        return SFT_MAP.sft[0];
+    }
+}
+
 pub trait Space<VM: VMBinding>: Sized + 'static + SFT {
     type PR: PageResource<VM, Space = Self>;
 
@@ -54,6 +89,10 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT {
 
     fn get_sft(object: ObjectReference) -> &'static dyn SFT {
         VM::VMActivePlan::global().get_sft(object)
+    }
+
+    fn do_is_live(object: ObjectReference) -> bool {
+        VM::VMActivePlan::global().get_sft(object).is_live(object)
     }
 
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
