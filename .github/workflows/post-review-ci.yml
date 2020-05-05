@@ -2,8 +2,7 @@ name: Post Code Review Checks
 
 on:
   pull_request:
-    types:
-      - labeled
+    types: [opened, synchronize, reopened, labeled]
     branches:
       - master
 
@@ -28,11 +27,11 @@ jobs:
       - name: Setup
         run: |
           cd mmtk-jikesrvm
-          ./.github/scripts/ci-setup.sh
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
       - name: Test
         run: |
           cd mmtk-jikesrvm
-          ./.github/scripts/ci-test.sh
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
       # This step is not quite useful, comment it out for now.
 #      - name: Result
 #        if: always()
@@ -41,3 +40,29 @@ jobs:
 #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 #          message: |
 #            '${{ github.job }}' for ${{ github.sha }}: [${{ job.status }}](https://github.com/mmtk/mmtk-core/actions/runs/${{ github.run_id }})
+
+  openjdk-binding-test:
+    runs-on: ubuntu-18.04
+    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout OpenJDK Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-openjdk
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-openjdk
+          submodules: true
+      - name: Overwrite MMTk core in openjdk binding
+        run: rsync -avLe mmtk-core/* mmtk-openjdk/repos/mmtk-core/
+      - name: Setup
+        run: |
+          cd mmtk-openjdk
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+      - name: Test
+        run: |
+          cd mmtk-openjdk
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh

@@ -54,7 +54,7 @@ for plan in PLANS:
     cmd = []
     cmd.append("cargo")
     if toolchain:
-        params.append(toolchain)
+        cmd.append(toolchain)
     cmd.extend([
         "build",
         "--manifest-path",
