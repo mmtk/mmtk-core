@@ -383,6 +383,34 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
+    #[cfg(feature = "base_spaces")]
+    pub fn get_pages_used(&self) -> usize {
+        let mut pages = 0;
+        let unsync = unsafe { &mut *self.unsync.get() };
+
+        #[cfg(feature = "code_space")]
+        {
+            pages += unsync.code_space.reserved_pages();
+        }
+        #[cfg(feature = "ro_space")]
+        {
+            pages += unsync.ro_space.reserved_pages();
+        }
+
+        // The VM space may be used as an immutable boot image, in which case, we should not count
+        // it as part of the heap size.
+        // #[cfg(feature = "vm_space")]
+        // {
+        //     pages += unsync.vm_space.reserved_pages();
+        // }
+        pages
+    }
+
+    #[cfg(not(feature = "base_spaces"))]
+    pub fn get_pages_used(&self) -> usize {
+        0
+    }
+
     pub fn will_never_move(&self, _object: ObjectReference) -> bool {
         true
     }
@@ -804,12 +832,12 @@ impl<VM: VMBinding> CommonPlan<VM> {
         if unsync.los.in_space(object) {
             return false; // unsync.los.is_live(object);
         }
-        panic!("Invalid space")
+        self.base.is_live(object)
     }
 
     pub fn get_pages_used(&self) -> usize {
         let unsync = unsafe { &*self.unsync.get() };
-        unsync.immortal.reserved_pages() + unsync.los.reserved_pages()
+        unsync.immortal.reserved_pages() + unsync.los.reserved_pages() + self.base.get_pages_used()
     }
 
     pub fn trace_object<T: TransitiveClosure>(
@@ -827,7 +855,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             trace!("trace_object: object in los");
             return unsync.los.trace_object(trace, object);
         }
-        panic!("No special case for space in trace_object");
+        self.base.trace_object(trace, object)
     }
 
     pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, primary: bool) {
