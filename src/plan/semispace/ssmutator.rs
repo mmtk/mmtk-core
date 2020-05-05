@@ -28,7 +28,8 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
         match phase {
             Phase::PrepareStacks => {
                 if !self.plan.common.stacks_prepared() {
-                    VM::VMCollection::prepare_mutator(tls, self);
+                    // Use the mutator's tls rather than the collector's tls
+                    VM::VMCollection::prepare_mutator(self.get_tls(), self);
                 }
                 self.flush_remembered_sets();
             }

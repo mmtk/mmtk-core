@@ -826,7 +826,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             }
             &Phase::Release => {
                 unsync.immortal.release();
-                unsync.los.release(true);
+                unsync.los.release(primary);
             }
             _ => {}
         }
