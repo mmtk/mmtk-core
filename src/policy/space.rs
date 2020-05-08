@@ -2,7 +2,6 @@ use crate::util::conversions::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
-use crate::mmtk::SFT_MAP;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
 use crate::util::heap::{PageResource, VMRequest};
@@ -66,7 +65,6 @@ impl SFT for EmptySpaceSFT {
 }
 
 pub struct SFTMap {
-    // sft: [&'static dyn SFT; MAX_CHUNKS]
     sft: Vec<&'static (dyn SFT + Sync)>, //sft: Vec<&’static dyn SFT + Sync>
 }
 
@@ -77,8 +75,24 @@ impl SFTMap {
         }
     }
 
-    pub fn get_sft(object: ObjectReference) -> &'static dyn SFT {
-        return SFT_MAP.sft[0];
+    // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
+    // of the same unsafe code.
+    // FIXME: We need a safe implementation.
+    #[allow(clippy::cast_ref_to_mut)]
+    #[allow(clippy::mut_from_ref)]
+    unsafe fn mut_self(&self) -> &mut Self {
+        &mut *(self as *const _ as *mut _)
+    }
+
+    pub fn get(&self, object: ObjectReference) -> &'static dyn SFT {
+        let chunk = object.to_address().chunk_index();
+        self.sft[chunk]
+    }
+
+    pub fn set(self, address: Address, sft: &'static (dyn SFT + Sync)) -> () {
+        let self_mut: &mut Self = unsafe { self.mut_self() };
+        let chunk = address.chunk_index();
+        self_mut.sft[chunk] = sft;
     }
 }
 

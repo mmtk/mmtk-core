@@ -4,7 +4,8 @@ use std::mem;
 use std::ops::*;
 use std::sync::atomic::Ordering;
 
-use crate::policy::space::SFTMap;
+use crate::mmtk::SFT_MAP;
+use crate::util::heap::layout::vm_layout_constants::*;
 
 /// size in bytes
 pub type ByteSize = usize;
@@ -275,6 +276,11 @@ impl Address {
     pub const fn as_usize(self) -> usize {
         self.0
     }
+
+    /// returns the chunk index for this address
+    pub fn chunk_index(self) -> usize {
+        self.0 >> LOG_BYTES_IN_CHUNK
+    }
 }
 
 /// allows print Address as upper-case hex value
@@ -411,7 +417,15 @@ impl ObjectReference {
     }
 
     pub fn is_live(self) -> bool {
-        SFTMap::get_sft(self).is_live(self)
+        SFT_MAP.get(self).is_live(self)
+    }
+
+    pub fn is_movable(self) -> bool {
+        SFT_MAP.get(self).is_movable()
+    }
+
+    pub fn initialize_header(self, alloc: bool) -> () {
+        SFT_MAP.get(self).initialize_header(self, alloc)
     }
 }
 
