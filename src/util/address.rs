@@ -428,7 +428,7 @@ impl ObjectReference {
         SFT_MAP.get(Address(self.0)).is_movable()
     }
 
-    pub fn initialize_header(self, alloc: bool) -> () {
+    pub fn initialize_header(self, alloc: bool) {
         SFT_MAP.get(Address(self.0)).initialize_header(self, alloc)
     }
 }

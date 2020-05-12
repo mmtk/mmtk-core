@@ -62,7 +62,7 @@ impl SFT for EmptySpaceSFT {
     fn is_movable(&self) -> bool {
         panic!("called is_movable() on empty space")
     }
-    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) -> () {
+    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {
         panic!("called initialize_header() on empty space")
     }
     // fn update_sft(&self, start: Address, chunks: usize) -> () {
@@ -99,14 +99,14 @@ impl SFTMap {
     }
 
     //    pub fn update(&self, space: &'static (dyn SFT + Sync), start: Address, chunks: usize) -> () {
-    pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) -> () {
+    pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
         let start = start.chunk_index();
         for chunk in start..(start + chunks - 1) {
             self.set(chunk, space);
         }
     }
 
-    fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) -> () {
+    fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         self_mut.sft[chunk] = sft;
     }
