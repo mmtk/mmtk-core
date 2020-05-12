@@ -66,3 +66,9 @@ impl<VM: VMBinding> MMTK<VM> {
         self.inside_harness.store(false, Ordering::SeqCst);
     }
 }
+
+impl<VM: VMBinding> Default for MMTK<VM> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
