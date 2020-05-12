@@ -13,6 +13,7 @@ use crate::policy::space::SpaceOptions;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
+// use crate::mmtk::SFT_MAP;
 use std::cell::UnsafeCell;
 
 pub struct ImmortalSpace<VM: VMBinding> {
@@ -41,6 +42,9 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         }
         VM::VMObjectModel::write_available_byte(object, new_value);
     }
+    // fn update_sft(&self, start: Address, chunks: usize) -> () {
+    //     SFT_MAP.update(self, start, chunks);
+    // }
 }
 
 impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {

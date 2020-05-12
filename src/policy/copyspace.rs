@@ -13,8 +13,11 @@ use crate::policy::space::SpaceOptions;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
+//use crate::mmtk::SFT_MAP;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::cell::UnsafeCell;
+
+unsafe impl<VM: VMBinding> Sync for CopySpace<VM> {}
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -31,6 +34,10 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         true
     }
     fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
+
+    // fn update_sft(&self, start: Address, chunks: usize) -> () {
+    //     SFT_MAP.update(&self, start, chunks);
+    // }
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {

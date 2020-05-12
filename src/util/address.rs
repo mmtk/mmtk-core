@@ -417,15 +417,15 @@ impl ObjectReference {
     }
 
     pub fn is_live(self) -> bool {
-        SFT_MAP.get(self).is_live(self)
+        SFT_MAP.get(Address(self.0)).is_live(self)
     }
 
     pub fn is_movable(self) -> bool {
-        SFT_MAP.get(self).is_movable()
+        SFT_MAP.get(Address(self.0)).is_movable()
     }
 
     pub fn initialize_header(self, alloc: bool) -> () {
-        SFT_MAP.get(self).initialize_header(self, alloc)
+        SFT_MAP.get(Address(self.0)).initialize_header(self, alloc)
     }
 }
 

@@ -13,12 +13,14 @@ use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
 use crate::util::OpaquePointer;
 
+use crate::mmtk::SFT_MAP;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
+
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
@@ -46,9 +48,10 @@ pub trait SFT {
     fn is_live(&self, object: ObjectReference) -> bool;
     fn is_movable(&self) -> bool;
     fn initialize_header(&self, object: ObjectReference, alloc: bool);
+    //    fn update_sft(&self, start: Address, chunks: usize);
 }
 
-//unsafe impl Sync for SFTMap {}
+unsafe impl Sync for SFTMap {}
 
 struct EmptySpaceSFT {}
 unsafe impl Sync for EmptySpaceSFT {}
@@ -62,10 +65,14 @@ impl SFT for EmptySpaceSFT {
     fn initialize_header(&self, _object: ObjectReference, _alloc: bool) -> () {
         panic!("called initialize_header() on empty space")
     }
+    // fn update_sft(&self, start: Address, chunks: usize) -> () {
+    //     panic!("called update_sft() on empty space")
+    // }
 }
 
 pub struct SFTMap {
-    sft: Vec<&'static (dyn SFT + Sync)>, //sft: Vec<&’static dyn SFT + Sync>
+    // sft: Vec<&'static (dyn SFT + Sync)>, //sft: Vec<&’static dyn SFT + Sync>
+    sft: Vec<*const (dyn SFT + Sync)>,
 }
 
 impl SFTMap {
@@ -84,19 +91,28 @@ impl SFTMap {
         &mut *(self as *const _ as *mut _)
     }
 
-    pub fn get(&self, object: ObjectReference) -> &'static dyn SFT {
-        let chunk = object.to_address().chunk_index();
-        self.sft[chunk]
+    //    pub fn get(&self, address: Address) -> * const (dyn SFT + Sync) {
+    pub fn get(&self, address: Address) -> &'static dyn SFT {
+        let foo = self.sft[address.chunk_index()];
+        // let bar = foo.as_ref();
+        unsafe { &*foo }
     }
 
-    pub fn set(self, address: Address, sft: &'static (dyn SFT + Sync)) -> () {
+    //    pub fn update(&self, space: &'static (dyn SFT + Sync), start: Address, chunks: usize) -> () {
+    pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) -> () {
+        let start = start.chunk_index();
+        for chunk in start..(start + chunks - 1) {
+            self.set(chunk, space);
+        }
+    }
+
+    fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) -> () {
         let self_mut: &mut Self = unsafe { self.mut_self() };
-        let chunk = address.chunk_index();
         self_mut.sft[chunk] = sft;
     }
 }
 
-pub trait Space<VM: VMBinding>: Sized + 'static + SFT {
+pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
     type PR: PageResource<VM, Space = Self>;
 
     fn init(&mut self, vm_map: &'static VMMap);
@@ -171,6 +187,8 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT {
         }
 
         self.unsafe_common_mut().head_discontiguous_region = new_head;
+        //self.update_sft(new_head, chunks);
+        SFT_MAP.update(self as *const (dyn SFT + Sync), new_head, chunks);
         new_head
     }
 
@@ -295,6 +313,8 @@ pub struct SpaceOptions {
 }
 
 const DEBUG: bool = false;
+
+unsafe impl<VM: VMBinding, PR: PageResource<VM>> Sync for CommonSpace<VM, PR> {}
 
 impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
     pub fn new(
