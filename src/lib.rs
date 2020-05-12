@@ -29,7 +29,7 @@ pub mod vm;
 
 pub use crate::mm::memory_manager;
 pub use crate::mmtk::MMTK;
-pub use crate::mmtk::{MMAPPER, VM_MAP, SFT_MAP};
+pub use crate::mmtk::{MMAPPER, SFT_MAP, VM_MAP};
 pub use crate::plan::selected_plan::{
     SelectedCollector, SelectedConstraints, SelectedMutator, SelectedPlan, SelectedTraceLocal,
 };
