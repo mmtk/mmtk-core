@@ -417,7 +417,11 @@ impl ObjectReference {
     }
 
     pub fn is_live(self) -> bool {
-        SFT_MAP.get(Address(self.0)).is_live(self)
+        if self.0 == 0 {
+            false
+        } else {
+            SFT_MAP.get(Address(self.0)).is_live(self)
+        }
     }
 
     pub fn is_movable(self) -> bool {

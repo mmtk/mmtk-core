@@ -248,10 +248,10 @@ pub extern "C" fn process_edge<VM: VMBinding>(
 }
 
 pub fn trace_is_live<VM: VMBinding>(
-    trace_local: &mut SelectedTraceLocal<VM>,
+    _trace_local: &mut SelectedTraceLocal<VM>, // FIXME remove
     object: ObjectReference,
 ) -> bool {
-    trace_local.is_live(object)
+    object.is_live()
 }
 
 pub fn trace_retain_referent<VM: VMBinding>(

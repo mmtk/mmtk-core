@@ -142,8 +142,4 @@ impl<'a, VM: VMBinding> TraceLocal for SanityChecker<'a, VM> {
     fn will_not_move_in_current_collection(&self, _obj: ObjectReference) -> bool {
         true
     }
-
-    fn is_live(&self, _object: ObjectReference) -> bool {
-        unimplemented!()
-    }
 }
