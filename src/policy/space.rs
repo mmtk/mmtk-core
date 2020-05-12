@@ -70,8 +70,8 @@ impl SFT for EmptySpaceSFT {
     // }
 }
 
+#[derive(Default)]
 pub struct SFTMap {
-    // sft: Vec<&'static (dyn SFT + Sync)>, //sft: Vec<&’static dyn SFT + Sync>
     sft: Vec<*const (dyn SFT + Sync)>,
 }
 
@@ -91,14 +91,10 @@ impl SFTMap {
         &mut *(self as *const _ as *mut _)
     }
 
-    //    pub fn get(&self, address: Address) -> * const (dyn SFT + Sync) {
     pub fn get(&self, address: Address) -> &'static dyn SFT {
-        let foo = self.sft[address.chunk_index()];
-        // let bar = foo.as_ref();
-        unsafe { &*foo }
+        unsafe { &*self.sft[address.chunk_index()] }
     }
 
-    //    pub fn update(&self, space: &'static (dyn SFT + Sync), start: Address, chunks: usize) -> () {
     pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
         let start = start.chunk_index();
         for chunk in start..(start + chunks - 1) {
