@@ -39,15 +39,15 @@ pub struct MMTK<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> MMTK<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
+    pub fn new() -> Self {
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = SelectedPlan::new(vm_map, mmapper, options.clone());
+        let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone());
         let phase_manager = PhaseManager::new(&plan.base().stats);
         MMTK {
             plan,
             phase_manager,
-            vm_map,
-            mmapper,
+            vm_map: &VM_MAP,
+            mmapper: &MMAPPER,
             reference_processors: ReferenceProcessors::new(),
             options,
             inside_harness: AtomicBool::new(false),
