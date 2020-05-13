@@ -56,7 +56,8 @@ unsafe impl Sync for SFTMap {}
 struct EmptySpaceSFT {}
 unsafe impl Sync for EmptySpaceSFT {}
 impl SFT for EmptySpaceSFT {
-    fn is_live(&self, _object: ObjectReference) -> bool {
+    fn is_live(&self, object: ObjectReference) -> bool {
+        println!("{:x}", object);
         panic!("called is_live() on empty space")
     }
     fn is_movable(&self) -> bool {
@@ -94,7 +95,7 @@ impl SFTMap {
 
     pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
         let start = start.chunk_index();
-        for chunk in start..(start + chunks - 1) {
+        for chunk in start..(start + chunks) {
             self.set(chunk, space);
         }
     }
@@ -194,7 +195,7 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
      */
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
         if new_chunk {
-            let chunks = bytes >> LOG_BYTES_IN_CHUNK;
+            let chunks = 1 + (bytes >> LOG_BYTES_IN_CHUNK);
             SFT_MAP.update(self as *const (dyn SFT + Sync), start, chunks);
         }
     }
