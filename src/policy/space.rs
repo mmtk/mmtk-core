@@ -65,9 +65,6 @@ impl SFT for EmptySpaceSFT {
     fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {
         panic!("called initialize_header() on empty space")
     }
-    // fn update_sft(&self, start: Address, chunks: usize) -> () {
-    //     panic!("called update_sft() on empty space")
-    // }
 }
 
 #[derive(Default)]
@@ -183,8 +180,6 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
         }
 
         self.unsafe_common_mut().head_discontiguous_region = new_head;
-        //self.update_sft(new_head, chunks);
-        SFT_MAP.update(self as *const (dyn SFT + Sync), new_head, chunks);
         new_head
     }
 
@@ -197,7 +192,12 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
      * @param bytes The size of the newly allocated space
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */
-    fn grow_space(&self, _start: Address, _bytes: usize, _new_chunk: bool) {}
+    fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
+        if new_chunk {
+            let chunks = bytes >> LOG_BYTES_IN_CHUNK;
+            SFT_MAP.update(self as *const (dyn SFT + Sync), start, chunks);
+        }
+    }
 
     fn reserved_pages(&self) -> usize {
         self.common().pr.as_ref().unwrap().reserved_pages()
