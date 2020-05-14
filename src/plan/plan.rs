@@ -5,7 +5,6 @@ use crate::plan::transitive_closure::TransitiveClosure;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-use crate::policy::space::SFT;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -50,7 +49,6 @@ pub trait Plan<VM: VMBinding>: Sized {
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::MutatorT>;
-    fn will_never_move(&self, object: ObjectReference) -> bool;
     // unsafe because only the primary collector thread can call this
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
 
@@ -225,15 +223,13 @@ pub trait Plan<VM: VMBinding>: Sized {
     fn is_in_space(&self, address: Address) -> bool;
 
     fn modify_check(&self, object: ObjectReference) {
-        if self.base().gc_in_progress_proper() && self.is_movable(object) {
+        if self.base().gc_in_progress_proper() && object.is_movable() {
             panic!(
                 "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
                 object
             );
         }
     }
-
-    fn is_movable(&self, object: ObjectReference) -> bool;
 }
 
 #[derive(PartialEq)]
@@ -410,10 +406,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         0
     }
 
-    pub fn will_never_move(&self, _object: ObjectReference) -> bool {
-        true
-    }
-
     pub fn is_valid_ref(&self, _object: ObjectReference) -> bool {
         #[cfg(feature = "base_spaces")]
         let unsync = unsafe { &mut *self.unsync.get() };
@@ -438,34 +430,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
 
         false
-    }
-
-    pub fn is_movable(&self, _object: ObjectReference) -> bool {
-        #[cfg(feature = "base_spaces")]
-        let unsync = unsafe { &*self.unsync.get() };
-
-        #[cfg(feature = "code_space")]
-        {
-            if unsync.code_space.in_space(_object) {
-                return unsync.code_space.is_movable();
-            }
-        }
-
-        #[cfg(feature = "ro_space")]
-        {
-            if unsync.ro_space.in_space(_object) {
-                return unsync.ro_space.is_movable();
-            }
-        }
-
-        #[cfg(feature = "vm_space")]
-        {
-            if unsync.vm_space.in_space(_object) {
-                return unsync.vm_space.is_movable();
-            }
-        }
-
-        true
     }
 
     pub fn in_base_space(&self, _object: ObjectReference) -> bool {
@@ -723,14 +687,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
             || self.base.in_base_space(object)
     }
 
-    pub fn will_never_move(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &mut *self.unsync.get() };
-        if unsync.immortal.in_space(object) || unsync.los.in_space(object) {
-            return true;
-        }
-        self.base.will_never_move(object)
-    }
-
     pub fn is_valid_ref(&self, object: ObjectReference) -> bool {
         let unsync = unsafe { &mut *self.unsync.get() };
 
@@ -741,17 +697,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
             return true;
         }
         self.base.is_valid_ref(object)
-    }
-
-    pub fn is_movable(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        if unsync.immortal.in_space(object) {
-            return unsync.immortal.is_movable();
-        }
-        if unsync.los.in_space(object) {
-            return unsync.los.is_movable();
-        }
-        self.base.is_movable(object)
     }
 
     pub fn get_pages_used(&self) -> usize {

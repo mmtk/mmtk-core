@@ -76,10 +76,6 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         Box::new(NoGCMutator::new(tls, self))
     }
 
-    fn will_never_move(&self, _object: ObjectReference) -> bool {
-        true
-    }
-
     unsafe fn collection_phase(&self, _tls: OpaquePointer, _phase: &Phase) {
         unreachable!()
     }
@@ -108,10 +104,6 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
             return true;
         }
         unsafe { self.base.in_base_space(address.to_object_reference()) }
-    }
-
-    fn is_movable(&self, _object: ObjectReference) -> bool {
-        false // By definition no objects are movable in NoGC
     }
 }
 

@@ -84,8 +84,8 @@ pub fn post_alloc<VM: VMBinding>(
     mutator.post_alloc(refer, type_refer, bytes, allocator);
 }
 
-pub fn will_never_move<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) -> bool {
-    mmtk.plan.will_never_move(object)
+pub fn will_never_move<VM: VMBinding>(_mmtk: &MMTK<VM>, object: ObjectReference) -> bool {
+    !object.is_movable()
 }
 
 pub fn is_valid_ref<VM: VMBinding>(mmtk: &MMTK<VM>, val: ObjectReference) -> bool {

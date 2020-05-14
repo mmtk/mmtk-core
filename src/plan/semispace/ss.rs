@@ -9,7 +9,6 @@ use crate::plan::Allocator;
 use crate::plan::Phase;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
-use crate::policy::space::SFT;
 use crate::util::heap::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -105,13 +104,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<SSMutator<VM>> {
         Box::new(SSMutator::new(tls, self))
-    }
-
-    fn will_never_move(&self, object: ObjectReference) -> bool {
-        if self.tospace().in_space(object) || self.fromspace().in_space(object) {
-            return false;
-        }
-        self.common.will_never_move(object)
     }
 
     fn is_valid_ref(&self, object: ObjectReference) -> bool {
@@ -213,17 +205,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
 
     fn is_bad_ref(&self, object: ObjectReference) -> bool {
         self.fromspace().in_space(object)
-    }
-
-    fn is_movable(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        if unsync.copyspace0.in_space(object) {
-            return unsync.copyspace0.is_movable();
-        }
-        if unsync.copyspace1.in_space(object) {
-            return unsync.copyspace1.is_movable();
-        }
-        self.common.is_movable(object)
     }
 
     fn is_in_space(&self, address: Address) -> bool {
