@@ -234,17 +234,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         }
         self.common.in_common_space(addr)
     }
-
-    fn get_sft(&self, object: ObjectReference) -> &dyn SFT {
-        let unsync = unsafe { &*self.unsync.get() };
-        if unsync.copyspace0.in_space(object) {
-            return &unsync.copyspace0;
-        }
-        if unsync.copyspace1.in_space(object) {
-            return &unsync.copyspace1;
-        }
-        self.common().get_sft(object)
-    }
 }
 
 impl<VM: VMBinding> SemiSpace<VM> {

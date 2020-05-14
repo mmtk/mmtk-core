@@ -115,12 +115,12 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
     fn init(&mut self, vm_map: &'static VMMap);
 
     fn get_sft(object: ObjectReference) -> &'static dyn SFT {
-        VM::VMActivePlan::global().get_sft(object)
+        SFT_MAP.get(object.to_address())
     }
     fn is_live(&self, object: ObjectReference) -> bool;
 
     fn do_is_live(object: ObjectReference) -> bool {
-        VM::VMActivePlan::global().get_sft(object).x_is_live(object)
+        SFT_MAP.get(object.to_address()).x_is_live(object)
     }
 
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
