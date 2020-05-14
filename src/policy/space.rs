@@ -62,7 +62,8 @@ impl SFT for EmptySpaceSFT {
         )
     }
     fn is_movable(&self) -> bool {
-        panic!("called is_movable() on empty space")
+        false // FIXME JikesRVM should not (but does) rely on this semantics
+              // panic!("called is_movable() on empty space")
     }
     fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
         panic!(
