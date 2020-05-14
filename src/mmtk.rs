@@ -42,16 +42,16 @@ pub struct MMTK<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> MMTK<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, sftmap: &'static SFTMap) -> Self {
+    pub fn new() -> Self {
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = SelectedPlan::new(vm_map, mmapper, options.clone());
+        let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone());
         let phase_manager = PhaseManager::new(&plan.base().stats);
         MMTK {
             plan,
             phase_manager,
-            vm_map,
-            mmapper,
-            sftmap,
+            vm_map: &VM_MAP,
+            mmapper: &MMAPPER,
+            sftmap: &SFT_MAP,
             reference_processors: ReferenceProcessors::new(),
             options,
             inside_harness: AtomicBool::new(false),
@@ -68,5 +68,11 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn harness_end(&self) {
         self.plan.base().stats.stop_all();
         self.inside_harness.store(false, Ordering::SeqCst);
+    }
+}
+
+impl<VM: VMBinding> Default for MMTK<VM> {
+    fn default() -> Self {
+        Self::new()
     }
 }
