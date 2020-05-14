@@ -1,7 +1,6 @@
 use crate::plan::{Phase, Plan};
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
-use crate::policy::space::SFT;
 use crate::util::heap::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;

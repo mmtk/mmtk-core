@@ -468,35 +468,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         true
     }
 
-    // FIXME: Move into space
-    pub fn is_live(&self, _object: ObjectReference) -> bool {
-        #[cfg(feature = "base_spaces")]
-        {
-            let unsync = unsafe { &*self.unsync.get() };
-
-            #[cfg(feature = "code_space")]
-            {
-                if unsync.code_space.in_space(_object) {
-                    return true;
-                }
-            }
-            #[cfg(feature = "ro_space")]
-            {
-                if unsync.ro_space.in_space(_object) {
-                    return true;
-                }
-            }
-            #[cfg(feature = "vm_space")]
-            {
-                if unsync.vm_space.in_space(_object) {
-                    return true;
-                }
-            }
-            panic!("Invalid space")
-        }
-        return true;
-    }
-
     pub fn in_base_space(&self, _object: ObjectReference) -> bool {
         #[cfg(feature = "base_spaces")]
         {
@@ -781,17 +752,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
             return unsync.los.is_movable();
         }
         self.base.is_movable(object)
-    }
-    // FIXME: Move into space
-    pub fn is_live(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        if unsync.immortal.in_space(object) {
-            return true;
-        }
-        if unsync.los.in_space(object) {
-            return unsync.los.is_live(object);
-        }
-        self.base.is_live(object)
     }
 
     pub fn get_pages_used(&self) -> usize {

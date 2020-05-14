@@ -36,7 +36,7 @@ pub struct LargeObjectSpace<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for LargeObjectSpace<VM> {}
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
-    fn x_is_live(&self, object: ObjectReference) -> bool {
+    fn is_live(&self, object: ObjectReference) -> bool {
         self.test_mark_bit(object, self.mark_state)
     }
     fn is_movable(&self) -> bool {
@@ -97,9 +97,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR> {
         &mut *self.common.get()
     }
-    fn is_live(&self, _object: ObjectReference) -> bool {
-        true
-    }
+
     fn release_multiple_pages(&mut self, start: Address) {
         self.common_mut().pr.as_mut().unwrap().release_pages(start);
     }

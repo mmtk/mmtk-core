@@ -45,7 +45,7 @@ use std::marker::PhantomData;
  * table of SFT rather than Space.
  */
 pub trait SFT {
-    fn x_is_live(&self, object: ObjectReference) -> bool;
+    fn is_live(&self, object: ObjectReference) -> bool;
     fn is_movable(&self) -> bool;
     fn initialize_header(&self, object: ObjectReference, alloc: bool);
 }
@@ -55,7 +55,7 @@ unsafe impl Sync for SFTMap {}
 struct EmptySpaceSFT {}
 unsafe impl Sync for EmptySpaceSFT {}
 impl SFT for EmptySpaceSFT {
-    fn x_is_live(&self, object: ObjectReference) -> bool {
+    fn is_live(&self, object: ObjectReference) -> bool {
         panic!(
             "Called is_live() on {:x}, which maps to an empty space",
             object
@@ -116,11 +116,6 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
 
     fn get_sft(object: ObjectReference) -> &'static dyn SFT {
         SFT_MAP.get(object.to_address())
-    }
-    fn is_live(&self, object: ObjectReference) -> bool;
-
-    fn do_is_live(object: ObjectReference) -> bool {
-        SFT_MAP.get(object.to_address()).x_is_live(object)
     }
 
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {

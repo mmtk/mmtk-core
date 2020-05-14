@@ -27,7 +27,7 @@ const GC_MARK_BIT_MASK: u8 = 1;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
-    fn x_is_live(&self, _object: ObjectReference) -> bool {
+    fn is_live(&self, _object: ObjectReference) -> bool {
         true
     }
     fn is_movable(&self) -> bool {
@@ -76,9 +76,6 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
             ));
         }
         common_mut.pr.as_mut().unwrap().bind_space(me);
-    }
-    fn is_live(&self, _object: ObjectReference) -> bool {
-        true
     }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")
