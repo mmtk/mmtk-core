@@ -57,14 +57,13 @@ struct EmptySpaceSFT {}
 unsafe impl Sync for EmptySpaceSFT {}
 impl SFT for EmptySpaceSFT {
     fn is_live(&self, object: ObjectReference) -> bool {
-        println!("{:x}", object);
-        panic!("called is_live() on empty space")
+        panic!("Called is_live() on {:x}, which maps to an empty space", object)
     }
     fn is_movable(&self) -> bool {
         panic!("called is_movable() on empty space")
     }
-    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {
-        panic!("called initialize_header() on empty space")
+    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
+        panic!("Called initialize_header() on {:x}, which maps to an empty space", object)
     }
 }
 
