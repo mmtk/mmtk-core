@@ -112,6 +112,31 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
         (unsync.hi && !unsync.copyspace0.in_space(obj))
             || (!unsync.hi && !unsync.copyspace1.in_space(obj))
     }
+
+    fn is_live(&self, object: ObjectReference) -> bool {
+        if object.is_null() {
+            return false;
+        }
+        let unsync = unsafe { &(*self.plan.unsync.get()) };
+        if unsync.copyspace0.in_space(object) {
+            if unsync.hi {
+                return unsync.copyspace0.is_live(object);
+            } else {
+                return true;
+            }
+        }
+        if unsync.copyspace1.in_space(object) {
+            if unsync.hi {
+                return true;
+            } else {
+                return unsync.copyspace1.is_live(object);
+            }
+        }
+        if self.plan.common.in_common_space(object) {
+            return self.plan.common.is_live(object);
+        }
+        self.plan.common.is_live(object)
+    }
 }
 
 impl<VM: VMBinding> SSTraceLocal<VM> {

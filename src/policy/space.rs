@@ -45,10 +45,9 @@ use std::marker::PhantomData;
  * table of SFT rather than Space.
  */
 pub trait SFT {
-    fn is_live(&self, object: ObjectReference) -> bool;
+    fn x_is_live(&self, object: ObjectReference) -> bool;
     fn is_movable(&self) -> bool;
     fn initialize_header(&self, object: ObjectReference, alloc: bool);
-    //    fn update_sft(&self, start: Address, chunks: usize);
 }
 
 unsafe impl Sync for SFTMap {}
@@ -56,14 +55,20 @@ unsafe impl Sync for SFTMap {}
 struct EmptySpaceSFT {}
 unsafe impl Sync for EmptySpaceSFT {}
 impl SFT for EmptySpaceSFT {
-    fn is_live(&self, object: ObjectReference) -> bool {
-        panic!("Called is_live() on {:x}, which maps to an empty space", object)
+    fn x_is_live(&self, object: ObjectReference) -> bool {
+        panic!(
+            "Called is_live() on {:x}, which maps to an empty space",
+            object
+        )
     }
     fn is_movable(&self) -> bool {
         panic!("called is_movable() on empty space")
     }
     fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
-        panic!("Called initialize_header() on {:x}, which maps to an empty space", object)
+        panic!(
+            "Called initialize_header() on {:x}, which maps to an empty space",
+            object
+        )
     }
 }
 
@@ -78,7 +83,6 @@ impl SFTMap {
             sft: vec![&EmptySpaceSFT {}; MAX_CHUNKS],
         }
     }
-
     // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
     // of the same unsafe code.
     // FIXME: We need a safe implementation.
@@ -113,9 +117,10 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
     fn get_sft(object: ObjectReference) -> &'static dyn SFT {
         VM::VMActivePlan::global().get_sft(object)
     }
+    fn is_live(&self, object: ObjectReference) -> bool;
 
     fn do_is_live(object: ObjectReference) -> bool {
-        VM::VMActivePlan::global().get_sft(object).is_live(object)
+        VM::VMActivePlan::global().get_sft(object).x_is_live(object)
     }
 
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {

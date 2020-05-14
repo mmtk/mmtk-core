@@ -20,6 +20,7 @@ pub trait TraceLocal: TransitiveClosure {
     fn get_forwarded_referent(&mut self, object: ObjectReference) -> ObjectReference {
         self.get_forwarded_reference(object)
     }
+    fn is_live(&self, object: ObjectReference) -> bool;
     fn retain_referent(&mut self, object: ObjectReference) -> ObjectReference {
         self.trace_object(object)
     }

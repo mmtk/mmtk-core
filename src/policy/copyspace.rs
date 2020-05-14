@@ -27,7 +27,7 @@ pub struct CopySpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for CopySpace<VM> {
-    fn is_live(&self, object: ObjectReference) -> bool {
+    fn x_is_live(&self, object: ObjectReference) -> bool {
         ForwardingWord::is_forwarded::<VM>(object)
     }
     fn is_movable(&self) -> bool {
@@ -70,7 +70,9 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         }
         common_mut.pr.as_mut().unwrap().bind_space(me);
     }
-
+    fn is_live(&self, object: ObjectReference) -> bool {
+        ForwardingWord::is_forwarded::<VM>(object)
+    }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("copyspace only releases pages enmasse")
     }

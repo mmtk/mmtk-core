@@ -420,7 +420,7 @@ impl ObjectReference {
         if self.0 == 0 {
             false
         } else {
-            SFT_MAP.get(Address(self.0)).is_live(self)
+            SFT_MAP.get(Address(self.0)).x_is_live(self)
         }
     }
 
