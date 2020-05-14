@@ -28,7 +28,7 @@ pub struct CopySpace<VM: VMBinding> {
 
 impl<VM: VMBinding> SFT for CopySpace<VM> {
     fn x_is_live(&self, object: ObjectReference) -> bool {
-        ForwardingWord::is_forwarded::<VM>(object)
+        !self.from_space || ForwardingWord::is_forwarded::<VM>(object)
     }
     fn is_movable(&self) -> bool {
         true
