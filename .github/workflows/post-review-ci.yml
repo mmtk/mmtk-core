@@ -40,6 +40,50 @@ jobs:
 #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 #          message: |
 #            '${{ github.job }}' for ${{ github.sha }}: [${{ job.status }}](https://github.com/mmtk/mmtk-core/actions/runs/${{ github.run_id }})
+  jikesrvm-perf-compare:
+    runs-on: ubuntu-18.04
+    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+    steps:
+      - name: Checkout JikesRVM Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-jikesrvm
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-jikesrvm
+          submodules: true
+      # checkout current branch
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core-branch
+      # checkout master
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          ref: master
+          path: mmtk-core-master
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/ci-perf-kit
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: ci-perf-kit
+          submodules: true
+      # run compare
+      - name: Compare Performance
+        id: run
+        run: |
+          ci-perf-kit/scripts/compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ report.md
+          OUT=`cat report.md`
+          echo "::set-output name=msg::$OUT"
+      # report
+      - name: Result
+        if: always()
+        uses: thollander/actions-comment-pull-request@master
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          message: ${{ steps.run.outputs.msg }}
 
   openjdk-binding-test:
     runs-on: ubuntu-18.04
