@@ -7,39 +7,31 @@ on:
       - master
 
 jobs:
-  jikesrvm-binding-test:
-    runs-on: ubuntu-18.04
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core
-      - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/mmtk-jikesrvm
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
-          path: mmtk-jikesrvm
-          submodules: true
-      - name: Overwrite MMTk core in JikesRVM binding
-        run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
-      - name: Setup
-        run: |
-          cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-      - name: Test
-        run: |
-          cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
-      # This step is not quite useful, comment it out for now.
-#      - name: Result
-#        if: always()
-#        uses: thollander/actions-comment-pull-request@master
-#        with:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#          message: |
-#            '${{ github.job }}' for ${{ github.sha }}: [${{ job.status }}](https://github.com/mmtk/mmtk-core/actions/runs/${{ github.run_id }})
+  # jikesrvm-binding-test:
+  #   runs-on: ubuntu-18.04
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v2
+  #       with:
+  #         path: mmtk-core
+  #     - name: Checkout JikesRVM Binding
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: mmtk/mmtk-jikesrvm
+  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
+  #         path: mmtk-jikesrvm
+  #         submodules: true
+  #     - name: Overwrite MMTk core in JikesRVM binding
+  #       run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-jikesrvm
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+  #     - name: Test
+  #       run: |
+  #         cd mmtk-jikesrvm
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
   jikesrvm-perf-compare:
     runs-on: ubuntu-18.04
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
@@ -70,43 +62,62 @@ jobs:
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           path: ci-perf-kit
           submodules: true
+      # setup
+      - name: Setup
+        run: |
+          cd mmtk-jikesrvm
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+          mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
+          cp repos/jikesrvm/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
       # run compare
       - name: Compare Performance
         id: run
         run: |
-          ci-perf-kit/scripts/compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ report.md
-          OUT=`cat report.md`
-          echo "::set-output name=msg::$OUT"
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ report.md
+      # set report.md to output
+      - uses: pCYSl5EDgo/cat@master
+        id: cat
+        with:
+          path: report.md
+      # upload run results
+      - uses: actions/upload-artifact@v2
+        with:
+          name: log
+          path: ci-perf-kit/running/results/log
+      - uses: actions/upload-artifact@v2
+        with:
+          name: report.md
+          path: report.md
       # report
       - name: Result
         if: always()
         uses: thollander/actions-comment-pull-request@master
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          message: ${{ steps.run.outputs.msg }}
+          message: ${{ steps.cat.outputs.text }}
 
-  openjdk-binding-test:
-    runs-on: ubuntu-18.04
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core
-      - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/mmtk-openjdk
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
-          path: mmtk-openjdk
-          submodules: true
-      - name: Overwrite MMTk core in openjdk binding
-        run: rsync -avLe mmtk-core/* mmtk-openjdk/repos/mmtk-core/
-      - name: Setup
-        run: |
-          cd mmtk-openjdk
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-      - name: Test
-        run: |
-          cd mmtk-openjdk
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
+  # openjdk-binding-test:
+  #   runs-on: ubuntu-18.04
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v2
+  #       with:
+  #         path: mmtk-core
+  #     - name: Checkout OpenJDK Binding
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: mmtk/mmtk-openjdk
+  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
+  #         path: mmtk-openjdk
+  #         submodules: true
+  #     - name: Overwrite MMTk core in openjdk binding
+  #       run: rsync -avLe mmtk-core/* mmtk-openjdk/repos/mmtk-core/
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-openjdk
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+  #     - name: Test
+  #       run: |
+  #         cd mmtk-openjdk
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
