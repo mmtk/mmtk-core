@@ -33,7 +33,10 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn is_movable(&self) -> bool {
         false
     }
-
+    #[cfg(feature = "sanity")]
+    fn is_sane(&self) -> bool {
+        true
+    }
     fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
         let old_value = VM::VMObjectModel::read_available_byte(object);
         let mut new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;

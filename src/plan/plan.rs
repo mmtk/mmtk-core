@@ -13,7 +13,6 @@ use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
-use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 use crate::vm::Collection;
@@ -194,12 +193,6 @@ pub trait Plan<VM: VMBinding>: Sized {
             .user_triggered_collection
             .store(false, Ordering::Relaxed)
     }
-
-    fn is_in_space(&self, address: Address) -> bool;
-
-    fn is_valid_ref(&self, object: ObjectReference) -> bool;
-
-    fn is_bad_ref(&self, object: ObjectReference) -> bool;
 
     fn modify_check(&self, object: ObjectReference) {
         if self.base().gc_in_progress_proper() && object.is_movable() {
@@ -383,61 +376,6 @@ impl<VM: VMBinding> BasePlan<VM> {
     #[cfg(not(feature = "base_spaces"))]
     pub fn get_pages_used(&self) -> usize {
         0
-    }
-
-    pub fn is_valid_ref(&self, _object: ObjectReference) -> bool {
-        #[cfg(feature = "base_spaces")]
-        let unsync = unsafe { &mut *self.unsync.get() };
-
-        #[cfg(feature = "code_space")]
-        {
-            if unsync.code_space.in_space(_object) {
-                return true;
-            }
-        }
-        #[cfg(feature = "ro_space")]
-        {
-            if unsync.ro_space.in_space(_object) {
-                return true;
-            }
-        }
-        #[cfg(feature = "vm_space")]
-        {
-            if unsync.vm_space.in_space(_object) {
-                return true;
-            }
-        }
-
-        false
-    }
-
-    pub fn in_base_space(&self, _object: ObjectReference) -> bool {
-        #[cfg(feature = "base_spaces")]
-        {
-            let unsync = unsafe { &*self.unsync.get() };
-
-            #[cfg(feature = "code_space")]
-            {
-                if unsync.code_space.in_space(_object) {
-                    return true;
-                }
-            }
-
-            #[cfg(feature = "ro_space")]
-            {
-                if unsync.ro_space.in_space(_object) {
-                    return true;
-                }
-            }
-
-            #[cfg(feature = "vm_space")]
-            {
-                if unsync.vm_space.in_space(_object) {
-                    return true;
-                }
-            }
-        }
-        false
     }
 
     pub fn trace_object<T: TransitiveClosure>(
@@ -657,25 +595,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.immortal.init(vm_map);
         unsync.los.init(vm_map);
-    }
-
-    pub fn in_common_space(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        unsync.immortal.in_space(object)
-            || unsync.los.in_space(object)
-            || self.base.in_base_space(object)
-    }
-
-    pub fn is_valid_ref(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &mut *self.unsync.get() };
-
-        if unsync.immortal.in_space(object) {
-            return true;
-        }
-        if unsync.los.in_space(object) {
-            return true;
-        }
-        self.base.is_valid_ref(object)
     }
 
     pub fn get_pages_used(&self) -> usize {

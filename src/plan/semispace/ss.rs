@@ -10,8 +10,6 @@ use crate::plan::Phase;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::util::heap::VMRequest;
-use crate::util::Address;
-use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
@@ -93,8 +91,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         unsync.copyspace0.init(vm_map);
         unsync.copyspace1.init(vm_map);
     }
-
-
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<SSMutator<VM>> {
         Box::new(SSMutator::new(tls, self))
@@ -196,29 +192,6 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
 
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
-    }
-
-    // MOVE TO SFT
-    fn is_valid_ref(&self, object: ObjectReference) -> bool {
-        if self.tospace().in_space(object) {
-            return true;
-        }
-        self.common.is_valid_ref(object)
-    }
-
-    // MOVE TO SFT
-    fn is_bad_ref(&self, object: ObjectReference) -> bool {
-        self.fromspace().in_space(object)
-    }
-
-    // MOVE TO SFT
-    fn is_in_space(&self, address: Address) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        let addr = unsafe { address.to_object_reference() };
-        if unsync.copyspace0.in_space(addr) || unsync.copyspace1.in_space(addr) {
-            return true;
-        }
-        self.common.in_common_space(addr)
     }
 }
 

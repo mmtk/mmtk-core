@@ -4,7 +4,7 @@ use std::mem;
 use std::ops::*;
 use std::sync::atomic::Ordering;
 
-use crate::mmtk::{MMAPPER,SFT_MAP};
+use crate::mmtk::{MMAPPER, SFT_MAP};
 use crate::util::heap::layout::mmapper::Mmapper;
 use crate::util::heap::layout::vm_layout_constants::*;
 
@@ -440,6 +440,11 @@ impl ObjectReference {
 
     pub fn is_mapped(self) -> bool {
         Address(self.0).is_mapped()
+    }
+
+    #[cfg(feature = "sanity")]
+    pub fn is_sane(self) -> bool {
+        SFT_MAP.get(Address(self.0)).is_sane()
     }
 
     pub fn initialize_header(self, alloc: bool) {

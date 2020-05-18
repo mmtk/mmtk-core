@@ -47,6 +47,8 @@ use std::marker::PhantomData;
 pub trait SFT {
     fn is_live(&self, object: ObjectReference) -> bool;
     fn is_movable(&self) -> bool;
+    #[cfg(feature = "sanity")]
+    fn is_sane(&self) -> bool;
     fn initialize_header(&self, object: ObjectReference, alloc: bool);
 }
 
@@ -60,6 +62,10 @@ impl SFT for EmptySpaceSFT {
             "Called is_live() on {:x}, which maps to an empty space",
             object
         )
+    }
+    #[cfg(feature = "sanity")]
+    fn is_sane(&self) -> bool {
+        false
     }
     fn is_movable(&self) -> bool {
         false // FIXME JikesRVM should not (but does) rely on this semantics

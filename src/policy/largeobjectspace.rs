@@ -42,7 +42,10 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn is_movable(&self) -> bool {
         false
     }
-
+    #[cfg(feature = "sanity")]
+    fn is_sane(&self) -> bool {
+        true
+    }
     fn initialize_header(&self, object: ObjectReference, alloc: bool) {
         let old_value = Self::read_gc_word(object);
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;

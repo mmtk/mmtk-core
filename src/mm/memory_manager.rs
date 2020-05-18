@@ -84,14 +84,6 @@ pub fn post_alloc<VM: VMBinding>(
     mutator.post_alloc(refer, type_refer, bytes, allocator);
 }
 
-pub fn will_never_move<VM: VMBinding>(_mmtk: &MMTK<VM>, object: ObjectReference) -> bool {
-    !object.is_movable()
-}
-
-pub fn is_valid_ref<VM: VMBinding>(mmtk: &MMTK<VM>, val: ObjectReference) -> bool {
-    mmtk.plan.is_valid_ref(val)
-}
-
 // The parameter 'trace_local' could either be &mut SelectedTraceLocal or &mut SanityChecker.
 // Ideally we should make 'trace_local' as a trait object - &mut TraceLocal. However, this is a fat
 // pointer, and it would appear in our API (and possibly in native API), which imposes inconvenience

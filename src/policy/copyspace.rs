@@ -33,11 +33,11 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     fn is_movable(&self) -> bool {
         true
     }
+    #[cfg(feature = "sanity")]
+    fn is_sane(&self) -> bool {
+        !self.from_space
+    }
     fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
-
-    // fn update_sft(&self, start: Address, chunks: usize) -> () {
-    //     SFT_MAP.update(&self, start, chunks);
-    // }
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {

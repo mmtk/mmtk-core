@@ -94,7 +94,8 @@ impl<'a, VM: VMBinding> TraceLocal for SanityChecker<'a, VM> {
         }
 
         if !self.refs.contains(&object) {
-            if !self.plan.is_valid_ref(object) {
+            // FIXME steveb consider VM-specific integrity check on reference.
+            if !object.is_sane() {
                 panic!("Invalid reference {:?}", object);
             }
             // Object is not "marked"
