@@ -4,7 +4,8 @@ use std::mem;
 use std::ops::*;
 use std::sync::atomic::Ordering;
 
-use crate::mmtk::SFT_MAP;
+use crate::mmtk::{MMAPPER,SFT_MAP};
+use crate::util::heap::layout::mmapper::Mmapper;
 use crate::util::heap::layout::vm_layout_constants::*;
 
 /// size in bytes
@@ -281,6 +282,15 @@ impl Address {
     pub fn chunk_index(self) -> usize {
         self.0 >> LOG_BYTES_IN_CHUNK
     }
+
+    /// return true if the referenced memory is mapped
+    pub fn is_mapped(self) -> bool {
+        if self.0 == 0 {
+            return false;
+        } else {
+            return MMAPPER.address_is_mapped(self);
+        }
+    }
 }
 
 /// allows print Address as upper-case hex value
@@ -426,6 +436,10 @@ impl ObjectReference {
 
     pub fn is_movable(self) -> bool {
         SFT_MAP.get(Address(self.0)).is_movable()
+    }
+
+    pub fn is_mapped(self) -> bool {
+        Address(self.0).is_mapped()
     }
 
     pub fn initialize_header(self, alloc: bool) {

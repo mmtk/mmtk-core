@@ -265,12 +265,12 @@ pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: Opaqu
     mmtk.plan.handle_user_collection_request(tls, false);
 }
 
-pub fn is_mapped_object<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) -> bool {
-    mmtk.plan.is_mapped_object(object)
+pub fn is_mapped_object<VM: VMBinding>(object: ObjectReference) -> bool {
+    object.is_mapped()
 }
 
-pub fn is_mapped_address<VM: VMBinding>(mmtk: &MMTK<VM>, address: Address) -> bool {
-    mmtk.plan.is_mapped_address(address)
+pub fn is_mapped_address<VM: VMBinding>(address: Address) -> bool {
+    address.is_mapped()
 }
 
 pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {

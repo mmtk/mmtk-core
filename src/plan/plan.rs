@@ -8,7 +8,6 @@ use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
@@ -180,10 +179,6 @@ pub trait Plan<VM: VMBinding>: Sized {
         }
     }
 
-    fn is_valid_ref(&self, object: ObjectReference) -> bool;
-
-    fn is_bad_ref(&self, object: ObjectReference) -> bool;
-
     fn handle_user_collection_request(&self, tls: OpaquePointer, force: bool) {
         if force || !self.options().ignore_system_g_c {
             self.base()
@@ -200,27 +195,11 @@ pub trait Plan<VM: VMBinding>: Sized {
             .store(false, Ordering::Relaxed)
     }
 
-    fn is_mapped_object(&self, object: ObjectReference) -> bool {
-        if object.is_null() {
-            return false;
-        }
-        if !self.is_valid_ref(object) {
-            return false;
-        }
-        if !self.mmapper().address_is_mapped(object.to_address()) {
-            return false;
-        }
-        true
-    }
-
-    fn is_mapped_address(&self, address: Address) -> bool {
-        if self.is_in_space(address) {
-            return self.mmapper().address_is_mapped(address);
-        }
-        false
-    }
-
     fn is_in_space(&self, address: Address) -> bool;
+
+    fn is_valid_ref(&self, object: ObjectReference) -> bool;
+
+    fn is_bad_ref(&self, object: ObjectReference) -> bool;
 
     fn modify_check(&self, object: ObjectReference) {
         if self.base().gc_in_progress_proper() && object.is_movable() {

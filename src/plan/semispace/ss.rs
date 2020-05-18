@@ -94,23 +94,10 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         unsync.copyspace1.init(vm_map);
     }
 
-    fn base(&self) -> &BasePlan<VM> {
-        &self.common.base
-    }
 
-    fn common(&self) -> &CommonPlan<VM> {
-        &self.common
-    }
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<SSMutator<VM>> {
         Box::new(SSMutator::new(tls, self))
-    }
-
-    fn is_valid_ref(&self, object: ObjectReference) -> bool {
-        if self.tospace().in_space(object) {
-            return true;
-        }
-        self.common.is_valid_ref(object)
     }
 
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {
@@ -203,10 +190,28 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         self.tospace().reserved_pages() + self.common.get_pages_used()
     }
 
+    fn base(&self) -> &BasePlan<VM> {
+        &self.common.base
+    }
+
+    fn common(&self) -> &CommonPlan<VM> {
+        &self.common
+    }
+
+    // MOVE TO SFT
+    fn is_valid_ref(&self, object: ObjectReference) -> bool {
+        if self.tospace().in_space(object) {
+            return true;
+        }
+        self.common.is_valid_ref(object)
+    }
+
+    // MOVE TO SFT
     fn is_bad_ref(&self, object: ObjectReference) -> bool {
         self.fromspace().in_space(object)
     }
 
+    // MOVE TO SFT
     fn is_in_space(&self, address: Address) -> bool {
         let unsync = unsafe { &*self.unsync.get() };
         let addr = unsafe { address.to_object_reference() };
