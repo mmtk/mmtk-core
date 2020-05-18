@@ -250,15 +250,15 @@ pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: Opaqu
     mmtk.plan.handle_user_collection_request(tls, false);
 }
 
-pub fn is_object_live<VM: VMBinding>(object: ObjectReference) -> bool {
+pub fn is_live_object(object: ObjectReference) -> bool {
     object.is_live()
 }
 
-pub fn is_object_mapped<VM: VMBinding>(object: ObjectReference) -> bool {
+pub fn is_mapped_object(object: ObjectReference) -> bool {
     object.is_mapped()
 }
 
-pub fn is_address_mapped<VM: VMBinding>(address: Address) -> bool {
+pub fn is_mapped_address(address: Address) -> bool {
     address.is_mapped()
 }
 
