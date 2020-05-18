@@ -286,9 +286,9 @@ impl Address {
     /// return true if the referenced memory is mapped
     pub fn is_mapped(self) -> bool {
         if self.0 == 0 {
-            return false;
+            false
         } else {
-            return MMAPPER.is_mapped_address(self);
+            MMAPPER.is_mapped_address(self)
         }
     }
 }
