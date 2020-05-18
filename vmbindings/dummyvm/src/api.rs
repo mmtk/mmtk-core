@@ -48,11 +48,6 @@ pub extern "C" fn will_never_move(object: ObjectReference) -> bool {
 }
 
 #[no_mangle]
-pub extern "C" fn is_valid_ref(val: ObjectReference) -> bool {
-    memory_manager::is_valid_ref(&SINGLETON, val)
-}
-
-#[no_mangle]
 pub extern "C" fn report_delayed_root_edge(trace_local: *mut SelectedTraceLocal<DummyVM>, addr: Address) {
     memory_manager::report_delayed_root_edge(&SINGLETON, unsafe { &mut *trace_local }, addr)
 }
@@ -109,23 +104,23 @@ pub extern "C" fn trace_get_forwarded_reference(trace_local: *mut SelectedTraceL
 }
 
 #[no_mangle]
-pub extern "C" fn trace_is_live(trace_local: *mut SelectedTraceLocal<DummyVM>, object: ObjectReference) -> bool{
-    memory_manager::trace_is_live::<DummyVM>(unsafe { &mut *trace_local }, object)
-}
-
-#[no_mangle]
 pub extern "C" fn trace_retain_referent(trace_local: *mut SelectedTraceLocal<DummyVM>, object: ObjectReference) -> ObjectReference{
     memory_manager::trace_retain_referent::<DummyVM>(unsafe { &mut *trace_local }, object)
 }
 
 #[no_mangle]
-pub extern "C" fn is_mapped_object(object: ObjectReference) -> bool {
-    memory_manager::is_mapped_object(&SINGLETON, object)
+pub extern "C" fn is_object_live(object: ObjectReference) -> bool{
+    object.is_live()
 }
 
 #[no_mangle]
-pub extern "C" fn is_mapped_address(object: Address) -> bool {
-    memory_manager::is_mapped_address(&SINGLETON, object)
+pub extern "C" fn is_object_mapped(object: ObjectReference) -> bool {
+    object.is_mapped()
+}
+
+#[no_mangle]
+pub extern "C" fn is_address_mapped(address: Address) -> bool {
+    address.is_mapped()
 }
 
 #[no_mangle]
