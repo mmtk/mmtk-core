@@ -207,8 +207,8 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 }
 
 #[cfg(feature = "sanity")]
-pub fn scan_region<VM: VMBinding>(mmtk: &MMTK<VM>) {
-    crate::util::sanity::memory_scan::scan_region(&mmtk.plan);
+pub fn scan_region() {
+    crate::util::sanity::memory_scan::scan_region();
 }
 
 pub fn trace_get_forwarded_referent<VM: VMBinding>(

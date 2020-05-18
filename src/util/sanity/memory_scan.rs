@@ -6,7 +6,7 @@ use crate::plan::SelectedPlan;
 use crate::vm::VMBinding;
 use std;
 
-pub fn scan_region<VM: VMBinding>(plan: &SelectedPlan<VM>) {
+pub fn scan_region() {
     loop {
         let mut buf = String::new();
         println!("start end <value>");

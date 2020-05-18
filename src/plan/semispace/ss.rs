@@ -163,7 +163,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                     println!("Post GC sanity check");
                     SanityChecker::new(tls, &self).check();
                     println!("Post GC memory scan");
-                    memory_scan::scan_region(&self);
+                    memory_scan::scan_region();
                     println!("Finished one GC");
                 }
                 debug_assert!(self.ss_trace.values.is_empty());
