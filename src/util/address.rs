@@ -288,7 +288,7 @@ impl Address {
         if self.0 == 0 {
             return false;
         } else {
-            return MMAPPER.address_is_mapped(self);
+            return MMAPPER.is_address_mapped(self);
         }
     }
 }

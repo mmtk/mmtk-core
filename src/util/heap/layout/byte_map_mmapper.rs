@@ -119,7 +119,7 @@ impl Mmapper for ByteMapMmapper {
      * @param addr The address in question.
      * @return {@code true} if the given address has been mmapped
      */
-    fn address_is_mapped(&self, addr: Address) -> bool {
+    fn is_address_mapped(&self, addr: Address) -> bool {
         let chunk = Self::address_to_mmap_chunks_down(addr);
         self.mapped[chunk].load(Ordering::Relaxed) == MAPPED
     }

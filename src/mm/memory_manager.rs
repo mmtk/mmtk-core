@@ -239,7 +239,6 @@ pub extern "C" fn process_edge<VM: VMBinding>(
     trace_local.process_edge(object);
 }
 
-
 pub fn trace_retain_referent<VM: VMBinding>(
     trace_local: &mut SelectedTraceLocal<VM>,
     object: ObjectReference,
