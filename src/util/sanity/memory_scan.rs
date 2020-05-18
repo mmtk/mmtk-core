@@ -1,9 +1,6 @@
 use crate::util::Address;
 use crate::util::ObjectReference;
 
-use crate::plan::SelectedPlan;
-
-use crate::vm::VMBinding;
 use std;
 
 pub fn scan_region() {
