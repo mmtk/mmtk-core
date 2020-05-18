@@ -109,17 +109,17 @@ pub extern "C" fn trace_retain_referent(trace_local: *mut SelectedTraceLocal<Dum
 }
 
 #[no_mangle]
-pub extern "C" fn is_object_live(object: ObjectReference) -> bool{
+pub extern "C" fn is_live_object(object: ObjectReference) -> bool{
     object.is_live()
 }
 
 #[no_mangle]
-pub extern "C" fn is_object_mapped(object: ObjectReference) -> bool {
+pub extern "C" fn is_mapped_object(object: ObjectReference) -> bool {
     object.is_mapped()
 }
 
 #[no_mangle]
-pub extern "C" fn is_address_mapped(address: Address) -> bool {
+pub extern "C" fn is_mapped_address(address: Address) -> bool {
     address.is_mapped()
 }
 
