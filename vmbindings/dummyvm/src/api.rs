@@ -44,7 +44,7 @@ pub extern "C" fn post_alloc(mutator: *mut SelectedMutator<DummyVM>, refer: Obje
 
 #[no_mangle]
 pub extern "C" fn will_never_move(object: ObjectReference) -> bool {
-    memory_manager::will_never_move(&SINGLETON, object)
+    !object.is_movable()
 }
 
 #[no_mangle]
