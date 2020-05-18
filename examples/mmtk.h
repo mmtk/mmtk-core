@@ -32,9 +32,9 @@ extern void* alloc_slow(MMTk_Mutator mutator, size_t size,
 extern void post_alloc(MMTk_Mutator mutator, void* refer, void* type_refer,
     int bytes, int allocator);
 
-extern bool is_object_live(void* ref);
-extern bool is_object_mapped(void* ref);
-extern bool is_address_mapped(void* addr);
+extern bool is_live_object(void* ref);
+extern bool is_mapped_object(void* ref);
+extern bool is_mapped_address(void* addr);
 extern void modify_check(void* ref);
 
 /**
