@@ -6,7 +6,6 @@ use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
 use crate::util::heap::layout::mmapper::Mmapper;
-use crate::util::heap::layout::vm_layout_constants::*;
 
 /// size in bytes
 pub type ByteSize = usize;
@@ -280,7 +279,8 @@ impl Address {
 
     /// returns the chunk index for this address
     pub fn chunk_index(self) -> usize {
-        self.0 >> LOG_BYTES_IN_CHUNK
+        use crate::util::conversions;
+        conversions::address_to_chunk_index(self)
     }
 
     /// return true if the referenced memory is mapped

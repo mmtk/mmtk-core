@@ -26,6 +26,14 @@ pub const fn chunk_align_down(addr: Address) -> Address {
     addr.align_down(BYTES_IN_CHUNK)
 }
 
+pub fn bytes_to_chunks_up(bytes: usize) -> usize {
+    (bytes + BYTES_IN_PAGE - 1) >> LOG_BYTES_IN_CHUNK
+}
+
+pub fn address_to_chunk_index(addr: Address) -> usize {
+    addr >> LOG_BYTES_IN_CHUNK
+}
+
 pub const fn raw_align_up(val: usize, align: usize) -> usize {
     // See https://github.com/rust-lang/rust/blob/e620d0f337d0643c757bab791fc7d88d63217704/src/libcore/alloc.rs#L192
     val.wrapping_add(align).wrapping_sub(1) & !align.wrapping_sub(1)
@@ -47,10 +55,6 @@ pub fn pages_to_bytes(pages: usize) -> usize {
 
 pub fn bytes_to_pages_up(bytes: usize) -> usize {
     (bytes + BYTES_IN_PAGE - 1) >> LOG_BYTES_IN_PAGE
-}
-
-pub fn bytes_to_chunks_up(bytes: usize) -> usize {
-    (bytes + BYTES_IN_PAGE - 1) >> LOG_BYTES_IN_CHUNK
 }
 
 pub fn bytes_to_pages(bytes: usize) -> usize {
