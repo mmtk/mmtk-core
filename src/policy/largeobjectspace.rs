@@ -13,7 +13,6 @@ use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-// use crate::mmtk::SFT_MAP;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[allow(unused)]
@@ -65,9 +64,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             VM::VMObjectModel::write_available_byte(object, b | header_byte::UNLOGGED_BIT);
         }
     }
-    // fn update_sft(&self, start: Address, chunks: usize) -> () {
-    //     SFT_MAP.update(self, start, chunks);
-    // }
 }
 
 impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
