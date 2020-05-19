@@ -446,10 +446,6 @@ impl ObjectReference {
     pub fn is_sane(self) -> bool {
         SFT_MAP.get(Address(self.0)).is_sane()
     }
-
-    pub fn initialize_header(self, alloc: bool) {
-        SFT_MAP.get(Address(self.0)).initialize_header(self, alloc)
-    }
 }
 
 /// allows print Address as upper-case hex value
