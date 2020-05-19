@@ -68,9 +68,17 @@ impl SFT for EmptySpaceSFT {
         false
     }
     fn is_movable(&self) -> bool {
-        false // FIXME JikesRVM should not (but does) rely on this semantics
-              // panic!("called is_movable() on empty space")
+        /*
+         * FIXME steveb I think this should panic (ie the function should not
+         * be invoked on an empty space).   However, JikesRVM currently does
+         * call this in an unchecked way and expects 'false' for out of bounds
+         * addresses.  So until that is fixed upstream, we'll return false here.
+         *
+         * panic!("called is_movable() on empty space")
+         */
+        false
     }
+
     fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
         panic!(
             "Called initialize_header() on {:x}, which maps to an empty space",
