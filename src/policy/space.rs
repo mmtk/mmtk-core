@@ -123,6 +123,15 @@ impl SFTMap {
     }
 
     fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
+        /*
+         * This is safe (only) because a) this is only called during the
+         * allocation and deallocation of chunks, which happens under a global
+         * lock, and b) it only transitions from empty to valid and valid to
+         * empty, so if there were a race to view the contents, in the one case
+         * it would either see the new (valid) space or an empty space (both of
+         * which are reasonable), and in the other case it would either see the
+         * old (valid) space or an empty space, both of which are valid.
+         */
         let self_mut: &mut Self = unsafe { self.mut_self() };
         self_mut.sft[chunk] = sft;
     }
