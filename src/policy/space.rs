@@ -110,6 +110,10 @@ impl SFTMap {
         }
     }
 
+    pub fn clear(&self, chunk_idx: usize) {
+        self.set(chunk_idx, &EmptySpaceSFT {});
+    }
+
     fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         self_mut.sft[chunk] = sft;
