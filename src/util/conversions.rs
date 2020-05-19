@@ -49,6 +49,10 @@ pub fn bytes_to_pages_up(bytes: usize) -> usize {
     (bytes + BYTES_IN_PAGE - 1) >> LOG_BYTES_IN_PAGE
 }
 
+pub fn bytes_to_chunks_up(bytes: usize) -> usize {
+    (bytes + BYTES_IN_PAGE - 1) >> LOG_BYTES_IN_CHUNK
+}
+
 pub fn bytes_to_pages(bytes: usize) -> usize {
     let pages = bytes_to_pages_up(bytes);
 

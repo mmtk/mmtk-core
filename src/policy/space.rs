@@ -142,10 +142,6 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
 
     fn init(&mut self, vm_map: &'static VMMap);
 
-    fn get_sft(object: ObjectReference) -> &'static dyn SFT {
-        SFT_MAP.get(object.to_address())
-    }
-
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
         // debug_assert!(tls != 0);
@@ -222,7 +218,7 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
      */
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
         if new_chunk {
-            let chunks = 1 + (bytes >> LOG_BYTES_IN_CHUNK);
+            let chunks = conversions::bytes_to_chunks_up(bytes);
             SFT_MAP.update(self as *const (dyn SFT + Sync), start, chunks);
         }
     }
