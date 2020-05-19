@@ -27,7 +27,7 @@ pub const fn chunk_align_down(addr: Address) -> Address {
 }
 
 pub fn bytes_to_chunks_up(bytes: usize) -> usize {
-    (bytes + BYTES_IN_PAGE - 1) >> LOG_BYTES_IN_CHUNK
+    (bytes + BYTES_IN_CHUNK - 1) >> LOG_BYTES_IN_CHUNK
 }
 
 pub fn address_to_chunk_index(addr: Address) -> usize {
