@@ -346,7 +346,10 @@ impl<VM: VMBinding> BasePlan<VM> {
             #[cfg(feature = "ro_space")]
             unsync.ro_space.init(vm_map);
             #[cfg(feature = "vm_space")]
-            unsync.vm_space.init(vm_map);
+            {
+                unsync.vm_space.init(vm_map);
+                unsync.vm_space.sft_bulk_init();
+            }
         }
     }
 

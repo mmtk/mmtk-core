@@ -223,6 +223,11 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
         }
     }
 
+    fn sft_bulk_init(&self) {
+        let chunks = conversions::bytes_to_chunks_up(self.common().extent);
+        SFT_MAP.update(self as *const (dyn SFT + Sync), self.common().start, chunks);
+    }
+
     fn reserved_pages(&self) -> usize {
         self.common().pr.as_ref().unwrap().reserved_pages()
     }
