@@ -13,7 +13,6 @@ use crate::policy::space::SpaceOptions;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
-// use crate::mmtk::SFT_MAP;
 use std::cell::UnsafeCell;
 
 pub struct ImmortalSpace<VM: VMBinding> {
