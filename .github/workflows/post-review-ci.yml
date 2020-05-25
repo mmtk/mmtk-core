@@ -8,121 +8,122 @@ on:
 
 jobs:
   # JikesRVM
-  jikesrvm-binding-test:
-    runs-on: ubuntu-18.04
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core
-      - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/mmtk-jikesrvm
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
-          path: mmtk-jikesrvm
-          submodules: true
-      - name: Overwrite MMTk core in JikesRVM binding
-        run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
-      - name: Setup
-        run: |
-          cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-      - name: Test
-        run: |
-          cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
-  jikesrvm-perf-compare:
-    runs-on: ubuntu-18.04
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
-    steps:
-      - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/mmtk-jikesrvm
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
-          path: mmtk-jikesrvm
-          submodules: true
-      # checkout current branch
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core-branch
-      # checkout master
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          ref: master
-          path: mmtk-core-master
-      # checkout perf-kit
-      - name: Checkout Perf Kit
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/ci-perf-kit
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
-          path: ci-perf-kit
-          submodules: true
-      # setup
-      - name: Setup
-        run: |
-          cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-          mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
-          cp repos/jikesrvm/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
-      # run compare
-      - name: Compare Performance
-        id: run
-        run: |
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ jikesrvm-compare-report.md
-      # set report.md to output
-      - uses: pCYSl5EDgo/cat@master
-        id: cat
-        with:
-          path: jikesrvm-compare-report.md
-      # upload run results
-      - uses: actions/upload-artifact@v2
-        with:
-          name: jikesrvm-log
-          path: ci-perf-kit/running/results/log
-      - uses: actions/upload-artifact@v2
-        with:
-          name: jikesrvm-compare-report.md
-          path: jikesrvm-compare-report.md
-      # report
-      - name: Result
-        if: always()
-        uses: thollander/actions-comment-pull-request@master
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          message: ${{ steps.cat.outputs.text }}
+  # jikesrvm-binding-test:
+  #   runs-on: ubuntu-18.04
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v2
+  #       with:
+  #         path: mmtk-core
+  #     - name: Checkout JikesRVM Binding
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: mmtk/mmtk-jikesrvm
+  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
+  #         path: mmtk-jikesrvm
+  #         submodules: true
+  #     - name: Overwrite MMTk core in JikesRVM binding
+  #       run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-jikesrvm
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+  #     - name: Test
+  #       run: |
+  #         cd mmtk-jikesrvm
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
+  # jikesrvm-perf-compare:
+  #   runs-on: ubuntu-18.04
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+  #   steps:
+  #     - name: Checkout JikesRVM Binding
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: mmtk/mmtk-jikesrvm
+  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
+  #         path: mmtk-jikesrvm
+  #         submodules: true
+  #     # checkout current branch
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v2
+  #       with:
+  #         path: mmtk-core-branch
+  #     # checkout master
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v2
+  #       with:
+  #         ref: master
+  #         path: mmtk-core-master
+  #     # checkout perf-kit
+  #     - name: Checkout Perf Kit
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: mmtk/ci-perf-kit
+  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
+  #         path: ci-perf-kit
+  #         submodules: true
+  #     # setup
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-jikesrvm
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+  #         mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
+  #         cp repos/jikesrvm/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
+  #     # run compare
+  #     - name: Compare Performance
+  #       id: run
+  #       run: |
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ jikesrvm-compare-report.md
+  #     # set report.md to output
+  #     - uses: pCYSl5EDgo/cat@master
+  #       id: cat
+  #       with:
+  #         path: jikesrvm-compare-report.md
+  #     # upload run results
+  #     - uses: actions/upload-artifact@v2
+  #       with:
+  #         name: jikesrvm-log
+  #         path: ci-perf-kit/running/results/log
+  #     - uses: actions/upload-artifact@v2
+  #       with:
+  #         name: jikesrvm-compare-report.md
+  #         path: jikesrvm-compare-report.md
+  #     # report
+  #     - name: Result
+  #       if: always()
+  #       uses: thollander/actions-comment-pull-request@master
+  #       with:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         message: ${{ steps.cat.outputs.text }}
 
   # OpenJDK
-  openjdk-binding-test:
-    runs-on: ubuntu-18.04
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core
-      - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/mmtk-openjdk
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
-          path: mmtk-openjdk
-          submodules: true
-      - name: Overwrite MMTk core in openjdk binding
-        run: rsync -avLe mmtk-core/* mmtk-openjdk/repos/mmtk-core/
-      - name: Setup
-        run: |
-          cd mmtk-openjdk
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-      - name: Test
-        run: |
-          cd mmtk-openjdk
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
+  # openjdk-binding-test:
+  #   runs-on: ubuntu-18.04
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v2
+  #       with:
+  #         path: mmtk-core
+  #     - name: Checkout OpenJDK Binding
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: mmtk/mmtk-openjdk
+  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
+  #         path: mmtk-openjdk
+  #         submodules: true
+  #     - name: Overwrite MMTk core in openjdk binding
+  #       run: rsync -avLe mmtk-core/* mmtk-openjdk/repos/mmtk-core/
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-openjdk
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+  #         sed -i 's/ssh:\/\/git@github.com\/mmtk/https:\/\/qinsoon:${{ secrets.CI_ACCESS_TOKEN }}@github.com\/mmtk/g' mmtk/Cargo.toml
+  #     - name: Test
+  #       run: |
+  #         cd mmtk-openjdk
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
   openjdk-perf-compare:
     runs-on: ubuntu-18.04
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
@@ -165,6 +166,11 @@ jobs:
         id: run
         run: |
           RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/openjdk-compare.sh mmtk-openjdk/ mmtk-core-master/ mmtk-core-branch/ openjdk-compare-report.md
+      - name: Debug2
+        if: always()
+        run: |
+          ls mmtk-openjdk/repos/mmtk-core
+          cat mmtk-openjdk/repos/mmtk-core/Cargo.toml
       # set report.md to output
       - uses: pCYSl5EDgo/cat@master
         id: cat
