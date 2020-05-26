@@ -115,8 +115,6 @@ impl SFTMap {
         let first = start.chunk_index();
         for chunk in first..(first + chunks) {
             self.set(chunk, space);
-            let addr = start+((chunk-first)<<22);
-            println!("U {} {:x}", chunk, addr);
         }
     }
 
@@ -225,16 +223,13 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
         }
     }
 
+    /**
+     *  Ensure this space is marked as mapped -- used when the space is already
+     *  mapped (e.g. for a vm image which is externally mmapped.)
+     */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        println!(
-            "BI {} {} {}",
-            self.common().start,
-            self.common().extent,
-            chunks
-        );
         SFT_MAP.update(self as *const (dyn SFT + Sync), self.common().start, chunks);
-        println!("Done");
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper

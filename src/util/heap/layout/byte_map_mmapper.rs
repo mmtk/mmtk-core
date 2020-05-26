@@ -42,21 +42,16 @@ impl Mmapper for ByteMapMmapper {
     }
 
     fn mark_as_mapped(&self, start: Address, bytes: usize) {
-        println!("Starting!");
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + bytes) - 1;
-        println!("EM: {} {}", start, (start + bytes));
-        println!("EM: {} {}", start_chunk, end_chunk);
         for i in start_chunk..=end_chunk {
             self.mapped[i].store(MAPPED, Ordering::Relaxed);
             let addr = start+((i-start_chunk)<<LOG_MMAP_CHUNK_BYTES);
-            println!("M {} {:x}", i, addr);
         }
-        println!("Finished!");
     }
 
     fn ensure_mapped(&self, start: Address, pages: usize) {
-        println!(
+        trace!(
             "Calling ensure_mapped with start={:?} and {} pages",
             start,
             pages
