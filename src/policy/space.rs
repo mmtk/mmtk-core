@@ -112,9 +112,11 @@ impl SFTMap {
     }
 
     pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
-        let start = start.chunk_index();
-        for chunk in start..(start + chunks) {
+        let first = start.chunk_index();
+        for chunk in first..(first + chunks) {
             self.set(chunk, space);
+            let addr = start+((chunk-first)<<22);
+            println!("U {} {:x}", chunk, addr);
         }
     }
 
@@ -223,9 +225,20 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
         }
     }
 
-    fn sft_bulk_init(&self) {
+    fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
+        println!(
+            "BI {} {} {}",
+            self.common().start,
+            self.common().extent,
+            chunks
+        );
         SFT_MAP.update(self as *const (dyn SFT + Sync), self.common().start, chunks);
+        println!("Done");
+        use crate::util::heap::layout::mmapper::Mmapper;
+        self.common()
+            .mmapper
+            .mark_as_mapped(self.common().start, self.common().extent);
     }
 
     fn reserved_pages(&self) -> usize {

@@ -348,7 +348,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             #[cfg(feature = "vm_space")]
             {
                 unsync.vm_space.init(vm_map);
-                unsync.vm_space.sft_bulk_init();
+                unsync.vm_space.ensure_mapped();
             }
         }
     }
