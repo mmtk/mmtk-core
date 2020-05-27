@@ -46,18 +46,20 @@ impl Mmapper for ByteMapMmapper {
         let end_chunk = Self::address_to_mmap_chunks_up(start + bytes) - 1;
         for i in start_chunk..=end_chunk {
             self.mapped[i].store(MAPPED, Ordering::Relaxed);
-            let addr = start+((i-start_chunk)<<LOG_MMAP_CHUNK_BYTES);
+            let addr = start + ((i - start_chunk) << LOG_MMAP_CHUNK_BYTES);
         }
     }
 
     fn ensure_mapped(&self, start: Address, pages: usize) {
-        trace!(
-            "Calling ensure_mapped with start={:?} and {} pages",
-            start,
-            pages
-        );
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
+        trace!(
+            "Calling ensure_mapped with start={:?} and {} pages, {}-{}",
+            start,
+            pages,
+            Self::mmap_chunks_to_address(start_chunk),
+            Self::mmap_chunks_to_address(end_chunk)
+        );
 
         for chunk in start_chunk..end_chunk {
             if self.mapped[chunk].load(Ordering::Relaxed) == MAPPED {
