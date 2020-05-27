@@ -46,7 +46,6 @@ impl Mmapper for ByteMapMmapper {
         let end_chunk = Self::address_to_mmap_chunks_up(start + bytes) - 1;
         for i in start_chunk..=end_chunk {
             self.mapped[i].store(MAPPED, Ordering::Relaxed);
-            let addr = start + ((i - start_chunk) << LOG_MMAP_CHUNK_BYTES);
         }
     }
 
