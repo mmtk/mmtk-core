@@ -1,4 +1,4 @@
-use crate::policy::space::{CommonSpace, Space};
+use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
 use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
 
@@ -24,6 +24,27 @@ unsafe impl<VM: VMBinding> Sync for ImmortalSpace<VM> {}
 
 const GC_MARK_BIT_MASK: u8 = 1;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
+
+impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
+    fn is_live(&self, _object: ObjectReference) -> bool {
+        true
+    }
+    fn is_movable(&self) -> bool {
+        false
+    }
+    #[cfg(feature = "sanity")]
+    fn is_sane(&self) -> bool {
+        true
+    }
+    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
+        let old_value = VM::VMObjectModel::read_available_byte(object);
+        let mut new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
+        if header_byte::NEEDS_UNLOGGED_BIT {
+            new_value |= header_byte::UNLOGGED_BIT;
+        }
+        VM::VMObjectModel::write_available_byte(object, new_value);
+    }
+}
 
 impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     type PR = MonotonePageResource<VM, ImmortalSpace<VM>>;
@@ -55,15 +76,6 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
         }
         common_mut.pr.as_mut().unwrap().bind_space(me);
     }
-
-    fn is_live(&self, _object: ObjectReference) -> bool {
-        true
-    }
-
-    fn is_movable(&self) -> bool {
-        false
-    }
-
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")
     }
@@ -115,6 +127,12 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         true
     }
 
+    pub fn prepare(&mut self) {
+        self.mark_state = GC_MARK_BIT_MASK - self.mark_state;
+    }
+
+    pub fn release(&mut self) {}
+
     pub fn trace_object<T: TransitiveClosure>(
         &self,
         trace: &mut T,
@@ -125,19 +143,4 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         }
         object
     }
-
-    pub fn initialize_header(&self, object: ObjectReference) {
-        let old_value = VM::VMObjectModel::read_available_byte(object);
-        let mut new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
-        if header_byte::NEEDS_UNLOGGED_BIT {
-            new_value |= header_byte::UNLOGGED_BIT;
-        }
-        VM::VMObjectModel::write_available_byte(object, new_value);
-    }
-
-    pub fn prepare(&mut self) {
-        self.mark_state = GC_MARK_BIT_MASK - self.mark_state;
-    }
-
-    pub fn release(&mut self) {}
 }

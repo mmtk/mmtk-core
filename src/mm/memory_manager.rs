@@ -84,14 +84,6 @@ pub fn post_alloc<VM: VMBinding>(
     mutator.post_alloc(refer, type_refer, bytes, allocator);
 }
 
-pub fn will_never_move<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) -> bool {
-    mmtk.plan.will_never_move(object)
-}
-
-pub fn is_valid_ref<VM: VMBinding>(mmtk: &MMTK<VM>, val: ObjectReference) -> bool {
-    mmtk.plan.is_valid_ref(val)
-}
-
 // The parameter 'trace_local' could either be &mut SelectedTraceLocal or &mut SanityChecker.
 // Ideally we should make 'trace_local' as a trait object - &mut TraceLocal. However, this is a fat
 // pointer, and it would appear in our API (and possibly in native API), which imposes inconvenience
@@ -215,8 +207,8 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 }
 
 #[cfg(feature = "sanity")]
-pub fn scan_region<VM: VMBinding>(mmtk: &MMTK<VM>) {
-    crate::util::sanity::memory_scan::scan_region(&mmtk.plan);
+pub fn scan_region() {
+    crate::util::sanity::memory_scan::scan_region();
 }
 
 pub fn trace_get_forwarded_referent<VM: VMBinding>(
@@ -247,13 +239,6 @@ pub extern "C" fn process_edge<VM: VMBinding>(
     trace_local.process_edge(object);
 }
 
-pub fn trace_is_live<VM: VMBinding>(
-    trace_local: &mut SelectedTraceLocal<VM>,
-    object: ObjectReference,
-) -> bool {
-    trace_local.is_live(object)
-}
-
 pub fn trace_retain_referent<VM: VMBinding>(
     trace_local: &mut SelectedTraceLocal<VM>,
     object: ObjectReference,
@@ -265,12 +250,16 @@ pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: Opaqu
     mmtk.plan.handle_user_collection_request(tls, false);
 }
 
-pub fn is_mapped_object<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) -> bool {
-    mmtk.plan.is_mapped_object(object)
+pub fn is_live_object(object: ObjectReference) -> bool {
+    object.is_live()
 }
 
-pub fn is_mapped_address<VM: VMBinding>(mmtk: &MMTK<VM>, address: Address) -> bool {
-    mmtk.plan.is_mapped_address(address)
+pub fn is_mapped_object(object: ObjectReference) -> bool {
+    object.is_mapped()
+}
+
+pub fn is_mapped_address(address: Address) -> bool {
+    address.is_mapped()
 }
 
 pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {

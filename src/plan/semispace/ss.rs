@@ -10,8 +10,6 @@ use crate::plan::Phase;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::util::heap::VMRequest;
-use crate::util::Address;
-use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
@@ -94,30 +92,8 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         unsync.copyspace1.init(vm_map);
     }
 
-    fn base(&self) -> &BasePlan<VM> {
-        &self.common.base
-    }
-
-    fn common(&self) -> &CommonPlan<VM> {
-        &self.common
-    }
-
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<SSMutator<VM>> {
         Box::new(SSMutator::new(tls, self))
-    }
-
-    fn will_never_move(&self, object: ObjectReference) -> bool {
-        if self.tospace().in_space(object) || self.fromspace().in_space(object) {
-            return false;
-        }
-        self.common.will_never_move(object)
-    }
-
-    fn is_valid_ref(&self, object: ObjectReference) -> bool {
-        if self.tospace().in_space(object) {
-            return true;
-        }
-        self.common.is_valid_ref(object)
     }
 
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {
@@ -187,7 +163,7 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                     println!("Post GC sanity check");
                     SanityChecker::new(tls, &self).check();
                     println!("Post GC memory scan");
-                    memory_scan::scan_region(&self);
+                    memory_scan::scan_region();
                     println!("Finished one GC");
                 }
                 debug_assert!(self.ss_trace.values.is_empty());
@@ -210,28 +186,12 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         self.tospace().reserved_pages() + self.common.get_pages_used()
     }
 
-    fn is_bad_ref(&self, object: ObjectReference) -> bool {
-        self.fromspace().in_space(object)
+    fn base(&self) -> &BasePlan<VM> {
+        &self.common.base
     }
 
-    fn is_movable(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        if unsync.copyspace0.in_space(object) {
-            return unsync.copyspace0.is_movable();
-        }
-        if unsync.copyspace1.in_space(object) {
-            return unsync.copyspace1.is_movable();
-        }
-        self.common.is_movable(object)
-    }
-
-    fn is_in_space(&self, address: Address) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        let addr = unsafe { address.to_object_reference() };
-        if unsync.copyspace0.in_space(addr) || unsync.copyspace1.in_space(addr) {
-            return true;
-        }
-        self.common.in_common_space(addr)
+    fn common(&self) -> &CommonPlan<VM> {
+        &self.common
     }
 }
 

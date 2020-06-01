@@ -2,7 +2,7 @@ use std::cell::UnsafeCell;
 
 use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
-use crate::policy::space::{CommonSpace, Space};
+use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
 use crate::util::header_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -30,6 +30,40 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     mark_state: usize,
     in_nursery_gc: bool,
     treadmill: TreadMill,
+}
+
+unsafe impl<VM: VMBinding> Sync for LargeObjectSpace<VM> {}
+
+impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
+    fn is_live(&self, object: ObjectReference) -> bool {
+        self.test_mark_bit(object, self.mark_state)
+    }
+    fn is_movable(&self) -> bool {
+        false
+    }
+    #[cfg(feature = "sanity")]
+    fn is_sane(&self) -> bool {
+        true
+    }
+    fn initialize_header(&self, object: ObjectReference, alloc: bool) {
+        let old_value = Self::read_gc_word(object);
+        let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
+        if alloc {
+            new_value |= NURSERY_BIT;
+        }
+        Self::write_gc_word(object, new_value);
+        let cell = VM::VMObjectModel::object_start_ref(object)
+            - if USE_PRECEEDING_GC_HEADER {
+                PRECEEDING_GC_HEADER_BYTES
+            } else {
+                0
+            };
+        self.treadmill.add_to_treadmill(cell, alloc);
+        if header_byte::NEEDS_UNLOGGED_BIT {
+            let b = VM::VMObjectModel::read_available_byte(object);
+            VM::VMObjectModel::write_available_byte(object, b | header_byte::UNLOGGED_BIT);
+        }
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
@@ -61,14 +95,6 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR> {
         &mut *self.common.get()
-    }
-
-    fn is_live(&self, object: ObjectReference) -> bool {
-        self.test_mark_bit(object, self.mark_state)
-    }
-
-    fn is_movable(&self) -> bool {
-        false
     }
 
     fn release_multiple_pages(&mut self, start: Address) {
@@ -120,32 +146,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             self.sweep_large_pages(false);
         }
     }
-
-    fn sweep_large_pages(&mut self, sweep_nursery: bool) {
-        // FIXME: borrow checker fighting
-        // didn't call self.release_multiple_pages
-        // so the compiler knows I'm borrowing two different fields
-        if sweep_nursery {
-            for cell in self.treadmill.collect_nursery() {
-                // println!("- cn {}", cell);
-                (unsafe { &mut *self.common.get() })
-                    .pr
-                    .as_mut()
-                    .unwrap()
-                    .release_pages(get_super_page(cell));
-            }
-        } else {
-            for cell in self.treadmill.collect() {
-                // println!("- ts {}", cell);
-                (unsafe { &mut *self.common.get() })
-                    .pr
-                    .as_mut()
-                    .unwrap()
-                    .release_pages(get_super_page(cell));
-            }
-        }
-    }
-
     // Allow nested-if for this function to make it clear that test_and_mark() is only executed
     // for the outer condition is met.
     #[allow(clippy::collapsible_if)]
@@ -171,23 +171,28 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         object
     }
 
-    pub fn initialize_header(&self, object: ObjectReference, alloc: bool) {
-        let old_value = Self::read_gc_word(object);
-        let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
-        if alloc {
-            new_value |= NURSERY_BIT;
-        }
-        Self::write_gc_word(object, new_value);
-        let cell = VM::VMObjectModel::object_start_ref(object)
-            - if USE_PRECEEDING_GC_HEADER {
-                PRECEEDING_GC_HEADER_BYTES
-            } else {
-                0
-            };
-        self.treadmill.add_to_treadmill(cell, alloc);
-        if header_byte::NEEDS_UNLOGGED_BIT {
-            let b = VM::VMObjectModel::read_available_byte(object);
-            VM::VMObjectModel::write_available_byte(object, b | header_byte::UNLOGGED_BIT);
+    fn sweep_large_pages(&mut self, sweep_nursery: bool) {
+        // FIXME: borrow checker fighting
+        // didn't call self.release_multiple_pages
+        // so the compiler knows I'm borrowing two different fields
+        if sweep_nursery {
+            for cell in self.treadmill.collect_nursery() {
+                // println!("- cn {}", cell);
+                (unsafe { &mut *self.common.get() })
+                    .pr
+                    .as_mut()
+                    .unwrap()
+                    .release_pages(get_super_page(cell));
+            }
+        } else {
+            for cell in self.treadmill.collect() {
+                // println!("- ts {}", cell);
+                (unsafe { &mut *self.common.get() })
+                    .pr
+                    .as_mut()
+                    .unwrap()
+                    .release_pages(get_super_page(cell));
+            }
         }
     }
 

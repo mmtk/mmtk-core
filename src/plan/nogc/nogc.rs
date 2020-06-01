@@ -2,8 +2,6 @@ use crate::plan::{Phase, Plan};
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
 use crate::util::heap::VMRequest;
-use crate::util::Address;
-use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
@@ -76,10 +74,6 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         Box::new(NoGCMutator::new(tls, self))
     }
 
-    fn will_never_move(&self, _object: ObjectReference) -> bool {
-        true
-    }
-
     unsafe fn collection_phase(&self, _tls: OpaquePointer, _phase: &Phase) {
         unreachable!()
     }
@@ -87,31 +81,6 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
     fn get_pages_used(&self) -> usize {
         let unsync = unsafe { &*self.unsync.get() };
         unsync.nogc_space.reserved_pages()
-    }
-
-    fn is_valid_ref(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        if unsync.nogc_space.in_space(object) {
-            true
-        } else {
-            self.base.is_valid_ref(object)
-        }
-    }
-
-    fn is_bad_ref(&self, _object: ObjectReference) -> bool {
-        false
-    }
-
-    fn is_in_space(&self, address: Address) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        if unsafe { unsync.nogc_space.in_space(address.to_object_reference()) } {
-            return true;
-        }
-        unsafe { self.base.in_base_space(address.to_object_reference()) }
-    }
-
-    fn is_movable(&self, _object: ObjectReference) -> bool {
-        false // By definition no objects are movable in NoGC
     }
 }
 

@@ -13,15 +13,131 @@ use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
 use crate::util::OpaquePointer;
 
+use crate::mmtk::SFT_MAP;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
+
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
-pub trait Space<VM: VMBinding>: Sized + 'static {
+/**
+ * Space Function Table (SFT).
+ *
+ * This trait captures functions that reflect _space-specific per-object
+ * semantics_.   These functions are implemented for each object via a special
+ * space-based dynamic dispatch mechanism where the semantics are _not_
+ * determined by the object's _type_, but rather, are determined by the _space_
+ * that the object is in.
+ *
+ * The underlying mechanism exploits the fact that spaces use the address space
+ * at an MMTk chunk granularity with the consequence that each chunk maps to
+ * exactluy one space, so knowing the chunk for an object reveals its space.
+ * The dispatch then works by performing simple address arithmetic on the object
+ * reference to find a chunk index which is used to index a table which returns
+ * the space.   The relevant function is then dispatched against that space
+ * object.
+ *
+ * We use the SFT trait to simplify typing for Rust, so our table is a
+ * table of SFT rather than Space.
+ */
+pub trait SFT {
+    fn is_live(&self, object: ObjectReference) -> bool;
+    fn is_movable(&self) -> bool;
+    #[cfg(feature = "sanity")]
+    fn is_sane(&self) -> bool;
+    fn initialize_header(&self, object: ObjectReference, alloc: bool);
+}
+
+unsafe impl Sync for SFTMap {}
+
+struct EmptySpaceSFT {}
+unsafe impl Sync for EmptySpaceSFT {}
+impl SFT for EmptySpaceSFT {
+    fn is_live(&self, object: ObjectReference) -> bool {
+        panic!(
+            "Called is_live() on {:x}, which maps to an empty space",
+            object
+        )
+    }
+    #[cfg(feature = "sanity")]
+    fn is_sane(&self) -> bool {
+        false
+    }
+    fn is_movable(&self) -> bool {
+        /*
+         * FIXME steveb I think this should panic (ie the function should not
+         * be invoked on an empty space).   However, JikesRVM currently does
+         * call this in an unchecked way and expects 'false' for out of bounds
+         * addresses.  So until that is fixed upstream, we'll return false here.
+         *
+         * panic!("called is_movable() on empty space")
+         */
+        false
+    }
+
+    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
+        panic!(
+            "Called initialize_header() on {:x}, which maps to an empty space",
+            object
+        )
+    }
+}
+
+#[derive(Default)]
+pub struct SFTMap {
+    sft: Vec<*const (dyn SFT + Sync)>,
+}
+
+impl SFTMap {
+    pub fn new() -> Self {
+        SFTMap {
+            sft: vec![&EmptySpaceSFT {}; MAX_CHUNKS],
+        }
+    }
+    // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
+    // of the same unsafe code.
+    // FIXME: We need a safe implementation.
+    #[allow(clippy::cast_ref_to_mut)]
+    #[allow(clippy::mut_from_ref)]
+    unsafe fn mut_self(&self) -> &mut Self {
+        &mut *(self as *const _ as *mut _)
+    }
+
+    pub fn get(&self, address: Address) -> &'static dyn SFT {
+        unsafe { &*self.sft[address.chunk_index()] }
+    }
+
+    pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+        let first = start.chunk_index();
+        for chunk in first..(first + chunks) {
+            self.set(chunk, space);
+        }
+    }
+
+    pub fn clear(&self, chunk_idx: usize) {
+        self.set(chunk_idx, &EmptySpaceSFT {});
+    }
+
+    fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
+        /*
+         * This is safe (only) because a) this is only called during the
+         * allocation and deallocation of chunks, which happens under a global
+         * lock, and b) it only transitions from empty to valid and valid to
+         * empty, so if there were a race to view the contents, in the one case
+         * it would either see the new (valid) space or an empty space (both of
+         * which are reasonable), and in the other case it would either see the
+         * old (valid) space or an empty space, both of which are valid.
+         */
+        let self_mut: &mut Self = unsafe { self.mut_self() };
+        self_mut.sft[chunk] = sft;
+    }
+}
+
+pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
     type PR: PageResource<VM, Space = Self>;
 
     fn init(&mut self, vm_map: &'static VMMap);
@@ -100,7 +216,25 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
      * @param bytes The size of the newly allocated space
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */
-    fn grow_space(&self, _start: Address, _bytes: usize, _new_chunk: bool) {}
+    fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
+        if new_chunk {
+            let chunks = conversions::bytes_to_chunks_up(bytes);
+            SFT_MAP.update(self as *const (dyn SFT + Sync), start, chunks);
+        }
+    }
+
+    /**
+     *  Ensure this space is marked as mapped -- used when the space is already
+     *  mapped (e.g. for a vm image which is externally mmapped.)
+     */
+    fn ensure_mapped(&self) {
+        let chunks = conversions::bytes_to_chunks_up(self.common().extent);
+        SFT_MAP.update(self as *const (dyn SFT + Sync), self.common().start, chunks);
+        use crate::util::heap::layout::mmapper::Mmapper;
+        self.common()
+            .mmapper
+            .mark_as_mapped(self.common().start, self.common().extent);
+    }
 
     fn reserved_pages(&self) -> usize {
         self.common().pr.as_ref().unwrap().reserved_pages()
@@ -120,9 +254,6 @@ pub trait Space<VM: VMBinding>: Sized + 'static {
     // (i.e. make sure their are no concurrent accesses through self when calling this)_
     #[allow(clippy::mut_from_ref)]
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR>;
-
-    fn is_live(&self, object: ObjectReference) -> bool;
-    fn is_movable(&self) -> bool;
 
     fn release_discontiguous_chunks(&mut self, chunk: Address) {
         debug_assert!(chunk == conversions::chunk_align_down(chunk));
@@ -215,6 +346,8 @@ pub struct SpaceOptions {
 }
 
 const DEBUG: bool = false;
+
+unsafe impl<VM: VMBinding, PR: PageResource<VM>> Sync for CommonSpace<VM, PR> {}
 
 impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
     pub fn new(

@@ -298,7 +298,7 @@ impl ReferenceProcessor {
             trace!("Processing reference: {:?}", reference);
         }
 
-        if !trace.is_live(reference) {
+        if !reference.is_live() {
             /*
              * Reference is currently unreachable but may get reachable by the
              * following trace. We postpone the decision.

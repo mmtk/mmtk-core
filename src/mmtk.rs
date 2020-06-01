@@ -1,6 +1,7 @@
 use crate::plan::phase::PhaseManager;
 use crate::plan::Plan;
 use crate::plan::SelectedPlan;
+use crate::policy::space::SFTMap;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::OpaquePointer;
@@ -25,6 +26,7 @@ lazy_static! {
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
     pub static ref VM_MAP: VMMap = VMMap::new();
     pub static ref MMAPPER: Mmapper = Mmapper::new();
+    pub static ref SFT_MAP: SFTMap = SFTMap::new();
 }
 
 pub struct MMTK<VM: VMBinding> {
@@ -32,6 +34,7 @@ pub struct MMTK<VM: VMBinding> {
     pub phase_manager: PhaseManager,
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
+    pub sftmap: &'static SFTMap,
     pub reference_processors: ReferenceProcessors,
     pub options: Arc<UnsafeOptionsWrapper>,
 
@@ -48,6 +51,7 @@ impl<VM: VMBinding> MMTK<VM> {
             phase_manager,
             vm_map: &VM_MAP,
             mmapper: &MMAPPER,
+            sftmap: &SFT_MAP,
             reference_processors: ReferenceProcessors::new(),
             options,
             inside_harness: AtomicBool::new(false),

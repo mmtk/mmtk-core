@@ -1,3 +1,4 @@
+use crate::mmtk::SFT_MAP;
 use crate::util::conversions;
 use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
@@ -172,6 +173,7 @@ impl Map32 {
         self_mut.next_link[chunk as usize] = 0;
         for offset in 0..chunks {
             self_mut.descriptor_map[(chunk + offset) as usize] = SpaceDescriptor::UNINITIALIZED;
+            SFT_MAP.clear((chunk + offset) as usize);
             // VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, chunk + offset, null);
         }
         chunks as _

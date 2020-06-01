@@ -43,20 +43,22 @@ impl Mmapper for ByteMapMmapper {
 
     fn mark_as_mapped(&self, start: Address, bytes: usize) {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
-        let end_chunk = Self::address_to_mmap_chunks_up(start + bytes);
+        let end_chunk = Self::address_to_mmap_chunks_up(start + bytes) - 1;
         for i in start_chunk..=end_chunk {
             self.mapped[i].store(MAPPED, Ordering::Relaxed);
         }
     }
 
     fn ensure_mapped(&self, start: Address, pages: usize) {
-        trace!(
-            "Calling ensure_mapped with start={:?} and {} pages",
-            start,
-            pages
-        );
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
+        trace!(
+            "Calling ensure_mapped with start={:?} and {} pages, {}-{}",
+            start,
+            pages,
+            Self::mmap_chunks_to_address(start_chunk),
+            Self::mmap_chunks_to_address(end_chunk)
+        );
 
         for chunk in start_chunk..end_chunk {
             if self.mapped[chunk].load(Ordering::Relaxed) == MAPPED {
@@ -119,7 +121,7 @@ impl Mmapper for ByteMapMmapper {
      * @param addr The address in question.
      * @return {@code true} if the given address has been mmapped
      */
-    fn address_is_mapped(&self, addr: Address) -> bool {
+    fn is_mapped_address(&self, addr: Address) -> bool {
         let chunk = Self::address_to_mmap_chunks_down(addr);
         self.mapped[chunk].load(Ordering::Relaxed) == MAPPED
     }

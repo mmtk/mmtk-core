@@ -44,12 +44,7 @@ pub extern "C" fn post_alloc(mutator: *mut SelectedMutator<DummyVM>, refer: Obje
 
 #[no_mangle]
 pub extern "C" fn will_never_move(object: ObjectReference) -> bool {
-    memory_manager::will_never_move(&SINGLETON, object)
-}
-
-#[no_mangle]
-pub extern "C" fn is_valid_ref(val: ObjectReference) -> bool {
-    memory_manager::is_valid_ref(&SINGLETON, val)
+    !object.is_movable()
 }
 
 #[no_mangle]
@@ -109,23 +104,23 @@ pub extern "C" fn trace_get_forwarded_reference(trace_local: *mut SelectedTraceL
 }
 
 #[no_mangle]
-pub extern "C" fn trace_is_live(trace_local: *mut SelectedTraceLocal<DummyVM>, object: ObjectReference) -> bool{
-    memory_manager::trace_is_live::<DummyVM>(unsafe { &mut *trace_local }, object)
-}
-
-#[no_mangle]
 pub extern "C" fn trace_retain_referent(trace_local: *mut SelectedTraceLocal<DummyVM>, object: ObjectReference) -> ObjectReference{
     memory_manager::trace_retain_referent::<DummyVM>(unsafe { &mut *trace_local }, object)
 }
 
 #[no_mangle]
-pub extern "C" fn is_mapped_object(object: ObjectReference) -> bool {
-    memory_manager::is_mapped_object(&SINGLETON, object)
+pub extern "C" fn is_live_object(object: ObjectReference) -> bool{
+    object.is_live()
 }
 
 #[no_mangle]
-pub extern "C" fn is_mapped_address(object: Address) -> bool {
-    memory_manager::is_mapped_address(&SINGLETON, object)
+pub extern "C" fn is_mapped_object(object: ObjectReference) -> bool {
+    object.is_mapped()
+}
+
+#[no_mangle]
+pub extern "C" fn is_mapped_address(address: Address) -> bool {
+    address.is_mapped()
 }
 
 #[no_mangle]

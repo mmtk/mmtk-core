@@ -8,13 +8,11 @@ use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
-use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 use crate::vm::Collection;
@@ -44,11 +42,11 @@ pub trait Plan<VM: VMBinding>: Sized {
     fn options(&self) -> &Options {
         &self.base().options
     }
+
     // unsafe because this can only be called once by the init thread
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::MutatorT>;
-    fn will_never_move(&self, object: ObjectReference) -> bool;
     // unsafe because only the primary collector thread can call this
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
 
@@ -180,10 +178,6 @@ pub trait Plan<VM: VMBinding>: Sized {
         }
     }
 
-    fn is_valid_ref(&self, object: ObjectReference) -> bool;
-
-    fn is_bad_ref(&self, object: ObjectReference) -> bool;
-
     fn handle_user_collection_request(&self, tls: OpaquePointer, force: bool) {
         if force || !self.options().ignore_system_g_c {
             self.base()
@@ -200,38 +194,14 @@ pub trait Plan<VM: VMBinding>: Sized {
             .store(false, Ordering::Relaxed)
     }
 
-    fn is_mapped_object(&self, object: ObjectReference) -> bool {
-        if object.is_null() {
-            return false;
-        }
-        if !self.is_valid_ref(object) {
-            return false;
-        }
-        if !self.mmapper().address_is_mapped(object.to_address()) {
-            return false;
-        }
-        true
-    }
-
-    fn is_mapped_address(&self, address: Address) -> bool {
-        if self.is_in_space(address) {
-            return self.mmapper().address_is_mapped(address);
-        }
-        false
-    }
-
-    fn is_in_space(&self, address: Address) -> bool;
-
     fn modify_check(&self, object: ObjectReference) {
-        if self.base().gc_in_progress_proper() && self.is_movable(object) {
+        if self.base().gc_in_progress_proper() && object.is_movable() {
             panic!(
                 "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
                 object
             );
         }
     }
-
-    fn is_movable(&self, object: ObjectReference) -> bool;
 }
 
 #[derive(PartialEq)]
@@ -376,7 +346,10 @@ impl<VM: VMBinding> BasePlan<VM> {
             #[cfg(feature = "ro_space")]
             unsync.ro_space.init(vm_map);
             #[cfg(feature = "vm_space")]
-            unsync.vm_space.init(vm_map);
+            {
+                unsync.vm_space.init(vm_map);
+                unsync.vm_space.ensure_mapped();
+            }
         }
     }
 
@@ -406,123 +379,6 @@ impl<VM: VMBinding> BasePlan<VM> {
     #[cfg(not(feature = "base_spaces"))]
     pub fn get_pages_used(&self) -> usize {
         0
-    }
-
-    pub fn will_never_move(&self, _object: ObjectReference) -> bool {
-        true
-    }
-
-    pub fn is_valid_ref(&self, _object: ObjectReference) -> bool {
-        #[cfg(feature = "base_spaces")]
-        let unsync = unsafe { &mut *self.unsync.get() };
-
-        #[cfg(feature = "code_space")]
-        {
-            if unsync.code_space.in_space(_object) {
-                return true;
-            }
-        }
-        #[cfg(feature = "ro_space")]
-        {
-            if unsync.ro_space.in_space(_object) {
-                return true;
-            }
-        }
-        #[cfg(feature = "vm_space")]
-        {
-            if unsync.vm_space.in_space(_object) {
-                return true;
-            }
-        }
-
-        false
-    }
-
-    pub fn is_movable(&self, _object: ObjectReference) -> bool {
-        #[cfg(feature = "base_spaces")]
-        let unsync = unsafe { &*self.unsync.get() };
-
-        #[cfg(feature = "code_space")]
-        {
-            if unsync.code_space.in_space(_object) {
-                return unsync.code_space.is_movable();
-            }
-        }
-
-        #[cfg(feature = "ro_space")]
-        {
-            if unsync.ro_space.in_space(_object) {
-                return unsync.ro_space.is_movable();
-            }
-        }
-
-        #[cfg(feature = "vm_space")]
-        {
-            if unsync.vm_space.in_space(_object) {
-                return unsync.vm_space.is_movable();
-            }
-        }
-
-        true
-    }
-
-    // FIXME: Move into space
-    pub fn is_live(&self, _object: ObjectReference) -> bool {
-        #[cfg(feature = "base_spaces")]
-        {
-            let unsync = unsafe { &*self.unsync.get() };
-
-            #[cfg(feature = "code_space")]
-            {
-                if unsync.code_space.in_space(_object) {
-                    return true;
-                }
-            }
-
-            #[cfg(feature = "ro_space")]
-            {
-                if unsync.ro_space.in_space(_object) {
-                    return true;
-                }
-            }
-
-            #[cfg(feature = "vm_space")]
-            {
-                if unsync.vm_space.in_space(_object) {
-                    return true;
-                }
-            }
-        }
-        panic!("Invalid space")
-    }
-
-    pub fn in_base_space(&self, _object: ObjectReference) -> bool {
-        #[cfg(feature = "base_spaces")]
-        {
-            let unsync = unsafe { &*self.unsync.get() };
-
-            #[cfg(feature = "code_space")]
-            {
-                if unsync.code_space.in_space(_object) {
-                    return true;
-                }
-            }
-
-            #[cfg(feature = "ro_space")]
-            {
-                if unsync.ro_space.in_space(_object) {
-                    return true;
-                }
-            }
-
-            #[cfg(feature = "vm_space")]
-            {
-                if unsync.vm_space.in_space(_object) {
-                    return true;
-                }
-            }
-        }
-        false
     }
 
     pub fn trace_object<T: TransitiveClosure>(
@@ -742,56 +598,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.immortal.init(vm_map);
         unsync.los.init(vm_map);
-    }
-
-    pub fn in_common_space(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        unsync.immortal.in_space(object)
-            || unsync.los.in_space(object)
-            || self.base.in_base_space(object)
-    }
-
-    pub fn will_never_move(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &mut *self.unsync.get() };
-        if unsync.immortal.in_space(object) || unsync.los.in_space(object) {
-            return true;
-        }
-        self.base.will_never_move(object)
-    }
-
-    pub fn is_valid_ref(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &mut *self.unsync.get() };
-
-        if unsync.immortal.in_space(object) {
-            return true;
-        }
-        if unsync.los.in_space(object) {
-            return true;
-        }
-        self.base.is_valid_ref(object)
-    }
-
-    pub fn is_movable(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        if unsync.immortal.in_space(object) {
-            return unsync.immortal.is_movable();
-        }
-        if unsync.los.in_space(object) {
-            return unsync.los.is_movable();
-        }
-        self.base.is_movable(object)
-    }
-
-    // FIXME: Move into space
-    pub fn is_live(&self, object: ObjectReference) -> bool {
-        let unsync = unsafe { &*self.unsync.get() };
-        if unsync.immortal.in_space(object) {
-            return true;
-        }
-        if unsync.los.in_space(object) {
-            return unsync.los.is_live(object);
-        }
-        self.base.is_live(object)
     }
 
     pub fn get_pages_used(&self) -> usize {
