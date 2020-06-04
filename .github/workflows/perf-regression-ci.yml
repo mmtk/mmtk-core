@@ -40,6 +40,7 @@ jobs:
         run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
       - name: Setup
         run: |
+          ./ci-perf-kit/scripts/history-run-setup.sh
           cd mmtk-jikesrvm
           RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
           mkdir -p ../ci-perf-kit/running/benchmarks/dacapo

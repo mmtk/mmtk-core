@@ -1,9 +1,12 @@
 name: Pre Code Review Checks
 
+# Disable this check for testing
 on:
   pull_request:
-    branches:
-      - master
+    # branches:
+    #   - master
+    branches-ignore:
+      - '**'
 
 jobs:
   pre-code-review-checks:
