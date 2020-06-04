@@ -59,6 +59,6 @@ jobs:
         with:
           ACCESS_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
           BRANCH: gh-pages
-          FOLDER: ./reports
+          FOLDER: reports
           REPOSITORY_NAME: qinsoon/ci-result-test
           TARGET_FOLDER: reports/jikesrvm
