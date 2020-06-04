@@ -55,10 +55,9 @@ jobs:
           ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports
       # deploy
       - name: Deploy to Github Page
-        uses: JamesIves/github-pages-deploy-action@releases/v3
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          ACCESS_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
-          BRANCH: gh-pages
-          FOLDER: reports
-          REPOSITORY_NAME: qinsoon/ci-result-test
-          TARGET_FOLDER: reports/jikesrvm
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          external_repository: qinsoon/ci-result-test
+          publish_dir: ./reports
+          publish_branch: gh-pages
