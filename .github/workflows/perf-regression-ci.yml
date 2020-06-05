@@ -61,3 +61,4 @@ jobs:
           external_repository: qinsoon/ci-result-test
           publish_dir: ./reports
           publish_branch: gh-pages
+          keep_files: true
