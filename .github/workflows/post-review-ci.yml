@@ -115,12 +115,13 @@ jobs:
           path: mmtk-openjdk
           submodules: true
       - name: Overwrite MMTk core in openjdk binding
-        run: rsync -avLe mmtk-core/* mmtk-openjdk/repos/mmtk-core/
+        run: cp -r mmtk-core mmtk-openjdk/repos/
       - name: Setup
         run: |
           cd mmtk-openjdk
           RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-          sed -i 's/ssh:\/\/git@github.com\/mmtk/https:\/\/qinsoon:${{ secrets.CI_ACCESS_TOKEN }}@github.com\/mmtk/g' mmtk/Cargo.toml
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
       - name: Test
         run: |
           cd mmtk-openjdk
