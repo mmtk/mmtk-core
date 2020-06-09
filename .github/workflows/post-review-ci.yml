@@ -115,7 +115,7 @@ jobs:
           path: mmtk-openjdk
           submodules: true
       - name: Overwrite MMTk core in openjdk binding
-        run: rsync -avLe mmtk-core/* mmtk-openjdk/repos/mmtk-core/
+        run: cp -r mmtk-core mmtk-openjdk/repos/
       - name: Setup
         run: |
           cd mmtk-openjdk
