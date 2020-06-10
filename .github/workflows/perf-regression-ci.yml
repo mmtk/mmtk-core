@@ -97,6 +97,8 @@ jobs:
           RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+          mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
+          cp repos/openjdk/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
       # run
       - name: Performance Run
         run: |
