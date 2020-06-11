@@ -49,8 +49,8 @@ jobs:
       - name: Performance Run
         run: |
           export RUSTUP_TOOLCHAIN=nightly-2019-08-26
-          export RESULT_REPO=qinsoon/ci-result-test
-          export RESULT_REPO_BRANCH=master
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports
       # deploy
@@ -58,7 +58,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
-          external_repository: qinsoon/ci-result-test
+          external_repository: mmtk/ci-perf-result
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
@@ -103,8 +103,8 @@ jobs:
       - name: Performance Run
         run: |
           export RUSTUP_TOOLCHAIN=nightly-2019-08-26
-          export RESULT_REPO=qinsoon/ci-result-test
-          export RESULT_REPO_BRANCH=master
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports
       # deploy
@@ -112,7 +112,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
-          external_repository: qinsoon/ci-result-test
+          external_repository: mmtk/ci-perf-result
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
