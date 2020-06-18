@@ -1,0 +1,116 @@
+name: Performance Regression CI
+
+# Triggerred when a new commit is pushed to master
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  # JikesRVM
+  jikesrvm-perf-regression:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout JikesRVM Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-jikesrvm
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-jikesrvm
+          submodules: true
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/ci-perf-kit
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          ref: "0.2"
+          path: ci-perf-kit
+          submodules: true
+      # setup
+      - name: Overwrite MMTk core in JikesRVM binding
+        run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
+      - name: Setup
+        run: |
+          ./ci-perf-kit/scripts/history-run-setup.sh
+          cd mmtk-jikesrvm
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+          mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
+          cp repos/jikesrvm/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
+      # run
+      - name: Performance Run
+        run: |
+          export RUSTUP_TOOLCHAIN=nightly-2019-08-26
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=test
+          export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+          export FROM_DATE=2020-06-11
+          ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports
+      # deploy
+      - name: Deploy to Github Page
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          external_repository: mmtk/ci-perf-result
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          keep_files: true
+    
+  # OpenJDK
+  openjdk-perf-regression:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout OpenJDK Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-openjdk
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-openjdk
+          submodules: true
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/ci-perf-kit
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          ref: "0.2"
+          path: ci-perf-kit
+          submodules: true
+      # setup
+      - name: Overwrite MMTk core in openjdk binding
+        run: cp -r mmtk-core mmtk-openjdk/repos/
+      - name: Setup
+        run: |
+          ./ci-perf-kit/scripts/history-run-setup.sh
+          cd mmtk-openjdk
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+          mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
+          cp repos/openjdk/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
+      # run
+      - name: Performance Run
+        run: |
+          export RUSTUP_TOOLCHAIN=nightly-2019-08-26
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=test
+          export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+          export FROM_DATE=2020-06-11
+          ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports
+      # deploy
+      - name: Deploy to Github Page
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          external_repository: mmtk/ci-perf-result
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          keep_files: true
