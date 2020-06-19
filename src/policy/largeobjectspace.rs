@@ -7,7 +7,7 @@ use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
 use crate::util::header_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
-use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
+use crate::util::heap::{PageResource, FreeListPageResource, VMRequest};
 use crate::util::treadmill::TreadMill;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
@@ -26,7 +26,8 @@ const PRECEEDING_GC_HEADER_WORDS: usize = 1;
 const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTES_IN_WORD;
 
 pub struct LargeObjectSpace<VM: VMBinding> {
-    common: UnsafeCell<CommonSpace<VM, FreeListPageResource<VM, LargeObjectSpace<VM>>>>,
+    common: UnsafeCell<CommonSpace<VM>>,
+    pr: FreeListPageResource<VM>,
     mark_state: usize,
     in_nursery_gc: bool,
     treadmill: TreadMill,
@@ -67,38 +68,30 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
 }
 
 impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
-    type PR = FreeListPageResource<VM, LargeObjectSpace<VM>>;
-
+    fn as_space(&self) -> &dyn Space<VM> {
+        self
+    }
+    fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
+        self
+    }
+    fn get_page_resource(&self) -> &dyn PageResource<VM> {
+        &self.pr
+    }
     fn init(&mut self, vm_map: &'static VMMap) {
         let me = unsafe { &*(self as *const Self) };
-
-        let common_mut = self.common_mut();
-
-        if common_mut.vmrequest.is_discontiguous() {
-            common_mut.pr = Some(FreeListPageResource::new_discontiguous(0, vm_map));
-        } else {
-            common_mut.pr = Some(FreeListPageResource::new_contiguous(
-                me,
-                common_mut.start,
-                common_mut.extent,
-                0,
-                vm_map,
-            ));
-        }
-
-        common_mut.pr.as_mut().unwrap().bind_space(me);
+        self.pr.bind_space(me);
     }
 
-    fn common(&self) -> &CommonSpace<VM, Self::PR> {
+    fn common(&self) -> &CommonSpace<VM> {
         unsafe { &*self.common.get() }
     }
 
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR> {
+    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
         &mut *self.common.get()
     }
 
     fn release_multiple_pages(&mut self, start: Address) {
-        self.common_mut().pr.as_mut().unwrap().release_pages(start);
+        self.pr.release_pages(start);
     }
 }
 
@@ -111,19 +104,25 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
+        let common = CommonSpace::new(
+            SpaceOptions {
+                name,
+                movable: false,
+                immortal: false,
+                zeroed,
+                vmrequest,
+            },
+            vm_map,
+            mmapper,
+            heap,
+        );
         LargeObjectSpace {
-            common: UnsafeCell::new(CommonSpace::new(
-                SpaceOptions {
-                    name,
-                    movable: false,
-                    immortal: false,
-                    zeroed,
-                    vmrequest,
-                },
-                vm_map,
-                mmapper,
-                heap,
-            )),
+            pr: if vmrequest.is_discontiguous() {
+                FreeListPageResource::new_discontiguous(0, vm_map)
+            } else {
+                FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
+            },
+            common: UnsafeCell::new(common),
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new(),
@@ -178,20 +177,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
-                (unsafe { &mut *self.common.get() })
-                    .pr
-                    .as_mut()
-                    .unwrap()
-                    .release_pages(get_super_page(cell));
+                self.pr.release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
-                (unsafe { &mut *self.common.get() })
-                    .pr
-                    .as_mut()
-                    .unwrap()
-                    .release_pages(get_super_page(cell));
+                self.pr.release_pages(get_super_page(cell));
             }
         }
     }

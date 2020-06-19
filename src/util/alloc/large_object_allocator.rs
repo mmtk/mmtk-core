@@ -1,7 +1,7 @@
 use crate::plan::selected_plan::SelectedPlan;
+use crate::policy::space::Space;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::util::alloc::{allocator, Allocator};
-use crate::util::heap::FreeListPageResource;
 use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
@@ -13,7 +13,7 @@ pub struct LargeObjectAllocator<VM: VMBinding> {
     plan: &'static SelectedPlan<VM>,
 }
 
-impl<VM: VMBinding> Allocator<VM, FreeListPageResource<VM, LargeObjectSpace<VM>>>
+impl<VM: VMBinding> Allocator<VM>
     for LargeObjectAllocator<VM>
 {
     fn get_tls(&self) -> OpaquePointer {
@@ -23,8 +23,8 @@ impl<VM: VMBinding> Allocator<VM, FreeListPageResource<VM, LargeObjectSpace<VM>>
         self.plan
     }
 
-    fn get_space(&self) -> Option<&'static LargeObjectSpace<VM>> {
-        self.space
+    fn get_space(&self) -> Option<&'static dyn Space<VM>> {
+        self.space.map(|s| s as &'static dyn Space<VM>)
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {

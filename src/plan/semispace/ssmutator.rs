@@ -1,10 +1,8 @@
 use crate::plan::mutator_context::{CommonMutatorContext, MutatorContext};
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
-use crate::policy::copyspace::CopySpace;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
-use crate::util::heap::MonotonePageResource;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
@@ -14,7 +12,7 @@ use crate::vm::VMBinding;
 
 #[repr(C)]
 pub struct SSMutator<VM: VMBinding> {
-    ss: BumpAllocator<VM, MonotonePageResource<VM, CopySpace<VM>>>,
+    ss: BumpAllocator<VM>,
     plan: &'static SemiSpace<VM>,
     common: CommonMutatorContext<VM>,
 }

@@ -10,11 +10,9 @@ use crate::plan::ParallelCollector;
 use crate::plan::ParallelCollectorGroup;
 use crate::plan::TraceLocal;
 use crate::plan::{phase, Phase};
-use crate::policy::copyspace::CopySpace;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::forwarding_word::clear_forwarding_bits;
-use crate::util::heap::MonotonePageResource;
 use crate::util::reference_processor::*;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
@@ -25,7 +23,7 @@ use crate::vm::VMBinding;
 pub struct SSCollector<VM: VMBinding> {
     pub tls: OpaquePointer,
     // CopyLocal
-    pub ss: BumpAllocator<VM, MonotonePageResource<VM, CopySpace<VM>>>,
+    pub ss: BumpAllocator<VM>,
     trace: SSTraceLocal<VM>,
 
     last_trigger_count: usize,

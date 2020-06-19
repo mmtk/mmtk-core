@@ -4,7 +4,6 @@ use crate::util::{Address, ObjectReference};
 use crate::util::alloc::dump_linear_scan::DumpLinearScan;
 use crate::util::alloc::linear_scan::LinearScan;
 use crate::util::alloc::Allocator;
-use crate::util::heap::PageResource;
 
 use crate::vm::ObjectModel;
 
@@ -19,15 +18,15 @@ const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
 const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 #[repr(C)]
-pub struct BumpAllocator<VM: VMBinding, PR: PageResource<VM>> {
+pub struct BumpAllocator<VM: VMBinding> {
     pub tls: OpaquePointer,
     cursor: Address,
     limit: Address,
-    space: Option<&'static PR::Space>,
+    space: Option<&'static dyn Space<VM>>,
     plan: &'static SelectedPlan<VM>,
 }
 
-impl<VM: VMBinding, PR: PageResource<VM>> BumpAllocator<VM, PR> {
+impl<VM: VMBinding> BumpAllocator<VM> {
     pub fn set_limit(&mut self, cursor: Address, limit: Address) {
         self.cursor = cursor;
         self.limit = limit;
@@ -38,7 +37,7 @@ impl<VM: VMBinding, PR: PageResource<VM>> BumpAllocator<VM, PR> {
         self.limit = unsafe { Address::zero() };
     }
 
-    pub fn rebind(&mut self, space: Option<&'static PR::Space>) {
+    pub fn rebind(&mut self, space: Option<&'static dyn Space<VM>>) {
         self.reset();
         self.space = space;
     }
@@ -85,8 +84,8 @@ impl<VM: VMBinding, PR: PageResource<VM>> BumpAllocator<VM, PR> {
     }
 }
 
-impl<VM: VMBinding, PR: PageResource<VM>> Allocator<VM, PR> for BumpAllocator<VM, PR> {
-    fn get_space(&self) -> Option<&'static PR::Space> {
+impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
+    fn get_space(&self) -> Option<&'static dyn Space<VM>> {
         self.space
     }
     fn get_plan(&self) -> &'static SelectedPlan<VM> {
@@ -142,10 +141,10 @@ impl<VM: VMBinding, PR: PageResource<VM>> Allocator<VM, PR> for BumpAllocator<VM
     }
 }
 
-impl<VM: VMBinding, PR: PageResource<VM>> BumpAllocator<VM, PR> {
+impl<VM: VMBinding> BumpAllocator<VM> {
     pub fn new(
         tls: OpaquePointer,
-        space: Option<&'static PR::Space>,
+        space: Option<&'static dyn Space<VM>>,
         plan: &'static SelectedPlan<VM>,
     ) -> Self {
         BumpAllocator {

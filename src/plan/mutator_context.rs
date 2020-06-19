@@ -2,10 +2,7 @@ use crate::plan::plan::CommonPlan;
 use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
-use crate::policy::immortalspace::ImmortalSpace;
-use crate::policy::space::SFT;
 use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator};
-use crate::util::heap::MonotonePageResource;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
@@ -32,7 +29,7 @@ pub trait MutatorContext<VM: VMBinding> {
 }
 
 pub struct CommonMutatorContext<VM: VMBinding> {
-    immortal: BumpAllocator<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>,
+    immortal: BumpAllocator<VM>,
     los: LargeObjectAllocator<VM>,
 }
 
