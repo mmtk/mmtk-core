@@ -2,10 +2,8 @@ use crate::plan::mutator_context::{CommonMutatorContext, MutatorContext};
 use crate::plan::nogc::NoGC;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
-use crate::policy::immortalspace::ImmortalSpace;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
-use crate::util::heap::MonotonePageResource;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
@@ -13,7 +11,7 @@ use crate::vm::VMBinding;
 #[repr(C)]
 pub struct NoGCMutator<VM: VMBinding> {
     // ImmortalLocal
-    nogc: BumpAllocator<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>,
+    nogc: BumpAllocator<VM>,
 }
 
 impl<VM: VMBinding> MutatorContext<VM> for NoGCMutator<VM> {
