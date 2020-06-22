@@ -4,8 +4,8 @@ use std::sync::atomic::Ordering;
 
 use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Plan;
-use crate::util::constants::*;
 use crate::policy::space::Space;
+use crate::util::constants::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection};

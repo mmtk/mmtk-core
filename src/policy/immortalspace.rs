@@ -1,6 +1,6 @@
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
-use crate::util::heap::{PageResource, MonotonePageResource, VMRequest};
+use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
 
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::ObjectReference;
@@ -100,7 +100,12 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
             pr: if vmrequest.is_discontiguous() {
                 MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
             } else {
-                MonotonePageResource::new_contiguous(common.start, common.extent, META_DATA_PAGES_PER_REGION, vm_map)
+                MonotonePageResource::new_contiguous(
+                    common.start,
+                    common.extent,
+                    META_DATA_PAGES_PER_REGION,
+                    vm_map,
+                )
             },
             common: UnsafeCell::new(common),
         }

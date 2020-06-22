@@ -49,9 +49,7 @@ struct FreeListPageResourceSync {
     highwater_mark: i32,
 }
 
-impl<VM: VMBinding> Deref
-    for FreeListPageResource<VM>
-{
+impl<VM: VMBinding> Deref for FreeListPageResource<VM> {
     type Target = CommonFreeListPageResource;
 
     fn deref(&self) -> &CommonFreeListPageResource {
@@ -59,17 +57,13 @@ impl<VM: VMBinding> Deref
     }
 }
 
-impl<VM: VMBinding> DerefMut
-    for FreeListPageResource<VM>
-{
+impl<VM: VMBinding> DerefMut for FreeListPageResource<VM> {
     fn deref_mut(&mut self) -> &mut CommonFreeListPageResource {
         &mut self.common_flpr
     }
 }
 
-impl<VM: VMBinding> PageResource<VM>
-    for FreeListPageResource<VM>
-{
+impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
     fn common(&self) -> &CommonPageResource<VM> {
         &self.common
     }
@@ -286,7 +280,8 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         /* now return the address space associated with the chunk for global reuse */
         // FIXME: We need a safe implementation
         #[allow(clippy::cast_ref_to_mut)]
-        let space: &mut dyn Space<VM> = unsafe { &mut *(self.common.space.unwrap() as *const _ as *mut _) };
+        let space: &mut dyn Space<VM> =
+            unsafe { &mut *(self.common.space.unwrap() as *const _ as *mut _) };
         space.release_discontiguous_chunks(chunk);
     }
 

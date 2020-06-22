@@ -125,10 +125,8 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                     use libc::memset;
                     if self.fromspace().common().contiguous {
                         let fromspace_start = self.fromspace().common().start;
-                        let fromspace_commited = self
-                            .fromspace()
-                            .get_page_resource()
-                            .committed_pages();
+                        let fromspace_commited =
+                            self.fromspace().get_page_resource().committed_pages();
                         let commited_bytes = fromspace_commited * (1 << LOG_BYTES_IN_PAGE);
                         println!(
                             "Destroying fromspace {}~{}",

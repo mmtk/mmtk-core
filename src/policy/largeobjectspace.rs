@@ -7,7 +7,7 @@ use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
 use crate::util::header_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
-use crate::util::heap::{PageResource, FreeListPageResource, VMRequest};
+use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use crate::util::treadmill::TreadMill;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};

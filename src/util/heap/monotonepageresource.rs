@@ -48,9 +48,7 @@ pub enum MonotonePageResourceConditional {
     },
     Discontiguous,
 }
-impl<VM: VMBinding> PageResource<VM>
-    for MonotonePageResource<VM>
-{
+impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
     fn common(&self) -> &CommonPageResource<VM> {
         &self.common
     }

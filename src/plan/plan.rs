@@ -113,11 +113,7 @@ pub trait Plan<VM: VMBinding>: Sized {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required(
-        &self,
-        space_full: bool,
-        _space: &dyn Space<VM>,
-    ) -> bool
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<VM>) -> bool
     where
         Self: Sized,
     {

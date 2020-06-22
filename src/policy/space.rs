@@ -228,7 +228,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync {
      */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), self.common().start, chunks);
+        SFT_MAP.update(
+            self.as_sft() as *const (dyn SFT + Sync),
+            self.common().start,
+            chunks,
+        );
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper

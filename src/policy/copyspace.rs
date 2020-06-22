@@ -3,8 +3,8 @@ use crate::plan::TransitiveClosure;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::forwarding_word as ForwardingWord;
-use crate::util::heap::{PageResource, MonotonePageResource};
 use crate::util::heap::VMRequest;
+use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 
@@ -92,10 +92,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         );
         CopySpace {
             pr: if vmrequest.is_discontiguous() {
-                MonotonePageResource::new_discontiguous(
-                    META_DATA_PAGES_PER_REGION,
-                    vm_map,
-                )
+                MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
             } else {
                 MonotonePageResource::new_contiguous(
                     common.start,
