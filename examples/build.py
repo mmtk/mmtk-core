@@ -8,7 +8,7 @@ import sys
 
 # check RUSTUP_TOOLCHAIN
 if "RUSTUP_TOOLCHAIN" in os.environ:
-    toolchain = "+" + os.environ["RUSTUP_TOOLCHAIN"]
+    toolchain = os.environ["RUSTUP_TOOLCHAIN"]
 else:
     toolchain = "+nightly"
 
