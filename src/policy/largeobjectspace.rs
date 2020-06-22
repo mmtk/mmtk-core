@@ -77,7 +77,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
-    fn init(&mut self, vm_map: &'static VMMap) {
+    fn init(&mut self, _vm_map: &'static VMMap) {
         let me = unsafe { &*(self as *const Self) };
         self.pr.bind_space(me);
     }

@@ -13,8 +13,6 @@ use crate::util::heap::VMRequest;
 use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
-#[cfg(feature = "sanity")]
-use std::sync::atomic::Ordering;
 
 use crate::plan::plan::BasePlan;
 use crate::plan::plan::CommonPlan;
@@ -124,19 +122,13 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
                 #[cfg(feature = "sanity")]
                 {
                     use crate::util::constants::LOG_BYTES_IN_PAGE;
-                    use crate::util::heap::PageResource;
                     use libc::memset;
                     if self.fromspace().common().contiguous {
                         let fromspace_start = self.fromspace().common().start;
                         let fromspace_commited = self
                             .fromspace()
-                            .common()
-                            .pr
-                            .as_ref()
-                            .unwrap()
-                            .common()
-                            .committed
-                            .load(Ordering::Relaxed);
+                            .get_page_resource()
+                            .committed_pages();
                         let commited_bytes = fromspace_commited * (1 << LOG_BYTES_IN_PAGE);
                         println!(
                             "Destroying fromspace {}~{}",
