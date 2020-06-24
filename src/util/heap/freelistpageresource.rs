@@ -172,6 +172,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             }),
         };
         if !flpr.common.growable {
+            // For non-growable space, we just need to reserve metadata according to the requested size.
             flpr.reserve_metadata(bytes);
             // reserveMetaData(space.getExtent());
             // unimplemented!()

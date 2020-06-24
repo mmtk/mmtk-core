@@ -217,8 +217,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync {
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
-            let space_ptr = self.as_sft() as *const (dyn SFT + Sync);
-            SFT_MAP.update(space_ptr, start, chunks);
+            SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
         }
     }
 

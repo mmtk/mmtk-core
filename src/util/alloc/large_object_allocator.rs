@@ -22,6 +22,7 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn get_space(&self) -> Option<&'static dyn Space<VM>> {
+        // Casting the interior of the Option: from &LargeObjectSpace to &dyn Space
         self.space.map(|s| s as &'static dyn Space<VM>)
     }
 
