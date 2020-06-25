@@ -137,9 +137,10 @@ impl SFTMap {
     }
 }
 
-pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
-    type PR: PageResource<VM, Space = Self>;
-
+pub trait Space<VM: VMBinding>: 'static + SFT + Sync {
+    fn as_space(&self) -> &dyn Space<VM>;
+    fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
+    fn get_page_resource(&self) -> &dyn PageResource<VM>;
     fn init(&mut self, vm_map: &'static VMMap);
 
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
@@ -149,16 +150,13 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
             && VM::VMActivePlan::global().is_initialized();
 
         trace!("Reserving pages");
-        let pr = self.common().pr.as_ref().unwrap();
+        let pr = self.get_page_resource();
         let pages_reserved = pr.reserve_pages(pages);
         trace!("Pages reserved");
 
-        // FIXME: Possibly unnecessary borrow-checker fighting
-        let me = unsafe { &*(self as *const Self) };
-
         trace!("Polling ..");
 
-        if allow_poll && VM::VMActivePlan::global().poll::<Self::PR>(false, me) {
+        if allow_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
             trace!("Collection required");
             pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(tls);
@@ -171,7 +169,7 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
                     panic!("Physical allocation failed when polling not allowed!");
                 }
 
-                let gc_performed = VM::VMActivePlan::global().poll::<Self::PR>(true, me);
+                let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
                 debug_assert!(gc_performed, "GC not performed when forced.");
                 pr.clear_request(pages_reserved);
                 VM::VMCollection::block_for_gc(tls);
@@ -219,7 +217,7 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
-            SFT_MAP.update(self as *const (dyn SFT + Sync), start, chunks);
+            SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
         }
     }
 
@@ -229,7 +227,11 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
      */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        SFT_MAP.update(self as *const (dyn SFT + Sync), self.common().start, chunks);
+        SFT_MAP.update(
+            self.as_sft() as *const (dyn SFT + Sync),
+            self.common().start,
+            chunks,
+        );
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
@@ -237,15 +239,15 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
     }
 
     fn reserved_pages(&self) -> usize {
-        self.common().pr.as_ref().unwrap().reserved_pages()
+        self.get_page_resource().reserved_pages()
     }
 
     fn get_name(&self) -> &'static str {
         self.common().name
     }
 
-    fn common(&self) -> &CommonSpace<VM, Self::PR>;
-    fn common_mut(&mut self) -> &mut CommonSpace<VM, Self::PR> {
+    fn common(&self) -> &CommonSpace<VM>;
+    fn common_mut(&mut self) -> &mut CommonSpace<VM> {
         // SAFE: Reference is exclusive
         unsafe { self.unsafe_common_mut() }
     }
@@ -253,7 +255,7 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
     // UNSAFE: This get's a mutable reference from self
     // (i.e. make sure their are no concurrent accesses through self when calling this)_
     #[allow(clippy::mut_from_ref)]
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR>;
+    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM>;
 
     fn release_discontiguous_chunks(&mut self, chunk: Address) {
         debug_assert!(chunk == conversions::chunk_align_down(chunk));
@@ -316,7 +318,7 @@ pub trait Space<VM: VMBinding>: Sized + 'static + SFT + Sync {
     }
 }
 
-pub struct CommonSpace<VM: VMBinding, PR: PageResource<VM>> {
+pub struct CommonSpace<VM: VMBinding> {
     pub name: &'static str,
     pub descriptor: SpaceDescriptor,
     pub vmrequest: VMRequest,
@@ -326,7 +328,6 @@ pub struct CommonSpace<VM: VMBinding, PR: PageResource<VM>> {
     pub contiguous: bool,
     pub zeroed: bool,
 
-    pub pr: Option<PR>,
     pub start: Address,
     pub extent: usize,
     pub head_discontiguous_region: Address,
@@ -347,9 +348,9 @@ pub struct SpaceOptions {
 
 const DEBUG: bool = false;
 
-unsafe impl<VM: VMBinding, PR: PageResource<VM>> Sync for CommonSpace<VM, PR> {}
+unsafe impl<VM: VMBinding> Sync for CommonSpace<VM> {}
 
-impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
+impl<VM: VMBinding> CommonSpace<VM> {
     pub fn new(
         opt: SpaceOptions,
         vm_map: &'static VMMap,
@@ -364,7 +365,6 @@ impl<VM: VMBinding, PR: PageResource<VM>> CommonSpace<VM, PR> {
             movable: opt.movable,
             contiguous: true,
             zeroed: opt.zeroed,
-            pr: None,
             start: unsafe { Address::zero() },
             extent: 0,
             head_discontiguous_region: unsafe { Address::zero() },

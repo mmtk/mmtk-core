@@ -16,7 +16,8 @@ use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 
 pub struct ImmortalSpace<VM: VMBinding> {
-    common: UnsafeCell<CommonSpace<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>>,
+    common: UnsafeCell<CommonSpace<VM>>,
+    pr: MonotonePageResource<VM>,
     mark_state: u8,
 }
 
@@ -47,34 +48,26 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
-    type PR = MonotonePageResource<VM, ImmortalSpace<VM>>;
-
-    fn common(&self) -> &CommonSpace<VM, Self::PR> {
+    fn as_space(&self) -> &dyn Space<VM> {
+        self
+    }
+    fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
+        self
+    }
+    fn get_page_resource(&self) -> &dyn PageResource<VM> {
+        &self.pr
+    }
+    fn common(&self) -> &CommonSpace<VM> {
         unsafe { &*self.common.get() }
     }
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR> {
+    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
         &mut *self.common.get()
     }
 
-    fn init(&mut self, vm_map: &'static VMMap) {
+    fn init(&mut self, _vm_map: &'static VMMap) {
         // Borrow-checker fighting so that we can have a cyclic reference
         let me = unsafe { &*(self as *const Self) };
-
-        let common_mut = self.common_mut();
-        if common_mut.vmrequest.is_discontiguous() {
-            common_mut.pr = Some(MonotonePageResource::new_discontiguous(
-                META_DATA_PAGES_PER_REGION,
-                vm_map,
-            ));
-        } else {
-            common_mut.pr = Some(MonotonePageResource::new_contiguous(
-                common_mut.start,
-                common_mut.extent,
-                META_DATA_PAGES_PER_REGION,
-                vm_map,
-            ));
-        }
-        common_mut.pr.as_mut().unwrap().bind_space(me);
+        self.pr.bind_space(me);
     }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")
@@ -90,20 +83,31 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
+        let common = CommonSpace::new(
+            SpaceOptions {
+                name,
+                movable: false,
+                immortal: true,
+                zeroed,
+                vmrequest,
+            },
+            vm_map,
+            mmapper,
+            heap,
+        );
         ImmortalSpace {
-            common: UnsafeCell::new(CommonSpace::new(
-                SpaceOptions {
-                    name,
-                    movable: false,
-                    immortal: true,
-                    zeroed,
-                    vmrequest,
-                },
-                vm_map,
-                mmapper,
-                heap,
-            )),
             mark_state: 0,
+            pr: if vmrequest.is_discontiguous() {
+                MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
+            } else {
+                MonotonePageResource::new_contiguous(
+                    common.start,
+                    common.extent,
+                    META_DATA_PAGES_PER_REGION,
+                    vm_map,
+                )
+            },
+            common: UnsafeCell::new(common),
         }
     }
 

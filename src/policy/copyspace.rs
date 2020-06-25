@@ -3,9 +3,8 @@ use crate::plan::TransitiveClosure;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::forwarding_word as ForwardingWord;
-use crate::util::heap::MonotonePageResource;
-use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
+use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 
@@ -22,7 +21,8 @@ unsafe impl<VM: VMBinding> Sync for CopySpace<VM> {}
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 pub struct CopySpace<VM: VMBinding> {
-    common: UnsafeCell<CommonSpace<VM, MonotonePageResource<VM, CopySpace<VM>>>>,
+    common: UnsafeCell<CommonSpace<VM>>,
+    pr: MonotonePageResource<VM>,
     from_space: bool,
 }
 
@@ -41,34 +41,26 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
-    type PR = MonotonePageResource<VM, CopySpace<VM>>;
-
-    fn common(&self) -> &CommonSpace<VM, Self::PR> {
+    fn as_space(&self) -> &dyn Space<VM> {
+        self
+    }
+    fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
+        self
+    }
+    fn get_page_resource(&self) -> &dyn PageResource<VM> {
+        &self.pr
+    }
+    fn common(&self) -> &CommonSpace<VM> {
         unsafe { &*self.common.get() }
     }
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR> {
+    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
         &mut *self.common.get()
     }
 
-    fn init(&mut self, vm_map: &'static VMMap) {
+    fn init(&mut self, _vm_map: &'static VMMap) {
         // Borrow-checker fighting so that we can have a cyclic reference
         let me = unsafe { &*(self as *const Self) };
-
-        let common_mut = self.common_mut();
-        if common_mut.vmrequest.is_discontiguous() {
-            common_mut.pr = Some(MonotonePageResource::new_discontiguous(
-                META_DATA_PAGES_PER_REGION,
-                vm_map,
-            ));
-        } else {
-            common_mut.pr = Some(MonotonePageResource::new_contiguous(
-                common_mut.start,
-                common_mut.extent,
-                META_DATA_PAGES_PER_REGION,
-                vm_map,
-            ));
-        }
-        common_mut.pr.as_mut().unwrap().bind_space(me);
+        self.pr.bind_space(me);
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -86,19 +78,30 @@ impl<VM: VMBinding> CopySpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
+        let common = CommonSpace::new(
+            SpaceOptions {
+                name,
+                movable: true,
+                immortal: false,
+                zeroed,
+                vmrequest,
+            },
+            vm_map,
+            mmapper,
+            heap,
+        );
         CopySpace {
-            common: UnsafeCell::new(CommonSpace::new(
-                SpaceOptions {
-                    name,
-                    movable: true,
-                    immortal: false,
-                    zeroed,
-                    vmrequest,
-                },
-                vm_map,
-                mmapper,
-                heap,
-            )),
+            pr: if vmrequest.is_discontiguous() {
+                MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
+            } else {
+                MonotonePageResource::new_contiguous(
+                    common.start,
+                    common.extent,
+                    META_DATA_PAGES_PER_REGION,
+                    vm_map,
+                )
+            },
+            common: UnsafeCell::new(common),
             from_space,
         }
     }
@@ -108,7 +111,7 @@ impl<VM: VMBinding> CopySpace<VM> {
     }
 
     pub unsafe fn release(&mut self) {
-        self.common().pr.as_ref().unwrap().reset();
+        self.pr.reset();
         self.from_space = false;
     }
 

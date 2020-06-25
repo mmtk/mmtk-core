@@ -9,7 +9,6 @@ use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::HeapMeta;
-use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
@@ -69,8 +68,8 @@ pub trait Plan<VM: VMBinding>: Sized {
         self.base().initialized.load(Ordering::SeqCst)
     }
 
-    fn poll<PR: PageResource<VM>>(&self, space_full: bool, space: &'static PR::Space) -> bool {
-        if self.collection_required::<PR>(space_full, space) {
+    fn poll(&self, space_full: bool, space: &dyn Space<VM>) -> bool {
+        if self.collection_required(space_full, space) {
             // FIXME
             /*if space == META_DATA_SPACE {
                 /* In general we must not trigger a GC on metadata allocation since
@@ -81,7 +80,7 @@ pub trait Plan<VM: VMBinding>: Sized {
                 self.common().control_collector_context.request();
                 return false;
             }*/
-            self.log_poll::<PR>(space, "Triggering collection");
+            self.log_poll(space, "Triggering collection");
             self.base().control_collector_context.request();
             return true;
         }
@@ -102,7 +101,7 @@ pub trait Plan<VM: VMBinding>: Sized {
         false
     }
 
-    fn log_poll<PR: PageResource<VM>>(&self, space: &'static PR::Space, message: &'static str) {
+    fn log_poll(&self, space: &dyn Space<VM>, message: &'static str) {
         info!("  [POLL] {}: {}", space.get_name(), message);
     }
 
@@ -114,11 +113,7 @@ pub trait Plan<VM: VMBinding>: Sized {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required<PR: PageResource<VM>>(
-        &self,
-        space_full: bool,
-        _space: &'static PR::Space,
-    ) -> bool
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<VM>) -> bool
     where
         Self: Sized,
     {

@@ -36,8 +36,8 @@ impl CommonFreeListPageResource {
     }
 }
 
-pub struct FreeListPageResource<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> {
-    common: CommonPageResource<VM, FreeListPageResource<VM, S>>,
+pub struct FreeListPageResource<VM: VMBinding> {
+    common: CommonPageResource<VM>,
     common_flpr: Box<CommonFreeListPageResource>,
     /** Number of pages to reserve at the start of every allocation */
     meta_data_pages_per_region: usize,
@@ -49,9 +49,7 @@ struct FreeListPageResourceSync {
     highwater_mark: i32,
 }
 
-impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> Deref
-    for FreeListPageResource<VM, S>
-{
+impl<VM: VMBinding> Deref for FreeListPageResource<VM> {
     type Target = CommonFreeListPageResource;
 
     fn deref(&self) -> &CommonFreeListPageResource {
@@ -59,23 +57,17 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> Deref
     }
 }
 
-impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> DerefMut
-    for FreeListPageResource<VM, S>
-{
+impl<VM: VMBinding> DerefMut for FreeListPageResource<VM> {
     fn deref_mut(&mut self) -> &mut CommonFreeListPageResource {
         &mut self.common_flpr
     }
 }
 
-impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> PageResource<VM>
-    for FreeListPageResource<VM, S>
-{
-    type Space = S;
-
-    fn common(&self) -> &CommonPageResource<VM, Self> {
+impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
+    fn common(&self) -> &CommonPageResource<VM> {
         &self.common
     }
-    fn common_mut(&mut self) -> &mut CommonPageResource<VM, Self> {
+    fn common_mut(&mut self) -> &mut CommonPageResource<VM> {
         &mut self.common
     }
 
@@ -144,9 +136,8 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> PageResource
     }
 }
 
-impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPageResource<VM, S> {
+impl<VM: VMBinding> FreeListPageResource<VM> {
     pub fn new_contiguous(
-        space: &S,
         start: Address,
         bytes: usize,
         meta_data_pages_per_region: usize,
@@ -181,7 +172,8 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
             }),
         };
         if !flpr.common.growable {
-            flpr.reserve_metadata(space.common().extent);
+            // For non-growable space, we just need to reserve metadata according to the requested size.
+            flpr.reserve_metadata(bytes);
             // reserveMetaData(space.getExtent());
             // unimplemented!()
         }
@@ -289,7 +281,8 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
         /* now return the address space associated with the chunk for global reuse */
         // FIXME: We need a safe implementation
         #[allow(clippy::cast_ref_to_mut)]
-        let space: &mut S = unsafe { &mut *(self.common.space.unwrap() as *const S as *mut S) };
+        let space: &mut dyn Space<VM> =
+            unsafe { &mut *(self.common.space.unwrap() as *const _ as *mut _) };
         space.release_discontiguous_chunks(chunk);
     }
 
