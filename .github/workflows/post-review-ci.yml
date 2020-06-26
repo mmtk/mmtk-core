@@ -8,31 +8,31 @@ on:
 
 jobs:
   # JikesRVM
-  jikesrvm-binding-test:
-    runs-on: ubuntu-18.04
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core
-      - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/mmtk-jikesrvm
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
-          path: mmtk-jikesrvm
-          submodules: true
-      - name: Overwrite MMTk core in JikesRVM binding
-        run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
-      - name: Setup
-        run: |
-          cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-      - name: Test
-        run: |
-          cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
+  # jikesrvm-binding-test:
+  #   runs-on: ubuntu-18.04
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v2
+  #       with:
+  #         path: mmtk-core
+  #     - name: Checkout JikesRVM Binding
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: mmtk/mmtk-jikesrvm
+  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
+  #         path: mmtk-jikesrvm
+  #         submodules: true
+  #     - name: Overwrite MMTk core in JikesRVM binding
+  #       run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-jikesrvm
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+  #     - name: Test
+  #       run: |
+  #         cd mmtk-jikesrvm
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
   jikesrvm-perf-compare:
     runs-on: [self-hosted, ubuntu-18.04]
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
@@ -99,33 +99,33 @@ jobs:
           message: ${{ steps.cat.outputs.text }}
 
   # OpenJDK
-  openjdk-binding-test:
-    runs-on: ubuntu-18.04
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core
-      - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/mmtk-openjdk
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
-          path: mmtk-openjdk
-          submodules: true
-      - name: Overwrite MMTk core in openjdk binding
-        run: cp -r mmtk-core mmtk-openjdk/repos/
-      - name: Setup
-        run: |
-          cd mmtk-openjdk
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
-      - name: Test
-        run: |
-          cd mmtk-openjdk
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
+  # openjdk-binding-test:
+  #   runs-on: ubuntu-18.04
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v2
+  #       with:
+  #         path: mmtk-core
+  #     - name: Checkout OpenJDK Binding
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: mmtk/mmtk-openjdk
+  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
+  #         path: mmtk-openjdk
+  #         submodules: true
+  #     - name: Overwrite MMTk core in openjdk binding
+  #       run: cp -r mmtk-core mmtk-openjdk/repos/
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-openjdk
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
+  #         sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+  #         sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+  #     - name: Test
+  #       run: |
+  #         cd mmtk-openjdk
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
   openjdk-perf-compare:
     runs-on: [self-hosted, ubuntu-18.04]
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
