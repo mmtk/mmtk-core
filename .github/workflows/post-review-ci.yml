@@ -95,6 +95,12 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.cat.outputs.text }}
+      # Cleanup logs (this is necessary for self-hosted runners)
+      - name: Clean up logs and reports
+        if: always()
+        run: |
+          rm -rf ci-perf-kit/running/results/log/*
+          rm jikesrvm-compare-report.md
 
   # OpenJDK
   # openjdk-binding-test:
@@ -186,3 +192,9 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.cat.outputs.text }}
+      # Cleanup logs (this is necessary for self-hosted runners)
+      - name: Clean up logs and reports
+        if: always()
+        run: |
+          rm -rf ci-perf-kit/running/results/log/*
+          rm openjdk-compare-report.md
