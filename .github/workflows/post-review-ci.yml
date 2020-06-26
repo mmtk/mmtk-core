@@ -73,7 +73,7 @@ jobs:
       - name: Compare Performance
         id: run
         run: |
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ jikesrvm-compare-report.md
+          JAVA_HOME=/usr/lib/jvm/default-java RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ jikesrvm-compare-report.md
       # set report.md to output
       - uses: pCYSl5EDgo/cat@master
         id: cat
