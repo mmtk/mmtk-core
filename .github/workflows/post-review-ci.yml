@@ -34,7 +34,7 @@ jobs:
           cd mmtk-jikesrvm
           RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
   jikesrvm-perf-compare:
-    runs-on: ubuntu-18.04
+    runs-on: [self-hosted, ubuntu-18.04]
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
     steps:
       - name: Checkout JikesRVM Binding
@@ -127,7 +127,7 @@ jobs:
           cd mmtk-openjdk
           RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
   openjdk-perf-compare:
-    runs-on: ubuntu-18.04
+    runs-on: [self-hosted, ubuntu-18.04]
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
     steps:
       - name: Checkout OpenJDK Binding
