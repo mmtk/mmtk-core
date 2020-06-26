@@ -67,10 +67,8 @@ jobs:
       # setup
       - name: Setup
         run: |
-          cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-          mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
-          cp repos/jikesrvm/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
+          mkdir -p ci-perf-kit/running/benchmarks/dacapo
+          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
       # run compare
       - name: Compare Performance
         id: run
@@ -160,10 +158,8 @@ jobs:
       # setup
       - name: Setup
         run: |
-          cd mmtk-openjdk
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-          mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
-          cp repos/openjdk/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
+          mkdir -p ci-perf-kit/running/benchmarks/dacapo
+          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
       # run compare
       - name: Compare Performance
         id: run
