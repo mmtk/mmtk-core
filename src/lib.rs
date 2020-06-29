@@ -18,6 +18,8 @@ extern crate log;
 extern crate atomic_traits;
 extern crate crossbeam_deque;
 extern crate num_cpus;
+#[macro_use]
+extern crate downcast_rs;
 
 #[macro_use]
 pub mod util;

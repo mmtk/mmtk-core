@@ -1,4 +1,5 @@
 use crate::plan::mutator_context::{CommonMutatorContext, MutatorContext};
+use crate::plan::mutator_context::Mutator;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
 use crate::util::alloc::Allocator;
@@ -15,6 +16,16 @@ pub struct SSMutator<VM: VMBinding> {
     ss: BumpAllocator<VM>,
     plan: &'static SemiSpace<VM>,
     common: CommonMutatorContext<VM>,
+}
+
+pub fn ss_collection_phase<VM: VMBinding>(mutator: &mut Mutator<VM, SemiSpace<VM>>, tls: OpaquePointer, phase: &Phase, primary: bool) {
+    match phase {
+        Phase::Release => {
+            // rebind the allocation bump pointer to the appropriate semispace
+            mutator.config.allocators[AllocationType::Default].rebind(Some(mutator.plan.tospace()));
+        }
+        _ => {}
+    }
 }
 
 impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {

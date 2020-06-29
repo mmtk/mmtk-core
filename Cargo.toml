@@ -18,6 +18,8 @@ log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] 
 crossbeam-deque = "0.6"
 num_cpus = "1.8"
 atomic-traits = "0.1.0"
+enum-map = "0.6.2"
+downcast-rs = "1.1.1"
 
 [dev-dependencies]
 crossbeam = "0.7.3"

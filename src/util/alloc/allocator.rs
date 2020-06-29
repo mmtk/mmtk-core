@@ -10,6 +10,8 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection};
 
+use downcast_rs::Downcast;
+
 // FIXME: Put this somewhere more appropriate
 pub const ALIGNMENT_VALUE: usize = 0xdead_beef;
 pub const LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
@@ -106,7 +108,7 @@ pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: 
     }
 }
 
-pub trait Allocator<VM: VMBinding> {
+pub trait Allocator<VM: VMBinding>: Downcast {
     fn get_tls(&self) -> OpaquePointer;
 
     fn get_space(&self) -> Option<&'static dyn Space<VM>>;
@@ -189,3 +191,5 @@ pub trait Allocator<VM: VMBinding> {
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address;
 }
+
+impl_downcast!(Allocator<VM> where VM: VMBinding);

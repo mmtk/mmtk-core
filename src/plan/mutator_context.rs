@@ -1,3 +1,4 @@
+use crate::plan::plan::Plan;
 use crate::plan::plan::CommonPlan;
 use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Allocator as AllocationType;
@@ -6,6 +7,55 @@ use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
+use crate::vm::Collection;
+
+use enum_map::EnumMap;
+
+const MAX_ALLOCATOR: usize = 10;
+pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
+    pub allocators: EnumMap<AllocationType, Box<dyn Allocator<VM>>>,
+    pub collection_phase_func: &'static dyn Fn(&mut Mutator<VM, P>, OpaquePointer, &Phase, bool),
+}
+
+pub struct Mutator<VM: VMBinding, P: Plan<VM> + 'static> {
+    mutator_handle: OpaquePointer,
+    pub config: MutatorConfig<VM, P>,
+    pub common: CommonMutatorContext<VM>,
+    pub plan: &'static P,
+}
+
+impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
+    fn common(&self) -> &CommonMutatorContext<VM> {
+        &self.common
+    }
+
+    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
+        match phase {
+            Phase::PrepareStacks => {
+                if !self.plan.common().stacks_prepared() {
+                    // Use the mutator's tls rather than the collector's tls
+                    VM::VMCollection::prepare_mutator(self.get_tls(), self);
+                }
+                self.flush_remembered_sets();
+            }
+            // Ignore for other phases
+            _ => {},
+        }
+        (*self.config.collection_phase_func)(self, tls, phase, primary)
+    }
+
+    fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
+        self.config.allocators[allocator].alloc(size, align, offset)
+    }
+
+    fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
+        self.config.allocators[allocator].get_space().unwrap().initialize_header(refer, true)
+    }
+
+    fn get_tls(&self) -> OpaquePointer {
+        self.mutator_handle
+    }
+}
 
 pub trait MutatorContext<VM: VMBinding> {
     fn common(&self) -> &CommonMutatorContext<VM>;

@@ -649,8 +649,10 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 }
 
+use enum_map::Enum;
 #[repr(i32)]
 #[derive(Clone, Copy, Debug)]
+#[derive(Enum)]
 pub enum Allocator {
     Default = 0,
     Immortal = 1,
