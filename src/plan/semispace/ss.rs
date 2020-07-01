@@ -1,7 +1,6 @@
 use crate::policy::space::Space;
 
 use super::SSCollector;
-use super::SSMutator;
 use super::SSTraceLocal;
 
 use crate::plan::trace::Trace;
@@ -22,6 +21,8 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
+use crate::plan::mutator_context::Mutator;
+use crate::plan::semispace::ssmutator::create_ss_mutator;
 use std::sync::Arc;
 
 pub type SelectedPlan<VM> = SemiSpace<VM>;
@@ -44,7 +45,7 @@ pub struct SemiSpaceUnsync<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
 
 impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
-    type MutatorT = SSMutator<VM>;
+    type MutatorT = Mutator<VM, Self>;
     type TraceLocalT = SSTraceLocal<VM>;
     type CollectorT = SSCollector<VM>;
 
@@ -90,8 +91,8 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         unsync.copyspace1.init(vm_map);
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<SSMutator<VM>> {
-        Box::new(SSMutator::new(tls, self))
+    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<VM, Self>> {
+        Box::new(create_ss_mutator(tls, self))
     }
 
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {

@@ -32,7 +32,7 @@ pub mod vm;
 pub use crate::mm::memory_manager;
 pub use crate::mmtk::MMTK;
 pub use crate::plan::selected_plan::{
-    SelectedCollector, SelectedConstraints, SelectedMutator, SelectedPlan, SelectedTraceLocal,
+    SelectedCollector, SelectedConstraints, SelectedPlan, SelectedTraceLocal,
 };
 pub use crate::plan::{
     Allocator, CollectorContext, MutatorContext, ParallelCollector, Plan, TraceLocal,

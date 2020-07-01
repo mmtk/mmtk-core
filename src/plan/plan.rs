@@ -657,8 +657,8 @@ pub enum Allocator {
     Default = 0,
     Immortal = 1,
     Los = 2,
-    #[cfg(feature = "code-space")]
+    // #[cfg(feature = "code-space")]
     Code = 3,
-    #[cfg(feature = "ro-space")]
+    // #[cfg(feature = "ro-space")]
     ReadOnly = 4,
 }
