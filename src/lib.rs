@@ -35,6 +35,6 @@ pub use crate::plan::selected_plan::{
     SelectedCollector, SelectedConstraints, SelectedPlan, SelectedTraceLocal,
 };
 pub use crate::plan::{
-    Allocator, CollectorContext, MutatorContext, ParallelCollector, Plan, TraceLocal,
+    Allocator, CollectorContext, Mutator, MutatorContext, ParallelCollector, Plan, TraceLocal,
     TransitiveClosure,
 };

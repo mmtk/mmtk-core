@@ -15,6 +15,7 @@ pub mod tracelocal;
 pub mod transitive_closure;
 
 pub use self::collector_context::CollectorContext;
+pub use self::mutator_context::Mutator;
 pub use self::mutator_context::MutatorContext;
 pub use self::parallel_collector::ParallelCollector;
 pub use self::parallel_collector_group::ParallelCollectorGroup;
