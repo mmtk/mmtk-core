@@ -31,6 +31,8 @@ pub struct Map32 {
 }
 
 impl Map for Map32 {
+    type FreeList = IntArrayFreeList;
+
     fn new() -> Self {
         Map32 {
             prev_link: vec![0; MAX_CHUNKS],

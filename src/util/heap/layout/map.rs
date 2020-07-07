@@ -1,18 +1,20 @@
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::int_array_freelist::IntArrayFreeList;
+use crate::util::generic_freelist::GenericFreeList;
 use crate::util::Address;
 
 
 pub trait Map: Sized {
+    type FreeList: GenericFreeList;
+
     fn new() -> Self;
 
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor);
 
-    fn create_freelist(&self, pr: &CommonFreeListPageResource) -> IntArrayFreeList;
+    fn create_freelist(&self, pr: &CommonFreeListPageResource) -> Self::FreeList;
 
-    fn create_parent_freelist(&self, units: usize, grain: i32) -> IntArrayFreeList;
+    fn create_parent_freelist(&self, units: usize, grain: i32) -> Self::FreeList;
 
     fn allocate_contiguous_chunks(
         &self,
