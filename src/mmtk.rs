@@ -13,6 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::vm::VMBinding;
 use std::sync::Arc;
+use crate::util::heap::layout::map::Map;
 
 // TODO: remove this singleton at some point to allow multiple instances of MMTK
 // This helps refactoring.

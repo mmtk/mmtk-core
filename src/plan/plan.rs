@@ -20,6 +20,7 @@ use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use crate::util::heap::layout::map::Map;
 
 pub trait Plan<VM: VMBinding>: Sized {
     type MutatorT: MutatorContext<VM>;

@@ -11,6 +11,7 @@ use crate::util::{generic_freelist, memory};
 // #[cfg(target_pointer_width = "32")]
 // FIXME: Use `RawMemoryFreeList` for 64-bit machines
 use super::layout::Mmapper;
+use super::layout::map::Map;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
 use super::PageResource;
 use crate::policy::space::Space;

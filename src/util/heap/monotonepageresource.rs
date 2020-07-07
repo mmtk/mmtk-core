@@ -12,6 +12,7 @@ use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::OpaquePointer;
 
 use super::layout::Mmapper;
+use super::layout::map::Map;
 
 use super::PageResource;
 use std::sync::atomic::Ordering;
