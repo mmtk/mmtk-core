@@ -7,7 +7,6 @@ use crate::util::OpaquePointer;
 use std::cell::UnsafeCell;
 
 use super::NoGCCollector;
-use super::NoGCMutator;
 use super::NoGCTraceLocal;
 use crate::plan::plan::BasePlan;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -16,6 +15,8 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
+use crate::plan::mutator_context::Mutator;
+use crate::plan::nogc::nogcmutator::create_nogc_mutator;
 use std::sync::Arc;
 
 pub type SelectedPlan<VM> = NoGC<VM>;
@@ -32,7 +33,7 @@ pub struct NoGCUnsync<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
-    type MutatorT = NoGCMutator<VM>;
+    type MutatorT = Mutator<VM, Self>;
     type TraceLocalT = NoGCTraceLocal<VM>;
     type CollectorT = NoGCCollector<VM>;
 
@@ -70,8 +71,8 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         &self.base
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<NoGCMutator<VM>> {
-        Box::new(NoGCMutator::new(tls, self))
+    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<VM, Self>> {
+        Box::new(create_nogc_mutator(tls, self))
     }
 
     unsafe fn collection_phase(&self, _tls: OpaquePointer, _phase: &Phase) {
