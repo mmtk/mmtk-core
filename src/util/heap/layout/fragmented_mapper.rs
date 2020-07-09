@@ -169,6 +169,7 @@ impl Mmapper for FragmentedMapper {
 
 impl FragmentedMapper {
     pub fn new() -> Self {
+        assert!(!cfg!(feature = "force_32bit_heap_layout"));
         Self {
             lock: Mutex::new(()),
             free_slab_index: 0,

@@ -35,6 +35,7 @@ impl Map for Map64 {
     type FreeList = RawMemoryFreeList;
 
     fn new() -> Self {
+        assert!(!cfg!(feature = "force_32bit_heap_layout"));
         let mut high_water = vec![Address::ZERO; MAX_SPACES];
         let mut base_address = vec![Address::ZERO; MAX_SPACES];
         /* Avoid producing an Address that will blow up a 32-bit compiler */
