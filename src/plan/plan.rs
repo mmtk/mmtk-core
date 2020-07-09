@@ -125,7 +125,7 @@ pub trait Plan<VM: VMBinding>: Sized {
             self.get_total_pages()
         );
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
-
+        
         space_full || stress_force_gc || heap_full
     }
 
@@ -330,6 +330,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             self.heap.get_discontig_start(),
             self.heap.get_discontig_end(),
         );
+        vm_map.boot();
         self.heap
             .total_pages
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);

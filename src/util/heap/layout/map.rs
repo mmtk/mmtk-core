@@ -12,9 +12,9 @@ pub trait Map: Sized {
 
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor);
 
-    fn create_freelist(&self, pr: &CommonFreeListPageResource) -> Self::FreeList;
+    fn create_freelist(&self, pr: &CommonFreeListPageResource) -> Box<Self::FreeList>;
 
-    fn create_parent_freelist(&self, units: usize, grain: i32) -> Self::FreeList;
+    fn create_parent_freelist(&self, pr: &CommonFreeListPageResource, units: usize, grain: i32) -> Box<Self::FreeList>;
 
     fn allocate_contiguous_chunks(
         &self,
@@ -33,6 +33,8 @@ pub trait Map: Sized {
 
     fn free_contiguous_chunks(&self, start: Address) -> usize;
 
+    fn boot(&self) {}
+    
     fn finalize_static_space_map(&self, from: Address, to: Address);
 
     fn is_finalized(&self) -> bool;

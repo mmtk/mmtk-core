@@ -45,25 +45,35 @@ pub const MAX_SPACE_EXTENT: usize = 1 << LOG_SPACE_EXTENT;
 
 // FIXME: HEAP_START, HEAP_END are VM-dependent
 /** Lowest virtual address used by the virtual machine */
+#[cfg(target_pointer_width = "32")]
 pub const HEAP_START: Address = chunk_align_down(unsafe { Address::from_usize(0x6000_0000) });
+#[cfg(target_pointer_width = "64")]
+pub const HEAP_START: Address = chunk_align_down(unsafe { Address::from_usize(0x00000200_0000_0000usize) });
 
 /** Highest virtual address used by the virtual machine */
+#[cfg(target_pointer_width = "32")]
 pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0xb000_0000) });
+#[cfg(target_pointer_width = "64")]
+pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0x00002000_0000_0000usize) });
 
 /**
  * Lowest virtual address available for MMTk to manage.  The address space between
  * HEAP_START and AVAILABLE_START comprises memory directly managed by the VM,
  * and not available to MMTk.
  */
+#[cfg(target_pointer_width = "32")]
 pub const AVAILABLE_START: Address =
     chunk_align_up(unsafe { Address::from_usize(0x6700_0000 + (0x6400_0000 - 0x6000_0000) / 5) });
+#[cfg(target_pointer_width = "64")]
+pub const AVAILABLE_START: Address = chunk_align_up(unsafe { Address::from_usize(0x00000200_0dc0_0000usize) });
+    // chunk_align_up(unsafe { Address::from_usize(0x6700_0000 + (0x6400_0000 - 0x6000_0000) / 5) });
 
 /**
  * Highest virtual address available for MMTk to manage.  The address space between
  * HEAP_END and AVAILABLE_END comprises memory directly managed by the VM,
  * and not available to MMTk.
 */
-pub const AVAILABLE_END: Address = chunk_align_down(unsafe { Address::from_usize(0xb000_0000) });
+pub const AVAILABLE_END: Address = HEAP_END;
 
 /** Size of the address space available to the MMTk heap. */
 pub const AVAILABLE_BYTES: usize = AVAILABLE_END.get_extent(AVAILABLE_START);

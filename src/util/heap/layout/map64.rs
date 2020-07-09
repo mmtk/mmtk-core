@@ -1,0 +1,227 @@
+use crate::mmtk::SFT_MAP;
+use crate::util::conversions;
+use crate::util::generic_freelist::GenericFreeList;
+use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
+use crate::util::heap::layout::heap_parameters::*;
+use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::constants::*;
+use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::raw_memory_freelist::RawMemoryFreeList;
+use crate::util::Address;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
+use super::map::Map;
+
+
+const NON_MAP_FRACTION: f64 = 1.0 - 8.0 / 4096.0;
+
+pub struct Map64 {
+    fl_page_resources: Vec<Option<&'static CommonFreeListPageResource>>,
+    fl_map: Vec<Option<&'static RawMemoryFreeList>>,
+    total_available_discontiguous_chunks: usize,
+    finalized: bool,
+    descriptor_map: Vec<SpaceDescriptor>,
+    base_address: Vec<Address>,
+    high_water: Vec<Address>,
+
+    // TODO: Is this the right place for this field?
+    // This used to be a global variable. When we remove global states, this needs to be put somewhere.
+    // Currently I am putting it here, as for where this variable is used, we already have
+    // references to vm_map - so it is convenient to put it here.
+    cumulative_committed_pages: AtomicUsize,
+}
+
+impl Map for Map64 {
+    type FreeList = RawMemoryFreeList;
+
+    fn new() -> Self {
+        let mut high_water = vec![Address::ZERO; MAX_SPACES];
+        let mut base_address = vec![Address::ZERO; MAX_SPACES];
+        /* Avoid producing an Address that will blow up a 32-bit compiler */
+        #[cfg(target_pointer_width = "64")]
+        const LOG_SPACE_SIZE: usize = LOG_SPACE_SIZE_64;
+        #[cfg(target_pointer_width = "32")]
+        const LOG_SPACE_SIZE: usize = 0;
+        for i in 0..MAX_SPACES {
+            let base = unsafe { Address::from_usize(i << LOG_SPACE_SIZE) };
+            high_water[i] = base;
+            base_address[i] = base;
+        }
+
+        Self {
+            descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS],
+            high_water,
+            base_address,
+            fl_page_resources: vec![None; MAX_SPACES],
+            fl_map: vec![None; MAX_SPACES],
+            total_available_discontiguous_chunks: 0,
+            finalized: false,
+            cumulative_committed_pages: AtomicUsize::new(0),
+        }
+    }
+
+    fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
+        debug_assert!(Self::is_space_start(start));
+        debug_assert!(cfg!(target_pointer_width = "32") || extent <= SPACE_SIZE_64);
+        let self_mut = unsafe { self.mut_self() };        
+        let index = Self::space_index(start).unwrap();
+        self_mut.descriptor_map[index] = descriptor;
+    }
+
+    fn create_freelist(&self, pr: &CommonFreeListPageResource) -> Box<Self::FreeList> {
+        let units = SPACE_SIZE_64 >> LOG_BYTES_IN_PAGE;
+        self.create_parent_freelist(pr, units, units as _)
+    }
+
+    fn create_parent_freelist(&self, pr: &CommonFreeListPageResource, mut units: usize, grain: i32) -> Box<Self::FreeList> {
+        let self_mut = unsafe { self.mut_self() };
+        // Space space = pr.getSpace();
+        let start = pr.get_start();
+        // let extent = space.getExtent();
+        let index = Self::space_index(start).unwrap();
+
+        units = (units as f64 * NON_MAP_FRACTION) as _;
+        let list_extent = conversions::pages_to_bytes(RawMemoryFreeList::size_in_pages(units as _, 1) as _);
+        
+        let heads = 1;
+        let pages_per_block = RawMemoryFreeList::default_block_size(units as _, heads);
+        let list = box RawMemoryFreeList::new(start, start + list_extent, pages_per_block, units as _, grain, heads);
+
+        self_mut.fl_page_resources[index] = Some(unsafe { ::std::mem::transmute(pr) });
+        self_mut.fl_map[index] = Some(unsafe { ::std::mem::transmute::<&RawMemoryFreeList, _>(&list) });
+
+        /* Adjust the base address and highwater to account for the allocated chunks for the map */
+        let base = conversions::chunk_align_up(start + list_extent);
+        // unreachable!();
+        self_mut.high_water[index] = base;
+        self_mut.base_address[index] = base;
+        return list;
+    }
+
+    fn allocate_contiguous_chunks(
+        &self,
+        descriptor: SpaceDescriptor,
+        chunks: usize,
+        head: Address,
+    ) -> Address {
+        debug_assert!(Self::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
+        let self_mut = unsafe { self.mut_self() };
+
+        let index = descriptor.get_index();
+        let rtn = self.high_water[index];
+        let extent = chunks << LOG_BYTES_IN_CHUNK;
+        self_mut.high_water[index] = rtn + extent;
+
+        /* Grow the free list to accommodate the new chunks */
+        let free_list = self.fl_map[Self::space_index(descriptor.get_start()).unwrap()];
+        if let Some(free_list) = free_list {
+            let free_list = unsafe { &mut *(free_list as *const _ as usize as *mut RawMemoryFreeList) };
+            free_list.grow_freelist(conversions::bytes_to_pages(extent) as _);
+            let base_page = conversions::bytes_to_pages(rtn - self.base_address[index]);
+            for offset in (0..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
+                free_list.set_uncoalescable((base_page + offset) as _);
+                /* The 32-bit implementation requires that pages are returned allocated to the caller */
+                free_list.alloc_from_unit(PAGES_IN_CHUNK as _, (base_page + offset) as _);
+            }
+        }
+        return rtn;
+    }
+
+    fn get_next_contiguous_region(&self, start: Address) -> Address {
+        unreachable!()
+    }
+
+    fn get_contiguous_region_chunks(&self, start: Address) -> usize {
+        unreachable!()
+    }
+
+    fn get_contiguous_region_size(&self, start: Address) -> usize {
+        unreachable!()
+    }
+
+    fn free_all_chunks(&self, any_chunk: Address) {
+        unreachable!()
+    }
+
+    fn free_contiguous_chunks(&self, start: Address) -> usize {
+        unreachable!()
+    }
+
+    fn boot(&self) {
+        let self_mut: &mut Self = unsafe { self.mut_self() };
+        for pr in 0..MAX_SPACES {
+            // if (flMap[pr] != null) {
+            //   flMap[pr].growFreeList(0);
+            // }
+            if let Some(fl) = self_mut.fl_map[pr] {
+                #[allow(clippy::cast_ref_to_mut)]
+                let fl_mut: &mut RawMemoryFreeList =
+                    unsafe { &mut *(fl as *const _ as *mut _) };
+                fl_mut.grow_freelist(0);
+            }
+        }
+    }
+
+    fn finalize_static_space_map(&self, from: Address, to: Address) {
+        let self_mut: &mut Self = unsafe { self.mut_self() };
+        for pr in 0..MAX_SPACES {
+            if let Some(fl) = self_mut.fl_page_resources[pr] {
+                #[allow(clippy::cast_ref_to_mut)]
+                let fl_mut: &mut CommonFreeListPageResource =
+                    unsafe { &mut *(fl as *const _ as *mut _) };
+                fl_mut.resize_freelist(conversions::chunk_align_up(self.fl_map[pr].unwrap().get_limit()));
+            }
+        }
+        self_mut.finalized = true;
+    }
+
+    fn is_finalized(&self) -> bool {
+        self.finalized
+    }
+
+    fn get_discontig_freelist_pr_ordinal(&self, pr: &CommonFreeListPageResource) -> usize {
+        unreachable!()
+    }
+
+    fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
+        let index = Self::space_index(address).unwrap();
+        self.descriptor_map[index]
+    }
+
+    fn add_to_cumulative_committed_pages(&self, pages: usize) {
+        self.cumulative_committed_pages
+            .fetch_add(pages, Ordering::Relaxed);
+    }
+
+    fn get_cumulative_committed_pages(&self) -> usize {
+        self.cumulative_committed_pages.load(Ordering::Relaxed)
+    }
+}
+
+impl Map64 {
+    // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
+    // of the same unsafe code.
+    // FIXME: We need a safe implementation.
+    #[allow(clippy::cast_ref_to_mut)]
+    #[allow(clippy::mut_from_ref)]
+    unsafe fn mut_self(&self) -> &mut Self {
+        &mut *(self as *const _ as *mut _)
+    }
+    
+    fn space_index(addr: Address) -> Option<usize> {
+        if addr > HEAP_END {
+          return None;
+        }
+        Some(addr.as_usize() >> SPACE_SHIFT_64)
+    }
+    
+    fn is_space_start(base: Address) -> bool {
+        (base.as_usize() & !SPACE_MASK_64) == 0
+    }
+}
+
+impl Default for Map64 {
+    fn default() -> Self {
+        Self::new()
+    }
+}

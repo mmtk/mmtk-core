@@ -43,10 +43,16 @@ impl VMRequest {
     }
 
     pub fn discontiguous() -> Self {
+        if HEAP_LAYOUT_64BIT {
+            return Self::common64bit(false);
+        }
         VMRequest::RequestDiscontiguous
     }
 
     pub fn fixed_size(mb: usize) -> Self {
+        if HEAP_LAYOUT_64BIT {
+            return Self::common64bit(false);
+        }
         VMRequest::RequestExtent {
             extent: mb << LOG_BYTES_IN_MBYTE,
             top: false,
@@ -54,10 +60,16 @@ impl VMRequest {
     }
 
     pub fn fraction(frac: f32) -> Self {
+        if HEAP_LAYOUT_64BIT {
+            return Self::common64bit(false);
+        }
         VMRequest::RequestFraction { frac, top: false }
     }
 
     pub fn high_fixed_size(mb: usize) -> Self {
+        if HEAP_LAYOUT_64BIT {
+            return Self::common64bit(false);
+        }
         VMRequest::RequestExtent {
             extent: mb << LOG_BYTES_IN_MBYTE,
             top: true,
@@ -65,6 +77,9 @@ impl VMRequest {
     }
 
     pub fn fixed_extent(extent: usize, top: bool) -> Self {
+        if HEAP_LAYOUT_64BIT {
+            return Self::common64bit(false);
+        }
         VMRequest::RequestExtent { extent, top }
     }
 }
