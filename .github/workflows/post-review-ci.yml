@@ -33,74 +33,74 @@ jobs:
   #       run: |
   #         cd mmtk-jikesrvm
   #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
-  # jikesrvm-perf-compare:
-  #   runs-on: [self-hosted, Linux, freq-scaling-off]
-  #   if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
-  #   steps:
-  #     - name: Checkout JikesRVM Binding
-  #       uses: actions/checkout@v2
-  #       with:
-  #         repository: mmtk/mmtk-jikesrvm
-  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
-  #         path: mmtk-jikesrvm
-  #         submodules: true
-  #     # checkout current branch
-  #     - name: Checkout MMTk Core
-  #       uses: actions/checkout@v2
-  #       with:
-  #         path: mmtk-core-branch
-  #     # checkout master
-  #     - name: Checkout MMTk Core
-  #       uses: actions/checkout@v2
-  #       with:
-  #         ref: master
-  #         path: mmtk-core-master
-  #     # checkout perf-kit
-  #     - name: Checkout Perf Kit
-  #       uses: actions/checkout@v2
-  #       with:
-  #         repository: mmtk/ci-perf-kit
-  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
-  #         ref: "reduce-noise"
-  #         path: ci-perf-kit
-  #         submodules: true
-  #     # setup
-  #     - name: Setup
-  #       run: |
-  #         mkdir -p ci-perf-kit/running/benchmarks/dacapo
-  #         cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
-  #     # run compare
-  #     - name: Compare Performance
-  #       id: run
-  #       run: |
-  #         JAVA_HOME=/usr/lib/jvm/default-java RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ jikesrvm-compare-report.md
-  #     # set report.md to output
-  #     - uses: pCYSl5EDgo/cat@master
-  #       id: cat
-  #       with:
-  #         path: jikesrvm-compare-report.md
-  #     # upload run results
-  #     - uses: actions/upload-artifact@v2
-  #       with:
-  #         name: jikesrvm-log
-  #         path: ci-perf-kit/running/results/log
-  #     - uses: actions/upload-artifact@v2
-  #       with:
-  #         name: jikesrvm-compare-report.md
-  #         path: jikesrvm-compare-report.md
-  #     # report
-  #     - name: Result
-  #       if: always()
-  #       uses: thollander/actions-comment-pull-request@master
-  #       with:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         message: ${{ steps.cat.outputs.text }}
-  #     # Cleanup logs (this is necessary for self-hosted runners)
-  #     - name: Clean up logs and reports
-  #       if: always()
-  #       run: |
-  #         rm -rf ci-perf-kit/running/results/log/*
-  #         rm jikesrvm-compare-report.md
+  jikesrvm-perf-compare:
+    runs-on: [self-hosted, Linux, freq-scaling-off]
+    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+    steps:
+      - name: Checkout JikesRVM Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-jikesrvm
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-jikesrvm
+          submodules: true
+      # checkout current branch
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core-branch
+      # checkout master
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          ref: master
+          path: mmtk-core-master
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/ci-perf-kit
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          ref: "reduce-noise"
+          path: ci-perf-kit
+          submodules: true
+      # setup
+      - name: Setup
+        run: |
+          mkdir -p ci-perf-kit/running/benchmarks/dacapo
+          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
+      # run compare
+      - name: Compare Performance
+        id: run
+        run: |
+          JAVA_HOME=/usr/lib/jvm/default-java RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ jikesrvm-compare-report.md
+      # set report.md to output
+      - uses: pCYSl5EDgo/cat@master
+        id: cat
+        with:
+          path: jikesrvm-compare-report.md
+      # upload run results
+      - uses: actions/upload-artifact@v2
+        with:
+          name: jikesrvm-log
+          path: ci-perf-kit/running/results/log
+      - uses: actions/upload-artifact@v2
+        with:
+          name: jikesrvm-compare-report.md
+          path: jikesrvm-compare-report.md
+      # report
+      - name: Result
+        if: always()
+        uses: thollander/actions-comment-pull-request@master
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          message: ${{ steps.cat.outputs.text }}
+      # Cleanup logs (this is necessary for self-hosted runners)
+      - name: Clean up logs and reports
+        if: always()
+        run: |
+          rm -rf ci-perf-kit/running/results/log/*
+          rm jikesrvm-compare-report.md
 
   # OpenJDK
   # openjdk-binding-test:
