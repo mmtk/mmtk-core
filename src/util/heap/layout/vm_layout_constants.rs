@@ -66,7 +66,6 @@ pub const AVAILABLE_START: Address =
     chunk_align_up(unsafe { Address::from_usize(0x6700_0000 + (0x6400_0000 - 0x6000_0000) / 5) });
 #[cfg(target_pointer_width = "64")]
 pub const AVAILABLE_START: Address = chunk_align_up(unsafe { Address::from_usize(0x00000200_0dc0_0000usize) });
-    // chunk_align_up(unsafe { Address::from_usize(0x6700_0000 + (0x6400_0000 - 0x6000_0000) / 5) });
 
 /**
  * Highest virtual address available for MMTk to manage.  The address space between
