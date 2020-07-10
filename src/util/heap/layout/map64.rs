@@ -1,4 +1,3 @@
-use crate::mmtk::SFT_MAP;
 use crate::util::conversions;
 use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
@@ -9,7 +8,6 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
 use super::map::Map;
 
 
@@ -18,7 +16,6 @@ const NON_MAP_FRACTION: f64 = 1.0 - 8.0 / 4096.0;
 pub struct Map64 {
     fl_page_resources: Vec<Option<&'static CommonFreeListPageResource>>,
     fl_map: Vec<Option<&'static RawMemoryFreeList>>,
-    total_available_discontiguous_chunks: usize,
     finalized: bool,
     descriptor_map: Vec<SpaceDescriptor>,
     base_address: Vec<Address>,
@@ -55,7 +52,6 @@ impl Map for Map64 {
             base_address,
             fl_page_resources: vec![None; MAX_SPACES],
             fl_map: vec![None; MAX_SPACES],
-            total_available_discontiguous_chunks: 0,
             finalized: false,
             cumulative_committed_pages: AtomicUsize::new(0),
         }
@@ -103,7 +99,7 @@ impl Map for Map64 {
         &self,
         descriptor: SpaceDescriptor,
         chunks: usize,
-        head: Address,
+        _head: Address,
     ) -> Address {
         debug_assert!(Self::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
         let self_mut = unsafe { self.mut_self() };
@@ -128,23 +124,23 @@ impl Map for Map64 {
         return rtn;
     }
 
-    fn get_next_contiguous_region(&self, start: Address) -> Address {
+    fn get_next_contiguous_region(&self, _start: Address) -> Address {
         unreachable!()
     }
 
-    fn get_contiguous_region_chunks(&self, start: Address) -> usize {
+    fn get_contiguous_region_chunks(&self, _start: Address) -> usize {
         unreachable!()
     }
 
-    fn get_contiguous_region_size(&self, start: Address) -> usize {
+    fn get_contiguous_region_size(&self, _start: Address) -> usize {
         unreachable!()
     }
 
-    fn free_all_chunks(&self, any_chunk: Address) {
+    fn free_all_chunks(&self, _any_chunk: Address) {
         unreachable!()
     }
 
-    fn free_contiguous_chunks(&self, start: Address) -> usize {
+    fn free_contiguous_chunks(&self, _start: Address) -> usize {
         unreachable!()
     }
 
@@ -163,7 +159,7 @@ impl Map for Map64 {
         }
     }
 
-    fn finalize_static_space_map(&self, from: Address, to: Address) {
+    fn finalize_static_space_map(&self, _from: Address, _to: Address) {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         for pr in 0..MAX_SPACES {
             if let Some(fl) = self_mut.fl_page_resources[pr] {
@@ -180,7 +176,7 @@ impl Map for Map64 {
         self.finalized
     }
 
-    fn get_discontig_freelist_pr_ordinal(&self, pr: &CommonFreeListPageResource) -> usize {
+    fn get_discontig_freelist_pr_ordinal(&self, _pr: &CommonFreeListPageResource) -> usize {
         unreachable!()
     }
 

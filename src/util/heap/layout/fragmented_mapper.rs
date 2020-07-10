@@ -1,18 +1,13 @@
 use super::Mmapper;
 use crate::util::Address;
-
 use crate::util::constants::*;
 use crate::util::conversions;
-use crate::util::conversions::pages_to_bytes;
 use crate::util::heap::layout::vm_layout_constants::*;
 use std::fmt;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
-
 use super::mmapper::MMAP_CHUNK_BYTES;
-
-use crate::util::memory::{dzmmap, mprotect, munprotect};
 use std::mem::transmute;
 
 const UNMAPPED: u8 = 0;
@@ -24,8 +19,6 @@ const MMAP_NUM_CHUNKS: usize = if_then_else_usize!(
     1 << (LOG_BYTES_IN_ADDRESS_SPACE as usize - LOG_MMAP_CHUNK_BYTES),
     1 << (33 - LOG_MMAP_CHUNK_BYTES)
 );
-pub const VERBOSE: bool = true;
-
 
 #[cfg(target_pointer_width = "32")]
 const LOG_MAPPABLE_BYTES: usize = 32; // can map all virtual space
@@ -218,7 +211,7 @@ impl FragmentedMapper {
             if base == self.slab_map[index] {
                 return self.slab_table_for(addr, index);
             }
-            let guard = self.lock.lock().unwrap();
+            let _guard = self.lock.lock().unwrap();
           
             /* Check whether another thread has allocated a slab while we were acquiring the lock */
             if base == self.slab_map[index] {
@@ -243,7 +236,7 @@ impl FragmentedMapper {
         }
     }
     
-    fn slab_table_for(&self, addr: Address, index: usize) -> Option<&Slab> {
+    fn slab_table_for(&self, _addr: Address, index: usize) -> Option<&Slab> {
         debug_assert!(self.slab_table[index].is_some());
         self.slab_table[index].as_ref().map(|x| &x as &Slab)
     }

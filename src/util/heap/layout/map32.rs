@@ -71,7 +71,7 @@ impl Map for Map32 {
         )
     }
 
-    fn create_parent_freelist(&self, pr: &CommonFreeListPageResource, units: usize, grain: i32) -> Box<Self::FreeList> {
+    fn create_parent_freelist(&self, _pr: &CommonFreeListPageResource, units: usize, grain: i32) -> Box<Self::FreeList> {
         box IntArrayFreeList::new(units, grain, 1)
     }
 

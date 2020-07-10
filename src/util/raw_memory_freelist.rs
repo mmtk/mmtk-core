@@ -1,5 +1,4 @@
 use super::generic_freelist::*;
-use std::mem;
 use crate::util::constants::*;
 use crate::util::address::Address;
 use crate::util::conversions;
@@ -173,7 +172,7 @@ impl RawMemoryFreeList {
     }
 
     fn mmap(&self, start: Address, bytes: usize) {
-        if let Err(e) = super::memory::dzmmap(start, bytes) {
+        if let Err(_) = super::memory::dzmmap(start, bytes) {
             assert!(false, "Can't get more space with mmap()");
         }
     }
