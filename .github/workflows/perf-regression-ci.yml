@@ -2,14 +2,17 @@ name: Performance Regression CI
 
 # Triggerred when a new commit is pushed to master
 on:
-  push:
+  # push:
+  #   branches:
+  #     - master
+  pull_request:
     branches:
       - master
 
 jobs:
   # JikesRVM
   jikesrvm-perf-regression:
-    runs-on: ubuntu-18.04
+    runs-on: [self-hosted, Linux, freq-scaling-off]
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -28,7 +31,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.2"
+          ref: "reduce-noise"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -37,18 +40,16 @@ jobs:
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
-          cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-          mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
-          cp repos/jikesrvm/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
+          mkdir -p ci-perf-kit/running/benchmarks/dacapo
+          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
       # run
       - name: Performance Run
         run: |
           export RUSTUP_TOOLCHAIN=nightly-2019-08-26
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=test
+          export RESULT_REPO_BRANCH=self-hosted
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
-          export FROM_DATE=2020-06-11
+          export FROM_DATE=2020-07-10
           ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports
       # deploy
       - name: Deploy to Github Page
@@ -62,7 +63,7 @@ jobs:
     
   # OpenJDK
   openjdk-perf-regression:
-    runs-on: ubuntu-18.04
+    runs-on: [self-hosted, Linux, freq-scaling-off]
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -81,7 +82,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.2"
+          ref: "reduce-noise"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -90,20 +91,18 @@ jobs:
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
-          cd mmtk-openjdk
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
-          mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
-          cp repos/openjdk/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
+          mkdir -p ci-perf-kit/running/benchmarks/dacapo
+          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
       # run
       - name: Performance Run
         run: |
           export RUSTUP_TOOLCHAIN=nightly-2019-08-26
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=test
+          export RESULT_REPO_BRANCH=self-hosted
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
-          export FROM_DATE=2020-06-11
+          export FROM_DATE=2020-07-10
           ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports
       # deploy
       - name: Deploy to Github Page
