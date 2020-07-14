@@ -7,7 +7,7 @@ on:
       - master
 
 jobs:
-  JikesRVM
+  # JikesRVM
   jikesrvm-binding-test:
     runs-on: ubuntu-18.04
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
@@ -102,7 +102,7 @@ jobs:
           rm -rf ci-perf-kit/running/results/log/*
           rm jikesrvm-compare-report.md
 
-  OpenJDK
+  # OpenJDK
   openjdk-binding-test:
     runs-on: ubuntu-18.04
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
