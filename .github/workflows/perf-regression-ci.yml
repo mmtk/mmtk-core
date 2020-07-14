@@ -50,7 +50,7 @@ jobs:
           export RESULT_REPO_BRANCH=self-hosted
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
-          ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports
+          JAVA_HOME=/usr/lib/jvm/default-java ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports
       # deploy
       - name: Deploy to Github Page
         uses: peaceiris/actions-gh-pages@v3
