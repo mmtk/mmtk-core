@@ -93,15 +93,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 
     fn acquire(&self, _tls: OpaquePointer, pages: usize) -> Address {
         let bytes = conversions::pages_to_bytes(pages);
-        let start = {
-            let start =
-                unsafe { Address::from_usize(self.cursor.fetch_add(bytes, Ordering::Relaxed)) };
-            if start + bytes <= self.limit {
-                start
-            } else {
-                panic!("OutOfMemory")
-            }
-        };
+        let start = unsafe { Address::from_usize(self.cursor.fetch_add(bytes, Ordering::Relaxed)) };
+        if start + bytes > self.limit {
+            panic!("OutOfMemory")
+        }
         if self.zeroed {
             crate::util::memory::zero(start, bytes);
         }
