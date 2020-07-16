@@ -1,28 +1,21 @@
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
-use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
+use crate::util::heap::PageResource;
 
-use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::ObjectReference;
 
-use crate::plan::TransitiveClosure;
-use crate::util::header_byte;
-
-use crate::policy::space::SpaceOptions;
-use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-use crate::util::heap::HeapMeta;
+use crate::util::heap::layout::heap_layout::VMMap;
 use crate::vm::VMBinding;
-use std::cell::UnsafeCell;
 use crate::vm::*;
 use std::marker::PhantomData;
 use crate::util::opaque_pointer::OpaquePointer;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
 use crate::plan::Plan;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END, AVAILABLE_BYTES};
 
 pub struct LockFreeImmortalSpace<VM: VMBinding> {
+    #[allow(unused)]
     name: &'static str,
     /// Heap range start
     cursor: AtomicUsize,
@@ -35,9 +28,6 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
 
 unsafe impl<VM: VMBinding> Sync for LockFreeImmortalSpace<VM> {}
 
-const GC_MARK_BIT_MASK: u8 = 1;
-const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
-
 impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn is_live(&self, _object: ObjectReference) -> bool {
         unimplemented!()
@@ -49,7 +39,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn is_sane(&self) -> bool {
         unimplemented!()
     }
-    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
+    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {
         unimplemented!()
     }
 }
@@ -90,7 +80,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         conversions::bytes_to_pages_up(self.limit - cursor)
     }
 
-    fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
+    fn acquire(&self, _tls: OpaquePointer, pages: usize) -> Address {
         let bytes = conversions::pages_to_bytes(pages);
         let start = {
             let start = unsafe { Address::from_usize(self.cursor.fetch_add(bytes, Ordering::Relaxed)) };

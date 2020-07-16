@@ -1,5 +1,6 @@
 use crate::plan::{Phase, Plan};
 use crate::policy::space::Space;
+#[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::OpaquePointer;
 
@@ -45,7 +46,10 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
+        #[cfg(not(feature="nogc_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        #[cfg(feature="nogc_lock_free")]
+        let heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         #[cfg(feature="nogc_lock_free")]
         let nogc_space = NoGCImmortalSpace::new("nogc_space", cfg!(not(feature="nogc_no_zeroing")));
