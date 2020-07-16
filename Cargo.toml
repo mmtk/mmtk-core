@@ -30,7 +30,6 @@ default = []
 
 # plans
 nogc = ["immortalspace", "largeobjectspace"]
-nogc_lock_free = ["nogc", "lockfreeimmortalspace"]
 semispace = ["immortalspace", "largeobjectspace", "copyspace"]
 
 # spaces
@@ -46,4 +45,5 @@ lockfreeimmortalspace = []
 
 sanity = []
 force_32bit_heap_layout = []
+nogc_lock_free = ["nogc", "lockfreeimmortalspace"]
 nogc_no_zeroing = ["nogc_lock_free"]
