@@ -61,10 +61,10 @@ pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0x0000
  * HEAP_START and AVAILABLE_START comprises memory directly managed by the VM,
  * and not available to MMTk.
  */
-#[cfg(target_pointer_width = "32")]
+#[cfg(any(target_pointer_width = "32", feature = "force_32bit_heap_layout"))]
 pub const AVAILABLE_START: Address =
     chunk_align_up(unsafe { Address::from_usize(0x6700_0000 + (0x6400_0000 - 0x6000_0000) / 5) });
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(target_pointer_width = "64", not(feature = "force_32bit_heap_layout")))]
 pub const AVAILABLE_START: Address = chunk_align_up(unsafe { Address::from_usize(0x0000_0200_0dc0_0000usize) });
 
 /**
