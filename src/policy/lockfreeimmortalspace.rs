@@ -4,15 +4,17 @@ use crate::util::heap::PageResource;
 
 use crate::util::ObjectReference;
 
+use crate::plan::Plan;
+use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::vm_layout_constants::{
+    AVAILABLE_BYTES, AVAILABLE_END, AVAILABLE_START,
+};
+use crate::util::opaque_pointer::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::vm::*;
 use std::marker::PhantomData;
-use crate::util::opaque_pointer::OpaquePointer;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::plan::Plan;
-use crate::util::conversions;
-use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_END, AVAILABLE_BYTES};
 
 pub struct LockFreeImmortalSpace<VM: VMBinding> {
     #[allow(unused)]
@@ -66,10 +68,19 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn init(&mut self, _vm_map: &'static VMMap) {
-        let total_pages = <VM as VMBinding>::VMActivePlan::global().base().heap.total_pages.load(Ordering::SeqCst);
+        let total_pages = <VM as VMBinding>::VMActivePlan::global()
+            .base()
+            .heap
+            .total_pages
+            .load(Ordering::SeqCst);
         let total_bytes = conversions::pages_to_bytes(total_pages);
         assert!(total_pages > 0);
-        assert!(total_bytes <= AVAILABLE_BYTES, "Initial requested memory ({} bytes) overflows the heap. Max heap size is {} bytes.", total_bytes, AVAILABLE_BYTES);
+        assert!(
+            total_bytes <= AVAILABLE_BYTES,
+            "Initial requested memory ({} bytes) overflows the heap. Max heap size is {} bytes.",
+            total_bytes,
+            AVAILABLE_BYTES
+        );
         self.limit = AVAILABLE_START + total_bytes;
         // Eagerly memory map the entire heap (also zero all the memory)
         crate::util::memory::dzmmap(AVAILABLE_START, total_bytes).unwrap();
@@ -83,7 +94,8 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn acquire(&self, _tls: OpaquePointer, pages: usize) -> Address {
         let bytes = conversions::pages_to_bytes(pages);
         let start = {
-            let start = unsafe { Address::from_usize(self.cursor.fetch_add(bytes, Ordering::Relaxed)) };
+            let start =
+                unsafe { Address::from_usize(self.cursor.fetch_add(bytes, Ordering::Relaxed)) };
             if start + bytes <= self.limit {
                 start
             } else {

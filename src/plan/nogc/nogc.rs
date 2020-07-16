@@ -18,10 +18,10 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
 use std::sync::Arc;
 
-#[cfg(feature="nogc_lock_free")]
-use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
-#[cfg(not(feature="nogc_lock_free"))]
+#[cfg(not(feature = "nogc_lock_free"))]
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
+#[cfg(feature = "nogc_lock_free")]
+use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
 
 pub type SelectedPlan<VM> = NoGC<VM>;
 
@@ -46,14 +46,15 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
-        #[cfg(not(feature="nogc_lock_free"))]
+        #[cfg(not(feature = "nogc_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        #[cfg(feature="nogc_lock_free")]
+        #[cfg(feature = "nogc_lock_free")]
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
 
-        #[cfg(feature="nogc_lock_free")]
-        let nogc_space = NoGCImmortalSpace::new("nogc_space", cfg!(not(feature="nogc_no_zeroing")));
-        #[cfg(not(feature="nogc_lock_free"))]
+        #[cfg(feature = "nogc_lock_free")]
+        let nogc_space =
+            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")));
+        #[cfg(not(feature = "nogc_lock_free"))]
         let nogc_space = NoGCImmortalSpace::new(
             "nogc_space",
             true,
@@ -64,9 +65,7 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         );
 
         NoGC {
-            unsync: UnsafeCell::new(NoGCUnsync {
-                nogc_space,
-            }),
+            unsync: UnsafeCell::new(NoGCUnsync { nogc_space }),
             base: BasePlan::new(vm_map, mmapper, options, heap),
         }
     }
