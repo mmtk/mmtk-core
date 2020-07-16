@@ -24,8 +24,11 @@ use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_START, AVAILABLE_
 
 pub struct LockFreeImmortalSpace<VM: VMBinding> {
     name: &'static str,
+    /// Heap range start
     cursor: AtomicUsize,
+    /// Heap range end
     limit: Address,
+    /// Zero memory after slow-path allocation
     zeroed: bool,
     phantom: PhantomData<VM>,
 }
@@ -78,6 +81,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         assert!(total_pages > 0);
         assert!(total_bytes <= AVAILABLE_BYTES, "Initial requested memory ({} bytes) overflows the heap. Max heap size is {} bytes.", total_bytes, AVAILABLE_BYTES);
         self.limit = AVAILABLE_START + total_bytes;
+        // Eagerly memory map the entire heap (also zero all the memory)
         crate::util::memory::dzmmap(AVAILABLE_START, total_bytes).unwrap();
     }
 
