@@ -68,7 +68,7 @@ impl VMRequest {
 
     pub fn high_fixed_size(mb: usize) -> Self {
         if HEAP_LAYOUT_64BIT {
-            return Self::common64bit(false);
+            return Self::common64bit(true);
         }
         VMRequest::RequestExtent {
             extent: mb << LOG_BYTES_IN_MBYTE,
@@ -78,7 +78,7 @@ impl VMRequest {
 
     pub fn fixed_extent(extent: usize, top: bool) -> Self {
         if HEAP_LAYOUT_64BIT {
-            return Self::common64bit(false);
+            return Self::common64bit(top);
         }
         VMRequest::RequestExtent { extent, top }
     }
