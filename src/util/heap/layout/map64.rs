@@ -32,7 +32,9 @@ impl Map for Map64 {
     type FreeList = RawMemoryFreeList;
 
     fn new() -> Self {
-        assert!(!cfg!(feature = "force_32bit_heap_layout"));
+        if cfg!(feature = "force_32bit_heap_layout") {
+           unreachable!("Should use Map32 if feature `force_32bit_heap_layout` is enabled");
+        }
         let mut high_water = vec![Address::ZERO; MAX_SPACES];
         let mut base_address = vec![Address::ZERO; MAX_SPACES];
         /* Avoid producing an Address that will blow up a 32-bit compiler */
@@ -85,14 +87,14 @@ impl Map for Map64 {
         let list = box RawMemoryFreeList::new(start, start + list_extent, pages_per_block, units as _, grain, heads);
 
         self_mut.fl_page_resources[index] = Some(unsafe { ::std::mem::transmute(pr) });
-        self_mut.fl_map[index] = Some(unsafe { ::std::mem::transmute::<&RawMemoryFreeList, _>(&list) });
+        self_mut.fl_map[index] = Some(unsafe { &*(&list as &RawMemoryFreeList as *const RawMemoryFreeList) });
 
         /* Adjust the base address and highwater to account for the allocated chunks for the map */
         let base = conversions::chunk_align_up(start + list_extent);
         // unreachable!();
         self_mut.high_water[index] = base;
         self_mut.base_address[index] = base;
-        return list;
+        list
     }
 
     fn allocate_contiguous_chunks(
@@ -121,7 +123,7 @@ impl Map for Map64 {
                 free_list.alloc_from_unit(PAGES_IN_CHUNK as _, (base_page + offset) as _);
             }
         }
-        return rtn;
+        rtn
     }
 
     fn get_next_contiguous_region(&self, _start: Address) -> Address {

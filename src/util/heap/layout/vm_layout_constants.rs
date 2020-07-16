@@ -48,13 +48,13 @@ pub const MAX_SPACE_EXTENT: usize = 1 << LOG_SPACE_EXTENT;
 #[cfg(any(target_pointer_width = "32", feature = "force_32bit_heap_layout"))]
 pub const HEAP_START: Address = chunk_align_down(unsafe { Address::from_usize(0x6000_0000) });
 #[cfg(all(target_pointer_width = "64", not(feature = "force_32bit_heap_layout")))]
-pub const HEAP_START: Address = chunk_align_down(unsafe { Address::from_usize(0x00000200_0000_0000usize) });
+pub const HEAP_START: Address = chunk_align_down(unsafe { Address::from_usize(0x0000_0200_0000_0000usize) });
 
 /** Highest virtual address used by the virtual machine */
 #[cfg(any(target_pointer_width = "32", feature = "force_32bit_heap_layout"))]
 pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0xb000_0000) });
 #[cfg(all(target_pointer_width = "64", not(feature = "force_32bit_heap_layout")))]
-pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0x00002000_0000_0000usize) });
+pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0x0000_2000_0000_0000usize) });
 
 /**
  * Lowest virtual address available for MMTk to manage.  The address space between
@@ -65,7 +65,7 @@ pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0x0000
 pub const AVAILABLE_START: Address =
     chunk_align_up(unsafe { Address::from_usize(0x6700_0000 + (0x6400_0000 - 0x6000_0000) / 5) });
 #[cfg(target_pointer_width = "64")]
-pub const AVAILABLE_START: Address = chunk_align_up(unsafe { Address::from_usize(0x00000200_0dc0_0000usize) });
+pub const AVAILABLE_START: Address = chunk_align_up(unsafe { Address::from_usize(0x0000_0200_0dc0_0000usize) });
 
 /**
  * Highest virtual address available for MMTk to manage.  The address space between

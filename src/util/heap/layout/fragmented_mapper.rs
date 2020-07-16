@@ -77,8 +77,8 @@ impl Mmapper for FragmentedMapper {
             let end_chunk = Self::chunk_index(slab, Self::chunk_align_up(high));
 
             let mapped = self.get_or_allocate_slab_table(start);
-            for i in start_chunk..end_chunk {
-                mapped[i].store(MAPPED, Ordering::Relaxed);
+            for entry in mapped.iter().take(end_chunk).skip(start_chunk) {
+                entry.store(MAPPED, Ordering::Relaxed);
             }
             start = high;
         }
@@ -98,21 +98,21 @@ impl Mmapper for FragmentedMapper {
             let mapped = self.get_or_allocate_slab_table(start);
         
               /* Iterate over the chunks within the slab */
-            for chunk in start_chunk..end_chunk {
-                if mapped[chunk].load(Ordering::Relaxed) == MAPPED {
+            for (chunk, entry) in mapped.iter().enumerate().take(end_chunk).skip(start_chunk) {
+                if entry.load(Ordering::Relaxed) == MAPPED {
                     continue;
                 }
                 let mmap_start = Self::chunk_index_to_address(base, chunk);
                 let _guard = self.lock.lock().unwrap();
 
                 // might have become MAPPED here
-                if mapped[chunk].load(Ordering::Relaxed) == UNMAPPED {
-                    let _ = crate::util::memory::dzmmap(mmap_start, MMAP_CHUNK_BYTES).unwrap();
+                if entry.load(Ordering::Relaxed) == UNMAPPED {
+                    crate::util::memory::dzmmap(mmap_start, MMAP_CHUNK_BYTES).unwrap();
                 }
-                if mapped[chunk].load(Ordering::Relaxed) == PROTECTED {
-                    let _ = crate::util::memory::munprotect(mmap_start, MMAP_CHUNK_BYTES).unwrap();
+                if entry.load(Ordering::Relaxed) == PROTECTED {
+                    crate::util::memory::munprotect(mmap_start, MMAP_CHUNK_BYTES).unwrap();
                 }
-                mapped[chunk].store(MAPPED, Ordering::Relaxed);
+                entry.store(MAPPED, Ordering::Relaxed);
             }
             start = high;
         }
@@ -146,13 +146,13 @@ impl Mmapper for FragmentedMapper {
 
             let mapped = self.get_or_allocate_slab_table(start);
 
-            for chunk in start_chunk..end_chunk {
-                if mapped[chunk].load(Ordering::Relaxed) == MAPPED {
+            for (chunk, entry) in mapped.iter().enumerate().take(end_chunk).skip(start_chunk) {
+                if entry.load(Ordering::Relaxed) == MAPPED {
                     let mmap_start = Self::chunk_index_to_address(base, chunk);
-                    let _ = crate::util::memory::mprotect(mmap_start, MMAP_CHUNK_BYTES).unwrap();
-                    mapped[chunk].store(PROTECTED, Ordering::Relaxed);
+                    crate::util::memory::mprotect(mmap_start, MMAP_CHUNK_BYTES).unwrap();
+                    entry.store(PROTECTED, Ordering::Relaxed);
                 } else {
-                    debug_assert!(mapped[chunk].load(Ordering::Relaxed) == PROTECTED);
+                    debug_assert!(entry.load(Ordering::Relaxed) == PROTECTED);
                 }
             }
             start = high;
@@ -162,7 +162,9 @@ impl Mmapper for FragmentedMapper {
 
 impl FragmentedMapper {
     pub fn new() -> Self {
-        assert!(!cfg!(feature = "force_32bit_heap_layout"));
+        if cfg!(feature = "force_32bit_heap_layout") {
+            unreachable!("Should use ByteMapMmapper if feature `force_32bit_heap_layout` is enabled");
+        }
         Self {
             lock: Mutex::new(()),
             free_slab_index: 0,
@@ -174,17 +176,17 @@ impl FragmentedMapper {
 
     fn new_slab() -> Box<Slab> {
         let mapped: Box<Slab> = box unsafe { transmute([UNMAPPED; MMAP_NUM_CHUNKS]) };
-        return mapped;
+        mapped
     }
 
     fn hash(addr: Address) -> usize {
         let mut initial = (addr & !MMAP_SLAB_MASK) >> LOG_MMAP_SLAB_BYTES;
         let mut hash = 0;
         while initial != 0 {
-            hash = hash ^ (initial & HASH_MASK);
-            initial = initial >> LOG_SLAB_TABLE_SIZE;
+            hash ^= initial & HASH_MASK;
+            initial >>= LOG_SLAB_TABLE_SIZE;
         }
-        return hash;
+        hash
     }
 
     fn slab_table(&self, addr: Address) -> Option<&Slab> {
@@ -231,7 +233,7 @@ impl FragmentedMapper {
             }
             //   lock.release();
             index += 1;
-            index = index % SLAB_TABLE_SIZE;
+            index %= SLAB_TABLE_SIZE;
             assert!(index != hash, "MMAP slab table is full!");
         }
     }

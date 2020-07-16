@@ -76,7 +76,7 @@ impl RawMemoryFreeList {
         self.units_per_block() - (self.heads as i32) - 1
     }
     pub fn default_block_size(units: i32, heads: i32) -> i32 {
-        return usize::min(Self::size_in_pages(units, heads) as _, 16) as _;
+        usize::min(Self::size_in_pages(units, heads) as _, 16) as _
     }
     pub fn size_in_pages(units: i32, heads: i32) -> i32 {
         let map_size = ((units + heads + 1) as usize) << LOG_BYTES_IN_UNIT as usize;
@@ -88,20 +88,20 @@ impl RawMemoryFreeList {
         debug_assert!(base + conversions::pages_to_bytes(Self::size_in_pages(units,heads) as _) <= limit);
         Self {
             head: -1,
-            heads: heads,
-            base: base,
-            limit: limit,
+            heads,
+            base,
+            limit,
             high_water: base,
             max_units: units,
-            grain: grain,
+            grain,
             current_units: 0,
-            pages_per_block: pages_per_block,
+            pages_per_block,
         }
     }
 
     fn current_capacity(&self) -> i32 {
         let list_blocks = conversions::bytes_to_pages(self.high_water - self.base) as i32 / self.pages_per_block;
-        return self.units_in_first_block() + (list_blocks - 1) * self.units_per_block();
+        self.units_in_first_block() + (list_blocks - 1) * self.units_per_block()
     }
     
     pub fn grow_freelist(&mut self, units: i32) -> bool {
@@ -109,13 +109,14 @@ impl RawMemoryFreeList {
         if required_units > self.max_units {
           return false;
         }
-        let mut blocks = 0;
-        if required_units > self.current_capacity() {
-          let units_requested = required_units - self.current_capacity();
-          blocks = (units_requested + self.units_per_block() - 1) / self.units_per_block();
-        }
+        let blocks = if required_units > self.current_capacity() {
+            let units_requested = required_units - self.current_capacity();
+            (units_requested + self.units_per_block() - 1) / self.units_per_block()
+        } else {
+            0
+        };
         self.grow_list_by_blocks(blocks, required_units);
-        return true;
+        true
     }
     fn grow_list_by_blocks(&mut self, blocks: i32, new_max: i32) {
         debug_assert!((new_max <= self.grain) || (((new_max / self.grain) * self.grain) == new_max));
@@ -134,7 +135,7 @@ impl RawMemoryFreeList {
     
         if old_max == 0 {
           // First allocation of capacity: initialize the sentinels.
-          for i in 1..(self.heads+1) {
+          for i in 1..=self.heads {
             self.set_sentinel(-i);
           }
         } else {
@@ -168,15 +169,15 @@ impl RawMemoryFreeList {
             grow_extent = self.high_water - self.limit;
         }
         self.mmap(self.high_water, grow_extent);
-        self.high_water = self.high_water + grow_extent;
+        self.high_water += grow_extent;
     }
 
     fn mmap(&self, start: Address, bytes: usize) {
-        if let Err(_) = super::memory::dzmmap(start, bytes) {
-            assert!(false, "Can't get more space with mmap()");
+        if super::memory::dzmmap(start, bytes).is_err() {
+            panic!("Can't get more space with mmap()");
         }
     }
     pub fn get_limit(&self) -> Address {
-        return self.limit;
+        self.limit
     }
 }
