@@ -1,0 +1,26 @@
+name: Test Checkout Specific Revision
+
+on:
+  pull_request:
+
+jobs:
+  fetch-specific-revision:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Check comment for env vars
+        uses: qinsoon/comment-env-vars@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          default_env: 'JIKESRVM_BINDING_REF=master'
+      - name: Checkout JikesRVM Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-jikesrvm
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-jikesrvm
+          submodules: true
+          ref: ${{ env.JIKESRVM_BINDING_REF }}
