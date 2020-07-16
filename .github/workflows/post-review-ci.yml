@@ -34,7 +34,7 @@ jobs:
           cd mmtk-jikesrvm
           RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
   jikesrvm-perf-compare:
-    runs-on: ubuntu-18.04
+    runs-on: [self-hosted, Linux, freq-scaling-off]
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
     steps:
       - name: Checkout JikesRVM Binding
@@ -61,21 +61,19 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.2"
+          ref: "0.2.1"
           path: ci-perf-kit
           submodules: true
       # setup
       - name: Setup
         run: |
-          cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-          mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
-          cp repos/jikesrvm/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
+          mkdir -p ci-perf-kit/running/benchmarks/dacapo
+          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
       # run compare
       - name: Compare Performance
         id: run
         run: |
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ jikesrvm-compare-report.md
+          JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ jikesrvm-compare-report.md
       # set report.md to output
       - uses: pCYSl5EDgo/cat@master
         id: cat
@@ -97,6 +95,12 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.cat.outputs.text }}
+      # Cleanup logs (this is necessary for self-hosted runners)
+      - name: Clean up logs and reports
+        if: always()
+        run: |
+          rm -rf ci-perf-kit/running/results/log/*
+          rm jikesrvm-compare-report.md
 
   # OpenJDK
   openjdk-binding-test:
@@ -127,7 +131,7 @@ jobs:
           cd mmtk-openjdk
           RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
   openjdk-perf-compare:
-    runs-on: ubuntu-18.04
+    runs-on: [self-hosted, Linux, freq-scaling-off]
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
     steps:
       - name: Checkout OpenJDK Binding
@@ -154,16 +158,14 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.2"
+          ref: "0.2.1"
           path: ci-perf-kit
           submodules: true
       # setup
       - name: Setup
         run: |
-          cd mmtk-openjdk
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-setup.sh
-          mkdir -p ../ci-perf-kit/running/benchmarks/dacapo
-          cp repos/openjdk/benchmarks/* ../ci-perf-kit/running/benchmarks/dacapo/
+          mkdir -p ci-perf-kit/running/benchmarks/dacapo
+          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
       # run compare
       - name: Compare Performance
         id: run
@@ -190,3 +192,9 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.cat.outputs.text }}
+      # Cleanup logs (this is necessary for self-hosted runners)
+      - name: Clean up logs and reports
+        if: always()
+        run: |
+          rm -rf ci-perf-kit/running/results/log/*
+          rm openjdk-compare-report.md
