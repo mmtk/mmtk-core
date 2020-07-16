@@ -27,7 +27,6 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     cursor: AtomicUsize,
     limit: Address,
     zeroed: bool,
-    sync: Mutex<()>,
     phantom: PhantomData<VM>,
 }
 
@@ -111,7 +110,6 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
             limit: AVAILABLE_END,
             zeroed,
-            sync: Mutex::new(()),
             phantom: PhantomData,
         }
     }
