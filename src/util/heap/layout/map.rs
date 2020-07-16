@@ -1,9 +1,8 @@
+use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::generic_freelist::GenericFreeList;
 use crate::util::Address;
-
 
 pub trait Map: Sized {
     type FreeList: GenericFreeList;
@@ -14,7 +13,12 @@ pub trait Map: Sized {
 
     fn create_freelist(&self, pr: &CommonFreeListPageResource) -> Box<Self::FreeList>;
 
-    fn create_parent_freelist(&self, pr: &CommonFreeListPageResource, units: usize, grain: i32) -> Box<Self::FreeList>;
+    fn create_parent_freelist(
+        &self,
+        pr: &CommonFreeListPageResource,
+        units: usize,
+        grain: i32,
+    ) -> Box<Self::FreeList>;
 
     fn allocate_contiguous_chunks(
         &self,
@@ -34,7 +38,7 @@ pub trait Map: Sized {
     fn free_contiguous_chunks(&self, start: Address) -> usize;
 
     fn boot(&self) {}
-    
+
     fn finalize_static_space_map(&self, from: Address, to: Address);
 
     fn is_finalized(&self) -> bool;

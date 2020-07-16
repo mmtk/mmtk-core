@@ -1,3 +1,4 @@
+use super::map::Map;
 use crate::mmtk::SFT_MAP;
 use crate::util::conversions;
 use crate::util::generic_freelist::GenericFreeList;
@@ -9,7 +10,6 @@ use crate::util::int_array_freelist::IntArrayFreeList;
 use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
-use super::map::Map;
 
 pub struct Map32 {
     prev_link: Vec<i32>,
@@ -71,7 +71,12 @@ impl Map for Map32 {
         )
     }
 
-    fn create_parent_freelist(&self, _pr: &CommonFreeListPageResource, units: usize, grain: i32) -> Box<Self::FreeList> {
+    fn create_parent_freelist(
+        &self,
+        _pr: &CommonFreeListPageResource,
+        units: usize,
+        grain: i32,
+    ) -> Box<Self::FreeList> {
         box IntArrayFreeList::new(units, grain, 1)
     }
 

@@ -1,14 +1,14 @@
+use super::mmapper::MMAP_CHUNK_BYTES;
 use super::Mmapper;
-use crate::util::Address;
 use crate::util::constants::*;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::Address;
 use std::fmt;
+use std::mem::transmute;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
-use super::mmapper::MMAP_CHUNK_BYTES;
-use std::mem::transmute;
 
 const UNMAPPED: u8 = 0;
 const MAPPED: u8 = 1;
@@ -24,11 +24,11 @@ const MMAP_NUM_CHUNKS: usize = if_then_else_usize!(
 const LOG_MAPPABLE_BYTES: usize = 32; // can map all virtual space
 #[cfg(target_pointer_width = "64")]
 const LOG_MAPPABLE_BYTES: usize = 36; // 128GB - physical memory larger than this is uncommon
-/*
- * Size of a slab.  The value 10 gives a slab size of 1GB, with 1024
- * chunks per slab, ie a 1k slab map.  In a 64-bit address space, this
- * will require 1M of slab maps.
- */
+                                      /*
+                                       * Size of a slab.  The value 10 gives a slab size of 1GB, with 1024
+                                       * chunks per slab, ie a 1k slab map.  In a 64-bit address space, this
+                                       * will require 1M of slab maps.
+                                       */
 const LOG_MMAP_CHUNKS_PER_SLAB: usize = 10;
 const LOG_MMAP_SLAB_BYTES: usize = LOG_MMAP_CHUNKS_PER_SLAB + LOG_MMAP_CHUNK_BYTES;
 const MMAP_SLAB_EXTENT: usize = 1 << LOG_MMAP_SLAB_BYTES;
@@ -37,7 +37,7 @@ const MMAP_SLAB_MASK: usize = (1 << LOG_MMAP_SLAB_BYTES) - 1;
  * Maximum number of slabs, which determines the maximum mappable address space.
  */
 const LOG_MAX_SLABS: usize = LOG_MAPPABLE_BYTES - LOG_MMAP_CHUNK_BYTES - LOG_MMAP_CHUNKS_PER_SLAB;
-const MAX_SLABS: usize =  1 << LOG_MAX_SLABS;
+const MAX_SLABS: usize = 1 << LOG_MAX_SLABS;
 /**
  * Parameters for the slab table.  The hash function requires it to be
  * a power of 2.  Must be larger than MAX_SLABS for hashing to work,
@@ -55,7 +55,7 @@ pub struct FragmentedMapper {
     free_slab_index: usize,
     free_slabs: Vec<Option<Box<Slab>>>,
     slab_table: Vec<Option<Box<Slab>>>,
-    slab_map: Vec<Address>
+    slab_map: Vec<Address>,
 }
 
 impl fmt::Debug for FragmentedMapper {
@@ -71,7 +71,11 @@ impl Mmapper for FragmentedMapper {
         let end = start + bytes;
         // Iterate over the slabs covered
         while start < end {
-            let high = if end > Self::slab_limit(start) && !Self::slab_limit(start).is_zero() { Self::slab_limit(start) } else { end };
+            let high = if end > Self::slab_limit(start) && !Self::slab_limit(start).is_zero() {
+                Self::slab_limit(start)
+            } else {
+                end
+            };
             let slab = Self::slab_align_down(start);
             let start_chunk = Self::chunk_index(slab, start);
             let end_chunk = Self::chunk_index(slab, Self::chunk_align_up(high));
@@ -89,15 +93,19 @@ impl Mmapper for FragmentedMapper {
         // Iterate over the slabs covered
         while start < end {
             let base = Self::slab_align_down(start);
-            let high = if end > Self::slab_limit(start) && !Self::slab_limit(start).is_zero() { Self::slab_limit(start) } else { end };
+            let high = if end > Self::slab_limit(start) && !Self::slab_limit(start).is_zero() {
+                Self::slab_limit(start)
+            } else {
+                end
+            };
 
             let slab = Self::slab_align_down(start);
             let start_chunk = Self::chunk_index(slab, start);
             let end_chunk = Self::chunk_index(slab, Self::chunk_align_up(high));
 
             let mapped = self.get_or_allocate_slab_table(start);
-        
-              /* Iterate over the chunks within the slab */
+
+            /* Iterate over the chunks within the slab */
             for (chunk, entry) in mapped.iter().enumerate().take(end_chunk).skip(start_chunk) {
                 if entry.load(Ordering::Relaxed) == MAPPED {
                     continue;
@@ -127,7 +135,10 @@ impl Mmapper for FragmentedMapper {
     fn is_mapped_address(&self, addr: Address) -> bool {
         let mapped = self.slab_table(addr);
         match mapped {
-            Some(mapped) => mapped[Self::chunk_index(Self::slab_align_down(addr), addr)].load(Ordering::Relaxed) == MAPPED,
+            Some(mapped) => {
+                mapped[Self::chunk_index(Self::slab_align_down(addr), addr)].load(Ordering::Relaxed)
+                    == MAPPED
+            }
             _ => false,
         }
     }
@@ -138,7 +149,11 @@ impl Mmapper for FragmentedMapper {
         // Iterate over the slabs covered
         while start < end {
             let base = Self::slab_align_down(start);
-            let high = if end > Self::slab_limit(start) && !Self::slab_limit(start).is_zero() { Self::slab_limit(start) } else { end };
+            let high = if end > Self::slab_limit(start) && !Self::slab_limit(start).is_zero() {
+                Self::slab_limit(start)
+            } else {
+                end
+            };
 
             let slab = Self::slab_align_down(start);
             let start_chunk = Self::chunk_index(slab, start);
@@ -163,7 +178,9 @@ impl Mmapper for FragmentedMapper {
 impl FragmentedMapper {
     pub fn new() -> Self {
         if cfg!(feature = "force_32bit_heap_layout") {
-            unreachable!("Should use ByteMapMmapper if feature `force_32bit_heap_layout` is enabled");
+            unreachable!(
+                "Should use ByteMapMmapper if feature `force_32bit_heap_layout` is enabled"
+            );
         }
         Self {
             lock: Mutex::new(()),
@@ -194,7 +211,9 @@ impl FragmentedMapper {
     }
 
     fn get_or_allocate_slab_table(&self, addr: Address) -> &Slab {
-        unsafe { self.mut_self() }.get_or_optionally_allocate_slab_table(addr, true).unwrap()
+        unsafe { self.mut_self() }
+            .get_or_optionally_allocate_slab_table(addr, true)
+            .unwrap()
     }
 
     #[allow(clippy::cast_ref_to_mut)]
@@ -203,24 +222,28 @@ impl FragmentedMapper {
         &mut *(self as *const _ as *mut _)
     }
 
-    fn get_or_optionally_allocate_slab_table(&mut self, addr: Address, allocate: bool) -> Option<&Slab> {
+    fn get_or_optionally_allocate_slab_table(
+        &mut self,
+        addr: Address,
+        allocate: bool,
+    ) -> Option<&Slab> {
         debug_assert!(addr != SENTINEL);
         let base = unsafe { Address::from_usize(addr & !MMAP_SLAB_MASK) };
         let hash = Self::hash(base);
-        let mut index = hash;  // Use 'index' to iterate over the hash table so that we remember where we started
+        let mut index = hash; // Use 'index' to iterate over the hash table so that we remember where we started
         loop {
             /* Check for a hash-table hit.  Should be the frequent case. */
             if base == self.slab_map[index] {
                 return self.slab_table_for(addr, index);
             }
             let _guard = self.lock.lock().unwrap();
-          
+
             /* Check whether another thread has allocated a slab while we were acquiring the lock */
             if base == self.slab_map[index] {
                 // drop(guard);
                 return self.slab_table_for(addr, index);
             }
-          
+
             /* Check for a free slot */
             if self.slab_map[index] == SENTINEL {
                 if !allocate {
@@ -237,29 +260,35 @@ impl FragmentedMapper {
             assert!(index != hash, "MMAP slab table is full!");
         }
     }
-    
+
     fn slab_table_for(&self, _addr: Address, index: usize) -> Option<&Slab> {
         debug_assert!(self.slab_table[index].is_some());
         self.slab_table[index].as_ref().map(|x| &x as &Slab)
     }
-    
+
     /**
      * Take a free slab of chunks from the freeSlabs array, and insert it
      * at the correct index in the slabTable.
      * @param index slab table index
      */
     fn commit_free_slab(&mut self, index: usize) {
-        assert!(self.free_slab_index < MAX_SLABS, "All free slabs used: virtual address space is exhausled.");
+        assert!(
+            self.free_slab_index < MAX_SLABS,
+            "All free slabs used: virtual address space is exhausled."
+        );
         debug_assert!(self.slab_table[index].is_none());
         debug_assert!(self.free_slabs[self.free_slab_index].is_some());
-        ::std::mem::swap(&mut self.slab_table[index], &mut self.free_slabs[self.free_slab_index]);
+        ::std::mem::swap(
+            &mut self.slab_table[index],
+            &mut self.free_slabs[self.free_slab_index],
+        );
         self.free_slab_index += 1;
     }
-      
+
     fn chunk_index_to_address(base: Address, chunk: usize) -> Address {
         base + (chunk << LOG_MMAP_CHUNK_BYTES)
     }
-    
+
     /**
      * @param addr an address
      * @return the base address of the enclosing slab
@@ -267,7 +296,7 @@ impl FragmentedMapper {
     fn slab_align_down(addr: Address) -> Address {
         unsafe { Address::from_usize(addr & !MMAP_SLAB_MASK) }
     }
-    
+
     /**
      * @param addr an address
      * @return the base address of the next slab
@@ -275,7 +304,7 @@ impl FragmentedMapper {
     fn slab_limit(addr: Address) -> Address {
         Self::slab_align_down(addr) + MMAP_SLAB_EXTENT
     }
-    
+
     /**
      * @param slab Address of the slab
      * @param addr Address within a chunk (could be in the next slab)

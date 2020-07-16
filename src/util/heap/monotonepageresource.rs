@@ -11,8 +11,8 @@ use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::OpaquePointer;
 
-use super::layout::Mmapper;
 use super::layout::map::Map;
+use super::layout::Mmapper;
 
 use super::PageResource;
 use std::sync::atomic::Ordering;

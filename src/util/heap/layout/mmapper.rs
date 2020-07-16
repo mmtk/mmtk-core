@@ -60,7 +60,7 @@ pub trait Mmapper {
     fn chunk_align_up(addr: Address) -> Address {
         Self::chunk_align_down(addr + MMAP_CHUNK_MASK)
     }
-  
+
     #[inline]
     fn chunk_align_down(addr: Address) -> Address {
         unsafe { Address::from_usize(addr.as_usize() & !MMAP_CHUNK_MASK) }

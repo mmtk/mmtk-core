@@ -1,15 +1,14 @@
+use super::map::Map;
+use crate::util::constants::*;
 use crate::util::conversions;
 use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout_constants::*;
-use crate::util::constants::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use super::map::Map;
-
 
 const NON_MAP_FRACTION: f64 = 1.0 - 8.0 / 4096.0;
 
@@ -33,7 +32,7 @@ impl Map for Map64 {
 
     fn new() -> Self {
         if cfg!(feature = "force_32bit_heap_layout") {
-           unreachable!("Should use Map32 if feature `force_32bit_heap_layout` is enabled");
+            unreachable!("Should use Map32 if feature `force_32bit_heap_layout` is enabled");
         }
         let mut high_water = vec![Address::ZERO; MAX_SPACES];
         let mut base_address = vec![Address::ZERO; MAX_SPACES];
@@ -62,7 +61,7 @@ impl Map for Map64 {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         debug_assert!(Self::is_space_start(start));
         debug_assert!(cfg!(target_pointer_width = "32") || extent <= SPACE_SIZE_64);
-        let self_mut = unsafe { self.mut_self() };        
+        let self_mut = unsafe { self.mut_self() };
         let index = Self::space_index(start).unwrap();
         self_mut.descriptor_map[index] = descriptor;
     }
@@ -72,7 +71,12 @@ impl Map for Map64 {
         self.create_parent_freelist(pr, units, units as _)
     }
 
-    fn create_parent_freelist(&self, pr: &CommonFreeListPageResource, mut units: usize, grain: i32) -> Box<Self::FreeList> {
+    fn create_parent_freelist(
+        &self,
+        pr: &CommonFreeListPageResource,
+        mut units: usize,
+        grain: i32,
+    ) -> Box<Self::FreeList> {
         let self_mut = unsafe { self.mut_self() };
         // Space space = pr.getSpace();
         let start = pr.get_start();
@@ -80,14 +84,23 @@ impl Map for Map64 {
         let index = Self::space_index(start).unwrap();
 
         units = (units as f64 * NON_MAP_FRACTION) as _;
-        let list_extent = conversions::pages_to_bytes(RawMemoryFreeList::size_in_pages(units as _, 1) as _);
-        
+        let list_extent =
+            conversions::pages_to_bytes(RawMemoryFreeList::size_in_pages(units as _, 1) as _);
+
         let heads = 1;
         let pages_per_block = RawMemoryFreeList::default_block_size(units as _, heads);
-        let list = box RawMemoryFreeList::new(start, start + list_extent, pages_per_block, units as _, grain, heads);
+        let list = box RawMemoryFreeList::new(
+            start,
+            start + list_extent,
+            pages_per_block,
+            units as _,
+            grain,
+            heads,
+        );
 
         self_mut.fl_page_resources[index] = Some(unsafe { ::std::mem::transmute(pr) });
-        self_mut.fl_map[index] = Some(unsafe { &*(&list as &RawMemoryFreeList as *const RawMemoryFreeList) });
+        self_mut.fl_map[index] =
+            Some(unsafe { &*(&list as &RawMemoryFreeList as *const RawMemoryFreeList) });
 
         /* Adjust the base address and highwater to account for the allocated chunks for the map */
         let base = conversions::chunk_align_up(start + list_extent);
@@ -114,7 +127,8 @@ impl Map for Map64 {
         /* Grow the free list to accommodate the new chunks */
         let free_list = self.fl_map[Self::space_index(descriptor.get_start()).unwrap()];
         if let Some(free_list) = free_list {
-            let free_list = unsafe { &mut *(free_list as *const _ as usize as *mut RawMemoryFreeList) };
+            let free_list =
+                unsafe { &mut *(free_list as *const _ as usize as *mut RawMemoryFreeList) };
             free_list.grow_freelist(conversions::bytes_to_pages(extent) as _);
             let base_page = conversions::bytes_to_pages(rtn - self.base_address[index]);
             for offset in (0..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
@@ -154,8 +168,7 @@ impl Map for Map64 {
             // }
             if let Some(fl) = self_mut.fl_map[pr] {
                 #[allow(clippy::cast_ref_to_mut)]
-                let fl_mut: &mut RawMemoryFreeList =
-                    unsafe { &mut *(fl as *const _ as *mut _) };
+                let fl_mut: &mut RawMemoryFreeList = unsafe { &mut *(fl as *const _ as *mut _) };
                 fl_mut.grow_freelist(0);
             }
         }
@@ -168,7 +181,9 @@ impl Map for Map64 {
                 #[allow(clippy::cast_ref_to_mut)]
                 let fl_mut: &mut CommonFreeListPageResource =
                     unsafe { &mut *(fl as *const _ as *mut _) };
-                fl_mut.resize_freelist(conversions::chunk_align_up(self.fl_map[pr].unwrap().get_limit()));
+                fl_mut.resize_freelist(conversions::chunk_align_up(
+                    self.fl_map[pr].unwrap().get_limit(),
+                ));
             }
         }
         self_mut.finalized = true;
@@ -207,14 +222,14 @@ impl Map64 {
     unsafe fn mut_self(&self) -> &mut Self {
         &mut *(self as *const _ as *mut _)
     }
-    
+
     fn space_index(addr: Address) -> Option<usize> {
         if addr > HEAP_END {
-          return None;
+            return None;
         }
         Some(addr.as_usize() >> SPACE_SHIFT_64)
     }
-    
+
     fn is_space_start(base: Address) -> bool {
         (base.as_usize() & !SPACE_MASK_64) == 0
     }

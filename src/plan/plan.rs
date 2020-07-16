@@ -8,6 +8,7 @@ use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
@@ -20,7 +21,6 @@ use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use crate::util::heap::layout::map::Map;
 
 pub trait Plan<VM: VMBinding>: Sized {
     type MutatorT: MutatorContext<VM>;
@@ -125,7 +125,7 @@ pub trait Plan<VM: VMBinding>: Sized {
             self.get_total_pages()
         );
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
-        
+
         space_full || stress_force_gc || heap_full
     }
 
