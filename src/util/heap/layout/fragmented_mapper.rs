@@ -74,7 +74,7 @@ impl Mmapper for FragmentedMapper {
             let high = if end > Self::slab_limit(start) && !Self::slab_limit(start).is_zero() { Self::slab_limit(start) } else { end };
             let slab = Self::slab_align_down(start);
             let start_chunk = Self::chunk_index(slab, start);
-            let end_chunk = Self::chunk_index(slab, conversions::chunk_align_up(high));
+            let end_chunk = Self::chunk_index(slab, Self::chunk_align_up(high));
 
             let mapped = self.get_or_allocate_slab_table(start);
             for i in start_chunk..end_chunk {
@@ -93,7 +93,7 @@ impl Mmapper for FragmentedMapper {
 
             let slab = Self::slab_align_down(start);
             let start_chunk = Self::chunk_index(slab, start);
-            let end_chunk = Self::chunk_index(slab, conversions::chunk_align_up(high));
+            let end_chunk = Self::chunk_index(slab, Self::chunk_align_up(high));
 
             let mapped = self.get_or_allocate_slab_table(start);
         
@@ -142,7 +142,7 @@ impl Mmapper for FragmentedMapper {
 
             let slab = Self::slab_align_down(start);
             let start_chunk = Self::chunk_index(slab, start);
-            let end_chunk = Self::chunk_index(slab, conversions::chunk_align_up(high));
+            let end_chunk = Self::chunk_index(slab, Self::chunk_align_up(high));
 
             let mapped = self.get_or_allocate_slab_table(start);
 
