@@ -16,6 +16,11 @@ jobs:
         uses: actions/checkout@v2
         with:
           path: mmtk-core
+      - name: Check Binding Revision
+        uses: qinsoon/comment-env-vars@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          default_env: 'JIKESRVM_BINDING_REF=master'
       - name: Checkout JikesRVM Binding
         uses: actions/checkout@v2
         with:
@@ -23,6 +28,7 @@ jobs:
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           path: mmtk-jikesrvm
           submodules: true
+          ref: ${{ env.JIKESRVM_BINDING_REF }}
       - name: Overwrite MMTk core in JikesRVM binding
         run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
       - name: Setup
@@ -111,6 +117,11 @@ jobs:
         uses: actions/checkout@v2
         with:
           path: mmtk-core
+      - name: Check Binding Revision
+        uses: qinsoon/comment-env-vars@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          default_env: 'OPENJDK_BINDING_REVISION=master'
       - name: Checkout OpenJDK Binding
         uses: actions/checkout@v2
         with:
@@ -118,6 +129,7 @@ jobs:
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           path: mmtk-openjdk
           submodules: true
+          ref: ${{ env.OPENJDK_BINDING_REVISION }}
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
       - name: Setup
