@@ -86,11 +86,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-<<<<<<< HEAD
           ref: "allow-binding-core-pairs"
-=======
-          ref: "0.2.1"
->>>>>>> master
           path: ci-perf-kit
           submodules: true
       # setup
@@ -102,11 +98,7 @@ jobs:
       - name: Compare Performance
         id: run
         run: |
-<<<<<<< HEAD
           JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm-trunk/ mmtk-core-trunk/ mmtk-jikesrvm-branch/ mmtk-core-branch/ jikesrvm-compare-report.md
-=======
-          JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ jikesrvm-compare-report.md
->>>>>>> master
       # set report.md to output
       - uses: pCYSl5EDgo/cat@master
         id: cat
@@ -216,11 +208,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-<<<<<<< HEAD
           ref: "allow-binding-core-pairs"
-=======
-          ref: "0.2.1"
->>>>>>> master
           path: ci-perf-kit
           submodules: true
       # setup
