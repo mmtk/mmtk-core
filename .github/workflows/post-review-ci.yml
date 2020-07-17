@@ -47,7 +47,7 @@ jobs:
         uses: qinsoon/comment-env-vars@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          default_env: 'JIKESRVM_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,JIKESRVM_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${GITHUB_SHA}'
+          default_env: 'JIKESRVM_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,JIKESRVM_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
       # Trunk
       # - binding
       - name: Checkout JikesRVM Binding Trunk
@@ -169,7 +169,7 @@ jobs:
         uses: qinsoon/comment-env-vars@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${GITHUB_SHA}'
+          default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
       # Trunk
       # - binding
       - name: Checkout OpenJDK Binding Trunk
