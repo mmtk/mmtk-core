@@ -326,11 +326,11 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     pub fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+        vm_map.boot();
         vm_map.finalize_static_space_map(
             self.heap.get_discontig_start(),
             self.heap.get_discontig_end(),
         );
-        vm_map.boot();
         self.heap
             .total_pages
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);
