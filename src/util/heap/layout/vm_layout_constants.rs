@@ -83,6 +83,8 @@ pub const AVAILABLE_BYTES: usize = AVAILABLE_END.get_extent(AVAILABLE_START);
 /** Granularity at which we map and unmap virtual address space in the heap */
 pub const LOG_MMAP_CHUNK_BYTES: usize = 20;
 
+pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES;
+
 /** log_2 of the number of pages in a 64-bit space */
 pub const LOG_PAGES_IN_SPACE64: usize = LOG_SPACE_SIZE_64 as usize - LOG_BYTES_IN_PAGE as usize;
 
