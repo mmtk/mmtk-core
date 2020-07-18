@@ -60,7 +60,7 @@ impl Map for Map64 {
 
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         debug_assert!(Self::is_space_start(start));
-        debug_assert!(cfg!(target_pointer_width = "32") || extent <= SPACE_SIZE_64);
+        debug_assert!(extent <= SPACE_SIZE_64);
         let self_mut = unsafe { self.mut_self() };
         let index = Self::space_index(start).unwrap();
         self_mut.descriptor_map[index] = descriptor;
@@ -78,9 +78,7 @@ impl Map for Map64 {
         grain: i32,
     ) -> Box<Self::FreeList> {
         let self_mut = unsafe { self.mut_self() };
-        // Space space = pr.getSpace();
         let start = pr.get_start();
-        // let extent = space.getExtent();
         let index = Self::space_index(start).unwrap();
 
         units = (units as f64 * NON_MAP_FRACTION) as _;
@@ -98,13 +96,17 @@ impl Map for Map64 {
             heads,
         );
 
-        self_mut.fl_page_resources[index] = Some(unsafe { ::std::mem::transmute(pr) });
+        // `CommonFreeListPageResource` lives as a member in space instances.
+        // Since `Space` instances are always stored as global variables, so it is safe here
+        // to turn `&CommonFreeListPageResource` into `&'static CommonFreeListPageResource`
+        self_mut.fl_page_resources[index] =
+            Some(unsafe { &*(pr as *const CommonFreeListPageResource) });
         self_mut.fl_map[index] =
             Some(unsafe { &*(&list as &RawMemoryFreeList as *const RawMemoryFreeList) });
 
         /* Adjust the base address and highwater to account for the allocated chunks for the map */
         let base = conversions::chunk_align_up(start + list_extent);
-        // unreachable!();
+
         self_mut.high_water[index] = base;
         self_mut.base_address[index] = base;
         list
@@ -163,9 +165,6 @@ impl Map for Map64 {
     fn boot(&self) {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         for pr in 0..MAX_SPACES {
-            // if (flMap[pr] != null) {
-            //   flMap[pr].growFreeList(0);
-            // }
             if let Some(fl) = self_mut.fl_map[pr] {
                 #[allow(clippy::cast_ref_to_mut)]
                 let fl_mut: &mut RawMemoryFreeList = unsafe { &mut *(fl as *const _ as *mut _) };
@@ -227,11 +226,11 @@ impl Map64 {
         if addr > HEAP_END {
             return None;
         }
-        Some(addr.as_usize() >> SPACE_SHIFT_64)
+        Some(addr >> SPACE_SHIFT_64)
     }
 
     fn is_space_start(base: Address) -> bool {
-        (base.as_usize() & !SPACE_MASK_64) == 0
+        (base & !SPACE_MASK_64) == 0
     }
 }
 
