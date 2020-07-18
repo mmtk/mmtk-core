@@ -1,6 +1,5 @@
 use super::mmapper::MMAP_CHUNK_BYTES;
 use super::Mmapper;
-use crate::util::constants::*;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::Address;
@@ -14,15 +13,8 @@ const UNMAPPED: u8 = 0;
 const MAPPED: u8 = 1;
 const PROTECTED: u8 = 2;
 
-const MMAP_NUM_CHUNKS: usize = if_then_else_usize!(
-    LOG_BYTES_IN_ADDRESS_SPACE == 32,
-    1 << (LOG_BYTES_IN_ADDRESS_SPACE as usize - LOG_MMAP_CHUNK_BYTES),
-    1 << (33 - LOG_MMAP_CHUNK_BYTES)
-);
+const MMAP_NUM_CHUNKS: usize = 1 << (33 - LOG_MMAP_CHUNK_BYTES);
 
-#[cfg(target_pointer_width = "32")]
-const LOG_MAPPABLE_BYTES: usize = 32; // can map all virtual space
-#[cfg(target_pointer_width = "64")]
 const LOG_MAPPABLE_BYTES: usize = 36; // 128GB - physical memory larger than this is uncommon
                                       /*
                                        * Size of a slab.  The value 10 gives a slab size of 1GB, with 1024
@@ -177,11 +169,6 @@ impl Mmapper for FragmentedMapper {
 
 impl FragmentedMapper {
     pub fn new() -> Self {
-        if cfg!(feature = "force_32bit_heap_layout") {
-            unreachable!(
-                "Should use ByteMapMmapper if feature `force_32bit_heap_layout` is enabled"
-            );
-        }
         Self {
             lock: Mutex::new(()),
             free_slab_index: 0,

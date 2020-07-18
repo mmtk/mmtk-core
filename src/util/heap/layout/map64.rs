@@ -31,18 +31,11 @@ impl Map for Map64 {
     type FreeList = RawMemoryFreeList;
 
     fn new() -> Self {
-        if cfg!(feature = "force_32bit_heap_layout") {
-            unreachable!("Should use Map32 if feature `force_32bit_heap_layout` is enabled");
-        }
         let mut high_water = vec![Address::ZERO; MAX_SPACES];
         let mut base_address = vec![Address::ZERO; MAX_SPACES];
-        /* Avoid producing an Address that will blow up a 32-bit compiler */
-        #[cfg(target_pointer_width = "64")]
-        const LOG_SPACE_SIZE: usize = LOG_SPACE_SIZE_64;
-        #[cfg(target_pointer_width = "32")]
-        const LOG_SPACE_SIZE: usize = 0;
+
         for i in 0..MAX_SPACES {
-            let base = unsafe { Address::from_usize(i << LOG_SPACE_SIZE) };
+            let base = unsafe { Address::from_usize(i << LOG_SPACE_SIZE_64) };
             high_water[i] = base;
             base_address[i] = base;
         }
