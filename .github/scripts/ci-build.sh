@@ -10,6 +10,7 @@ cargo build --features semispace
 cargo build --features nogc,vm_space
 cargo build --features nogc,vm_space,code_space,ro_space
 cargo build --features nogc,nogc_lock_free
+cargo build --features nogc,nogc_lock_free,nogc_no_zeroing
 cargo build --features semispace,vm_space
 cargo build --features semispace,vm_space,code_space,ro_space
 cargo build --features nogc,sanity
