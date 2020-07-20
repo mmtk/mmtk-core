@@ -3,21 +3,21 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::{Mutex, MutexGuard};
 
-use crate::util::address::Address;
-use crate::util::alloc::embedded_meta_data::*;
-use crate::util::generic_freelist::GenericFreeList;
-use crate::util::heap::pageresource::CommonPageResource;
-use crate::util::{generic_freelist, memory};
 use super::layout::map::Map;
 use super::layout::Mmapper;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
 use super::PageResource;
 use crate::policy::space::Space;
+use crate::util::address::Address;
+use crate::util::alloc::embedded_meta_data::*;
 use crate::util::constants::*;
 use crate::util::conversions;
+use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::OpaquePointer;
+use crate::util::{generic_freelist, memory};
 use crate::vm::VMBinding;
 use std::mem::MaybeUninit;
 
