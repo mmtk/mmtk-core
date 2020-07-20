@@ -24,7 +24,7 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     /// Heap range end
     limit: Address,
     /// Zero memory after slow-path allocation
-    zeroed: bool,
+    slow_path_zeroing: bool,
     phantom: PhantomData<VM>,
 }
 
@@ -97,7 +97,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         if start + bytes > self.limit {
             panic!("OutOfMemory")
         }
-        if self.zeroed {
+        if self.slow_path_zeroing {
             crate::util::memory::zero(start, bytes);
         }
         start
@@ -105,12 +105,12 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
-    pub fn new(name: &'static str, zeroed: bool) -> Self {
+    pub fn new(name: &'static str, slow_path_zeroing: bool) -> Self {
         Self {
             name,
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
             limit: AVAILABLE_END,
-            zeroed,
+            slow_path_zeroing,
             phantom: PhantomData,
         }
     }
