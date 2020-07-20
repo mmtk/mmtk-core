@@ -8,8 +8,6 @@ use crate::util::alloc::embedded_meta_data::*;
 use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::{generic_freelist, memory};
-// #[cfg(target_pointer_width = "32")]
-// FIXME: Use `RawMemoryFreeList` for 64-bit machines
 use super::layout::map::Map;
 use super::layout::Mmapper;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
