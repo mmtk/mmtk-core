@@ -2,15 +2,18 @@ use super::Mmapper;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::Address;
+use atomic::{Atomic, Ordering};
 use std::fmt;
 use std::mem::transmute;
-use std::sync::atomic::AtomicU8;
-use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
-const UNMAPPED: u8 = 0;
-const MAPPED: u8 = 1;
-const PROTECTED: u8 = 2;
+#[repr(u8)]
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum MapState {
+    Unmapped,
+    Mapped,
+    Protected,
+}
 
 const MMAP_NUM_CHUNKS: usize = 1 << (33 - LOG_MMAP_CHUNK_BYTES);
 
@@ -39,7 +42,7 @@ const HASH_MASK: usize = (1 << LOG_SLAB_TABLE_SIZE) - 1;
 const SLAB_TABLE_SIZE: usize = 1 << LOG_SLAB_TABLE_SIZE;
 const SENTINEL: Address = Address::MAX;
 
-type Slab = [AtomicU8; MMAP_NUM_CHUNKS];
+type Slab = [Atomic<MapState>; MMAP_NUM_CHUNKS];
 
 pub struct FragmentedMapper {
     lock: Mutex<()>,
@@ -73,7 +76,7 @@ impl Mmapper for FragmentedMapper {
 
             let mapped = self.get_or_allocate_slab_table(start);
             for entry in mapped.iter().take(end_chunk).skip(start_chunk) {
-                entry.store(MAPPED, Ordering::Relaxed);
+                entry.store(MapState::Mapped, Ordering::Relaxed);
             }
             start = high;
         }
@@ -98,20 +101,20 @@ impl Mmapper for FragmentedMapper {
 
             /* Iterate over the chunks within the slab */
             for (chunk, entry) in mapped.iter().enumerate().take(end_chunk).skip(start_chunk) {
-                if entry.load(Ordering::Relaxed) == MAPPED {
+                if entry.load(Ordering::Relaxed) == MapState::Mapped {
                     continue;
                 }
                 let mmap_start = Self::chunk_index_to_address(base, chunk);
                 let _guard = self.lock.lock().unwrap();
 
                 // might have become MAPPED here
-                if entry.load(Ordering::Relaxed) == UNMAPPED {
+                if entry.load(Ordering::Relaxed) == MapState::Unmapped {
                     crate::util::memory::dzmmap(mmap_start, MMAP_CHUNK_BYTES).unwrap();
                 }
-                if entry.load(Ordering::Relaxed) == PROTECTED {
+                if entry.load(Ordering::Relaxed) == MapState::Protected {
                     crate::util::memory::munprotect(mmap_start, MMAP_CHUNK_BYTES).unwrap();
                 }
-                entry.store(MAPPED, Ordering::Relaxed);
+                entry.store(MapState::Mapped, Ordering::Relaxed);
             }
             start = high;
         }
@@ -128,7 +131,7 @@ impl Mmapper for FragmentedMapper {
         match mapped {
             Some(mapped) => {
                 mapped[Self::chunk_index(Self::slab_align_down(addr), addr)].load(Ordering::Relaxed)
-                    == MAPPED
+                    == MapState::Mapped
             }
             _ => false,
         }
@@ -153,12 +156,12 @@ impl Mmapper for FragmentedMapper {
             let mapped = self.get_or_allocate_slab_table(start);
 
             for (chunk, entry) in mapped.iter().enumerate().take(end_chunk).skip(start_chunk) {
-                if entry.load(Ordering::Relaxed) == MAPPED {
+                if entry.load(Ordering::Relaxed) == MapState::Mapped {
                     let mmap_start = Self::chunk_index_to_address(base, chunk);
                     crate::util::memory::mprotect(mmap_start, MMAP_CHUNK_BYTES).unwrap();
-                    entry.store(PROTECTED, Ordering::Relaxed);
+                    entry.store(MapState::Protected, Ordering::Relaxed);
                 } else {
-                    debug_assert!(entry.load(Ordering::Relaxed) == PROTECTED);
+                    debug_assert!(entry.load(Ordering::Relaxed) == MapState::Protected);
                 }
             }
             start = high;
@@ -178,7 +181,7 @@ impl FragmentedMapper {
     }
 
     fn new_slab() -> Box<Slab> {
-        let mapped: Box<Slab> = box unsafe { transmute([UNMAPPED; MMAP_NUM_CHUNKS]) };
+        let mapped: Box<Slab> = box unsafe { transmute([MapState::Unmapped; MMAP_NUM_CHUNKS]) };
         mapped
     }
 

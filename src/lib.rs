@@ -15,6 +15,7 @@ extern crate libc;
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
+extern crate atomic;
 extern crate atomic_traits;
 extern crate crossbeam_deque;
 extern crate num_cpus;
