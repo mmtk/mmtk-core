@@ -10,7 +10,7 @@ jobs:
   # JikesRVM
   jikesrvm-binding-test:
     runs-on: ubuntu-18.04
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-approved') || contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -35,7 +35,7 @@ jobs:
           RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
   jikesrvm-perf-compare:
     runs-on: [self-hosted, Linux, freq-scaling-off]
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-approved') || contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
       - name: Checkout JikesRVM Binding
         uses: actions/checkout@v2
@@ -105,7 +105,7 @@ jobs:
   # OpenJDK
   openjdk-binding-test:
     runs-on: ubuntu-18.04
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-approved') || contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -132,7 +132,7 @@ jobs:
           RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./.github/scripts/ci-test.sh
   openjdk-perf-compare:
     runs-on: [self-hosted, Linux, freq-scaling-off]
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-approved') || contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
       - name: Checkout OpenJDK Binding
         uses: actions/checkout@v2
