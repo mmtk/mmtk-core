@@ -58,17 +58,20 @@ pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0xb000
 pub const HEAP_END: Address =
     chunk_align_up(unsafe { Address::from_usize(0x0000_2000_0000_0000usize) });
 
+/// vm-sapce size (currently only used by jikesrvm)
+#[cfg(any(target_pointer_width = "32", feature = "force_32bit_heap_layout"))]
+pub const VM_SPACE_SIZE: usize =
+    chunk_align_up(unsafe { Address::from_usize(0x800_0000) }).as_usize();
+#[cfg(all(target_pointer_width = "64", not(feature = "force_32bit_heap_layout")))]
+pub const VM_SPACE_SIZE: usize =
+    chunk_align_up(unsafe { Address::from_usize(0xdc0_0000) }).as_usize();
+
 /**
  * Lowest virtual address available for MMTk to manage.  The address space between
  * HEAP_START and AVAILABLE_START comprises memory directly managed by the VM,
  * and not available to MMTk.
  */
-#[cfg(any(target_pointer_width = "32", feature = "force_32bit_heap_layout"))]
-pub const AVAILABLE_START: Address =
-    chunk_align_up(unsafe { Address::from_usize(0x6700_0000 + (0x6400_0000 - 0x6000_0000) / 5) });
-#[cfg(all(target_pointer_width = "64", not(feature = "force_32bit_heap_layout")))]
-pub const AVAILABLE_START: Address =
-    chunk_align_up(unsafe { Address::from_usize(0x0000_0200_0dc0_0000usize) });
+pub const AVAILABLE_START: Address = HEAP_START.add(VM_SPACE_SIZE);
 
 /**
  * Highest virtual address available for MMTk to manage.  The address space between
