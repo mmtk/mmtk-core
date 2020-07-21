@@ -101,18 +101,18 @@ impl Mmapper for FragmentedMapper {
 
             /* Iterate over the chunks within the slab */
             for (chunk, entry) in mapped.iter().enumerate().take(end_chunk).skip(start_chunk) {
-                if entry.load(Ordering::Relaxed) == MapState::Mapped {
-                    continue;
-                }
-                let mmap_start = Self::chunk_index_to_address(base, chunk);
-                let _guard = self.lock.lock().unwrap();
-
-                // might have become MAPPED here
-                if entry.load(Ordering::Relaxed) == MapState::Unmapped {
-                    crate::util::memory::dzmmap(mmap_start, MMAP_CHUNK_BYTES).unwrap();
-                }
-                if entry.load(Ordering::Relaxed) == MapState::Protected {
-                    crate::util::memory::munprotect(mmap_start, MMAP_CHUNK_BYTES).unwrap();
+                match entry.load(Ordering::Relaxed) {
+                    MapState::Mapped => continue,
+                    MapState::Unmapped => {
+                        let mmap_start = Self::chunk_index_to_address(base, chunk);
+                        let _guard = self.lock.lock().unwrap();
+                        crate::util::memory::dzmmap(mmap_start, MMAP_CHUNK_BYTES).unwrap();
+                    }
+                    MapState::Protected => {
+                        let mmap_start = Self::chunk_index_to_address(base, chunk);
+                        let _guard = self.lock.lock().unwrap();
+                        crate::util::memory::munprotect(mmap_start, MMAP_CHUNK_BYTES).unwrap();
+                    }
                 }
                 entry.store(MapState::Mapped, Ordering::Relaxed);
             }
