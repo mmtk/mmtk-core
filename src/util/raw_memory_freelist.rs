@@ -202,3 +202,339 @@ impl RawMemoryFreeList {
         self.limit
     }
 }
+
+/**
+ * See documentation of `mod tests` below for the necessity of `impl Drop`.
+ */
+#[cfg(test)]
+impl Drop for RawMemoryFreeList {
+    fn drop(&mut self) {
+        let len = self.high_water - self.base;
+        if len != 0 {
+            unsafe {
+                ::libc::munmap(self.base.as_usize() as _, len);
+            }
+        }
+    }
+}
+
+/**
+ * The initialization of `RawMemoryFreeList` involves memory-mapping a fixed range of virtual address.
+ *
+ * This raises an implicit assumption that a test process can only have one `RawMemoryFreeList` instance at a time unless each instance uses different fixed address ranges.
+ *
+ * We use a single fixed address range for all the following tests. So the tests cannot be executed in parallel. Which means:
+ *
+ * 1. Each test should hold a global mutex to prevent parallel execution.
+ * 2. `RawMemoryFreeList` should implement `Drop` trait to unmap the memory properly at the end of each test.
+ */
+#[cfg(test)]
+mod tests {
+    use super::GenericFreeList;
+    use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    const TOP_SENTINEL: i32 = -1;
+    const FIRST_UNIT: i32 = 0;
+
+    lazy_static! {
+        /**
+         * See documentation of `mod tests` above for for the necessity of this mutex.
+         */
+        static ref MUTEX: Mutex<()> = Mutex::new(());
+    }
+
+    fn new_raw_memory_freelist<'a>(list_size: usize, grain: i32) -> (MutexGuard<'a, ()>, RawMemoryFreeList, i32, i32, i32) {
+        /*
+         * Note: The mutex could be poisoned!
+         * Test `free_list_access_out_of_bounds` below is expected to panic and poison the mutex.
+         * So we need to manually recover the lock here, if it is poisoned.
+         *
+         * See documentation of `mod tests` above for more details.
+         */
+        let guard = match MUTEX.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let start = unsafe { Address::from_usize(0x80000000000) };
+        let extent = BYTES_IN_PAGE;
+        let pages_per_block = RawMemoryFreeList::default_block_size(list_size as _, 1);
+        assert_eq!(pages_per_block, 1);
+        let mut l = RawMemoryFreeList::new(start, start + extent, pages_per_block, list_size as _, grain, 1);
+        // Grow the free-list to do the actual memory-mapping.
+        l.grow_freelist(list_size as _);
+        let last_unit = list_size as i32 - grain;
+        let bottom_sentinel = list_size as i32;
+        (guard, l, list_size as _, last_unit, bottom_sentinel)
+    }
+
+    #[test]
+    #[allow(clippy::cognitive_complexity)] // extensive checks, and it doesn't matter for tests
+    fn new_free_list_grain1() {
+        let (_guard, l, _, last_unit, bottom_sentinel) = new_raw_memory_freelist(5, 1);
+        assert_eq!(l.head(), TOP_SENTINEL);
+
+        assert_eq!(l.get_prev(TOP_SENTINEL), last_unit);
+        assert_eq!(l.get_next(TOP_SENTINEL), FIRST_UNIT);
+
+        assert_eq!(l.get_size(FIRST_UNIT), 1);
+        assert_eq!(l.get_left(FIRST_UNIT), -1);
+        assert_eq!(l.get_prev(FIRST_UNIT), -1);
+        assert_eq!(l.get_right(FIRST_UNIT), 1);
+        assert_eq!(l.get_next(FIRST_UNIT), 1);
+        assert_eq!(l.is_free(FIRST_UNIT), true);
+        assert_eq!(l.is_coalescable(FIRST_UNIT), true);
+        assert_eq!(l.is_multi(FIRST_UNIT), false);
+
+        assert_eq!(l.get_size(1), 1);
+        assert_eq!(l.get_left(1), 0);
+        assert_eq!(l.get_prev(1), 0);
+        assert_eq!(l.get_right(1), 2);
+        assert_eq!(l.get_next(1), 2);
+        assert_eq!(l.is_free(1), true);
+        assert_eq!(l.is_coalescable(1), true);
+        assert_eq!(l.is_multi(1), false);
+
+        assert_eq!(l.get_size(last_unit), 1);
+        assert_eq!(l.get_left(last_unit), last_unit - 1);
+        assert_eq!(l.get_prev(last_unit), last_unit - 1);
+        assert_eq!(l.get_right(last_unit), bottom_sentinel);
+        assert_eq!(l.get_next(last_unit), -1);
+        assert_eq!(l.is_free(last_unit), true);
+        assert_eq!(l.is_coalescable(last_unit), true);
+        assert_eq!(l.is_multi(last_unit), false);
+
+        assert_eq!(l.get_prev(bottom_sentinel), bottom_sentinel);
+        assert_eq!(l.get_next(bottom_sentinel), bottom_sentinel);
+    }
+
+    #[test]
+    #[allow(clippy::cognitive_complexity)] // extensive checks, and it doesn't matter for tests
+    fn new_free_list_grain2() {
+        let (_guard, l, _, last_unit, bottom_sentinel) = new_raw_memory_freelist(6, 2);
+        assert_eq!(l.head(), TOP_SENTINEL);
+
+        assert_eq!(l.get_prev(TOP_SENTINEL), last_unit);
+        assert_eq!(l.get_next(TOP_SENTINEL), FIRST_UNIT);
+
+        assert_eq!(l.get_size(FIRST_UNIT), 2);
+        assert_eq!(l.get_left(FIRST_UNIT), -1);
+        assert_eq!(l.get_prev(FIRST_UNIT), -1);
+        assert_eq!(l.get_right(FIRST_UNIT), 2);
+        assert_eq!(l.get_next(FIRST_UNIT), 2);
+        assert_eq!(l.is_free(FIRST_UNIT), true);
+        assert_eq!(l.is_coalescable(FIRST_UNIT), true);
+        assert_eq!(l.is_multi(FIRST_UNIT), true);
+
+        assert_eq!(l.get_size(2), 2);
+        assert_eq!(l.get_left(2), 0);
+        assert_eq!(l.get_prev(2), 0);
+        assert_eq!(l.get_right(2), 4);
+        assert_eq!(l.get_next(2), 4);
+        assert_eq!(l.is_free(2), true);
+        assert_eq!(l.is_coalescable(2), true);
+        assert_eq!(l.is_multi(2), true);
+
+        assert_eq!(l.get_size(last_unit), 2);
+        assert_eq!(l.get_left(last_unit), last_unit - 2);
+        assert_eq!(l.get_prev(last_unit), last_unit - 2);
+        assert_eq!(l.get_right(last_unit), bottom_sentinel);
+        assert_eq!(l.get_next(last_unit), -1);
+        assert_eq!(l.is_free(last_unit), true);
+        assert_eq!(l.is_coalescable(last_unit), true);
+        assert_eq!(l.is_multi(last_unit), true);
+
+        assert_eq!(l.get_prev(bottom_sentinel), bottom_sentinel);
+        assert_eq!(l.get_next(bottom_sentinel), bottom_sentinel);
+    }
+
+    #[test]
+    #[should_panic]
+    fn free_list_access_out_of_bounds() {
+        let (_guard, l, _, _, _) = new_raw_memory_freelist(5, 1);
+        l.get_size(4096);
+        // `_guard` should be dropped during stack unwinding
+    }
+
+    #[test]
+    fn alloc_fit() {
+        let (_guard, mut l, _, last_unit, _) = new_raw_memory_freelist(6, 2);
+        let result = l.alloc(2);
+        assert_eq!(result, 0);
+
+        const NEXT: i32 = 2;
+
+        assert_eq!(l.get_prev(TOP_SENTINEL), last_unit);
+        assert_eq!(l.get_next(TOP_SENTINEL), NEXT);
+
+        assert_eq!(l.get_size(FIRST_UNIT), 2);
+        assert_eq!(l.get_left(FIRST_UNIT), -1);
+        assert_eq!(l.get_prev(FIRST_UNIT), -1);
+        assert_eq!(l.get_right(FIRST_UNIT), 2);
+        assert_eq!(l.get_next(FIRST_UNIT), 2);
+        assert_eq!(l.is_free(FIRST_UNIT), false); // not free
+        assert_eq!(l.is_coalescable(FIRST_UNIT), true);
+        assert_eq!(l.is_multi(FIRST_UNIT), true);
+
+        assert_eq!(l.get_size(2), 2);
+        assert_eq!(l.get_left(2), 0);
+        assert_eq!(l.get_prev(2), -1); // no prev now
+        assert_eq!(l.get_right(2), 4);
+        assert_eq!(l.get_next(2), 4);
+        assert_eq!(l.is_free(2), true);
+        assert_eq!(l.is_coalescable(2), true);
+        assert_eq!(l.is_multi(2), true);
+    }
+
+    #[test]
+    #[allow(clippy::cognitive_complexity)] // extensive checks, and it doesn't matter for tests
+    fn alloc_split() {
+        let (_guard, mut l, _, last_unit, _) = new_raw_memory_freelist(6, 2);
+        let result = l.alloc(1);
+        assert_eq!(result, 0);
+
+        const NEXT: i32 = 1;
+        assert_eq!(l.get_prev(TOP_SENTINEL), last_unit);
+        assert_eq!(l.get_next(TOP_SENTINEL), NEXT);
+
+        assert_eq!(l.get_size(FIRST_UNIT), 1);
+        assert_eq!(l.get_left(FIRST_UNIT), -1);
+        assert_eq!(l.get_prev(FIRST_UNIT), 1); // prev is 1 now
+        assert_eq!(l.get_right(FIRST_UNIT), 1); // right is 1 now
+        assert_eq!(l.get_next(FIRST_UNIT), 2);
+        assert_eq!(l.is_free(FIRST_UNIT), false); // not free
+        assert_eq!(l.is_coalescable(FIRST_UNIT), true);
+        assert_eq!(l.is_multi(FIRST_UNIT), false); // not multi
+
+        assert_eq!(l.get_size(1), 1);
+        assert_eq!(l.get_left(1), 0); // unit1's left is 0
+        assert_eq!(l.get_prev(1), -1); // unit1's prev is -1 (no prev, unit1 is removed form the list)
+        assert_eq!(l.get_right(1), 2);
+        assert_eq!(l.get_next(1), 2);
+        assert_eq!(l.is_free(1), true); // not free
+        assert_eq!(l.is_coalescable(1), true);
+        assert_eq!(l.is_multi(1), false); // not multi
+
+        assert_eq!(l.get_size(2), 2);
+        assert_eq!(l.get_left(2), 1);
+        assert_eq!(l.get_prev(2), 1); // uni2's prev is 1 now
+        assert_eq!(l.get_right(2), 4);
+        assert_eq!(l.get_next(2), 4);
+        assert_eq!(l.is_free(2), true);
+        assert_eq!(l.is_coalescable(2), true);
+        assert_eq!(l.is_multi(2), true);
+    }
+
+    #[test]
+    fn alloc_split_twice() {
+        let (_guard, mut l, _, _, _) = new_raw_memory_freelist(6, 2);
+        // Alloc size 1 and cause split
+        let res1 = l.alloc(1);
+        assert_eq!(res1, 0);
+        // Alloc size 1
+        let res2 = l.alloc(1);
+        assert_eq!(res2, 1);
+
+        // Next available unit has no prev now
+        assert_eq!(l.get_prev(2), -1);
+    }
+
+    #[test]
+    fn alloc_skip() {
+        let (_guard, mut l, _, _, _) = new_raw_memory_freelist(6, 2);
+        // Alloc size 1 and cause split
+        let res1 = l.alloc(1);
+        assert_eq!(res1, 0);
+        // Alloc size 2, we skip unit1
+        let res2 = l.alloc(2);
+        assert_eq!(res2, 2);
+
+        // unit1 is still free, and linked with unit4
+        assert_eq!(l.is_free(1), true);
+        assert_eq!(l.get_next(1), 4);
+        assert_eq!(l.get_prev(4), 1);
+    }
+
+    #[test]
+    fn alloc_exhaust() {
+        let (_guard, mut l, _, _, _) = new_raw_memory_freelist(6, 2);
+        let res1 = l.alloc(2);
+        assert_eq!(res1, 0);
+        let res2 = l.alloc(2);
+        assert_eq!(res2, 2);
+        let res3 = l.alloc(2);
+        assert_eq!(res3, 4);
+        let res4 = l.alloc(2);
+        assert_eq!(res4, FAILURE);
+    }
+
+    #[test]
+    fn free_unit() {
+        let (_guard, mut l, _, _, _) = new_raw_memory_freelist(6, 2);
+        let res1 = l.alloc(2);
+        assert_eq!(res1, 0);
+        let res2 = l.alloc(2);
+        assert_eq!(res2, 2);
+
+        // Unit4 is still free, but has no prev
+        assert_eq!(l.get_prev(4), -1);
+
+        // Free Unit2
+        let freed = l.free(res2, false);
+        assert_eq!(freed, res2);
+        assert_eq!(l.is_free(res2), true);
+    }
+
+    #[test]
+    fn free_coalesce() {
+        let (_guard, mut l, _, _, _) = new_raw_memory_freelist(6, 2);
+        let res1 = l.alloc(2);
+        assert_eq!(res1, 0);
+        let res2 = l.alloc(2);
+        assert_eq!(res2, 2);
+
+        // Free Unit2. It will coalesce with Unit4
+        let coalesced_size = l.free(res2, true);
+        assert_eq!(coalesced_size, 4);
+    }
+
+    #[test]
+    fn free_cant_coalesce() {
+        let (_guard, mut l, _, _, _) = new_raw_memory_freelist(6, 2);
+        let res1 = l.alloc(2);
+        assert_eq!(res1, 0);
+        let res2 = l.alloc(2);
+        assert_eq!(res2, 2);
+        let res3 = l.alloc(1);
+        assert_eq!(res3, 4);
+
+        // Free Unit2. It cannot coalesce with Unit4
+        let coalesced_size = l.free(res2, true);
+        assert_eq!(coalesced_size, 2);
+    }
+
+    #[test]
+    fn free_realloc() {
+        let (_guard, mut l, _, _, _) = new_raw_memory_freelist(6, 2);
+        let res1 = l.alloc(2);
+        assert_eq!(res1, 0);
+        let res2 = l.alloc(2);
+        assert_eq!(res2, 2);
+
+        // Unit4 is still free, but has no prev
+        assert_eq!(l.get_prev(4), -1);
+
+        // Free Unit2
+        let freed = l.free(res2, false);
+        assert_eq!(freed, res2);
+        assert_eq!(l.is_free(res2), true);
+
+        // Alloc again
+        let res3 = l.alloc(2);
+        assert_eq!(res3, 2);
+        assert_eq!(l.is_free(res3), false);
+
+        let res4 = l.alloc(1);
+        assert_eq!(res4, 4);
+    }
+}
