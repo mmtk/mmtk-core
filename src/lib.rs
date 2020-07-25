@@ -15,6 +15,7 @@ extern crate libc;
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
+#[cfg(target = "x86_64-unknown-linux-gnu")]
 extern crate atomic;
 extern crate atomic_traits;
 extern crate crossbeam_deque;
