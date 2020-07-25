@@ -244,7 +244,10 @@ mod tests {
         static ref MUTEX: Mutex<()> = Mutex::new(());
     }
 
-    fn new_raw_memory_freelist<'a>(list_size: usize, grain: i32) -> (MutexGuard<'a, ()>, RawMemoryFreeList, i32, i32, i32) {
+    fn new_raw_memory_freelist<'a>(
+        list_size: usize,
+        grain: i32,
+    ) -> (MutexGuard<'a, ()>, RawMemoryFreeList, i32, i32, i32) {
         /*
          * Note: The mutex could be poisoned!
          * Test `free_list_access_out_of_bounds` below is expected to panic and poison the mutex.
@@ -256,11 +259,18 @@ mod tests {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
-        let start = unsafe { Address::from_usize(0x80000000000) };
+        let start = unsafe { Address::from_usize(0x8000_0000) };
         let extent = BYTES_IN_PAGE;
         let pages_per_block = RawMemoryFreeList::default_block_size(list_size as _, 1);
         assert_eq!(pages_per_block, 1);
-        let mut l = RawMemoryFreeList::new(start, start + extent, pages_per_block, list_size as _, grain, 1);
+        let mut l = RawMemoryFreeList::new(
+            start,
+            start + extent,
+            pages_per_block,
+            list_size as _,
+            grain,
+            1,
+        );
         // Grow the free-list to do the actual memory-mapping.
         l.grow_freelist(list_size as _);
         let last_unit = list_size as i32 - grain;

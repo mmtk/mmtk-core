@@ -311,13 +311,12 @@ impl Default for FragmentedMapper {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::util::{conversions, Address};
-    use crate::util::constants::LOG_BYTES_IN_PAGE;
-    use crate::util::heap::layout::vm_layout_constants::{MMAP_CHUNK_BYTES, AVAILABLE_START};
     use super::*;
+    use crate::util::constants::LOG_BYTES_IN_PAGE;
+    use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_START, MMAP_CHUNK_BYTES};
+    use crate::util::{conversions, Address};
 
     const FIXED_ADDRESS: Address = AVAILABLE_START;
 
@@ -329,9 +328,13 @@ mod tests {
         assert_eq!(conversions::mmap_chunk_align_up(chunk), chunk);
         let mapped = mmapper.slab_table(chunk);
         match mapped {
-            Some(mapped) => {
-                Some(mapped[FragmentedMapper::chunk_index(FragmentedMapper::slab_align_down(chunk), chunk)].load(Ordering::Relaxed))
-            }
+            Some(mapped) => Some(
+                mapped[FragmentedMapper::chunk_index(
+                    FragmentedMapper::slab_align_down(chunk),
+                    chunk,
+                )]
+                .load(Ordering::Relaxed),
+            ),
             _ => None,
         }
     }
@@ -341,21 +344,18 @@ mod tests {
         for i in 0..10 {
             unsafe {
                 let a = i << LOG_MMAP_SLAB_BYTES;
-                assert_eq!(
-                    FragmentedMapper::hash(Address::from_usize(a)),
-                    i
-                );
+                assert_eq!(FragmentedMapper::hash(Address::from_usize(a)), i);
 
                 let b = a + ((i + 1) << (LOG_MMAP_SLAB_BYTES + LOG_SLAB_TABLE_SIZE + 1));
                 assert_eq!(
                     FragmentedMapper::hash(Address::from_usize(b)),
-                    0 ^ i ^ ((i + 1) << 1)
+                    i ^ ((i + 1) << 1)
                 );
 
                 let c = b + ((i + 2) << (LOG_MMAP_SLAB_BYTES + LOG_SLAB_TABLE_SIZE * 2 + 2));
                 assert_eq!(
                     FragmentedMapper::hash(Address::from_usize(c)),
-                    0 ^ i ^ ((i + 1) << 1) ^ ((i + 2) << 2)
+                    i ^ ((i + 1) << 1) ^ ((i + 2) << 2)
                 );
             }
         }
@@ -369,7 +369,10 @@ mod tests {
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
-            assert_eq!(get_chunk_map_state(&mmapper, FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)), Some(MapState::Mapped));
+            assert_eq!(
+                get_chunk_map_state(&mmapper, FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)),
+                Some(MapState::Mapped)
+            );
         }
     }
     #[test]
@@ -380,7 +383,10 @@ mod tests {
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
-            assert_eq!(get_chunk_map_state(&mmapper, FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)), Some(MapState::Mapped));
+            assert_eq!(
+                get_chunk_map_state(&mmapper, FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)),
+                Some(MapState::Mapped)
+            );
         }
     }
 
@@ -392,7 +398,10 @@ mod tests {
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
-            assert_eq!(get_chunk_map_state(&mmapper, FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)), Some(MapState::Mapped));
+            assert_eq!(
+                get_chunk_map_state(&mmapper, FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)),
+                Some(MapState::Mapped)
+            );
         }
     }
 
@@ -406,8 +415,14 @@ mod tests {
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
 
-        assert_eq!(get_chunk_map_state(&mmapper, FIXED_ADDRESS), Some(MapState::Protected));
-        assert_eq!(get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES), Some(MapState::Mapped));
+        assert_eq!(
+            get_chunk_map_state(&mmapper, FIXED_ADDRESS),
+            Some(MapState::Protected)
+        );
+        assert_eq!(
+            get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
+            Some(MapState::Mapped)
+        );
     }
 
     #[test]
@@ -420,12 +435,24 @@ mod tests {
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
 
-        assert_eq!(get_chunk_map_state(&mmapper, FIXED_ADDRESS), Some(MapState::Protected));
-        assert_eq!(get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES), Some(MapState::Mapped));
+        assert_eq!(
+            get_chunk_map_state(&mmapper, FIXED_ADDRESS),
+            Some(MapState::Protected)
+        );
+        assert_eq!(
+            get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
+            Some(MapState::Mapped)
+        );
 
         // ensure mapped - this will unprotect the previously protected chunk
         mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2);
-        assert_eq!(get_chunk_map_state(&mmapper, FIXED_ADDRESS), Some(MapState::Mapped));
-        assert_eq!(get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES), Some(MapState::Mapped));
+        assert_eq!(
+            get_chunk_map_state(&mmapper, FIXED_ADDRESS),
+            Some(MapState::Mapped)
+        );
+        assert_eq!(
+            get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
+            Some(MapState::Mapped)
+        );
     }
 }
