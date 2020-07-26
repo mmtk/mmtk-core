@@ -3,32 +3,34 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::{Mutex, MutexGuard};
 
-use crate::util::address::Address;
-use crate::util::alloc::embedded_meta_data::*;
-use crate::util::generic_freelist::GenericFreeList;
-use crate::util::heap::pageresource::CommonPageResource;
-use crate::util::{generic_freelist, memory};
-// #[cfg(target_pointer_width = "32")]
-// FIXME: Use `RawMemoryFreeList` for 64-bit machines
+use super::layout::map::Map;
 use super::layout::Mmapper;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
 use super::PageResource;
 use crate::policy::space::Space;
+use crate::util::address::Address;
+use crate::util::alloc::embedded_meta_data::*;
 use crate::util::constants::*;
 use crate::util::conversions;
+use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
-use crate::util::int_array_freelist::IntArrayFreeList as FreeList;
+use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::OpaquePointer;
+use crate::util::{generic_freelist, memory};
 use crate::vm::VMBinding;
 use std::mem::MaybeUninit;
 
 pub struct CommonFreeListPageResource {
-    free_list: FreeList,
+    free_list: Box<<VMMap as Map>::FreeList>,
     start: Address,
 }
 
 impl CommonFreeListPageResource {
+    pub fn get_start(&self) -> Address {
+        self.start
+    }
+
     pub fn resize_freelist(&mut self, start_address: Address) {
         // debug_assert!((HEAP_LAYOUT_64BIT || !contiguous) && !Plan.isInitialized());
         self.start = start_address.align_up(BYTES_IN_REGION);
@@ -151,7 +153,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             });
             ::std::ptr::write(
                 &mut common_flpr.free_list,
-                vm_map.create_parent_freelist(pages, PAGES_IN_REGION as _),
+                vm_map.create_parent_freelist(&common_flpr, pages, PAGES_IN_REGION as _),
             );
             common_flpr
         };

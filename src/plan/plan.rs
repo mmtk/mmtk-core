@@ -8,6 +8,7 @@ use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
@@ -325,6 +326,7 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     pub fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+        vm_map.boot();
         vm_map.finalize_static_space_map(
             self.heap.get_discontig_start(),
             self.heap.get_discontig_end(),

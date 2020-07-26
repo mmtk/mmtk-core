@@ -1,3 +1,4 @@
+use super::map::Map;
 use crate::mmtk::SFT_MAP;
 use crate::util::conversions;
 use crate::util::generic_freelist::GenericFreeList;
@@ -29,8 +30,10 @@ pub struct Map32 {
     cumulative_committed_pages: AtomicUsize,
 }
 
-impl Map32 {
-    pub fn new() -> Self {
+impl Map for Map32 {
+    type FreeList = IntArrayFreeList;
+
+    fn new() -> Self {
         Map32 {
             prev_link: vec![0; MAX_CHUNKS],
             next_link: vec![0; MAX_CHUNKS],
@@ -46,16 +49,7 @@ impl Map32 {
         }
     }
 
-    // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
-    // of the same unsafe code.
-    // FIXME: We need a safe implementation.
-    #[allow(clippy::cast_ref_to_mut)]
-    #[allow(clippy::mut_from_ref)]
-    unsafe fn mut_self(&self) -> &mut Self {
-        &mut *(self as *const _ as *mut _)
-    }
-
-    pub fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
+    fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         let mut e = 0;
         while e < extent {
@@ -70,18 +64,23 @@ impl Map32 {
         }
     }
 
-    pub fn create_freelist(&self, pr: &CommonFreeListPageResource) -> IntArrayFreeList {
-        IntArrayFreeList::from_parent(
+    fn create_freelist(&self, pr: &CommonFreeListPageResource) -> Box<Self::FreeList> {
+        box IntArrayFreeList::from_parent(
             &self.global_page_map,
             self.get_discontig_freelist_pr_ordinal(pr) as _,
         )
     }
 
-    pub fn create_parent_freelist(&self, units: usize, grain: i32) -> IntArrayFreeList {
-        IntArrayFreeList::new(units, grain, 1)
+    fn create_parent_freelist(
+        &self,
+        _pr: &CommonFreeListPageResource,
+        units: usize,
+        grain: i32,
+    ) -> Box<Self::FreeList> {
+        box IntArrayFreeList::new(units, grain, 1)
     }
 
-    pub fn allocate_contiguous_chunks(
+    fn allocate_contiguous_chunks(
         &self,
         descriptor: SpaceDescriptor,
         chunks: usize,
@@ -107,7 +106,7 @@ impl Map32 {
         rtn
     }
 
-    pub fn get_next_contiguous_region(&self, start: Address) -> Address {
+    fn get_next_contiguous_region(&self, start: Address) -> Address {
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = self.get_chunk_index(start);
         if chunk == 0 || self.next_link[chunk] == 0 {
@@ -118,13 +117,13 @@ impl Map32 {
         }
     }
 
-    pub fn get_contiguous_region_chunks(&self, start: Address) -> usize {
+    fn get_contiguous_region_chunks(&self, start: Address) -> usize {
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = self.get_chunk_index(start);
         self.region_map.size(chunk as i32) as _
     }
 
-    pub fn get_contiguous_region_size(&self, start: Address) -> usize {
+    fn get_contiguous_region_size(&self, start: Address) -> usize {
         self.get_contiguous_region_chunks(start) << LOG_BYTES_IN_CHUNK
     }
 
@@ -133,7 +132,7 @@ impl Map32 {
     // The two while loops can end.
     // TODO: We need to check the correctness, especially check thread safety.
     #[allow(clippy::while_immutable_condition)]
-    pub fn free_all_chunks(&self, any_chunk: Address) {
+    fn free_all_chunks(&self, any_chunk: Address) {
         let _sync = self.sync.lock().unwrap();
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
         if !any_chunk.is_zero() {
@@ -150,36 +149,14 @@ impl Map32 {
         }
     }
 
-    pub fn free_contiguous_chunks(&self, start: Address) -> usize {
+    fn free_contiguous_chunks(&self, start: Address) -> usize {
         let _sync = self.sync.lock().unwrap();
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = self.get_chunk_index(start);
         self.free_contiguous_chunks_no_lock(chunk as _)
     }
 
-    fn free_contiguous_chunks_no_lock(&self, chunk: i32) -> usize {
-        let self_mut: &mut Self = unsafe { self.mut_self() };
-        let chunks = self_mut.region_map.free(chunk, false);
-        self_mut.total_available_discontiguous_chunks += chunks as usize;
-        let next = self.next_link[chunk as usize];
-        let prev = self.prev_link[chunk as usize];
-        if next != 0 {
-            self_mut.prev_link[next as usize] = prev
-        };
-        if prev != 0 {
-            self_mut.next_link[prev as usize] = next
-        };
-        self_mut.prev_link[chunk as usize] = 0;
-        self_mut.next_link[chunk as usize] = 0;
-        for offset in 0..chunks {
-            self_mut.descriptor_map[(chunk + offset) as usize] = SpaceDescriptor::UNINITIALIZED;
-            SFT_MAP.clear((chunk + offset) as usize);
-            // VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, chunk + offset, null);
-        }
-        chunks as _
-    }
-
-    pub fn finalize_static_space_map(&self, from: Address, to: Address) {
+    fn finalize_static_space_map(&self, from: Address, to: Address) {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         /* establish bounds of discontiguous space */
         let start_address = from;
@@ -233,11 +210,11 @@ impl Map32 {
         self_mut.finalized = true;
     }
 
-    pub fn is_finalized(&self) -> bool {
+    fn is_finalized(&self) -> bool {
         self.finalized
     }
 
-    pub fn get_discontig_freelist_pr_ordinal(&self, pr: &CommonFreeListPageResource) -> usize {
+    fn get_discontig_freelist_pr_ordinal(&self, pr: &CommonFreeListPageResource) -> usize {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         self_mut.shared_fl_map[self.shared_discontig_fl_count] =
             Some(unsafe { &*(pr as *const CommonFreeListPageResource) });
@@ -245,26 +222,51 @@ impl Map32 {
         self.shared_discontig_fl_count
     }
 
-    pub fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
+    fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
         let index = self.get_chunk_index(address);
         self.descriptor_map[index]
     }
 
-    fn get_chunk_index(&self, address: Address) -> usize {
-        address >> LOG_BYTES_IN_CHUNK
-    }
-
-    fn address_for_chunk_index(&self, chunk: usize) -> Address {
-        unsafe { Address::from_usize(chunk << LOG_BYTES_IN_CHUNK) }
-    }
-
-    pub fn add_to_cumulative_committed_pages(&self, pages: usize) {
+    fn add_to_cumulative_committed_pages(&self, pages: usize) {
         self.cumulative_committed_pages
             .fetch_add(pages, Ordering::Relaxed);
     }
 
-    pub fn get_cumulative_committed_pages(&self) -> usize {
+    fn get_cumulative_committed_pages(&self) -> usize {
         self.cumulative_committed_pages.load(Ordering::Relaxed)
+    }
+}
+
+impl Map32 {
+    // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
+    // of the same unsafe code.
+    // FIXME: We need a safe implementation.
+    #[allow(clippy::cast_ref_to_mut)]
+    #[allow(clippy::mut_from_ref)]
+    unsafe fn mut_self(&self) -> &mut Self {
+        &mut *(self as *const _ as *mut _)
+    }
+
+    fn free_contiguous_chunks_no_lock(&self, chunk: i32) -> usize {
+        let self_mut: &mut Self = unsafe { self.mut_self() };
+        let chunks = self_mut.region_map.free(chunk, false);
+        self_mut.total_available_discontiguous_chunks += chunks as usize;
+        let next = self.next_link[chunk as usize];
+        let prev = self.prev_link[chunk as usize];
+        if next != 0 {
+            self_mut.prev_link[next as usize] = prev
+        };
+        if prev != 0 {
+            self_mut.next_link[prev as usize] = next
+        };
+        self_mut.prev_link[chunk as usize] = 0;
+        self_mut.next_link[chunk as usize] = 0;
+        for offset in 0..chunks {
+            self_mut.descriptor_map[(chunk + offset) as usize] = SpaceDescriptor::UNINITIALIZED;
+            SFT_MAP.clear((chunk + offset) as usize);
+            // VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, chunk + offset, null);
+        }
+        chunks as _
     }
 }
 
