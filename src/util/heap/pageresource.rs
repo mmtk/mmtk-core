@@ -5,6 +5,7 @@ use crate::vm::ActivePlan;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use super::layout::map::Map;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::vm::VMBinding;
 
