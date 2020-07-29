@@ -11,6 +11,7 @@ use crate::util::reference_processor::ReferenceProcessors;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::util::heap::layout::map::Map;
 use crate::vm::VMBinding;
 use std::sync::Arc;
 

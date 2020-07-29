@@ -19,6 +19,10 @@ jobs:
           # This overwrites the default toolchain with the toolchain specified above.
           override: true
 
+      # Setup Environments
+      - name: Setup Environments
+        run: ./.github/scripts/ci-setup.sh
+
       # Build
       - name: Build
         run: ./.github/scripts/ci-build.sh

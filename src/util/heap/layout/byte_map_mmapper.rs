@@ -9,8 +9,6 @@ use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
-use super::mmapper::MMAP_CHUNK_BYTES;
-
 use crate::util::memory::{dzmmap, mprotect, munprotect};
 use std::mem::transmute;
 
@@ -205,7 +203,7 @@ mod tests {
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::conversions::pages_to_bytes;
     use crate::util::heap::layout::byte_map_mmapper::{MAPPED, PROTECTED};
-    use crate::util::heap::layout::mmapper::MMAP_CHUNK_BYTES;
+    use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use std::sync::atomic::Ordering;
 
     const MEGABYTE: usize = 1 << 20;

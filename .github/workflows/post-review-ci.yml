@@ -16,6 +16,11 @@ jobs:
         uses: actions/checkout@v2
         with:
           path: mmtk-core
+      - name: Check Binding Revision
+        uses: qinsoon/comment-env-vars@1.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          default_env: 'JIKESRVM_BINDING_REF=master'
       - name: Checkout JikesRVM Binding
         uses: actions/checkout@v2
         with:
@@ -23,6 +28,7 @@ jobs:
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           path: mmtk-jikesrvm
           submodules: true
+          ref: ${{ env.JIKESRVM_BINDING_REF }}
       - name: Overwrite MMTk core in JikesRVM binding
         run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
       - name: Setup
@@ -37,31 +43,50 @@ jobs:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved') || contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
-      - name: Checkout JikesRVM Binding
+      - name: Check Revisions
+        uses: qinsoon/comment-env-vars@1.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          default_env: 'JIKESRVM_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,JIKESRVM_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
+      # Trunk
+      # - binding
+      - name: Checkout JikesRVM Binding Trunk
         uses: actions/checkout@v2
         with:
           repository: mmtk/mmtk-jikesrvm
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          path: mmtk-jikesrvm
+          path: mmtk-jikesrvm-trunk
           submodules: true
-      # checkout current branch
+          ref: ${{ env.JIKESRVM_BINDING_TRUNK_REF }}
+      # - core
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
         with:
+          ref: ${{ env.MMTK_CORE_TRUNK_REF }}
+          path: mmtk-core-trunk
+      # Branch
+      # - binding
+      - name: Checkout JikesRVM Binding Branch
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-jikesrvm
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-jikesrvm-branch
+          submodules: true
+          ref: ${{ env.JIKESRVM_BINDING_BRANCH_REF }}
+      # - core
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ env.MMTK_CORE_BRANCH_REF }}
           path: mmtk-core-branch
-      # checkout master
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          ref: master
-          path: mmtk-core-master
-      # checkout perf-kit
+      # Checkout perf-kit
       - name: Checkout Perf Kit
         uses: actions/checkout@v2
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.2.1"
+          ref: "0.2.2"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -73,7 +98,7 @@ jobs:
       - name: Compare Performance
         id: run
         run: |
-          JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm/ mmtk-core-master/ mmtk-core-branch/ jikesrvm-compare-report.md
+          JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm-trunk/ mmtk-core-trunk/ mmtk-jikesrvm-branch/ mmtk-core-branch/ jikesrvm-compare-report.md
       # set report.md to output
       - uses: pCYSl5EDgo/cat@master
         id: cat
@@ -111,6 +136,11 @@ jobs:
         uses: actions/checkout@v2
         with:
           path: mmtk-core
+      - name: Check Binding Revision
+        uses: qinsoon/comment-env-vars@1.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          default_env: 'OPENJDK_BINDING_REVISION=master'
       - name: Checkout OpenJDK Binding
         uses: actions/checkout@v2
         with:
@@ -118,6 +148,7 @@ jobs:
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           path: mmtk-openjdk
           submodules: true
+          ref: ${{ env.OPENJDK_BINDING_REVISION }}
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
       - name: Setup
@@ -134,31 +165,50 @@ jobs:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     if: contains(github.event.pull_request.labels.*.name, 'PR-approved') || contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
-      - name: Checkout OpenJDK Binding
+      - name: Check Revisions
+        uses: qinsoon/comment-env-vars@1.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
+      # Trunk
+      # - binding
+      - name: Checkout OpenJDK Binding Trunk
         uses: actions/checkout@v2
         with:
           repository: mmtk/mmtk-openjdk
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          path: mmtk-openjdk
+          path: mmtk-openjdk-trunk
           submodules: true
-      # checkout current branch
+          ref: ${{ env.OPENJDK_BINDING_TRUNK_REF }}
+      # -core
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
         with:
+          ref: ${{ env.MMTK_CORE_TRUNK_REF }}
+          path: mmtk-core-trunk
+      # Branch
+      # - binding
+      - name: Checkout OpenJDK Binding Branch
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-openjdk
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-openjdk-branch
+          submodules: true
+          ref: ${{ env.OPENJDK_BINDING_BRANCH_REF }}
+      # - core
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ env.MMTK_CORE_BRANCH_REF }}
           path: mmtk-core-branch
-      # checkout master
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          ref: master
-          path: mmtk-core-master
       # checkout perf-kit
       - name: Checkout Perf Kit
         uses: actions/checkout@v2
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.2.1"
+          ref: "0.2.2"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -170,7 +220,7 @@ jobs:
       - name: Compare Performance
         id: run
         run: |
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/openjdk-compare.sh mmtk-openjdk/ mmtk-core-master/ mmtk-core-branch/ openjdk-compare-report.md
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/openjdk-compare.sh mmtk-openjdk-trunk/ mmtk-core-trunk/ mmtk-openjdk-branch/ mmtk-core-branch/ openjdk-compare-report.md
       # set report.md to output
       - uses: pCYSl5EDgo/cat@master
         id: cat
