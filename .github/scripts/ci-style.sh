@@ -3,8 +3,8 @@ set -xe
 export RUSTFLAGS="-D warnings"
 # check plan
 cargo clippy --features nogc
-cargo clippy --features nogc,nogc_lock_free
-cargo clippy --features nogc,nogc_lock_free,nogc_no_zeroing
+cargo clippy --features nogc_lock_free
+cargo clippy --features nogc_no_zeroing
 cargo clippy --features semispace
 # check features
 cargo clippy --features nogc,sanity

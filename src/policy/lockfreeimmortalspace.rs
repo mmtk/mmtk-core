@@ -20,6 +20,9 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     #[allow(unused)]
     name: &'static str,
     /// Heap range start
+    ///
+    /// We use `AtomicUsize` instead of `Address` here to atomically bumping this cursor.
+    /// TODO: Better address type here (Atomic<Address>?)
     cursor: AtomicUsize,
     /// Heap range end
     limit: Address,
@@ -68,7 +71,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn init(&mut self, _vm_map: &'static VMMap) {
-        let total_pages = <VM as VMBinding>::VMActivePlan::global()
+        let total_pages = VM::VMActivePlan::global()
             .base()
             .heap
             .total_pages
