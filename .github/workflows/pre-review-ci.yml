@@ -2,8 +2,10 @@ name: Pre Code Review Checks
 
 on:
   pull_request:
-    branches:
-      - master
+    # branches:
+    #   - master
+    branches-ignore:
+      - '**'
 
 jobs:
   pre-code-review-checks:
