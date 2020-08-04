@@ -82,6 +82,10 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         let unsync = unsafe { &*self.unsync.get() };
         unsync.nogc_space.reserved_pages()
     }
+
+    fn handle_user_collection_request(&self, _tls: OpaquePointer, _force: bool) {
+        println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
+    }
 }
 
 impl<VM: VMBinding> NoGC<VM> {
