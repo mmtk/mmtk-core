@@ -9,7 +9,7 @@ use std::cell::UnsafeCell;
 use super::NoGCCollector;
 use super::NoGCMutator;
 use super::NoGCTraceLocal;
-use crate::plan::plan::BasePlan;
+use crate::plan::global::BasePlan;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
