@@ -153,8 +153,17 @@ jobs:
         run: |
           export RUSTUP_TOOLCHAIN=nightly-2019-08-26
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=self-hosted
+          export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-08-04
           export JAVA_HOME=/usr/lib/jvm/java-1.6.0-openjdk-amd64
           ./ci-perf-kit/scripts/mutator-history-run.sh ./mmtk-openjdk ./reports
+      # deploy
+      - name: Deploy to Github Page
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          external_repository: mmtk/ci-perf-result
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          keep_files: true
