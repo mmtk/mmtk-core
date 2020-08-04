@@ -116,7 +116,7 @@ jobs:
   #         keep_files: true
 
   opennjdk-mutator-perf:
-    runns-on: [self-hosted, Linux, freq-scaling-off]
+    runs-on: [self-hosted, Linux, freq-scaling-off]
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
