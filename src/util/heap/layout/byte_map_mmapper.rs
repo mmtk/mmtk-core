@@ -9,8 +9,6 @@ use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
-use super::mmapper::MMAP_CHUNK_BYTES;
-
 use crate::util::memory::{dzmmap, mprotect, munprotect};
 use std::mem::transmute;
 
@@ -43,20 +41,22 @@ impl Mmapper for ByteMapMmapper {
 
     fn mark_as_mapped(&self, start: Address, bytes: usize) {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
-        let end_chunk = Self::address_to_mmap_chunks_up(start + bytes);
+        let end_chunk = Self::address_to_mmap_chunks_up(start + bytes) - 1;
         for i in start_chunk..=end_chunk {
             self.mapped[i].store(MAPPED, Ordering::Relaxed);
         }
     }
 
     fn ensure_mapped(&self, start: Address, pages: usize) {
-        trace!(
-            "Calling ensure_mapped with start={:?} and {} pages",
-            start,
-            pages
-        );
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
+        trace!(
+            "Calling ensure_mapped with start={:?} and {} pages, {}-{}",
+            start,
+            pages,
+            Self::mmap_chunks_to_address(start_chunk),
+            Self::mmap_chunks_to_address(end_chunk)
+        );
 
         for chunk in start_chunk..end_chunk {
             if self.mapped[chunk].load(Ordering::Relaxed) == MAPPED {
@@ -119,7 +119,7 @@ impl Mmapper for ByteMapMmapper {
      * @param addr The address in question.
      * @return {@code true} if the given address has been mmapped
      */
-    fn address_is_mapped(&self, addr: Address) -> bool {
+    fn is_mapped_address(&self, addr: Address) -> bool {
         let chunk = Self::address_to_mmap_chunks_down(addr);
         self.mapped[chunk].load(Ordering::Relaxed) == MAPPED
     }
@@ -203,16 +203,16 @@ mod tests {
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::conversions::pages_to_bytes;
     use crate::util::heap::layout::byte_map_mmapper::{MAPPED, PROTECTED};
-    use crate::util::heap::layout::mmapper::MMAP_CHUNK_BYTES;
+    use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use std::sync::atomic::Ordering;
 
     const MEGABYTE: usize = 1 << 20;
     #[cfg(target_os = "linux")]
     const FIXED_ADDRESS: Address =
-        unsafe { conversions::chunk_align_down(Address::from_usize(0x60000000)) };
+        unsafe { conversions::chunk_align_down(Address::from_usize(0x6000_0000)) };
     #[cfg(target_os = "macos")]
     const FIXED_ADDRESS: Address =
-        unsafe { conversions::chunk_align_down(Address::from_usize(0x135000000)) };
+        unsafe { conversions::chunk_align_down(Address::from_usize(0x0001_3500_0000)) };
 
     #[test]
     fn address_to_mmap_chunks() {

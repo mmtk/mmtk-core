@@ -86,6 +86,7 @@ mod tests {
     const BOTTOM_SENTINEL: i32 = LIST_SIZE as i32;
 
     #[test]
+    #[allow(clippy::cognitive_complexity)] // extensive checks, and it doesn't matter for tests
     fn new_free_list_grain1() {
         let l = IntArrayFreeList::new(LIST_SIZE, 1, 1);
         assert_eq!(l.head(), TOP_SENTINEL);
@@ -125,6 +126,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cognitive_complexity)] // extensive checks, and it doesn't matter for tests
     fn new_free_list_grain2() {
         let l = IntArrayFreeList::new(LIST_SIZE, 2, 1);
         assert_eq!(l.head(), TOP_SENTINEL);
@@ -201,6 +203,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cognitive_complexity)] // extensive checks, and it doesn't matter for tests
     fn alloc_split() {
         let mut l = IntArrayFreeList::new(LIST_SIZE, 2, 1);
         let result = l.alloc(1);

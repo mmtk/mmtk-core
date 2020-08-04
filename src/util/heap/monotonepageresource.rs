@@ -1,7 +1,6 @@
 use super::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
 use crate::policy::space::required_chunks;
-use crate::policy::space::Space;
 use crate::util::address::Address;
 use crate::util::conversions::*;
 use std::sync::atomic::AtomicUsize;
@@ -12,6 +11,7 @@ use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::OpaquePointer;
 
+use super::layout::map::Map;
 use super::layout::Mmapper;
 
 use super::PageResource;
@@ -21,8 +21,8 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::vm::VMBinding;
 use libc::{c_void, memset};
 
-pub struct MonotonePageResource<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> {
-    common: CommonPageResource<VM, MonotonePageResource<VM, S>>,
+pub struct MonotonePageResource<VM: VMBinding> {
+    common: CommonPageResource<VM>,
 
     /** Number of pages to reserve at the start of every allocation */
     meta_data_pages_per_region: usize,
@@ -49,15 +49,11 @@ pub enum MonotonePageResourceConditional {
     },
     Discontiguous,
 }
-impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> PageResource<VM>
-    for MonotonePageResource<VM, S>
-{
-    type Space = S;
-
-    fn common(&self) -> &CommonPageResource<VM, Self> {
+impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
+    fn common(&self) -> &CommonPageResource<VM> {
         &self.common
     }
-    fn common_mut(&mut self) -> &mut CommonPageResource<VM, Self> {
+    fn common_mut(&mut self) -> &mut CommonPageResource<VM> {
         &mut self.common
     }
 
@@ -184,7 +180,7 @@ impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> PageResource
     }
 }
 
-impl<VM: VMBinding, S: Space<VM, PR = MonotonePageResource<VM, S>>> MonotonePageResource<VM, S> {
+impl<VM: VMBinding> MonotonePageResource<VM> {
     pub fn new_contiguous(
         start: Address,
         bytes: usize,

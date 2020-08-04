@@ -1,6 +1,7 @@
 use crate::plan::phase::PhaseManager;
 use crate::plan::Plan;
 use crate::plan::SelectedPlan;
+use crate::policy::space::SFTMap;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::OpaquePointer;
@@ -10,6 +11,7 @@ use crate::util::reference_processor::ReferenceProcessors;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::util::heap::layout::map::Map;
 use crate::vm::VMBinding;
 use std::sync::Arc;
 
@@ -25,6 +27,7 @@ lazy_static! {
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
     pub static ref VM_MAP: VMMap = VMMap::new();
     pub static ref MMAPPER: Mmapper = Mmapper::new();
+    pub static ref SFT_MAP: SFTMap = SFTMap::new();
 }
 
 pub struct MMTK<VM: VMBinding> {
@@ -32,6 +35,7 @@ pub struct MMTK<VM: VMBinding> {
     pub phase_manager: PhaseManager,
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
+    pub sftmap: &'static SFTMap,
     pub reference_processors: ReferenceProcessors,
     pub options: Arc<UnsafeOptionsWrapper>,
 
@@ -39,15 +43,16 @@ pub struct MMTK<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> MMTK<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper) -> Self {
+    pub fn new() -> Self {
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = SelectedPlan::new(vm_map, mmapper, options.clone());
-        let phase_manager = PhaseManager::new(&plan.common().stats);
+        let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone());
+        let phase_manager = PhaseManager::new(&plan.base().stats);
         MMTK {
             plan,
             phase_manager,
-            vm_map,
-            mmapper,
+            vm_map: &VM_MAP,
+            mmapper: &MMAPPER,
+            sftmap: &SFT_MAP,
             reference_processors: ReferenceProcessors::new(),
             options,
             inside_harness: AtomicBool::new(false),
@@ -58,11 +63,17 @@ impl<VM: VMBinding> MMTK<VM> {
         // FIXME Do a full heap GC if we have generational GC
         self.plan.handle_user_collection_request(tls, true);
         self.inside_harness.store(true, Ordering::SeqCst);
-        self.plan.common().stats.start_all();
+        self.plan.base().stats.start_all();
     }
 
     pub fn harness_end(&self) {
-        self.plan.common().stats.stop_all();
+        self.plan.base().stats.stop_all();
         self.inside_harness.store(false, Ordering::SeqCst);
+    }
+}
+
+impl<VM: VMBinding> Default for MMTK<VM> {
+    fn default() -> Self {
+        Self::new()
     }
 }

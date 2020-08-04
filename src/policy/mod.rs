@@ -8,3 +8,6 @@ pub mod copyspace;
 
 #[cfg(feature = "largeobjectspace")]
 pub mod largeobjectspace;
+
+#[cfg(feature = "lockfreeimmortalspace")]
+pub mod lockfreeimmortalspace;

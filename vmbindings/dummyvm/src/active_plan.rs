@@ -1,4 +1,3 @@
-use libc::c_void;
 use mmtk::{Plan, SelectedPlan};
 use mmtk::vm::ActivePlan;
 use mmtk::util::OpaquePointer;
@@ -12,16 +11,16 @@ impl ActivePlan<DummyVM> for VMActivePlan {
         &SINGLETON.plan
     }
 
-    unsafe fn collector(tls: OpaquePointer) -> &'static mut <SelectedPlan<DummyVM> as Plan<DummyVM>>::CollectorT {
+    unsafe fn collector(_tls: OpaquePointer) -> &'static mut <SelectedPlan<DummyVM> as Plan<DummyVM>>::CollectorT {
         unimplemented!()
     }
 
-    unsafe fn is_mutator(tls: OpaquePointer) -> bool {
+    unsafe fn is_mutator(_tls: OpaquePointer) -> bool {
         // FIXME
         true
     }
 
-    unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan<DummyVM> as Plan<DummyVM>>::MutatorT {
+    unsafe fn mutator(_tls: OpaquePointer) -> &'static mut <SelectedPlan<DummyVM> as Plan<DummyVM>>::MutatorT {
         unimplemented!()
     }
 

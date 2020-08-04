@@ -15,6 +15,8 @@ extern crate libc;
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
+#[cfg(target = "x86_64-unknown-linux-gnu")]
+extern crate atomic;
 extern crate atomic_traits;
 extern crate crossbeam_deque;
 extern crate num_cpus;
@@ -24,12 +26,11 @@ pub mod util;
 mod mm;
 mod mmtk;
 mod plan;
-mod policy;
+pub mod policy;
 pub mod vm;
 
 pub use crate::mm::memory_manager;
 pub use crate::mmtk::MMTK;
-pub use crate::mmtk::{MMAPPER, VM_MAP};
 pub use crate::plan::selected_plan::{
     SelectedCollector, SelectedConstraints, SelectedMutator, SelectedPlan, SelectedTraceLocal,
 };

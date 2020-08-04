@@ -69,25 +69,7 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
                 .copyspace1
                 .trace_object(self, object, global::ALLOC_SS, tls);
         }
-        if plan_unsync.versatile_space.in_space(object) {
-            trace!("trace_object: object in versatile_space");
-            return plan_unsync.versatile_space.trace_object(self, object);
-        }
-        if plan_unsync.vm_space.is_some() && plan_unsync.vm_space.as_ref().unwrap().in_space(object)
-        {
-            trace!("trace_object: object in boot space");
-            return plan_unsync
-                .vm_space
-                .as_ref()
-                .unwrap()
-                .trace_object(self, object);
-        }
-        if plan_unsync.los.in_space(object) {
-            trace!("trace_object: object in los");
-            return plan_unsync.los.trace_object(self, object);
-        }
-
-        panic!("No special case for space in trace_object");
+        self.plan.common.trace_object(self, object)
     }
 
     fn complete_trace(&mut self) {
@@ -126,38 +108,6 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
         let unsync = unsafe { &(*self.plan.unsync.get()) };
         (unsync.hi && !unsync.copyspace0.in_space(obj))
             || (!unsync.hi && !unsync.copyspace1.in_space(obj))
-    }
-
-    fn is_live(&self, object: ObjectReference) -> bool {
-        if object.is_null() {
-            return false;
-        }
-        let unsync = unsafe { &(*self.plan.unsync.get()) };
-        if unsync.copyspace0.in_space(object) {
-            if unsync.hi {
-                return unsync.copyspace0.is_live(object);
-            } else {
-                return true;
-            }
-        }
-        if unsync.copyspace1.in_space(object) {
-            if unsync.hi {
-                return true;
-            } else {
-                return unsync.copyspace1.is_live(object);
-            }
-        }
-        // FIXME is it actually alive?
-        if unsync.versatile_space.in_space(object) {
-            return true;
-        }
-        if unsync.vm_space.is_some() && unsync.vm_space.as_ref().unwrap().in_space(object) {
-            return true;
-        }
-        if unsync.los.in_space(object) {
-            return true;
-        }
-        panic!("Invalid space")
     }
 }
 

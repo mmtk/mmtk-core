@@ -3,32 +3,34 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::{Mutex, MutexGuard};
 
-use crate::util::address::Address;
-use crate::util::alloc::embedded_meta_data::*;
-use crate::util::generic_freelist::GenericFreeList;
-use crate::util::heap::pageresource::CommonPageResource;
-use crate::util::{generic_freelist, memory};
-// #[cfg(target_pointer_width = "32")]
-// FIXME: Use `RawMemoryFreeList` for 64-bit machines
+use super::layout::map::Map;
 use super::layout::Mmapper;
 use super::vmrequest::HEAP_LAYOUT_64BIT;
 use super::PageResource;
 use crate::policy::space::Space;
+use crate::util::address::Address;
+use crate::util::alloc::embedded_meta_data::*;
 use crate::util::constants::*;
 use crate::util::conversions;
+use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
-use crate::util::int_array_freelist::IntArrayFreeList as FreeList;
+use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::OpaquePointer;
+use crate::util::{generic_freelist, memory};
 use crate::vm::VMBinding;
 use std::mem::MaybeUninit;
 
 pub struct CommonFreeListPageResource {
-    free_list: FreeList,
+    free_list: Box<<VMMap as Map>::FreeList>,
     start: Address,
 }
 
 impl CommonFreeListPageResource {
+    pub fn get_start(&self) -> Address {
+        self.start
+    }
+
     pub fn resize_freelist(&mut self, start_address: Address) {
         // debug_assert!((HEAP_LAYOUT_64BIT || !contiguous) && !Plan.isInitialized());
         self.start = start_address.align_up(BYTES_IN_REGION);
@@ -36,8 +38,8 @@ impl CommonFreeListPageResource {
     }
 }
 
-pub struct FreeListPageResource<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> {
-    common: CommonPageResource<VM, FreeListPageResource<VM, S>>,
+pub struct FreeListPageResource<VM: VMBinding> {
+    common: CommonPageResource<VM>,
     common_flpr: Box<CommonFreeListPageResource>,
     /** Number of pages to reserve at the start of every allocation */
     meta_data_pages_per_region: usize,
@@ -49,9 +51,7 @@ struct FreeListPageResourceSync {
     highwater_mark: i32,
 }
 
-impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> Deref
-    for FreeListPageResource<VM, S>
-{
+impl<VM: VMBinding> Deref for FreeListPageResource<VM> {
     type Target = CommonFreeListPageResource;
 
     fn deref(&self) -> &CommonFreeListPageResource {
@@ -59,23 +59,17 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> Deref
     }
 }
 
-impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> DerefMut
-    for FreeListPageResource<VM, S>
-{
+impl<VM: VMBinding> DerefMut for FreeListPageResource<VM> {
     fn deref_mut(&mut self) -> &mut CommonFreeListPageResource {
         &mut self.common_flpr
     }
 }
 
-impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> PageResource<VM>
-    for FreeListPageResource<VM, S>
-{
-    type Space = S;
-
-    fn common(&self) -> &CommonPageResource<VM, Self> {
+impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
+    fn common(&self) -> &CommonPageResource<VM> {
         &self.common
     }
-    fn common_mut(&mut self) -> &mut CommonPageResource<VM, Self> {
+    fn common_mut(&mut self) -> &mut CommonPageResource<VM> {
         &mut self.common
     }
 
@@ -144,9 +138,8 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> PageResource
     }
 }
 
-impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPageResource<VM, S> {
+impl<VM: VMBinding> FreeListPageResource<VM> {
     pub fn new_contiguous(
-        space: &S,
         start: Address,
         bytes: usize,
         meta_data_pages_per_region: usize,
@@ -160,7 +153,7 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
             });
             ::std::ptr::write(
                 &mut common_flpr.free_list,
-                vm_map.create_parent_freelist(pages, PAGES_IN_REGION as _),
+                vm_map.create_parent_freelist(&common_flpr, pages, PAGES_IN_REGION as _),
             );
             common_flpr
         };
@@ -181,7 +174,8 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
             }),
         };
         if !flpr.common.growable {
-            flpr.reserve_metadata(space.common().extent);
+            // For non-growable space, we just need to reserve metadata according to the requested size.
+            flpr.reserve_metadata(bytes);
             // reserveMetaData(space.getExtent());
             // unimplemented!()
         }
@@ -289,7 +283,8 @@ impl<VM: VMBinding, S: Space<VM, PR = FreeListPageResource<VM, S>>> FreeListPage
         /* now return the address space associated with the chunk for global reuse */
         // FIXME: We need a safe implementation
         #[allow(clippy::cast_ref_to_mut)]
-        let space: &mut S = unsafe { &mut *(self.common.space.unwrap() as *const S as *mut S) };
+        let space: &mut dyn Space<VM> =
+            unsafe { &mut *(self.common.space.unwrap() as *const _ as *mut _) };
         space.release_discontiguous_chunks(chunk);
     }
 

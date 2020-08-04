@@ -4,6 +4,9 @@ use std::mem;
 use std::ops::*;
 use std::sync::atomic::Ordering;
 
+use crate::mmtk::{MMAPPER, SFT_MAP};
+use crate::util::heap::layout::mmapper::Mmapper;
+
 /// size in bytes
 pub type ByteSize = usize;
 /// offset in byte
@@ -117,6 +120,7 @@ impl Shr<usize> for Address {
 
 impl Address {
     pub const ZERO: Self = Address(0);
+    pub const MAX: Self = Address(usize::max_value());
 
     /// creates Address from a pointer
     #[inline(always)]
@@ -273,6 +277,21 @@ impl Address {
     pub const fn as_usize(self) -> usize {
         self.0
     }
+
+    /// returns the chunk index for this address
+    pub fn chunk_index(self) -> usize {
+        use crate::util::conversions;
+        conversions::address_to_chunk_index(self)
+    }
+
+    /// return true if the referenced memory is mapped
+    pub fn is_mapped(self) -> bool {
+        if self.0 == 0 {
+            false
+        } else {
+            MMAPPER.is_mapped_address(self)
+        }
+    }
 }
 
 /// allows print Address as upper-case hex value
@@ -406,6 +425,27 @@ impl ObjectReference {
     /// returns the ObjectReference
     pub fn value(self) -> usize {
         self.0
+    }
+
+    pub fn is_live(self) -> bool {
+        if self.0 == 0 {
+            false
+        } else {
+            SFT_MAP.get(Address(self.0)).is_live(self)
+        }
+    }
+
+    pub fn is_movable(self) -> bool {
+        SFT_MAP.get(Address(self.0)).is_movable()
+    }
+
+    pub fn is_mapped(self) -> bool {
+        Address(self.0).is_mapped()
+    }
+
+    #[cfg(feature = "sanity")]
+    pub fn is_sane(self) -> bool {
+        SFT_MAP.get(Address(self.0)).is_sane()
     }
 }
 

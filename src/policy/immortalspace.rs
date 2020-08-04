@@ -1,4 +1,4 @@
-use crate::policy::space::{CommonSpace, Space};
+use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
 use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
 
@@ -16,7 +16,8 @@ use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 
 pub struct ImmortalSpace<VM: VMBinding> {
-    common: UnsafeCell<CommonSpace<VM, MonotonePageResource<VM, ImmortalSpace<VM>>>>,
+    common: UnsafeCell<CommonSpace<VM>>,
+    pr: MonotonePageResource<VM>,
     mark_state: u8,
 }
 
@@ -25,45 +26,49 @@ unsafe impl<VM: VMBinding> Sync for ImmortalSpace<VM> {}
 const GC_MARK_BIT_MASK: u8 = 1;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
-impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
-    type PR = MonotonePageResource<VM, ImmortalSpace<VM>>;
-
-    fn common(&self) -> &CommonSpace<VM, Self::PR> {
-        unsafe { &*self.common.get() }
-    }
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM, Self::PR> {
-        &mut *self.common.get()
-    }
-
-    fn init(&mut self, vm_map: &'static VMMap) {
-        // Borrow-checker fighting so that we can have a cyclic reference
-        let me = unsafe { &*(self as *const Self) };
-
-        let common_mut = self.common_mut();
-        if common_mut.vmrequest.is_discontiguous() {
-            common_mut.pr = Some(MonotonePageResource::new_discontiguous(
-                META_DATA_PAGES_PER_REGION,
-                vm_map,
-            ));
-        } else {
-            common_mut.pr = Some(MonotonePageResource::new_contiguous(
-                common_mut.start,
-                common_mut.extent,
-                META_DATA_PAGES_PER_REGION,
-                vm_map,
-            ));
-        }
-        common_mut.pr.as_mut().unwrap().bind_space(me);
-    }
-
+impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn is_live(&self, _object: ObjectReference) -> bool {
         true
     }
-
     fn is_movable(&self) -> bool {
         false
     }
+    #[cfg(feature = "sanity")]
+    fn is_sane(&self) -> bool {
+        true
+    }
+    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
+        let old_value = VM::VMObjectModel::read_available_byte(object);
+        let mut new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
+        if header_byte::NEEDS_UNLOGGED_BIT {
+            new_value |= header_byte::UNLOGGED_BIT;
+        }
+        VM::VMObjectModel::write_available_byte(object, new_value);
+    }
+}
 
+impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
+    fn as_space(&self) -> &dyn Space<VM> {
+        self
+    }
+    fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
+        self
+    }
+    fn get_page_resource(&self) -> &dyn PageResource<VM> {
+        &self.pr
+    }
+    fn common(&self) -> &CommonSpace<VM> {
+        unsafe { &*self.common.get() }
+    }
+    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
+        &mut *self.common.get()
+    }
+
+    fn init(&mut self, _vm_map: &'static VMMap) {
+        // Borrow-checker fighting so that we can have a cyclic reference
+        let me = unsafe { &*(self as *const Self) };
+        self.pr.bind_space(me);
+    }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")
     }
@@ -78,20 +83,31 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
+        let common = CommonSpace::new(
+            SpaceOptions {
+                name,
+                movable: false,
+                immortal: true,
+                zeroed,
+                vmrequest,
+            },
+            vm_map,
+            mmapper,
+            heap,
+        );
         ImmortalSpace {
-            common: UnsafeCell::new(CommonSpace::new(
-                SpaceOptions {
-                    name,
-                    movable: false,
-                    immortal: true,
-                    zeroed,
-                    vmrequest,
-                },
-                vm_map,
-                mmapper,
-                heap,
-            )),
             mark_state: 0,
+            pr: if vmrequest.is_discontiguous() {
+                MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
+            } else {
+                MonotonePageResource::new_contiguous(
+                    common.start,
+                    common.extent,
+                    META_DATA_PAGES_PER_REGION,
+                    vm_map,
+                )
+            },
+            common: UnsafeCell::new(common),
         }
     }
 
@@ -115,6 +131,12 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         true
     }
 
+    pub fn prepare(&mut self) {
+        self.mark_state = GC_MARK_BIT_MASK - self.mark_state;
+    }
+
+    pub fn release(&mut self) {}
+
     pub fn trace_object<T: TransitiveClosure>(
         &self,
         trace: &mut T,
@@ -125,19 +147,4 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         }
         object
     }
-
-    pub fn initialize_header(&self, object: ObjectReference) {
-        let old_value = VM::VMObjectModel::read_available_byte(object);
-        let mut new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
-        if header_byte::NEEDS_UNLOGGED_BIT {
-            new_value |= header_byte::UNLOGGED_BIT;
-        }
-        VM::VMObjectModel::write_available_byte(object, new_value);
-    }
-
-    pub fn prepare(&mut self) {
-        self.mark_state = GC_MARK_BIT_MASK - self.mark_state;
-    }
-
-    pub fn release(&mut self) {}
 }

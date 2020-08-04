@@ -26,6 +26,22 @@ pub const fn chunk_align_down(addr: Address) -> Address {
     addr.align_down(BYTES_IN_CHUNK)
 }
 
+pub const fn mmap_chunk_align_up(addr: Address) -> Address {
+    addr.align_up(MMAP_CHUNK_BYTES)
+}
+
+pub const fn mmap_chunk_align_down(addr: Address) -> Address {
+    addr.align_down(MMAP_CHUNK_BYTES)
+}
+
+pub fn bytes_to_chunks_up(bytes: usize) -> usize {
+    (bytes + BYTES_IN_CHUNK - 1) >> LOG_BYTES_IN_CHUNK
+}
+
+pub fn address_to_chunk_index(addr: Address) -> usize {
+    addr >> LOG_BYTES_IN_CHUNK
+}
+
 pub const fn raw_align_up(val: usize, align: usize) -> usize {
     // See https://github.com/rust-lang/rust/blob/e620d0f337d0643c757bab791fc7d88d63217704/src/libcore/alloc.rs#L192
     val.wrapping_add(align).wrapping_sub(1) & !align.wrapping_sub(1)
@@ -75,9 +91,9 @@ mod tests {
 
     #[test]
     fn test_page_align() {
-        let addr = unsafe { Address::from_usize(0x123456789) };
+        let addr = unsafe { Address::from_usize(0x0001_2345_6789) };
         assert_eq!(page_align_down(addr), unsafe {
-            Address::from_usize(0x123456000)
+            Address::from_usize(0x0001_2345_6000)
         });
         assert!(!is_page_aligned(addr));
         assert!(is_page_aligned(page_align_down(addr)));
@@ -85,12 +101,12 @@ mod tests {
 
     #[test]
     fn test_chunk_align() {
-        let addr = unsafe { Address::from_usize(0x123456789) };
+        let addr = unsafe { Address::from_usize(0x0001_2345_6789) };
         assert_eq!(chunk_align_down(addr), unsafe {
-            Address::from_usize(0x123400000)
+            Address::from_usize(0x1_2340_0000)
         });
         assert_eq!(chunk_align_up(addr), unsafe {
-            Address::from_usize(0x123800000)
+            Address::from_usize(0x1_2380_0000)
         });
     }
 }

@@ -39,13 +39,13 @@ use crate::vm::VMBinding;
 // * TraceLocal: Scanning::* as &mut TraceLocal
 
 pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
-    mmtk.plan.common().control_collector_context.run(tls);
+    mmtk.plan.base().control_collector_context.run(tls);
 }
 
 pub fn gc_init<VM: VMBinding>(mmtk: &MMTK<VM>, heap_size: usize) {
     crate::util::logger::init().unwrap();
     mmtk.plan.gc_init(heap_size, &mmtk.vm_map);
-    mmtk.plan.common().initialized.store(true, Ordering::SeqCst);
+    mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
 
     // TODO: We should have an option so we know whether we should spawn the controller.
     //    thread::spawn(|| {
@@ -74,17 +74,6 @@ pub fn alloc<VM: VMBinding>(
     mutator.alloc(size, align, offset, allocator)
 }
 
-#[inline(never)]
-pub fn alloc_slow<VM: VMBinding>(
-    mutator: &mut SelectedMutator<VM>,
-    size: usize,
-    align: usize,
-    offset: isize,
-    allocator: Allocator,
-) -> Address {
-    mutator.alloc_slow(size, align, offset, allocator)
-}
-
 pub fn post_alloc<VM: VMBinding>(
     mutator: &mut SelectedMutator<VM>,
     refer: ObjectReference,
@@ -93,14 +82,6 @@ pub fn post_alloc<VM: VMBinding>(
     allocator: Allocator,
 ) {
     mutator.post_alloc(refer, type_refer, bytes, allocator);
-}
-
-pub fn will_never_move<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) -> bool {
-    mmtk.plan.will_never_move(object)
-}
-
-pub fn is_valid_ref<VM: VMBinding>(mmtk: &MMTK<VM>, val: ObjectReference) -> bool {
-    mmtk.plan.is_valid_ref(val)
 }
 
 // The parameter 'trace_local' could either be &mut SelectedTraceLocal or &mut SanityChecker.
@@ -115,7 +96,7 @@ pub fn report_delayed_root_edge<VM: VMBinding>(
     addr: Address,
 ) {
     use crate::util::sanity::sanity_checker::SanityChecker;
-    if mmtk.plan.common().is_in_sanity() {
+    if mmtk.plan.is_in_sanity() {
         let sanity_checker: &mut SanityChecker<VM> =
             unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.report_delayed_root_edge(addr);
@@ -139,7 +120,7 @@ pub fn will_not_move_in_current_collection<VM: VMBinding>(
     obj: ObjectReference,
 ) -> bool {
     use crate::util::sanity::sanity_checker::SanityChecker;
-    if mmtk.plan.common().is_in_sanity() {
+    if mmtk.plan.is_in_sanity() {
         let sanity_checker: &mut SanityChecker<VM> =
             unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.will_not_move_in_current_collection(obj)
@@ -165,7 +146,7 @@ pub fn process_interior_edge<VM: VMBinding>(
     root: bool,
 ) {
     use crate::util::sanity::sanity_checker::SanityChecker;
-    if mmtk.plan.common().is_in_sanity() {
+    if mmtk.plan.is_in_sanity() {
         let sanity_checker: &mut SanityChecker<VM> =
             unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
         sanity_checker.process_interior_edge(target, slot, root)
@@ -191,14 +172,13 @@ pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &mut SelectedColl
 
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
     unsafe {
-        { (&mut *mmtk.plan.common().control_collector_context.workers.get()) }
-            .init_group(mmtk, tls);
+        { &mut *mmtk.plan.base().control_collector_context.workers.get() }.init_group(mmtk, tls);
         {
             VM::VMCollection::spawn_worker_thread::<<SelectedPlan<VM> as Plan<VM>>::CollectorT>(
                 tls, None,
             );
         } // spawn controller thread
-        mmtk.plan.common().initialized.store(true, Ordering::SeqCst);
+        mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
     }
 }
 
@@ -227,8 +207,8 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 }
 
 #[cfg(feature = "sanity")]
-pub fn scan_region<VM: VMBinding>(mmtk: &MMTK<VM>) {
-    crate::util::sanity::memory_scan::scan_region(&mmtk.plan);
+pub fn scan_region() {
+    crate::util::sanity::memory_scan::scan_region();
 }
 
 pub fn trace_get_forwarded_referent<VM: VMBinding>(
@@ -259,13 +239,6 @@ pub extern "C" fn process_edge<VM: VMBinding>(
     trace_local.process_edge(object);
 }
 
-pub fn trace_is_live<VM: VMBinding>(
-    trace_local: &mut SelectedTraceLocal<VM>,
-    object: ObjectReference,
-) -> bool {
-    trace_local.is_live(object)
-}
-
 pub fn trace_retain_referent<VM: VMBinding>(
     trace_local: &mut SelectedTraceLocal<VM>,
     object: ObjectReference,
@@ -277,12 +250,16 @@ pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: Opaqu
     mmtk.plan.handle_user_collection_request(tls, false);
 }
 
-pub fn is_mapped_object<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) -> bool {
-    mmtk.plan.is_mapped_object(object)
+pub fn is_live_object(object: ObjectReference) -> bool {
+    object.is_live()
 }
 
-pub fn is_mapped_address<VM: VMBinding>(mmtk: &MMTK<VM>, address: Address) -> bool {
-    mmtk.plan.is_mapped_address(address)
+pub fn is_mapped_object(object: ObjectReference) -> bool {
+    object.is_mapped()
+}
+
+pub fn is_mapped_address(address: Address) -> bool {
+    address.is_mapped()
 }
 
 pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {

@@ -356,8 +356,7 @@ impl PhaseManager {
         let order = collector.rendezvous();
         let primary = order == 0;
         if primary && resume {
-            plan.common()
-                .set_gc_status(plan::global::GcStatus::GcProper);
+            plan.base().set_gc_status(plan::global::GcStatus::GcProper);
         }
         let mut is_even_phase = true;
         if primary {

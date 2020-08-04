@@ -4,8 +4,8 @@ use std::sync::atomic::Ordering;
 
 use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Plan;
+use crate::policy::space::Space;
 use crate::util::constants::*;
-use crate::util::heap::PageResource;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection};
@@ -106,10 +106,10 @@ pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: 
     }
 }
 
-pub trait Allocator<VM: VMBinding, PR: PageResource<VM>> {
+pub trait Allocator<VM: VMBinding> {
     fn get_tls(&self) -> OpaquePointer;
 
-    fn get_space(&self) -> Option<&'static PR::Space>;
+    fn get_space(&self) -> Option<&'static dyn Space<VM>>;
     fn get_plan(&self) -> &'static SelectedPlan<VM>;
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
@@ -134,7 +134,7 @@ pub trait Allocator<VM: VMBinding, PR: PageResource<VM>> {
                 return result;
             }
 
-            let plan = self.get_plan().common();
+            let plan = self.get_plan().base();
             if !result.is_zero() {
                 // TODO: Check if we need oom lock.
                 // It seems the lock only protects access to the atomic boolean. We could possibly do

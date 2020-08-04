@@ -5,12 +5,11 @@ use crate::vm::ActivePlan;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use super::layout::map::Map;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::vm::VMBinding;
 
-pub trait PageResource<VM: VMBinding>: Sized + 'static {
-    type Space: Space<VM, PR = Self>;
-
+pub trait PageResource<VM: VMBinding>: 'static {
     /// Allocate pages from this resource.
     /// Simply bump the cursor, and fail if we hit the sentinel.
     /// Return The start of the first page if successful, zero on failure.
@@ -97,22 +96,22 @@ pub trait PageResource<VM: VMBinding>: Sized + 'static {
         self.common().committed.load(Ordering::Relaxed)
     }
 
-    fn bind_space(&mut self, space: &'static Self::Space) {
+    fn bind_space(&mut self, space: &'static dyn Space<VM>) {
         self.common_mut().space = Some(space);
     }
 
-    fn common(&self) -> &CommonPageResource<VM, Self>;
-    fn common_mut(&mut self) -> &mut CommonPageResource<VM, Self>;
+    fn common(&self) -> &CommonPageResource<VM>;
+    fn common_mut(&mut self) -> &mut CommonPageResource<VM>;
     fn vm_map(&self) -> &'static VMMap {
         self.common().space.unwrap().common().vm_map()
     }
 }
 
-pub struct CommonPageResource<VM: VMBinding, PR: PageResource<VM>> {
+pub struct CommonPageResource<VM: VMBinding> {
     pub reserved: AtomicUsize,
     pub committed: AtomicUsize,
 
     pub contiguous: bool,
     pub growable: bool,
-    pub space: Option<&'static PR::Space>,
+    pub space: Option<&'static dyn Space<VM>>,
 }

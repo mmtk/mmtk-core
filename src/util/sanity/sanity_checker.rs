@@ -29,7 +29,7 @@ impl<'a, VM: VMBinding> SanityChecker<'a, VM> {
     }
 
     pub fn check(&mut self) {
-        self.plan.common().enter_sanity();
+        self.plan.enter_sanity();
 
         println!("Sanity stackroots, collector");
         VM::VMScanning::compute_thread_roots(self, self.tls);
@@ -49,7 +49,7 @@ impl<'a, VM: VMBinding> SanityChecker<'a, VM> {
         self.values.clear();
         self.refs.clear();
 
-        self.plan.common().leave_sanity();
+        self.plan.leave_sanity();
     }
 }
 
@@ -94,7 +94,8 @@ impl<'a, VM: VMBinding> TraceLocal for SanityChecker<'a, VM> {
         }
 
         if !self.refs.contains(&object) {
-            if !self.plan.is_valid_ref(object) {
+            // FIXME steveb consider VM-specific integrity check on reference.
+            if !object.is_sane() {
                 panic!("Invalid reference {:?}", object);
             }
             // Object is not "marked"
@@ -141,9 +142,5 @@ impl<'a, VM: VMBinding> TraceLocal for SanityChecker<'a, VM> {
 
     fn will_not_move_in_current_collection(&self, _obj: ObjectReference) -> bool {
         true
-    }
-
-    fn is_live(&self, _object: ObjectReference) -> bool {
-        unimplemented!()
     }
 }

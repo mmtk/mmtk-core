@@ -1,12 +1,12 @@
-use libc::c_void;
+// All functions here are extern function. There is no point for marking them as unsafe.
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 use libc::c_char;
 use std::ffi::CStr;
-use std::ptr::null_mut;
 use mmtk::memory_manager;
 use mmtk::Allocator;
 use mmtk::util::{ObjectReference, OpaquePointer, Address};
 use mmtk::{SelectedMutator, SelectedTraceLocal, SelectedCollector};
-use mmtk::Plan;
 use DummyVM;
 use SINGLETON;
 
@@ -37,12 +37,6 @@ pub extern "C" fn alloc(mutator: *mut SelectedMutator<DummyVM>, size: usize,
 }
 
 #[no_mangle]
-pub extern "C" fn alloc_slow(mutator: *mut SelectedMutator<DummyVM>, size: usize,
-                                        align: usize, offset: isize, allocator: Allocator) -> Address {
-    memory_manager::alloc_slow::<DummyVM>(unsafe { &mut *mutator }, size, align, offset, allocator)
-}
-
-#[no_mangle]
 pub extern "C" fn post_alloc(mutator: *mut SelectedMutator<DummyVM>, refer: ObjectReference, type_refer: ObjectReference,
                                         bytes: usize, allocator: Allocator) {
     memory_manager::post_alloc::<DummyVM>(unsafe { &mut *mutator }, refer, type_refer, bytes, allocator)
@@ -50,12 +44,7 @@ pub extern "C" fn post_alloc(mutator: *mut SelectedMutator<DummyVM>, refer: Obje
 
 #[no_mangle]
 pub extern "C" fn will_never_move(object: ObjectReference) -> bool {
-    memory_manager::will_never_move(&SINGLETON, object)
-}
-
-#[no_mangle]
-pub extern "C" fn is_valid_ref(val: ObjectReference) -> bool {
-    memory_manager::is_valid_ref(&SINGLETON, val)
+    !object.is_movable()
 }
 
 #[no_mangle]
@@ -115,23 +104,23 @@ pub extern "C" fn trace_get_forwarded_reference(trace_local: *mut SelectedTraceL
 }
 
 #[no_mangle]
-pub extern "C" fn trace_is_live(trace_local: *mut SelectedTraceLocal<DummyVM>, object: ObjectReference) -> bool{
-    memory_manager::trace_is_live::<DummyVM>(unsafe { &mut *trace_local }, object)
-}
-
-#[no_mangle]
 pub extern "C" fn trace_retain_referent(trace_local: *mut SelectedTraceLocal<DummyVM>, object: ObjectReference) -> ObjectReference{
     memory_manager::trace_retain_referent::<DummyVM>(unsafe { &mut *trace_local }, object)
 }
 
 #[no_mangle]
-pub extern "C" fn is_mapped_object(object: ObjectReference) -> bool {
-    memory_manager::is_mapped_object(&SINGLETON, object)
+pub extern "C" fn is_live_object(object: ObjectReference) -> bool{
+    object.is_live()
 }
 
 #[no_mangle]
-pub extern "C" fn is_mapped_address(object: Address) -> bool {
-    memory_manager::is_mapped_address(&SINGLETON, object)
+pub extern "C" fn is_mapped_object(object: ObjectReference) -> bool {
+    object.is_mapped()
+}
+
+#[no_mangle]
+pub extern "C" fn is_mapped_address(address: Address) -> bool {
+    address.is_mapped()
 }
 
 #[no_mangle]
@@ -165,7 +154,7 @@ pub extern "C" fn harness_begin(tls: OpaquePointer) {
 }
 
 #[no_mangle]
-pub extern "C" fn harness_end(tls: OpaquePointer) {
+pub extern "C" fn harness_end(_tls: OpaquePointer) {
     memory_manager::harness_end(&SINGLETON)
 }
 

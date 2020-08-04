@@ -1,9 +1,4 @@
-use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::Address;
-
-pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES; // the granularity VMResource operates at
-#[allow(unused)]
-pub const MMAP_CHUNK_MASK: usize = MMAP_CHUNK_BYTES - 1;
 
 pub trait Mmapper {
     /****************************************************************************
@@ -47,7 +42,7 @@ pub trait Mmapper {
      * @param addr Address in question
      * @return {@code true} if the page at the given address is mapped.
      */
-    fn address_is_mapped(&self, addr: Address) -> bool;
+    fn is_mapped_address(&self, addr: Address) -> bool;
 
     /**
      * Mark a number of pages as inaccessible.
