@@ -1,4 +1,4 @@
-use super::ss;
+use super::global;
 use crate::plan::semispace::SemiSpace;
 use crate::plan::{TraceLocal, TransitiveClosure};
 use crate::policy::space::Space;
@@ -61,13 +61,13 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
             trace!("trace_object: object in copyspace0");
             return plan_unsync
                 .copyspace0
-                .trace_object(self, object, ss::ALLOC_SS, tls);
+                .trace_object(self, object, global::ALLOC_SS, tls);
         }
         if plan_unsync.copyspace1.in_space(object) {
             trace!("trace_object: object in copyspace1");
             return plan_unsync
                 .copyspace1
-                .trace_object(self, object, ss::ALLOC_SS, tls);
+                .trace_object(self, object, global::ALLOC_SS, tls);
         }
         self.plan.common.trace_object(self, object)
     }

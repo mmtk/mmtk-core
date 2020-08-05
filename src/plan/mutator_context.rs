@@ -1,4 +1,4 @@
-use crate::plan::plan::CommonPlan;
+use crate::plan::global::CommonPlan;
 use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
