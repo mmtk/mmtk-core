@@ -1,0 +1,41 @@
+name: Stress Test CI
+
+on:
+  # push:
+  #   branches:
+  #     - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  jikesrvm-stress-test:
+    runs-on: [self-hosted, Linux, freq-scaling-on]
+    strategy:
+      matrix:
+        plan: [RFastAdaptiveSemiSpace]
+        benchmark: [antlr, bloat, eclipse, fop, hsqldb, jython, luindex, lusearch, pmd, xalan]
+        # From least stressful to most stressful
+        #              1G,          1M,      256K,   64K,   16K,   4K,   1K,   512, 256
+        stress-factor: [1073741824, 1048576, 262144, 65536, 16384, 4096, 1024, 512, 256]
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout JikesRVM Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-jikesrvm
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-jikesrvm
+          submodules: true
+      # setup
+      - name: Overwrite MMTk core in JikesRVM binding
+        run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
+      # Build
+      - name: Run Matrix
+        run: |
+          cd mmtk-jikesrvm/repos/jikesrvm
+          python scripts/testMMTk.py ${{ matrix.plan }} -j /usr/lib/jvm/java-1.8.0-openjdk-amd64 --answer-yes --quick --use-third-party-heap=../../ --use-third-party-build-configs=../../jikesrvm/build/configs --use-external-source=../../jikesrvm/rvm/src
+          ./dist/${{ matrix.plan }}_x86_64-linux/rvm -X:gc:stress_factor=${{ matrix.stress-factor }} -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ${{ matrix.benchmark }}
