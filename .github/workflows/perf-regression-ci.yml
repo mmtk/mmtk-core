@@ -42,6 +42,10 @@ jobs:
           ./ci-perf-kit/scripts/history-run-setup.sh
           mkdir -p ci-perf-kit/running/benchmarks/dacapo
           cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
+      - uses: nelonoel/branch-name@v1
+      - id: branch
+        # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
+        run: echo ::set-output name=branch_name::${BRANCH_NAME}
       # run
       - name: Performance Run
         run: |
@@ -50,15 +54,14 @@ jobs:
           export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
-          JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${BRANCH_NAME}
+          JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
-      - uses: nelonoel/branch-name@v1
       - name: Deploy to Github Page
         uses: peaceiris/actions-gh-pages@v3
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result
-          publish_dir: ./reports/${BRANCH_NAME}
+          publish_dir: ./reports/${{ steps.branch.outputs.branch_name }}
           publish_branch: gh-pages
           keep_files: true
     
@@ -96,6 +99,10 @@ jobs:
           cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
+      - uses: nelonoel/branch-name@v1
+      - id: branch
+        # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
+        run: echo ::set-output name=branch_name::${BRANCH_NAME}      
       # run
       - name: Performance Run
         run: |
@@ -104,15 +111,14 @@ jobs:
           export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
-          ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports/${BRANCH_NAME}
+          ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
-      - uses: nelonoel/branch-name@v1
       - name: Deploy to Github Page
         uses: peaceiris/actions-gh-pages@v3
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result
-          publish_dir: ./reports/${BRANCH_NAME}
+          publish_dir: ./reports/${{ steps.branch.outputs.branch_name }}
           publish_branch: gh-pages
           keep_files: true
 
