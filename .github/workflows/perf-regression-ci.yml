@@ -52,6 +52,7 @@ jobs:
           export FROM_DATE=2020-07-10
           JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${BRANCH_NAME}
       # deploy
+      - uses: nelonoel/branch-name@v1
       - name: Deploy to Github Page
         uses: peaceiris/actions-gh-pages@v3
         with:
@@ -105,6 +106,7 @@ jobs:
           export FROM_DATE=2020-07-10
           ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports/${BRANCH_NAME}
       # deploy
+      - uses: nelonoel/branch-name@v1
       - name: Deploy to Github Page
         uses: peaceiris/actions-gh-pages@v3
         with:
