@@ -30,24 +30,34 @@ jobs:
       - name: Build SemiSpace
         run: |
           cd mmtk-jikesrvm/repos/jikesrvm
-          python scripts/testMMTk.py -g RFastAdaptiveSemiSpace -j /usr/lib/jvm/java-1.8.0-openjdk-amd64 -- --answer-yes --quick --use-third-party-heap=../../ --use-third-party-build-configs=../../jikesrvm/build/configs --use-external-source=../../jikesrvm/rvm/src
+          RUSTUP_TOOLCHAIN=nightly-2019-08-26 python scripts/testMMTk.py -g RFastAdaptiveSemiSpace -j /usr/lib/jvm/java-1.8.0-openjdk-amd64 -- --answer-yes --quick --use-third-party-heap=../../ --use-third-party-build-configs=../../jikesrvm/build/configs --use-external-source=../../jikesrvm/rvm/src
       - name: antlr
-        run: ./dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr
+        if: always()
+        run: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr
       - name: bloat
-        run: ./dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar bloat
+        if: always()
+        run: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar bloat
       - name: eclipse
-        run: ./dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse
+        if: always()
+        run: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse
       - name: fop
-        run: ./dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop
+        if: always()
+        run: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop
       - name: hsqldb
-        run: ./dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb
+        if: always()
+        run: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb
       - name: jython
-        run: ./dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar jython
+        if: always()
+        run: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar jython
       - name: luindex
-        run: ./dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex
+        if: always()
+        run: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex
       - name: lusearch
-        run: ./dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar lusearch
+        if: always()
+        run: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar lusearch
       - name: pmd
-        run: ./dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd
+        if: always()
+        run: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd
       - name: xalan
-        run: ./dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar xalan
+        if: always()
+        run: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -X:gc:stress_factor=1048576 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar xalan
