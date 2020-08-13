@@ -31,6 +31,7 @@ jobs:
         run: |
           cd mmtk-jikesrvm/repos/jikesrvm
           RUSTUP_TOOLCHAIN=nightly-2019-08-26 python scripts/testMMTk.py -g RFastAdaptiveSemiSpace -j /usr/lib/jvm/java-1.8.0-openjdk-amd64 --build-only -- --answer-yes --quick --use-third-party-heap=../../ --use-third-party-build-configs=../../jikesrvm/build/configs --use-external-source=../../jikesrvm/rvm/src
+      # Run
       - name: antlr
         if: always()
         run: for i in {1..10}; do mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -X:gc:stress_factor=4096 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr; done
@@ -61,3 +62,53 @@ jobs:
       - name: xalan
         if: always()
         run: for i in {1..10}; do mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms100M -Xmx100M -X:gc:stress_factor=4096 -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar xalan; done
+
+  openjdk-stress-test:
+    runs-on: [self-hosted, Linux, freq-scaling-on]
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout OpenJDK Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-openjdk
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-openjdk
+          submodules: true
+      # setup
+      - name: Overwrite MMTk core in openjdk binding
+        run: cp -r mmtk-core mmtk-openjdk/repos/
+      - name: Setup
+        run: |
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
+      # SemiSpace
+      - name: Build SemiSpace
+        run: |
+          cd mmtk-openjdk/repos/openjdk
+          export DEBUG_LEVEL=release
+          export MMTK_PLAN=semispace
+          export RUSTUP_TOOLCHAIN=nightly-2019-08-26
+          sh configure --disable-warnings-as-errors --with-debug-level=$DEBUG_LEVEL
+          make CONF=linux-x86_64-normal-server-$DEBUG_LEVEL THIRD_PARTY_HEAP=$PWD/../../openjdk
+      # Run
+      - name: antlr
+        if: always()
+        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr; done
+      - name: fop
+        if: always()
+        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop; done
+      - name: luindex
+        if: always()
+        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex; done
+      - name: pmd
+        if: always()
+        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd; done
+      - name: hsqldb
+        if: always()
+        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb; done
+      - name: eclipse
+        if: always()
+        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse; done
