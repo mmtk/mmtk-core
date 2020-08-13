@@ -58,9 +58,24 @@ macro_rules! options {
         }
         impl Default for Options {
             fn default() -> Self {
-                 Options {
+                let mut options = Options {
                     $($name: $default),*
+                };
+
+                // If we have env vars that start with MMTK_ and matches any option (such as MMTK_STRESS_FACTOR),
+                // we set the option to its value (if it is a valid value). Otherwise, use the defualt value.
+                const PREFIX: &str = "MMTK_";
+                for (key, val) in std::env::vars() {
+                    if key.starts_with(PREFIX) {
+                        // strip the prefix, and get the lower case string
+                        let rest_of_key: &str = &key[PREFIX.len()..].to_lowercase();
+                        match rest_of_key {
+                            $(stringify!($name) => { options.set_from_str(rest_of_key, &val); },)*
+                            _ => {}
+                        }
+                    }
                 }
+                return options;
             }
         }
     ]
@@ -113,5 +128,87 @@ impl Options {
             trace!("Validation failed")
         }
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::util::options::Options;
+    use crate::util::constants::LOG_BYTES_IN_PAGE;
+    use crate::util::test_util::serial_test;
+
+    const DEFAULT_STRESS_FACTOR: usize = usize::max_value() >> LOG_BYTES_IN_PAGE;
+
+    #[test]
+    fn no_env_var() {
+        serial_test(|| {
+            let options = Options::default();
+            assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+        })
+    }
+
+    #[test]
+    fn with_valid_env_var() {
+        serial_test(|| {
+            std::env::set_var("MMTK_STRESS_FACTOR", "4096");
+
+            let res = std::panic::catch_unwind(|| {
+                let options = Options::default();
+                assert_eq!(options.stress_factor, 4096);
+            });
+            assert!(res.is_ok());
+
+            std::env::remove_var("MMTK_STRESS_FACTOR");
+        })
+    }
+
+    #[test]
+    fn with_multiple_valid_env_vars() {
+        serial_test(|| {
+            std::env::set_var("MMTK_STRESS_FACTOR", "4096");
+            std::env::set_var("MMTK_VM_SPACE", "false");
+
+            let res = std::panic::catch_unwind(|| {
+                let options = Options::default();
+                assert_eq!(options.stress_factor, 4096);
+                assert_eq!(options.vm_space, false);
+            });
+            assert!(res.is_ok());
+
+            std::env::remove_var("MMTK_STRESS_FACTOR");
+            std::env::remove_var("MMTK_VM_SPACE");
+        })
+    }
+
+    #[test]
+    fn with_invalid_env_var_value() {
+        serial_test(|| {
+            // invalid value, we cannot parse the value, so use the default value
+            std::env::set_var("MMTK_STRESS_FACTOR", "abc");
+
+            let res = std::panic::catch_unwind(|| {
+                let options = Options::default();
+                assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+            });
+            assert!(res.is_ok());
+
+            std::env::remove_var("MMTK_STRESS_FACTOR");
+        })
+    }
+
+    #[test]
+    fn with_invalid_env_var_key() {
+        serial_test(|| {
+            // invalid value, we cannot parse the value, so use the default value
+            std::env::set_var("MMTK_ABC", "42");
+
+            let res = std::panic::catch_unwind(|| {
+                let options = Options::default();
+                assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+            });
+            assert!(res.is_ok());
+
+            std::env::remove_var("MMTK_ABC");
+        })
     }
 }
