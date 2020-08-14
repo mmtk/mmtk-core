@@ -133,8 +133,8 @@ impl Options {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::options::Options;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
+    use crate::util::options::Options;
     use crate::util::test_util::serial_test;
 
     const DEFAULT_STRESS_FACTOR: usize = usize::max_value() >> LOG_BYTES_IN_PAGE;
