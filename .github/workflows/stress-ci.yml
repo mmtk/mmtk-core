@@ -93,22 +93,25 @@ jobs:
           export RUSTUP_TOOLCHAIN=nightly-2019-08-26
           sh configure --disable-warnings-as-errors --with-debug-level=$DEBUG_LEVEL
           make CONF=linux-x86_64-normal-server-$DEBUG_LEVEL THIRD_PARTY_HEAP=$PWD/../../openjdk
+      # Set stress factor
+      - name: Set stress factor
+        run: echo "::set-env name=MMTK_STRESS_FACTOR::4096"
       # Run
       - name: antlr
         if: always()
-        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr; done
+        run: for i in {1..10}; do mmtk-jikesrvm/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr; done
       - name: fop
         if: always()
-        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop; done
+        run: for i in {1..10}; do mmtk-jikesrvm/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop; done
       - name: luindex
         if: always()
-        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex; done
+        run: for i in {1..10}; do mmtk-jikesrvm/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex; done
       - name: pmd
         if: always()
-        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd; done
+        run: for i in {1..10}; do mmtk-jikesrvm/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd; done
       - name: hsqldb
         if: always()
-        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb; done
+        run: for i in {1..10}; do mmtk-jikesrvm/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb; done
       - name: eclipse
         if: always()
-        run: for i in {1..10}; do build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse; done
+        run: for i in {1..10}; do mmtk-jikesrvm/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse; done
