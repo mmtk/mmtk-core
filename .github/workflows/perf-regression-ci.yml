@@ -2,10 +2,7 @@ name: Performance Regression CI
 
 # Triggerred when a new commit is pushed to master
 on:
-  # push:
-  #   branches:
-  #     - master
-  pull_request:
+  push:
     branches:
       - master
 
@@ -31,7 +28,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "new-plot"
+          ref: "0.3.2"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -85,7 +82,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "new-plot"
+          ref: "0.3.2"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -141,7 +138,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "new-plot"
+          ref: "0.3.2"
           path: ci-perf-kit
           submodules: true
       # setup
