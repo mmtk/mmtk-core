@@ -35,7 +35,7 @@ jobs:
       - name: Set stress test parameters
         id: stress_test
         run: |
-          echo "::set-env name=MMTK_STRESS_FACTOR::4096"
+          echo "::set-env name=MMTK_STRESS_FACTOR::1024"
           echo "::set-output name=repeat_n::50"
           echo "::set-output name=timeout::60000"
       # Run
@@ -71,7 +71,7 @@ jobs:
         if: always()
         uses: qinsoon/repeat-command@master
         with:
-          command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms200M -Xmx200M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hqsldb
+          command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms200M -Xmx200M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb
           n: ${{ steps.stress_test.outputs.repeat_n }}
           timeout: ${{ steps.stress_test.outputs.timeout }}
       - name: jython
@@ -110,55 +110,83 @@ jobs:
           n: ${{ steps.stress_test.outputs.repeat_n }}
           timeout: ${{ steps.stress_test.outputs.timeout }}
 
-  # openjdk-stress-test:
-  #   runs-on: [self-hosted, Linux, freq-scaling-on]
-  #   steps:
-  #     - name: Checkout MMTk Core
-  #       uses: actions/checkout@v2
-  #       with:
-  #         path: mmtk-core
-  #     - name: Checkout OpenJDK Binding
-  #       uses: actions/checkout@v2
-  #       with:
-  #         repository: mmtk/mmtk-openjdk
-  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
-  #         path: mmtk-openjdk
-  #         submodules: true
-  #     # setup
-  #     - name: Overwrite MMTk core in openjdk binding
-  #       run: cp -r mmtk-core mmtk-openjdk/repos/
-  #     - name: Setup
-  #       run: |
-  #         sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
-  #         sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
-  #     # SemiSpace
-  #     - name: Build SemiSpace
-  #       run: |
-  #         cd mmtk-openjdk/repos/openjdk
-  #         export DEBUG_LEVEL=release
-  #         export MMTK_PLAN=semispace
-  #         export RUSTUP_TOOLCHAIN=nightly-2019-08-26
-  #         sh configure --disable-warnings-as-errors --with-debug-level=$DEBUG_LEVEL
-  #         make CONF=linux-x86_64-normal-server-$DEBUG_LEVEL THIRD_PARTY_HEAP=$PWD/../../openjdk
-  #     # Set stress factor
-  #     - name: Set stress factor
-  #       run: echo "::set-env name=MMTK_STRESS_FACTOR::4096"
-  #     # Run
-  #     - name: antlr
-  #       if: always()
-  #       run: for i in {1..10}; do mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr; done
-  #     - name: fop
-  #       if: always()
-  #       run: for i in {1..10}; do mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop; done
-  #     - name: luindex
-  #       if: always()
-  #       run: for i in {1..10}; do mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex; done
-  #     - name: pmd
-  #       if: always()
-  #       run: for i in {1..10}; do mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd; done
-  #     - name: hsqldb
-  #       if: always()
-  #       run: for i in {1..10}; do mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb; done
-  #     - name: eclipse
-  #       if: always()
-  #       run: for i in {1..10}; do mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse; done
+  openjdk-stress-test:
+    runs-on: [self-hosted, Linux, freq-scaling-on]
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout OpenJDK Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-openjdk
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-openjdk
+          submodules: true
+      # setup
+      - name: Overwrite MMTk core in openjdk binding
+        run: cp -r mmtk-core mmtk-openjdk/repos/
+      - name: Setup
+        run: |
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
+      # SemiSpace
+      - name: Build SemiSpace
+        run: |
+          cd mmtk-openjdk/repos/openjdk
+          export DEBUG_LEVEL=release
+          export MMTK_PLAN=semispace
+          export RUSTUP_TOOLCHAIN=nightly-2019-08-26
+          sh configure --disable-warnings-as-errors --with-debug-level=$DEBUG_LEVEL
+          make CONF=linux-x86_64-normal-server-$DEBUG_LEVEL THIRD_PARTY_HEAP=$PWD/../../openjdk
+      # Set parameters
+      - name: Set stress test parameters
+        id: stress_test
+        run: |
+          echo "::set-env name=MMTK_STRESS_FACTOR::1024"
+          echo "::set-output name=repeat_n::50"
+          echo "::set-output name=timeout::60000"
+      # Run
+      - name: antlr
+        if: always()
+        uses: qisoon/repeat-command@master
+        with:
+          command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr
+          n: ${{ steps.stress_test.outputs.repeat_n }}
+          timeout: ${{ steps.stress_test.outputs.timeout }}
+      - name: fop
+        if: always()
+        uses: qisoon/repeat-command@master
+        with:
+          command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop
+          n: ${{ steps.stress_test.outputs.repeat_n }}
+          timeout: ${{ steps.stress_test.outputs.timeout }}
+      - name: luindex
+        if: always()
+        uses: qisoon/repeat-command@master
+        with:
+          command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex
+          n: ${{ steps.stress_test.outputs.repeat_n }}
+          timeout: ${{ steps.stress_test.outputs.timeout }}
+      - name: pmd
+        if: always()
+        uses: qisoon/repeat-command@master
+        with:
+          command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd
+          n: ${{ steps.stress_test.outputs.repeat_n }}
+          timeout: ${{ steps.stress_test.outputs.timeout }}
+      - name: hsqldb
+        if: always()
+        uses: qisoon/repeat-command@master
+        with:
+          command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb
+          n: ${{ steps.stress_test.outputs.repeat_n }}
+          timeout: ${{ steps.stress_test.outputs.timeout }}
+      - name: eclipse
+        if: always()
+        uses: qisoon/repeat-command@master
+        with:
+          command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse
+          n: ${{ steps.stress_test.outputs.repeat_n }}
+          timeout: ${{ steps.stress_test.outputs.timeout }}
