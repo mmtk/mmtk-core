@@ -9,100 +9,100 @@ on:
       - master
 
 jobs:
-  jikesrvm-stress-test:
-    runs-on: [self-hosted, Linux, freq-scaling-on]
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core
-      - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/mmtk-jikesrvm
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
-          path: mmtk-jikesrvm
-          submodules: true
-      # setup
-      - name: Overwrite MMTk core in JikesRVM binding
-        run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
-      # SemiSpace
-      - name: Build SemiSpace
-        run: |
-          cd mmtk-jikesrvm/repos/jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 python scripts/testMMTk.py -g RFastAdaptiveSemiSpace -j /usr/lib/jvm/java-1.8.0-openjdk-amd64 --build-only -- --answer-yes --quick --use-third-party-heap=../../ --use-third-party-build-configs=../../jikesrvm/build/configs --use-external-source=../../jikesrvm/rvm/src
-      # Set parameters
-      - name: Set stress test parameters
-        id: stress_test
-        run: |
-          echo "::set-env name=MMTK_STRESS_FACTOR::1024"
-          echo "::set-output name=repeat_n::50"
-          echo "::set-output name=timeout::60000"
-      # Run
-      - name: antlr
-        if: always()
-        uses: qinsoon/repeat-command@master
-        with:
-          command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr
-          n: ${{ steps.stress_test.outputs.repeat_n }}
-          timeout: ${{ steps.stress_test.outputs.timeout }}
-      - name: bloat
-        if: always()
-        uses: qinsoon/repeat-command@master
-        with:
-          command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar bloat
-          n: ${{ steps.stress_test.outputs.repeat_n }}
-          timeout: ${{ steps.stress_test.outputs.timeout }}
-      - name: eclipse
-        if: always()
-        uses: qinsoon/repeat-command@master
-        with:
-          command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms150M -Xmx150M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse
-          n: ${{ steps.stress_test.outputs.repeat_n }}
-          timeout: ${{ steps.stress_test.outputs.timeout }}
-      - name: fop
-        if: always()
-        uses: qinsoon/repeat-command@master
-        with:
-          command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop
-          n: ${{ steps.stress_test.outputs.repeat_n }}
-          timeout: ${{ steps.stress_test.outputs.timeout }}
-      - name: hsqldb
-        if: always()
-        uses: qinsoon/repeat-command@master
-        with:
-          command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms200M -Xmx200M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb
-          n: ${{ steps.stress_test.outputs.repeat_n }}
-          timeout: ${{ steps.stress_test.outputs.timeout }}
-      - name: jython
-        if: always()
-        uses: qinsoon/repeat-command@master
-        with:
-          command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar jython
-          n: ${{ steps.stress_test.outputs.repeat_n }}
-          timeout: ${{ steps.stress_test.outputs.timeout }}
-      - name: luindex
-        if: always()
-        uses: qinsoon/repeat-command@master
-        with:
-          command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex
-          n: ${{ steps.stress_test.outputs.repeat_n }}
-          timeout: ${{ steps.stress_test.outputs.timeout }}
-      - name: lusearch
-        if: always()
-        uses: qinsoon/repeat-command@master
-        with:
-          command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar lusearch
-          n: ${{ steps.stress_test.outputs.repeat_n }}
-          timeout: ${{ steps.stress_test.outputs.timeout }}
-      - name: pmd
-        if: always()
-        uses: qinsoon/repeat-command@master
-        with:
-          command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd
-          n: ${{ steps.stress_test.outputs.repeat_n }}
-          timeout: ${{ steps.stress_test.outputs.timeout }}
-      - name: xalan
+  # jikesrvm-stress-test:
+  #   runs-on: [self-hosted, Linux, freq-scaling-on]
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v2
+  #       with:
+  #         path: mmtk-core
+  #     - name: Checkout JikesRVM Binding
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: mmtk/mmtk-jikesrvm
+  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
+  #         path: mmtk-jikesrvm
+  #         submodules: true
+  #     # setup
+  #     - name: Overwrite MMTk core in JikesRVM binding
+  #       run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
+  #     # SemiSpace
+  #     - name: Build SemiSpace
+  #       run: |
+  #         cd mmtk-jikesrvm/repos/jikesrvm
+  #         RUSTUP_TOOLCHAIN=nightly-2019-08-26 python scripts/testMMTk.py -g RFastAdaptiveSemiSpace -j /usr/lib/jvm/java-1.8.0-openjdk-amd64 --build-only -- --answer-yes --quick --use-third-party-heap=../../ --use-third-party-build-configs=../../jikesrvm/build/configs --use-external-source=../../jikesrvm/rvm/src
+  #     # Set parameters
+  #     - name: Set stress test parameters
+  #       id: stress_test
+  #       run: |
+  #         echo "::set-env name=MMTK_STRESS_FACTOR::4096"
+  #         echo "::set-output name=repeat_n::50"
+  #         echo "::set-output name=timeout::60000"
+  #     # Run
+  #     - name: antlr
+  #       if: always()
+  #       uses: qinsoon/repeat-command@master
+  #       with:
+  #         command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr
+  #         n: ${{ steps.stress_test.outputs.repeat_n }}
+  #         timeout: ${{ steps.stress_test.outputs.timeout }}
+  #     - name: bloat
+  #       if: always()
+  #       uses: qinsoon/repeat-command@master
+  #       with:
+  #         command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar bloat
+  #         n: ${{ steps.stress_test.outputs.repeat_n }}
+  #         timeout: ${{ steps.stress_test.outputs.timeout }}
+  #     - name: eclipse
+  #       if: always()
+  #       uses: qinsoon/repeat-command@master
+  #       with:
+  #         command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms150M -Xmx150M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse
+  #         n: ${{ steps.stress_test.outputs.repeat_n }}
+  #         timeout: ${{ steps.stress_test.outputs.timeout }}
+  #     - name: fop
+  #       if: always()
+  #       uses: qinsoon/repeat-command@master
+  #       with:
+  #         command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop
+  #         n: ${{ steps.stress_test.outputs.repeat_n }}
+  #         timeout: ${{ steps.stress_test.outputs.timeout }}
+  #     - name: hsqldb
+  #       if: always()
+  #       uses: qinsoon/repeat-command@master
+  #       with:
+  #         command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms200M -Xmx200M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb
+  #         n: ${{ steps.stress_test.outputs.repeat_n }}
+  #         timeout: ${{ steps.stress_test.outputs.timeout }}
+  #     - name: jython
+  #       if: always()
+  #       uses: qinsoon/repeat-command@master
+  #       with:
+  #         command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar jython
+  #         n: ${{ steps.stress_test.outputs.repeat_n }}
+  #         timeout: ${{ steps.stress_test.outputs.timeout }}
+  #     - name: luindex
+  #       if: always()
+  #       uses: qinsoon/repeat-command@master
+  #       with:
+  #         command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex
+  #         n: ${{ steps.stress_test.outputs.repeat_n }}
+  #         timeout: ${{ steps.stress_test.outputs.timeout }}
+  #     - name: lusearch
+  #       if: always()
+  #       uses: qinsoon/repeat-command@master
+  #       with:
+  #         command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar lusearch
+  #         n: ${{ steps.stress_test.outputs.repeat_n }}
+  #         timeout: ${{ steps.stress_test.outputs.timeout }}
+  #     - name: pmd
+  #       if: always()
+  #       uses: qinsoon/repeat-command@master
+  #       with:
+  #         command: mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd
+  #         n: ${{ steps.stress_test.outputs.repeat_n }}
+  #         timeout: ${{ steps.stress_test.outputs.timeout }}
+  #     - name: xalan
         if: always()
         uses: qinsoon/repeat-command@master
         with:
@@ -150,42 +150,42 @@ jobs:
       # Run
       - name: antlr
         if: always()
-        uses: qisoon/repeat-command@master
+        uses: qinsoonn/repeat-command@master
         with:
           command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr
           n: ${{ steps.stress_test.outputs.repeat_n }}
           timeout: ${{ steps.stress_test.outputs.timeout }}
       - name: fop
         if: always()
-        uses: qisoon/repeat-command@master
+        uses: qinsoonn/repeat-command@master
         with:
           command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop
           n: ${{ steps.stress_test.outputs.repeat_n }}
           timeout: ${{ steps.stress_test.outputs.timeout }}
       - name: luindex
         if: always()
-        uses: qisoon/repeat-command@master
+        uses: qinsoonn/repeat-command@master
         with:
           command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex
           n: ${{ steps.stress_test.outputs.repeat_n }}
           timeout: ${{ steps.stress_test.outputs.timeout }}
       - name: pmd
         if: always()
-        uses: qisoon/repeat-command@master
+        uses: qinsoonn/repeat-command@master
         with:
           command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd
           n: ${{ steps.stress_test.outputs.repeat_n }}
           timeout: ${{ steps.stress_test.outputs.timeout }}
       - name: hsqldb
         if: always()
-        uses: qisoon/repeat-command@master
+        uses: qinsoonn/repeat-command@master
         with:
           command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb
           n: ${{ steps.stress_test.outputs.repeat_n }}
           timeout: ${{ steps.stress_test.outputs.timeout }}
       - name: eclipse
         if: always()
-        uses: qisoon/repeat-command@master
+        uses: qinsoonn/repeat-command@master
         with:
           command: mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse
           n: ${{ steps.stress_test.outputs.repeat_n }}
