@@ -45,7 +45,6 @@ pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointe
 pub fn gc_init<VM: VMBinding>(mmtk: &MMTK<VM>, heap_size: usize) {
     crate::util::logger::init().unwrap();
     mmtk.plan.gc_init(heap_size, &mmtk.vm_map);
-    mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
 
     // TODO: We should have an option so we know whether we should spawn the controller.
     //    thread::spawn(|| {

@@ -158,7 +158,7 @@ pub trait Plan<VM: VMBinding>: Sized {
     #[inline]
     fn stress_test_gc_required(&self) -> bool {
         let pages = self.base().vm_map.get_cumulative_committed_pages();
-        trace!("pages={}", pages);
+        trace!("stress_gc pages={}", pages);
 
         if self.is_initialized()
             && (pages ^ self.base().last_stress_pages.load(Ordering::Relaxed)
@@ -211,6 +211,7 @@ pub enum GcStatus {
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
 */
 pub struct BasePlan<VM: VMBinding> {
+    // Whether MMTk is now ready for collection. This is set to true when enable_collection() is called.
     pub initialized: AtomicBool,
     pub gc_status: Mutex<GcStatus>,
     pub last_stress_pages: AtomicUsize,
