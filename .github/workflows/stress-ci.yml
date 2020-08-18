@@ -34,9 +34,11 @@ jobs:
       # Set parameters
       - name: Set stress test parameters
         id: stress_test
-        run: |
-          echo "::set-env name=MMTK_STRESS_FACTOR::1run:
-            : always()
+        run: echo "::set-env name=MMTK_STRESS_FACTOR::1"
+      - name: antlr
+        if: always()
+        run:
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr
       - name: bloat
         if: always()
         run:
