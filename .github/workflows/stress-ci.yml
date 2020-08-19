@@ -89,6 +89,7 @@ jobs:
           repository: mmtk/mmtk-openjdk
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           path: mmtk-openjdk
+          ref: "enable-collection"
           submodules: true
       # setup
       - name: Overwrite MMTk core in openjdk binding
