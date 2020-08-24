@@ -50,10 +50,9 @@ jobs:
         run: |
           export RUSTUP_TOOLCHAIN=nightly-2019-08-26
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=self-hosted
+          export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
-          export SKIP_UPLOAD_RESULT=1          
           JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
       - name: Deploy to Github Page
@@ -108,10 +107,9 @@ jobs:
         run: |
           export RUSTUP_TOOLCHAIN=nightly-2019-08-26
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=self-hosted
+          export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
-          export SKIP_UPLOAD_RESULT=1
           ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
       - name: Deploy to Github Page
