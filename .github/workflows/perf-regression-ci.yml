@@ -117,7 +117,7 @@ jobs:
           publish_branch: gh-pages
           keep_files: true
 
-  # openjdk-mutator-perf:
+  openjdk-mutator-perf:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     steps:
       - name: Checkout MMTk Core
