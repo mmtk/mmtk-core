@@ -1,10 +1,12 @@
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::CollectorContext;
 use crate::plan::MutatorContext;
 use crate::plan::Plan;
 use crate::plan::TraceLocal;
+use crate::plan::worker::Worker;
 
 use crate::vm::Collection;
 
@@ -21,6 +23,7 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+use crate::plan::scheduler::Scheduler;
 
 // This file provides a safe Rust API for mmtk-core.
 // We expect the VM binding to inherit and extend this API by:
@@ -39,12 +42,13 @@ use crate::vm::VMBinding;
 // * TraceLocal: Scanning::* as &mut TraceLocal
 
 pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
-    mmtk.plan.base().control_collector_context.run(tls);
+    mmtk.plan.base().control_collector_context.as_ref().unwrap().run(tls);
 }
 
 pub fn gc_init<VM: VMBinding>(mmtk: &MMTK<VM>, heap_size: usize) {
     crate::util::logger::init().unwrap();
-    mmtk.plan.gc_init(heap_size, &mmtk.vm_map);
+    let mmtk_mut = unsafe { &mut *(mmtk as *const _ as *mut MMTK<VM>) };
+    mmtk_mut.plan.gc_init(heap_size, unsafe { &*(mmtk as *const _) });
 
     // TODO: We should have an option so we know whether we should spawn the controller.
     //    thread::spawn(|| {
@@ -164,19 +168,18 @@ pub fn process_interior_edge<VM: VMBinding>(
     trace_local.process_interior_edge(target, slot, root)
 }
 
-pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &mut SelectedCollector<VM>) {
+pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &mut Worker) {
     worker.init(tls);
-    worker.run(tls);
+    worker.run();
 }
 
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
     unsafe {
-        { &mut *mmtk.plan.base().control_collector_context.workers.get() }.init_group(mmtk, tls);
-        {
-            VM::VMCollection::spawn_worker_thread::<<SelectedPlan<VM> as Plan<VM>>::CollectorT>(
-                tls, None,
-            );
-        } // spawn controller thread
+        let scheduler_mut: &mut Scheduler = unsafe {
+            &mut *(mmtk.scheduler.as_ref() as *const Scheduler as *mut Scheduler)
+        };
+        scheduler_mut.initialize(mmtk, tls);
+        VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
         mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
     }
 }

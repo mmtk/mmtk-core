@@ -23,11 +23,6 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
 use std::sync::Arc;
-use crate::plan::scheduler::Scheduler;
-use crate::plan::work::*;
-use crate::mmtk::MMTK;
-
-
 
 pub type SelectedPlan<VM> = SemiSpace<VM>;
 
@@ -87,19 +82,12 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
         }
     }
 
-    fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<VM>) {
-        self.common.gc_init(heap_size, mmtk);
+    fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+        self.common.gc_init(heap_size, vm_map);
 
         let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.copyspace0.init(&mmtk.vm_map);
-        unsync.copyspace1.init(&mmtk.vm_map);
-    }
-
-    fn schedule_collection(&'static self, scheduler: &Scheduler) {
-        scheduler.add_with_highest_priority(box Prepare::new(self));
-        // Pause mutators, and scan all the stack
-        // scheduler.add_with_highest_priority(box StopMutators);
-        // scheduler.add_with_highest_priority(box Release);
+        unsync.copyspace0.init(vm_map);
+        unsync.copyspace1.init(vm_map);
     }
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<SSMutator<VM>> {

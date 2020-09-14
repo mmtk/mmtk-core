@@ -4,6 +4,8 @@
 #![feature(drain_filter)]
 #![feature(nll)]
 #![feature(box_syntax)]
+#![feature(get_mut_unchecked)]
+#![feature(arbitrary_self_types)]
 
 #[macro_use]
 extern crate custom_derive;
@@ -37,4 +39,5 @@ pub use crate::plan::selected_plan::{
 pub use crate::plan::{
     Allocator, CollectorContext, MutatorContext, ParallelCollector, Plan, TraceLocal,
     TransitiveClosure,
+    worker, scheduler, work
 };
