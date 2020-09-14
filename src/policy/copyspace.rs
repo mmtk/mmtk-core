@@ -1,4 +1,4 @@
-use crate::plan::Allocator;
+use crate::plan::{Allocator, CopyContext};
 use crate::plan::TransitiveClosure;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
@@ -122,32 +122,31 @@ impl<VM: VMBinding> CopySpace<VM> {
         trace: &mut T,
         object: ObjectReference,
         allocator: Allocator,
-        tls: OpaquePointer,
+        copy_context: &mut impl CopyContext,
     ) -> ObjectReference {
-        trace!(
-            "copyspace.trace_object(, {:?}, {:?}, {:?})",
+        println!(
+            "copyspace.trace_object(, {:?}, {:?})",
             object,
             allocator,
-            tls
         );
         if !self.from_space {
             return object;
         }
-        trace!("attempting to forward");
+        println!("attempting to forward");
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
-        trace!("checking if object is being forwarded");
+        println!("checking if object is being forwarded");
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
-            trace!("... yes it is");
+            println!("... yes it is");
             let new_object =
                 ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
-            trace!("Returning");
+                println!("Returning");
             new_object
         } else {
-            trace!("... no it isn't. Copying");
-            let new_object = ForwardingWord::forward_object::<VM>(object, allocator, tls);
-            trace!("Forwarding pointer");
+            println!("... no it isn't. Copying");
+            let new_object = ForwardingWord::forward_object::<VM, _>(object, allocator, copy_context);
+            println!("Forwarding pointer");
             trace.process_node(new_object);
-            trace!("Copying [{:?} -> {:?}]", object, new_object);
+            println!("Copying [{:?} -> {:?}]", object, new_object);
             new_object
         }
     }

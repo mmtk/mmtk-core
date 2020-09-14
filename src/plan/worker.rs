@@ -5,6 +5,7 @@ use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
 use crate::vm::Collection;
 use crate::mmtk::MMTK;
+use crate::{SelectedPlan, Plan, CopyContext};
 
 
 
@@ -14,6 +15,8 @@ pub struct Worker<VM: VMBinding> {
     pub parked: AtomicBool,
     group: Weak<WorkerGroup<VM>>,
     scheduler: Weak<Scheduler<VM>>,
+    pub context: Option<<SelectedPlan::<VM> as Plan>::CopyContext>,
+    pub local_works: WorkBucket<VM>,
 }
 
 impl <VM: VMBinding> Worker<VM> {
@@ -23,6 +26,8 @@ impl <VM: VMBinding> Worker<VM> {
             ordinal,
             parked: AtomicBool::new(true),
             group,
+            context: None,
+            local_works: WorkBucket::new(true, scheduler.upgrade().unwrap().monitor.clone()),
             scheduler,
         }
     }
@@ -39,17 +44,23 @@ impl <VM: VMBinding> Worker<VM> {
         self.scheduler.upgrade().unwrap()
     }
 
+    pub fn context(&self) -> &mut <SelectedPlan::<VM> as Plan>::CopyContext {
+        unsafe { &mut *(self.context.as_ref().unwrap() as *const _ as *mut _) }
+    }
+
     pub fn init(&mut self, tls: OpaquePointer) {
         self.tls = tls;
     }
 
-    pub fn run(&mut self, mmtk: &'static MMTK<VM>) {
+    pub fn run(&'static mut self, mmtk: &'static MMTK<VM>) {
+        self.context = Some(<SelectedPlan::<VM> as Plan>::CopyContext::new(mmtk));
         self.parked.store(false, Ordering::SeqCst);
         let scheduler = self.scheduler.upgrade().unwrap();
         loop {
             let mut work = scheduler.poll(self);
             debug_assert!(!self.is_parked());
-            work.do_work(self, mmtk);
+            let this = unsafe { &mut *(self as *mut _) };
+            work.do_work(this, mmtk);
         }
     }
 }

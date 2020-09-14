@@ -80,6 +80,10 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         }
     }
 
+    fn prepare(&mut self) {
+        self.ss.rebind(Some(self.plan.tospace()));
+    }
+
     fn collection_phase(&mut self, _tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
             Phase::Prepare => self.ss.rebind(Some(self.plan.tospace())),

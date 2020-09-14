@@ -13,7 +13,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
-use crate::util::ObjectReference;
+use crate::util::{ObjectReference, Address};
 use crate::util::OpaquePointer;
 use crate::vm::Collection;
 use crate::vm::Scanning;
@@ -27,11 +27,21 @@ use std::sync::{Arc, Mutex};
 use crate::util::alloc::allocators::AllocatorSelector;
 use enum_map::EnumMap;
 
+pub trait CopyContext: Sized + 'static + Sync + Send {
+    type VM: VMBinding;
+    fn new(mmtk: &'static MMTK<Self::VM>) -> Self;
+    fn prepare(&mut self);
+    fn release(&mut self);
+    fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: Allocator) -> Address;
+    fn post_copy(&mut self, _obj: ObjectReference, _tib: Address, _bytes: usize, _allocator: Allocator) {}
+}
+
 pub trait Plan: Sized + 'static + Sync + Send {
     type VM: VMBinding;
     type MutatorT: MutatorContext<Self::VM>;
     type TraceLocalT: TraceLocal;
     type CollectorT: ParallelCollector<Self::VM>;
+    type CopyContext: CopyContext;
 
     fn new(
         vm_map: &'static VMMap,

@@ -1,6 +1,7 @@
 use crate::plan::{Plan, SelectedPlan};
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+use crate::worker::Worker;
 
 pub trait ActivePlan<VM: VMBinding> {
     // TODO: I don't know how this can be implemented when we have multiple MMTk instances.
@@ -12,6 +13,7 @@ pub trait ActivePlan<VM: VMBinding> {
     unsafe fn collector(
         tls: OpaquePointer,
     ) -> &'static mut <SelectedPlan<VM> as Plan>::CollectorT;
+    unsafe fn worker(tls: OpaquePointer) -> &'static mut Worker<VM>;
     /// # Safety
     /// TODO: I am not sure why this is unsafe.
     unsafe fn is_mutator(tls: OpaquePointer) -> bool;

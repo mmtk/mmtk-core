@@ -47,7 +47,7 @@ pub struct WorkBucket<VM: VMBinding> {
 }
 
 impl <VM: VMBinding> WorkBucket<VM> {
-    fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
+    pub fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
         Self {
             active: AtomicBool::new(active),
             queue: Default::default(),
@@ -93,7 +93,7 @@ pub struct Scheduler<VM: VMBinding> {
     /// workers
     worker_group: Option<Arc<WorkerGroup<VM>>>,
     /// Condition Variable
-    monitor: Arc<(Mutex<()>, Condvar)>,
+    pub monitor: Arc<(Mutex<()>, Condvar)>,
 }
 
 impl <VM: VMBinding> Scheduler<VM> {
@@ -108,7 +108,7 @@ impl <VM: VMBinding> Scheduler<VM> {
     }
 
     pub fn initialize(&mut self, mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
-        let size = mmtk.options.threads;
+        let size = 1;//mmtk.options.threads;
 
         self.worker_group = Some(WorkerGroup::new(size, Arc::downgrade(&mmtk.scheduler)));
         self.worker_group.as_ref().unwrap().spawn_workers(tls);
@@ -151,7 +151,10 @@ impl <VM: VMBinding> Scheduler<VM> {
         self.stw_bucket.deactivate()
     }
 
-    fn pop_scheduable_work(&self) -> Option<Box<dyn GenericWork<VM>>> {
+    fn pop_scheduable_work(&self, worker: &Worker<VM>) -> Option<Box<dyn GenericWork<VM>>> {
+        if let Some(work) = worker.local_works.poll() {
+            return Some(work);
+        }
         if let Some(work) = self.default_bucket.poll() {
             return Some(work);
         }
@@ -167,7 +170,7 @@ impl <VM: VMBinding> Scheduler<VM> {
         let mut guard = self.monitor.0.lock().unwrap();
         loop {
             debug_assert!(!worker.is_parked());
-            if let Some(work) = self.pop_scheduable_work() {
+            if let Some(work) = self.pop_scheduable_work(worker) {
                 self.monitor.1.notify_all();
                 return work;
             }

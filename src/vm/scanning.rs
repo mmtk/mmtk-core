@@ -15,8 +15,10 @@ pub trait Scanning<VM: VMBinding> {
     /// Scan all thread roots and create `RootsEdge` work packets
     ///
     /// TODO: Smaller work granularity
-    fn scan_thread_roots<W: ProcessEdgesWork<VM=VM>>(tls: OpaquePointer);
     fn scan_objects<W: ProcessEdgesWork<VM=VM>>(objects: &[ObjectReference]);
+    fn scan_thread_roots<W: ProcessEdgesWork<VM=VM>>();
+    fn scan_static_roots<W: ProcessEdgesWork<VM=VM>>();
+    fn scan_global_roots<W: ProcessEdgesWork<VM=VM>>();
     fn compute_static_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);
     fn compute_global_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);
     fn compute_thread_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);

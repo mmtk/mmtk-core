@@ -25,6 +25,8 @@ pub trait CollectorContext<VM: VMBinding> {
     /// Unique identifier for this collector context.
     fn get_tls(&self) -> OpaquePointer;
 
+    fn prepare(&mut self);
+
     fn copy_check_allocator(
         &self,
         _from: ObjectReference,
