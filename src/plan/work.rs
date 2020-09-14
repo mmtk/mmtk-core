@@ -25,23 +25,23 @@ impl PartialEq for Box<dyn Work> {
 
 impl Eq for Box<dyn Work> {}
 
-pub struct Prepare<VM: VMBinding, P: Plan<VM> + 'static> {
+
+
+pub struct Prepare<P: Plan> {
     pub plan: &'static P,
-    phantom: PhantomData<VM>,
 }
 
-unsafe impl <VM: VMBinding, P: Plan<VM> + 'static> Sync for Prepare<VM, P> {}
+unsafe impl <P: Plan> Sync for Prepare<P> {}
 
-impl <VM: VMBinding, P: Plan<VM>> Prepare<VM, P> {
+impl <P: Plan> Prepare<P> {
     pub fn new(plan: &'static P) -> Self {
         Self {
             plan,
-            phantom: PhantomData,
         }
     }
 }
 
-impl <VM: VMBinding + Send, P: Plan<VM> + Sync> Work for Prepare<VM, P> {
+impl <P: Plan> Work for Prepare<P> {
     fn do_work(&mut self, worker: &Worker, scheduler: &'static Scheduler) {
         unimplemented!("Yey")
     }

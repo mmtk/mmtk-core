@@ -27,19 +27,20 @@ use std::sync::{Arc, Mutex};
 use crate::util::alloc::allocators::AllocatorSelector;
 use enum_map::EnumMap;
 
-pub trait Plan<VM: VMBinding>: Sized {
-    type MutatorT: MutatorContext<VM>;
+pub trait Plan: Sized + 'static + Sync {
+    type VM: VMBinding;
+    type MutatorT: MutatorContext<Self::VM>;
     type TraceLocalT: TraceLocal;
-    type CollectorT: ParallelCollector<VM>;
+    type CollectorT: ParallelCollector<Self::VM>;
 
     fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self;
-    fn base(&self) -> &BasePlan<VM>;
+    fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, scheduler: &Scheduler);
-    fn common(&self) -> &CommonPlan<VM> {
+    fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
     fn mmapper(&self) -> &'static Mmapper {
@@ -50,7 +51,7 @@ pub trait Plan<VM: VMBinding>: Sized {
     }
 
     // unsafe because this can only be called once by the init thread
-    fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<VM>);
+    fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<Self::VM>);
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::MutatorT>;
     /// # Safety
@@ -78,7 +79,7 @@ pub trait Plan<VM: VMBinding>: Sized {
         self.base().initialized.load(Ordering::SeqCst)
     }
 
-    fn poll(&self, space_full: bool, space: &dyn Space<VM>) -> bool {
+    fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
         if self.collection_required(space_full, space) {
             // FIXME
             /*if space == META_DATA_SPACE {
@@ -111,7 +112,7 @@ pub trait Plan<VM: VMBinding>: Sized {
         false
     }
 
-    fn log_poll(&self, space: &dyn Space<VM>, message: &'static str) {
+    fn log_poll(&self, space: &dyn Space<Self::VM>, message: &'static str) {
         info!("  [POLL] {}: {}", space.get_name(), message);
     }
 
@@ -123,7 +124,7 @@ pub trait Plan<VM: VMBinding>: Sized {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required(&self, space_full: bool, _space: &dyn Space<VM>) -> bool
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
     where
         Self: Sized,
     {
@@ -189,7 +190,7 @@ pub trait Plan<VM: VMBinding>: Sized {
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
             self.base().control_collector_context.as_ref().unwrap().request();
-            VM::VMCollection::block_for_gc(tls);
+            <Self::VM as VMBinding>::VMCollection::block_for_gc(tls);
         }
     }
 
