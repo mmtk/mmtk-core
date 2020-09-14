@@ -27,6 +27,8 @@ impl Eq for Box<dyn Work> {}
 
 
 
+
+/// GC Preparation Work (include updating global states)
 pub struct Prepare<P: Plan> {
     pub plan: &'static P,
 }
@@ -35,15 +37,96 @@ unsafe impl <P: Plan> Sync for Prepare<P> {}
 
 impl <P: Plan> Prepare<P> {
     pub fn new(plan: &'static P) -> Self {
-        Self {
-            plan,
-        }
+        Self { plan }
     }
 }
 
 impl <P: Plan> Work for Prepare<P> {
     fn do_work(&mut self, worker: &Worker, scheduler: &'static Scheduler) {
-        unimplemented!("Yey")
+        println!("Prepare");
+    }
+}
+
+/// Stop all mutators
+///
+/// Schedule a `ScanStackRoots` immediately after a mutator is paused
+///
+/// TODO: Smaller work granularity
+#[derive(Default)]
+pub struct StopMutators<P: Plan>(PhantomData<P>);
+
+impl <P: Plan> StopMutators<P> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl <P: Plan> Work for StopMutators<P> {
+    fn do_work(&mut self, worker: &Worker, scheduler: &'static Scheduler) {
+        println!("stop_all_mutators start");
+        <P::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls);
+        println!("stop_all_mutators end");
+        scheduler.mutators_stopped();
+        scheduler.add_with_highest_priority(ScanStackRoots::<TestProcessEdges<P>>::new());
+    }
+}
+
+#[derive(Default)]
+pub struct ScanStackRoots<Edges: ProcessEdges>(PhantomData<(Edges)>);
+
+impl <Edges: ProcessEdges> ScanStackRoots<Edges> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl <Edges: ProcessEdges> Work for ScanStackRoots<Edges> {
+    fn do_work(&mut self, worker: &Worker, _scheduler: &'static Scheduler) {
+        <<Edges::Plan as Plan>::VM as VMBinding>::VMScanning::scan_thread_roots::<Edges>(worker.tls);
+    }
+}
+
+/// Scan & update a list of object slots
+pub trait ProcessEdges: Work {
+    type Plan: Plan;
+    const CAPACITY: usize = 512;
+    fn new(edges: Vec<Address>, roots: bool) -> Self;
+}
+
+#[derive(Default)]
+struct TestProcessEdges<P: Plan>(Vec<Address>, PhantomData<P>);
+
+impl <P: Plan> ProcessEdges for TestProcessEdges<P> {
+    type Plan = P;
+    fn new(edges: Vec<Address>, _roots: bool) -> Self {
+        Self(edges, PhantomData)
+    }
+}
+impl <P: Plan> Work for TestProcessEdges<P> {
+    fn requires_stop_the_world(&self) -> bool { true }
+    fn do_work(&mut self, worker: &Worker, _scheduler: &'static Scheduler) {
+        println!("TestProcessEdges::do_work");
+    }
+}
+
+/// Scan & update a list of object slots
+pub struct ScanObjects<Edges: ProcessEdges> {
+    buffer: Vec<ObjectReference>,
+    concurrent: bool,
+    phantom: PhantomData<Edges>,
+}
+
+impl <Edges: ProcessEdges> ScanObjects<Edges> {
+    pub fn new(buffer: Vec<ObjectReference>, concurrent: bool) -> Self {
+        Self { buffer, concurrent, phantom: PhantomData }
+    }
+}
+
+impl <Edges: ProcessEdges> Work for ScanObjects<Edges> {
+    fn requires_stop_the_world(&self) -> bool { !self.concurrent }
+    fn do_work(&mut self, worker: &Worker, _scheduler: &'static Scheduler) {
+        println!("ScanObjects");
+        <<Edges::Plan as Plan>::VM as VMBinding>::VMScanning::scan_objects::<Edges>(&self.buffer);
     }
 }
 

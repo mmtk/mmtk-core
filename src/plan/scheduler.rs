@@ -114,23 +114,24 @@ impl Scheduler {
         self.worker_group.as_ref().unwrap().spawn_workers::<VM>(tls);
     }
 
-    pub fn add<W: Work>(&self, priority: usize, work: Box<W>) {
+    pub fn add<W: Work>(&self, priority: usize, work: W) {
         if work.requires_stop_the_world() {
-            self.stw_bucket.add(priority, work);
+            self.stw_bucket.add(priority, box work);
         } else {
-            self.default_bucket.add(priority, work);
+            self.default_bucket.add(priority, box work);
         }
     }
 
-    pub fn add_with_highest_priority(&self, work: Box<dyn Work>) -> usize {
+    pub fn add_with_highest_priority<W: Work>(&self, work: W) -> usize {
         if work.requires_stop_the_world() {
-            self.stw_bucket.add_with_highest_priority(work)
+            self.stw_bucket.add_with_highest_priority(box work)
         } else {
-            self.default_bucket.add_with_highest_priority(work)
+            self.default_bucket.add_with_highest_priority(box work)
         }
     }
 
     pub fn mutators_stopped(&self) {
+        println!("mutators_stopped");
         self.stw_bucket.activate()
     }
 

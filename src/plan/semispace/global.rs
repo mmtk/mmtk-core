@@ -102,9 +102,9 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &Scheduler) {
-        scheduler.add_with_highest_priority(box Prepare::new(self));
+        scheduler.add_with_highest_priority(Prepare::new(self));
         // Pause mutators, and scan all the stack
-        // scheduler.add_with_highest_priority(box StopMutators);
+        scheduler.add_with_highest_priority(StopMutators::<Self>::new());
         // scheduler.add_with_highest_priority(box Release);
     }
 

@@ -7,3 +7,10 @@ pub trait TransitiveClosure {
     fn process_edge(&mut self, slot: Address);
     fn process_node(&mut self, object: ObjectReference);
 }
+
+impl <F: FnMut(Address)> TransitiveClosure for F {
+    fn process_edge(&mut self, slot: Address) {
+        (self)(slot);
+    }
+    fn process_node(&mut self, object: ObjectReference) { unreachable!() }
+}

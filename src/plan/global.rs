@@ -27,7 +27,7 @@ use std::sync::{Arc, Mutex};
 use crate::util::alloc::allocators::AllocatorSelector;
 use enum_map::EnumMap;
 
-pub trait Plan: Sized + 'static + Sync {
+pub trait Plan: Sized + 'static + Sync + Send {
     type VM: VMBinding;
     type MutatorT: MutatorContext<Self::VM>;
     type TraceLocalT: TraceLocal;
