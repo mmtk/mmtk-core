@@ -29,6 +29,7 @@ use std::sync::Arc;
 use crate::plan::scheduler::Scheduler;
 use crate::plan::work::*;
 use crate::mmtk::MMTK;
+use super::*;
 
 
 
@@ -101,10 +102,10 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         unsync.copyspace1.init(&mmtk.vm_map);
     }
 
-    fn schedule_collection(&'static self, scheduler: &Scheduler) {
+    fn schedule_collection(&'static self, scheduler: &Scheduler<VM>) {
         scheduler.add_with_highest_priority(Prepare::new(self));
         // Pause mutators, and scan all the stack
-        scheduler.add_with_highest_priority(StopMutators::<Self>::new());
+        scheduler.add_with_highest_priority(StopMutators::<ScanStackRoots<SSProcessEdges<VM>>>::new());
         // scheduler.add_with_highest_priority(box Release);
     }
 
@@ -188,6 +189,28 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
             }
             _ => self.common.collection_phase(tls, phase, true),
         }
+    }
+
+    fn prepare(&self, tls: OpaquePointer) {
+        self.common.prepare(tls, true);
+        debug_assert!(self.ss_trace.values.is_empty());
+        debug_assert!(self.ss_trace.root_locations.is_empty());
+        #[cfg(feature = "sanity")] self.fromspace().unprotect();
+        let unsync = unsafe { &mut *self.unsync.get() };
+        unsync.hi = !unsync.hi; // flip the semi-spaces
+        // prepare each of the collected regions
+        unsync.copyspace0.prepare(unsync.hi);
+        unsync.copyspace1.prepare(!unsync.hi);
+
+        #[cfg(feature = "sanity")] {
+            use crate::util::sanity::sanity_checker::SanityChecker;
+            println!("Pre GC sanity check");
+            SanityChecker::new(tls, &self).check();
+        }
+    }
+
+    fn release(&self, tls: OpaquePointer) {
+        unimplemented!()
     }
 
     fn get_collection_reserve(&self) -> usize {

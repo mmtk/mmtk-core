@@ -13,6 +13,10 @@ pub struct OpaquePointer(*mut c_void);
 unsafe impl Sync for OpaquePointer {}
 unsafe impl Send for OpaquePointer {}
 
+impl Default for OpaquePointer {
+    fn default() -> Self { Self::UNINITIALIZED }
+}
+
 impl OpaquePointer {
     pub const UNINITIALIZED: Self = Self(0 as *mut c_void);
 

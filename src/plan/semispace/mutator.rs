@@ -34,6 +34,14 @@ pub fn ss_collection_phase<VM: VMBinding>(
     }
 }
 
+pub fn ss_mutator_prepare<VM: VMBinding>(_tls: OpaquePointer) {
+    // Do nothing
+}
+
+pub fn ss_mutator_release<VM: VMBinding>(_tls: OpaquePointer) {
+    self.ss.rebind(Some(self.plan.tospace()));
+}
+
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::BumpPointer(0),
@@ -57,6 +65,8 @@ pub fn create_ss_mutator<VM: VMBinding>(
             (AllocatorSelector::LargeObject(0), plan.common.get_los()),
         ],
         collection_phase_func: &ss_collection_phase,
+        prepare_func: &ss_mutator_prepare,
+        release_func: &ss_mutator_release,
     };
 
     Mutator {

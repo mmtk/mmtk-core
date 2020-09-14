@@ -22,6 +22,8 @@ pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
     pub space_mapping: Box<Vec<(AllocatorSelector, &'static dyn Space<VM>)>>,
     // Plan-specific code for mutator collection phase
     pub collection_phase_func: &'static dyn Fn(&mut Mutator<VM, P>, OpaquePointer, &Phase, bool),
+    pub prepare_func: &'static dyn Fn(&mut Mutator<VM, P>, OpaquePointer),
+    pub release_func: &'static dyn Fn(&mut Mutator<VM, P>, OpaquePointer),
 }
 
 // We are trying to make this struct fixed-sized so that VM bindings can easily define a type to have the exact same layout as this struct.
@@ -52,6 +54,13 @@ impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
         }
         // Call plan-specific collection phase.
         (*self.config.collection_phase_func)(self, tls, phase, primary)
+    }
+
+    fn prepare(&mut self, tls: OpaquePointer) {
+        (*self.config.prepare_func)(tls)
+    }
+    fn release(&mut self, tls: OpaquePointer) {
+        (*self.config.release_func)(tls)
     }
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
@@ -94,8 +103,10 @@ impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
 
 // TODO: We should be able to remove this trait, as we removed per-plan mutator implementation, and there is no other type that implements this trait.
 // The Mutator struct above is the only type that implements this trait. We should be able to merge them.
-pub trait MutatorContext<VM: VMBinding> {
+pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
     fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool);
+    fn prepare(&mut self, tls: OpaquePointer);
+    fn release(&mut self, tls: OpaquePointer);
     fn alloc(
         &mut self,
         size: usize,

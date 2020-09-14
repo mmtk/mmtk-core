@@ -177,16 +177,15 @@ pub fn process_interior_edge<VM: VMBinding>(
     trace_local.process_interior_edge(target, slot, root)
 }
 
-pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &mut Worker) {
+pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &mut Worker<VM>, mmtk: &'static MMTK<VM>) {
     worker.init(tls);
-    worker.run();
+    worker.run(mmtk);
 }
 
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
     unsafe {
-        let scheduler_mut: &mut Scheduler = unsafe {
-            &mut *(mmtk.scheduler.as_ref() as *const Scheduler as *mut Scheduler)
-        };
+        let scheduler_mut: &mut Scheduler<VM> =
+            &mut *(mmtk.scheduler.as_ref() as *const Scheduler<VM> as *mut Scheduler<VM>);
         scheduler_mut.initialize(mmtk, tls);
         VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
         mmtk.plan.base().initialized.store(true, Ordering::SeqCst);

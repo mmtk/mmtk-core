@@ -6,25 +6,39 @@ use crate::plan::Plan;
 use std::sync::{Arc, Barrier};
 use std::marker::PhantomData;
 use crate::vm::*;
-use crate::util::{ObjectReference, Address};
-use crate::plan::TransitiveClosure;
+use crate::util::{ObjectReference, Address, OpaquePointer};
+use crate::plan::{TransitiveClosure, SelectedPlan, MutatorContext};
 use std::mem;
+use std::ops::{Deref, DerefMut};
 
 
-
-pub trait Work: 'static + Send + Sync {
+pub trait GenericWork<VM: VMBinding>: 'static + Send + Sync {
     fn requires_stop_the_world(&self) -> bool { false }
-    fn do_work(&mut self, worker: &Worker, scheduler: &'static Scheduler);
+    fn do_work(&mut self, worker: &Worker<VM>, mmtk: &'static MMTK<VM>);
 }
 
-impl PartialEq for Box<dyn Work> {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_ref() as *const dyn Work == other.as_ref() as *const dyn Work
+impl <VM: VMBinding, W: Work<VM=VM>> GenericWork<VM> for W {
+    fn requires_stop_the_world(&self) -> bool {
+        W::REQUIRES_STOP_THE_WORLD
+    }
+    fn do_work(&mut self, worker: &Worker<VM>, mmtk: &'static MMTK<VM>) {
+        Work::do_work(self, worker, mmtk)
     }
 }
 
-impl Eq for Box<dyn Work> {}
+impl <VM: VMBinding> PartialEq for Box<dyn GenericWork<VM>> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref() as *const dyn GenericWork<VM> == other.as_ref() as *const dyn GenericWork<VM>
+    }
+}
 
+impl <VM: VMBinding> Eq for Box<dyn GenericWork<VM>> {}
+
+pub trait Work: 'static + Send + Sync + Sized {
+    type VM: VMBinding;
+    const REQUIRES_STOP_THE_WORLD: bool = false;
+    fn do_work(&mut self, worker: &Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>);
+}
 
 
 
@@ -42,8 +56,40 @@ impl <P: Plan> Prepare<P> {
 }
 
 impl <P: Plan> Work for Prepare<P> {
-    fn do_work(&mut self, worker: &Worker, scheduler: &'static Scheduler) {
-        println!("Prepare");
+    type VM = P::VM;
+    const REQUIRES_STOP_THE_WORLD: bool = true;
+    fn do_work(&mut self, worker: &Worker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+        println!("Prepare Global");
+        self.plan.prepare(worker.tls);
+        <Self::VM as VMBinding>::VMActivePlan::reset_mutator_iterator();
+        while let Some(mutator) = <P::VM as VMBinding>::VMActivePlan::get_next_mutator() {
+            let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::MutatorT) };
+            println!("Scuedule Prepare Mutator");
+            mmtk.scheduler.add_with_highest_priority(PrepareMutator::<P>::new(self.plan, mutator));
+        }
+    }
+}
+
+/// GC Preparation Work (include updating global states)
+pub struct PrepareMutator<P: Plan> {
+    pub plan: &'static P,
+    pub mutator: &'static mut P::MutatorT,
+}
+
+unsafe impl <P: Plan> Sync for PrepareMutator<P> {}
+
+impl <P: Plan> PrepareMutator<P> {
+    pub fn new(plan: &'static P, mutator: &'static mut P::MutatorT) -> Self {
+        Self { plan, mutator }
+    }
+}
+
+impl <P: Plan> Work for PrepareMutator<P> {
+    type VM = P::VM;
+    const REQUIRES_STOP_THE_WORLD: bool = true;
+    fn do_work(&mut self, worker: &Worker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+        println!("Prepare Mutator");
+        self.mutator.prepare(worker.tls);
     }
 }
 
@@ -53,233 +99,129 @@ impl <P: Plan> Work for Prepare<P> {
 ///
 /// TODO: Smaller work granularity
 #[derive(Default)]
-pub struct StopMutators<P: Plan>(PhantomData<P>);
+pub struct StopMutators<ScanMutators: ScanMutatorsWork>(PhantomData<ScanMutators>);
 
-impl <P: Plan> StopMutators<P> {
+impl <ScanMutators: ScanMutatorsWork> StopMutators<ScanMutators> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl <P: Plan> Work for StopMutators<P> {
-    fn do_work(&mut self, worker: &Worker, scheduler: &'static Scheduler) {
+impl <ScanMutators: ScanMutatorsWork> Work for StopMutators<ScanMutators> {
+    type VM = <ScanMutators as Work>::VM;
+    fn do_work(&mut self, worker: &Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>) {
         println!("stop_all_mutators start");
-        <P::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls);
+        <Self::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls);
         println!("stop_all_mutators end");
-        scheduler.mutators_stopped();
-        scheduler.add_with_highest_priority(ScanStackRoots::<TestProcessEdges<P>>::new());
+        mmtk.scheduler.mutators_stopped();
+        mmtk.scheduler.add_with_highest_priority(ScanMutators::new());
     }
 }
 
-#[derive(Default)]
-pub struct ScanStackRoots<Edges: ProcessEdges>(PhantomData<(Edges)>);
+pub trait ScanMutatorsWork: Work {
+    fn new() -> Self;
+}
 
-impl <Edges: ProcessEdges> ScanStackRoots<Edges> {
-    pub fn new() -> Self {
+#[derive(Default)]
+pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
+
+impl <E: ProcessEdgesWork> Work for ScanStackRoots<E> {
+    type VM = E::VM;
+    fn do_work(&mut self, worker: &Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>) {
+        <E::VM as VMBinding>::VMScanning::scan_thread_roots::<E>(worker.tls);
+    }
+}
+
+impl <E: ProcessEdgesWork> ScanMutatorsWork for ScanStackRoots<E> {
+    fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl <Edges: ProcessEdges> Work for ScanStackRoots<Edges> {
-    fn do_work(&mut self, worker: &Worker, _scheduler: &'static Scheduler) {
-        <<Edges::Plan as Plan>::VM as VMBinding>::VMScanning::scan_thread_roots::<Edges>(worker.tls);
-    }
-}
-
-/// Scan & update a list of object slots
-pub trait ProcessEdges: Work {
-    type Plan: Plan;
-    const CAPACITY: usize = 512;
-    fn new(edges: Vec<Address>, roots: bool) -> Self;
-}
-
 #[derive(Default)]
-struct TestProcessEdges<P: Plan>(Vec<Address>, PhantomData<P>);
-
-impl <P: Plan> ProcessEdges for TestProcessEdges<P> {
-    type Plan = P;
-    fn new(edges: Vec<Address>, _roots: bool) -> Self {
-        Self(edges, PhantomData)
-    }
+pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
+    pub edges: Vec<Address>,
+    pub nodes: Vec<ObjectReference>,
+    pub mmtk: Option<&'static MMTK<E::VM>>,
+    pub tls: OpaquePointer,
 }
-impl <P: Plan> Work for TestProcessEdges<P> {
-    fn requires_stop_the_world(&self) -> bool { true }
-    fn do_work(&mut self, worker: &Worker, _scheduler: &'static Scheduler) {
-        println!("TestProcessEdges::do_work");
+
+impl <E: ProcessEdgesWork> ProcessEdgesBase<E> {
+    pub fn new(edges: Vec<Address>) -> Self {
+        Self { edges, nodes: vec![], mmtk: None, tls: OpaquePointer::UNINITIALIZED }
+    }
+    pub fn mmtk(&self) -> &'static MMTK<E::VM> {
+        self.mmtk.unwrap()
+    }
+    pub fn plan(&self) -> &'static SelectedPlan<E::VM> {
+        &self.mmtk.unwrap().plan
     }
 }
 
 /// Scan & update a list of object slots
-pub struct ScanObjects<Edges: ProcessEdges> {
+pub trait ProcessEdgesWork: Send + Sync + 'static + Sized + DerefMut + Deref<Target=ProcessEdgesBase<Self>> {
+    type VM: VMBinding;
+    const CAPACITY: usize = 512;
+    const OVERWRITE_REFERENCE: bool = true;
+    fn new(edges: Vec<Address>, roots: bool) -> Self;
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
+
+    fn process_node(&mut self, object: ObjectReference) {
+        if self.nodes.len() == 0 {
+            self.nodes.reserve(Self::CAPACITY);
+        }
+        self.nodes.push(object);
+        if self.nodes.len() >= Self::CAPACITY {
+            let mut new_nodes = Vec::with_capacity(Self::CAPACITY);
+            mem::swap(&mut new_nodes, &mut self.nodes);
+            self.mmtk.unwrap().scheduler.add_with_highest_priority(ScanObjects::<Self>::new(new_nodes, false));
+        }
+    }
+
+    fn process_edge(&mut self, slot: Address) {
+        let object = unsafe { slot.load::<ObjectReference>() };
+        let new_object = self.trace_object(object);
+        if Self::OVERWRITE_REFERENCE {
+            unsafe { slot.store(new_object) };
+        }
+    }
+
+    fn process_edges(&mut self) {
+        for i in 0..self.edges.len() {
+            self.process_edge(self.edges[i])
+        }
+    }
+}
+
+impl <E: ProcessEdgesWork> Work for E {
+    type VM = <E as ProcessEdgesWork>::VM;
+    const REQUIRES_STOP_THE_WORLD: bool = true;
+    default fn do_work(&mut self, worker: &Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>) {
+        println!("ProcessEdgesWork");
+        self.mmtk = Some(mmtk);
+        self.tls = worker.tls;
+        self.process_edges();
+    }
+}
+
+/// Scan & update a list of object slots
+pub struct ScanObjects<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
     concurrent: bool,
     phantom: PhantomData<Edges>,
 }
 
-impl <Edges: ProcessEdges> ScanObjects<Edges> {
+impl <Edges: ProcessEdgesWork> ScanObjects<Edges> {
     pub fn new(buffer: Vec<ObjectReference>, concurrent: bool) -> Self {
         Self { buffer, concurrent, phantom: PhantomData }
     }
 }
 
-impl <Edges: ProcessEdges> Work for ScanObjects<Edges> {
-    fn requires_stop_the_world(&self) -> bool { !self.concurrent }
-    fn do_work(&mut self, worker: &Worker, _scheduler: &'static Scheduler) {
+impl <Edges: ProcessEdgesWork> Work for ScanObjects<Edges> {
+    type VM = <Edges as Work>::VM;
+    const REQUIRES_STOP_THE_WORLD: bool = true;
+    fn do_work(&mut self, worker: &Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>) {
         println!("ScanObjects");
-        <<Edges::Plan as Plan>::VM as VMBinding>::VMScanning::scan_objects::<Edges>(&self.buffer);
+        <Self::VM as VMBinding>::VMScanning::scan_objects::<Edges>(&self.buffer);
     }
 }
-
-// pub struct TraceStrongRefs<Trace: TraceObjects>(pub &'static MMTK<VM>);
-
-// impl <Trace: TraceObjects> Work for TraceStrongRefs<Trace> {
-//     fn do_work(&mut self, worker: &Worker, scheduler: &Scheduler) {
-//         scheduler.stw_bucket.add(box ScanStackRoots);
-//         scheduler.stw_bucket.add(box ScanGlobalRoots);
-//     }
-// }
-
-// /// Stop all mutators
-// ///
-// /// Schedule a `ScanStackRoots` immediately after a mutator is paused
-// pub struct StopMutators<VM: VMBinding>(pub &'static MMTK<VM>);
-
-// impl <VM: VMBinding> Work for StopMutators<VM> {
-//     fn do_work(&mut self, worker: &Worker, scheduler: &Scheduler) {
-//         VM::VMCollection::stop_all_mutators(worker.tls);
-//         self.0.plan.base().control_collector_context.clear_request();
-//         scheduler.mutators_stopped();
-//         scheduler.stw_bucket.add(box ScanStackRoots);
-//         scheduler.stw_bucket.add(box ScanGlobalRoots);
-//     }
-// }
-
-// #[derive(Default)]
-// pub struct ScanStackRoots<Trace: TraceObjects>(PhantomData<(VM, Trace)>);
-
-// impl <Trace: TraceObjects> Work for ScanStackRoots<Trace> {
-//     fn do_work(&mut self, scheduler: &Scheduler) {
-//         VM::VMScanning::compute_thread_roots(&mut self.trace, self.tls);
-//     }
-// }
-
-// #[derive(Default)]
-// pub struct ScanGlobalRoots<Trace: TraceObjects>(PhantomData<Trace>);
-
-// impl <Trace: TraceObjects> Work for ScanGlobalRoots<Trace> {
-//     fn requires_stop_the_world(&self) -> bool { true }
-//     fn do_work(&mut self, scheduler: &Scheduler) {
-//         Trace::VM::VMScanning::compute_global_roots(&mut self.trace, self.tls);
-//         Trace::VM::VMScanning::compute_static_roots(&mut self.trace, self.tls);
-//         // if super::global::SCAN_BOOT_IMAGE {
-//         //     VM::VMScanning::compute_bootimage_roots(&mut self.trace, self.tls);
-//         // }
-//     }
-// }
-
-// impl <T: TraceObjects> TraceLocal for ScanGlobalRoots<T> {
-//     fn report_delayed_root_edge(&mut self, slot: Address) {
-
-//     }
-
-//     fn process_roots(&mut self) { unreachable!() }
-//     fn process_root_edge(&mut self, slot: Address, untraced: bool) { unreachable!() }
-//     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference { unreachable!() }
-//     fn complete_trace(&mut self) { unreachable!() }
-//     fn release(&mut self) { unreachable!() }
-//     fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, root: bool) { unreachable!() }
-//     fn overwrite_reference_during_trace(&self) -> bool { unreachable!() }
-//     fn will_not_move_in_current_collection(&self, obj: ObjectReference) -> bool { unreachable!() }
-//     fn get_forwarded_reference(&mut self, object: ObjectReference) -> ObjectReference { unreachable!() }
-//     fn get_forwarded_referent(&mut self, object: ObjectReference) -> ObjectReference { unreachable!() }
-//     fn retain_referent(&mut self, object: ObjectReference) -> ObjectReference { unreachable!() }
-// }
-
-
-// impl <T: TraceObjects> TransitiveClosure for ScanGlobalRoots<T> {
-//     fn process_edge(&mut self, src: ObjectReference, slot: Address) {
-//         unreachable!()
-//     }
-//     fn process_node(&mut self, object: ObjectReference) {
-//         unreachable!()
-//     }
-// }
-
-// pub struct ScanObjects<E: ProcessEdges> {
-//     pub buffer: Vec<ObjectReference>,
-//     edges: Vec<(Option<ObjectReference>, Address)>,
-//     phantom: PhantomData<E>,
-//     scheduler: Option<&'static Scheduler>,
-// }
-
-// impl <E: ProcessEdges> ScanObjects<E> {
-//     pub fn new(buffer: Vec<ObjectReference>) -> Self {
-//         Self { buffer, edges: vec![], phantom: PhantomData }
-//     }
-// }
-
-// impl <E: ProcessEdges> TransitiveClosure for ScanObjects<E> {
-//     fn process_edge(&mut self, src: ObjectReference, slot: Address) {
-//         self.edges.push((Some(src), slot));
-//         if self.edges.len() > E::BUFFER_LENGTH {
-//             // Create a new `ProcessEdges` work
-//             let mut empty_edges = vec![];
-//             mem::swap(&mut empty_edges, &mut self.edges);
-//             self.scheduler.unwrap().add_with_highest_priority(box E::new(empty_edges));
-//         }
-//     }
-//     fn process_node(&mut self, object: ObjectReference) {
-//         unreachable!()
-//     }
-// }
-
-// impl <E: ProcessEdges> Work for ScanObjects<E> {
-//     fn requires_stop_the_world(&self) -> bool { true }
-//     fn do_work(&mut self, worker: &Worker, scheduler: &'static Scheduler) {
-//         self.scheduler = Some(scheduler);
-//         for object in self.0 {
-//             <E::VM as VMBinding>::VMScanning::scan_object(self, *object, worker.tls);
-//         }
-//     }
-// }
-
-// pub trait ProcessEdges: Work {
-//     type VM: VMBinding;
-//     const OVERWRITE_REFERENCE: bool = true;
-//     const BUFFER_LENGTH: usize = 512;
-//     fn new(edges: Vec<(Option<ObjectReference>, Address)>) -> Self;
-//     /// Get the list of objects to scan
-//     fn edges(&self) -> &[(Option<ObjectReference>, Address)];
-//     /// Create a new `TraceObjects` with a new buffer
-//     fn clone_with_buffer(&self, buf: Vec<ObjectReference>) -> Self;
-//     /// Add the object to a queue of unscanned nodes.
-//     ///
-//     /// If the queue is full, create a new `TraceObjects` work and send to the scheduler
-//     fn process_node(&mut self, object: ObjectReference);
-//     /// Scan an edge
-//     fn process_edge(&mut self, slot: Address) {
-//         let mut object = unsafe { slot.load::<ObjectReference>() };
-//         object = self.trace_object(object);
-//         if Self::OVERWRITE_REFERENCE {
-//             unsafe { slot.store(object) };
-//         }
-//     }
-//     /// Trace an object
-//     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
-// }
-
-// impl <T: ProcessEdges> Work for T {
-//     fn requires_stop_the_world(&self) -> bool { true }
-//     fn do_work(&mut self, worker: &Worker, scheduler: &'static Scheduler) {
-//         for slot in self.edges() {
-//             self.process_edge(slot);
-//         }
-//     }
-// }
-
-// pub struct Release;
-
-// impl Work for Release {
-//     fn requires_stop_the_world(&self) -> bool { true }
-//     fn do_work(&mut self, scheduler: &Scheduler) {}
-// }

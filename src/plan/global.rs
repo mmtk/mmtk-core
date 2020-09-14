@@ -39,7 +39,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self;
     fn base(&self) -> &BasePlan<Self::VM>;
-    fn schedule_collection(&'static self, scheduler: &Scheduler);
+    fn schedule_collection(&'static self, scheduler: &Scheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
@@ -78,6 +78,9 @@ pub trait Plan: Sized + 'static + Sync + Send {
     fn is_initialized(&self) -> bool {
         self.base().initialized.load(Ordering::SeqCst)
     }
+
+    fn prepare(&self, tls: OpaquePointer);
+    fn release(&self, tls: OpaquePointer);
 
     fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
         if self.collection_required(space_full, space) {
@@ -426,6 +429,22 @@ impl<VM: VMBinding> BasePlan<VM> {
         panic!("No special case for space in trace_object");
     }
 
+    pub fn prepare(&self, tls: OpaquePointer, _primary: bool) {
+        #[cfg(feature = "base_spaces")]
+        let unsync = unsafe { &mut *self.unsync.get() };
+        #[cfg(feature = "code_space")] unsync.code_space.prepare();
+        #[cfg(feature = "ro_space")] unsync.ro_space.prepare();
+        #[cfg(feature = "vm_space")] unsync.vm_space.prepare();
+    }
+
+    pub fn release(&self, tls: OpaquePointer, _primary: bool) {
+        #[cfg(feature = "base_spaces")]
+        let unsync = unsafe { &mut *self.unsync.get() };
+        #[cfg(feature = "code_space")] unsync.code_space.release();
+        #[cfg(feature = "ro_space")] unsync.ro_space.release();
+        #[cfg(feature = "vm_space")] unsync.vm_space.release();
+    }
+
     pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, _primary: bool) {
         {
             #[cfg(feature = "base_spaces")]
@@ -630,6 +649,20 @@ impl<VM: VMBinding> CommonPlan<VM> {
             return unsync.los.trace_object(trace, object);
         }
         self.base.trace_object(trace, object)
+    }
+
+    pub fn prepare(&self, tls: OpaquePointer, primary: bool) {
+        let unsync = unsafe { &mut *self.unsync.get() };
+        unsync.immortal.prepare();
+        unsync.los.prepare(primary);
+        self.base.prepare(tls, primary)
+    }
+
+    pub fn release(&self, tls: OpaquePointer, primary: bool) {
+        let unsync = unsafe { &mut *self.unsync.get() };
+        unsync.immortal.release();
+        unsync.los.release(primary);
+        self.base.release(tls, primary)
     }
 
     pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, primary: bool) {

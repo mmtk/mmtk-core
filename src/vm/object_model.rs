@@ -1,4 +1,4 @@
-use crate::plan::Allocator;
+use crate::Allocator;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;

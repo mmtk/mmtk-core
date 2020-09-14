@@ -5,7 +5,7 @@ use std::ptr;
 use crate::vm::VMBinding;
 use crate::mmtk::MMTK;
 use crate::util::OpaquePointer;
-use super::work::Work;
+use super::work::{Work, GenericWork};
 use super::worker::{WorkerGroup, Worker};
 use crate::vm::Collection;
 use std::collections::BinaryHeap;
@@ -13,40 +13,40 @@ use std::cmp;
 
 
 // #[derive(Eq, PartialEq)]
-struct PrioritizedWork {
+struct PrioritizedWork<VM: VMBinding> {
     priority: usize,
-    work: Box<dyn Work>,
+    work: Box<dyn GenericWork<VM>>,
 }
 
-impl PartialEq for PrioritizedWork {
+impl <VM: VMBinding> PartialEq for PrioritizedWork<VM> {
     fn eq(&self, other: &Self) -> bool {
         self.priority == other.priority && &self.work == &other.work
     }
 }
 
-impl Eq for PrioritizedWork {}
+impl <VM: VMBinding> Eq for PrioritizedWork<VM> {}
 
-impl Ord for PrioritizedWork {
+impl <VM: VMBinding> Ord for PrioritizedWork<VM> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         // other.0.cmp(&self.0)
         self.priority.cmp(&other.priority)
     }
 }
 
-impl PartialOrd for PrioritizedWork {
+impl <VM: VMBinding> PartialOrd for PrioritizedWork<VM> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-pub struct WorkBucket {
+pub struct WorkBucket<VM: VMBinding> {
     active: AtomicBool,
     /// A priority queue
-    queue: RwLock<BinaryHeap<PrioritizedWork>>,
+    queue: RwLock<BinaryHeap<PrioritizedWork<VM>>>,
     monitor: Arc<(Mutex<()>, Condvar)>,
 }
 
-impl WorkBucket {
+impl <VM: VMBinding> WorkBucket<VM> {
     fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
         Self {
             active: AtomicBool::new(active),
@@ -68,35 +68,35 @@ impl WorkBucket {
         self.active.store(false, Ordering::SeqCst);
     }
     /// Add a work packet to this bucket
-    pub fn add(&self, priority: usize, work: Box<dyn Work>) {
+    pub fn add(&self, priority: usize, work: Box<dyn GenericWork<VM>>) {
         let _guard = self.monitor.0.lock().unwrap();
         self.monitor.1.notify_all();
         self.queue.write().unwrap().push(PrioritizedWork { priority, work });
     }
-    pub fn add_with_highest_priority(&self, work: Box<dyn Work>) -> usize {
+    pub fn add_with_highest_priority(&self, work: Box<dyn GenericWork<VM>>) -> usize {
         let priority = usize::max_value();
         self.add(priority, work);
         priority
     }
     /// Get a work packet (with the greatest priority) from this bucket
-    fn poll(&self) -> Option<Box<dyn Work>> {
+    fn poll(&self) -> Option<Box<dyn GenericWork<VM>>> {
         if !self.active.load(Ordering::SeqCst) { return None }
         self.queue.write().unwrap().pop().map(|v| v.work)
     }
 }
 
-pub struct Scheduler {
+pub struct Scheduler<VM: VMBinding> {
     /// Works that are scheduable at any time
-    default_bucket: WorkBucket,
+    default_bucket: WorkBucket<VM>,
     /// Works that are scheduable within Stop-the-world
-    stw_bucket: WorkBucket,
+    stw_bucket: WorkBucket<VM>,
     /// workers
-    worker_group: Option<Arc<WorkerGroup>>,
+    worker_group: Option<Arc<WorkerGroup<VM>>>,
     /// Condition Variable
     monitor: Arc<(Mutex<()>, Condvar)>,
 }
 
-impl Scheduler {
+impl <VM: VMBinding> Scheduler<VM> {
     pub fn new() -> Arc<Self> {
         let monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
         Arc::new(Self {
@@ -107,23 +107,23 @@ impl Scheduler {
         })
     }
 
-    pub fn initialize<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
+    pub fn initialize(&mut self, mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
         let size = mmtk.options.threads;
 
         self.worker_group = Some(WorkerGroup::new(size, Arc::downgrade(&mmtk.scheduler)));
-        self.worker_group.as_ref().unwrap().spawn_workers::<VM>(tls);
+        self.worker_group.as_ref().unwrap().spawn_workers(tls);
     }
 
-    pub fn add<W: Work>(&self, priority: usize, work: W) {
-        if work.requires_stop_the_world() {
+    pub fn add<W: Work<VM=VM>>(&self, priority: usize, work: W) {
+        if W::REQUIRES_STOP_THE_WORLD {
             self.stw_bucket.add(priority, box work);
         } else {
             self.default_bucket.add(priority, box work);
         }
     }
 
-    pub fn add_with_highest_priority<W: Work>(&self, work: W) -> usize {
-        if work.requires_stop_the_world() {
+    pub fn add_with_highest_priority<W: Work<VM=VM>>(&self, work: W) -> usize {
+        if W::REQUIRES_STOP_THE_WORLD {
             self.stw_bucket.add_with_highest_priority(box work)
         } else {
             self.default_bucket.add_with_highest_priority(box work)
@@ -151,7 +151,7 @@ impl Scheduler {
         self.stw_bucket.deactivate()
     }
 
-    fn pop_scheduable_work(&self) -> Option<Box<dyn Work>> {
+    fn pop_scheduable_work(&self) -> Option<Box<dyn GenericWork<VM>>> {
         if let Some(work) = self.default_bucket.poll() {
             return Some(work);
         }
@@ -162,7 +162,7 @@ impl Scheduler {
     }
 
     /// Get a scheduable work. Called by workers
-    pub fn poll(&self, worker: &Worker) -> Box<dyn Work> {
+    pub fn poll(&self, worker: &Worker<VM>) -> Box<dyn GenericWork<VM>> {
         debug_assert!(!worker.is_parked());
         let mut guard = self.monitor.0.lock().unwrap();
         loop {

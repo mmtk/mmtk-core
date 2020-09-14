@@ -4,19 +4,20 @@ use crate::util::OpaquePointer;
 use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
 use crate::vm::Collection;
+use crate::mmtk::MMTK;
 
 
 
-pub struct Worker {
+pub struct Worker<VM: VMBinding> {
     pub tls: OpaquePointer,
     pub ordinal: usize,
     pub parked: AtomicBool,
-    group: Weak<WorkerGroup>,
-    scheduler: Weak<Scheduler>,
+    group: Weak<WorkerGroup<VM>>,
+    scheduler: Weak<Scheduler<VM>>,
 }
 
-impl Worker {
-    fn new(ordinal: usize, group: Weak<WorkerGroup>, scheduler: Weak<Scheduler>) -> Self {
+impl <VM: VMBinding> Worker<VM> {
+    fn new(ordinal: usize, group: Weak<WorkerGroup<VM>>, scheduler: Weak<Scheduler<VM>>) -> Self {
         Self {
             tls: OpaquePointer::UNINITIALIZED,
             ordinal,
@@ -30,11 +31,11 @@ impl Worker {
         self.parked.load(Ordering::SeqCst)
     }
 
-    pub fn group(&self) -> Arc<WorkerGroup> {
+    pub fn group(&self) -> Arc<WorkerGroup<VM>> {
         self.group.upgrade().unwrap()
     }
 
-    pub fn scheduler(&self) -> Arc<Scheduler> {
+    pub fn scheduler(&self) -> Arc<Scheduler<VM>> {
         self.scheduler.upgrade().unwrap()
     }
 
@@ -42,27 +43,24 @@ impl Worker {
         self.tls = tls;
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self, mmtk: &'static MMTK<VM>) {
         self.parked.store(false, Ordering::SeqCst);
         let scheduler = self.scheduler.upgrade().unwrap();
         loop {
             let mut work = scheduler.poll(self);
             debug_assert!(!self.is_parked());
-            let static_scheduler: &'static Scheduler = unsafe {
-                &*(scheduler.as_ref() as *const Scheduler)
-            };
-            work.do_work(self, static_scheduler);
+            work.do_work(self, mmtk);
         }
     }
 }
 
 
-pub struct WorkerGroup {
-    pub workers: Vec<Worker>,
+pub struct WorkerGroup<VM: VMBinding> {
+    pub workers: Vec<Worker<VM>>,
 }
 
-impl WorkerGroup {
-    pub fn new(workers: usize, scheduler: Weak<Scheduler>) -> Arc<Self> {
+impl <VM: VMBinding> WorkerGroup<VM> {
+    pub fn new(workers: usize, scheduler: Weak<Scheduler<VM>>) -> Arc<Self> {
         let mut group = Arc::new(Self {
             workers: vec![]
         });
@@ -75,7 +73,7 @@ impl WorkerGroup {
         self.workers.len()
     }
 
-    pub fn spawn_workers<VM: VMBinding>(&self, tls: OpaquePointer) {
+    pub fn spawn_workers(&self, tls: OpaquePointer) {
         for i in 0..self.worker_count() {
             let worker = &self.workers[i];
             VM::VMCollection::spawn_worker_thread(tls, Some(worker));
