@@ -18,6 +18,8 @@ use crate::util::OpaquePointer;
 use crate::vm::Collection;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
+use crate::plan::scheduler::Scheduler;
+use crate::mmtk::MMTK;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -36,6 +38,7 @@ pub trait Plan<VM: VMBinding>: Sized {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self;
     fn base(&self) -> &BasePlan<VM>;
+    fn schedule_collection(&'static self, scheduler: &Scheduler);
     fn common(&self) -> &CommonPlan<VM> {
         panic!("Common Plan not handled!")
     }
@@ -47,7 +50,7 @@ pub trait Plan<VM: VMBinding>: Sized {
     }
 
     // unsafe because this can only be called once by the init thread
-    fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
+    fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<VM>);
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::MutatorT>;
     /// # Safety
@@ -88,7 +91,7 @@ pub trait Plan<VM: VMBinding>: Sized {
                 return false;
             }*/
             self.log_poll(space, "Triggering collection");
-            self.base().control_collector_context.request();
+            self.base().control_collector_context.as_ref().unwrap().request();
             return true;
         }
 
@@ -185,7 +188,7 @@ pub trait Plan<VM: VMBinding>: Sized {
             self.base()
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
-            self.base().control_collector_context.request();
+            self.base().control_collector_context.as_ref().unwrap().request();
             VM::VMCollection::block_for_gc(tls);
         }
     }
@@ -232,7 +235,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub cur_collection_attempts: AtomicUsize,
     // Lock used for out of memory handling
     pub oom_lock: Mutex<()>,
-    pub control_collector_context: ControllerCollectorContext<VM>,
+    pub control_collector_context: Option<ControllerCollectorContext<VM>>,
     pub stats: Stats,
     mmapper: &'static Mmapper,
     pub vm_map: &'static VMMap,
@@ -321,7 +324,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             max_collection_attempts: AtomicUsize::new(0),
             cur_collection_attempts: AtomicUsize::new(0),
             oom_lock: Mutex::new(()),
-            control_collector_context: ControllerCollectorContext::new(),
+            control_collector_context: None,
             stats: Stats::new(),
             mmapper,
             heap,
@@ -332,15 +335,16 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
-    pub fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
-        vm_map.boot();
-        vm_map.finalize_static_space_map(
+    pub fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<VM>) {
+        mmtk.vm_map.boot();
+        mmtk.vm_map.finalize_static_space_map(
             self.heap.get_discontig_start(),
             self.heap.get_discontig_end(),
         );
         self.heap
             .total_pages
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);
+        self.control_collector_context = Some(ControllerCollectorContext::new(mmtk));
 
         #[cfg(feature = "base_spaces")]
         {
@@ -597,11 +601,11 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
-    pub fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
-        self.base.gc_init(heap_size, vm_map);
+    pub fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<VM>) {
+        self.base.gc_init(heap_size, mmtk);
         let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.immortal.init(vm_map);
-        unsync.los.init(vm_map);
+        unsync.immortal.init(&mmtk.vm_map);
+        unsync.los.init(&mmtk.vm_map);
     }
 
     pub fn get_pages_used(&self) -> usize {

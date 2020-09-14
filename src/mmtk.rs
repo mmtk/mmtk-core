@@ -1,6 +1,7 @@
 use crate::plan::phase::PhaseManager;
 use crate::plan::Plan;
 use crate::plan::SelectedPlan;
+use crate::plan::scheduler::Scheduler;
 use crate::policy::space::SFTMap;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -38,6 +39,7 @@ pub struct MMTK<VM: VMBinding> {
     pub sftmap: &'static SFTMap,
     pub reference_processors: ReferenceProcessors,
     pub options: Arc<UnsafeOptionsWrapper>,
+    pub scheduler: Arc<Scheduler>,
 
     inside_harness: AtomicBool,
 }
@@ -55,6 +57,7 @@ impl<VM: VMBinding> MMTK<VM> {
             sftmap: &SFT_MAP,
             reference_processors: ReferenceProcessors::new(),
             options,
+            scheduler: Scheduler::new(),
             inside_harness: AtomicBool::new(false),
         }
     }

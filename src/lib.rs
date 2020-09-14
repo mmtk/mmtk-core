@@ -6,6 +6,8 @@
 #![feature(box_syntax)]
 #![feature(maybe_uninit_ref)]
 #![feature(maybe_uninit_extra)]
+#![feature(get_mut_unchecked)]
+#![feature(arbitrary_self_types)]
 
 //! Memory Management ToolKit (MMTk) is a portable and high performance memory manager
 //! that includes various garbage collection algorithms and provides clean and efficient
@@ -61,4 +63,5 @@ pub use crate::plan::selected_plan::{
 pub use crate::plan::{
     Allocator, CollectorContext, Mutator, MutatorContext, ParallelCollector, Plan, TraceLocal,
     TransitiveClosure,
+    worker, scheduler, work
 };

@@ -75,7 +75,7 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         }
     }
 
-    fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
         self.base.gc_init(heap_size, vm_map);
 
         // FIXME correctly initialize spaces based on options

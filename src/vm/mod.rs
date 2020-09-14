@@ -14,7 +14,7 @@ pub use self::scanning::Scanning;
 
 pub trait VMBinding
 where
-    Self: Sized + 'static,
+    Self: Sized + 'static + Send,
 {
     type VMObjectModel: ObjectModel<Self>;
     type VMScanning: Scanning<Self>;

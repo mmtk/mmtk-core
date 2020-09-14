@@ -50,6 +50,7 @@ impl<VM: VMBinding, C: ParallelCollector<VM>> ParallelCollectorGroup<VM, C> {
     }
 
     pub fn init_group(&mut self, mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
+        unreachable!();
         {
             let inner = self.sync.get_mut().unwrap();
             inner.trigger_count = 1;
@@ -64,7 +65,7 @@ impl<VM: VMBinding, C: ParallelCollector<VM>> ParallelCollectorGroup<VM, C> {
             let self_ptr = self as *const Self;
             self.contexts[i].set_group(self_ptr);
             self.contexts[i].set_worker_ordinal(i);
-            VM::VMCollection::spawn_worker_thread(tls, Some(&mut self.contexts[i]));
+            // VM::VMCollection::spawn_worker_thread(tls, Some(&mut self.contexts[i]));
         }
     }
 
