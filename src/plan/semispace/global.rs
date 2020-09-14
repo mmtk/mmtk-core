@@ -54,6 +54,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     type MutatorT = SSMutator<VM>;
     type TraceLocalT = SSTraceLocal<VM>;
     type CollectorT = SSCollector<VM>;
+    type CopyContext = SSCopyContext<VM>;
 
     fn new(
         vm_map: &'static VMMap,
@@ -100,7 +101,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn schedule_collection(&'static self, scheduler: &Scheduler<VM>) {
         scheduler.add_with_highest_priority(Prepare::new(self));
         // Pause mutators, and scan all the stack
-        scheduler.add_with_highest_priority(StopMutators::<ScanStackRoots<SSProcessEdges<VM>>>::new());
+        scheduler.add_with_highest_priority(StopMutators::<SSProcessEdges<VM>>::new());
         // scheduler.add_with_highest_priority(box Release);
     }
 

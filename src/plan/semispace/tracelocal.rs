@@ -49,26 +49,26 @@ impl<VM: VMBinding> TraceLocal for SSTraceLocal<VM> {
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        trace!("trace_object({:?})", object.to_address());
-        let tls = self.tls;
-        let plan_unsync = unsafe { &*self.plan.unsync.get() };
+        // trace!("trace_object({:?})", object.to_address());
+        // let tls = self.tls;
+        // let plan_unsync = unsafe { &*self.plan.unsync.get() };
 
-        if object.is_null() {
-            trace!("trace_object: object is null");
-            return object;
-        }
-        if plan_unsync.copyspace0.in_space(object) {
-            trace!("trace_object: object in copyspace0");
-            return plan_unsync
-                .copyspace0
-                .trace_object(self, object, global::ALLOC_SS, tls);
-        }
-        if plan_unsync.copyspace1.in_space(object) {
-            trace!("trace_object: object in copyspace1");
-            return plan_unsync
-                .copyspace1
-                .trace_object(self, object, global::ALLOC_SS, tls);
-        }
+        // if object.is_null() {
+        //     trace!("trace_object: object is null");
+        //     return object;
+        // }
+        // if plan_unsync.copyspace0.in_space(object) {
+        //     trace!("trace_object: object in copyspace0");
+        //     return plan_unsync
+        //         .copyspace0
+        //         .trace_object(self, object, global::ALLOC_SS, tls);
+        // }
+        // if plan_unsync.copyspace1.in_space(object) {
+        //     trace!("trace_object: object in copyspace1");
+        //     return plan_unsync
+        //         .copyspace1
+        //         .trace_object(self, object, global::ALLOC_SS, tls);
+        // }
         self.plan.common.trace_object(self, object)
     }
 

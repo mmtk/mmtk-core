@@ -41,5 +41,6 @@ pub use crate::plan::selected_plan::{
 pub use crate::plan::{
     Allocator, CollectorContext, MutatorContext, ParallelCollector, Plan, TraceLocal,
     TransitiveClosure,
-    worker, scheduler, work
+    worker, scheduler, work,
+    CopyContext,
 };
