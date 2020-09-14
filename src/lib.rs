@@ -6,6 +6,8 @@
 #![feature(box_syntax)]
 #![feature(get_mut_unchecked)]
 #![feature(arbitrary_self_types)]
+#![feature(associated_type_defaults)]
+#![feature(specialization)]
 
 #[macro_use]
 extern crate custom_derive;

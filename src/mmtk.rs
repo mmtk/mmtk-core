@@ -39,7 +39,7 @@ pub struct MMTK<VM: VMBinding> {
     pub sftmap: &'static SFTMap,
     pub reference_processors: ReferenceProcessors,
     pub options: Arc<UnsafeOptionsWrapper>,
-    pub scheduler: Arc<Scheduler>,
+    pub scheduler: Arc<Scheduler<VM>>,
 
     inside_harness: AtomicBool,
 }

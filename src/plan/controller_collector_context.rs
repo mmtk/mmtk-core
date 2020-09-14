@@ -26,7 +26,7 @@ pub struct ControllerCollectorContext<VM: VMBinding> {
     request_condvar: Condvar,
 
     mmtk: &'static MMTK<VM>,
-    pub scheduler: Arc<Scheduler>,
+    pub scheduler: Arc<Scheduler<VM>>,
     request_flag: AtomicBool,
     phantom: PhantomData<VM>,
 }

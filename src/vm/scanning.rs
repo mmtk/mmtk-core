@@ -2,7 +2,7 @@ use crate::plan::{TraceLocal, TransitiveClosure};
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::work::ProcessEdges;
+use crate::work::*;
 
 pub trait Scanning<VM: VMBinding> {
     fn scan_object<T: TransitiveClosure>(
@@ -15,8 +15,8 @@ pub trait Scanning<VM: VMBinding> {
     /// Scan all thread roots and create `RootsEdge` work packets
     ///
     /// TODO: Smaller work granularity
-    fn scan_thread_roots<W: ProcessEdges>(tls: OpaquePointer);
-    fn scan_objects<W: ProcessEdges>(objects: &[ObjectReference]);
+    fn scan_thread_roots<W: ProcessEdgesWork<VM=VM>>(tls: OpaquePointer);
+    fn scan_objects<W: ProcessEdgesWork<VM=VM>>(objects: &[ObjectReference]);
     fn compute_static_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);
     fn compute_global_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);
     fn compute_thread_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);

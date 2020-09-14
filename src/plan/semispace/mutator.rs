@@ -23,6 +23,13 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
         &self.common
     }
 
+    fn prepare(&mut self, tls: OpaquePointer) {
+        // Do nothing
+    }
+    fn release(&mut self, tls: OpaquePointer) {
+        self.ss.rebind(Some(self.plan.tospace()));
+    }
+
     fn collection_phase(&mut self, _tls: OpaquePointer, phase: &Phase, _primary: bool) {
         match phase {
             Phase::PrepareStacks => {
