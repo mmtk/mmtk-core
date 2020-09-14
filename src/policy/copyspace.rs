@@ -124,7 +124,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         allocator: Allocator,
         copy_context: &mut impl CopyContext,
     ) -> ObjectReference {
-        println!(
+        trace!(
             "copyspace.trace_object(, {:?}, {:?})",
             object,
             allocator,
@@ -132,21 +132,21 @@ impl<VM: VMBinding> CopySpace<VM> {
         if !self.from_space {
             return object;
         }
-        println!("attempting to forward");
+        trace!("attempting to forward");
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
-        println!("checking if object is being forwarded");
+        trace!("checking if object is being forwarded");
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
-            println!("... yes it is");
+            trace!("... yes it is");
             let new_object =
                 ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
-                println!("Returning");
+                trace!("Returning");
             new_object
         } else {
-            println!("... no it isn't. Copying");
+            trace!("... no it isn't. Copying");
             let new_object = ForwardingWord::forward_object::<VM, _>(object, allocator, copy_context);
-            println!("Forwarding pointer");
+            trace!("Forwarding pointer");
             trace.process_node(new_object);
-            println!("Copying [{:?} -> {:?}]", object, new_object);
+            trace!("Copying [{:?} -> {:?}]", object, new_object);
             new_object
         }
     }
