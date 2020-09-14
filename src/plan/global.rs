@@ -24,7 +24,7 @@ use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-pub trait Plan: Sized + 'static + Sync {
+pub trait Plan: Sized + 'static + Sync + Send {
     type VM: VMBinding;
     type MutatorT: MutatorContext<Self::VM>;
     type TraceLocalT: TraceLocal;
