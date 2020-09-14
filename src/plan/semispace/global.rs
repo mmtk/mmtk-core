@@ -48,7 +48,8 @@ pub struct SemiSpaceUnsync<VM: VMBinding> {
 
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
 
-impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
+impl<VM: VMBinding> Plan for SemiSpace<VM> {
+    type VM = VM;
     type MutatorT = SSMutator<VM>;
     type TraceLocalT = SSTraceLocal<VM>;
     type CollectorT = SSCollector<VM>;

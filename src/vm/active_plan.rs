@@ -11,14 +11,14 @@ pub trait ActivePlan<VM: VMBinding> {
     /// TODO: I am not sure why this is unsafe.
     unsafe fn collector(
         tls: OpaquePointer,
-    ) -> &'static mut <SelectedPlan<VM> as Plan<VM>>::CollectorT;
+    ) -> &'static mut <SelectedPlan<VM> as Plan>::CollectorT;
     /// # Safety
     /// TODO: I am not sure why this is unsafe.
     unsafe fn is_mutator(tls: OpaquePointer) -> bool;
     /// # Safety
     /// TODO: I am not sure why this is unsafe.
-    unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan<VM> as Plan<VM>>::MutatorT;
+    unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan<VM> as Plan>::MutatorT;
     fn collector_count() -> usize;
     fn reset_mutator_iterator();
-    fn get_next_mutator() -> Option<&'static mut <SelectedPlan<VM> as Plan<VM>>::MutatorT>;
+    fn get_next_mutator() -> Option<&'static mut <SelectedPlan<VM> as Plan>::MutatorT>;
 }
