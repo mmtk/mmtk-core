@@ -47,7 +47,6 @@ pub struct WorkBucket<VM: VMBinding> {
     monitor: Arc<(Mutex<()>, Condvar)>,
     pub active_priority: AtomicUsize,
     can_open: Option<Box<dyn Fn() -> bool>>,
-    can_close: Option<Box<dyn Fn()>>,
 }
 
 unsafe impl <VM: VMBinding> Send for WorkBucket<VM> {}
@@ -61,7 +60,6 @@ impl <VM: VMBinding> WorkBucket<VM> {
             monitor,
             active_priority: AtomicUsize::new(usize::max_value()),
             can_open: None,
-            can_close: None,
         }
     }
     pub fn is_activated(&self) -> bool {
@@ -87,25 +85,16 @@ impl <VM: VMBinding> WorkBucket<VM> {
         self.active.store(false, Ordering::SeqCst);
         self.active_priority.store(usize::max_value(), Ordering::SeqCst);
     }
-    /// Add a work packet to this bucket
-    pub fn add_with_priority(&self, priority: usize, work: Box<dyn GenericWork<VM>>) {
+    /// Add a work packet to this bucket, with a given priority
+    pub fn add_with_priority<W: GenericWork<VM>>(&self, priority: usize, work: W) {
         let _guard = self.monitor.0.lock().unwrap();
         self.monitor.1.notify_all();
-        self.queue.write().unwrap().push(PrioritizedWork { priority, work });
+        self.queue.write().unwrap().push(PrioritizedWork { priority, work: box work });
     }
-    pub fn add(&self, work: Box<dyn GenericWork<VM>>) {
-        self.add_with_priority(usize::max_value(), work);
+    /// Add a work packet to this bucket, with a default priority (1000)
+    pub fn add<W: GenericWork<VM>>(&self, work: W) {
+        self.add_with_priority(1000, work);
     }
-    // pub fn add(&self, priority: usize, work: Box<dyn GenericWork<VM>>) {
-    //     let _guard = self.monitor.0.lock().unwrap();
-    //     self.monitor.1.notify_all();
-    //     self.queue.write().unwrap().push(PrioritizedWork { priority, work });
-    // }
-    // pub fn add_with_highest_priority(&self, work: Box<dyn GenericWork<VM>>) -> usize {
-    //     let priority = usize::max_value();
-    //     self.add(priority, work);
-    //     priority
-    // }
     /// Get a work packet (with the greatest priority) from this bucket
     fn poll(&self) -> Option<Box<dyn GenericWork<VM>>> {
         if !self.active.load(Ordering::SeqCst) { return None }
@@ -123,14 +112,6 @@ impl <VM: VMBinding> WorkBucket<VM> {
         }
         false
     }
-}
-
-pub enum ScheduleStage {
-    Default,
-    Prepare,
-    Closure,
-    Release,
-    Final,
 }
 
 pub struct Scheduler<VM: VMBinding> {
@@ -181,32 +162,6 @@ impl <VM: VMBinding> Scheduler<VM> {
     pub fn worker_group(&self) -> Arc<WorkerGroup<VM>> {
         self.worker_group.as_ref().unwrap().clone()
     }
-
-    pub fn add<W: Work<VM=VM>>(&self, stage: ScheduleStage, work: W) {
-        match stage {
-            ScheduleStage::Default => self.unconstrained_works.add(box work),
-            ScheduleStage::Prepare => self.prepare_stage.add(box work),
-            ScheduleStage::Closure => self.closure_stage.add(box work),
-            ScheduleStage::Release => self.release_stage.add(box work),
-            ScheduleStage::Final => self.final_stage.add(box work),
-        }
-    }
-
-    // pub fn add<W: Work<VM=VM>>(&self, priority: usize, work: W) {
-    //     if W::REQUIRES_STOP_THE_WORLD {
-    //         self.stw_bucket.add(priority, box work);
-    //     } else {
-    //         self.default_bucket.add(priority, box work);
-    //     }
-    // }
-
-    // pub fn add_with_highest_priority<W: Work<VM=VM>>(&self, work: W) -> usize {
-    //     if W::REQUIRES_STOP_THE_WORLD {
-    //         self.stw_bucket.add_with_highest_priority(box work)
-    //     } else {
-    //         self.default_bucket.add_with_highest_priority(box work)
-    //     }
-    // }
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.plan.base().control_collector_context.as_ref().unwrap().clear_request();

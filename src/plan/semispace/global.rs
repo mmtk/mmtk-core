@@ -106,13 +106,13 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn schedule_collection(&'static self, scheduler: &Scheduler<VM>) {
         // Stop & scan mutators (mutator scanning can happen before STW)
         // Create initial works for `closure_stage`
-        scheduler.unconstrained_works.add(box StopMutators::<SSProcessEdges<VM>>::new());
+        scheduler.unconstrained_works.add(StopMutators::<SSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
-        scheduler.prepare_stage.add(box Prepare::new(self));
+        scheduler.prepare_stage.add(Prepare::new(self));
         // Release global/collectors/mutators
-        scheduler.release_stage.add(box Release::new(self));
+        scheduler.release_stage.add(Release::new(self));
         // Resume mutators
-        scheduler.final_stage.add(box ResumeMutators::<VM>::new());
+        scheduler.final_stage.add(ResumeMutators);
     }
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<VM, Self>> {
