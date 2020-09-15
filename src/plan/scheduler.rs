@@ -10,6 +10,7 @@ use super::worker::{WorkerGroup, Worker};
 use crate::vm::Collection;
 use std::collections::BinaryHeap;
 use std::cmp;
+use crate::plan::Plan;
 
 
 // #[derive(Eq, PartialEq)]
@@ -207,9 +208,9 @@ impl <VM: VMBinding> Scheduler<VM> {
     //     }
     // }
 
-    pub fn mutators_stopped(&self) {
-        println!("mutators_stopped");
-        self.prepare_stage.activate()
+    pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
+        mmtk.plan.base().control_collector_context.as_ref().unwrap().clear_request();
+        self.prepare_stage.activate();
     }
 
     fn all_buckets_drained(&self) -> bool {

@@ -179,7 +179,7 @@ impl <ScanEdges: ProcessEdgesWork> Work for StopMutators<ScanEdges> {
         println!("stop_all_mutators start");
         <Self::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls);
         println!("stop_all_mutators end");
-        mmtk.scheduler.mutators_stopped();
+        mmtk.scheduler.notify_mutators_paused(mmtk);
         mmtk.scheduler.prepare_stage.add(box ScanStackRoots::<ScanEdges>::new());
         mmtk.scheduler.prepare_stage.add_with_priority(0, box ScanStaticRoots::<ScanEdges>::new());
         mmtk.scheduler.prepare_stage.add_with_priority(0, box ScanGlobalRoots::<ScanEdges>::new());
@@ -323,6 +323,11 @@ impl <E: ProcessEdgesWork> Work for E {
         self.mmtk = Some(mmtk);
         self.worker = Some(worker);
         self.process_edges();
+        if self.nodes.len() > 0 {
+            let mut new_nodes = Vec::with_capacity(Self::CAPACITY);
+            mem::swap(&mut new_nodes, &mut self.nodes);
+            self.mmtk.unwrap().scheduler.closure_stage.add(box ScanObjects::<Self>::new(new_nodes, false));
+        }
         println!("ProcessEdgesWork End");
     }
 }
