@@ -84,6 +84,14 @@ impl <VM: VMBinding> WorkerGroup<VM> {
         self.workers.len()
     }
 
+    pub fn parked_workers(&self) -> usize {
+        self.workers.iter().filter(|w| w.is_parked()).count()
+    }
+
+    pub fn all_parked(&self) -> bool {
+        self.parked_workers() == self.worker_count()
+    }
+
     pub fn spawn_workers(&self, tls: OpaquePointer) {
         for i in 0..self.worker_count() {
             let worker = &self.workers[i];

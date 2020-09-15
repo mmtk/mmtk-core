@@ -10,8 +10,8 @@ pub trait TransitiveClosure {
 }
 
 impl <T: ProcessEdgesWork> TransitiveClosure for T {
-    fn process_edge(&mut self, slot: Address) {
-        ProcessEdgesWork::process_edge(self, slot);
+    fn process_edge(&mut self, _slot: Address) {
+        unreachable!();
     }
     fn process_node(&mut self, object: ObjectReference) {
         ProcessEdgesWork::process_node(self, object);

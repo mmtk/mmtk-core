@@ -104,10 +104,15 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &Scheduler<VM>) {
-        scheduler.add_with_highest_priority(Prepare::new(self));
-        // Pause mutators, and scan all the stack
-        scheduler.add_with_highest_priority(StopMutators::<SSProcessEdges<VM>>::new());
-        // scheduler.add_with_highest_priority(box Release);
+        // Stop & scan mutators (mutator scanning can happen before STW)
+        // Create initial works for `closure_stage`
+        scheduler.unconstrained_works.add(box StopMutators::<SSProcessEdges<VM>>::new());
+        // Prepare global/collectors/mutators
+        scheduler.prepare_stage.add(box Prepare::new(self));
+        // Release global/collectors/mutators
+        scheduler.release_stage.add(box Release::new(self));
+        // Resume mutators
+        scheduler.final_stage.add(box ResumeMutators::<VM>::new());
     }
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<VM, Self>> {
@@ -193,6 +198,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn prepare(&self, tls: OpaquePointer) {
+        self.fromspace().print_vm_map();
+        self.tospace().print_vm_map();
         self.common.prepare(tls, true);
         debug_assert!(self.ss_trace.values.is_empty());
         debug_assert!(self.ss_trace.root_locations.is_empty());
@@ -208,10 +215,39 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
             println!("Pre GC sanity check");
             SanityChecker::new(tls, &self).check();
         }
+
     }
 
     fn release(&self, tls: OpaquePointer) {
-        unimplemented!()
+        self.common.release(tls, true);
+        // #[cfg(feature = "sanity")]
+        // {
+        //     use crate::util::constants::LOG_BYTES_IN_PAGE;
+        //     use libc::memset;
+        //     if self.fromspace().common().contiguous {
+        //         let fromspace_start = self.fromspace().common().start;
+        //         let fromspace_commited =
+        //             self.fromspace().get_page_resource().committed_pages();
+        //         let commited_bytes = fromspace_commited * (1 << LOG_BYTES_IN_PAGE);
+        //         println!(
+        //             "Destroying fromspace {}~{}",
+        //             fromspace_start,
+        //             fromspace_start + commited_bytes
+        //         );
+        //         memset(fromspace_start.to_mut_ptr(), 0xFF, commited_bytes);
+        //     } else {
+        //         println!("Fromspace is discontiguous, not destroying")
+        //     }
+        // }
+        // release the collected region
+        let unsync = unsafe { &mut *self.unsync.get() };
+        if unsync.hi {
+            unsafe { unsync.copyspace0.release(); }
+        } else {
+            unsafe { unsync.copyspace1.release(); }
+        }
+        self.fromspace().print_vm_map();
+        self.tospace().print_vm_map();
     }
 
     fn get_collection_reserve(&self) -> usize {

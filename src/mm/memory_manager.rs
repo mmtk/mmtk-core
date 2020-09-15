@@ -184,7 +184,7 @@ pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &'static mut Work
 
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
     unsafe {
-        let scheduler_mut: &mut Scheduler<VM> =
+        let scheduler_mut: &'static mut Scheduler<VM> =
             &mut *(mmtk.scheduler.as_ref() as *const Scheduler<VM> as *mut Scheduler<VM>);
         scheduler_mut.initialize(mmtk, tls);
         VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
