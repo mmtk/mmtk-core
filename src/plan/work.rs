@@ -16,7 +16,7 @@ pub trait GenericWork<VM: VMBinding>: 'static + Send + Sync {
     fn do_work(&mut self, worker: &'static mut Worker<VM>, mmtk: &'static MMTK<VM>);
 }
 
-impl <VM: VMBinding, W: Work<VM=VM>> GenericWork<VM> for W {
+impl <VM: VMBinding, W: Work<VM>> GenericWork<VM> for W {
     fn do_work(&mut self, worker: &'static mut Worker<VM>, mmtk: &'static MMTK<VM>) {
         Work::do_work(self, worker, mmtk)
     }
@@ -30,9 +30,8 @@ impl <VM: VMBinding> PartialEq for Box<dyn GenericWork<VM>> {
 
 impl <VM: VMBinding> Eq for Box<dyn GenericWork<VM>> {}
 
-pub trait Work: 'static + Send + Sync + Sized {
-    type VM: VMBinding;
-    fn do_work(&mut self, worker: &'static mut Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>);
+pub trait Work<VM: VMBinding>: 'static + Send + Sync + Sized {
+    fn do_work(&mut self, worker: &'static mut Worker<VM>, mmtk: &'static MMTK<VM>);
 }
 
 
@@ -50,18 +49,17 @@ impl <P: Plan> Prepare<P> {
     }
 }
 
-impl <P: Plan> Work for Prepare<P> {
-    type VM = P::VM;
+impl <P: Plan> Work<P::VM> for Prepare<P> {
     fn do_work(&mut self, worker: &mut Worker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         println!("Prepare Global");
         self.plan.prepare(worker.tls);
-        <Self::VM as VMBinding>::VMActivePlan::reset_mutator_iterator();
+        <P::VM as VMBinding>::VMActivePlan::reset_mutator_iterator();
         while let Some(mutator) = <P::VM as VMBinding>::VMActivePlan::get_next_mutator() {
             let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::MutatorT) };
-            mmtk.scheduler.prepare_stage.add(box PrepareMutator::<P>::new(self.plan, mutator));
+            mmtk.scheduler.prepare_stage.add(PrepareMutator::<P>::new(self.plan, mutator));
         }
         for w in &worker.group().workers {
-            w.local_works.add(box PrepareCollector::default());
+            w.local_works.add(PrepareCollector::default());
         }
     }
 }
@@ -80,8 +78,7 @@ impl <P: Plan> PrepareMutator<P> {
     }
 }
 
-impl <P: Plan> Work for PrepareMutator<P> {
-    type VM = P::VM;
+impl <P: Plan> Work<P::VM> for PrepareMutator<P> {
     fn do_work(&mut self, worker: &mut Worker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         println!("Prepare Mutator");
         self.mutator.prepare(worker.tls);
@@ -89,10 +86,9 @@ impl <P: Plan> Work for PrepareMutator<P> {
 }
 
 #[derive(Default)]
-pub struct PrepareCollector<VM: VMBinding>(PhantomData<VM>);
+pub struct PrepareCollector;
 
-impl <VM: VMBinding> Work for PrepareCollector<VM> {
-    type VM = VM;
+impl <VM: VMBinding> Work<VM> for PrepareCollector {
     fn do_work(&mut self, worker: &mut Worker<VM>, mmtk: &'static MMTK<VM>) {
         println!("Prepare Collector");
         worker.context().prepare();
@@ -111,18 +107,17 @@ impl <P: Plan> Release<P> {
     }
 }
 
-impl <P: Plan> Work for Release<P> {
-    type VM = P::VM;
+impl <P: Plan> Work<P::VM> for Release<P> {
     fn do_work(&mut self, worker: &mut Worker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         println!("Release Global");
         self.plan.release(worker.tls);
-        <Self::VM as VMBinding>::VMActivePlan::reset_mutator_iterator();
+        <P::VM as VMBinding>::VMActivePlan::reset_mutator_iterator();
         while let Some(mutator) = <P::VM as VMBinding>::VMActivePlan::get_next_mutator() {
             let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::MutatorT) };
-            mmtk.scheduler.release_stage.add(box ReleaseMutator::<P>::new(self.plan, mutator));
+            mmtk.scheduler.release_stage.add(ReleaseMutator::<P>::new(self.plan, mutator));
         }
         for w in &worker.group().workers {
-            w.local_works.add(box ReleaseCollector::default());
+            w.local_works.add(ReleaseCollector::default());
         }
     }
 }
@@ -140,8 +135,7 @@ impl <P: Plan> ReleaseMutator<P> {
     }
 }
 
-impl <P: Plan> Work for ReleaseMutator<P> {
-    type VM = P::VM;
+impl <P: Plan> Work<P::VM> for ReleaseMutator<P> {
     fn do_work(&mut self, worker: &mut Worker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         println!("Release Mutator");
         self.mutator.release(worker.tls);
@@ -149,10 +143,9 @@ impl <P: Plan> Work for ReleaseMutator<P> {
 }
 
 #[derive(Default)]
-pub struct ReleaseCollector<VM: VMBinding>(PhantomData<VM>);
+pub struct ReleaseCollector;
 
-impl <VM: VMBinding> Work for ReleaseCollector<VM> {
-    type VM = VM;
+impl <VM: VMBinding> Work<VM> for ReleaseCollector {
     fn do_work(&mut self, worker: &mut Worker<VM>, mmtk: &'static MMTK<VM>) {
         println!("Release Collector");
         worker.context().release();
@@ -173,88 +166,73 @@ impl <ScanEdges: ProcessEdgesWork> StopMutators<ScanEdges> {
     }
 }
 
-impl <ScanEdges: ProcessEdgesWork> Work for StopMutators<ScanEdges> {
-    type VM = <ScanEdges as Work>::VM;
-    fn do_work(&mut self, worker: &mut Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>) {
+impl <E: ProcessEdgesWork> Work<E::VM> for StopMutators<E> {
+    fn do_work(&mut self, worker: &mut Worker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         println!("stop_all_mutators start");
-        <Self::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls);
+        <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls);
         println!("stop_all_mutators end");
         mmtk.scheduler.notify_mutators_paused(mmtk);
-        mmtk.scheduler.prepare_stage.add(box ScanStackRoots::<ScanEdges>::new());
-        mmtk.scheduler.prepare_stage.add_with_priority(0, box ScanStaticRoots::<ScanEdges>::new());
-        mmtk.scheduler.prepare_stage.add_with_priority(0, box ScanGlobalRoots::<ScanEdges>::new());
+        mmtk.scheduler.prepare_stage.add(ScanStackRoots::<E>::new());
+        mmtk.scheduler.prepare_stage.add_with_priority(0, ScanStaticRoots::<E>::new());
+        mmtk.scheduler.prepare_stage.add_with_priority(0, ScanGlobalRoots::<E>::new());
     }
 }
 
 #[derive(Default)]
-pub struct ResumeMutators<VM: VMBinding>(PhantomData<VM>);
+pub struct ResumeMutators;
 
-impl <VM: VMBinding> ResumeMutators<VM> {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl <VM: VMBinding> Work for ResumeMutators<VM> {
-    type VM = VM;
-    fn do_work(&mut self, worker: &mut Worker<Self::VM>, _mmtk: &'static MMTK<Self::VM>) {
+impl <VM: VMBinding> Work<VM> for ResumeMutators {
+    fn do_work(&mut self, worker: &mut Worker<VM>, _mmtk: &'static MMTK<VM>) {
         println!("ResumeMutators");
-        <Self::VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
+        <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
-}
-
-pub trait ScanMutatorsWork: Work {
-    fn new() -> Self;
 }
 
 #[derive(Default)]
 pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
 
-impl <E: ProcessEdgesWork> Work for ScanStackRoots<E> {
-    type VM = E::VM;
-    fn do_work(&mut self, worker: &mut Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>) {
-        println!("ScanStackRoots");
-        <E::VM as VMBinding>::VMScanning::scan_thread_roots::<E>();
+impl <E: ProcessEdgesWork> ScanStackRoots<E> {
+    fn new() -> Self {
+        Self(PhantomData)
     }
 }
 
-impl <E: ProcessEdgesWork> ScanMutatorsWork for ScanStackRoots<E> {
-    fn new() -> Self {
-        Self(PhantomData)
+impl <E: ProcessEdgesWork> Work<E::VM> for ScanStackRoots<E> {
+    fn do_work(&mut self, worker: &mut Worker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        println!("ScanStackRoots");
+        <E::VM as VMBinding>::VMScanning::scan_thread_roots::<E>();
     }
 }
 
 #[derive(Default)]
 pub struct ScanStaticRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
 
-impl <E: ProcessEdgesWork> Work for ScanStaticRoots<E> {
-    type VM = E::VM;
-    fn do_work(&mut self, worker: &mut Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>) {
-        println!("ScanStaticRoots");
-        <E::VM as VMBinding>::VMScanning::scan_static_roots::<E>();
+impl <E: ProcessEdgesWork> ScanStaticRoots<E> {
+    fn new() -> Self {
+        Self(PhantomData)
     }
 }
 
-impl <E: ProcessEdgesWork> ScanMutatorsWork for ScanStaticRoots<E> {
-    fn new() -> Self {
-        Self(PhantomData)
+impl <E: ProcessEdgesWork> Work<E::VM> for ScanStaticRoots<E> {
+    fn do_work(&mut self, worker: &mut Worker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        println!("ScanStaticRoots");
+        <E::VM as VMBinding>::VMScanning::scan_static_roots::<E>();
     }
 }
 
 #[derive(Default)]
 pub struct ScanGlobalRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
 
-impl <E: ProcessEdgesWork> Work for ScanGlobalRoots<E> {
-    type VM = E::VM;
-    fn do_work(&mut self, worker: &mut Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>) {
-        println!("ScanGlobalRoots");
-        <E::VM as VMBinding>::VMScanning::scan_global_roots::<E>();
+impl <E: ProcessEdgesWork> ScanGlobalRoots<E> {
+    fn new() -> Self {
+        Self(PhantomData)
     }
 }
 
-impl <E: ProcessEdgesWork> ScanMutatorsWork for ScanGlobalRoots<E> {
-    fn new() -> Self {
-        Self(PhantomData)
+impl <E: ProcessEdgesWork> Work<E::VM> for ScanGlobalRoots<E> {
+    fn do_work(&mut self, worker: &mut Worker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        println!("ScanGlobalRoots");
+        <E::VM as VMBinding>::VMScanning::scan_global_roots::<E>();
     }
 }
 
@@ -297,7 +275,7 @@ pub trait ProcessEdgesWork: Send + Sync + 'static + Sized + DerefMut + Deref<Tar
         if self.nodes.len() >= Self::CAPACITY {
             let mut new_nodes = Vec::with_capacity(Self::CAPACITY);
             mem::swap(&mut new_nodes, &mut self.nodes);
-            self.mmtk.unwrap().scheduler.closure_stage.add(box ScanObjects::<Self>::new(new_nodes, false));
+            self.mmtk.unwrap().scheduler.closure_stage.add(ScanObjects::<Self>::new(new_nodes, false));
         }
     }
 
@@ -316,9 +294,8 @@ pub trait ProcessEdgesWork: Send + Sync + 'static + Sized + DerefMut + Deref<Tar
     }
 }
 
-impl <E: ProcessEdgesWork> Work for E {
-    type VM = <E as ProcessEdgesWork>::VM;
-    default fn do_work(&mut self, worker: &'static mut Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>) {
+impl <E: ProcessEdgesWork> Work<E::VM> for E {
+    default fn do_work(&mut self, worker: &'static mut Worker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         println!("ProcessEdgesWork");
         self.mmtk = Some(mmtk);
         self.worker = Some(worker);
@@ -326,7 +303,7 @@ impl <E: ProcessEdgesWork> Work for E {
         if self.nodes.len() > 0 {
             let mut new_nodes = Vec::with_capacity(Self::CAPACITY);
             mem::swap(&mut new_nodes, &mut self.nodes);
-            self.mmtk.unwrap().scheduler.closure_stage.add(box ScanObjects::<Self>::new(new_nodes, false));
+            self.mmtk.unwrap().scheduler.closure_stage.add(ScanObjects::<Self>::new(new_nodes, false));
         }
         println!("ProcessEdgesWork End");
     }
@@ -345,11 +322,10 @@ impl <Edges: ProcessEdgesWork> ScanObjects<Edges> {
     }
 }
 
-impl <Edges: ProcessEdgesWork> Work for ScanObjects<Edges> {
-    type VM = <Edges as Work>::VM;
-    fn do_work(&mut self, worker: &mut Worker<Self::VM>, mmtk: &'static MMTK<Self::VM>) {
+impl <E: ProcessEdgesWork> Work<E::VM> for ScanObjects<E> {
+    fn do_work(&mut self, worker: &mut Worker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         println!("ScanObjects");
-        <Self::VM as VMBinding>::VMScanning::scan_objects::<Edges>(&self.buffer);
+        <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer);
         println!("ScanObjects End");
     }
 }
