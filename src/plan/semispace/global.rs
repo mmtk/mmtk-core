@@ -26,8 +26,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
 use std::sync::Arc;
-use crate::plan::scheduler::Scheduler;
-use crate::plan::work::*;
+use crate::scheduler::*;
 use crate::mmtk::MMTK;
 use super::*;
 

@@ -14,7 +14,7 @@ pub use self::global::SelectedPlan;
 pub use self::tracelocal::SSTraceLocal as SelectedTraceLocal;
 
 
-use crate::work::*;
+use crate::scheduler::*;
 use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::VMBinding;
 use std::marker::PhantomData;

@@ -1,7 +1,7 @@
 use crate::plan::phase::PhaseManager;
 use crate::plan::Plan;
 use crate::plan::SelectedPlan;
-use crate::plan::scheduler::Scheduler;
+use crate::scheduler::Scheduler;
 use crate::policy::space::SFTMap;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;

@@ -18,7 +18,7 @@ use crate::util::OpaquePointer;
 use crate::vm::Collection;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
-use crate::plan::scheduler::Scheduler;
+use crate::scheduler::*;
 use crate::mmtk::MMTK;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};

@@ -1,5 +1,5 @@
 use crate::plan::{MutatorContext, ParallelCollector};
-use crate::plan::worker::Worker;
+use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 
