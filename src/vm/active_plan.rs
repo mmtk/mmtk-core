@@ -1,7 +1,7 @@
 use crate::plan::{Plan, SelectedPlan};
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::worker::Worker;
+use crate::scheduler::*;
 
 pub trait ActivePlan<VM: VMBinding> {
     // TODO: I don't know how this can be implemented when we have multiple MMTk instances.

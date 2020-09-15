@@ -13,7 +13,7 @@ use crate::plan::Plan;
 
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::plan::scheduler::Scheduler;
+use crate::scheduler::*;
 
 struct RequestSync {
     tls: OpaquePointer,

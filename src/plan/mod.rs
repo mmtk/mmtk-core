@@ -20,9 +20,6 @@ pub use self::parallel_collector_group::ParallelCollectorGroup;
 pub use self::phase::Phase;
 pub use self::tracelocal::TraceLocal;
 pub use self::transitive_closure::TransitiveClosure;
-pub mod scheduler;
-pub mod work;
-pub mod worker;
 
 #[cfg(feature = "nogc")]
 pub mod nogc;

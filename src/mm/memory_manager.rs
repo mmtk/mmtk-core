@@ -6,7 +6,7 @@ use crate::plan::CollectorContext;
 use crate::plan::MutatorContext;
 use crate::plan::Plan;
 use crate::plan::TraceLocal;
-use crate::plan::worker::Worker;
+use crate::scheduler::Worker;
 
 use crate::vm::Collection;
 
@@ -23,7 +23,7 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::plan::scheduler::Scheduler;
+use crate::scheduler::Scheduler;
 
 // This file provides a safe Rust API for mmtk-core.
 // We expect the VM binding to inherit and extend this API by:
