@@ -17,7 +17,7 @@ lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
 num_cpus = "1.8"
-atomic-traits = "0.1.0"
+atomic-traits = "0.2.0"
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 atomic = "0.4.6"
