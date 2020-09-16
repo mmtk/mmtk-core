@@ -13,7 +13,7 @@ pub trait ActivePlan<VM: VMBinding> {
     unsafe fn collector(
         tls: OpaquePointer,
     ) -> &'static mut <SelectedPlan<VM> as Plan>::CollectorT;
-    unsafe fn worker(tls: OpaquePointer) -> &'static mut Worker<VM>;
+    unsafe fn worker(tls: OpaquePointer) -> &'static mut GCWorker<VM>;
     /// # Safety
     /// TODO: I am not sure why this is unsafe.
     unsafe fn is_mutator(tls: OpaquePointer) -> bool;

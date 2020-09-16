@@ -49,7 +49,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self;
     fn base(&self) -> &BasePlan<Self::VM>;
-    fn schedule_collection(&'static self, scheduler: &Scheduler<Self::VM>);
+    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }

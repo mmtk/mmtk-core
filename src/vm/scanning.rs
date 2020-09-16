@@ -2,7 +2,7 @@ use crate::plan::{TraceLocal, TransitiveClosure};
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::scheduler::*;
+use crate::scheduler::gc_works::ProcessEdgesWork;
 
 pub trait Scanning<VM: VMBinding> {
     fn scan_object<T: TransitiveClosure>(
