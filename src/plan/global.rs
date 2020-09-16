@@ -35,9 +35,7 @@ pub trait CopyContext: Sized + 'static + Sync + Send {
 
 pub trait Plan: Sized + 'static + Sync + Send {
     type VM: VMBinding;
-    type MutatorT: MutatorContext<Self::VM>;
-    type TraceLocalT: TraceLocal;
-    type CollectorT: ParallelCollector<Self::VM>;
+    type Mutator: MutatorContext<Self::VM>;
     type CopyContext: CopyContext;
 
     fn new(
@@ -60,7 +58,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
     // unsafe because this can only be called once by the init thread
     fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<Self::VM>);
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::MutatorT>;
+    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::Mutator>;
     /// # Safety
     /// Only the primary collector thread can call this.
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);

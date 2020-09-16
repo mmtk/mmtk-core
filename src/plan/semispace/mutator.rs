@@ -6,8 +6,6 @@ use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
-use crate::vm::Collection;
-
 use crate::plan::semispace::SemiSpace;
 use crate::vm::VMBinding;
 
@@ -23,29 +21,15 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
         &self.common
     }
 
-    fn prepare(&mut self, tls: OpaquePointer) {
+    fn prepare(&mut self, _tls: OpaquePointer) {
         // Do nothing
     }
-    fn release(&mut self, tls: OpaquePointer) {
+    fn release(&mut self, _tls: OpaquePointer) {
         self.ss.rebind(Some(self.plan.tospace()));
     }
 
-    fn collection_phase(&mut self, _tls: OpaquePointer, phase: &Phase, _primary: bool) {
-        match phase {
-            Phase::PrepareStacks => {
-                if !self.plan.common.stacks_prepared() {
-                    // Use the mutator's tls rather than the collector's tls
-                    VM::VMCollection::prepare_mutator(self.get_tls(), self);
-                }
-                self.flush_remembered_sets();
-            }
-            Phase::Prepare => {}
-            Phase::Release => {
-                // rebind the allocation bump pointer to the appropriate semispace
-                self.ss.rebind(Some(self.plan.tospace()));
-            }
-            _ => panic!("Per-mutator phase not handled!"),
-        }
+    fn collection_phase(&mut self, _tls: OpaquePointer, _phase: &Phase, _primary: bool) {
+        unreachable!()
     }
 
     fn alloc(
