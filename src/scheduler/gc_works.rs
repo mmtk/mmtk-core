@@ -23,7 +23,7 @@ impl <P: Plan> Prepare<P> {
 
 impl <P: Plan> GCWork<P::VM> for Prepare<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
-        println!("Prepare Global");
+        trace!("Prepare Global");
         self.plan.prepare(worker.tls);
         <P::VM as VMBinding>::VMActivePlan::reset_mutator_iterator();
         while let Some(mutator) = <P::VM as VMBinding>::VMActivePlan::get_next_mutator() {
@@ -52,7 +52,7 @@ impl <P: Plan> PrepareMutator<P> {
 
 impl <P: Plan> GCWork<P::VM> for PrepareMutator<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
-        println!("Prepare Mutator");
+        trace!("Prepare Mutator");
         self.mutator.prepare(worker.tls);
     }
 }
@@ -62,7 +62,7 @@ pub struct PrepareCollector;
 
 impl <VM: VMBinding> GCWork<VM> for PrepareCollector {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        println!("Prepare Collector");
+        trace!("Prepare Collector");
         worker.local().prepare();
     }
 }
@@ -81,7 +81,7 @@ impl <P: Plan> Release<P> {
 
 impl <P: Plan> GCWork<P::VM> for Release<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
-        println!("Release Global");
+        trace!("Release Global");
         self.plan.release(worker.tls);
         <P::VM as VMBinding>::VMActivePlan::reset_mutator_iterator();
         while let Some(mutator) = <P::VM as VMBinding>::VMActivePlan::get_next_mutator() {
@@ -109,7 +109,7 @@ impl <P: Plan> ReleaseMutator<P> {
 
 impl <P: Plan> GCWork<P::VM> for ReleaseMutator<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
-        println!("Release Mutator");
+        trace!("Release Mutator");
         self.mutator.release(worker.tls);
     }
 }
@@ -119,7 +119,7 @@ pub struct ReleaseCollector;
 
 impl <VM: VMBinding> GCWork<VM> for ReleaseCollector {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        println!("Release Collector");
+        trace!("Release Collector");
         worker.local().release();
     }
 }
@@ -141,13 +141,12 @@ impl <ScanEdges: ProcessEdgesWork> StopMutators<ScanEdges> {
 impl <E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if worker.is_coordinator() {
-            println!("stop_all_mutators start");
+            trace!("stop_all_mutators start");
             <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls);
-            println!("stop_all_mutators end");
+            trace!("stop_all_mutators end");
             mmtk.scheduler.notify_mutators_paused(mmtk);
             mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanStackRoots::<E>::new(), worker);
-            mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanStaticRoots::<E>::new(), worker);
-            mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanGlobalRoots::<E>::new(), worker);
+            mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanVMSpecificRoots::<E>::new(), worker);
         } else {
             mmtk.scheduler.add_coordinator_work(StopMutators::<E>::new());
         }
@@ -162,7 +161,7 @@ pub struct ResumeMutators;
 impl <VM: VMBinding> GCWork<VM> for ResumeMutators {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         if worker.is_coordinator() {
-            println!("ResumeMutators");
+            trace!("ResumeMutators");
             <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
         } else {
             mmtk.scheduler.add_coordinator_work(ResumeMutators);
@@ -183,40 +182,24 @@ impl <E: ProcessEdgesWork> ScanStackRoots<E> {
 
 impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        println!("ScanStackRoots");
+        trace!("ScanStackRoots");
         <E::VM as VMBinding>::VMScanning::scan_thread_roots::<E>();
     }
 }
 
 #[derive(Default)]
-pub struct ScanStaticRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
+pub struct ScanVMSpecificRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
 
-impl <E: ProcessEdgesWork> ScanStaticRoots<E> {
+impl <E: ProcessEdgesWork> ScanVMSpecificRoots<E> {
     fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanStaticRoots<E> {
+impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        println!("ScanStaticRoots");
-        <E::VM as VMBinding>::VMScanning::scan_static_roots::<E>();
-    }
-}
-
-#[derive(Default)]
-pub struct ScanGlobalRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
-
-impl <E: ProcessEdgesWork> ScanGlobalRoots<E> {
-    fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanGlobalRoots<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        println!("ScanGlobalRoots");
-        <E::VM as VMBinding>::VMScanning::scan_global_roots::<E>();
+        trace!("ScanStaticRoots");
+        <E::VM as VMBinding>::VMScanning::scan_vm_specific_roots::<E>();
     }
 }
 
@@ -280,7 +263,7 @@ pub trait ProcessEdgesWork: Send + Sync + 'static + Sized + DerefMut + Deref<Tar
 
 impl <E: ProcessEdgesWork> GCWork<E::VM> for E {
     default fn do_work(&mut self, worker: &'static mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        println!("ProcessEdgesWork");
+        trace!("ProcessEdgesWork");
         self.mmtk = Some(mmtk);
         self.worker = Some(worker);
         self.process_edges();
@@ -289,7 +272,7 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for E {
             mem::swap(&mut new_nodes, &mut self.nodes);
             self.mmtk.unwrap().scheduler.closure_stage.add(ScanObjects::<Self>::new(new_nodes, false));
         }
-        println!("ProcessEdgesWork End");
+        trace!("ProcessEdgesWork End");
     }
 }
 
@@ -308,8 +291,8 @@ impl <Edges: ProcessEdgesWork> ScanObjects<Edges> {
 
 impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        println!("ScanObjects");
+        trace!("ScanObjects");
         <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer);
-        println!("ScanObjects End");
+        trace!("ScanObjects End");
     }
 }
