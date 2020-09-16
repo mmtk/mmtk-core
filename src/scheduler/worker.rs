@@ -12,10 +12,11 @@ pub struct Worker<C: Context> {
     pub tls: OpaquePointer,
     pub ordinal: usize,
     pub parked: AtomicBool,
-    group: Option<Weak<WorkerGroup<C>>>,
-    scheduler: Weak<Scheduler<C>>,
+    group: Option<Arc<WorkerGroup<C>>>,
+    scheduler: Arc<Scheduler<C>>,
     local: Option<C::WorkerLocal>,
     pub local_works: WorkBucket<C>,
+    pub packets: usize,
 }
 
 pub type GCWorker<VM> = Worker<MMTK<VM>>;
@@ -26,10 +27,11 @@ impl <C: Context> Worker<C> {
             tls: OpaquePointer::UNINITIALIZED,
             ordinal,
             parked: AtomicBool::new(true),
-            group,
+            group: group.map(|g| g.upgrade().unwrap()),
             local: None,
-            local_works: WorkBucket::new(true, scheduler.upgrade().unwrap().monitor.clone()),
-            scheduler,
+            local_works: WorkBucket::new(true, scheduler.upgrade().unwrap().worker_monitor.clone()),
+            scheduler: scheduler.upgrade().unwrap(),
+            packets: 0,
         }
     }
 
@@ -37,16 +39,16 @@ impl <C: Context> Worker<C> {
         self.parked.load(Ordering::SeqCst)
     }
 
-    pub fn group(&self) -> Option<Arc<WorkerGroup<C>>> {
-        self.group.as_ref().map(|g| g.upgrade().unwrap())
+    pub fn group(&self) -> Option<&WorkerGroup<C>> {
+        self.group.as_ref().map(|g| &g as &WorkerGroup<C>)
     }
 
     pub fn is_coordinator(&self) -> bool {
         self.group.is_none()
     }
 
-    pub fn scheduler(&self) -> Arc<Scheduler<C>> {
-        self.scheduler.upgrade().unwrap()
+    pub fn scheduler(&self) -> &Scheduler<C> {
+        &self.scheduler
     }
 
     pub fn local(&self) -> &mut C::WorkerLocal {
@@ -60,9 +62,11 @@ impl <C: Context> Worker<C> {
     pub fn run(&'static mut self, context: &'static C) {
         self.local = Some(C::WorkerLocal::new(context));
         self.parked.store(false, Ordering::SeqCst);
-        let scheduler = self.scheduler.upgrade().unwrap();
         loop {
-            let mut work = scheduler.poll(self);
+            let mut work = self.scheduler().poll(self);
+            if cfg!(debug_assertions) {
+                self.packets += 1;
+            }
             debug_assert!(!self.is_parked());
             let this = unsafe { &mut *(self as *mut _) };
             work.do_work(this, context);
