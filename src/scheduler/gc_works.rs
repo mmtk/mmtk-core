@@ -27,7 +27,7 @@ impl <P: Plan> GCWork<P::VM> for Prepare<P> {
         self.plan.prepare(worker.tls);
         <P::VM as VMBinding>::VMActivePlan::reset_mutator_iterator();
         while let Some(mutator) = <P::VM as VMBinding>::VMActivePlan::get_next_mutator() {
-            let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::MutatorT) };
+            let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::Mutator) };
             mmtk.scheduler.prepare_stage.add(PrepareMutator::<P>::new(self.plan, mutator));
         }
         for w in &worker.group().unwrap().workers {
@@ -39,13 +39,13 @@ impl <P: Plan> GCWork<P::VM> for Prepare<P> {
 /// GC Preparation Work (include updating global states)
 pub struct PrepareMutator<P: Plan> {
     pub plan: &'static P,
-    pub mutator: &'static mut P::MutatorT,
+    pub mutator: &'static mut P::Mutator,
 }
 
 unsafe impl <P: Plan> Sync for PrepareMutator<P> {}
 
 impl <P: Plan> PrepareMutator<P> {
-    pub fn new(plan: &'static P, mutator: &'static mut P::MutatorT) -> Self {
+    pub fn new(plan: &'static P, mutator: &'static mut P::Mutator) -> Self {
         Self { plan, mutator }
     }
 }
@@ -85,7 +85,7 @@ impl <P: Plan> GCWork<P::VM> for Release<P> {
         self.plan.release(worker.tls);
         <P::VM as VMBinding>::VMActivePlan::reset_mutator_iterator();
         while let Some(mutator) = <P::VM as VMBinding>::VMActivePlan::get_next_mutator() {
-            let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::MutatorT) };
+            let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::Mutator) };
             mmtk.scheduler.release_stage.add(ReleaseMutator::<P>::new(self.plan, mutator));
         }
         for w in &worker.group().unwrap().workers {
@@ -96,13 +96,13 @@ impl <P: Plan> GCWork<P::VM> for Release<P> {
 
 pub struct ReleaseMutator<P: Plan> {
     pub plan: &'static P,
-    pub mutator: &'static mut P::MutatorT,
+    pub mutator: &'static mut P::Mutator,
 }
 
 unsafe impl <P: Plan> Sync for ReleaseMutator<P> {}
 
 impl <P: Plan> ReleaseMutator<P> {
-    pub fn new(plan: &'static P, mutator: &'static mut P::MutatorT) -> Self {
+    pub fn new(plan: &'static P, mutator: &'static mut P::Mutator) -> Self {
         Self { plan, mutator }
     }
 }

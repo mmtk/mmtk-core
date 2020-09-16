@@ -62,7 +62,7 @@ pub mod scheduler;
 pub use crate::mm::memory_manager;
 pub use crate::mmtk::MMTK;
 pub use crate::plan::selected_plan::{
-    SelectedCollector, SelectedConstraints, SelectedPlan, SelectedTraceLocal,
+    SelectedConstraints, SelectedPlan,
 };
 pub use crate::plan::{
     Allocator, CollectorContext, Mutator, MutatorContext, ParallelCollector, Plan, TraceLocal,

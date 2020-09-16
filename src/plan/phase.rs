@@ -329,13 +329,7 @@ impl PhaseManager {
         tls: OpaquePointer,
         scheduled_phase: ScheduledPhase,
     ) {
-        let order = unsafe { VM::VMActivePlan::collector(tls).rendezvous() };
-
-        if order == 0 {
-            self.push_scheduled_phase(scheduled_phase);
-        }
-
-        self.process_phase_stack::<VM>(tls, false);
+        unreachable!()
     }
 
     pub fn continue_phase_stack<VM: VMBinding>(&self, tls: OpaquePointer) {
@@ -350,92 +344,7 @@ impl PhaseManager {
     }
 
     fn process_phase_stack<VM: VMBinding>(&self, tls: OpaquePointer, resume: bool) {
-        let mut resume = resume;
-        let plan = VM::VMActivePlan::global();
-        let collector = unsafe { VM::VMActivePlan::collector(tls) };
-        let order = collector.rendezvous();
-        let primary = order == 0;
-        if primary && resume {
-            plan.base().set_gc_status(plan::global::GcStatus::GcProper);
-        }
-        let mut is_even_phase = true;
-        if primary {
-            // FIXME allowConcurrentPhase
-            let next_phase = self.get_next_phase();
-            self.set_next_phase(false, next_phase, false);
-        }
-        collector.rendezvous();
-        loop {
-            let cp = self.get_current_phase(is_even_phase);
-            let schedule = cp.schedule;
-            let phase = cp.phase;
-            if phase.is_empty() {
-                break;
-            }
-            if primary {
-                if resume {
-                    self.resume_complex_timers();
-                }
-                self.phase_timer.start_timer(&phase);
-                {
-                    let mut start_complex_timer = self.start_complex_timer.lock().unwrap();
-                    if let Some(ref timer) = *start_complex_timer {
-                        timer.lock().unwrap().start();
-                        *start_complex_timer = None;
-                    }
-                }
-            }
-            match schedule {
-                Schedule::Global => {
-                    debug!("Execute {:?} as Global...", phase);
-                    if primary {
-                        unsafe { plan.collection_phase(tls, &phase) }
-                    }
-                }
-                Schedule::Collector => {
-                    debug!("Execute {:?} as Collector...", phase);
-                    collector.collection_phase(tls, &phase, primary)
-                }
-                Schedule::Mutator => {
-                    debug!("Execute {:?} as Mutator...", phase);
-                    while let Some(mutator) = VM::VMActivePlan::get_next_mutator() {
-                        mutator.collection_phase(tls, &phase, primary);
-                    }
-                }
-                Schedule::Concurrent => unimplemented!(),
-                _ => panic!("Invalid schedule in Phase.process_phase_stack"),
-            }
-
-            if primary {
-                let next = self.get_next_phase();
-                let needs_reset_rendezvous = !next.phase.is_empty()
-                    && (schedule == Schedule::Mutator && next.schedule == Schedule::Mutator);
-                self.set_next_phase(is_even_phase, next, needs_reset_rendezvous);
-            }
-
-            collector.rendezvous();
-
-            if primary && schedule == Schedule::Mutator {
-                VM::VMActivePlan::reset_mutator_iterator();
-            }
-
-            if self.needs_mutator_reset_rendevous(is_even_phase) {
-                collector.rendezvous();
-            }
-
-            if primary {
-                self.phase_timer.stop_timer(&phase);
-                {
-                    let mut stop_complex_timer = self.stop_complex_timer.lock().unwrap();
-                    if let Some(ref timer) = *stop_complex_timer {
-                        timer.lock().unwrap().stop();
-                        *stop_complex_timer = None;
-                    }
-                }
-            }
-            is_even_phase = !is_even_phase;
-            resume = false;
-        }
+        unreachable!()
     }
 
     fn get_current_phase(&self, is_even_phase: bool) -> ScheduledPhase {

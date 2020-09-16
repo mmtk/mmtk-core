@@ -16,7 +16,6 @@ use self::selected_plan::SelectedPlan;
 use crate::plan::selected_plan;
 use crate::util::alloc::allocators::AllocatorSelector;
 
-use self::selected_plan::{SelectedCollector, SelectedTraceLocal};
 use crate::mmtk::MMTK;
 use crate::plan::Allocator;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
@@ -116,14 +115,6 @@ pub fn report_delayed_root_edge<VM: VMBinding>(
         trace_local.report_delayed_root_edge(addr)
     }
 }
-#[cfg(not(feature = "sanity"))]
-pub fn report_delayed_root_edge<VM: VMBinding>(
-    _: &MMTK<VM>,
-    trace_local: &mut SelectedTraceLocal<VM>,
-    addr: Address,
-) {
-    trace_local.report_delayed_root_edge(addr);
-}
 
 #[cfg(feature = "sanity")]
 pub fn will_not_move_in_current_collection<VM: VMBinding>(
@@ -139,14 +130,6 @@ pub fn will_not_move_in_current_collection<VM: VMBinding>(
     } else {
         trace_local.will_not_move_in_current_collection(obj)
     }
-}
-#[cfg(not(feature = "sanity"))]
-pub fn will_not_move_in_current_collection<VM: VMBinding>(
-    _: &MMTK<VM>,
-    trace_local: &mut SelectedTraceLocal<VM>,
-    obj: ObjectReference,
-) -> bool {
-    trace_local.will_not_move_in_current_collection(obj)
 }
 
 #[cfg(feature = "sanity")]
@@ -165,16 +148,6 @@ pub fn process_interior_edge<VM: VMBinding>(
     } else {
         trace_local.process_interior_edge(target, slot, root)
     }
-}
-#[cfg(not(feature = "sanity"))]
-pub fn process_interior_edge<VM: VMBinding>(
-    _: &MMTK<VM>,
-    trace_local: &mut SelectedTraceLocal<VM>,
-    target: ObjectReference,
-    slot: Address,
-    root: bool,
-) {
-    trace_local.process_interior_edge(target, slot, root)
 }
 
 pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &'static mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
@@ -215,41 +188,6 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 #[cfg(feature = "sanity")]
 pub fn scan_region() {
     crate::util::sanity::memory_scan::scan_region();
-}
-
-pub fn trace_get_forwarded_referent<VM: VMBinding>(
-    trace_local: &mut SelectedTraceLocal<VM>,
-    object: ObjectReference,
-) -> ObjectReference {
-    trace_local.get_forwarded_reference(object)
-}
-
-pub fn trace_get_forwarded_reference<VM: VMBinding>(
-    trace_local: &mut SelectedTraceLocal<VM>,
-    object: ObjectReference,
-) -> ObjectReference {
-    trace_local.get_forwarded_reference(object)
-}
-
-pub fn trace_root_object<VM: VMBinding>(
-    trace_local: &mut SelectedTraceLocal<VM>,
-    object: ObjectReference,
-) -> ObjectReference {
-    trace_local.trace_object(object)
-}
-
-pub extern "C" fn process_edge<VM: VMBinding>(
-    trace_local: &mut SelectedTraceLocal<VM>,
-    object: Address,
-) {
-    trace_local.process_edge(object);
-}
-
-pub fn trace_retain_referent<VM: VMBinding>(
-    trace_local: &mut SelectedTraceLocal<VM>,
-    object: ObjectReference,
-) -> ObjectReference {
-    trace_local.retain_referent(object)
 }
 
 pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {

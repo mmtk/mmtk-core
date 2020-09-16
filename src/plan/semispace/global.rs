@@ -1,8 +1,4 @@
 use crate::policy::space::Space;
-
-use super::SSCollector;
-use super::SSTraceLocal;
-
 use crate::plan::trace::Trace;
 use crate::plan::Allocator;
 use crate::plan::Phase;
@@ -11,9 +7,7 @@ use crate::policy::copyspace::CopySpace;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::VMRequest;
 use crate::util::OpaquePointer;
-
 use std::cell::UnsafeCell;
-
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::mutator_context::Mutator;
@@ -29,7 +23,7 @@ use std::sync::Arc;
 use crate::scheduler::*;
 use crate::scheduler::gc_works::*;
 use crate::mmtk::MMTK;
-use super::{SSCopyContext, SSProcessEdges};
+use super::gc_works::{SSCopyContext, SSProcessEdges};
 
 
 
@@ -38,7 +32,6 @@ use enum_map::EnumMap;
 pub type SelectedPlan<VM> = SemiSpace<VM>;
 
 pub const ALLOC_SS: Allocator = Allocator::Default;
-pub const SCAN_BOOT_IMAGE: bool = true;
 
 pub struct SemiSpace<VM: VMBinding> {
     pub unsync: UnsafeCell<SemiSpaceUnsync<VM>>,
@@ -56,9 +49,7 @@ unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
 
 impl<VM: VMBinding> Plan for SemiSpace<VM> {
     type VM = VM;
-    type MutatorT = Mutator<VM, Self>;
-    type TraceLocalT = SSTraceLocal<VM>;
-    type CollectorT = SSCollector<VM>;
+    type Mutator = Mutator<VM, Self>;
     type CopyContext = SSCopyContext<VM>;
 
     fn new(
@@ -123,78 +114,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {
-        let unsync = &mut *self.unsync.get();
-        match phase {
-            Phase::Prepare => {
-                self.common.collection_phase(tls, phase, true);
-                debug_assert!(self.ss_trace.values.is_empty());
-                debug_assert!(self.ss_trace.root_locations.is_empty());
-                #[cfg(feature = "sanity")]
-                {
-                    self.fromspace().unprotect();
-                }
-                unsync.hi = !unsync.hi; // flip the semi-spaces
-                                        // prepare each of the collected regions
-                unsync.copyspace0.prepare(unsync.hi);
-                unsync.copyspace1.prepare(!unsync.hi);
-
-                #[cfg(feature = "sanity")]
-                {
-                    use crate::util::sanity::sanity_checker::SanityChecker;
-                    println!("Pre GC sanity check");
-                    SanityChecker::new(tls, &self).check();
-                }
-            }
-            &Phase::Release => {
-                self.common.collection_phase(tls, phase, true);
-                #[cfg(feature = "sanity")]
-                {
-                    use crate::util::constants::LOG_BYTES_IN_PAGE;
-                    use libc::memset;
-                    if self.fromspace().common().contiguous {
-                        let fromspace_start = self.fromspace().common().start;
-                        let fromspace_commited =
-                            self.fromspace().get_page_resource().committed_pages();
-                        let commited_bytes = fromspace_commited * (1 << LOG_BYTES_IN_PAGE);
-                        println!(
-                            "Destroying fromspace {}~{}",
-                            fromspace_start,
-                            fromspace_start + commited_bytes
-                        );
-                        memset(fromspace_start.to_mut_ptr(), 0xFF, commited_bytes);
-                    } else {
-                        println!("Fromspace is discontiguous, not destroying")
-                    }
-                }
-                // release the collected region
-                if unsync.hi {
-                    unsync.copyspace0.release();
-                } else {
-                    unsync.copyspace1.release();
-                }
-            }
-            Phase::Complete => {
-                #[cfg(feature = "sanity")]
-                {
-                    use crate::util::sanity::memory_scan;
-                    use crate::util::sanity::sanity_checker::SanityChecker;
-                    println!("Post GC sanity check");
-                    SanityChecker::new(tls, &self).check();
-                    println!("Post GC memory scan");
-                    memory_scan::scan_region();
-                    println!("Finished one GC");
-                }
-                debug_assert!(self.ss_trace.values.is_empty());
-                debug_assert!(self.ss_trace.root_locations.is_empty());
-                #[cfg(feature = "sanity")]
-                {
-                    self.fromspace().protect();
-                }
-                self.common.collection_phase(tls, phase, true);
-            }
-            _ => self.common.collection_phase(tls, phase, true),
-        }
+    unsafe fn collection_phase(&self, _tls: OpaquePointer, _phase: &Phase) {
+        unreachable!()
     }
 
     fn prepare(&self, tls: OpaquePointer) {

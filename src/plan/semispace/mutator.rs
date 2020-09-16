@@ -6,6 +6,7 @@ use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
 
 use crate::plan::mutator_context::MutatorConfig;
+use crate::util::{Address, ObjectReference};
 use crate::plan::semispace::SemiSpace;
 use crate::vm::VMBinding;
 use enum_map::enum_map;
@@ -18,28 +19,23 @@ pub fn ss_collection_phase<VM: VMBinding>(
     phase: &Phase,
     _primary: bool,
 ) {
-    match phase {
-        Phase::Release => {
-            // rebind the allocation bump pointer to the appropriate semispace
-            let bump_allocator = unsafe {
-                mutator
-                    .allocators
-                    .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
-            }
-            .downcast_mut::<BumpAllocator<VM>>()
-            .unwrap();
-            bump_allocator.rebind(Some(mutator.plan.tospace()));
-        }
-        _ => {}
-    }
+    unreachable!()
 }
 
-pub fn ss_mutator_prepare<VM: VMBinding>(_tls: OpaquePointer) {
+pub fn ss_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM, SemiSpace<VM>>, _tls: OpaquePointer) {
     // Do nothing
 }
 
-pub fn ss_mutator_release<VM: VMBinding>(_tls: OpaquePointer) {
-    self.ss.rebind(Some(self.plan.tospace()));
+pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM, SemiSpace<VM>>, _tls: OpaquePointer) {
+    // rebind the allocation bump pointer to the appropriate semispace
+    let bump_allocator = unsafe {
+        mutator
+            .allocators
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
+    }
+    .downcast_mut::<BumpAllocator<VM>>()
+    .unwrap();
+    bump_allocator.rebind(Some(mutator.plan.tospace()));
 }
 
 lazy_static! {
