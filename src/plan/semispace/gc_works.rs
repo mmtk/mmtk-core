@@ -29,9 +29,11 @@ impl <VM: VMBinding> CopyContext for SSCopyContext<VM> {
     fn release(&mut self) {
         // self.ss.rebind(Some(self.plan.tospace()));
     }
+    #[inline(always)]
     fn alloc_copy(&mut self, _original: ObjectReference, bytes: usize, align: usize, offset: isize, _allocator: crate::Allocator) -> Address {
         self.ss.alloc(bytes, align, offset)
     }
+    #[inline(always)]
     fn post_copy(&mut self, obj: ObjectReference, _tib: Address, _bytes: usize, _allocator: crate::Allocator) {
         forwarding_word::clear_forwarding_bits::<VM>(obj);
     }
@@ -48,6 +50,7 @@ impl <VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
     fn new(edges: Vec<Address>, _roots: bool) -> Self {
         Self { base: ProcessEdgesBase::new(edges), ..Default::default() }
     }
+    #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;

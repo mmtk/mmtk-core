@@ -119,8 +119,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn prepare(&self, tls: OpaquePointer) {
-        self.fromspace().print_vm_map();
-        self.tospace().print_vm_map();
         self.common.prepare(tls, true);
         debug_assert!(self.ss_trace.values.is_empty());
         debug_assert!(self.ss_trace.root_locations.is_empty());
@@ -167,8 +165,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         } else {
             unsafe { unsync.copyspace1.release(); }
         }
-        self.fromspace().print_vm_map();
-        self.tospace().print_vm_map();
     }
 
     fn get_collection_reserve(&self) -> usize {

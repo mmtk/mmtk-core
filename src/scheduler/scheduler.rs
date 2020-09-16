@@ -30,7 +30,8 @@ pub struct Scheduler<C: Context> {
     /// workers
     worker_group: Option<Arc<WorkerGroup<C>>>,
     /// Condition Variable
-    pub monitor: Arc<(Mutex<()>, Condvar)>,
+    pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
+    pub coord_monitor: Arc<(Mutex<()>, Condvar)>,
     context: Option<&'static C>,
     coordinator_worker: Option<Worker<C>>,
     pub channel: (Sender<Box<dyn CoordinatorWork<C>>>, Receiver<Box<dyn CoordinatorWork<C>>>),
@@ -41,16 +42,17 @@ unsafe impl <C: Context> Sync for Scheduler<C> {}
 
 impl <C: Context> Scheduler<C> {
     pub fn new() -> Arc<Self> {
-        let monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
+        let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
         Arc::new(Self {
-            unconstrained_works: WorkBucket::new(true, monitor.clone()), // `default_bucket` is always activated
-            prepare_stage: WorkBucket::new(false, monitor.clone()),
-            closure_stage: WorkBucket::new(false, monitor.clone()),
-            release_stage: WorkBucket::new(false, monitor.clone()),
-            final_stage: WorkBucket::new(false, monitor.clone()),
-            coordinator_works: WorkBucket::new(true, monitor.clone()),
+            unconstrained_works: WorkBucket::new(true, worker_monitor.clone()), // `default_bucket` is always activated
+            prepare_stage: WorkBucket::new(false, worker_monitor.clone()),
+            closure_stage: WorkBucket::new(false, worker_monitor.clone()),
+            release_stage: WorkBucket::new(false, worker_monitor.clone()),
+            final_stage: WorkBucket::new(false, worker_monitor.clone()),
+            coordinator_works: WorkBucket::new(true, worker_monitor.clone()),
             worker_group: None,
-            monitor,
+            worker_monitor,
+            coord_monitor: Default::default(),
             context: None,
             coordinator_worker: None,
             channel: channel(),
@@ -97,7 +99,7 @@ impl <C: Context> Scheduler<C> {
         buckets_updated |= self.release_stage.update();
         buckets_updated |= self.final_stage.update();
         if buckets_updated {
-            self.monitor.1.notify_all();
+            self.worker_monitor.1.notify_all();
         }
     }
 
@@ -112,14 +114,14 @@ impl <C: Context> Scheduler<C> {
     }
 
     pub fn wait_for_completion(&self) {
-        let mut guard = self.monitor.0.lock().unwrap();
+        let mut guard = self.coord_monitor.0.lock().unwrap();
         loop {
             self.update_buckets();
             self.process_coordinator_works();
             if self.worker_group().all_parked() && self.all_buckets_empty() {
                 break;
             }
-            guard = self.monitor.1.wait(guard).unwrap();
+            guard = self.coord_monitor.1.wait(guard).unwrap();
         }
         self.prepare_stage.deactivate();
         self.closure_stage.deactivate();
@@ -131,46 +133,67 @@ impl <C: Context> Scheduler<C> {
         self.channel.0.send(box work).unwrap();
     }
 
-    fn pop_scheduable_work(&self, worker: &Worker<C>) -> Option<Box<dyn Work<C>>> {
+    #[inline]
+    fn pop_scheduable_work(&self, worker: &Worker<C>) -> Option<(Box<dyn Work<C>>, bool)> {
         if let Some(work) = worker.local_works.poll() {
-            return Some(work);
+            return Some((work, worker.local_works.is_empty()));
         }
         if let Some(work) = self.unconstrained_works.poll() {
-            return Some(work);
+            return Some((work, self.unconstrained_works.is_empty()));
         }
         if let Some(work) = self.prepare_stage.poll() {
-            return Some(work);
+            return Some((work, self.prepare_stage.is_empty()));
         }
         if let Some(work) = self.closure_stage.poll() {
-            return Some(work);
+            return Some((work, self.closure_stage.is_empty()));
         }
         if let Some(work) = self.release_stage.poll() {
-            return Some(work);
+            return Some((work, self.release_stage.is_empty()));
         }
         if let Some(work) = self.final_stage.poll() {
-            return Some(work);
+            return Some((work, self.final_stage.is_empty()));
         }
         None
     }
 
     /// Get a scheduable work. Called by workers
+    #[inline]
     pub fn poll(&self, worker: &Worker<C>) -> Box<dyn Work<C>> {
+        if let Some((work, bucket_is_empty)) = self.pop_scheduable_work(worker) {
+            if bucket_is_empty {
+                let _guard = self.coord_monitor.0.lock().unwrap();
+                self.coord_monitor.1.notify_one();
+            }
+            return work;
+        }
+        self.poll_slow(worker)
+    }
+
+    #[cold]
+    fn poll_slow(&self, worker: &Worker<C>) -> Box<dyn Work<C>> {
         debug_assert!(!worker.is_parked());
-        let mut guard = self.monitor.0.lock().unwrap();
+        let mut guard = self.worker_monitor.0.lock().unwrap();
         loop {
             debug_assert!(!worker.is_parked());
-            if let Some(work) = self.pop_scheduable_work(worker) {
-                self.monitor.1.notify_all();
+            if let Some((work, bucket_is_empty)) = self.pop_scheduable_work(worker) {
+                if bucket_is_empty {
+                    let _guard = self.coord_monitor.0.lock().unwrap();
+                    self.coord_monitor.1.notify_one();
+                }
                 return work;
             }
             // Park this worker
+            // println!("Park #{:?} {}", worker.ordinal, worker.packets);
             worker.parked.store(true, Ordering::SeqCst);
-            self.monitor.1.notify_all();
+            if self.worker_group().all_parked() {
+                // Notify the coordinator
+                let _guard = self.coord_monitor.0.lock().unwrap();
+                self.coord_monitor.1.notify_one();
+            }
             // Wait
-            guard = self.monitor.1.wait(guard).unwrap();
+            guard = self.worker_monitor.1.wait(guard).unwrap();
             // Unpark this worker
             worker.parked.store(false, Ordering::SeqCst);
-            self.monitor.1.notify_all();
         }
     }
 }

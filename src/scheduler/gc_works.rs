@@ -229,11 +229,12 @@ impl <E: ProcessEdgesWork> ProcessEdgesBase<E> {
 /// Scan & update a list of object slots
 pub trait ProcessEdgesWork: Send + Sync + 'static + Sized + DerefMut + Deref<Target=ProcessEdgesBase<Self>> {
     type VM: VMBinding;
-    const CAPACITY: usize = 512;
+    const CAPACITY: usize = 4096;
     const OVERWRITE_REFERENCE: bool = true;
     fn new(edges: Vec<Address>, roots: bool) -> Self;
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 
+    #[inline]
     fn process_node(&mut self, object: ObjectReference) {
         if self.nodes.len() == 0 {
             self.nodes.reserve(Self::CAPACITY);
@@ -246,6 +247,7 @@ pub trait ProcessEdgesWork: Send + Sync + 'static + Sized + DerefMut + Deref<Tar
         }
     }
 
+    #[inline]
     fn process_edge(&mut self, slot: Address) {
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
@@ -254,6 +256,7 @@ pub trait ProcessEdgesWork: Send + Sync + 'static + Sized + DerefMut + Deref<Tar
         }
     }
 
+    #[inline]
     fn process_edges(&mut self) {
         for i in 0..self.edges.len() {
             self.process_edge(self.edges[i])
@@ -262,6 +265,7 @@ pub trait ProcessEdgesWork: Send + Sync + 'static + Sized + DerefMut + Deref<Tar
 }
 
 impl <E: ProcessEdgesWork> GCWork<E::VM> for E {
+    #[inline]
     default fn do_work(&mut self, worker: &'static mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessEdgesWork");
         self.mmtk = Some(mmtk);
