@@ -6,7 +6,7 @@ use crate::plan::CollectorContext;
 use crate::plan::MutatorContext;
 use crate::plan::Plan;
 use crate::plan::TraceLocal;
-use crate::scheduler::Worker;
+use crate::scheduler::GCWorker;
 
 use crate::vm::Collection;
 
@@ -168,19 +168,15 @@ pub fn process_interior_edge<VM: VMBinding>(
     trace_local.process_interior_edge(target, slot, root)
 }
 
-pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &'static mut Worker<VM>, mmtk: &'static MMTK<VM>) {
+pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &'static mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
     worker.init(tls);
     worker.run(mmtk);
 }
 
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
-    unsafe {
-        let scheduler_mut: &'static mut Scheduler<VM> =
-            &mut *(mmtk.scheduler.as_ref() as *const Scheduler<VM> as *mut Scheduler<VM>);
-        scheduler_mut.initialize(mmtk, tls);
-        VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
-        mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
-    }
+    mmtk.scheduler.initialize(mmtk.options.threads, tls);
+    VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
+    mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
 }
 
 pub fn process<VM: VMBinding>(mmtk: &'static MMTK<VM>, name: &str, value: &str) -> bool {

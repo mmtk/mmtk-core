@@ -5,130 +5,32 @@ use std::ptr;
 use crate::vm::VMBinding;
 use crate::mmtk::MMTK;
 use crate::util::OpaquePointer;
-use super::work::{Work, GenericWork};
+use super::work::{GCWork, Work};
 use super::worker::{WorkerGroup, Worker};
 use crate::vm::Collection;
 use std::collections::BinaryHeap;
 use std::cmp;
 use crate::plan::Plan;
+use super::work_bucket::*;
+use super::*;
 
 
-// #[derive(Eq, PartialEq)]
-struct PrioritizedWork<VM: VMBinding> {
-    priority: usize,
-    work: Box<dyn GenericWork<VM>>,
-}
 
-impl <VM: VMBinding> PartialEq for PrioritizedWork<VM> {
-    fn eq(&self, other: &Self) -> bool {
-        self.priority == other.priority && &self.work == &other.work
-    }
-}
-
-impl <VM: VMBinding> Eq for PrioritizedWork<VM> {}
-
-impl <VM: VMBinding> Ord for PrioritizedWork<VM> {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        // other.0.cmp(&self.0)
-        self.priority.cmp(&other.priority)
-    }
-}
-
-impl <VM: VMBinding> PartialOrd for PrioritizedWork<VM> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-pub struct WorkBucket<VM: VMBinding> {
-    active: AtomicBool,
-    /// A priority queue
-    queue: RwLock<BinaryHeap<PrioritizedWork<VM>>>,
-    monitor: Arc<(Mutex<()>, Condvar)>,
-    pub active_priority: AtomicUsize,
-    can_open: Option<Box<dyn Fn() -> bool>>,
-}
-
-unsafe impl <VM: VMBinding> Send for WorkBucket<VM> {}
-unsafe impl <VM: VMBinding> Sync for WorkBucket<VM> {}
-
-impl <VM: VMBinding> WorkBucket<VM> {
-    pub fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
-        Self {
-            active: AtomicBool::new(active),
-            queue: Default::default(),
-            monitor,
-            active_priority: AtomicUsize::new(usize::max_value()),
-            can_open: None,
-        }
-    }
-    pub fn is_activated(&self) -> bool {
-        self.active.load(Ordering::SeqCst)
-    }
-    pub fn active_priority(&self) -> usize {
-        self.active_priority.load(Ordering::SeqCst)
-    }
-    /// Enable the bucket
-    pub fn activate(&self) {
-        self.active.store(true, Ordering::SeqCst);
-    }
-    /// Test if the bucket is drained
-    pub fn is_empty(&self) -> bool {
-        self.queue.read().unwrap().len() == 0
-    }
-    pub fn is_drained(&self) -> bool {
-        self.is_activated() && self.is_empty()
-    }
-    /// Disable the bucket
-    pub fn deactivate(&self) {
-        debug_assert!(self.queue.read().unwrap().is_empty(), "Bucket not drained before close");
-        self.active.store(false, Ordering::SeqCst);
-        self.active_priority.store(usize::max_value(), Ordering::SeqCst);
-    }
-    /// Add a work packet to this bucket, with a given priority
-    pub fn add_with_priority<W: GenericWork<VM>>(&self, priority: usize, work: W) {
-        let _guard = self.monitor.0.lock().unwrap();
-        self.monitor.1.notify_all();
-        self.queue.write().unwrap().push(PrioritizedWork { priority, work: box work });
-    }
-    /// Add a work packet to this bucket, with a default priority (1000)
-    pub fn add<W: GenericWork<VM>>(&self, work: W) {
-        self.add_with_priority(1000, work);
-    }
-    /// Get a work packet (with the greatest priority) from this bucket
-    fn poll(&self) -> Option<Box<dyn GenericWork<VM>>> {
-        if !self.active.load(Ordering::SeqCst) { return None }
-        self.queue.write().unwrap().pop().map(|v| v.work)
-    }
-    pub fn set_open_condition(&mut self, pred: impl Fn() -> bool + 'static) {
-        self.can_open = Some(box pred);
-    }
-    pub fn update(&self) -> bool {
-        if let Some(can_open) = self.can_open.as_ref() {
-            if !self.is_activated() && can_open() {
-                self.activate();
-                return true;
-            }
-        }
-        false
-    }
-}
-
-pub struct Scheduler<VM: VMBinding> {
+pub struct Scheduler<C: Context> {
     /// Works that are scheduable at any time
-    pub unconstrained_works: WorkBucket<VM>,
+    pub unconstrained_works: WorkBucket<C>,
     /// Works that are scheduable within Stop-the-world
-    pub prepare_stage: WorkBucket<VM>,
-    pub closure_stage: WorkBucket<VM>,
-    pub release_stage: WorkBucket<VM>,
-    pub final_stage: WorkBucket<VM>,
+    pub prepare_stage: WorkBucket<C>,
+    pub closure_stage: WorkBucket<C>,
+    pub release_stage: WorkBucket<C>,
+    pub final_stage: WorkBucket<C>,
     /// workers
-    worker_group: Option<Arc<WorkerGroup<VM>>>,
+    worker_group: Option<Arc<WorkerGroup<C>>>,
     /// Condition Variable
     pub monitor: Arc<(Mutex<()>, Condvar)>,
 }
 
-impl <VM: VMBinding> Scheduler<VM> {
+impl <C: Context> Scheduler<C> {
     pub fn new() -> Arc<Self> {
         let monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
         Arc::new(Self {
@@ -142,30 +44,26 @@ impl <VM: VMBinding> Scheduler<VM> {
         })
     }
 
-    pub fn initialize(&'static mut self, mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
-        let size = 1;//mmtk.options.threads;
+    pub fn initialize(self: &'static Arc<Self>, num_workers: usize, tls: OpaquePointer) {
+        let mut self_mut = self.clone();
+        let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
 
-        self.worker_group = Some(WorkerGroup::new(size, Arc::downgrade(&mmtk.scheduler)));
+        self_mut.worker_group = Some(WorkerGroup::new(1, Arc::downgrade(&self)));
         self.worker_group.as_ref().unwrap().spawn_workers(tls);
 
-        self.closure_stage.set_open_condition(move || {
-            mmtk.scheduler.prepare_stage.is_drained() && mmtk.scheduler.worker_group().all_parked()
+        self_mut.closure_stage.set_open_condition(move || {
+            self.prepare_stage.is_drained() && self.worker_group().all_parked()
         });
-        self.release_stage.set_open_condition(move || {
-            mmtk.scheduler.closure_stage.is_drained() && mmtk.scheduler.worker_group().all_parked()
+        self_mut.release_stage.set_open_condition(move || {
+            self.closure_stage.is_drained() && self.worker_group().all_parked()
         });
-        self.final_stage.set_open_condition(move || {
-            mmtk.scheduler.release_stage.is_drained() && mmtk.scheduler.worker_group().all_parked()
+        self_mut.final_stage.set_open_condition(move || {
+            self.release_stage.is_drained() && self.worker_group().all_parked()
         });
     }
 
-    pub fn worker_group(&self) -> Arc<WorkerGroup<VM>> {
+    pub fn worker_group(&self) -> Arc<WorkerGroup<C>> {
         self.worker_group.as_ref().unwrap().clone()
-    }
-
-    pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
-        mmtk.plan.base().control_collector_context.as_ref().unwrap().clear_request();
-        self.prepare_stage.activate();
     }
 
     fn all_buckets_drained(&self) -> bool {
@@ -206,7 +104,7 @@ impl <VM: VMBinding> Scheduler<VM> {
         self.final_stage.deactivate();
     }
 
-    fn pop_scheduable_work(&self, worker: &Worker<VM>) -> Option<Box<dyn GenericWork<VM>>> {
+    fn pop_scheduable_work(&self, worker: &Worker<C>) -> Option<Box<dyn Work<C>>> {
         if let Some(work) = worker.local_works.poll() {
             return Some(work);
         }
@@ -229,7 +127,7 @@ impl <VM: VMBinding> Scheduler<VM> {
     }
 
     /// Get a scheduable work. Called by workers
-    pub fn poll(&self, worker: &Worker<VM>) -> Box<dyn GenericWork<VM>> {
+    pub fn poll(&self, worker: &Worker<C>) -> Box<dyn Work<C>> {
         debug_assert!(!worker.is_parked());
         let mut guard = self.monitor.0.lock().unwrap();
         loop {
@@ -250,5 +148,14 @@ impl <VM: VMBinding> Scheduler<VM> {
             worker.parked.store(false, Ordering::SeqCst);
             self.monitor.1.notify_all();
         }
+    }
+}
+
+pub type MMTkScheduler<VM> = Scheduler<MMTK<VM>>;
+
+impl <VM: VMBinding> MMTkScheduler<VM> {
+    pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
+        mmtk.plan.base().control_collector_context.as_ref().unwrap().clear_request();
+        self.prepare_stage.activate();
     }
 }

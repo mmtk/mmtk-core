@@ -1,5 +1,5 @@
 use crate::util::{Address, ObjectReference};
-use crate::scheduler::*;
+use crate::scheduler::gc_works::ProcessEdgesWork;
 
 pub trait TransitiveClosure {
     // The signature of this function changes during the port

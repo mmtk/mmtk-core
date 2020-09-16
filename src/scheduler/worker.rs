@@ -1,32 +1,33 @@
-use crate::vm::VMBinding;
-use super::scheduler::*;
+use super::*;
+use super::work_bucket::*;
 use crate::util::OpaquePointer;
 use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::vm::Collection;
 use crate::mmtk::MMTK;
-use crate::{SelectedPlan, Plan, CopyContext};
 
 
 
-pub struct Worker<VM: VMBinding> {
+
+pub struct Worker<C: Context> {
     pub tls: OpaquePointer,
     pub ordinal: usize,
     pub parked: AtomicBool,
-    group: Weak<WorkerGroup<VM>>,
-    scheduler: Weak<Scheduler<VM>>,
-    pub context: Option<<SelectedPlan::<VM> as Plan>::CopyContext>,
-    pub local_works: WorkBucket<VM>,
+    group: Weak<WorkerGroup<C>>,
+    scheduler: Weak<Scheduler<C>>,
+    local: Option<C::WorkerLocal>,
+    pub local_works: WorkBucket<C>,
 }
 
-impl <VM: VMBinding> Worker<VM> {
-    fn new(ordinal: usize, group: Weak<WorkerGroup<VM>>, scheduler: Weak<Scheduler<VM>>) -> Self {
+pub type GCWorker<VM> = Worker<MMTK<VM>>;
+
+impl <C: Context> Worker<C> {
+    fn new(ordinal: usize, group: Weak<WorkerGroup<C>>, scheduler: Weak<Scheduler<C>>) -> Self {
         Self {
             tls: OpaquePointer::UNINITIALIZED,
             ordinal,
             parked: AtomicBool::new(true),
             group,
-            context: None,
+            local: None,
             local_works: WorkBucket::new(true, scheduler.upgrade().unwrap().monitor.clone()),
             scheduler,
         }
@@ -36,42 +37,42 @@ impl <VM: VMBinding> Worker<VM> {
         self.parked.load(Ordering::SeqCst)
     }
 
-    pub fn group(&self) -> Arc<WorkerGroup<VM>> {
+    pub fn group(&self) -> Arc<WorkerGroup<C>> {
         self.group.upgrade().unwrap()
     }
 
-    pub fn scheduler(&self) -> Arc<Scheduler<VM>> {
+    pub fn scheduler(&self) -> Arc<Scheduler<C>> {
         self.scheduler.upgrade().unwrap()
     }
 
-    pub fn context(&self) -> &mut <SelectedPlan::<VM> as Plan>::CopyContext {
-        unsafe { &mut *(self.context.as_ref().unwrap() as *const _ as *mut _) }
+    pub fn local(&self) -> &mut C::WorkerLocal {
+        unsafe { &mut *(self.local.as_ref().unwrap() as *const _ as *mut _) }
     }
 
     pub fn init(&mut self, tls: OpaquePointer) {
         self.tls = tls;
     }
 
-    pub fn run(&'static mut self, mmtk: &'static MMTK<VM>) {
-        self.context = Some(<SelectedPlan::<VM> as Plan>::CopyContext::new(mmtk));
+    pub fn run(&'static mut self, context: &'static C) {
+        self.local = Some(C::WorkerLocal::new(context));
         self.parked.store(false, Ordering::SeqCst);
         let scheduler = self.scheduler.upgrade().unwrap();
         loop {
             let mut work = scheduler.poll(self);
             debug_assert!(!self.is_parked());
             let this = unsafe { &mut *(self as *mut _) };
-            work.do_work(this, mmtk);
+            work.do_work(this, context);
         }
     }
 }
 
 
-pub struct WorkerGroup<VM: VMBinding> {
-    pub workers: Vec<Worker<VM>>,
+pub struct WorkerGroup<C: Context> {
+    pub workers: Vec<Worker<C>>,
 }
 
-impl <VM: VMBinding> WorkerGroup<VM> {
-    pub fn new(workers: usize, scheduler: Weak<Scheduler<VM>>) -> Arc<Self> {
+impl <C: Context> WorkerGroup<C> {
+    pub fn new(workers: usize, scheduler: Weak<Scheduler<C>>) -> Arc<Self> {
         let mut group = Arc::new(Self {
             workers: vec![]
         });
@@ -95,7 +96,7 @@ impl <VM: VMBinding> WorkerGroup<VM> {
     pub fn spawn_workers(&self, tls: OpaquePointer) {
         for i in 0..self.worker_count() {
             let worker = &self.workers[i];
-            VM::VMCollection::spawn_worker_thread(tls, Some(worker));
+            C::spawn_worker(worker, tls);
         }
     }
 }

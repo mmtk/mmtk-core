@@ -24,8 +24,9 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
 use std::sync::Arc;
 use crate::scheduler::*;
+use crate::scheduler::gc_works::*;
 use crate::mmtk::MMTK;
-use super::*;
+use super::{SSCopyContext, SSProcessEdges};
 
 
 
@@ -97,7 +98,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         unsync.copyspace1.init(&mmtk.vm_map);
     }
 
-    fn schedule_collection(&'static self, scheduler: &Scheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         // Stop & scan mutators (mutator scanning can happen before STW)
         // Create initial works for `closure_stage`
         scheduler.unconstrained_works.add(StopMutators::<SSProcessEdges<VM>>::new());
