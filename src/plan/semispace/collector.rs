@@ -57,6 +57,8 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         self.trace.init(tls);
     }
 
+    // We may have other allocators in the future. We keep the pattern matching code.
+    #[allow(clippy::match_single_binding)]
     fn alloc_copy(
         &mut self,
         _original: ObjectReference,

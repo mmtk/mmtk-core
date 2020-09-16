@@ -16,6 +16,10 @@ pub trait ObjectModel<VM: VMBinding> {
     fn get_align_offset_when_copied(object: ObjectReference) -> isize;
     fn get_current_size(object: ObjectReference) -> usize;
     fn get_next_object(object: ObjectReference) -> ObjectReference;
+    /// # Safety
+    /// We would expect ObjectReferences point to valid objects,
+    /// but an arbitrary Address may not reside an object. This conversion is unsafe,
+    /// and it is the user's responsibility to ensure the safety.    
     unsafe fn get_object_from_start_address(start: Address) -> ObjectReference;
     fn get_object_end_address(object: ObjectReference) -> Address;
     // FIXME: determine lifetime, returns byte[]

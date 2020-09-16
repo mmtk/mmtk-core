@@ -140,14 +140,18 @@ impl Address {
     }
 
     /// creates a null Address (0)
+    /// # Safety
     /// It is unsafe and the user needs to be aware that they are creating an invalid address.
+    /// The zero address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option<Address>).
     #[inline(always)]
     pub const unsafe fn zero() -> Address {
         Address(0)
     }
 
     /// creates an Address of (usize::MAX)
+    /// # Safety
     /// It is unsafe and the user needs to be aware that they are creating an invalid address.
+    /// The max address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option<Address>).
     #[inline(always)]
     pub unsafe fn max() -> Address {
         use std::usize;
@@ -155,7 +159,10 @@ impl Address {
     }
 
     /// creates an arbitrary Address
+    /// # Safety
     /// It is unsafe and the user needs to be aware that they may create an invalid address.
+    /// This creates arbitrary addresses which may not be valid. This should only be used for hard-coded addresses. Any other uses of this function could be
+    /// replaced with more proper alternatives.
     #[inline(always)]
     pub const unsafe fn from_usize(raw: usize) -> Address {
         Address(raw)
@@ -190,30 +197,40 @@ impl Address {
     }
 
     /// loads a value of type T from the address
+    /// # Safety
+    /// This could throw a segment fault if the address is invalid
     #[inline(always)]
     pub unsafe fn load<T: Copy>(self) -> T {
         *(self.0 as *mut T)
     }
 
     /// stores a value of type T to the address
+    /// # Safety
+    /// This could throw a segment fault if the address is invalid
     #[inline(always)]
     pub unsafe fn store<T>(self, value: T) {
         *(self.0 as *mut T) = value;
     }
 
     /// atomic operation: load
+    /// # Safety
+    /// This could throw a segment fault if the address is invalid
     pub unsafe fn atomic_load<T: Atomic>(self, order: Ordering) -> T::Type {
         let loc = &*(self.0 as *const T);
         loc.load(order)
     }
 
     /// atomic operation: store
+    /// # Safety
+    /// This could throw a segment fault if the address is invalid
     pub unsafe fn atomic_store<T: Atomic>(self, val: T::Type, order: Ordering) {
         let loc = &*(self.0 as *const T);
         loc.store(val, order)
     }
 
     /// atomic operation: compare and exchange usize
+    /// # Safety
+    /// This could throw a segment fault if the address is invalid
     pub unsafe fn compare_exchange<T: Atomic>(
         self,
         old: T::Type,
@@ -252,8 +269,9 @@ impl Address {
     }
 
     /// converts the Address into an ObjectReference
-    /// Since we would expect ObjectReferences point to valid objects,
-    /// but an arbitrary Address may reside an object, this conversion is unsafe,
+    /// # Safety
+    /// We would expect ObjectReferences point to valid objects,
+    /// but an arbitrary Address may not reside an object. This conversion is unsafe,
     /// and it is the user's responsibility to ensure the safety.
     #[inline(always)]
     pub unsafe fn to_object_reference(self) -> ObjectReference {

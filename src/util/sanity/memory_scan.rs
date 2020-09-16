@@ -1,8 +1,6 @@
 use crate::util::Address;
 use crate::util::ObjectReference;
 
-use std;
-
 pub fn scan_region() {
     loop {
         let mut buf = String::new();

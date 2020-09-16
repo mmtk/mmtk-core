@@ -248,6 +248,8 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         addr.align_down(BYTES_IN_REGION)
     }
 
+    // FIXME: I am not sure why this is unsafe.
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn reset(&self) {
         let mut guard = self.sync.lock().unwrap();
         self.common().reserved.store(0, Ordering::Relaxed);

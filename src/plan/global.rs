@@ -47,7 +47,8 @@ pub trait Plan<VM: VMBinding>: Sized {
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::MutatorT>;
-    // unsafe because only the primary collector thread can call this
+    /// # Safety
+    /// Only the primary collector thread can call this.
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
 
     #[cfg(feature = "sanity")]

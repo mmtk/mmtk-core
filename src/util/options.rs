@@ -20,6 +20,9 @@ impl UnsafeOptionsWrapper {
     pub const fn new(o: Options) -> UnsafeOptionsWrapper {
         UnsafeOptionsWrapper(UnsafeCell::new(o))
     }
+    /// # Safety
+    /// This method is not thread safe, as internally it acquires a mutable reference to self.
+    /// It is supposed to be used by one thread during boot time.
     pub unsafe fn process(&self, name: &str, value: &str) -> bool {
         (&mut *self.0.get()).set_from_camelcase_str(name, value)
     }

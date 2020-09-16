@@ -110,6 +110,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         self.from_space = from_space;
     }
 
+    // FIXME: I am not sure why this is unsafe.
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self) {
         self.pr.reset();
         self.from_space = false;
