@@ -7,9 +7,17 @@ use crate::util::OpaquePointer;
 
 pub trait Context: 'static + Send + Sync + Sized {
     type WorkerLocal: WorkerLocal<Self>;
-    fn spawn_worker(worker: &Worker<Self>, tls: OpaquePointer) {
-        unimplemented!()
+    fn spawn_worker(worker: &'static Worker<Self>, _tls: OpaquePointer, context: &'static Self) {
+        let worker_ptr = worker as *const Worker<Self> as usize;
+        std::thread::spawn(move || {
+            let worker = unsafe { &mut *(worker_ptr as *mut Worker<Self>) };
+            worker.run(context);
+        });
     }
+}
+
+impl Context for () {
+    type WorkerLocal = ();
 }
 
 pub trait WorkerLocal<C: Context> {
@@ -24,7 +32,7 @@ trait GCWorkerLocal<VM: VMBinding> = WorkerLocal<MMTK<VM>>;
 
 impl <VM: VMBinding> Context for MMTK<VM> {
     type WorkerLocal = <SelectedPlan::<VM> as Plan>::CopyContext;
-    fn spawn_worker(worker: &GCWorker<VM>, tls: OpaquePointer) {
+    fn spawn_worker(worker: &GCWorker<VM>, tls: OpaquePointer, _context: &'static Self) {
         VM::VMCollection::spawn_worker_thread(tls, Some(worker));
     }
 }

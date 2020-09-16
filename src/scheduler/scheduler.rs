@@ -44,12 +44,12 @@ impl <C: Context> Scheduler<C> {
         })
     }
 
-    pub fn initialize(self: &'static Arc<Self>, num_workers: usize, tls: OpaquePointer) {
+    pub fn initialize(self: &'static Arc<Self>, num_workers: usize, context: &'static C, tls: OpaquePointer) {
         let mut self_mut = self.clone();
         let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
 
-        self_mut.worker_group = Some(WorkerGroup::new(1, Arc::downgrade(&self)));
-        self.worker_group.as_ref().unwrap().spawn_workers(tls);
+        self_mut.worker_group = Some(WorkerGroup::new(num_workers, Arc::downgrade(&self)));
+        self.worker_group.as_ref().unwrap().spawn_workers(tls, context);
 
         self_mut.closure_stage.set_open_condition(move || {
             self.prepare_stage.is_drained() && self.worker_group().all_parked()
@@ -66,12 +66,12 @@ impl <C: Context> Scheduler<C> {
         self.worker_group.as_ref().unwrap().clone()
     }
 
-    fn all_buckets_drained(&self) -> bool {
-        self.unconstrained_works.is_drained()
-        && self.prepare_stage.is_drained()
-        && self.closure_stage.is_drained()
-        && self.release_stage.is_drained()
-        && self.final_stage.is_drained()
+    fn all_buckets_empty(&self) -> bool {
+        self.unconstrained_works.is_empty()
+        && self.prepare_stage.is_empty()
+        && self.closure_stage.is_empty()
+        && self.release_stage.is_empty()
+        && self.final_stage.is_empty()
     }
 
     pub fn wait_for_completion(&self) {
@@ -93,7 +93,7 @@ impl <C: Context> Scheduler<C> {
                 println!("final_stage open");
                 self.monitor.1.notify_all();
             }
-            if self.worker_group().all_parked() && self.all_buckets_drained() {
+            if self.worker_group().all_parked() && self.all_buckets_empty() {
                 break;
             }
             guard = self.monitor.1.wait(guard).unwrap();
@@ -137,14 +137,11 @@ impl <C: Context> Scheduler<C> {
                 return work;
             }
             // Park this worker
-            println!("Park");
             worker.parked.store(true, Ordering::SeqCst);
             self.monitor.1.notify_all();
-            println!("Park Notified");
             // Wait
             guard = self.monitor.1.wait(guard).unwrap();
             // Unpark this worker
-            println!("UnPark");
             worker.parked.store(false, Ordering::SeqCst);
             self.monitor.1.notify_all();
         }

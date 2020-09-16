@@ -174,7 +174,7 @@ pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &'static mut GCWo
 }
 
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
-    mmtk.scheduler.initialize(mmtk.options.threads, tls);
+    mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
     VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
 }

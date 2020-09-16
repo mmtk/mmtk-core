@@ -24,6 +24,7 @@ atomic = "0.4.6"
 
 [dev-dependencies]
 crossbeam = "0.7.3"
+rand = "0.7.3"
 
 [features]
 default = []
