@@ -93,10 +93,10 @@ impl <C: Context> WorkerGroup<C> {
         self.parked_workers() == self.worker_count()
     }
 
-    pub fn spawn_workers(&self, tls: OpaquePointer) {
+    pub fn spawn_workers(&'static self, tls: OpaquePointer, context: &'static C) {
         for i in 0..self.worker_count() {
             let worker = &self.workers[i];
-            C::spawn_worker(worker, tls);
+            C::spawn_worker(worker, tls, context);
         }
     }
 }
