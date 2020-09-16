@@ -13,6 +13,7 @@ use std::cmp;
 use crate::plan::Plan;
 use super::work_bucket::*;
 use super::*;
+use std::sync::mpsc::{channel, Sender, Receiver};
 
 
 
@@ -24,11 +25,19 @@ pub struct Scheduler<C: Context> {
     pub closure_stage: WorkBucket<C>,
     pub release_stage: WorkBucket<C>,
     pub final_stage: WorkBucket<C>,
+    /// Works for the coordinator thread
+    pub coordinator_works: WorkBucket<C>,
     /// workers
     worker_group: Option<Arc<WorkerGroup<C>>>,
     /// Condition Variable
     pub monitor: Arc<(Mutex<()>, Condvar)>,
+    context: Option<&'static C>,
+    coordinator_worker: Option<Worker<C>>,
+    pub channel: (Sender<Box<dyn CoordinatorWork<C>>>, Receiver<Box<dyn CoordinatorWork<C>>>),
 }
+
+unsafe impl <C: Context> Send for Scheduler<C> {}
+unsafe impl <C: Context> Sync for Scheduler<C> {}
 
 impl <C: Context> Scheduler<C> {
     pub fn new() -> Arc<Self> {
@@ -39,8 +48,12 @@ impl <C: Context> Scheduler<C> {
             closure_stage: WorkBucket::new(false, monitor.clone()),
             release_stage: WorkBucket::new(false, monitor.clone()),
             final_stage: WorkBucket::new(false, monitor.clone()),
+            coordinator_works: WorkBucket::new(true, monitor.clone()),
             worker_group: None,
             monitor,
+            context: None,
+            coordinator_worker: None,
+            channel: channel(),
         })
     }
 
@@ -48,6 +61,8 @@ impl <C: Context> Scheduler<C> {
         let mut self_mut = self.clone();
         let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
 
+        self_mut.context = Some(context);
+        self_mut.coordinator_worker = Some(Worker::new(0, None, Arc::downgrade(&self)));
         self_mut.worker_group = Some(WorkerGroup::new(num_workers, Arc::downgrade(&self)));
         self.worker_group.as_ref().unwrap().spawn_workers(tls, context);
 
@@ -74,25 +89,33 @@ impl <C: Context> Scheduler<C> {
         && self.final_stage.is_empty()
     }
 
+    /// Open buckets if their conditions are met
+    fn update_buckets(&self) {
+        let mut buckets_updated = false;
+        buckets_updated |= self.prepare_stage.update();
+        buckets_updated |= self.closure_stage.update();
+        buckets_updated |= self.release_stage.update();
+        buckets_updated |= self.final_stage.update();
+        if buckets_updated {
+            self.monitor.1.notify_all();
+        }
+    }
+
+    /// Execute coordinator works, in the controller thread
+    fn process_coordinator_works(&self) {
+        let worker = self.coordinator_worker.as_ref().unwrap() as *const _ as *mut Worker<C>;
+        let context = self.context.unwrap();
+        for mut work in self.channel.1.try_iter() {
+            let worker = unsafe { &mut *worker };
+            work.do_work(worker, context);
+        }
+    }
+
     pub fn wait_for_completion(&self) {
         let mut guard = self.monitor.0.lock().unwrap();
         loop {
-            if self.prepare_stage.update() {
-                println!("prepare_stage open");
-                self.monitor.1.notify_all();
-            }
-            if self.closure_stage.update() {
-                println!("closure_stage open");
-                self.monitor.1.notify_all();
-            }
-            if self.release_stage.update() {
-                println!("release_stage open");
-                self.monitor.1.notify_all();
-            }
-            if self.final_stage.update() {
-                println!("final_stage open");
-                self.monitor.1.notify_all();
-            }
+            self.update_buckets();
+            self.process_coordinator_works();
             if self.worker_group().all_parked() && self.all_buckets_empty() {
                 break;
             }
@@ -102,6 +125,10 @@ impl <C: Context> Scheduler<C> {
         self.closure_stage.deactivate();
         self.release_stage.deactivate();
         self.final_stage.deactivate();
+    }
+
+    pub fn add_coordinator_work(&self, work: impl CoordinatorWork<C>) {
+        self.channel.0.send(box work).unwrap();
     }
 
     fn pop_scheduable_work(&self, worker: &Worker<C>) -> Option<Box<dyn Work<C>>> {

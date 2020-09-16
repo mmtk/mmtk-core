@@ -12,7 +12,7 @@ pub struct Worker<C: Context> {
     pub tls: OpaquePointer,
     pub ordinal: usize,
     pub parked: AtomicBool,
-    group: Weak<WorkerGroup<C>>,
+    group: Option<Weak<WorkerGroup<C>>>,
     scheduler: Weak<Scheduler<C>>,
     local: Option<C::WorkerLocal>,
     pub local_works: WorkBucket<C>,
@@ -21,7 +21,7 @@ pub struct Worker<C: Context> {
 pub type GCWorker<VM> = Worker<MMTK<VM>>;
 
 impl <C: Context> Worker<C> {
-    fn new(ordinal: usize, group: Weak<WorkerGroup<C>>, scheduler: Weak<Scheduler<C>>) -> Self {
+    pub fn new(ordinal: usize, group: Option<Weak<WorkerGroup<C>>>, scheduler: Weak<Scheduler<C>>) -> Self {
         Self {
             tls: OpaquePointer::UNINITIALIZED,
             ordinal,
@@ -37,8 +37,12 @@ impl <C: Context> Worker<C> {
         self.parked.load(Ordering::SeqCst)
     }
 
-    pub fn group(&self) -> Arc<WorkerGroup<C>> {
-        self.group.upgrade().unwrap()
+    pub fn group(&self) -> Option<Arc<WorkerGroup<C>>> {
+        self.group.as_ref().map(|g| g.upgrade().unwrap())
+    }
+
+    pub fn is_coordinator(&self) -> bool {
+        self.group.is_none()
     }
 
     pub fn scheduler(&self) -> Arc<Scheduler<C>> {
@@ -77,7 +81,7 @@ impl <C: Context> WorkerGroup<C> {
             workers: vec![]
         });
         let group_weak = Arc::downgrade(&group);
-        unsafe { Arc::get_mut_unchecked(&mut group) }.workers = (0..workers).map(|i| Worker::new(i, group_weak.clone(), scheduler.clone())).collect();
+        unsafe { Arc::get_mut_unchecked(&mut group) }.workers = (0..workers).map(|i| Worker::new(i, Some(group_weak.clone()), scheduler.clone())).collect();
         group
     }
 

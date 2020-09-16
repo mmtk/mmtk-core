@@ -44,6 +44,9 @@ pub struct MMTK<VM: VMBinding> {
     inside_harness: AtomicBool,
 }
 
+unsafe impl <VM: VMBinding> Send for MMTK<VM> {}
+unsafe impl <VM: VMBinding> Sync for MMTK<VM> {}
+
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));

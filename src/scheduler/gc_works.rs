@@ -30,7 +30,7 @@ impl <P: Plan> GCWork<P::VM> for Prepare<P> {
             let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::MutatorT) };
             mmtk.scheduler.prepare_stage.add(PrepareMutator::<P>::new(self.plan, mutator));
         }
-        for w in &worker.group().workers {
+        for w in &worker.group().unwrap().workers {
             w.local_works.add(PrepareCollector::default());
         }
     }
@@ -88,7 +88,7 @@ impl <P: Plan> GCWork<P::VM> for Release<P> {
             let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::MutatorT) };
             mmtk.scheduler.release_stage.add(ReleaseMutator::<P>::new(self.plan, mutator));
         }
-        for w in &worker.group().workers {
+        for w in &worker.group().unwrap().workers {
             w.local_works.add(ReleaseCollector::default());
         }
     }
@@ -140,25 +140,37 @@ impl <ScanEdges: ProcessEdgesWork> StopMutators<ScanEdges> {
 
 impl <E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        println!("stop_all_mutators start");
-        <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls);
-        println!("stop_all_mutators end");
-        mmtk.scheduler.notify_mutators_paused(mmtk);
-        mmtk.scheduler.prepare_stage.add(ScanStackRoots::<E>::new());
-        mmtk.scheduler.prepare_stage.add_with_priority(0, ScanStaticRoots::<E>::new());
-        mmtk.scheduler.prepare_stage.add_with_priority(0, ScanGlobalRoots::<E>::new());
+        if worker.is_coordinator() {
+            println!("stop_all_mutators start");
+            <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls);
+            println!("stop_all_mutators end");
+            mmtk.scheduler.notify_mutators_paused(mmtk);
+            mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanStackRoots::<E>::new(), worker);
+            mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanStaticRoots::<E>::new(), worker);
+            mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanGlobalRoots::<E>::new(), worker);
+        } else {
+            mmtk.scheduler.add_coordinator_work(StopMutators::<E>::new());
+        }
     }
 }
+
+impl <E: ProcessEdgesWork> CoordinatorWork<MMTK<E::VM>> for StopMutators<E> {}
 
 #[derive(Default)]
 pub struct ResumeMutators;
 
 impl <VM: VMBinding> GCWork<VM> for ResumeMutators {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        println!("ResumeMutators");
-        <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        if worker.is_coordinator() {
+            println!("ResumeMutators");
+            <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
+        } else {
+            mmtk.scheduler.add_coordinator_work(ResumeMutators);
+        }
     }
 }
+
+impl <VM: VMBinding> CoordinatorWork<MMTK<VM>> for ResumeMutators {}
 
 #[derive(Default)]
 pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);

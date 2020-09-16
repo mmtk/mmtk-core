@@ -96,6 +96,12 @@ impl <C: Context> WorkBucket<C> {
     pub fn add<W: Work<C>>(&self, work: W) {
         self.add_with_priority(1000, work);
     }
+    /// Only for `CoordinatorWork`s to add new works while holding the monitor.
+    pub fn add_with_priority_unsync<W: Work<C>>(&self, priority: usize, work: W, coordinator_worker: &Worker<C>) {
+        debug_assert!(coordinator_worker.is_coordinator());
+        self.monitor.1.notify_all();
+        self.queue.write().unwrap().push(PrioritizedWork { priority, work: box work });
+    }
     /// Get a work packet (with the greatest priority) from this bucket
     pub fn poll(&self) -> Option<Box<dyn Work<C>>> {
         if !self.active.load(Ordering::SeqCst) { return None }
