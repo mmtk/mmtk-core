@@ -61,7 +61,8 @@ impl <VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
         if self.plan().fromspace().in_space(object) {
             return self.plan().fromspace().trace_object(self, object, super::global::ALLOC_SS, self.worker().local());
         }
-        self.plan().common.trace_object(self, object)
+        object
+        // self.plan().common.trace_object(self, object)
     }
 }
 
