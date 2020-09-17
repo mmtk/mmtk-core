@@ -142,11 +142,19 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if worker.is_coordinator() {
             trace!("stop_all_mutators start");
-            <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls);
+            <E::VM as VMBinding>::VMCollection::stop_all_mutators::<E>(worker.tls);
             trace!("stop_all_mutators end");
             mmtk.scheduler.notify_mutators_paused(mmtk);
-            mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanStackRoots::<E>::new(), worker);
-            mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanVMSpecificRoots::<E>::new(), worker);
+            if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
+                if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
+                    mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanStackRoots::<E>::new());
+                } else {
+                    for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+                        mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanStackRoot::<E>(mutator));
+                    }
+                }
+            }
+            mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanVMSpecificRoots::<E>::new());
         } else {
             mmtk.scheduler.add_coordinator_work(StopMutators::<E>::new());
         }
@@ -175,7 +183,7 @@ impl <VM: VMBinding> CoordinatorWork<MMTK<VM>> for ResumeMutators {}
 pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
 
 impl <E: ProcessEdgesWork> ScanStackRoots<E> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self(PhantomData)
     }
 }
@@ -184,6 +192,15 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoots");
         <E::VM as VMBinding>::VMScanning::scan_thread_roots::<E>();
+    }
+}
+
+pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut SelectedMutator<Edges::VM>);
+
+impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
+    fn do_work(&mut self, _worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+        trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
+        <E::VM as VMBinding>::VMScanning::scan_thread_root::<E>(unsafe { &mut *(self.0 as *mut _) });
     }
 }
 

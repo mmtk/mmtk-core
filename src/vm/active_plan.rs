@@ -2,6 +2,24 @@ use crate::plan::{Plan, SelectedPlan};
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::scheduler::*;
+use std::marker::PhantomData;
+
+pub struct MutatorIter<VM: VMBinding> {
+    start: bool,
+    phantom: PhantomData<VM>,
+}
+
+impl <VM: VMBinding> Iterator for MutatorIter<VM> {
+    type Item = &'static mut <SelectedPlan<VM> as Plan>::Mutator;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start {
+            self.start = false;
+            VM::VMActivePlan::reset_mutator_iterator();
+        }
+        VM::VMActivePlan::get_next_mutator()
+    }
+}
 
 pub trait ActivePlan<VM: VMBinding> {
     // TODO: I don't know how this can be implemented when we have multiple MMTk instances.
@@ -18,4 +36,10 @@ pub trait ActivePlan<VM: VMBinding> {
     fn collector_count() -> usize;
     fn reset_mutator_iterator();
     fn get_next_mutator() -> Option<&'static mut <SelectedPlan<VM> as Plan>::Mutator>;
+    fn mutators() -> MutatorIter<VM> {
+        MutatorIter {
+            start: true,
+            phantom: PhantomData,
+        }
+    }
 }

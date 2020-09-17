@@ -98,7 +98,7 @@ impl <C: Context> WorkBucket<C> {
     /// Add a work packet to this bucket, with a given priority
     pub fn add_with_priority<W: Work<C>>(&self, priority: usize, work: W) {
         self.queue.write().push(PrioritizedWork { priority, work: box work });
-        self.notify_one_worker();
+        self.notify_one_worker(); // FIXME: Performance
     }
     /// Add a work packet to this bucket, with a default priority (1000)
     pub fn add<W: Work<C>>(&self, work: W) {
@@ -111,12 +111,11 @@ impl <C: Context> WorkBucket<C> {
                 queue.push(PrioritizedWork { priority, work: w });
             }
         }
-        self.notify_all_workers();
+        self.notify_all_workers(); // FIXME: Performance
     }
     /// Only for `CoordinatorWork`s to add new works while holding the monitor.
-    pub fn add_with_priority_unsync<W: Work<C>>(&self, priority: usize, work: W, coordinator_worker: &Worker<C>) {
-        debug_assert!(coordinator_worker.is_coordinator());
-        self.monitor.1.notify_one();
+    pub fn add_with_priority_unsync<W: Work<C>>(&self, priority: usize, work: W) {
+        self.monitor.1.notify_one(); // FIXME: Performance
         self.queue.write().push(PrioritizedWork { priority, work: box work });
     }
     /// Get a work packet (with the greatest priority) from this bucket
