@@ -24,12 +24,9 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
     fn prepare(&mut self, _tls: OpaquePointer) {
         // Do nothing
     }
+
     fn release(&mut self, _tls: OpaquePointer) {
         self.ss.rebind(Some(self.plan.tospace()));
-    }
-
-    fn collection_phase(&mut self, _tls: OpaquePointer, _phase: &Phase, _primary: bool) {
-        unreachable!()
     }
 
     fn alloc(

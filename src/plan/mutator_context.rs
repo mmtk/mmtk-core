@@ -9,7 +9,6 @@ use crate::vm::VMBinding;
 
 pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
     fn common(&self) -> &CommonMutatorContext<VM>;
-    fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool);
     fn prepare(&mut self, tls: OpaquePointer);
     fn release(&mut self, tls: OpaquePointer);
     fn alloc(
