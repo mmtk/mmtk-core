@@ -42,4 +42,5 @@ pub trait ActivePlan<VM: VMBinding> {
             phantom: PhantomData,
         }
     }
+    fn number_of_mutators() -> usize;
 }

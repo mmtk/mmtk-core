@@ -5,8 +5,29 @@ use crate::util::*;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::mem;
+use crate::plan::global::GcStatus;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 
+
+/// GC Preparation Work (include updating global states)
+pub struct Initiate<P: Plan>(PhantomData<P>);
+
+unsafe impl <P: Plan> Sync for Initiate<P> {}
+
+impl <P: Plan> Initiate<P> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl <P: Plan> GCWork<P::VM> for Initiate<P> {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+        trace!("Initiate");
+        mmtk.plan.base().set_collection_kind();
+        mmtk.plan.base().set_gc_status(GcStatus::GcPrepare);
+    }
+}
 
 /// GC Preparation Work (include updating global states)
 pub struct Prepare<P: Plan> {
@@ -146,6 +167,14 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
             trace!("stop_all_mutators end");
             mmtk.scheduler.notify_mutators_paused(mmtk);
             if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
+                // Prepare mutators if necessary
+                // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
+                if !mmtk.plan.common().stacks_prepared() {
+                    for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+                        <E::VM as VMBinding>::VMCollection::prepare_mutator(mutator.get_tls(), mutator);
+                    }
+                }
+                // Scan mutators
                 if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
                     mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanStackRoots::<E>::new());
                 } else {
@@ -170,6 +199,7 @@ impl <VM: VMBinding> GCWork<VM> for ResumeMutators {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         if worker.is_coordinator() {
             trace!("ResumeMutators");
+            mmtk.plan.common().base.set_gc_status(GcStatus::NotInGC);
             <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
         } else {
             mmtk.scheduler.add_coordinator_work(ResumeMutators);
@@ -178,6 +208,8 @@ impl <VM: VMBinding> GCWork<VM> for ResumeMutators {
 }
 
 impl <VM: VMBinding> CoordinatorWork<MMTK<VM>> for ResumeMutators {}
+
+static SCANNED_STACKS: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Default)]
 pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
@@ -192,15 +224,23 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoots");
         <E::VM as VMBinding>::VMScanning::scan_thread_roots::<E>();
+        <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
+        mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
     }
 }
 
 pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut SelectedMutator<Edges::VM>);
 
 impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
-    fn do_work(&mut self, _worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
         <E::VM as VMBinding>::VMScanning::scan_thread_root::<E>(unsafe { &mut *(self.0 as *mut _) });
+        let old = SCANNED_STACKS.fetch_add(1, Ordering::SeqCst);
+        if old + 1 == <E::VM as VMBinding>::VMActivePlan::number_of_mutators() {
+            SCANNED_STACKS.store(0, Ordering::SeqCst);
+            <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
+            mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
+        }
     }
 }
 
