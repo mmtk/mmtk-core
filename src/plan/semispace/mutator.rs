@@ -12,16 +12,6 @@ use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-#[allow(clippy::single_match)]
-pub fn ss_collection_phase<VM: VMBinding>(
-    mutator: &mut Mutator<VM, SemiSpace<VM>>,
-    _tls: OpaquePointer,
-    phase: &Phase,
-    _primary: bool,
-) {
-    unreachable!()
-}
-
 pub fn ss_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM, SemiSpace<VM>>, _tls: OpaquePointer) {
     // Do nothing
 }
@@ -60,7 +50,6 @@ pub fn create_ss_mutator<VM: VMBinding>(
             ),
             (AllocatorSelector::LargeObject(0), plan.common.get_los()),
         ],
-        collection_phase_func: &ss_collection_phase,
         prepare_func: &ss_mutator_prepare,
         release_func: &ss_mutator_release,
     };

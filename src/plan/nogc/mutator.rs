@@ -31,7 +31,6 @@ pub fn create_nogc_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![(AllocatorSelector::BumpPointer(0), plan.get_immortal_space())],
-        collection_phase_func: &nogc_collection_phase,
     };
 
     Mutator {

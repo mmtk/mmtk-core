@@ -62,9 +62,6 @@ pub trait Plan: Sized + 'static + Sync + Send {
     fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<Self::VM>);
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::Mutator>;
-    /// # Safety
-    /// Only the primary collector thread can call this.
-    unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector>;
 

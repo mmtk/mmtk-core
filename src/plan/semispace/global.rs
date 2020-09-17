@@ -115,10 +115,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    unsafe fn collection_phase(&self, _tls: OpaquePointer, _phase: &Phase) {
-        unreachable!()
-    }
-
     fn prepare(&self, tls: OpaquePointer) {
         self.common.prepare(tls, true);
         debug_assert!(self.ss_trace.values.is_empty());
