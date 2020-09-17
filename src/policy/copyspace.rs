@@ -12,6 +12,7 @@ use crate::policy::space::SpaceOptions;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
+use std::sync::atomic::{AtomicBool, Ordering};
 //use crate::mmtk::SFT_MAP;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::cell::UnsafeCell;
@@ -23,19 +24,19 @@ const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 pub struct CopySpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
     pr: MonotonePageResource<VM>,
-    from_space: bool,
+    from_space: AtomicBool,
 }
 
 impl<VM: VMBinding> SFT for CopySpace<VM> {
     fn is_live(&self, object: ObjectReference) -> bool {
-        !self.from_space || ForwardingWord::is_forwarded::<VM>(object)
+        !self.from_space() || ForwardingWord::is_forwarded::<VM>(object)
     }
     fn is_movable(&self) -> bool {
         true
     }
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
-        !self.from_space
+        !self.from_space()
     }
     fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
 }
@@ -102,19 +103,21 @@ impl<VM: VMBinding> CopySpace<VM> {
                 )
             },
             common: UnsafeCell::new(common),
-            from_space,
+            from_space: AtomicBool::new(from_space),
         }
     }
 
-    pub fn prepare(&mut self, from_space: bool) {
-        self.from_space = from_space;
+    pub fn prepare(&self, from_space: bool) {
+        self.from_space.store(from_space, Ordering::SeqCst);
     }
 
-    /// # Safety
-    /// TODO: I am not sure why this is unsafe.
-    pub unsafe fn release(&mut self) {
-        self.pr.reset();
-        self.from_space = false;
+    pub fn release(&self) {
+        unsafe { self.pr.reset(); }
+        self.from_space.store(false, Ordering::SeqCst);
+    }
+
+    fn from_space(&self) -> bool {
+        self.from_space.load(Ordering::SeqCst)
     }
 
     pub fn trace_object<T: TransitiveClosure>(
@@ -129,7 +132,7 @@ impl<VM: VMBinding> CopySpace<VM> {
             object,
             allocator,
         );
-        if !self.from_space {
+        if !self.from_space() {
             return object;
         }
         trace!("attempting to forward");
