@@ -92,6 +92,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         // Stop & scan mutators (mutator scanning can happen before STW)
+        scheduler.unconstrained_works.add(Initiate::<Self>::new());
         // Create initial works for `closure_stage`
         scheduler.unconstrained_works.add(StopMutators::<SSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators

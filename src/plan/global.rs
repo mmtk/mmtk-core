@@ -526,6 +526,27 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
+    pub fn set_collection_kind(&self) {
+        self.cur_collection_attempts.store(
+            if self.is_user_triggered_collection() {
+                1
+            } else {
+                self.determine_collection_attempts()
+            },
+            Ordering::Relaxed,
+        );
+
+        let emergency_collection = !self.is_internal_triggered_collection()
+            && self.last_collection_was_exhaustive()
+            && self.cur_collection_attempts.load(Ordering::Relaxed) > 1;
+        self.emergency_collection
+            .store(emergency_collection, Ordering::Relaxed);
+
+        if emergency_collection {
+            self.force_full_heap_collection();
+        }
+    }
+
     pub fn set_gc_status(&self, s: GcStatus) {
         let mut gc_status = self.gc_status.lock().unwrap();
         if *gc_status == GcStatus::NotInGC {
