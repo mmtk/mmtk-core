@@ -20,6 +20,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use crate::scheduler::*;
 use crate::scheduler::gc_works::*;
 use crate::mmtk::MMTK;
@@ -34,15 +35,10 @@ pub type SelectedPlan<VM> = SemiSpace<VM>;
 pub const ALLOC_SS: Allocator = Allocator::Default;
 
 pub struct SemiSpace<VM: VMBinding> {
-    pub unsync: UnsafeCell<SemiSpaceUnsync<VM>>,
-    pub ss_trace: Trace,
-    pub common: CommonPlan<VM>,
-}
-
-pub struct SemiSpaceUnsync<VM: VMBinding> {
-    pub hi: bool,
+    pub hi: AtomicBool,
     pub copyspace0: CopySpace<VM>,
     pub copyspace1: CopySpace<VM>,
+    pub common: CommonPlan<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
@@ -60,28 +56,25 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         SemiSpace {
-            unsync: UnsafeCell::new(SemiSpaceUnsync {
-                hi: false,
-                copyspace0: CopySpace::new(
-                    "copyspace0",
-                    false,
-                    true,
-                    VMRequest::discontiguous(),
-                    vm_map,
-                    mmapper,
-                    &mut heap,
-                ),
-                copyspace1: CopySpace::new(
-                    "copyspace1",
-                    true,
-                    true,
-                    VMRequest::discontiguous(),
-                    vm_map,
-                    mmapper,
-                    &mut heap,
-                ),
-            }),
-            ss_trace: Trace::new(),
+            hi: AtomicBool::new(false),
+            copyspace0: CopySpace::new(
+                "copyspace0",
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            copyspace1: CopySpace::new(
+                "copyspace1",
+                true,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
         }
     }
@@ -89,9 +82,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<VM>) {
         self.common.gc_init(heap_size, mmtk);
 
-        let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.copyspace0.init(&mmtk.vm_map);
-        unsync.copyspace1.init(&mmtk.vm_map);
+        self.copyspace0.init(&mmtk.vm_map);
+        self.copyspace1.init(&mmtk.vm_map);
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
@@ -117,14 +109,14 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
     fn prepare(&self, tls: OpaquePointer) {
         self.common.prepare(tls, true);
-        debug_assert!(self.ss_trace.values.is_empty());
-        debug_assert!(self.ss_trace.root_locations.is_empty());
+
         #[cfg(feature = "sanity")] self.fromspace().unprotect();
-        let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.hi = !unsync.hi; // flip the semi-spaces
+
+        self.hi.store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
         // prepare each of the collected regions
-        unsync.copyspace0.prepare(unsync.hi);
-        unsync.copyspace1.prepare(!unsync.hi);
+        let hi = self.hi.load(Ordering::SeqCst);
+        self.copyspace0.prepare(hi);
+        self.copyspace1.prepare(!hi);
 
         #[cfg(feature = "sanity")] {
             use crate::util::sanity::sanity_checker::SanityChecker;
@@ -156,12 +148,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         //     }
         // }
         // release the collected region
-        let unsync = unsafe { &mut *self.unsync.get() };
-        if unsync.hi {
-            unsafe { unsync.copyspace0.release(); }
-        } else {
-            unsafe { unsync.copyspace1.release(); }
-        }
+        self.fromspace().release();
     }
 
     fn get_collection_reserve(&self) -> usize {
@@ -182,27 +169,19 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 }
 
 impl<VM: VMBinding> SemiSpace<VM> {
-    pub fn tospace(&self) -> &'static CopySpace<VM> {
-        let unsync = unsafe { &*self.unsync.get() };
-
-        if unsync.hi {
-            &unsync.copyspace1
+    pub fn tospace(&self) -> &CopySpace<VM> {
+        if self.hi.load(Ordering::SeqCst) {
+            &self.copyspace1
         } else {
-            &unsync.copyspace0
+            &self.copyspace0
         }
     }
 
-    pub fn fromspace(&self) -> &'static CopySpace<VM> {
-        let unsync = unsafe { &*self.unsync.get() };
-
-        if unsync.hi {
-            &unsync.copyspace0
+    pub fn fromspace(&self) -> &CopySpace<VM> {
+        if self.hi.load(Ordering::SeqCst) {
+            &self.copyspace0
         } else {
-            &unsync.copyspace1
+            &self.copyspace1
         }
-    }
-
-    pub fn get_sstrace(&self) -> &Trace {
-        &self.ss_trace
     }
 }
