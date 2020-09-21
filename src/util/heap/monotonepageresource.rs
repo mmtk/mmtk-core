@@ -55,6 +55,11 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         &mut self.common
     }
 
+    fn reserve_pages(&self, pages: usize) -> usize {
+        self.common().reserved.fetch_add(pages, Ordering::Relaxed);
+        pages
+    }
+
     fn alloc_pages(
         &self,
         reserved_pages: usize,
