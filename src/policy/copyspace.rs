@@ -29,6 +29,9 @@ const fn max(a: usize, b: usize) -> usize {
     [a, b][(a < b) as usize]
 }
 
+#[cfg(not(feature = "gencopy"))]
+const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
+#[cfg(feature = "gencopy")]
 const META_DATA_PAGES_PER_REGION: usize = max(CARD_META_PAGES_PER_REGION, <MarkBitMap as PerChunkMetadata>::METADATA_PAGES_PER_CHUNK);
 
 pub struct CopySpace<VM: VMBinding> {
@@ -74,13 +77,15 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
             let chunks = conversions::bytes_to_chunks_up(bytes);
             SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
         }
-        let chunk = conversions::chunk_align_down(start);
-        self.common().mmapper.ensure_mapped(chunk, META_DATA_PAGES_PER_REGION << LOG_BYTES_IN_PAGE);
-        let mark_table = MarkBitMap::of(start);
-        let mut mark_tables = self.mark_tables.lock().unwrap();
-        if !mark_tables.contains(&mark_table) {
-            mark_table.clear();
-            mark_tables.push(mark_table);
+        #[cfg(feature = "gencopy")] {
+            let chunk = conversions::chunk_align_down(start);
+            self.common().mmapper.ensure_mapped(chunk, META_DATA_PAGES_PER_REGION << LOG_BYTES_IN_PAGE);
+            let mark_table = MarkBitMap::of(start);
+            let mut mark_tables = self.mark_tables.lock().unwrap();
+            if !mark_tables.contains(&mark_table) {
+                mark_table.clear();
+                mark_tables.push(mark_table);
+            }
         }
     }
 
@@ -136,13 +141,16 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn prepare(&self, from_space: bool) {
         self.from_space.store(from_space, Ordering::SeqCst);
-        let mark_tables = self.mark_tables.lock().unwrap();
-        for mark_table in mark_tables.iter() {
-            mark_table.clear();
+        #[cfg(feature = "gencopy")] {
+            let mark_tables = self.mark_tables.lock().unwrap();
+            for mark_table in mark_tables.iter() {
+                mark_table.clear();
+            }
         }
     }
 
     pub fn release(&self) {
+        #[cfg(feature = "gencopy")]
         self.mark_tables.lock().unwrap().clear();
         unsafe { self.pr.reset(); }
         self.from_space.store(false, Ordering::SeqCst);
