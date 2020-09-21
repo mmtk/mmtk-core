@@ -1,16 +1,8 @@
 use std::sync::{Mutex, Condvar, Arc};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::collections::LinkedList;
-use std::ptr;
-use crate::vm::VMBinding;
-use crate::mmtk::MMTK;
-use crate::util::OpaquePointer;
-use super::work::{GCWork, Work};
-use super::worker::{WorkerGroup, Worker};
-use crate::vm::Collection;
+use super::work::Work;
 use std::collections::BinaryHeap;
 use std::cmp;
-use crate::plan::Plan;
 use super::*;
 use spin::RwLock;
 
@@ -31,7 +23,6 @@ impl <C: Context> Eq for PrioritizedWork<C> {}
 
 impl <C: Context> Ord for PrioritizedWork<C> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        // other.0.cmp(&self.0)
         self.priority.cmp(&other.priority)
     }
 }
@@ -112,11 +103,6 @@ impl <C: Context> WorkBucket<C> {
             }
         }
         self.notify_all_workers(); // FIXME: Performance
-    }
-    /// Only for `CoordinatorWork`s to add new works while holding the monitor.
-    pub fn add_with_priority_unsync<W: Work<C>>(&self, priority: usize, work: W) {
-        self.monitor.1.notify_one(); // FIXME: Performance
-        self.queue.write().push(PrioritizedWork { priority, work: box work });
     }
     /// Get a work packet (with the greatest priority) from this bucket
     pub fn poll(&self) -> Option<Box<dyn Work<C>>> {

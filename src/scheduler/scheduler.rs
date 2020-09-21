@@ -1,21 +1,22 @@
-use std::sync::{Mutex, RwLock, Condvar, Arc};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::collections::LinkedList;
-use std::ptr;
+use std::sync::{Mutex, Condvar, Arc};
+use std::sync::atomic::Ordering;
 use crate::vm::VMBinding;
 use crate::mmtk::MMTK;
 use crate::util::OpaquePointer;
-use super::work::{GCWork, Work};
+use super::work::Work;
 use super::worker::{WorkerGroup, Worker};
-use crate::vm::Collection;
-use std::collections::BinaryHeap;
-use std::cmp;
 use crate::plan::Plan;
 use super::work_bucket::*;
 use super::*;
 use std::sync::mpsc::{channel, Sender, Receiver};
 
 
+
+pub enum CoordinatorMessage<C: Context> {
+    Work(Box<dyn CoordinatorWork<C>>),
+    AllWorkerParked,
+    BucketDrained,
+}
 
 pub struct Scheduler<C: Context> {
     /// Works that are scheduable at any time
@@ -29,12 +30,12 @@ pub struct Scheduler<C: Context> {
     pub coordinator_works: WorkBucket<C>,
     /// workers
     worker_group: Option<Arc<WorkerGroup<C>>>,
-    /// Condition Variable
+    /// Condition Variable for worker synchronization
     pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
-    pub coord_monitor: Arc<(Mutex<()>, Condvar)>,
     context: Option<&'static C>,
     coordinator_worker: Option<Worker<C>>,
-    pub channel: (Sender<Box<dyn CoordinatorWork<C>>>, Receiver<Box<dyn CoordinatorWork<C>>>),
+    /// A message channel to send new coordinator works and other actions to the coordinator thread
+    pub channel: (Sender<CoordinatorMessage<C>>, Receiver<CoordinatorMessage<C>>),
 }
 
 unsafe impl <C: Context> Send for Scheduler<C> {}
@@ -52,7 +53,6 @@ impl <C: Context> Scheduler<C> {
             coordinator_works: WorkBucket::new(true, worker_monitor.clone()),
             worker_group: None,
             worker_monitor,
-            coord_monitor: Default::default(),
             context: None,
             coordinator_worker: None,
             channel: channel(),
@@ -99,29 +99,42 @@ impl <C: Context> Scheduler<C> {
         buckets_updated |= self.release_stage.update();
         buckets_updated |= self.final_stage.update();
         if buckets_updated {
+            // Notify the workers for new works
+            let _guard = self.worker_monitor.0.lock().unwrap();
             self.worker_monitor.1.notify_all();
         }
     }
 
     /// Execute coordinator works, in the controller thread
-    fn process_coordinator_works(&self) {
+    fn process_coordinator_work(&self, mut work: Box<dyn CoordinatorWork<C>>) {
         let worker = self.coordinator_worker.as_ref().unwrap() as *const _ as *mut Worker<C>;
         let context = self.context.unwrap();
-        for mut work in self.channel.1.try_iter() {
-            let worker = unsafe { &mut *worker };
-            work.do_work(worker, context);
-        }
+        let worker = unsafe { &mut *worker };
+        work.do_work(worker, context);
     }
 
+    /// Drain the message queue and execute coordinator works
     pub fn wait_for_completion(&self) {
-        let mut guard = self.coord_monitor.0.lock().unwrap();
         loop {
-            self.update_buckets();
-            self.process_coordinator_works();
+            let message = self.channel.1.recv().unwrap();
+            match message {
+                CoordinatorMessage::Work(work) => {
+                    self.process_coordinator_work(work);
+                }
+                CoordinatorMessage::AllWorkerParked | CoordinatorMessage::BucketDrained => {
+                    self.update_buckets();
+                }
+            }
+            let _guard = self.worker_monitor.0.lock().unwrap();
             if self.worker_group().all_parked() && self.all_buckets_empty() {
                 break;
             }
-            guard = self.coord_monitor.1.wait(guard).unwrap();
+        }
+        for message in self.channel.1.try_iter() {
+            match message {
+                CoordinatorMessage::Work(work) => self.process_coordinator_work(work),
+                _ => {}
+            }
         }
         self.prepare_stage.deactivate();
         self.closure_stage.deactivate();
@@ -129,8 +142,8 @@ impl <C: Context> Scheduler<C> {
         self.final_stage.deactivate();
     }
 
-    pub fn add_coordinator_work(&self, work: impl CoordinatorWork<C>) {
-        self.channel.0.send(box work).unwrap();
+    pub fn add_coordinator_work(&self, work: impl CoordinatorWork<C>, worker: &Worker<C>) {
+        worker.sender.send(CoordinatorMessage::Work(box work)).unwrap();
     }
 
     #[inline]
@@ -161,8 +174,7 @@ impl <C: Context> Scheduler<C> {
     pub fn poll(&self, worker: &Worker<C>) -> Box<dyn Work<C>> {
         if let Some((work, bucket_is_empty)) = self.pop_scheduable_work(worker) {
             if bucket_is_empty {
-                let _guard = self.coord_monitor.0.lock().unwrap();
-                self.coord_monitor.1.notify_one();
+                worker.sender.send(CoordinatorMessage::BucketDrained).unwrap();
             }
             return work;
         }
@@ -177,18 +189,14 @@ impl <C: Context> Scheduler<C> {
             debug_assert!(!worker.is_parked());
             if let Some((work, bucket_is_empty)) = self.pop_scheduable_work(worker) {
                 if bucket_is_empty {
-                    let _guard = self.coord_monitor.0.lock().unwrap();
-                    self.coord_monitor.1.notify_one();
+                    worker.sender.send(CoordinatorMessage::BucketDrained).unwrap();
                 }
                 return work;
             }
             // Park this worker
-            // println!("Park #{:?} {}", worker.ordinal, worker.packets);
             worker.parked.store(true, Ordering::SeqCst);
-            if self.worker_group().all_parked() {
-                // Notify the coordinator
-                let _guard = self.coord_monitor.0.lock().unwrap();
-                self.coord_monitor.1.notify_one();
+            if worker.group().unwrap().all_parked() {
+                worker.sender.send(CoordinatorMessage::AllWorkerParked).unwrap();
             }
             // Wait
             guard = self.worker_monitor.1.wait(guard).unwrap();
@@ -204,5 +212,7 @@ impl <VM: VMBinding> MMTkScheduler<VM> {
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.plan.base().control_collector_context.as_ref().unwrap().clear_request();
         self.prepare_stage.activate();
+        let _guard = self.worker_monitor.0.lock().unwrap();
+        self.worker_monitor.1.notify_all();
     }
 }

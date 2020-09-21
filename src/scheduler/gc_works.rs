@@ -22,7 +22,7 @@ impl <P: Plan> Initiate<P> {
 }
 
 impl <P: Plan> GCWork<P::VM> for Initiate<P> {
-    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Initiate");
         mmtk.plan.base().set_collection_kind();
         mmtk.plan.base().set_gc_status(GcStatus::GcPrepare);
@@ -72,7 +72,7 @@ impl <P: Plan> PrepareMutator<P> {
 }
 
 impl <P: Plan> GCWork<P::VM> for PrepareMutator<P> {
-    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, _mmtk: &'static MMTK<P::VM>) {
         trace!("Prepare Mutator");
         self.mutator.prepare(worker.tls);
     }
@@ -82,7 +82,7 @@ impl <P: Plan> GCWork<P::VM> for PrepareMutator<P> {
 pub struct PrepareCollector;
 
 impl <VM: VMBinding> GCWork<VM> for PrepareCollector {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Prepare Collector");
         worker.local().prepare();
     }
@@ -129,7 +129,7 @@ impl <P: Plan> ReleaseMutator<P> {
 }
 
 impl <P: Plan> GCWork<P::VM> for ReleaseMutator<P> {
-    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, _mmtk: &'static MMTK<P::VM>) {
         trace!("Release Mutator");
         self.mutator.release(worker.tls);
     }
@@ -139,7 +139,7 @@ impl <P: Plan> GCWork<P::VM> for ReleaseMutator<P> {
 pub struct ReleaseCollector;
 
 impl <VM: VMBinding> GCWork<VM> for ReleaseCollector {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Release Collector");
         worker.local().release();
     }
@@ -176,16 +176,16 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
                 }
                 // Scan mutators
                 if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
-                    mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanStackRoots::<E>::new());
+                    mmtk.scheduler.prepare_stage.add(ScanStackRoots::<E>::new());
                 } else {
                     for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                        mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanStackRoot::<E>(mutator));
+                        mmtk.scheduler.prepare_stage.add(ScanStackRoot::<E>(mutator));
                     }
                 }
             }
-            mmtk.scheduler.prepare_stage.add_with_priority_unsync(usize::max_value(), ScanVMSpecificRoots::<E>::new());
+            mmtk.scheduler.prepare_stage.add(ScanVMSpecificRoots::<E>::new());
         } else {
-            mmtk.scheduler.add_coordinator_work(StopMutators::<E>::new());
+            mmtk.scheduler.add_coordinator_work(StopMutators::<E>::new(), worker);
         }
     }
 }
@@ -202,7 +202,7 @@ impl <VM: VMBinding> GCWork<VM> for ResumeMutators {
             mmtk.plan.common().base.set_gc_status(GcStatus::NotInGC);
             <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
         } else {
-            mmtk.scheduler.add_coordinator_work(ResumeMutators);
+            mmtk.scheduler.add_coordinator_work(ResumeMutators, worker);
         }
     }
 }
@@ -254,7 +254,7 @@ impl <E: ProcessEdgesWork> ScanVMSpecificRoots<E> {
 }
 
 impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStaticRoots");
         <E::VM as VMBinding>::VMScanning::scan_vm_specific_roots::<E>();
     }
@@ -351,7 +351,7 @@ impl <Edges: ProcessEdgesWork> ScanObjects<Edges> {
 }
 
 impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ScanObjects");
         <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer);
         trace!("ScanObjects End");

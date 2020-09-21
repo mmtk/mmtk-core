@@ -3,6 +3,7 @@ use super::work_bucket::*;
 use crate::util::OpaquePointer;
 use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
 use crate::mmtk::MMTK;
 
 
@@ -17,20 +18,26 @@ pub struct Worker<C: Context> {
     local: Option<C::WorkerLocal>,
     pub local_works: WorkBucket<C>,
     pub packets: usize,
+    pub sender: Sender<CoordinatorMessage<C>>,
 }
+
+unsafe impl <C: Context> Sync for Worker<C> {}
+unsafe impl <C: Context> Send for Worker<C> {}
 
 pub type GCWorker<VM> = Worker<MMTK<VM>>;
 
 impl <C: Context> Worker<C> {
     pub fn new(ordinal: usize, group: Option<Weak<WorkerGroup<C>>>, scheduler: Weak<Scheduler<C>>) -> Self {
+        let scheduler = scheduler.upgrade().unwrap();
         Self {
             tls: OpaquePointer::UNINITIALIZED,
             ordinal,
             parked: AtomicBool::new(true),
             group: group.map(|g| g.upgrade().unwrap()),
             local: None,
-            local_works: WorkBucket::new(true, scheduler.upgrade().unwrap().worker_monitor.clone()),
-            scheduler: scheduler.upgrade().unwrap(),
+            local_works: WorkBucket::new(true, scheduler.worker_monitor.clone()),
+            sender: scheduler.channel.0.clone(),
+            scheduler: scheduler,
             packets: 0,
         }
     }
