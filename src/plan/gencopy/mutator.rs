@@ -1,23 +1,20 @@
 use crate::plan::mutator_context::{CommonMutatorContext, MutatorContext};
 use crate::plan::Allocator as AllocationType;
-use crate::plan::Phase;
-use crate::policy::space::Space;
-use crate::plan::SelectedPlan;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
-use super::SemiSpace;
+use super::GenCopy;
 use crate::vm::VMBinding;
 
 #[repr(C)]
-pub struct SSMutator<VM: VMBinding> {
+pub struct GenCopyMutator<VM: VMBinding> {
     ss: BumpAllocator<VM>,
-    plan: &'static SemiSpace<VM>,
+    plan: &'static GenCopy<VM>,
     common: CommonMutatorContext<VM>,
 }
 
-impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
+impl <VM: VMBinding> MutatorContext<VM> for GenCopyMutator<VM> {
     fn common(&self) -> &CommonMutatorContext<VM> {
         &self.common
     }
@@ -27,7 +24,7 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
     }
 
     fn release(&mut self, _tls: OpaquePointer) {
-        self.ss.rebind(Some(self.plan.tospace()));
+        self.ss.rebind(Some(&self.plan.nursery));
     }
 
     fn alloc(
@@ -45,8 +42,7 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
             allocator
         );
         debug_assert!(
-            self.ss.get_space().unwrap().common().descriptor
-                == self.plan.tospace().common().descriptor,
+            self.ss.get_space().unwrap() as *const _ == &self.plan.nursery as *const _,
             "bumpallocator {:?} holds wrong space, ss.space: {:?}, tospace: {:?}",
             self as *const _,
             self.ss.get_space().unwrap() as *const _,
@@ -65,10 +61,7 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
         _bytes: usize,
         allocator: AllocationType,
     ) {
-        debug_assert!(
-            self.ss.get_space().unwrap().common().descriptor
-                == self.plan.tospace().common().descriptor
-        );
+        // debug_assert!(self.ss.get_space().unwrap() as *const _ == self.plan.tospace() as *const _);
         match allocator {
             AllocationType::Default => {}
             _ => self.common.post_alloc(object, _type, _bytes, allocator),
@@ -80,10 +73,10 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
     }
 }
 
-impl<VM: VMBinding> SSMutator<VM> {
-    pub fn new(tls: OpaquePointer, plan: &'static SemiSpace<VM>) -> Self {
-        SSMutator {
-            ss: BumpAllocator::new(tls, Some(plan.tospace()), plan),
+impl <VM: VMBinding> GenCopyMutator<VM> {
+    pub fn new(tls: OpaquePointer, plan: &'static GenCopy<VM>) -> Self {
+        Self {
+            ss: BumpAllocator::new(tls, Some(&plan.nursery), plan),
             plan,
             common: CommonMutatorContext::<VM>::new(tls, plan, &plan.common),
         }
