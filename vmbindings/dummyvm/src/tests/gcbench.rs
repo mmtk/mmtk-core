@@ -1,12 +1,9 @@
-extern crate mmtk_dummyvm;
-extern crate mmtk;
-use mmtk_dummyvm::api::*;
-use mmtk_dummyvm::DummyVM;
+use crate::api::*;
+use crate::DummyVM;
 use mmtk::util::{OpaquePointer};
 use mmtk::Allocator;
 use std::ptr;
 use std::time::{SystemTime, UNIX_EPOCH};
-
 
 struct Node { 
     _v1: i32, 
@@ -21,7 +18,8 @@ const K_ARRAY_SIZE: usize =500000;
 const K_MIN_TREE_DEPTH: usize = 4;
 const K_MAX_TREE_DEPTH: usize = 16;
 
-fn main() {
+#[test]
+fn run_gcbench() {
     gc_init(1024*1024*1024);
     let handle: *mut mmtk::SelectedMutator<DummyVM> = bind_mutator(OpaquePointer::UNINITIALIZED);
 

@@ -13,6 +13,9 @@ pub mod active_plan;
 pub mod reference_glue;
 pub mod api;
 
+#[cfg(test)]
+mod tests;
+
 pub struct DummyVM;
 
 impl VMBinding for DummyVM {

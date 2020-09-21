@@ -1,7 +1,5 @@
-extern crate mmtk_dummyvm;
-extern crate mmtk;
-use mmtk_dummyvm::api::*;
-use mmtk_dummyvm::DummyVM;
+use crate::api::*;
+use crate::DummyVM;
 use mmtk::util::{OpaquePointer};
 use mmtk::Allocator;use std::ptr;
 
@@ -12,7 +10,8 @@ struct Node {
     _right: *mut Node,
 }
 
-fn main() {
+#[test]
+fn run_fixed_live() {
   gc_init(200*1024*1024);  let handle = bind_mutator(OpaquePointer::UNINITIALIZED);
   let _n = create_tree(18, handle);
   alloc_loop(100000);
