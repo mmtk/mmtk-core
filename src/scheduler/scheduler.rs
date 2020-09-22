@@ -9,6 +9,8 @@ use crate::plan::Plan;
 use super::work_bucket::*;
 use super::*;
 use std::sync::mpsc::{channel, Sender, Receiver};
+use super::stat::SchedulerStat;
+use std::collections::HashMap;
 
 
 
@@ -107,10 +109,10 @@ impl <C: Context> Scheduler<C> {
 
     /// Execute coordinator works, in the controller thread
     fn process_coordinator_work(&self, mut work: Box<dyn CoordinatorWork<C>>) {
-        let worker = self.coordinator_worker.as_ref().unwrap() as *const _ as *mut Worker<C>;
+        let worker_ptr = self.coordinator_worker.as_ref().unwrap() as *const _ as *mut Worker<C>;
         let context = self.context.unwrap();
-        let worker = unsafe { &mut *worker };
-        work.do_work(worker, context);
+        let worker = unsafe { &mut *worker_ptr };
+        work.do_work_with_stat(worker, context);
     }
 
     /// Drain the message queue and execute coordinator works
@@ -172,13 +174,15 @@ impl <C: Context> Scheduler<C> {
     /// Get a scheduable work. Called by workers
     #[inline]
     pub fn poll(&self, worker: &Worker<C>) -> Box<dyn Work<C>> {
-        if let Some((work, bucket_is_empty)) = self.pop_scheduable_work(worker) {
+        let work = if let Some((work, bucket_is_empty)) = self.pop_scheduable_work(worker) {
             if bucket_is_empty {
                 worker.sender.send(CoordinatorMessage::BucketDrained).unwrap();
             }
-            return work;
-        }
-        self.poll_slow(worker)
+            work
+        } else {
+            self.poll_slow(worker)
+        };
+        work
     }
 
     #[cold]
@@ -203,6 +207,15 @@ impl <C: Context> Scheduler<C> {
             // Unpark this worker
             worker.parked.store(false, Ordering::SeqCst);
         }
+    }
+
+    pub fn statistics(&self) -> HashMap<String, String> {
+        let mut summary = SchedulerStat::default();
+        for worker in &self.worker_group().workers {
+            summary.merge(&worker.stat);
+        }
+        summary.merge(&self.coordinator_worker.as_ref().unwrap().stat);
+        summary.harness_stat()
     }
 }
 

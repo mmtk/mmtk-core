@@ -3,6 +3,7 @@ mod worker;
 mod work;
 mod work_bucket;
 mod context;
+pub mod stat;
 
 pub use scheduler::*;
 pub use context::*;

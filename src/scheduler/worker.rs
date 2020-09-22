@@ -5,7 +5,7 @@ use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use crate::mmtk::MMTK;
-
+use super::stat::WorkerLocalStat;
 
 
 
@@ -17,8 +17,8 @@ pub struct Worker<C: Context> {
     scheduler: Arc<Scheduler<C>>,
     local: Option<C::WorkerLocal>,
     pub local_works: WorkBucket<C>,
-    pub packets: usize,
     pub sender: Sender<CoordinatorMessage<C>>,
+    pub stat: WorkerLocalStat,
 }
 
 unsafe impl <C: Context> Sync for Worker<C> {}
@@ -38,7 +38,7 @@ impl <C: Context> Worker<C> {
             local_works: WorkBucket::new(true, scheduler.worker_monitor.clone()),
             sender: scheduler.channel.0.clone(),
             scheduler: scheduler,
-            packets: 0,
+            stat: Default::default(),
         }
     }
 
@@ -66,17 +66,17 @@ impl <C: Context> Worker<C> {
         self.tls = tls;
     }
 
+    pub unsafe fn as_mut<'a>(&'static self) -> &'a mut Self {
+        &mut *(self as *const _ as *mut _)
+    }
+
     pub fn run(&'static mut self, context: &'static C) {
         self.local = Some(C::WorkerLocal::new(context));
         self.parked.store(false, Ordering::SeqCst);
         loop {
             let mut work = self.scheduler().poll(self);
-            if cfg!(debug_assertions) {
-                self.packets += 1;
-            }
             debug_assert!(!self.is_parked());
-            let this = unsafe { &mut *(self as *mut _) };
-            work.do_work(this, context);
+            work.do_work_with_stat(unsafe { self.as_mut() }, context);
         }
     }
 }
