@@ -72,8 +72,8 @@ impl<VM: VMBinding> MMTK<VM> {
         self.plan.base().stats.start_all();
     }
 
-    pub fn harness_end(&self) {
-        self.plan.base().stats.stop_all();
+    pub fn harness_end(&'static self) {
+        self.plan.base().stats.stop_all(self);
         self.inside_harness.store(false, Ordering::SeqCst);
     }
 }

@@ -233,6 +233,6 @@ pub fn harness_begin<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
     mmtk.harness_begin(tls);
 }
 
-pub fn harness_end<VM: VMBinding>(mmtk: &MMTK<VM>) {
+pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     mmtk.harness_end();
 }

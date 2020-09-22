@@ -2,11 +2,16 @@ use super::worker::*;
 use crate::vm::VMBinding;
 use crate::mmtk::MMTK;
 use super::*;
+use std::any::{TypeId, type_name};
 
 
 
 pub trait Work<C: Context>: 'static + Send + Sync {
     fn do_work(&mut self, worker: &'static mut Worker<C>, context: &'static C);
+    fn do_work_with_stat(&mut self, worker: &'static mut Worker<C>, context: &'static C) {
+        let _guard = unsafe { worker.as_mut() }.stat.measure_work(TypeId::of::<Self>(), type_name::<Self>());
+        self.do_work(unsafe { worker.as_mut() }, context);
+    }
 }
 
 impl <VM: VMBinding> PartialEq for Box<dyn Work<VM>> {
