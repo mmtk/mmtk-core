@@ -71,13 +71,15 @@ fn random_array(size: usize) -> Box<[usize]> {
 fn quicksort() {
     let data: &'static mut [usize] = Box::leak(random_array(1000));
 
-    println!("Original: {:?}", data);
+    // println!("Original: {:?}", data);
 
     SCHEDULER.initialize(NUM_WORKERS, &(), OpaquePointer::UNINITIALIZED);
     SCHEDULER.unconstrained_works.add(Sort(unsafe { &mut *(data as *mut _) }));
     SCHEDULER.wait_for_completion();
 
-    println!("Sorted: {:?}", data);
+    // println!("Sorted: {:?}", data);
+
+    println!("{:?}", SCHEDULER.statistics());
 
     assert!(data.is_sorted());
 
