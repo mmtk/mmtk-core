@@ -36,7 +36,6 @@ jobs:
       - name: Setup
         run: |
           cd mmtk-jikesrvm
-          cat repos/mmtk-core/Cargo.toml
           RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./.github/scripts/ci-setup.sh
       - name: Test
         run: |

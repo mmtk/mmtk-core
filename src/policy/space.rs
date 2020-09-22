@@ -190,9 +190,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync {
         }
     }
 
-    // UNSAFE: potential data race as this mutates 'common'
-    // FIXME: This does not sound like 'unsafe', it is more like 'incorrect'. Any allocator/mutator may do slowpath allocation, and call this.
-    #[allow(clippy::missing_safety_doc)]
+    /// # Safety
+    /// potential data race as this mutates 'common'
+    /// FIXME: This does not sound like 'unsafe', it is more like 'incorrect'. Any allocator/mutator may do slowpath allocation, and call this.
     unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
         // FIXME
         let new_head: Address = self.common().vm_map().allocate_contiguous_chunks(
@@ -272,8 +272,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync {
 
     fn release_multiple_pages(&mut self, start: Address);
 
-    // FIXME: I am not sure why this is unsafe.
-    #[allow(clippy::missing_safety_doc)]
+    /// # Safety
+    /// TODO: I am not sure why this is unsafe.
     unsafe fn release_all_chunks(&self) {
         self.common()
             .vm_map()
