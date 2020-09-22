@@ -1,6 +1,7 @@
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 
 
@@ -104,6 +105,7 @@ pub struct WorkStatGuard<'a> {
 
 impl <'a> Drop for WorkStatGuard<'a> {
     fn drop(&mut self) {
+        if !self.worker_stat.is_enabled() { return };
         self.worker_stat.work_id_name_map.insert(self.type_id, self.type_name);
         if self.worker_stat.work_counts.contains_key(&self.type_id) {
             *self.worker_stat.work_counts.get_mut(&self.type_id).unwrap() += 1;
@@ -124,9 +126,18 @@ pub struct WorkerLocalStat {
     work_id_name_map: HashMap<TypeId, &'static str>,
     work_counts: HashMap<TypeId, usize>,
     work_durations: HashMap<TypeId, Vec<Duration>>,
+    enabled: AtomicBool,
 }
 
 impl WorkerLocalStat {
+    #[inline]
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.load(Ordering::SeqCst)
+    }
+    #[inline]
+    pub fn enable(&self) {
+        self.enabled.store(true, Ordering::SeqCst);
+    }
     #[inline]
     pub fn measure_work(&mut self, work_id: TypeId, work_name: &'static str) -> WorkStatGuard<'_> {
         WorkStatGuard {

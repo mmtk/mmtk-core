@@ -70,6 +70,7 @@ impl<VM: VMBinding> MMTK<VM> {
         self.plan.handle_user_collection_request(tls, true);
         self.inside_harness.store(true, Ordering::SeqCst);
         self.plan.base().stats.start_all();
+        self.scheduler.enable_stat();
     }
 
     pub fn harness_end(&'static self) {
