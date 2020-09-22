@@ -209,6 +209,13 @@ impl <C: Context> Scheduler<C> {
         }
     }
 
+    pub fn enable_stat(&self) {
+        for worker in &self.worker_group().workers {
+            worker.stat.enable();
+        }
+        self.coordinator_worker.as_ref().unwrap().stat.enable();
+    }
+
     pub fn statistics(&self) -> HashMap<String, String> {
         let mut summary = SchedulerStat::default();
         for worker in &self.worker_group().workers {
