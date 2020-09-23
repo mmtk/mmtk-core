@@ -2,6 +2,7 @@ use super::controller_collector_context::ControllerCollectorContext;
 use super::{MutatorContext, ParallelCollector, TraceLocal};
 use crate::plan::phase::Phase;
 use crate::plan::transitive_closure::TransitiveClosure;
+use crate::plan::Allocator as AllocationType;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
@@ -198,6 +199,10 @@ pub trait Plan<VM: VMBinding>: Sized {
             );
         }
     }
+
+    /// Whether the object is in a space that matches the allocation type.
+    /// Its implementation needs to be consistent with Mutator.alloc()
+    fn is_in_space(&self, obj: ObjectReference, allocator: AllocationType) -> bool;
 }
 
 #[derive(PartialEq)]
@@ -635,6 +640,17 @@ impl<VM: VMBinding> CommonPlan<VM> {
             _ => {}
         }
         self.base.collection_phase(tls, phase, primary)
+    }
+
+    /// Whether the object is in a space that matches the allocation type.
+    /// Its implementation needs to be consistent with CommonMutatorContext.alloc()
+    pub fn is_in_space(&self, obj: ObjectReference, allocator: AllocationType) -> bool {
+        let unsync = unsafe { &*self.unsync.get() };
+        match allocator {
+            AllocationType::Los => unsync.los.in_space(obj),
+            AllocationType::Immortal => unsync.immortal.in_space(obj),
+            _ => false,
+        }
     }
 
     pub fn stacks_prepared(&self) -> bool {

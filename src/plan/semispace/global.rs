@@ -10,12 +10,13 @@ use crate::plan::Phase;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::util::heap::VMRequest;
-use crate::util::OpaquePointer;
+use crate::util::{ObjectReference, OpaquePointer};
 
 use std::cell::UnsafeCell;
 
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
+use crate::plan::Allocator as AllocationType;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -182,6 +183,15 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
 
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
+    }
+
+    /// Whether the object is in a space that matches the allocation type.
+    /// Its implementation needs to be consistent with Mutator.alloc()
+    fn is_in_space(&self, obj: ObjectReference, allocator: AllocationType) -> bool {
+        match allocator {
+            AllocationType::Default => self.tospace().in_space(obj),
+            _ => self.common.is_in_space(obj, allocator),
+        }
     }
 }
 

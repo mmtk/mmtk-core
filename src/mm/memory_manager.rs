@@ -63,6 +63,14 @@ pub fn destroy_mutator<VM: VMBinding>(mutator: Box<SelectedMutator<VM>>) {
     drop(mutator);
 }
 
+pub fn is_in_space<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+    obj: ObjectReference,
+    allocator: Allocator,
+) -> bool {
+    mmtk.plan.is_in_space(obj, allocator)
+}
+
 pub fn alloc<VM: VMBinding>(
     mutator: &mut SelectedMutator<VM>,
     size: usize,

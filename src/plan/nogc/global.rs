@@ -10,11 +10,13 @@ use super::NoGCCollector;
 use super::NoGCMutator;
 use super::NoGCTraceLocal;
 use crate::plan::global::BasePlan;
+use crate::plan::Allocator as AllocationType;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use std::sync::Arc;
 
@@ -97,6 +99,13 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
 
     fn handle_user_collection_request(&self, _tls: OpaquePointer, _force: bool) {
         println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
+    }
+
+    /// Whether the object is in a space that matches the allocation type.
+    /// Its implementation needs to be consistent with Mutator.alloc()
+    fn is_in_space(&self, obj: ObjectReference, _allocator: AllocationType) -> bool {
+        let unsync = unsafe { &*self.unsync.get() };
+        unsync.nogc_space.in_space(obj)
     }
 }
 
