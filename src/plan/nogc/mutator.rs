@@ -1,7 +1,6 @@
 use crate::plan::mutator_context::{CommonMutatorContext, MutatorContext};
 use crate::plan::nogc::NoGC;
 use crate::plan::Allocator as AllocationType;
-use crate::plan::Phase;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
@@ -19,7 +18,10 @@ impl<VM: VMBinding> MutatorContext<VM> for NoGCMutator<VM> {
         unreachable!()
     }
 
-    fn collection_phase(&mut self, _tls: OpaquePointer, _phase: &Phase, _primary: bool) {
+    fn prepare(&mut self, _tls: OpaquePointer) {
+        unreachable!()
+    }
+    fn release(&mut self, _tls: OpaquePointer) {
         unreachable!()
     }
 
@@ -64,7 +66,7 @@ impl<VM: VMBinding> MutatorContext<VM> for NoGCMutator<VM> {
 impl<VM: VMBinding> NoGCMutator<VM> {
     pub fn new(tls: OpaquePointer, plan: &'static NoGC<VM>) -> Self {
         NoGCMutator {
-            nogc: BumpAllocator::new(tls, Some(plan.get_immortal_space()), plan),
+            nogc: BumpAllocator::new(tls, Some(&plan.nogc_space), plan),
         }
     }
 }
