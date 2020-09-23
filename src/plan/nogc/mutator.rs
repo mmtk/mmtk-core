@@ -10,18 +10,14 @@ use crate::plan::mutator_context::MutatorConfig;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn nogc_collection_phase<VM: VMBinding>(
-    _mutator: &mut Mutator<VM, NoGC<VM>>,
-    _tls: OpaquePointer,
-    _phase: &Phase,
-    _primary: bool,
-) {
-}
-
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::BumpPointer(0),
     };
+}
+
+pub fn nogc_mutator_noop<VM: VMBinding>(_mutator: &mut Mutator<VM, SemiSpace<VM>>, _tls: OpaquePointer) {
+
 }
 
 pub fn create_nogc_mutator<VM: VMBinding>(
@@ -31,6 +27,8 @@ pub fn create_nogc_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![(AllocatorSelector::BumpPointer(0), plan.get_immortal_space())],
+        prepare_func: &nogc_mutator_noop,
+        release_func: &nogc_mutator_noop,
     };
 
     Mutator {

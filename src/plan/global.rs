@@ -23,6 +23,7 @@ use crate::mmtk::MMTK;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::marker::PhantomData;
 
 use crate::util::alloc::allocators::AllocatorSelector;
 use enum_map::EnumMap;
@@ -34,6 +35,20 @@ pub trait CopyContext: Sized + 'static + Sync + Send {
     fn release(&mut self);
     fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: Allocator) -> Address;
     fn post_copy(&mut self, _obj: ObjectReference, _tib: Address, _bytes: usize, _allocator: Allocator) {}
+}
+
+pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
+
+impl <VM: VMBinding> CopyContext for NoCopy<VM> {
+    type VM = VM;
+    fn new(_mmtk: &'static MMTK<Self::VM>) -> Self {
+        Self(PhantomData)
+    }
+    fn prepare(&mut self) {}
+    fn release(&mut self) {}
+    fn alloc_copy(&mut self, _original: ObjectReference, _bytes: usize, _align: usize, _offset: isize, _allocator: Allocator) -> Address {
+        unreachable!()
+    }
 }
 
 pub trait Plan: Sized + 'static + Sync + Send {
