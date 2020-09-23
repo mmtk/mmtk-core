@@ -1,10 +1,10 @@
-use crate::util::{Address, ObjectReference};
+use crate::util::Address;
 use crate::util::constants::*;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::*;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU8, Ordering};
-use std::slice;
+
 
 
 pub trait PerChunkMetadata: Sized + 'static {
@@ -18,7 +18,8 @@ pub trait PerChunkMetadata: Sized + 'static {
     }
 }
 
-pub struct MarkBitMap;
+#[repr(C)]
+pub struct MarkBitMap([AtomicU8; BYTES_IN_BITMAP]);
 
 impl MarkBitMap {
     fn calculate_bit_location(a: Address) -> (usize, usize) {
@@ -52,10 +53,9 @@ impl PerChunkMetadata for MarkBitMap {
 }
 
 impl Deref for MarkBitMap {
-    type Target = [AtomicU8];
+    type Target = [AtomicU8; BYTES_IN_BITMAP];
     fn deref(&self) -> &Self::Target {
-        // Every word in chunk maps to a bit in the bitmap
-        unsafe { slice::from_raw_parts(self as *const Self as *const AtomicU8, BYTES_IN_BITMAP) }
+        &self.0
     }
 }
 
