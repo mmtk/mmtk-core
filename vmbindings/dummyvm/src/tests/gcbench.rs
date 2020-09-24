@@ -1,9 +1,12 @@
-use crate::api::*;
-use crate::DummyVM;
+extern crate mmtk_dummyvm;
+extern crate mmtk;
+use mmtk_dummyvm::api::*;
+use mmtk_dummyvm::DummyVM;
 use mmtk::util::{OpaquePointer};
 use mmtk::Allocator;
 use std::ptr;
 use std::time::{SystemTime, UNIX_EPOCH};
+
 
 struct Node { 
     _v1: i32, 
@@ -14,12 +17,11 @@ struct Node {
 
 const K_STRETCH_TREE_DEPTH: usize = 18;
 const K_LONG_LIVED_TREE_DEPTH: usize = 16;
-const K_ARRAY_SIZE: usize =500000;
+const K_ARRAY_SIZE: usize =100000;
 const K_MIN_TREE_DEPTH: usize = 4;
 const K_MAX_TREE_DEPTH: usize = 16;
 
-#[test]
-fn run_gcbench() {
+fn main() {
     gc_init(1024*1024*1024);
     let handle: *mut mmtk::SelectedMutator<DummyVM> = bind_mutator(OpaquePointer::UNINITIALIZED);
 
@@ -36,7 +38,7 @@ fn run_gcbench() {
     let _temporary_tree : Node = make_tree(K_STRETCH_TREE_DEPTH, handle);
 		
     println!("Creating a long-lived binary tree of depth {}", K_LONG_LIVED_TREE_DEPTH);
-    let ptr1 = alloc(handle, K_LONG_LIVED_TREE_DEPTH*16, 8, 0, Allocator::Default);
+    let ptr1 = alloc(handle, K_LONG_LIVED_TREE_DEPTH*16, 4, 0, Allocator::Default);
     let long_lived_tree = ptr1.to_mut_ptr();  
     unsafe{*long_lived_tree = Node{
         _v1: 1,
@@ -47,16 +49,18 @@ fn run_gcbench() {
     populate(K_LONG_LIVED_TREE_DEPTH, long_lived_tree, handle);
 	
     println!("Creating a long-lived array of {} doubles", K_ARRAY_SIZE);
-    let mut array: [usize; K_ARRAY_SIZE] = [0; K_ARRAY_SIZE];
+    let ptr2 = alloc(handle, K_ARRAY_SIZE, 4, 0, Allocator::Default);
+    let array = ptr2.to_mut_ptr(); 
+    unsafe{*array = [0; K_ARRAY_SIZE];}
     for i in 1..=(K_ARRAY_SIZE/2+1) {
-	array[i] = 1/i;
+	unsafe{(*array)[i] = 1/i};
     }
     print_diagnostics();
 
     for i in (K_MIN_TREE_DEPTH..=K_MAX_TREE_DEPTH).step_by(2) {
 	time_construction(i, handle);
     }
-    if long_lived_tree == ptr::null_mut() || array[1000] != 1/1000 {
+    if long_lived_tree == ptr::null_mut() || unsafe{(*array)[1000]} != 1/1000 {
 	println!("Failed");
     }
     let t_finish = SystemTime::now();
@@ -82,10 +86,10 @@ fn populate(mut depth : usize, mut this_node : *mut Node, handle : *mut mmtk::Se
       return;
   } else {
       depth = depth-1;
-      let ptr1 = alloc(handle, depth*16, 8, 0, Allocator::Default);
+      let ptr1 = alloc(handle, depth*16, 4, 0, Allocator::Default);
       unsafe{(*this_node)._left = ptr1.to_mut_ptr();}
       populate(depth-1, unsafe{(*this_node)._left}, handle);
-      let ptr2 = alloc(handle, depth*16, 8, 0, Allocator::Default);
+      let ptr2 = alloc(handle, depth*16, 4, 0, Allocator::Default);
       unsafe{(*this_node)._right = ptr2.to_mut_ptr();}
       populate(depth-1, unsafe{(*this_node)._right}, handle);
   }
@@ -95,10 +99,10 @@ fn make_tree(depth : usize, handle : *mut mmtk::SelectedMutator<DummyVM>) -> Nod
   let mut t_left: *mut Node = ptr::null_mut();
   let mut t_right: *mut Node = ptr::null_mut();
   if depth > 1 {unsafe{
-      let ptr1 = alloc(handle, depth*16, 8, 0, Allocator::Default);
+      let ptr1 = alloc(handle, depth*16, 4, 0, Allocator::Default);
       t_left = ptr1.to_mut_ptr();
       *t_left = make_tree(depth-1, handle);
-      let ptr2 = alloc(handle, depth*16, 8, 0, Allocator::Default);
+      let ptr2 = alloc(handle, depth*16, 4, 0, Allocator::Default);
       t_right = ptr2.to_mut_ptr();
       *t_right = make_tree(depth-1, handle);}
   }
@@ -140,7 +144,7 @@ fn time_construction(depth : usize, handle : *mut mmtk::SelectedMutator<DummyVM>
         .expect("Time went backwards");	
     let mut in_ms_s = since_the_epoch_s.as_millis();
     for _i in 1..(i_number_of_iterations+1) {
-	ptr1 = alloc(handle, K_LONG_LIVED_TREE_DEPTH*16, 8, 0, Allocator::Default);
+	ptr1 = alloc(handle, K_LONG_LIVED_TREE_DEPTH*16, 4, 0, Allocator::Default);
         temporary_tree = ptr1.to_mut_ptr();  
         unsafe{*temporary_tree = Node{
             _v1: 1,
