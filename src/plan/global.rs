@@ -8,6 +8,7 @@ use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
@@ -46,7 +47,8 @@ pub trait Plan<VM: VMBinding>: Sized {
     fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::MutatorT>;
-    // unsafe because only the primary collector thread can call this
+    /// # Safety
+    /// Only the primary collector thread can call this.
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
 
     #[cfg(feature = "sanity")]
@@ -157,7 +159,7 @@ pub trait Plan<VM: VMBinding>: Sized {
     #[inline]
     fn stress_test_gc_required(&self) -> bool {
         let pages = self.base().vm_map.get_cumulative_committed_pages();
-        trace!("pages={}", pages);
+        trace!("stress_gc pages={}", pages);
 
         if self.is_initialized()
             && (pages ^ self.base().last_stress_pages.load(Ordering::Relaxed)
@@ -210,6 +212,7 @@ pub enum GcStatus {
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
 */
 pub struct BasePlan<VM: VMBinding> {
+    // Whether MMTk is now ready for collection. This is set to true when enable_collection() is called.
     pub initialized: AtomicBool,
     pub gc_status: Mutex<GcStatus>,
     pub last_stress_pages: AtomicUsize,
@@ -325,6 +328,7 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     pub fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+        vm_map.boot();
         vm_map.finalize_static_space_map(
             self.heap.get_discontig_start(),
             self.heap.get_discontig_end(),

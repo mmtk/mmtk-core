@@ -1,6 +1,6 @@
 use crate::plan::{Phase, Plan};
-use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
+#[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::OpaquePointer;
 
@@ -8,7 +8,7 @@ use std::cell::UnsafeCell;
 
 use super::NoGCCollector;
 use super::NoGCTraceLocal;
-use crate::plan::plan::BasePlan;
+use crate::plan::global::BasePlan;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -16,8 +16,13 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
 use crate::plan::mutator_context::Mutator;
-use crate::plan::nogc::nogcmutator::create_nogc_mutator;
+use crate::plan::nogc::mutator::create_nogc_mutator;
 use std::sync::Arc;
+
+#[cfg(not(feature = "nogc_lock_free"))]
+use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
+#[cfg(feature = "nogc_lock_free")]
+use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
 
 pub type SelectedPlan<VM> = NoGC<VM>;
 
@@ -29,7 +34,7 @@ pub struct NoGC<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
 
 pub struct NoGCUnsync<VM: VMBinding> {
-    pub nogc_space: ImmortalSpace<VM>,
+    pub nogc_space: NoGCImmortalSpace<VM>,
 }
 
 impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
@@ -42,19 +47,26 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
+        #[cfg(not(feature = "nogc_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        #[cfg(feature = "nogc_lock_free")]
+        let heap = HeapMeta::new(HEAP_START, HEAP_END);
+
+        #[cfg(feature = "nogc_lock_free")]
+        let nogc_space =
+            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")));
+        #[cfg(not(feature = "nogc_lock_free"))]
+        let nogc_space = NoGCImmortalSpace::new(
+            "nogc_space",
+            true,
+            VMRequest::discontiguous(),
+            vm_map,
+            mmapper,
+            &mut heap,
+        );
 
         NoGC {
-            unsync: UnsafeCell::new(NoGCUnsync {
-                nogc_space: ImmortalSpace::new(
-                    "nogc_space",
-                    true,
-                    VMRequest::discontiguous(),
-                    vm_map,
-                    mmapper,
-                    &mut heap,
-                ),
-            }),
+            unsync: UnsafeCell::new(NoGCUnsync { nogc_space }),
             base: BasePlan::new(vm_map, mmapper, options, heap),
         }
     }
@@ -83,10 +95,14 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         let unsync = unsafe { &*self.unsync.get() };
         unsync.nogc_space.reserved_pages()
     }
+
+    fn handle_user_collection_request(&self, _tls: OpaquePointer, _force: bool) {
+        println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
+    }
 }
 
 impl<VM: VMBinding> NoGC<VM> {
-    pub fn get_immortal_space(&self) -> &'static ImmortalSpace<VM> {
+    pub fn get_immortal_space(&self) -> &'static NoGCImmortalSpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };
         &unsync.nogc_space
     }

@@ -1,4 +1,4 @@
-use super::sstracelocal::SSTraceLocal;
+use super::tracelocal::SSTraceLocal;
 use crate::mmtk::MMTK;
 use crate::plan::phase::PhaseManager;
 use crate::plan::phase::ScheduledPhase;
@@ -57,6 +57,8 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
         self.trace.init(tls);
     }
 
+    // We may have other allocators in the future. We keep the pattern matching code.
+    #[allow(clippy::match_single_binding)]
     fn alloc_copy(
         &mut self,
         _original: ObjectReference,
@@ -92,7 +94,7 @@ impl<VM: VMBinding> CollectorContext<VM> for SSCollector<VM> {
                 trace!("Computing static roots");
                 VM::VMScanning::compute_static_roots(&mut self.trace, self.tls);
                 trace!("Finished static roots");
-                if super::ss::SCAN_BOOT_IMAGE {
+                if super::global::SCAN_BOOT_IMAGE {
                     trace!("Scanning boot image");
                     VM::VMScanning::compute_bootimage_roots(&mut self.trace, self.tls);
                     trace!("Finished boot image");

@@ -3,9 +3,9 @@ use crate::util::constants::*;
 use crate::util::Address;
 
 ////////// FIXME //////////////
-#[cfg(target_pointer_width = "32")]
+#[cfg(any(target_pointer_width = "32", feature = "force_32bit_heap_layout"))]
 pub const HEAP_LAYOUT_32BIT: bool = true;
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(target_pointer_width = "64", not(feature = "force_32bit_heap_layout")))]
 pub const HEAP_LAYOUT_32BIT: bool = false; // FIXME SERIOUSLY
 pub const HEAP_LAYOUT_64BIT: bool = !HEAP_LAYOUT_32BIT;
 
@@ -43,10 +43,16 @@ impl VMRequest {
     }
 
     pub fn discontiguous() -> Self {
+        if HEAP_LAYOUT_64BIT {
+            return Self::common64bit(false);
+        }
         VMRequest::RequestDiscontiguous
     }
 
     pub fn fixed_size(mb: usize) -> Self {
+        if HEAP_LAYOUT_64BIT {
+            return Self::common64bit(false);
+        }
         VMRequest::RequestExtent {
             extent: mb << LOG_BYTES_IN_MBYTE,
             top: false,
@@ -54,10 +60,16 @@ impl VMRequest {
     }
 
     pub fn fraction(frac: f32) -> Self {
+        if HEAP_LAYOUT_64BIT {
+            return Self::common64bit(false);
+        }
         VMRequest::RequestFraction { frac, top: false }
     }
 
     pub fn high_fixed_size(mb: usize) -> Self {
+        if HEAP_LAYOUT_64BIT {
+            return Self::common64bit(true);
+        }
         VMRequest::RequestExtent {
             extent: mb << LOG_BYTES_IN_MBYTE,
             top: true,
@@ -65,6 +77,9 @@ impl VMRequest {
     }
 
     pub fn fixed_extent(extent: usize, top: bool) -> Self {
+        if HEAP_LAYOUT_64BIT {
+            return Self::common64bit(top);
+        }
         VMRequest::RequestExtent { extent, top }
     }
 }

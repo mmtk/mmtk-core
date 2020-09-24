@@ -13,11 +13,15 @@ jobs:
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2019-08-26
+          toolchain: nightly-2020-07-08
           components: rustfmt, clippy
           target: i686-unknown-linux-gnu
           # This overwrites the default toolchain with the toolchain specified above.
           override: true
+
+      # Setup Environments
+      - name: Setup Environments
+        run: ./.github/scripts/ci-setup.sh
 
       # Build
       - name: Build

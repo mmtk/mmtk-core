@@ -15,6 +15,7 @@ pub mod memory;
 pub mod opaque_pointer;
 pub mod options;
 pub mod queue;
+pub mod raw_memory_freelist;
 pub mod reference_processor;
 #[cfg(feature = "sanity")]
 pub mod sanity;

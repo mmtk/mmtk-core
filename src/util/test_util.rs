@@ -1,4 +1,5 @@
 use std::sync::mpsc;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
@@ -20,4 +21,17 @@ where
         Ok(_) => handle.join().expect("Thread panicked"),
         Err(e) => panic!("Thread took too long: {}", e),
     }
+}
+
+lazy_static! {
+    static ref SERIAL_TEST_LOCK: Mutex<()> = Mutex::default();
+}
+
+// force some tests to be executed serially
+pub fn serial_test<F>(f: F)
+where
+    F: FnOnce(),
+{
+    let _lock = SERIAL_TEST_LOCK.lock();
+    f();
 }

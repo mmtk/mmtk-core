@@ -8,6 +8,13 @@ pub fn zero(start: Address, len: usize) {
     }
 }
 
+/// Demand-zero mmap:
+/// This function guarantees to zero all mapped memory.
+///
+/// On linux, this is achieved by using the `MAP_ANON` mmap flag.
+///
+/// ***TODO: Unimplemented for other OSes***
+#[cfg(target_os = "linux")]
 pub fn dzmmap(start: Address, size: usize) -> Result<Address> {
     let prot = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;

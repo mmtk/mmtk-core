@@ -26,6 +26,14 @@ pub const fn chunk_align_down(addr: Address) -> Address {
     addr.align_down(BYTES_IN_CHUNK)
 }
 
+pub const fn mmap_chunk_align_up(addr: Address) -> Address {
+    addr.align_up(MMAP_CHUNK_BYTES)
+}
+
+pub const fn mmap_chunk_align_down(addr: Address) -> Address {
+    addr.align_down(MMAP_CHUNK_BYTES)
+}
+
 pub fn bytes_to_chunks_up(bytes: usize) -> usize {
     (bytes + BYTES_IN_CHUNK - 1) >> LOG_BYTES_IN_CHUNK
 }

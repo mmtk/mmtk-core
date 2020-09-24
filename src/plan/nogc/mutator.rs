@@ -42,6 +42,21 @@ pub fn create_nogc_mutator<VM: VMBinding>(mutator_tls: OpaquePointer, plan: &'st
 //     fn common(&self) -> &CommonMutatorContext<VM> {
 //         unreachable!()
 //     }
+    // We may match other patterns in the future, so temporarily disable this check
+    // #[allow(clippy::single_match)]
+    // #[allow(clippy::match_single_binding)]
+    // fn post_alloc(
+    //     &mut self,
+    //     _refer: ObjectReference,
+    //     _type_refer: ObjectReference,
+    //     _bytes: usize,
+    //     allocator: AllocationType,
+    // ) {
+    //     match allocator {
+    //         // FIXME: other allocation types
+    //         _ => {}
+    //     }
+    // }
 
 //     fn collection_phase(&mut self, _tls: OpaquePointer, _phase: &Phase, _primary: bool) {
 //         unreachable!()

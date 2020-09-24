@@ -13,8 +13,8 @@ use crate::util::OpaquePointer;
 
 use std::cell::UnsafeCell;
 
-use crate::plan::plan::BasePlan;
-use crate::plan::plan::CommonPlan;
+use crate::plan::global::BasePlan;
+use crate::plan::global::CommonPlan;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -22,7 +22,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
 use crate::plan::mutator_context::Mutator;
-use crate::plan::semispace::ssmutator::create_ss_mutator;
+use crate::plan::semispace::mutator::create_ss_mutator;
 use std::sync::Arc;
 
 pub type SelectedPlan<VM> = SemiSpace<VM>;
