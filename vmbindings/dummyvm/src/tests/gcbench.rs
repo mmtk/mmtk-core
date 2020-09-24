@@ -1,7 +1,5 @@
-extern crate mmtk_dummyvm;
-extern crate mmtk;
-use mmtk_dummyvm::api::*;
-use mmtk_dummyvm::DummyVM;
+use crate::api::*;
+use crate::DummyVM;
 use mmtk::util::{OpaquePointer};
 use mmtk::Allocator;
 use std::ptr;
