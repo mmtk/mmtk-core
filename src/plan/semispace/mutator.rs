@@ -1,6 +1,7 @@
 use crate::plan::mutator_context::{CommonMutatorContext, MutatorContext};
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
+use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
@@ -55,7 +56,8 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
             allocator
         );
         debug_assert!(
-            self.ss.get_space().unwrap() as *const _ == self.plan.tospace() as *const _,
+            self.ss.get_space().unwrap().common().descriptor
+                == self.plan.tospace().common().descriptor,
             "bumpallocator {:?} holds wrong space, ss.space: {:?}, tospace: {:?}",
             self as *const _,
             self.ss.get_space().unwrap() as *const _,
@@ -74,7 +76,10 @@ impl<VM: VMBinding> MutatorContext<VM> for SSMutator<VM> {
         _bytes: usize,
         allocator: AllocationType,
     ) {
-        debug_assert!(self.ss.get_space().unwrap() as *const _ == self.plan.tospace() as *const _);
+        debug_assert!(
+            self.ss.get_space().unwrap().common().descriptor
+                == self.plan.tospace().common().descriptor
+        );
         match allocator {
             AllocationType::Default => {}
             _ => self.common.post_alloc(object, _type, _bytes, allocator),

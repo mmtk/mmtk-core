@@ -42,6 +42,7 @@ impl<VM: VMBinding> MutatorContext<VM> for NoGCMutator<VM> {
 
     // We may match other patterns in the future, so temporarily disable this check
     #[allow(clippy::single_match)]
+    #[allow(clippy::match_single_binding)]
     fn post_alloc(
         &mut self,
         _refer: ObjectReference,

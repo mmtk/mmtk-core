@@ -146,6 +146,10 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         vm_map: &'static VMMap,
     ) -> Self {
         let pages = conversions::bytes_to_pages(bytes);
+        // We use MaybeUninit::uninit().assume_init(), which is nul, for a Box value, which cannot be null.
+        // FIXME: We should try either remove this kind of circular dependency or use MaybeUninit<T> instead of Box<T>
+        #[allow(invalid_value)]
+        #[allow(clippy::uninit_assumed_init)]
         let common_flpr = unsafe {
             let mut common_flpr = Box::new(CommonFreeListPageResource {
                 free_list: MaybeUninit::uninit().assume_init(),
@@ -183,6 +187,10 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     }
 
     pub fn new_discontiguous(meta_data_pages_per_region: usize, vm_map: &'static VMMap) -> Self {
+        // We use MaybeUninit::uninit().assume_init(), which is nul, for a Box value, which cannot be null.
+        // FIXME: We should try either remove this kind of circular dependency or use MaybeUninit<T> instead of Box<T>
+        #[allow(invalid_value)]
+        #[allow(clippy::uninit_assumed_init)]
         let common_flpr = unsafe {
             let mut common_flpr = Box::new(CommonFreeListPageResource {
                 free_list: MaybeUninit::uninit().assume_init(),

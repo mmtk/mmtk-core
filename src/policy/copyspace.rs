@@ -110,6 +110,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         self.from_space = from_space;
     }
 
+    /// # Safety
+    /// TODO: I am not sure why this is unsafe.
     pub unsafe fn release(&mut self) {
         self.pr.reset();
         self.from_space = false;
