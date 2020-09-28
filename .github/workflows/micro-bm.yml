@@ -50,7 +50,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.4.0"
+          ref: "master"
           path: ci-perf-kit
           submodules: true
       # run compare
