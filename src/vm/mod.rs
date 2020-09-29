@@ -1,3 +1,5 @@
+use crate::util::constants::*;
+
 mod active_plan;
 mod collection;
 mod object_model;
@@ -19,4 +21,17 @@ where
     type VMCollection: Collection<Self>;
     type VMActivePlan: ActivePlan<Self>;
     type VMReferenceGlue: ReferenceGlue<Self>;
+
+    const ALIGNMENT_VALUE: usize = 0xdead_beef;
+    const LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
+    const MIN_ALIGNMENT: usize = 1 << Self::LOG_MIN_ALIGNMENT;
+    #[cfg(target_arch = "x86")]
+    const MAX_ALIGNMENT_SHIFT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
+    #[cfg(target_arch = "x86_64")]
+    const MAX_ALIGNMENT_SHIFT: usize = LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
+    
+    const MAX_ALIGNMENT: usize = Self::MIN_ALIGNMENT << Self::MAX_ALIGNMENT_SHIFT;
+    // This value is used to assert if the cursor is reasonable after last allocation. 
+    // At the end of an allocation, the allocation cursor should be aligned to this value. 
+    const ALLOC_END_ALIGNMENT: usize = 1;
 }
