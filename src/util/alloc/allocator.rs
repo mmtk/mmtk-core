@@ -11,7 +11,11 @@ use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection};
 
 #[inline(always)]
-pub fn align_allocation_no_fill<VM: VMBinding>(region: Address, alignment: usize, offset: isize) -> Address {
+pub fn align_allocation_no_fill<VM: VMBinding>(
+    region: Address,
+    alignment: usize,
+    offset: isize,
+) -> Address {
     align_allocation::<VM>(region, alignment, offset, VM::MIN_ALIGNMENT, false)
 }
 
@@ -77,7 +81,11 @@ pub fn fill_alignment_gap<VM: VMBinding>(immut_start: Address, end: Address) {
 }
 
 #[inline(always)]
-pub fn get_maximum_aligned_size<VM: VMBinding>(size: usize, alignment: usize, known_alignment: usize) -> usize {
+pub fn get_maximum_aligned_size<VM: VMBinding>(
+    size: usize,
+    alignment: usize,
+    known_alignment: usize,
+) -> usize {
     trace!(
         "size={}, alignment={}, known_alignment={}, MIN_ALIGNMENT={}",
         size,

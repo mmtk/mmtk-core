@@ -29,9 +29,12 @@ where
     const MAX_ALIGNMENT_SHIFT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
     #[cfg(target_arch = "x86_64")]
     const MAX_ALIGNMENT_SHIFT: usize = LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
-    
+
     const MAX_ALIGNMENT: usize = Self::MIN_ALIGNMENT << Self::MAX_ALIGNMENT_SHIFT;
-    // This value is used to assert if the cursor is reasonable after last allocation. 
-    // At the end of an allocation, the allocation cursor should be aligned to this value. 
+
+    // This value is used to assert if the cursor is reasonable after last allocation.
+    // At the end of an allocation, the allocation cursor should be aligned to this value.
+    // Note that MMTk does not attempt to do anything to align the cursor to this value, but
+    // it merely asserts with this constant.
     const ALLOC_END_ALIGNMENT: usize = 1;
 }
