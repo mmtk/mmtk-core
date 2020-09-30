@@ -5,6 +5,7 @@ use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
+use crate::util::alloc::allocators::{Allocators, AllocatorSelector};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
@@ -16,16 +17,21 @@ pub fn nogc_collection_phase<VM: VMBinding>(mutator: &mut Mutator<VM, NoGC<VM>>,
 
 pub fn create_nogc_mutator<VM: VMBinding>(mutator_tls: OpaquePointer, plan: &'static NoGC<VM>) -> Mutator<VM, NoGC<VM>> {
     let config = MutatorConfig {
-        allocators: vec![
-            // 0 - nogc
-            Box::new(BumpAllocator::new(mutator_tls, Some(plan.get_immortal_space()), plan)),
-        ],
+        // allocators: vec![
+        //     // 0 - nogc
+        //     Box::new(),
+        // ],
         allocator_mapping: enum_map!{
-            AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly | AllocationType::Los => 0,
+            AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::BumpPointer(0),
         },
         collection_phase_func: &nogc_collection_phase,
     };
+
+    let mut allocators = Allocators::<VM>::uninit();
+    allocators.bump_pointer[0].write(BumpAllocator::new(mutator_tls, Some(plan.get_immortal_space()), plan));
+
     Mutator {
+        allocators,
         mutator_tls,
         config,
         plan

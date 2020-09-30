@@ -4,6 +4,8 @@
 #![feature(drain_filter)]
 #![feature(nll)]
 #![feature(box_syntax)]
+#![feature(maybe_uninit_ref)]
+#![feature(maybe_uninit_extra)]
 
 #[macro_use]
 extern crate custom_derive;

@@ -6,6 +6,7 @@ use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::alloc::LargeObjectAllocator;
+use crate::util::alloc::allocators::{Allocators, AllocatorSelector};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
@@ -20,7 +21,7 @@ pub fn ss_collection_phase<VM: VMBinding>(mutator: &mut Mutator<VM, SemiSpace<VM
     match phase {
         Phase::Release => {
             // rebind the allocation bump pointer to the appropriate semispace
-            let bump_allocator = mutator.config.get_allocator_mut(AllocationType::Default).downcast_mut::<BumpAllocator<VM>>().unwrap();
+            let bump_allocator = unsafe { mutator.allocators.get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default]) }.downcast_mut::<BumpAllocator<VM>>().unwrap();
             bump_allocator.rebind(Some(mutator.plan.tospace()));
         }
         _ => {}
@@ -29,24 +30,29 @@ pub fn ss_collection_phase<VM: VMBinding>(mutator: &mut Mutator<VM, SemiSpace<VM
 
 pub fn create_ss_mutator<VM: VMBinding>(mutator_tls: OpaquePointer, plan: &'static SemiSpace<VM>) -> Mutator<VM, SemiSpace<VM>> {
     let config = MutatorConfig {
-        allocators: vec![
-            // 0 - ss
-            Box::new(BumpAllocator::new(mutator_tls, Some(plan.fromspace()), plan)),
-            // 1 - immortal
-            Box::new(BumpAllocator::new(mutator_tls, Some(plan.common.get_immortal()), plan)),
-            // 2 - los
-            Box::new(LargeObjectAllocator::new(mutator_tls, Some(plan.common.get_los()), plan)),
-        ],
+        // allocators: vec![
+        //     // 0 - ss
+        //     Box::new(),
+        //     // 1 - immortal
+        //     Box::new(),
+        //     // 2 - los
+        //     Box::new(),
+        // ],
         allocator_mapping: enum_map!{
-            AllocationType::Default => 0,
-            AllocationType::Immortal => 1,
-            AllocationType::Code => 1,
-            AllocationType::ReadOnly => 1,
-            AllocationType::Los => 2,
+            AllocationType::Default => AllocatorSelector::BumpPointer(0),
+            AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
+            AllocationType::Los => AllocatorSelector::LargeObject(0),
         },
         collection_phase_func: &ss_collection_phase,
     };
+
+    let mut allocators = Allocators::<VM>::uninit();
+    allocators.bump_pointer[0].write(BumpAllocator::new(mutator_tls, Some(plan.fromspace()), plan));
+    allocators.bump_pointer[1].write(BumpAllocator::new(mutator_tls, Some(plan.common.get_immortal()), plan));
+    allocators.large_object[0].write(LargeObjectAllocator::new(mutator_tls, Some(plan.common.get_los()), plan));
+
     Mutator {
+        allocators,
         mutator_tls,
         config,
         plan

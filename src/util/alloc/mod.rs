@@ -1,4 +1,5 @@
 pub mod allocator;
+pub mod allocators;
 mod bumpallocator;
 pub mod dump_linear_scan;
 pub mod embedded_meta_data;

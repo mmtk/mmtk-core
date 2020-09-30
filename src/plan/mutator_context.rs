@@ -4,6 +4,7 @@ use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
 use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator};
+use crate::util::alloc::allocators::{Allocators, AllocatorSelector};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
@@ -13,26 +14,15 @@ use enum_map::EnumMap;
 
 pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
     // All the allocators for this mutator
-    pub allocators: Vec<Box<dyn Allocator<VM>>>,
+    // pub allocators: Vec<Box<dyn Allocator<VM>>>,
     // Mapping between allocation semantics and allocator index
-    pub allocator_mapping: EnumMap<AllocationType, usize>,
+    pub allocator_mapping: EnumMap<AllocationType, AllocatorSelector>,
     // Plan-specific code for mutator collection phase
     pub collection_phase_func: &'static dyn Fn(&mut Mutator<VM, P>, OpaquePointer, &Phase, bool),
 }
 
-impl<VM: VMBinding, P: Plan<VM> + 'static> MutatorConfig<VM, P> {
-    pub fn get_allocator(&self, allocator: AllocationType) -> &dyn Allocator<VM> {
-        let allocator_index = self.allocator_mapping[allocator];
-        self.allocators[allocator_index].as_ref()
-    }
-
-    pub fn get_allocator_mut(&mut self, allocator: AllocationType) -> &mut dyn Allocator<VM> {
-        let allocator_index = self.allocator_mapping[allocator];
-        self.allocators[allocator_index].as_mut()
-    }
-}
-
 pub struct Mutator<VM: VMBinding, P: Plan<VM> + 'static> {
+    pub allocators: Allocators<VM>,
     pub mutator_tls: OpaquePointer,
     pub config: MutatorConfig<VM, P>,
     // pub common: CommonMutatorContext<VM>,
@@ -60,11 +50,11 @@ impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
-        self.config.get_allocator_mut(allocator).alloc(size, align, offset)
+        unsafe { self.allocators.get_allocator_mut(self.config.allocator_mapping[allocator]) }.alloc(size, align, offset)
     }
 
     fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
-        self.config.get_allocator(allocator).get_space().unwrap().initialize_header(refer, true)
+        unsafe { self.allocators.get_allocator_mut(self.config.allocator_mapping[allocator]) }.get_space().unwrap().initialize_header(refer, true)
     }
 
     fn get_tls(&self) -> OpaquePointer {
