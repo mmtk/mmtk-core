@@ -17,21 +17,17 @@ pub fn nogc_collection_phase<VM: VMBinding>(mutator: &mut Mutator<VM, NoGC<VM>>,
 
 pub fn create_nogc_mutator<VM: VMBinding>(mutator_tls: OpaquePointer, plan: &'static NoGC<VM>) -> Mutator<VM, NoGC<VM>> {
     let config = MutatorConfig {
-        // allocators: vec![
-        //     // 0 - nogc
-        //     Box::new(),
-        // ],
         allocator_mapping: enum_map!{
             AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::BumpPointer(0),
         },
+        space_mapping: vec![
+            (AllocatorSelector::BumpPointer(0), plan.get_immortal_space()),
+        ],
         collection_phase_func: &nogc_collection_phase,
     };
 
-    let mut allocators = Allocators::<VM>::uninit();
-    allocators.bump_pointer[0].write(BumpAllocator::new(mutator_tls, Some(plan.get_immortal_space()), plan));
-
     Mutator {
-        allocators,
+        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
         mutator_tls,
         config,
         plan

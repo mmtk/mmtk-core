@@ -30,29 +30,21 @@ pub fn ss_collection_phase<VM: VMBinding>(mutator: &mut Mutator<VM, SemiSpace<VM
 
 pub fn create_ss_mutator<VM: VMBinding>(mutator_tls: OpaquePointer, plan: &'static SemiSpace<VM>) -> Mutator<VM, SemiSpace<VM>> {
     let config = MutatorConfig {
-        // allocators: vec![
-        //     // 0 - ss
-        //     Box::new(),
-        //     // 1 - immortal
-        //     Box::new(),
-        //     // 2 - los
-        //     Box::new(),
-        // ],
         allocator_mapping: enum_map!{
             AllocationType::Default => AllocatorSelector::BumpPointer(0),
             AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
             AllocationType::Los => AllocatorSelector::LargeObject(0),
         },
+        space_mapping: vec![
+            (AllocatorSelector::BumpPointer(0), plan.fromspace()),
+            (AllocatorSelector::BumpPointer(1), plan.common.get_immortal()),
+            (AllocatorSelector::LargeObject(0), plan.common.get_los()),
+        ],
         collection_phase_func: &ss_collection_phase,
     };
 
-    let mut allocators = Allocators::<VM>::uninit();
-    allocators.bump_pointer[0].write(BumpAllocator::new(mutator_tls, Some(plan.fromspace()), plan));
-    allocators.bump_pointer[1].write(BumpAllocator::new(mutator_tls, Some(plan.common.get_immortal()), plan));
-    allocators.large_object[0].write(LargeObjectAllocator::new(mutator_tls, Some(plan.common.get_los()), plan));
-
     Mutator {
-        allocators,
+        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
         mutator_tls,
         config,
         plan

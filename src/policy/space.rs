@@ -25,6 +25,8 @@ use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
+use downcast_rs::Downcast;
+
 /**
  * Space Function Table (SFT).
  *
@@ -138,7 +140,7 @@ impl SFTMap {
     }
 }
 
-pub trait Space<VM: VMBinding>: 'static + SFT + Sync {
+pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
@@ -323,6 +325,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync {
         println!();
     }
 }
+
+impl_downcast!(Space<VM> where VM: VMBinding);
 
 pub struct CommonSpace<VM: VMBinding> {
     pub name: &'static str,

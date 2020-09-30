@@ -9,14 +9,15 @@ use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::vm::Collection;
+use crate::policy::space::Space;
 
 use enum_map::EnumMap;
 
 pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
-    // All the allocators for this mutator
-    // pub allocators: Vec<Box<dyn Allocator<VM>>>,
-    // Mapping between allocation semantics and allocator index
-    pub allocator_mapping: EnumMap<AllocationType, AllocatorSelector>,
+    // Mapping between allocation semantics and allocator selector
+    pub allocator_mapping: EnumMap<AllocationType, AllocatorSelector>,    
+    // Mapping between allocator selector and spaces. Each pair represents a mapping.
+    pub space_mapping: Vec<(AllocatorSelector, &'static dyn Space<VM>)>,
     // Plan-specific code for mutator collection phase
     pub collection_phase_func: &'static dyn Fn(&mut Mutator<VM, P>, OpaquePointer, &Phase, bool),
 }
