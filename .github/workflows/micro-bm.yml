@@ -58,7 +58,7 @@ jobs:
       - name: Compare Performance
         id: run
         run: |
-          RUSTUP_TOOLCHAIN=nightly-2019-08-26 ./ci-perf-kit/scripts/openjdk-micro-bm.sh mmtk-openjdk-trunk/ mmtk-core-trunk/ mmtk-openjdk-branch/ mmtk-core-branch/ openjdk-rebench-report.md
+          RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./ci-perf-kit/scripts/openjdk-micro-bm.sh mmtk-openjdk-trunk/ mmtk-core-trunk/ mmtk-openjdk-branch/ mmtk-core-branch/ openjdk-rebench-report.md
       # set report.md to output
       - uses: pCYSl5EDgo/cat@master
         id: cat
