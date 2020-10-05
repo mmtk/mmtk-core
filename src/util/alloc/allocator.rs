@@ -10,45 +10,38 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection};
 
-// FIXME: Put this somewhere more appropriate
-pub const ALIGNMENT_VALUE: usize = 0xdead_beef;
-pub const LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
-pub const MIN_ALIGNMENT: usize = 1 << LOG_MIN_ALIGNMENT;
-#[cfg(target_arch = "x86")]
-pub const MAX_ALIGNMENT_SHIFT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
-#[cfg(target_arch = "x86_64")]
-pub const MAX_ALIGNMENT_SHIFT: usize = LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
-
-pub const MAX_ALIGNMENT: usize = MIN_ALIGNMENT << MAX_ALIGNMENT_SHIFT;
-
 #[inline(always)]
-pub fn align_allocation_no_fill(region: Address, alignment: usize, offset: isize) -> Address {
-    align_allocation(region, alignment, offset, MIN_ALIGNMENT, false)
+pub fn align_allocation_no_fill<VM: VMBinding>(
+    region: Address,
+    alignment: usize,
+    offset: isize,
+) -> Address {
+    align_allocation::<VM>(region, alignment, offset, VM::MIN_ALIGNMENT, false)
 }
 
 #[inline(always)]
-pub fn align_allocation(
+pub fn align_allocation<VM: VMBinding>(
     region: Address,
     alignment: usize,
     offset: isize,
     known_alignment: usize,
     fillalignmentgap: bool,
 ) -> Address {
-    debug_assert!(known_alignment >= MIN_ALIGNMENT);
+    debug_assert!(known_alignment >= VM::MIN_ALIGNMENT);
     // Make sure MIN_ALIGNMENT is reasonable.
     #[allow(clippy::assertions_on_constants)]
     {
-        debug_assert!(MIN_ALIGNMENT >= BYTES_IN_INT);
+        debug_assert!(VM::MIN_ALIGNMENT >= BYTES_IN_INT);
     }
     debug_assert!(!(fillalignmentgap && region.is_zero()));
-    debug_assert!(alignment <= MAX_ALIGNMENT);
+    debug_assert!(alignment <= VM::MAX_ALIGNMENT);
     debug_assert!(offset >= 0);
-    debug_assert!(region.is_aligned_to(MIN_ALIGNMENT));
-    debug_assert!((alignment & (MIN_ALIGNMENT - 1)) == 0);
-    debug_assert!((offset & (MIN_ALIGNMENT - 1) as isize) == 0);
+    debug_assert!(region.is_aligned_to(VM::ALLOC_END_ALIGNMENT));
+    debug_assert!((alignment & (VM::MIN_ALIGNMENT - 1)) == 0);
+    debug_assert!((offset & (VM::MIN_ALIGNMENT - 1) as isize) == 0);
 
     // No alignment ever required.
-    if alignment <= known_alignment || MAX_ALIGNMENT <= MIN_ALIGNMENT {
+    if alignment <= known_alignment || VM::MAX_ALIGNMENT <= VM::MIN_ALIGNMENT {
         return region;
     }
 
@@ -59,28 +52,28 @@ pub fn align_allocation(
     let neg_off = -offset; // fromIntSignExtend
     let delta = (neg_off - region_isize) & mask;
 
-    if fillalignmentgap && (ALIGNMENT_VALUE != 0) {
-        fill_alignment_gap(region, region + delta);
+    if fillalignmentgap && (VM::ALIGNMENT_VALUE != 0) {
+        fill_alignment_gap::<VM>(region, region + delta);
     }
 
     region + delta
 }
 
 #[inline(always)]
-pub fn fill_alignment_gap(immut_start: Address, end: Address) {
+pub fn fill_alignment_gap<VM: VMBinding>(immut_start: Address, end: Address) {
     let mut start = immut_start;
 
-    if MAX_ALIGNMENT - MIN_ALIGNMENT == BYTES_IN_INT {
+    if VM::MAX_ALIGNMENT - VM::MIN_ALIGNMENT == BYTES_IN_INT {
         // At most a single hole
         if end - start != 0 {
             unsafe {
-                start.store(ALIGNMENT_VALUE);
+                start.store(VM::ALIGNMENT_VALUE);
             }
         }
     } else {
         while start < end {
             unsafe {
-                start.store(ALIGNMENT_VALUE);
+                start.store(VM::ALIGNMENT_VALUE);
             }
             start += BYTES_IN_INT;
         }
@@ -88,18 +81,22 @@ pub fn fill_alignment_gap(immut_start: Address, end: Address) {
 }
 
 #[inline(always)]
-pub fn get_maximum_aligned_size(size: usize, alignment: usize, known_alignment: usize) -> usize {
+pub fn get_maximum_aligned_size<VM: VMBinding>(
+    size: usize,
+    alignment: usize,
+    known_alignment: usize,
+) -> usize {
     trace!(
         "size={}, alignment={}, known_alignment={}, MIN_ALIGNMENT={}",
         size,
         alignment,
         known_alignment,
-        MIN_ALIGNMENT
+        VM::MIN_ALIGNMENT
     );
     debug_assert!(size == size & !(known_alignment - 1));
-    debug_assert!(known_alignment >= MIN_ALIGNMENT);
+    debug_assert!(known_alignment >= VM::MIN_ALIGNMENT);
 
-    if MAX_ALIGNMENT <= MIN_ALIGNMENT || alignment <= known_alignment {
+    if VM::MAX_ALIGNMENT <= VM::MIN_ALIGNMENT || alignment <= known_alignment {
         size
     } else {
         size + alignment - known_alignment
