@@ -25,9 +25,9 @@ pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
 pub struct Mutator<VM: VMBinding, P: Plan<VM> + 'static> {
     pub allocators: Allocators<VM>,
     pub mutator_tls: OpaquePointer,
-    pub config: MutatorConfig<VM, P>,
     // pub common: CommonMutatorContext<VM>,
     pub plan: &'static P,
+    pub config: MutatorConfig<VM, P>,
 }
 
 impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
