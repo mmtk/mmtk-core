@@ -12,6 +12,7 @@ use crate::util::{Address, ObjectReference};
 
 use self::selected_plan::SelectedPlan;
 use crate::plan::selected_plan;
+use crate::util::alloc::allocators::AllocatorSelector;
 
 use self::selected_plan::{SelectedCollector, SelectedTraceLocal};
 use crate::mmtk::MMTK;
@@ -81,6 +82,10 @@ pub fn post_alloc<VM: VMBinding>(
     allocator: Allocator,
 ) {
     mutator.post_alloc(refer, type_refer, bytes, allocator);
+}
+
+pub fn get_allocator_mapping<VM: VMBinding>(mmtk: &MMTK<VM>, allocator: Allocator) -> AllocatorSelector {
+    mmtk.plan.get_allocator_mapping()[allocator]
 }
 
 // The parameter 'trace_local' could either be &mut SelectedTraceLocal or &mut SanityChecker.

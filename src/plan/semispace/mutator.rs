@@ -16,6 +16,7 @@ use crate::vm::VMBinding;
 use crate::plan::mutator_context::MutatorConfig;
 use downcast_rs::Downcast;
 use enum_map::enum_map;
+use enum_map::EnumMap;
 
 pub fn ss_collection_phase<VM: VMBinding>(mutator: &mut Mutator<VM, SemiSpace<VM>>, tls: OpaquePointer, phase: &Phase, primary: bool) {
     match phase {
@@ -28,13 +29,17 @@ pub fn ss_collection_phase<VM: VMBinding>(mutator: &mut Mutator<VM, SemiSpace<VM
     }
 }
 
+lazy_static!{
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map!{
+        AllocationType::Default => AllocatorSelector::BumpPointer(0),
+        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
+        AllocationType::Los => AllocatorSelector::LargeObject(0),
+    };
+}
+
 pub fn create_ss_mutator<VM: VMBinding>(mutator_tls: OpaquePointer, plan: &'static SemiSpace<VM>) -> Mutator<VM, SemiSpace<VM>> {
     let config = MutatorConfig {
-        allocator_mapping: enum_map!{
-            AllocationType::Default => AllocatorSelector::BumpPointer(0),
-            AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
-            AllocationType::Los => AllocatorSelector::LargeObject(0),
-        },
+        allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: vec![
             (AllocatorSelector::BumpPointer(0), plan.fromspace()),
             (AllocatorSelector::BumpPointer(1), plan.common.get_immortal()),

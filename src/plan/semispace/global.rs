@@ -10,6 +10,7 @@ use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::util::heap::VMRequest;
 use crate::util::OpaquePointer;
+use crate::util::alloc::allocators::{Allocators, AllocatorSelector};
 
 use std::cell::UnsafeCell;
 
@@ -24,6 +25,9 @@ use crate::vm::VMBinding;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::semispace::mutator::create_ss_mutator;
 use std::sync::Arc;
+use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
+
+use enum_map::EnumMap;
 
 pub type SelectedPlan<VM> = SemiSpace<VM>;
 
@@ -93,6 +97,10 @@ impl<VM: VMBinding> Plan<VM> for SemiSpace<VM> {
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<VM, Self>> {
         Box::new(create_ss_mutator(tls, self))
+    }
+
+    fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector> {
+        &*ALLOCATOR_MAPPING
     }
 
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase) {

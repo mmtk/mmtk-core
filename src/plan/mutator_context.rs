@@ -15,7 +15,7 @@ use enum_map::EnumMap;
 
 pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
     // Mapping between allocation semantics and allocator selector
-    pub allocator_mapping: EnumMap<AllocationType, AllocatorSelector>,    
+    pub allocator_mapping: &'static EnumMap<AllocationType, AllocatorSelector>,    
     // Mapping between allocator selector and spaces. Each pair represents a mapping.
     pub space_mapping: Vec<(AllocatorSelector, &'static dyn Space<VM>)>,
     // Plan-specific code for mutator collection phase

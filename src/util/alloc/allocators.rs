@@ -21,8 +21,8 @@ impl<VM: VMBinding> Allocators<VM> {
     /// The selector needs to be valid, and points to an allocator that has been initialized.
     pub unsafe fn get_allocator(&self, selector: AllocatorSelector) -> &dyn Allocator<VM> {
         match selector {
-            AllocatorSelector::BumpPointer(index) => self.bump_pointer[index].get_ref(),
-            AllocatorSelector::LargeObject(index) => self.large_object[index].get_ref(),
+            AllocatorSelector::BumpPointer(index) => self.bump_pointer[index as usize].get_ref(),
+            AllocatorSelector::LargeObject(index) => self.large_object[index as usize].get_ref(),
         }
     }
 
@@ -30,8 +30,8 @@ impl<VM: VMBinding> Allocators<VM> {
     /// The selector needs to be valid, and points to an allocator that has been initialized.
     pub unsafe fn get_allocator_mut(&mut self, selector: AllocatorSelector) -> &mut dyn Allocator<VM> {
         match selector {
-            AllocatorSelector::BumpPointer(index) => self.bump_pointer[index].get_mut(),
-            AllocatorSelector::LargeObject(index) => self.large_object[index].get_mut(),
+            AllocatorSelector::BumpPointer(index) => self.bump_pointer[index as usize].get_mut(),
+            AllocatorSelector::LargeObject(index) => self.large_object[index as usize].get_mut(),
         }        
     }
 
@@ -44,10 +44,10 @@ impl<VM: VMBinding> Allocators<VM> {
         for &(selector, space) in space_mapping.iter() {
             match selector {
                 AllocatorSelector::BumpPointer(index) => { 
-                    ret.bump_pointer[index].write(BumpAllocator::new(mutator_tls, Some(space), plan));
+                    ret.bump_pointer[index as usize].write(BumpAllocator::new(mutator_tls, Some(space), plan));
                 }
                 AllocatorSelector::LargeObject(index) => {
-                    ret.large_object[index].write(LargeObjectAllocator::new(mutator_tls, Some(space.downcast_ref::<LargeObjectSpace<VM>>().unwrap()), plan));
+                    ret.large_object[index as usize].write(LargeObjectAllocator::new(mutator_tls, Some(space.downcast_ref::<LargeObjectSpace<VM>>().unwrap()), plan));
                 }
             }
         }
@@ -56,8 +56,20 @@ impl<VM: VMBinding> Allocators<VM> {
     }
 }
 
+// This type is equivalent to:
+// #[repr(C)]
+// struct AllocatorSelector {
+//   tag: AllocatorSelectorTag,
+//   payload: u8,    
+// }
+// #[repr(u8)]
+// enum AllocatorSelectorTag {
+//   BumpPointer,
+//   LargeObject,
+// }
+#[repr(C, u8)]
 #[derive(Copy, Clone)]
 pub enum AllocatorSelector {
-    BumpPointer(usize),
-    LargeObject(usize)
+    BumpPointer(u8),
+    LargeObject(u8)
 }

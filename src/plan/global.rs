@@ -22,6 +22,9 @@ use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use enum_map::EnumMap;
+use crate::util::alloc::allocators::AllocatorSelector;
+
 pub trait Plan<VM: VMBinding>: Sized {
     type MutatorT: MutatorContext<VM>;
     type TraceLocalT: TraceLocal;
@@ -50,6 +53,8 @@ pub trait Plan<VM: VMBinding>: Sized {
     /// # Safety
     /// Only the primary collector thread can call this.
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
+
+    fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector>;
 
     #[cfg(feature = "sanity")]
     fn enter_sanity(&self) {

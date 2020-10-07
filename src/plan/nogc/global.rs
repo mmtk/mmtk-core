@@ -18,6 +18,10 @@ use crate::vm::VMBinding;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::nogc::mutator::create_nogc_mutator;
 use std::sync::Arc;
+use crate::plan::Allocator;
+use crate::util::alloc::allocators::{Allocators, AllocatorSelector};
+use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
+use enum_map::EnumMap;
 
 #[cfg(not(feature = "nogc_lock_free"))]
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
@@ -89,6 +93,10 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
 
     unsafe fn collection_phase(&self, _tls: OpaquePointer, _phase: &Phase) {
         unreachable!()
+    }
+
+    fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector> {
+        &*ALLOCATOR_MAPPING
     }
 
     fn get_pages_used(&self) -> usize {
