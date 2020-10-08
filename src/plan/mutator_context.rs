@@ -13,15 +13,22 @@ use crate::policy::space::Space;
 
 use enum_map::EnumMap;
 
+// This struct is part of Mutator. 
+// We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
 pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
     // Mapping between allocation semantics and allocator selector
     pub allocator_mapping: &'static EnumMap<AllocationType, AllocatorSelector>,    
     // Mapping between allocator selector and spaces. Each pair represents a mapping.
-    pub space_mapping: Vec<(AllocatorSelector, &'static dyn Space<VM>)>,
+    // Put this behind a box, so it is a pointer-sized field.
+    pub space_mapping: Box<Vec<(AllocatorSelector, &'static dyn Space<VM>)>>,
     // Plan-specific code for mutator collection phase
     pub collection_phase_func: &'static dyn Fn(&mut Mutator<VM, P>, OpaquePointer, &Phase, bool),
 }
 
+// We are trying to make this struct fixed-sized so that VM bindings can easily define a type to have the exact same layout as this struct.
+// Currently Mutator is fixed sized, and we should try keep this invariant:
+// - Allocators are arrays of allocators, which are fixed sized.
+// - MutatorConfig has 3 pointers/refs (including one fat pointer), and is fixed sized.
 pub struct Mutator<VM: VMBinding, P: Plan<VM> + 'static> {
     pub allocators: Allocators<VM>,
     pub mutator_tls: OpaquePointer,

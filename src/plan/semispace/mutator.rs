@@ -40,7 +40,7 @@ lazy_static!{
 pub fn create_ss_mutator<VM: VMBinding>(mutator_tls: OpaquePointer, plan: &'static SemiSpace<VM>) -> Mutator<VM, SemiSpace<VM>> {
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: vec![
+        space_mapping: box vec![
             (AllocatorSelector::BumpPointer(0), plan.fromspace()),
             (AllocatorSelector::BumpPointer(1), plan.common.get_immortal()),
             (AllocatorSelector::LargeObject(0), plan.common.get_los()),

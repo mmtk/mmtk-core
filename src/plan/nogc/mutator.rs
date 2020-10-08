@@ -25,7 +25,7 @@ lazy_static!{
 pub fn create_nogc_mutator<VM: VMBinding>(mutator_tls: OpaquePointer, plan: &'static NoGC<VM>) -> Mutator<VM, NoGC<VM>> {
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: vec![
+        space_mapping: box vec![
             (AllocatorSelector::BumpPointer(0), plan.get_immortal_space()),
         ],
         collection_phase_func: &nogc_collection_phase,
