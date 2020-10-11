@@ -41,7 +41,7 @@ pub fn create_ss_mutator<VM: VMBinding>(mutator_tls: OpaquePointer, plan: &'stat
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), plan.fromspace()),
+            (AllocatorSelector::BumpPointer(0), plan.tospace()),
             (AllocatorSelector::BumpPointer(1), plan.common.get_immortal()),
             (AllocatorSelector::LargeObject(0), plan.common.get_los()),
         ],

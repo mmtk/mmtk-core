@@ -125,7 +125,7 @@ pub trait Plan<VM: VMBinding>: Sized {
         Self: Sized,
     {
         let stress_force_gc = self.stress_test_gc_required();
-        trace!(
+        debug!(
             "self.get_pages_reserved()={}, self.get_total_pages()={}",
             self.get_pages_reserved(),
             self.get_total_pages()

@@ -104,10 +104,8 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
                 {
                     let regions = 1 + ((page_offset - sync.highwater_mark) >> LOG_PAGES_IN_REGION);
                     let metapages = regions as usize * self.meta_data_pages_per_region;
-                    self.common.reserved.fetch_add(metapages, Ordering::Relaxed);
-                    self.common
-                        .committed
-                        .fetch_add(metapages, Ordering::Relaxed);
+                    self.common.reserve(metapages);
+                    self.common.commit(metapages);
                     new_chunk = true;
                 }
                 sync.highwater_mark = page_offset;
@@ -163,13 +161,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         };
         let growable = HEAP_LAYOUT_64BIT;
         let mut flpr = FreeListPageResource {
-            common: CommonPageResource {
-                reserved: AtomicUsize::new(0),
-                committed: AtomicUsize::new(0),
-                contiguous: true,
-                growable,
-                space: None,
-            },
+            common: CommonPageResource::new(true, growable),
             common_flpr,
             meta_data_pages_per_region,
             sync: Mutex::new(FreeListPageResourceSync {
@@ -203,13 +195,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             common_flpr
         };
         FreeListPageResource {
-            common: CommonPageResource {
-                reserved: AtomicUsize::new(0),
-                committed: AtomicUsize::new(0),
-                contiguous: false,
-                growable: true,
-                space: None,
-            },
+            common: CommonPageResource::new(false, true),
             common_flpr,
             meta_data_pages_per_region,
             sync: Mutex::new(FreeListPageResourceSync {
@@ -325,16 +311,12 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         let pages = self.free_list.size(page_offset as _);
         // if (VM.config.ZERO_PAGES_ON_RELEASE)
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
-        debug_assert!(pages as usize <= self.common.committed.load(Ordering::Relaxed));
+        debug_assert!(pages as usize <= self.common.get_committed());
         let me = unsafe { &mut *(self as *mut Self) };
         let freed = {
             let mut sync = self.sync.lock().unwrap();
-            self.common
-                .reserved
-                .fetch_sub(pages as _, Ordering::Relaxed);
-            self.common
-                .committed
-                .fetch_sub(pages as _, Ordering::Relaxed);
+            self.common.release_reserved(pages as _);
+            self.common.release_committed(pages as _);
             let freed = me.free_list.free(page_offset as _, true);
             sync.pages_currently_on_freelist += pages as usize;
             freed

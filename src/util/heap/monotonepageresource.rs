@@ -190,13 +190,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         let sentinel = start + bytes;
 
         MonotonePageResource {
-            common: CommonPageResource {
-                reserved: AtomicUsize::new(0),
-                committed: AtomicUsize::new(0),
-                contiguous: true,
-                growable: HEAP_LAYOUT_64BIT,
-                space: None,
-            },
+            common: CommonPageResource::new(true, HEAP_LAYOUT_64BIT),
 
             meta_data_pages_per_region,
             sync: Mutex::new(MonotonePageResourceSync {
@@ -214,13 +208,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
 
     pub fn new_discontiguous(meta_data_pages_per_region: usize, _vm_map: &'static VMMap) -> Self {
         MonotonePageResource {
-            common: CommonPageResource {
-                reserved: AtomicUsize::new(0),
-                committed: AtomicUsize::new(0),
-                contiguous: false,
-                growable: true,
-                space: None,
-            },
+            common: CommonPageResource::new(false, true),
 
             meta_data_pages_per_region,
             sync: Mutex::new(MonotonePageResourceSync {
@@ -252,8 +240,8 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
     /// TODO: I am not sure why this is unsafe.
     pub unsafe fn reset(&self) {
         let mut guard = self.sync.lock().unwrap();
-        self.common().reserved.store(0, Ordering::Relaxed);
-        self.common().committed.store(0, Ordering::Relaxed);
+        self.common().reset_reserved();
+        self.common().reset_committed();
         self.release_pages(&mut guard);
         drop(guard);
     }

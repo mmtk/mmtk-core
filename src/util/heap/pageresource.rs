@@ -108,10 +108,55 @@ pub trait PageResource<VM: VMBinding>: 'static {
 }
 
 pub struct CommonPageResource<VM: VMBinding> {
-    pub reserved: AtomicUsize,
-    pub committed: AtomicUsize,
+    reserved: AtomicUsize,
+    committed: AtomicUsize,
 
     pub contiguous: bool,
     pub growable: bool,
     pub space: Option<&'static dyn Space<VM>>,
+}
+
+impl<VM: VMBinding> CommonPageResource<VM> {
+    pub fn new(contiguous: bool, growable: bool) -> CommonPageResource<VM> {
+        CommonPageResource {
+            reserved: AtomicUsize::new(0),
+            committed: AtomicUsize::new(0),
+
+            contiguous,
+            growable,
+            space: None,
+        }
+    }
+
+    pub fn reserve(&self, pages: usize) {
+        self.reserved.fetch_add(pages, Ordering::Relaxed);
+    }
+
+    pub fn release_reserved(&self, pages: usize) {
+        self.reserved.fetch_sub(pages, Ordering::Relaxed);
+    }
+
+    pub fn get_reserved(&self) -> usize {
+        self.reserved.load(Ordering::Relaxed)
+    }
+
+    pub fn reset_reserved(&self) {
+        self.reserved.store(0, Ordering::Relaxed);
+    }
+
+    pub fn commit(&self, pages: usize) {
+        self.committed.fetch_add(pages, Ordering::Relaxed);
+    }
+
+    pub fn release_committed(&self, pages: usize) {
+        self.committed.fetch_sub(pages, Ordering::Relaxed);
+    }
+
+    pub fn get_committed(&self) -> usize {
+        self.committed.load(Ordering::Relaxed)
+    }
+
+    pub fn reset_committed(&self) {
+        self.committed.store(0, Ordering::Relaxed);
+    }
 }

@@ -160,12 +160,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Polling ..");
 
         if allow_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
-            trace!("Collection required");
+            debug!("Collection required");
             pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(tls);
             unsafe { Address::zero() }
         } else {
-            trace!("Collection not required");
+            debug!("Collection not required");
             let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, tls);
             if rtn.is_zero() {
                 if !allow_poll {
@@ -178,6 +178,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 VM::VMCollection::block_for_gc(tls);
                 unsafe { Address::zero() }
             } else {
+                debug!("Space.acquire(), returned = {}", rtn);
                 rtn
             }
         }
