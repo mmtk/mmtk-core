@@ -32,7 +32,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install libc6-dev-i386
-          export RUSTUP_TOOLCHAIN=
+          export RUSTUP_TOOLCHAIN=nightly-2020-07-08
           ./.github/scripts/ci-test.sh
 
       # Style checks

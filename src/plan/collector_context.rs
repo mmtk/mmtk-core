@@ -32,10 +32,10 @@ pub trait CollectorContext<VM: VMBinding> {
         align: usize,
         allocator: Allocator,
     ) -> Allocator {
-        let large = crate::util::alloc::allocator::get_maximum_aligned_size(
+        let large = crate::util::alloc::allocator::get_maximum_aligned_size::<VM>(
             bytes,
             align,
-            crate::util::alloc::allocator::MIN_ALIGNMENT,
+            VM::MIN_ALIGNMENT,
         ) > MAX_NON_LOS_COPY_BYTES;
         if large {
             Allocator::Los
