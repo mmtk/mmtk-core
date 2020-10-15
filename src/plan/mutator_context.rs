@@ -26,7 +26,14 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
         allocator: AllocationType,
     );
     fn flush_remembered_sets(&mut self) {}
+    fn flush(&mut self) {
+        self.flush_remembered_sets();
+    }
     fn get_tls(&self) -> OpaquePointer;
+
+    fn object_reference_write(&mut self, src: ObjectReference, slot: Address, value: ObjectReference) {}
+    fn record_modified_node(&mut self, obj: ObjectReference) {}
+    fn record_modified_edge(&mut self, slot: Address) {}
 }
 
 pub struct CommonMutatorContext<VM: VMBinding> {

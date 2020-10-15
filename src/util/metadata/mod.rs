@@ -18,7 +18,7 @@ pub trait PerChunkMetadata: Sized + 'static {
     }
 }
 
-#[repr(C)]
+#[repr(transparent)]
 pub struct MarkBitMap([AtomicU8; BYTES_IN_BITMAP]);
 
 impl MarkBitMap {

@@ -49,8 +49,9 @@ unsafe impl <VM: VMBinding> Sync for MMTK<VM> {}
 
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
+        let scheduler = Scheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone());
+        let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone(), unsafe { &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>) });
         let phase_manager = PhaseManager::new(&plan.base().stats);
         MMTK {
             plan,
@@ -60,7 +61,7 @@ impl<VM: VMBinding> MMTK<VM> {
             sftmap: &SFT_MAP,
             reference_processors: ReferenceProcessors::new(),
             options,
-            scheduler: Scheduler::new(),
+            scheduler,
             inside_harness: AtomicBool::new(false),
         }
     }

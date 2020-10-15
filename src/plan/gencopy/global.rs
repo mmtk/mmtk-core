@@ -35,6 +35,7 @@ pub struct GenCopy<VM: VMBinding> {
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
     in_nursery: AtomicBool,
+    pub scheduler: &'static MMTkScheduler<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
@@ -44,10 +45,17 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
     type Mutator = GenCopyMutator<VM>;
     type CopyContext = GenCopyCopyContext<VM>;
 
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool where Self: Sized {
+        let nursery_full = self.nursery.reserved_pages() >= (NURSERY_SIZE / 4096);
+        let heap_full = self.get_pages_reserved() > self.get_total_pages();
+        space_full || nursery_full || heap_full
+    }
+
     fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
+        scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
@@ -82,6 +90,7 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
             ),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
             in_nursery: AtomicBool::default(),
+            scheduler,
         }
     }
 
@@ -94,6 +103,7 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         let in_nursery = !self.request_full_heap_collection();
+        println!("GC: nursery={:?}", in_nursery);
         self.in_nursery.store(in_nursery, Ordering::SeqCst);
 
         // Stop & scan mutators (mutator scanning can happen before STW)
@@ -117,6 +127,7 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn prepare(&self, tls: OpaquePointer) {
+        // self.fromspace().unprotect();
         self.common.prepare(tls, true);
         self.nursery.prepare(true);
         if !self.in_nursery() {
@@ -125,6 +136,10 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
+        println!("from space:");
+        self.fromspace().print_vm_map();
+        println!("to space:");
+        self.tospace().print_vm_map();
     }
 
     fn release(&self, tls: OpaquePointer) {
@@ -132,6 +147,7 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
         self.nursery.release();
         if !self.in_nursery() {
             self.fromspace().release();
+            // self.fromspace().protect();
         }
     }
 
