@@ -52,6 +52,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
+        scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 

@@ -60,6 +60,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
+        scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self;
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<Self::VM>);

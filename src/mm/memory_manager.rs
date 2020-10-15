@@ -67,6 +67,10 @@ pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<VM, SelectedPlan<VM>>
     drop(mutator);
 }
 
+pub fn flush_mutator<VM: VMBinding>(mutator: &mut SelectedMutator<VM>) {
+    mutator.flush()
+}
+
 pub fn alloc<VM: VMBinding>(
     mutator: &mut Mutator<VM, SelectedPlan<VM>>,
     size: usize,

@@ -22,6 +22,7 @@ use crate::util::conversions;
 use crate::util::constants::*;
 use crate::mmtk::SFT_MAP;
 use crate::util::heap::layout::Mmapper as MmapperTrait;
+use crate::util::heap::layout::vm_layout_constants::*;
 
 unsafe impl<VM: VMBinding> Sync for CopySpace<VM> {}
 
@@ -79,9 +80,17 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         }
         #[cfg(feature = "gencopy")] {
             let chunk = conversions::chunk_align_down(start);
-            self.common().mmapper.ensure_mapped(chunk, META_DATA_PAGES_PER_REGION << LOG_BYTES_IN_PAGE);
-            let mark_table = MarkBitMap::of(start);
+            self.common().mmapper.ensure_mapped(start, bytes >> LOG_BYTES_IN_PAGE);
             let mut mark_tables = self.mark_tables.lock().unwrap();
+            let mut mark_table;
+            for offset in (0..bytes).step_by(BYTES_IN_CHUNK) {
+                mark_table = MarkBitMap::of(start + offset);
+                if !mark_tables.contains(&mark_table) {
+                    mark_table.clear();
+                    mark_tables.push(mark_table);
+                }
+            }
+            mark_table = MarkBitMap::of(start + bytes - 1);
             if !mark_tables.contains(&mark_table) {
                 mark_table.clear();
                 mark_tables.push(mark_table);

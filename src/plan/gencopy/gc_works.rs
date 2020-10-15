@@ -1,7 +1,8 @@
 use super::global::GenCopy;
 use crate::scheduler::gc_works::*;
+use crate::scheduler::{GCWorker, GCWork};
 use crate::util::{Address, ObjectReference, OpaquePointer};
-use crate::vm::VMBinding;
+use crate::vm::*;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use crate::policy::space::Space;
@@ -62,14 +63,16 @@ impl <VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
         if self.plan().nursery.in_space(object) {
             return self.plan().nursery.trace_object(self, object, super::global::ALLOC_SS, self.worker().local());
         }
+        debug_assert!(!self.plan().fromspace().in_space(object));
+        return object;
         // Mark mature objects
-        if self.plan().tospace().in_space(object) {
-            return self.plan().tospace().trace_mark_object(self, object);
-        }
-        if self.plan().fromspace().in_space(object) {
-            return self.plan().fromspace().trace_mark_object(self, object);
-        }
-        self.plan().common.trace_object(self, object)
+        // if self.plan().tospace().in_space(object) {
+        //     return self.plan().tospace().trace_mark_object(self, object);
+        // }
+        // if self.plan().fromspace().in_space(object) {
+        //     return self.plan().fromspace().trace_mark_object(self, object);
+        // }
+        // self.plan().common.trace_object(self, object)
     }
 }
 
@@ -129,5 +132,28 @@ impl <VM: VMBinding> Deref for GenCopyMatureProcessEdges<VM> {
 impl <VM: VMBinding> DerefMut for GenCopyMatureProcessEdges<VM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
+    }
+}
+
+#[derive(Default)]
+pub struct GenCopyProcessModBuf {
+    pub modified_nodes: Vec<ObjectReference>,
+    pub modified_edges: Vec<Address>,
+}
+
+impl <VM: VMBinding> GCWork<VM> for GenCopyProcessModBuf {
+    #[inline]
+    fn do_work(&mut self, worker: &'static mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        if mmtk.plan.in_nursery() {
+            let mut modified_nodes = vec![];
+            ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
+            worker.scheduler().closure_stage.add(ScanObjects::<GenCopyNurseryProcessEdges::<VM>>::new(modified_nodes, false));
+
+            let mut modified_edges = vec![];
+            ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
+            worker.scheduler().closure_stage.add(GenCopyNurseryProcessEdges::<VM>::new(modified_edges, true));
+        } else {
+            // Do nothing
+        }
     }
 }
