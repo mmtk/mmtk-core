@@ -157,3 +157,55 @@ impl <VM: VMBinding> GCWork<VM> for GenCopyProcessModBuf {
         }
     }
 }
+
+
+
+#[derive(Default)]
+pub struct SanityGCProcessEdges<VM: VMBinding>  {
+    base: ProcessEdgesBase<SanityGCProcessEdges<VM>>,
+    phantom: PhantomData<VM>,
+}
+
+impl <VM: VMBinding> Deref for SanityGCProcessEdges<VM> {
+    type Target = ProcessEdgesBase<Self>;
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl <VM: VMBinding> DerefMut for SanityGCProcessEdges<VM> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
+
+impl <VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
+    type VM = VM;
+    const OVERWRITE_REFERENCE: bool = false;
+    fn new(edges: Vec<Address>, _roots: bool) -> Self {
+        Self { base: ProcessEdgesBase::new(edges), ..Default::default() }
+    }
+
+    #[inline]
+    fn process_edge(&mut self, slot: Address) {
+        let object = unsafe { slot.load::<ObjectReference>() };
+        assert!(!self.plan().nursery.in_space(object)
+            "Invalid edge: {:?} -> {:?}", slot, object
+        );
+        assert!(!self.plan().fromspace().in_space(object)
+            "Invalid edge: {:?} -> {:?}", slot, object
+        );
+        self.trace_object(object);
+    }
+
+    #[inline]
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+        if self.plan().tospace().in_space(object) {
+            return self.plan().tospace().trace_mark_object(self, object);
+        }
+        unreachable!()
+    }
+}

@@ -13,13 +13,13 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::vm::VMBinding;
+use crate::vm::*;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use crate::scheduler::*;
 use crate::scheduler::gc_works::*;
 use crate::mmtk::MMTK;
-use super::gc_works::{GenCopyCopyContext, GenCopyNurseryProcessEdges, GenCopyMatureProcessEdges};
+use super::gc_works::{GenCopyCopyContext, GenCopyNurseryProcessEdges, GenCopyMatureProcessEdges, SanityGCProcessEdges};
 
 
 
@@ -35,6 +35,7 @@ pub struct GenCopy<VM: VMBinding> {
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
     in_nursery: AtomicBool,
+    in_sanity: AtomicBool,
     pub scheduler: &'static MMTkScheduler<VM>,
 }
 
@@ -90,6 +91,7 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
             ),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
             in_nursery: AtomicBool::default(),
+            in_sanity: AtomicBool::default(),
             scheduler,
         }
     }
@@ -103,8 +105,9 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         let in_nursery = !self.request_full_heap_collection();
-        println!("GC: nursery={:?}", in_nursery);
+        // println!("GC: nursery={:?}", in_nursery);
         self.in_nursery.store(in_nursery, Ordering::SeqCst);
+        self.in_sanity.store(false, Ordering::SeqCst);
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.unconstrained_works.add(Initiate::<Self>::new());
@@ -119,6 +122,29 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
         // Release global/collectors/mutators
         scheduler.release_stage.add(Release::new(self));
         // Resume mutators
+        // if cfg!(feature="gencopy_sanity_gc") {
+        //     scheduler.final_stage.add(ScheduleSanityGC);
+        // } else {
+            scheduler.final_stage.add(ResumeMutators);
+        // }
+    }
+
+    fn schedule_sanity_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+        println!("sanity gc");
+        self.in_sanity.store(true, Ordering::SeqCst);
+
+        // Stop & scan mutators (mutator scanning can happen before STW)
+        scheduler.unconstrained_works.add(Initiate::<Self>::new());
+        // Create initial works for `closure_stage`
+        for mutator in <VM as VMBinding>::VMActivePlan::mutators() {
+            scheduler.prepare_stage.add(ScanStackRoot::<SanityGCProcessEdges<VM>>(mutator));
+        }
+        scheduler.prepare_stage.add(ScanVMSpecificRoots::<SanityGCProcessEdges<VM>>::new());
+        // Prepare global/collectors/mutators
+        scheduler.prepare_stage.add(Prepare::new(self));
+        // Release global/collectors/mutators
+        scheduler.release_stage.add(Release::new(self));
+        // Resume mutators
         scheduler.final_stage.add(ResumeMutators);
     }
 
@@ -128,26 +154,41 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
 
     fn prepare(&self, tls: OpaquePointer) {
         // self.fromspace().unprotect();
-        self.common.prepare(tls, true);
-        self.nursery.prepare(true);
-        if !self.in_nursery() {
-            self.hi.store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
+        if !self.in_sanity() {
+            self.common.prepare(tls, true);
+            self.nursery.prepare(true);
+            if !self.in_nursery() {
+                self.hi.store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
+            }
+            let hi = self.hi.load(Ordering::SeqCst);
+            self.copyspace0.prepare(hi);
+            self.copyspace1.prepare(!hi);
+            // println!("from space:");
+            // self.fromspace().print_vm_map();
+            // println!("to space:");
+            // self.tospace().print_vm_map();
+        } else {
+            self.common.prepare(tls, true);
+            self.nursery.sanity_prepare();
+            self.copyspace0.sanity_prepare();
+            self.copyspace1.sanity_prepare();
         }
-        let hi = self.hi.load(Ordering::SeqCst);
-        self.copyspace0.prepare(hi);
-        self.copyspace1.prepare(!hi);
-        println!("from space:");
-        self.fromspace().print_vm_map();
-        println!("to space:");
-        self.tospace().print_vm_map();
     }
 
     fn release(&self, tls: OpaquePointer) {
-        self.common.release(tls, true);
-        self.nursery.release();
-        if !self.in_nursery() {
-            self.fromspace().release();
-            // self.fromspace().protect();
+        if !self.in_sanity() {
+            self.common.release(tls, true);
+            self.nursery.release();
+            if !self.in_nursery() {
+                self.fromspace().release();
+            }
+        } else {
+            self.common.release(tls, true);
+            self.nursery.sanity_release();
+            if !self.in_nursery() {
+                self.fromspace().sanity_release();
+            }
+            // self.copyspace1.sanity_release();
         }
     }
 
@@ -192,5 +233,9 @@ impl <VM: VMBinding> GenCopy<VM> {
 
     pub fn in_nursery(&self) -> bool {
         self.in_nursery.load(Ordering::SeqCst)
+    }
+
+    pub fn in_sanity(&self) -> bool {
+        self.in_sanity.load(Ordering::SeqCst)
     }
 }

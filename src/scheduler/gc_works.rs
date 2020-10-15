@@ -248,7 +248,7 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
 pub struct ScanVMSpecificRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
 
 impl <E: ProcessEdgesWork> ScanVMSpecificRoots<E> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self(PhantomData)
     }
 }
@@ -355,5 +355,15 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
         trace!("ScanObjects");
         <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer);
         trace!("ScanObjects End");
+    }
+}
+
+#[derive(Default)]
+pub struct ScheduleSanityGC;
+
+impl <VM: VMBinding> GCWork<VM> for ScheduleSanityGC {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        worker.scheduler().reset_state();
+        mmtk.plan.schedule_sanity_collection(worker.scheduler());
     }
 }

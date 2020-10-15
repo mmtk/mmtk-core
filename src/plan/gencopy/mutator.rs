@@ -7,7 +7,7 @@ use crate::util::{Address, ObjectReference};
 use crate::scheduler::MMTkScheduler;
 use super::gc_works::GenCopyProcessModBuf;
 use super::GenCopy;
-use crate::vm::VMBinding;
+use crate::vm::*;
 use std::mem;
 use crate::policy::space::Space;
 
@@ -87,12 +87,17 @@ impl <VM: VMBinding> MutatorContext<VM> for GenCopyMutator<VM> {
     }
 
     fn record_modified_node(&mut self, obj: ObjectReference) {
-        if self.plan.copyspace0.in_space(obj) || self.plan.copyspace1.in_space(obj) {
+        if !self.plan.nursery.in_space(obj) {
+            // println!("record_modified_node {:?} .. {:?}", obj, if self.plan.copyspace0.in_space(obj) || self.plan.copyspace1.in_space(obj) {
+            //     obj.to_address() + VM::VMObjectModel::get_current_size(obj)
+            // } else {
+            //     Address::ZERO
+            // });
             self.enqueue_node(obj);
         }
     }
     fn record_modified_edge(&mut self, slot: Address) {
-        if self.plan.copyspace0.address_in_space(slot) || self.plan.copyspace1.address_in_space(slot) {
+        if !self.plan.nursery.address_in_space(slot) {
             self.enqueue_edge(slot);
         }
     }
