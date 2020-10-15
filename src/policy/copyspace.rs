@@ -30,9 +30,9 @@ const fn max(a: usize, b: usize) -> usize {
     [a, b][(a < b) as usize]
 }
 
-#[cfg(not(feature = "gencopy"))]
+#[cfg(not(feature = "gencopy_sanity_gc"))]
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
-#[cfg(feature = "gencopy")]
+#[cfg(feature = "gencopy_sanity_gc")]
 const META_DATA_PAGES_PER_REGION: usize = max(CARD_META_PAGES_PER_REGION, <MarkBitMap as PerChunkMetadata>::METADATA_PAGES_PER_CHUNK);
 
 pub struct CopySpace<VM: VMBinding> {
@@ -78,7 +78,7 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
             let chunks = conversions::bytes_to_chunks_up(bytes);
             SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
         }
-        #[cfg(feature = "gencopy")] {
+        #[cfg(feature = "gencopy_sanity_gc")] {
             let chunk = conversions::chunk_align_down(start);
             self.common().mmapper.ensure_mapped(start, bytes >> LOG_BYTES_IN_PAGE);
             let mut mark_tables = self.mark_tables.lock().unwrap();
@@ -150,7 +150,7 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn prepare(&self, from_space: bool) {
         self.from_space.store(from_space, Ordering::SeqCst);
-        #[cfg(feature = "gencopy")] {
+        #[cfg(feature = "gencopy_sanity_gc")] {
             let mark_tables = self.mark_tables.lock().unwrap();
             for mark_table in mark_tables.iter() {
                 mark_table.clear();
@@ -159,10 +159,24 @@ impl<VM: VMBinding> CopySpace<VM> {
     }
 
     pub fn release(&self) {
-        #[cfg(feature = "gencopy")]
+        #[cfg(feature = "gencopy_sanity_gc")]
         self.mark_tables.lock().unwrap().clear();
         unsafe { self.pr.reset(); }
         self.from_space.store(false, Ordering::SeqCst);
+    }
+
+    pub fn sanity_prepare(&self) {
+        #[cfg(feature = "gencopy_sanity_gc")] {
+            let mark_tables = self.mark_tables.lock().unwrap();
+            for mark_table in mark_tables.iter() {
+                mark_table.clear();
+            }
+        }
+    }
+
+    pub fn sanity_release(&self) {
+        #[cfg(feature = "gencopy_sanity_gc")]
+        self.mark_tables.lock().unwrap().clear();
     }
 
     fn from_space(&self) -> bool {

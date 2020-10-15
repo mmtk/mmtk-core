@@ -144,6 +144,13 @@ impl <C: Context> Scheduler<C> {
         self.final_stage.deactivate();
     }
 
+    pub fn reset_state(&self) {
+        // self.prepare_stage.deactivate();
+        self.closure_stage.deactivate();
+        self.release_stage.deactivate();
+        self.final_stage.deactivate();
+    }
+
     pub fn add_coordinator_work(&self, work: impl CoordinatorWork<C>, worker: &Worker<C>) {
         worker.sender.send(CoordinatorMessage::Work(box work)).unwrap();
     }

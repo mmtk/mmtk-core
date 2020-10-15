@@ -64,6 +64,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
     ) -> Self;
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<Self::VM>);
+    fn schedule_sanity_collection(&'static self, scheduler: &MMTkScheduler<Self::VM>) {}
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
