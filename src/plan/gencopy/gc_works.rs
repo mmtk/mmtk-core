@@ -65,14 +65,6 @@ impl <VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
         }
         debug_assert!(!self.plan().fromspace().in_space(object));
         return object;
-        // Mark mature objects
-        // if self.plan().tospace().in_space(object) {
-        //     return self.plan().tospace().trace_mark_object(self, object);
-        // }
-        // if self.plan().fromspace().in_space(object) {
-        //     return self.plan().fromspace().trace_mark_object(self, object);
-        // }
-        // self.plan().common.trace_object(self, object)
     }
 }
 

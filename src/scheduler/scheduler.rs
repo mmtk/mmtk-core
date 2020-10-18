@@ -71,7 +71,7 @@ impl <C: Context> Scheduler<C> {
         self.worker_group.as_ref().unwrap().spawn_workers(tls, context);
 
         self_mut.closure_stage.set_open_condition(move || {
-            self.prepare_stage.is_drained() && self.worker_group().all_parked()
+            self.unconstrained_works.is_drained() && self.prepare_stage.is_drained() && self.worker_group().all_parked()
         });
         self_mut.release_stage.set_open_condition(move || {
             self.closure_stage.is_drained() && self.worker_group().all_parked()
