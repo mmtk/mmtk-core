@@ -23,6 +23,7 @@ use crate::scheduler::*;
 use crate::scheduler::gc_works::*;
 use crate::mmtk::MMTK;
 use super::gc_works::{SSCopyContext, SSProcessEdges};
+use crate::plan::global::GcStatus;
 
 
 
@@ -84,16 +85,16 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+        self.base().set_collection_kind();
+        self.base().set_gc_status(GcStatus::GcPrepare);
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.unconstrained_works.add(Initiate::<Self>::new());
-        // Create initial works for `closure_stage`
         scheduler.unconstrained_works.add(StopMutators::<SSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
         scheduler.prepare_stage.add(Prepare::new(self));
         // Release global/collectors/mutators
         scheduler.release_stage.add(Release::new(self));
         // Resume mutators
-        scheduler.final_stage.add(ResumeMutators);
+        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<SSMutator<VM>> {

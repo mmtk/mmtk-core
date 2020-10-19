@@ -10,6 +10,7 @@ use super::GenCopy;
 use crate::vm::*;
 use std::mem;
 use crate::policy::space::Space;
+use crate::plan::Plan;
 
 #[repr(C)]
 pub struct GenCopyMutator<VM: VMBinding> {
@@ -88,11 +89,6 @@ impl <VM: VMBinding> MutatorContext<VM> for GenCopyMutator<VM> {
 
     fn record_modified_node(&mut self, obj: ObjectReference) {
         if !self.plan.nursery.in_space(obj) {
-            // println!("record_modified_node {:?} .. {:?}", obj, if self.plan.copyspace0.in_space(obj) || self.plan.copyspace1.in_space(obj) {
-            //     obj.to_address() + VM::VMObjectModel::get_current_size(obj)
-            // } else {
-            //     Address::ZERO
-            // });
             self.enqueue_node(obj);
         }
     }
@@ -107,6 +103,7 @@ impl <VM: VMBinding> MutatorContext<VM> for GenCopyMutator<VM> {
         mem::swap(&mut modified_nodes, &mut self.modbuf.0);
         let mut modified_edges = vec![];
         mem::swap(&mut modified_edges, &mut self.modbuf.1);
+        debug_assert!(!self.plan.scheduler.final_stage.is_activated(), "{:?}", self as *const _);
         self.plan.scheduler.closure_stage.add(GenCopyProcessModBuf {
             modified_nodes, modified_edges
         });

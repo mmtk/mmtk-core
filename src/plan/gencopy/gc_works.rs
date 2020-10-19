@@ -9,7 +9,7 @@ use crate::policy::space::Space;
 use crate::util::alloc::{BumpAllocator, Allocator};
 use crate::util::forwarding_word;
 use crate::MMTK;
-use crate::plan::CopyContext;
+use crate::plan::{CopyContext, Plan};
 
 pub struct GenCopyCopyContext<VM: VMBinding> {
     plan: &'static GenCopy<VM>,
@@ -32,6 +32,7 @@ impl <VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
     }
     #[inline(always)]
     fn alloc_copy(&mut self, _original: ObjectReference, bytes: usize, align: usize, offset: isize, _allocator: crate::Allocator) -> Address {
+        debug_assert!(VM::VMActivePlan::global().base().gc_in_progress_proper());
         self.ss.alloc(bytes, align, offset)
     }
     #[inline(always)]
@@ -64,7 +65,18 @@ impl <VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
             return self.plan().nursery.trace_object(self, object, super::global::ALLOC_SS, self.worker().local());
         }
         debug_assert!(!self.plan().fromspace().in_space(object));
+        debug_assert!(self.plan().tospace().in_space(object));
         return object;
+    }
+    #[inline]
+    fn process_edge(&mut self, slot: Address) {
+        debug_assert!(!self.plan().fromspace().address_in_space(slot));
+        let object = unsafe { slot.load::<ObjectReference>() };
+        let new_object = self.trace_object(object);
+        debug_assert!(!self.plan().nursery.in_space(new_object));
+        if Self::OVERWRITE_REFERENCE {
+            unsafe { slot.store(new_object) };
+        }
     }
 }
 
