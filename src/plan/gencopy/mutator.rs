@@ -81,12 +81,6 @@ impl <VM: VMBinding> MutatorContext<VM> for GenCopyMutator<VM> {
         self.ss.tls
     }
 
-    fn object_reference_write(&mut self, src: ObjectReference, slot: Address, value: ObjectReference) {
-        if self.plan.copyspace0.address_in_space(slot) || self.plan.copyspace1.address_in_space(slot) {
-            self.enqueue_edge(slot);
-        }
-    }
-
     fn record_modified_node(&mut self, obj: ObjectReference) {
         if !self.plan.nursery.in_space(obj) {
             self.enqueue_node(obj);
