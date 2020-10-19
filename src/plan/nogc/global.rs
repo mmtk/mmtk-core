@@ -38,6 +38,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
+        _scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
         #[cfg(not(feature = "nogc_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
