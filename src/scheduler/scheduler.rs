@@ -38,6 +38,7 @@ pub struct Scheduler<C: Context> {
     coordinator_worker: Option<Worker<C>>,
     /// A message channel to send new coordinator works and other actions to the coordinator thread
     pub channel: (Sender<CoordinatorMessage<C>>, Receiver<CoordinatorMessage<C>>),
+    finalizer: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
 }
 
 unsafe impl <C: Context> Send for Scheduler<C> {}
@@ -58,6 +59,7 @@ impl <C: Context> Scheduler<C> {
             context: None,
             coordinator_worker: None,
             channel: channel(),
+            finalizer: Mutex::new(None),
         })
     }
 
@@ -74,11 +76,15 @@ impl <C: Context> Scheduler<C> {
             self.unconstrained_works.is_drained() && self.prepare_stage.is_drained() && self.worker_group().all_parked()
         });
         self_mut.release_stage.set_open_condition(move || {
-            self.closure_stage.is_drained() && self.worker_group().all_parked()
+            self.unconstrained_works.is_drained() && self.prepare_stage.is_drained() && self.closure_stage.is_drained() && self.worker_group().all_parked()
         });
         self_mut.final_stage.set_open_condition(move || {
-            self.release_stage.is_drained() && self.worker_group().all_parked()
+            self.unconstrained_works.is_drained() && self.prepare_stage.is_drained() && self.closure_stage.is_drained() && self.release_stage.is_drained() && self.worker_group().all_parked()
         });
+    }
+
+    pub fn set_finalizer<W: CoordinatorWork<C>>(&self, w: Option<W>) {
+        *self.finalizer.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<C>>);
     }
 
     pub fn worker_group(&self) -> Arc<WorkerGroup<C>> {
@@ -138,6 +144,22 @@ impl <C: Context> Scheduler<C> {
                 _ => {}
             }
         }
+        self.deactivate_all();
+        // Finalization: Resume mutators, reset gc states
+        // Note: Resume-mutators must happen after all work buckets are closed.
+        //       Otherwise, for generational GCs, workers will receive and process
+        //       newly generated remembered-sets from those open buckets.
+        //       But these remsets should be preserved until next GC.
+        if let Some(finalizer) = self.finalizer.lock().unwrap().take() {
+            self.process_coordinator_work(finalizer);
+        }
+        debug_assert!(!self.prepare_stage.is_activated());
+        debug_assert!(!self.closure_stage.is_activated());
+        debug_assert!(!self.final_stage.is_activated());
+        debug_assert!(!self.release_stage.is_activated());
+    }
+
+    pub fn deactivate_all(&self) {
         self.prepare_stage.deactivate();
         self.closure_stage.deactivate();
         self.release_stage.deactivate();
@@ -238,6 +260,7 @@ pub type MMTkScheduler<VM> = Scheduler<MMTK<VM>>;
 impl <VM: VMBinding> MMTkScheduler<VM> {
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.plan.base().control_collector_context.as_ref().unwrap().clear_request();
+        debug_assert!(!self.prepare_stage.is_activated());
         self.prepare_stage.activate();
         let _guard = self.worker_monitor.0.lock().unwrap();
         self.worker_monitor.1.notify_all();

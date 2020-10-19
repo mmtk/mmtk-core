@@ -12,25 +12,6 @@ use std::sync::Mutex;
 
 
 /// GC Preparation Work (include updating global states)
-pub struct Initiate<P: Plan>(PhantomData<P>);
-
-unsafe impl <P: Plan> Sync for Initiate<P> {}
-
-impl <P: Plan> Initiate<P> {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl <P: Plan> GCWork<P::VM> for Initiate<P> {
-    fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
-        trace!("Initiate");
-        // mmtk.plan.base().set_collection_kind();
-        // mmtk.plan.base().set_gc_status(GcStatus::GcPrepare);
-    }
-}
-
-/// GC Preparation Work (include updating global states)
 pub struct Prepare<P: Plan> {
     pub plan: &'static P,
 }
@@ -46,8 +27,6 @@ impl <P: Plan> Prepare<P> {
 impl <P: Plan> GCWork<P::VM> for Prepare<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Prepare Global");
-        mmtk.plan.base().set_collection_kind();
-        mmtk.plan.base().set_gc_status(GcStatus::GcPrepare);
         self.plan.prepare(worker.tls);
         let _guard = MUTATOR_ITERATOR_LOCK.lock().unwrap();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
@@ -207,21 +186,16 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
 impl <E: ProcessEdgesWork> CoordinatorWork<MMTK<E::VM>> for StopMutators<E> {}
 
 #[derive(Default)]
-pub struct ResumeMutators;
+pub struct EndOfGC;
 
-impl <VM: VMBinding> GCWork<VM> for ResumeMutators {
+impl <VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        if worker.is_coordinator() {
-            trace!("ResumeMutators");
-            mmtk.plan.common().base.set_gc_status(GcStatus::NotInGC);
-            <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
-        } else {
-            mmtk.scheduler.add_coordinator_work(ResumeMutators, worker);
-        }
+        mmtk.plan.common().base.set_gc_status(GcStatus::NotInGC);
+        <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
 }
 
-impl <VM: VMBinding> CoordinatorWork<MMTK<VM>> for ResumeMutators {}
+impl <VM: VMBinding> CoordinatorWork<MMTK<VM>> for EndOfGC {}
 
 static SCANNED_STACKS: AtomicUsize = AtomicUsize::new(0);
 

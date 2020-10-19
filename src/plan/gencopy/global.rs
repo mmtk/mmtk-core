@@ -20,6 +20,7 @@ use crate::scheduler::*;
 use crate::scheduler::gc_works::*;
 use crate::mmtk::MMTK;
 use super::gc_works::{GenCopyCopyContext, GenCopyNurseryProcessEdges, GenCopyMatureProcessEdges, SanityGCProcessEdges};
+use crate::plan::global::GcStatus;
 
 
 
@@ -105,13 +106,12 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         let in_nursery = !self.request_full_heap_collection();
-        // println!("GC: nursery={:?}", in_nursery);
         self.in_nursery.store(in_nursery, Ordering::SeqCst);
         self.in_sanity.store(false, Ordering::SeqCst);
+        self.base().set_collection_kind();
+        self.base().set_gc_status(GcStatus::GcPrepare);
 
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.unconstrained_works.add(Initiate::<Self>::new());
-        // Create initial works for `closure_stage`
         if in_nursery {
             scheduler.unconstrained_works.add(StopMutators::<GenCopyNurseryProcessEdges<VM>>::new());
         } else {
@@ -122,11 +122,10 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
         // Release global/collectors/mutators
         scheduler.release_stage.add(Release::new(self));
         // Resume mutators
-        // if cfg!(feature="gencopy_sanity_gc") {
-        //     scheduler.final_stage.add(ScheduleSanityGC);
-        // } else {
-            scheduler.final_stage.add(ResumeMutators);
-        // }
+        if cfg!(feature="gencopy_sanity_gc") {
+            scheduler.final_stage.add(ScheduleSanityGC);
+        }
+        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn schedule_sanity_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
@@ -134,8 +133,6 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
         self.in_sanity.store(true, Ordering::SeqCst);
 
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.unconstrained_works.add(Initiate::<Self>::new());
-        // Create initial works for `closure_stage`
         for mutator in <VM as VMBinding>::VMActivePlan::mutators() {
             scheduler.prepare_stage.add(ScanStackRoot::<SanityGCProcessEdges<VM>>(mutator));
         }
@@ -144,8 +141,6 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
         scheduler.prepare_stage.add(Prepare::new(self));
         // Release global/collectors/mutators
         scheduler.release_stage.add(Release::new(self));
-        // Resume mutators
-        scheduler.final_stage.add(ResumeMutators);
     }
 
     fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<GenCopyMutator<VM>> {
@@ -163,10 +158,6 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
             let hi = self.hi.load(Ordering::SeqCst);
             self.copyspace0.prepare(hi);
             self.copyspace1.prepare(!hi);
-            // println!("from space:");
-            // self.fromspace().print_vm_map();
-            // println!("to space:");
-            // self.tospace().print_vm_map();
         } else {
             self.common.prepare(tls, true);
             self.nursery.sanity_prepare();

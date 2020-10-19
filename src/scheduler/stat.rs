@@ -65,9 +65,11 @@ impl SchedulerStat {
             stat.insert(format!("works.{}.time.geomean", self.work_name(n)), format!("{:.2}", geomean));
         }
         let durations = total_durations.iter().map(|d| d.as_nanos() as f64).collect::<Vec<_>>();
-        stat.insert("total-works.time.geomean".to_owned(), format!("{:.2}", self.geomean(&durations)));
-        stat.insert("total-works.time.min".to_owned(), format!("{:.2}", self.min(&durations)));
-        stat.insert("total-works.time.max".to_owned(), format!("{:.2}", self.max(&durations)));
+        if durations.len() > 0 {
+            stat.insert("total-works.time.geomean".to_owned(), format!("{:.2}", self.geomean(&durations)));
+            stat.insert("total-works.time.min".to_owned(), format!("{:.2}", self.min(&durations)));
+            stat.insert("total-works.time.max".to_owned(), format!("{:.2}", self.max(&durations)));
+        }
 
         stat
     }
