@@ -13,7 +13,7 @@ use crate::plan::mutator_context::Mutator;
 use crate::plan::nogc::mutator::create_nogc_mutator;
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::Allocator;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};

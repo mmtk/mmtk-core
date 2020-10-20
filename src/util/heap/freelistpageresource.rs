@@ -1,6 +1,4 @@
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
 use std::sync::{Mutex, MutexGuard};
 
 use super::layout::map::Map;

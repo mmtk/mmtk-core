@@ -3,7 +3,6 @@ use super::vmrequest::HEAP_LAYOUT_64BIT;
 use crate::policy::space::required_chunks;
 use crate::util::address::Address;
 use crate::util::conversions::*;
-use std::sync::atomic::AtomicUsize;
 use std::sync::{Mutex, MutexGuard};
 
 use crate::util::alloc::embedded_meta_data::*;
@@ -15,7 +14,6 @@ use super::layout::map::Map;
 use super::layout::Mmapper;
 
 use super::PageResource;
-use std::sync::atomic::Ordering;
 
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::vm::VMBinding;

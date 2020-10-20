@@ -1,4 +1,3 @@
-use downcast_rs::Downcast;
 use std::mem::MaybeUninit;
 
 use crate::plan::selected_plan::SelectedPlan;

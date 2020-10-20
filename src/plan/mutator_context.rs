@@ -1,11 +1,8 @@
-use crate::plan::global::CommonPlan;
 use crate::plan::global::Plan;
-use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
 use crate::policy::space::Space;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
@@ -71,11 +68,12 @@ impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
     }
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
+    // Q: Can we remove type_refer?
     fn post_alloc(
         &mut self,
         refer: ObjectReference,
-        type_refer: ObjectReference,
-        bytes: usize,
+        _type_refer: ObjectReference,
+        _bytes: usize,
         allocator: AllocationType,
     ) {
         unsafe {

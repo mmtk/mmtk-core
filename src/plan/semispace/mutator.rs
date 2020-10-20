@@ -1,28 +1,21 @@
 use crate::plan::mutator_context::Mutator;
-use crate::plan::mutator_context::MutatorContext;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
-use crate::policy::space::Space;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
-use crate::util::alloc::LargeObjectAllocator;
 use crate::util::OpaquePointer;
-use crate::util::{Address, ObjectReference};
-use crate::vm::Collection;
 
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::semispace::SemiSpace;
 use crate::vm::VMBinding;
-use downcast_rs::Downcast;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
 pub fn ss_collection_phase<VM: VMBinding>(
     mutator: &mut Mutator<VM, SemiSpace<VM>>,
-    tls: OpaquePointer,
+    _tls: OpaquePointer,
     phase: &Phase,
-    primary: bool,
+    _primary: bool,
 ) {
     match phase {
         Phase::Release => {

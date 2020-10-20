@@ -8,7 +8,7 @@ use crate::plan::Allocator;
 use crate::plan::Phase;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::VMRequest;
 use crate::util::OpaquePointer;
 

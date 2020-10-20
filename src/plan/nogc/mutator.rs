@@ -1,13 +1,9 @@
 use crate::plan::mutator_context::Mutator;
-use crate::plan::mutator_context::MutatorContext;
 use crate::plan::nogc::NoGC;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::Allocator;
-use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
-use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
 use crate::plan::mutator_context::MutatorConfig;
@@ -15,10 +11,10 @@ use enum_map::enum_map;
 use enum_map::EnumMap;
 
 pub fn nogc_collection_phase<VM: VMBinding>(
-    mutator: &mut Mutator<VM, NoGC<VM>>,
-    tls: OpaquePointer,
-    phase: &Phase,
-    primary: bool,
+    _mutator: &mut Mutator<VM, NoGC<VM>>,
+    _tls: OpaquePointer,
+    _phase: &Phase,
+    _primary: bool,
 ) {
 }
 
