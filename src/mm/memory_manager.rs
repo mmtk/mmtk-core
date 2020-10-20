@@ -84,6 +84,7 @@ pub fn post_alloc<VM: VMBinding>(
     mutator.post_alloc(refer, type_refer, bytes, allocator);
 }
 
+// Returns an AllocatorSelector for the given allocator. This method is provided so that VM compilers may call it to help generate allocation fastpath.
 pub fn get_allocator_mapping<VM: VMBinding>(mmtk: &MMTK<VM>, allocator: Allocator) -> AllocatorSelector {
     mmtk.plan.get_allocator_mapping()[allocator]
 }

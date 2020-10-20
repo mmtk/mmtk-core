@@ -11,8 +11,11 @@ use crate::policy::largeobjectspace::LargeObjectSpace;
 const MAX_BUMP_ALLOCATORS: usize = 5;
 const MAX_LARGE_OBJECT_ALLOCATORS: usize = 1;
 
-// This struct is part of Mutator. 
+// The allocators set owned by each mutator. We provide a fixed number of allocators for each allocator type in the mutator, 
+// and each plan will select part of the allocators to use.
+// Note that this struct is part of the Mutator struct. 
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
+#[repr(C)]
 pub struct Allocators<VM: VMBinding> {
     pub bump_pointer: [MaybeUninit<BumpAllocator<VM>>; MAX_BUMP_ALLOCATORS],
     pub large_object: [MaybeUninit<LargeObjectAllocator<VM>>; MAX_LARGE_OBJECT_ALLOCATORS],
@@ -58,7 +61,8 @@ impl<VM: VMBinding> Allocators<VM> {
     }
 }
 
-// This type is equivalent to:
+// This type describe which allocator in the allocators set.
+// For VM binding implementors, this type is equivalent to the following native types:
 // #[repr(C)]
 // struct AllocatorSelector {
 //   tag: AllocatorSelectorTag,

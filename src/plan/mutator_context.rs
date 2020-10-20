@@ -13,8 +13,9 @@ use crate::policy::space::Space;
 
 use enum_map::EnumMap;
 
-// This struct is part of Mutator. 
+// This struct is part of the Mutator struct. 
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
+#[repr(C)]
 pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
     // Mapping between allocation semantics and allocator selector
     pub allocator_mapping: &'static EnumMap<AllocationType, AllocatorSelector>,    
@@ -27,21 +28,17 @@ pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
 
 // We are trying to make this struct fixed-sized so that VM bindings can easily define a type to have the exact same layout as this struct.
 // Currently Mutator is fixed sized, and we should try keep this invariant:
-// - Allocators are arrays of allocators, which are fixed sized.
+// - Allocators are fixed-length arrays of allocators.
 // - MutatorConfig has 3 pointers/refs (including one fat pointer), and is fixed sized.
+#[repr(C)]
 pub struct Mutator<VM: VMBinding, P: Plan<VM> + 'static> {
     pub allocators: Allocators<VM>,
     pub mutator_tls: OpaquePointer,
-    // pub common: CommonMutatorContext<VM>,
     pub plan: &'static P,
     pub config: MutatorConfig<VM, P>,
 }
 
 impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
-    // fn common(&self) -> &CommonMutatorContext<VM> {
-    //     unreachable!()
-    // }
-
     fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
             Phase::PrepareStacks => {
@@ -54,13 +51,16 @@ impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
             // Ignore for other phases
             _ => {},
         }
+        // Call plan-specific collection phase.
         (*self.config.collection_phase_func)(self, tls, phase, primary)
     }
 
+    // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
     fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
         unsafe { self.allocators.get_allocator_mut(self.config.allocator_mapping[allocator]) }.alloc(size, align, offset)
     }
 
+    // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
     fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
         unsafe { self.allocators.get_allocator_mut(self.config.allocator_mapping[allocator]) }.get_space().unwrap().initialize_header(refer, true)
     }
@@ -70,8 +70,9 @@ impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
     }
 }
 
+// TODO: We should be able to remove this trait, as we removed per-plan mutator implementation, and there is no other type that implements this trait.
+// The Mutator struct above is the only type that implements this trait. We should be able to merge them.
 pub trait MutatorContext<VM: VMBinding> {
-    // fn common(&self) -> &CommonMutatorContext<VM>;
     fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool);
     fn alloc(
         &mut self,
@@ -90,58 +91,3 @@ pub trait MutatorContext<VM: VMBinding> {
     fn flush_remembered_sets(&mut self) {}
     fn get_tls(&self) -> OpaquePointer;
 }
-
-// pub struct CommonMutatorContext<VM: VMBinding> {
-//     immortal: BumpAllocator<VM>,
-//     los: LargeObjectAllocator<VM>,
-// }
-
-// impl<VM: VMBinding> CommonMutatorContext<VM> {
-//     pub fn new(
-//         tls: OpaquePointer,
-//         plan: &'static SelectedPlan<VM>,
-//         common_plan: &'static CommonPlan<VM>,
-//     ) -> Self {
-//         CommonMutatorContext {
-//             immortal: BumpAllocator::new(tls, Some(common_plan.get_immortal()), plan),
-//             los: LargeObjectAllocator::new(tls, Some(common_plan.get_los()), plan),
-//         }
-//     }
-
-//     pub fn alloc(
-//         &mut self,
-//         size: usize,
-//         align: usize,
-//         offset: isize,
-//         allocator: AllocationType,
-//     ) -> Address {
-//         match allocator {
-//             AllocationType::Los => self.los.alloc(size, align, offset),
-//             AllocationType::Immortal => self.immortal.alloc(size, align, offset),
-//             _ => panic!("Unexpected allocator for alloc(): {:?}", allocator),
-//         }
-//     }
-
-//     pub fn post_alloc(
-//         &mut self,
-//         object: ObjectReference,
-//         _type: ObjectReference,
-//         _bytes: usize,
-//         allocator: AllocationType,
-//     ) {
-//         match allocator {
-//             AllocationType::Los => {
-//                 self.los
-//                     .get_space()
-//                     .unwrap()
-//                     .initialize_header(object, true);
-//             }
-//             AllocationType::Immortal => self
-//                 .immortal
-//                 .get_space()
-//                 .unwrap()
-//                 .initialize_header(object, true),
-//             _ => panic!("Unexpected allocator for post_alloc(): {:?}", allocator),
-//         }
-//     }
-// }

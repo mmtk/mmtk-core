@@ -16,9 +16,9 @@ use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 
 pub struct ImmortalSpace<VM: VMBinding> {
+    mark_state: u8,
     common: UnsafeCell<CommonSpace<VM>>,
     pr: MonotonePageResource<VM>,
-    mark_state: u8,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmortalSpace<VM> {}
