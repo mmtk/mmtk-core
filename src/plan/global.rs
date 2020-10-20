@@ -22,8 +22,8 @@ use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use enum_map::EnumMap;
 use crate::util::alloc::allocators::AllocatorSelector;
+use enum_map::EnumMap;
 
 pub trait Plan<VM: VMBinding>: Sized {
     type MutatorT: MutatorContext<VM>;
@@ -660,8 +660,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
 use enum_map::Enum;
 #[repr(i32)]
-#[derive(Clone, Copy, Debug)]
-#[derive(Enum)]
+#[derive(Clone, Copy, Debug, Enum)]
 pub enum Allocator {
     Default = 0,
     Immortal = 1,

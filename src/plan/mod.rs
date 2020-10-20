@@ -13,13 +13,13 @@ pub mod transitive_closure;
 pub use self::collector_context::CollectorContext;
 pub use self::global::Allocator;
 pub use self::global::Plan;
+pub use self::mutator_context::Mutator;
 pub use self::mutator_context::MutatorContext;
 pub use self::parallel_collector::ParallelCollector;
 pub use self::parallel_collector_group::ParallelCollectorGroup;
 pub use self::phase::Phase;
 pub use self::tracelocal::TraceLocal;
 pub use self::transitive_closure::TransitiveClosure;
-pub use self::mutator_context::Mutator;
 
 #[cfg(feature = "nogc")]
 pub mod nogc;

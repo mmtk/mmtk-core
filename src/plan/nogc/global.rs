@@ -9,19 +9,19 @@ use std::cell::UnsafeCell;
 use super::NoGCCollector;
 use super::NoGCTraceLocal;
 use crate::plan::global::BasePlan;
+use crate::plan::mutator_context::Mutator;
+use crate::plan::nogc::mutator::create_nogc_mutator;
+use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::Allocator;
+use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
-use crate::plan::mutator_context::Mutator;
-use crate::plan::nogc::mutator::create_nogc_mutator;
-use std::sync::Arc;
-use crate::plan::Allocator;
-use crate::util::alloc::allocators::{Allocators, AllocatorSelector};
-use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use enum_map::EnumMap;
+use std::sync::Arc;
 
 #[cfg(not(feature = "nogc_lock_free"))]
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;

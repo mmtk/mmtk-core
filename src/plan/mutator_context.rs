@@ -1,24 +1,24 @@
-use crate::plan::global::Plan;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::Plan;
 use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Allocator as AllocationType;
 use crate::plan::Phase;
+use crate::policy::space::Space;
+use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator};
-use crate::util::alloc::allocators::{Allocators, AllocatorSelector};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
-use crate::vm::VMBinding;
 use crate::vm::Collection;
-use crate::policy::space::Space;
+use crate::vm::VMBinding;
 
 use enum_map::EnumMap;
 
-// This struct is part of the Mutator struct. 
+// This struct is part of the Mutator struct.
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
 #[repr(C)]
 pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
     // Mapping between allocation semantics and allocator selector
-    pub allocator_mapping: &'static EnumMap<AllocationType, AllocatorSelector>,    
+    pub allocator_mapping: &'static EnumMap<AllocationType, AllocatorSelector>,
     // Mapping between allocator selector and spaces. Each pair represents a mapping.
     // Put this behind a box, so it is a pointer-sized field.
     pub space_mapping: Box<Vec<(AllocatorSelector, &'static dyn Space<VM>)>>,
@@ -49,20 +49,42 @@ impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
                 self.flush_remembered_sets();
             }
             // Ignore for other phases
-            _ => {},
+            _ => {}
         }
         // Call plan-specific collection phase.
         (*self.config.collection_phase_func)(self, tls, phase, primary)
     }
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
-    fn alloc(&mut self, size: usize, align: usize, offset: isize, allocator: AllocationType) -> Address {
-        unsafe { self.allocators.get_allocator_mut(self.config.allocator_mapping[allocator]) }.alloc(size, align, offset)
+    fn alloc(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: isize,
+        allocator: AllocationType,
+    ) -> Address {
+        unsafe {
+            self.allocators
+                .get_allocator_mut(self.config.allocator_mapping[allocator])
+        }
+        .alloc(size, align, offset)
     }
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
-    fn post_alloc(&mut self, refer: ObjectReference, type_refer: ObjectReference, bytes: usize, allocator: AllocationType) {
-        unsafe { self.allocators.get_allocator_mut(self.config.allocator_mapping[allocator]) }.get_space().unwrap().initialize_header(refer, true)
+    fn post_alloc(
+        &mut self,
+        refer: ObjectReference,
+        type_refer: ObjectReference,
+        bytes: usize,
+        allocator: AllocationType,
+    ) {
+        unsafe {
+            self.allocators
+                .get_allocator_mut(self.config.allocator_mapping[allocator])
+        }
+        .get_space()
+        .unwrap()
+        .initialize_header(refer, true)
     }
 
     fn get_tls(&self) -> OpaquePointer {

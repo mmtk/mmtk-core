@@ -1,8 +1,8 @@
 use std::sync::atomic::Ordering;
 
+use crate::plan::mutator_context::{Mutator, MutatorContext};
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::CollectorContext;
-use crate::plan::mutator_context::{Mutator, MutatorContext};
 use crate::plan::Plan;
 use crate::plan::TraceLocal;
 
@@ -85,7 +85,10 @@ pub fn post_alloc<VM: VMBinding>(
 }
 
 // Returns an AllocatorSelector for the given allocator. This method is provided so that VM compilers may call it to help generate allocation fastpath.
-pub fn get_allocator_mapping<VM: VMBinding>(mmtk: &MMTK<VM>, allocator: Allocator) -> AllocatorSelector {
+pub fn get_allocator_mapping<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    allocator: Allocator,
+) -> AllocatorSelector {
     mmtk.plan.get_allocator_mapping()[allocator]
 }
 
