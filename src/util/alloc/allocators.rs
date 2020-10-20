@@ -45,7 +45,7 @@ impl<VM: VMBinding> Allocators<VM> {
     pub fn new(
         mutator_tls: OpaquePointer,
         plan: &'static SelectedPlan<VM>,
-        space_mapping: &Vec<(AllocatorSelector, &'static dyn Space<VM>)>,
+        space_mapping: &[(AllocatorSelector, &'static dyn Space<VM>)],
     ) -> Self {
         let mut ret = Allocators {
             bump_pointer: unsafe { MaybeUninit::uninit().assume_init() },

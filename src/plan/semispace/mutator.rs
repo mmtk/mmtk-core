@@ -11,6 +11,7 @@ use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
+#[allow(clippy::single_match)]
 pub fn ss_collection_phase<VM: VMBinding>(
     mutator: &mut Mutator<VM, SemiSpace<VM>>,
     _tls: OpaquePointer,

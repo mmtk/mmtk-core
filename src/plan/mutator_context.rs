@@ -18,6 +18,7 @@ pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
     pub allocator_mapping: &'static EnumMap<AllocationType, AllocatorSelector>,
     // Mapping between allocator selector and spaces. Each pair represents a mapping.
     // Put this behind a box, so it is a pointer-sized field.
+    #[allow(clippy::box_vec)]
     pub space_mapping: Box<Vec<(AllocatorSelector, &'static dyn Space<VM>)>>,
     // Plan-specific code for mutator collection phase
     pub collection_phase_func: &'static dyn Fn(&mut Mutator<VM, P>, OpaquePointer, &Phase, bool),
@@ -36,6 +37,7 @@ pub struct Mutator<VM: VMBinding, P: Plan<VM> + 'static> {
 }
 
 impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
+    #[allow(clippy::single_match)]
     fn collection_phase(&mut self, tls: OpaquePointer, phase: &Phase, primary: bool) {
         match phase {
             Phase::PrepareStacks => {
