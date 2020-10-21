@@ -1,0 +1,18 @@
+events:
+  pull_request: &config
+    - trustAnyone: true
+      paths:
+        disallowed:
+          - ".github/**"
+          - ".github/protected-workflows.yml"
+    - trustOrgMembers: true
+  
+  pull_request_target: *config
+  push: *config
+
+# 'anyEvent' value is a rule, and will be used when an event specific configuration is not set.
+# It is automatically added in case it was not explictly set and it does not supports the 'paths' property.
+anyEvent:
+  trustAnyone: false
+  trustCollaborators: false
+  trustedUserNames: []
