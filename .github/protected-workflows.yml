@@ -5,17 +5,14 @@ events:
         disallowed:
           - ".github/**"
           - ".github/protected-workflows.yml"
-    
-    - trustedUserNames:
-        - "caizixian"
-        - "javadamiri"
-        - "qinsoon"
-        - "steveblackburn"
-        - "wenyuzhao"
-      paths:
-        allowed:
-          - ".github/**"
-          - ".github/protected-workflows.yml"
+    - trustOrgMembers: true
+
+    # - trustedUserNames:
+    #     - "caizixian"
+    #     - "javadamiri"
+    #     - "qinsoon"
+    #     - "steveblackburn"
+    #     - "wenyuzhao"
   
   pull_request_target: *config
   push: *config
