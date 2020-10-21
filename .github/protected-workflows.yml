@@ -6,13 +6,6 @@ events:
           - ".github/**"
           - ".github/protected-workflows.yml"
     - trustOrgMembers: true
-
-    # - trustedUserNames:
-    #     - "caizixian"
-    #     - "javadamiri"
-    #     - "qinsoon"
-    #     - "steveblackburn"
-    #     - "wenyuzhao"
   
   pull_request_target: *config
   push: *config
