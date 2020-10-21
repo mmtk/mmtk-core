@@ -24,17 +24,31 @@ use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::marker::PhantomData;
+use crate::util::constants::*;
 
 use crate::util::alloc::allocators::AllocatorSelector;
 use enum_map::EnumMap;
 
 pub trait CopyContext: Sized + 'static + Sync + Send {
     type VM: VMBinding;
+    const MAX_NON_LOS_COPY_BYTES: usize = MAX_INT;
     fn new(mmtk: &'static MMTK<Self::VM>) -> Self;
     fn prepare(&mut self);
     fn release(&mut self);
     fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: Allocator) -> Address;
     fn post_copy(&mut self, _obj: ObjectReference, _tib: Address, _bytes: usize, _allocator: Allocator) {}
+    fn copy_check_allocator(&self, _from: ObjectReference, bytes: usize, align: usize, allocator: Allocator) -> Allocator {
+        let large = crate::util::alloc::allocator::get_maximum_aligned_size::<Self::VM>(
+            bytes,
+            align,
+            Self::VM::MIN_ALIGNMENT,
+        ) > Self::MAX_NON_LOS_COPY_BYTES;
+        if large {
+            Allocator::Los
+        } else {
+            allocator
+        }
+    }
 }
 
 pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
@@ -376,12 +390,12 @@ impl<VM: VMBinding> BasePlan<VM> {
         {
             let unsync = unsafe { &mut *self.unsync.get() };
             #[cfg(feature = "code_space")]
-            unsync.code_space.init(vm_map);
+            unsync.code_space.init(mmtk.vm_map);
             #[cfg(feature = "ro_space")]
-            unsync.ro_space.init(vm_map);
+            unsync.ro_space.init(mmtk.vm_map);
             #[cfg(feature = "vm_space")]
             {
-                unsync.vm_space.init(vm_map);
+                unsync.vm_space.init(mmtk.vm_map);
                 unsync.vm_space.ensure_mapped();
             }
         }
