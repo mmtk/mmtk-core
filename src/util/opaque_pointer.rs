@@ -24,7 +24,7 @@ impl OpaquePointer {
         OpaquePointer(addr.to_mut_ptr::<c_void>())
     }
 
-    pub fn to_address(self) -> Self {
+    pub fn to_address(self) -> Address {
         Address::from_mut_ptr(self.0)
     }
 
