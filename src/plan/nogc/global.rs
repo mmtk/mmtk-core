@@ -7,15 +7,20 @@ use crate::util::OpaquePointer;
 use std::cell::UnsafeCell;
 
 use super::NoGCCollector;
-use super::NoGCMutator;
 use super::NoGCTraceLocal;
 use crate::plan::global::BasePlan;
+use crate::plan::mutator_context::Mutator;
+use crate::plan::nogc::mutator::create_nogc_mutator;
+use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::Allocator;
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
+use enum_map::EnumMap;
 use std::sync::Arc;
 
 #[cfg(not(feature = "nogc_lock_free"))]
@@ -37,7 +42,7 @@ pub struct NoGCUnsync<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
-    type MutatorT = NoGCMutator<VM>;
+    type MutatorT = Mutator<VM, Self>;
     type TraceLocalT = NoGCTraceLocal<VM>;
     type CollectorT = NoGCCollector<VM>;
 
@@ -82,12 +87,16 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         &self.base
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<NoGCMutator<VM>> {
-        Box::new(NoGCMutator::new(tls, self))
+    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<VM, Self>> {
+        Box::new(create_nogc_mutator(tls, self))
     }
 
     unsafe fn collection_phase(&self, _tls: OpaquePointer, _phase: &Phase) {
         unreachable!()
+    }
+
+    fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector> {
+        &*ALLOCATOR_MAPPING
     }
 
     fn get_pages_used(&self) -> usize {

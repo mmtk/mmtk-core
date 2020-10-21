@@ -4,6 +4,8 @@
 #![feature(drain_filter)]
 #![feature(nll)]
 #![feature(box_syntax)]
+#![feature(maybe_uninit_ref)]
+#![feature(maybe_uninit_extra)]
 
 #[macro_use]
 extern crate custom_derive;
@@ -20,6 +22,8 @@ extern crate atomic;
 extern crate atomic_traits;
 extern crate crossbeam_deque;
 extern crate num_cpus;
+#[macro_use]
+extern crate downcast_rs;
 
 #[macro_use]
 pub mod util;
@@ -32,9 +36,9 @@ pub mod vm;
 pub use crate::mm::memory_manager;
 pub use crate::mmtk::MMTK;
 pub use crate::plan::selected_plan::{
-    SelectedCollector, SelectedConstraints, SelectedMutator, SelectedPlan, SelectedTraceLocal,
+    SelectedCollector, SelectedConstraints, SelectedPlan, SelectedTraceLocal,
 };
 pub use crate::plan::{
-    Allocator, CollectorContext, MutatorContext, ParallelCollector, Plan, TraceLocal,
+    Allocator, CollectorContext, Mutator, MutatorContext, ParallelCollector, Plan, TraceLocal,
     TransitiveClosure,
 };

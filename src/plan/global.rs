@@ -22,6 +22,9 @@ use std::cell::UnsafeCell;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use crate::util::alloc::allocators::AllocatorSelector;
+use enum_map::EnumMap;
+
 pub trait Plan<VM: VMBinding>: Sized {
     type MutatorT: MutatorContext<VM>;
     type TraceLocalT: TraceLocal;
@@ -50,6 +53,8 @@ pub trait Plan<VM: VMBinding>: Sized {
     /// # Safety
     /// Only the primary collector thread can call this.
     unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
+
+    fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector>;
 
     #[cfg(feature = "sanity")]
     fn enter_sanity(&self) {
@@ -120,7 +125,7 @@ pub trait Plan<VM: VMBinding>: Sized {
         Self: Sized,
     {
         let stress_force_gc = self.stress_test_gc_required();
-        trace!(
+        debug!(
             "self.get_pages_reserved()={}, self.get_total_pages()={}",
             self.get_pages_reserved(),
             self.get_total_pages()
@@ -653,14 +658,13 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 }
 
+use enum_map::Enum;
 #[repr(i32)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Enum)]
 pub enum Allocator {
     Default = 0,
     Immortal = 1,
     Los = 2,
-    #[cfg(feature = "code-space")]
     Code = 3,
-    #[cfg(feature = "ro-space")]
     ReadOnly = 4,
 }

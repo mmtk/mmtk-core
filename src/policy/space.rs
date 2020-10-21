@@ -25,6 +25,8 @@ use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
+use downcast_rs::Downcast;
+
 /**
  * Space Function Table (SFT).
  *
@@ -138,7 +140,7 @@ impl SFTMap {
     }
 }
 
-pub trait Space<VM: VMBinding>: 'static + SFT + Sync {
+pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
@@ -158,12 +160,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync {
         trace!("Polling ..");
 
         if allow_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
-            trace!("Collection required");
+            debug!("Collection required");
             pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(tls);
             unsafe { Address::zero() }
         } else {
-            trace!("Collection not required");
+            debug!("Collection not required");
             let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, tls);
             if rtn.is_zero() {
                 if !allow_poll {
@@ -176,6 +178,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync {
                 VM::VMCollection::block_for_gc(tls);
                 unsafe { Address::zero() }
             } else {
+                debug!("Space.acquire(), returned = {}", rtn);
                 rtn
             }
         }
@@ -323,6 +326,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync {
         println!();
     }
 }
+
+impl_downcast!(Space<VM> where VM: VMBinding);
 
 pub struct CommonSpace<VM: VMBinding> {
     pub name: &'static str,

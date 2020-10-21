@@ -1,8 +1,8 @@
 use std::sync::atomic::Ordering;
 
+use crate::plan::mutator_context::{Mutator, MutatorContext};
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::CollectorContext;
-use crate::plan::MutatorContext;
 use crate::plan::Plan;
 use crate::plan::TraceLocal;
 
@@ -12,8 +12,9 @@ use crate::util::{Address, ObjectReference};
 
 use self::selected_plan::SelectedPlan;
 use crate::plan::selected_plan;
+use crate::util::alloc::allocators::AllocatorSelector;
 
-use self::selected_plan::{SelectedCollector, SelectedMutator, SelectedTraceLocal};
+use self::selected_plan::{SelectedCollector, SelectedTraceLocal};
 use crate::mmtk::MMTK;
 use crate::plan::Allocator;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
@@ -55,16 +56,16 @@ pub fn gc_init<VM: VMBinding>(mmtk: &MMTK<VM>, heap_size: usize) {
 pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: OpaquePointer,
-) -> Box<SelectedMutator<VM>> {
+) -> Box<Mutator<VM, SelectedPlan<VM>>> {
     SelectedPlan::bind_mutator(&mmtk.plan, tls)
 }
 
-pub fn destroy_mutator<VM: VMBinding>(mutator: Box<SelectedMutator<VM>>) {
+pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<VM, SelectedPlan<VM>>>) {
     drop(mutator);
 }
 
 pub fn alloc<VM: VMBinding>(
-    mutator: &mut SelectedMutator<VM>,
+    mutator: &mut Mutator<VM, SelectedPlan<VM>>,
     size: usize,
     align: usize,
     offset: isize,
@@ -74,13 +75,21 @@ pub fn alloc<VM: VMBinding>(
 }
 
 pub fn post_alloc<VM: VMBinding>(
-    mutator: &mut SelectedMutator<VM>,
+    mutator: &mut Mutator<VM, SelectedPlan<VM>>,
     refer: ObjectReference,
     type_refer: ObjectReference,
     bytes: usize,
     allocator: Allocator,
 ) {
     mutator.post_alloc(refer, type_refer, bytes, allocator);
+}
+
+// Returns an AllocatorSelector for the given allocator. This method is provided so that VM compilers may call it to help generate allocation fastpath.
+pub fn get_allocator_mapping<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    allocator: Allocator,
+) -> AllocatorSelector {
+    mmtk.plan.get_allocator_mapping()[allocator]
 }
 
 // The parameter 'trace_local' could either be &mut SelectedTraceLocal or &mut SanityChecker.
