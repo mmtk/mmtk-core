@@ -25,7 +25,7 @@ pub trait WorkerLocal<C: Context> {
 }
 
 impl <C: Context> WorkerLocal<C> for () {
-    fn new(_: &'static C) -> Self { () }
+    fn new(_: &'static C) -> Self {}
 }
 
 trait GCWorkerLocal<VM: VMBinding> = WorkerLocal<MMTK<VM>>;

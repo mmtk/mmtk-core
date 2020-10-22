@@ -1,7 +1,8 @@
 use mmtk::vm::Scanning;
-use mmtk::{TransitiveClosure, TraceLocal};
+use mmtk::{TransitiveClosure, TraceLocal, SelectedPlan, Mutator};
 use mmtk::util::{ObjectReference, SynchronizedCounter};
 use mmtk::util::OpaquePointer;
+use mmtk::scheduler::gc_works::*;
 use crate::DummyVM;
 
 static COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
@@ -9,6 +10,18 @@ static COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 pub struct VMScanning {}
 
 impl Scanning<DummyVM> for VMScanning {
+    fn scan_objects<W: ProcessEdgesWork<VM=DummyVM>>(_objects: &[ObjectReference]) {
+        unimplemented!()
+    }
+    fn scan_thread_roots<W: ProcessEdgesWork<VM=DummyVM>>() {
+        unimplemented!()
+    }
+    fn scan_thread_root<W: ProcessEdgesWork<VM=DummyVM>>(_mutator: &'static mut Mutator<SelectedPlan<DummyVM>>) {
+        unimplemented!()
+    }
+    fn scan_vm_specific_roots<W: ProcessEdgesWork<VM=DummyVM>>() {
+        unimplemented!()
+    }
     fn scan_object<T: TransitiveClosure>(_trace: &mut T, _object: ObjectReference, _tls: OpaquePointer) {
         unimplemented!()
     }

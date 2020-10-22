@@ -1,4 +1,3 @@
-use crate::util::OpaquePointer;
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;

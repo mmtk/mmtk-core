@@ -1,14 +1,9 @@
-use super::ParallelCollectorGroup;
-
-use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex, Arc};
 use std::marker::PhantomData;
 
-use crate::vm::Collection;
 use crate::mmtk::MMTK;
 
-use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Plan;
 
 use crate::util::OpaquePointer;

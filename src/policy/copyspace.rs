@@ -5,7 +5,6 @@ use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::forwarding_word as ForwardingWord;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 
 use crate::policy::space::SpaceOptions;
@@ -19,13 +18,17 @@ use std::cell::UnsafeCell;
 use crate::util::metadata::*;
 use std::sync::Mutex;
 use crate::util::conversions;
-use crate::util::constants::*;
 use crate::mmtk::SFT_MAP;
+#[cfg(feature = "gencopy_sanity_gc")]
+use crate::util::constants::*;
+#[cfg(feature = "gencopy_sanity_gc")]
 use crate::util::heap::layout::Mmapper as MmapperTrait;
+#[cfg(feature = "gencopy_sanity_gc")]
 use crate::util::heap::layout::vm_layout_constants::*;
 
 unsafe impl<VM: VMBinding> Sync for CopySpace<VM> {}
 
+#[cfg(feature = "gencopy_sanity_gc")]
 const fn max(a: usize, b: usize) -> usize {
     [a, b][(a < b) as usize]
 }
@@ -79,7 +82,7 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
             SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
         }
         #[cfg(feature = "gencopy_sanity_gc")] {
-            let chunk = conversions::chunk_align_down(start);
+            let _chunk = conversions::chunk_align_down(start);
             self.common().mmapper.ensure_mapped(start, bytes >> LOG_BYTES_IN_PAGE);
             let mut mark_tables = self.mark_tables.lock().unwrap();
             let mut mark_table;

@@ -1,15 +1,9 @@
-use crate::plan;
 use crate::plan::phase::Phase::*;
 use crate::plan::phase::Schedule::*;
-use crate::plan::{CollectorContext, MutatorContext, ParallelCollector, Plan};
-use crate::util::statistics::phase_timer::PhaseTimer;
 use crate::util::statistics::stats::Stats;
-use crate::util::statistics::{Counter, Timer};
+use crate::util::statistics::Timer;
 use crate::util::OpaquePointer;
-use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -95,16 +89,6 @@ impl ScheduledPhase {
 }
 
 pub struct PhaseManager {
-    even_mutator_reset_rendezvous: AtomicBool,
-    odd_mutator_reset_rendezvous: AtomicBool,
-
-    phase_stack: Mutex<Vec<ScheduledPhase>>,
-    even_scheduled_phase: Mutex<ScheduledPhase>,
-    odd_scheduled_phase: Mutex<ScheduledPhase>,
-    start_complex_timer: Mutex<Option<Arc<Mutex<Timer>>>>,
-    stop_complex_timer: Mutex<Option<Arc<Mutex<Timer>>>>,
-    phase_timer: PhaseTimer,
-
     // TODO: Some plan may want to change the phase. We need to figure out a pattern to allow it.
     pub collection_phase: Phase,
 }
@@ -112,16 +96,6 @@ pub struct PhaseManager {
 impl PhaseManager {
     pub fn new(stats: &Stats) -> Self {
         PhaseManager {
-            even_mutator_reset_rendezvous: AtomicBool::new(false),
-            odd_mutator_reset_rendezvous: AtomicBool::new(false),
-
-            phase_stack: Mutex::new(vec![]),
-            even_scheduled_phase: Mutex::new(ScheduledPhase::EMPTY),
-            odd_scheduled_phase: Mutex::new(ScheduledPhase::EMPTY),
-            start_complex_timer: Mutex::new(None),
-            stop_complex_timer: Mutex::new(None),
-            phase_timer: PhaseTimer::new(stats),
-
             collection_phase: PhaseManager::define_phase_collection(stats),
         }
     }
@@ -326,8 +300,8 @@ impl PhaseManager {
     // FIXME: It's probably unsafe to call most of these functions, because tls
     pub fn begin_new_phase_stack<VM: VMBinding>(
         &self,
-        tls: OpaquePointer,
-        scheduled_phase: ScheduledPhase,
+        _tls: OpaquePointer,
+        _scheduled_phase: ScheduledPhase,
     ) {
         unreachable!()
     }
@@ -336,109 +310,11 @@ impl PhaseManager {
         self.process_phase_stack::<VM>(tls, true);
     }
 
-    fn resume_complex_timers(&self) {
-        let stack = self.phase_stack.lock().unwrap();
-        for cp in (*stack).iter().rev() {
-            self.phase_timer.start_timer(&cp.phase);
-        }
-    }
-
-    fn process_phase_stack<VM: VMBinding>(&self, tls: OpaquePointer, resume: bool) {
+    fn process_phase_stack<VM: VMBinding>(&self, _tls: OpaquePointer, _resume: bool) {
         unreachable!()
     }
 
-    fn get_current_phase(&self, is_even_phase: bool) -> ScheduledPhase {
-        if is_even_phase {
-            (*self.even_scheduled_phase.lock().unwrap()).clone()
-        } else {
-            (*self.odd_scheduled_phase.lock().unwrap()).clone()
-        }
-    }
-
-    fn get_next_phase(&self) -> ScheduledPhase {
-        let mut stack = self.phase_stack.lock().unwrap();
-        while !stack.is_empty() {
-            let mut scheduled_phase = stack.pop().unwrap();
-            match scheduled_phase.schedule {
-                Schedule::Placeholder => {}
-                Schedule::Global => {
-                    return scheduled_phase;
-                }
-                Schedule::Collector => {
-                    return scheduled_phase;
-                }
-                Schedule::Mutator => {
-                    return scheduled_phase;
-                }
-                Schedule::Concurrent => unimplemented!(),
-                Schedule::Complex => {
-                    let mut internal_phase = ScheduledPhase::EMPTY;
-                    // FIXME start complex timer
-                    if let Phase::Complex(ref v, ref mut cursor, ref timer_opt) =
-                        scheduled_phase.phase
-                    {
-                        trace!("Complex phase: {:?} with cursor: {:?}", v, cursor);
-                        if *cursor == 0 {
-                            if let Some(ref t) = timer_opt {
-                                let mut start_complex_timer =
-                                    self.start_complex_timer.lock().unwrap();
-                                *start_complex_timer = Some(t.clone());
-                            }
-                        }
-                        if *cursor < v.len() {
-                            internal_phase = v[*cursor].clone();
-                            *cursor += 1;
-                        } else {
-                            if let Some(ref t) = timer_opt {
-                                let mut stop_complex_timer =
-                                    self.stop_complex_timer.lock().unwrap();
-                                *stop_complex_timer = Some(t.clone());
-                            }
-                            trace!("Finished processing phase");
-                        }
-                    } else {
-                        panic!("Complex schedule should be paired with complex phase");
-                    }
-                    if !internal_phase.phase.is_empty() {
-                        stack.push(scheduled_phase);
-                        stack.push(internal_phase);
-                    }
-                    // FIXME stop complex timer
-                }
-                _ => {
-                    panic!("Invalid phase type encountered");
-                }
-            }
-        }
-        ScheduledPhase::EMPTY
-    }
-
-    fn set_next_phase(
-        &self,
-        is_even_phase: bool,
-        scheduled_phase: ScheduledPhase,
-        needs_reset_rendezvous: bool,
-    ) {
-        if is_even_phase {
-            *self.odd_scheduled_phase.lock().unwrap() = scheduled_phase;
-            self.even_mutator_reset_rendezvous
-                .store(needs_reset_rendezvous, Ordering::Relaxed);
-        } else {
-            *self.even_scheduled_phase.lock().unwrap() = scheduled_phase;
-            self.odd_mutator_reset_rendezvous
-                .store(needs_reset_rendezvous, Ordering::Relaxed);
-        }
-    }
-
-    pub fn push_scheduled_phase(&self, scheduled_phase: ScheduledPhase) {
-        self.phase_stack.lock().unwrap().push(scheduled_phase);
-    }
-
-    fn needs_mutator_reset_rendevous(&self, is_even_phase: bool) -> bool {
-        if is_even_phase {
-            self.even_mutator_reset_rendezvous.load(Ordering::Relaxed)
-        } else {
-            self.odd_mutator_reset_rendezvous.load(Ordering::Relaxed)
-        }
+    pub fn push_scheduled_phase(&self, _scheduled_phase: ScheduledPhase) {
+        unreachable!()
     }
 }

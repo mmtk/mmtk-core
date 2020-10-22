@@ -1,11 +1,11 @@
 use crate::util::*;
 #[cfg(feature="copyspace")]
-use crate::policy::copyspace::CopySpace;
-use crate::vm::VMBinding;
-use crate::SelectedPlan;
 use crate::policy::space::Space;
-use std::mem;
+#[cfg(feature="copyspace")]
+use crate::policy::copyspace::CopySpace;
+#[cfg(feature="copyspace")]
 use crate::scheduler::gc_works::*;
+#[cfg(feature="copyspace")]
 use crate::MMTK;
 
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address
@@ -23,7 +23,7 @@ pub struct NoBarrier;
 
 impl Barrier for NoBarrier {
     fn flush(&mut self) {}
-    fn post_write_barrier(&mut self, target: WriteTarget) {}
+    fn post_write_barrier(&mut self, _target: WriteTarget) {}
 }
 
 #[cfg(feature="copyspace")]
@@ -35,6 +35,7 @@ pub struct FieldRememberingBarrier<E: ProcessEdgesWork> {
 
 #[cfg(feature="copyspace")]
 impl <E: ProcessEdgesWork> FieldRememberingBarrier<E> {
+    #[allow(unused)]
     pub fn new(mmtk: &'static MMTK<E::VM>, nursery: &'static CopySpace<E::VM>) -> Self {
         Self {
             mmtk, nursery,
@@ -61,9 +62,9 @@ impl <E: ProcessEdgesWork> FieldRememberingBarrier<E> {
 impl <E: ProcessEdgesWork> Barrier for FieldRememberingBarrier<E> {
     fn flush(&mut self) {
         let mut modified_nodes = vec![];
-        mem::swap(&mut modified_nodes, &mut self.modbuf.0);
+        std::mem::swap(&mut modified_nodes, &mut self.modbuf.0);
         let mut modified_edges = vec![];
-        mem::swap(&mut modified_edges, &mut self.modbuf.1);
+        std::mem::swap(&mut modified_edges, &mut self.modbuf.1);
         debug_assert!(!self.mmtk.scheduler.final_stage.is_activated(), "{:?}", self as *const _);
         self.mmtk.scheduler.closure_stage.add(ProcessModBuf::<E>::new(modified_nodes, modified_edges));
     }

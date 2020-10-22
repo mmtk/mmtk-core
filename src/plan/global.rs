@@ -1,5 +1,5 @@
 use super::controller_collector_context::ControllerCollectorContext;
-use super::{MutatorContext, ParallelCollector, TraceLocal};
+use super::MutatorContext;
 use crate::plan::phase::Phase;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -77,8 +77,8 @@ pub trait Plan: Sized + 'static + Sync + Send {
         scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self;
     fn base(&self) -> &BasePlan<Self::VM>;
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<Self::VM>);
-    fn schedule_sanity_collection(&'static self, scheduler: &MMTkScheduler<Self::VM>) {}
+    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
+    fn schedule_sanity_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>) {}
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
@@ -469,7 +469,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         panic!("No special case for space in trace_object");
     }
 
-    pub fn prepare(&self, tls: OpaquePointer, _primary: bool) {
+    pub fn prepare(&self, _tls: OpaquePointer, _primary: bool) {
         #[cfg(feature = "base_spaces")]
         let unsync = unsafe { &mut *self.unsync.get() };
         #[cfg(feature = "code_space")] unsync.code_space.prepare();
@@ -477,7 +477,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         #[cfg(feature = "vm_space")] unsync.vm_space.prepare();
     }
 
-    pub fn release(&self, tls: OpaquePointer, _primary: bool) {
+    pub fn release(&self, _tls: OpaquePointer, _primary: bool) {
         #[cfg(feature = "base_spaces")]
         let unsync = unsafe { &mut *self.unsync.get() };
         #[cfg(feature = "code_space")] unsync.code_space.release();

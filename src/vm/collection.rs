@@ -1,4 +1,4 @@
-use crate::plan::{MutatorContext, ParallelCollector};
+use crate::plan::MutatorContext;
 use crate::scheduler::*;
 use crate::scheduler::gc_works::ProcessEdgesWork;
 use crate::util::OpaquePointer;

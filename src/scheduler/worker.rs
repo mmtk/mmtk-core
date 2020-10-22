@@ -37,7 +37,7 @@ impl <C: Context> Worker<C> {
             local: None,
             local_works: WorkBucket::new(true, scheduler.worker_monitor.clone()),
             sender: scheduler.channel.0.clone(),
-            scheduler: scheduler,
+            scheduler,
             stat: Default::default(),
         }
     }

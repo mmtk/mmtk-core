@@ -1,11 +1,9 @@
 use crate::plan::global::Plan;
 use crate::plan::Allocator as AllocationType;
-use crate::plan::Phase;
 use crate::policy::space::Space;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
-use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::plan::barriers::{Barrier, WriteTarget};
 

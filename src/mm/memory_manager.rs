@@ -1,11 +1,7 @@
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
 use crate::plan::mutator_context::{Mutator, MutatorContext};
-use crate::plan::transitive_closure::TransitiveClosure;
-use crate::plan::CollectorContext;
 use crate::plan::Plan;
-use crate::plan::TraceLocal;
 use crate::scheduler::GCWorker;
 
 use crate::vm::Collection;
@@ -23,7 +19,6 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::scheduler::Scheduler;
 
 // This file provides a safe Rust API for mmtk-core.
 // We expect the VM binding to inherit and extend this API by:
@@ -97,61 +92,6 @@ pub fn get_allocator_mapping<VM: VMBinding>(
     allocator: Allocator,
 ) -> AllocatorSelector {
     mmtk.plan.get_allocator_mapping()[allocator]
-}
-
-// The parameter 'trace_local' could either be &mut SelectedTraceLocal or &mut SanityChecker.
-// Ideally we should make 'trace_local' as a trait object - &mut TraceLocal. However, this is a fat
-// pointer, and it would appear in our API (and possibly in native API), which imposes inconvenience
-// to store and pass around a fat pointer. Thus, we just assume it is &mut SelectedTraceLocal,
-// and use unsafe transmute when we know it is a SanityChcker ref.
-#[cfg(feature = "sanity")]
-pub fn report_delayed_root_edge<VM: VMBinding>(
-    mmtk: &MMTK<VM>,
-    trace_local: &mut SelectedTraceLocal<VM>,
-    addr: Address,
-) {
-    use crate::util::sanity::sanity_checker::SanityChecker;
-    if mmtk.plan.is_in_sanity() {
-        let sanity_checker: &mut SanityChecker<VM> =
-            unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
-        sanity_checker.report_delayed_root_edge(addr);
-    } else {
-        trace_local.report_delayed_root_edge(addr)
-    }
-}
-
-#[cfg(feature = "sanity")]
-pub fn will_not_move_in_current_collection<VM: VMBinding>(
-    mmtk: &MMTK<VM>,
-    trace_local: &mut SelectedTraceLocal<VM>,
-    obj: ObjectReference,
-) -> bool {
-    use crate::util::sanity::sanity_checker::SanityChecker;
-    if mmtk.plan.is_in_sanity() {
-        let sanity_checker: &mut SanityChecker<VM> =
-            unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
-        sanity_checker.will_not_move_in_current_collection(obj)
-    } else {
-        trace_local.will_not_move_in_current_collection(obj)
-    }
-}
-
-#[cfg(feature = "sanity")]
-pub fn process_interior_edge<VM: VMBinding>(
-    mmtk: &MMTK<VM>,
-    trace_local: &mut SelectedTraceLocal<VM>,
-    target: ObjectReference,
-    slot: Address,
-    root: bool,
-) {
-    use crate::util::sanity::sanity_checker::SanityChecker;
-    if mmtk.plan.is_in_sanity() {
-        let sanity_checker: &mut SanityChecker<VM> =
-            unsafe { &mut *(trace_local as *mut SelectedTraceLocal<VM> as *mut SanityChecker<VM>) };
-        sanity_checker.process_interior_edge(target, slot, root)
-    } else {
-        trace_local.process_interior_edge(target, slot, root)
-    }
 }
 
 pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &'static mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {

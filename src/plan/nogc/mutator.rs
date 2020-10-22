@@ -1,7 +1,6 @@
 use crate::plan::mutator_context::Mutator;
 use crate::plan::nogc::NoGC;
 use crate::plan::Allocator as AllocationType;
-use crate::plan::Phase;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;

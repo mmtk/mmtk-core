@@ -329,6 +329,7 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for E {
 /// Scan & update a list of object slots
 pub struct ScanObjects<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
+    #[allow(unused)]
     concurrent: bool,
     phantom: PhantomData<Edges>,
 }

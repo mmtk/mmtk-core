@@ -20,3 +20,4 @@ lazy_static = "1.1"
 default = []
 nogc = ["mmtk/nogc"]
 semispace = ["mmtk/semispace"]
+gencopy = ["mmtk/gencopy"]

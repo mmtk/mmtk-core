@@ -1,16 +1,10 @@
 use crate::plan::mutator_context::Mutator;
 use crate::plan::Allocator as AllocationType;
-use crate::plan::Phase;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::policy::space::Space;
-use crate::plan::SelectedPlan;
-use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
-use crate::plan::Plan;
 use crate::plan::barriers::*;
 use crate::plan::mutator_context::MutatorConfig;
-use crate::util::{Address, ObjectReference};
 use super::GenCopy;
 use super::gc_works::*;
 use crate::vm::VMBinding;
@@ -18,7 +12,7 @@ use crate::MMTK;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn gencopy_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<GenCopy<VM>>, _tls: OpaquePointer) {
+pub fn gencopy_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<GenCopy<VM>>, _tls: OpaquePointer) {
     // Do nothing
 }
 

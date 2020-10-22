@@ -80,7 +80,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &self.base
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> Box<Mutator<Self>> {
+    fn bind_mutator(&'static self, tls: OpaquePointer, _mmtk: &'static MMTK<Self::VM>) -> Box<Mutator<Self>> {
         Box::new(create_nogc_mutator(tls, self))
     }
 

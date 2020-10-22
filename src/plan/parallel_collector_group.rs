@@ -4,7 +4,6 @@ use std::sync::{Condvar, Mutex};
 use std::vec::Vec;
 
 use super::ParallelCollector;
-use crate::vm::Collection;
 
 use crate::mmtk::MMTK;
 use crate::vm::VMBinding;
@@ -49,24 +48,8 @@ impl<VM: VMBinding, C: ParallelCollector<VM>> ParallelCollectorGroup<VM, C> {
         self.contexts.len()
     }
 
-    pub fn init_group(&mut self, mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
+    pub fn init_group(&mut self, _mmtk: &'static MMTK<VM>, _tls: OpaquePointer) {
         unreachable!();
-        {
-            let inner = self.sync.get_mut().unwrap();
-            inner.trigger_count = 1;
-        }
-        let size = mmtk.options.threads;
-        self.contexts = Vec::<C>::with_capacity(size);
-        for i in 0..size {
-            self.contexts.push(C::new(mmtk));
-            // XXX: Borrow-checker fighting. I _believe_ this is unavoidable
-            //      because we have a circular dependency here, but I'd very
-            //      much like to be wrong.
-            let self_ptr = self as *const Self;
-            self.contexts[i].set_group(self_ptr);
-            self.contexts[i].set_worker_ordinal(i);
-            // VM::VMCollection::spawn_worker_thread(tls, Some(&mut self.contexts[i]));
-        }
     }
 
     pub fn trigger_cycle(&self) {

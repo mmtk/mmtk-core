@@ -1,13 +1,10 @@
 use crate::policy::space::Space;
-use crate::plan::trace::Trace;
 use crate::plan::Allocator;
-use crate::plan::Phase;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::VMRequest;
 use crate::util::OpaquePointer;
-use std::cell::UnsafeCell;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::mutator_context::Mutator;
@@ -53,7 +50,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        scheduler: &'static MMTkScheduler<Self::VM>,
+        _scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
@@ -101,7 +98,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> Box<Mutator<Self>> {
+    fn bind_mutator(&'static self, tls: OpaquePointer, _mmtk: &'static MMTK<Self::VM>) -> Box<Mutator<Self>> {
         Box::new(create_ss_mutator(tls, self))
     }
 
