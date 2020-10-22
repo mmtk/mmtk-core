@@ -15,11 +15,11 @@ use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn ss_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM, SemiSpace<VM>>, _tls: OpaquePointer) {
+pub fn ss_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<SemiSpace<VM>>, _tls: OpaquePointer) {
     // Do nothing
 }
 
-pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM, SemiSpace<VM>>, _tls: OpaquePointer) {
+pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<SemiSpace<VM>>, _tls: OpaquePointer) {
     // rebind the allocation bump pointer to the appropriate semispace
     let bump_allocator = unsafe {
         mutator
@@ -42,7 +42,7 @@ lazy_static! {
 pub fn create_ss_mutator<VM: VMBinding>(
     mutator_tls: OpaquePointer,
     plan: &'static SemiSpace<VM>,
-) -> Mutator<VM, SemiSpace<VM>> {
+) -> Mutator<SemiSpace<VM>> {
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![

@@ -36,7 +36,7 @@ unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
 
 impl<VM: VMBinding> Plan for NoGC<VM> {
     type VM = VM;
-    type Mutator = Mutator<VM, Self>;
+    type Mutator = Mutator<Self>;
     type CopyContext = NoCopy<VM>;
 
     fn new(
@@ -80,7 +80,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &self.base
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<VM, Self>> {
+    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<Self>> {
         Box::new(create_nogc_mutator(tls, self))
     }
 

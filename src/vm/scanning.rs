@@ -1,9 +1,8 @@
-use crate::plan::{TraceLocal, TransitiveClosure};
+use crate::plan::{TraceLocal, TransitiveClosure, Mutator, SelectedPlan};
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::scheduler::gc_works::ProcessEdgesWork;
-use crate::SelectedMutator;
 
 pub trait Scanning<VM: VMBinding> {
     /// Scan stack roots after all mutators are paused
@@ -26,7 +25,7 @@ pub trait Scanning<VM: VMBinding> {
     /// Scan all the mutators for roots
     fn scan_thread_roots<W: ProcessEdgesWork<VM=VM>>();
     /// Scan one mutator for roots
-    fn scan_thread_root<W: ProcessEdgesWork<VM=VM>>(mutator: &'static mut SelectedMutator<VM>);
+    fn scan_thread_root<W: ProcessEdgesWork<VM=VM>>(mutator: &'static mut Mutator<SelectedPlan<VM>>);
     /// The creation of all root scan tasks (except thread scanning) goes here
     fn scan_vm_specific_roots<W: ProcessEdgesWork<VM=VM>>();
     fn compute_static_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);

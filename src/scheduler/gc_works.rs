@@ -217,7 +217,7 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     }
 }
 
-pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut SelectedMutator<Edges::VM>);
+pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut Mutator<SelectedPlan<Edges::VM>>);
 
 impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {

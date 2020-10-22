@@ -16,17 +16,17 @@ lazy_static! {
     };
 }
 
-pub fn nogc_mutator_noop<VM: VMBinding>(_mutator: &mut Mutator<VM, SemiSpace<VM>>, _tls: OpaquePointer) {
-
+pub fn nogc_mutator_noop<VM: VMBinding>(_mutator: &mut Mutator<NoGC<VM>>, _tls: OpaquePointer) {
+    unreachable!();
 }
 
 pub fn create_nogc_mutator<VM: VMBinding>(
     mutator_tls: OpaquePointer,
     plan: &'static NoGC<VM>,
-) -> Mutator<VM, NoGC<VM>> {
+) -> Mutator<NoGC<VM>> {
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box vec![(AllocatorSelector::BumpPointer(0), plan.get_immortal_space())],
+        space_mapping: box vec![(AllocatorSelector::BumpPointer(0), &plan.nogc_space)],
         prepare_func: &nogc_mutator_noop,
         release_func: &nogc_mutator_noop,
     };

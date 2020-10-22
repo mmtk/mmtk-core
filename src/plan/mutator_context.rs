@@ -13,31 +13,34 @@ use enum_map::EnumMap;
 // This struct is part of the Mutator struct.
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
 #[repr(C)]
-pub struct MutatorConfig<VM: VMBinding, P: Plan<VM> + 'static> {
+pub struct MutatorConfig<P: Plan> {
     // Mapping between allocation semantics and allocator selector
     pub allocator_mapping: &'static EnumMap<AllocationType, AllocatorSelector>,
     // Mapping between allocator selector and spaces. Each pair represents a mapping.
     // Put this behind a box, so it is a pointer-sized field.
     #[allow(clippy::box_vec)]
-    pub space_mapping: Box<Vec<(AllocatorSelector, &'static dyn Space<VM>)>>,
+    pub space_mapping: Box<Vec<(AllocatorSelector, &'static dyn Space<P::VM>)>>,
     // Plan-specific code for mutator prepare/release
-    pub prepare_func: &'static dyn Fn(&mut Mutator<VM, P>, OpaquePointer),
-    pub release_func: &'static dyn Fn(&mut Mutator<VM, P>, OpaquePointer),
+    pub prepare_func: &'static dyn Fn(&mut Mutator<P>, OpaquePointer),
+    pub release_func: &'static dyn Fn(&mut Mutator<P>, OpaquePointer),
 }
+
+unsafe impl <P: Plan> Send for MutatorConfig<P> {}
+unsafe impl <P: Plan> Sync for MutatorConfig<P> {}
 
 // We are trying to make this struct fixed-sized so that VM bindings can easily define a type to have the exact same layout as this struct.
 // Currently Mutator is fixed sized, and we should try keep this invariant:
 // - Allocators are fixed-length arrays of allocators.
 // - MutatorConfig has 3 pointers/refs (including one fat pointer), and is fixed sized.
 #[repr(C)]
-pub struct Mutator<VM: VMBinding, P: Plan<VM> + 'static> {
-    pub allocators: Allocators<VM>,
+pub struct Mutator<P: Plan> {
+    pub allocators: Allocators<P::VM>,
     pub mutator_tls: OpaquePointer,
     pub plan: &'static P,
-    pub config: MutatorConfig<VM, P>,
+    pub config: MutatorConfig<P>,
 }
 
-impl<VM: VMBinding, P: Plan<VM>> MutatorContext<VM> for Mutator<VM, P> {
+impl <P: Plan<Mutator=Self>> MutatorContext<P::VM> for Mutator<P> {
     fn prepare(&mut self, tls: OpaquePointer) {
         (*self.config.prepare_func)(self, tls)
     }

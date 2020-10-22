@@ -59,20 +59,20 @@ pub fn gc_init<VM: VMBinding>(mmtk: &MMTK<VM>, heap_size: usize) {
 pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: OpaquePointer,
-) -> Box<Mutator<VM, SelectedPlan<VM>>> {
+) -> Box<Mutator<SelectedPlan<VM>>> {
     SelectedPlan::bind_mutator(&mmtk.plan, tls)
 }
 
-pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<VM, SelectedPlan<VM>>>) {
+pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<SelectedPlan<VM>>>) {
     drop(mutator);
 }
 
-pub fn flush_mutator<VM: VMBinding>(mutator: &mut SelectedMutator<VM>) {
+pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<SelectedPlan<VM>>) {
     mutator.flush()
 }
 
 pub fn alloc<VM: VMBinding>(
-    mutator: &mut Mutator<VM, SelectedPlan<VM>>,
+    mutator: &mut Mutator<SelectedPlan<VM>>,
     size: usize,
     align: usize,
     offset: isize,
@@ -82,7 +82,7 @@ pub fn alloc<VM: VMBinding>(
 }
 
 pub fn post_alloc<VM: VMBinding>(
-    mutator: &mut Mutator<VM, SelectedPlan<VM>>,
+    mutator: &mut Mutator<SelectedPlan<VM>>,
     refer: ObjectReference,
     type_refer: ObjectReference,
     bytes: usize,

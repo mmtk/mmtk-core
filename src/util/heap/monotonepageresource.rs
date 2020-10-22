@@ -17,6 +17,7 @@ use super::PageResource;
 
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::vm::VMBinding;
+use std::sync::atomic::Ordering;
 use libc::{c_void, memset};
 
 pub struct MonotonePageResource<VM: VMBinding> {

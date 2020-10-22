@@ -108,7 +108,7 @@ pub trait PageResource<VM: VMBinding>: 'static {
 }
 
 pub struct CommonPageResource<VM: VMBinding> {
-    reserved: AtomicUsize,
+    pub reserved: AtomicUsize,
     committed: AtomicUsize,
 
     pub contiguous: bool,

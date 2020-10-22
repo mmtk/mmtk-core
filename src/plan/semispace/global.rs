@@ -46,7 +46,7 @@ unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
 
 impl<VM: VMBinding> Plan for SemiSpace<VM> {
     type VM = VM;
-    type Mutator = Mutator<VM, Self>;
+    type Mutator = Mutator<Self>;
     type CopyContext = SSCopyContext<VM>;
 
     fn new(
@@ -101,7 +101,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<VM, Self>> {
+    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<Self>> {
         Box::new(create_ss_mutator(tls, self))
     }
 
