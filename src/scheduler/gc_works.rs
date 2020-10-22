@@ -347,6 +347,42 @@ impl <E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
     }
 }
 
+
+#[derive(Default)]
+pub struct ProcessModBuf<E: ProcessEdgesWork> {
+    modified_nodes: Vec<ObjectReference>,
+    modified_edges: Vec<Address>,
+    phantom: PhantomData<E>,
+}
+
+impl <E: ProcessEdgesWork> ProcessModBuf<E> {
+    pub fn new(modified_nodes: Vec<ObjectReference>, modified_edges: Vec<Address>) -> Self {
+        Self {
+            modified_nodes,
+            modified_edges,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl <E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
+    #[inline]
+    fn do_work(&mut self, worker: &'static mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        if mmtk.plan.in_nursery() {
+            let mut modified_nodes = vec![];
+            ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
+            worker.scheduler().closure_stage.add(ScanObjects::<E>::new(modified_nodes, false));
+
+            let mut modified_edges = vec![];
+            ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
+            worker.scheduler().closure_stage.add(E::new(modified_edges, true));
+        } else {
+            // Do nothing
+        }
+    }
+}
+
+
 #[derive(Default)]
 pub struct ScheduleSanityGC;
 

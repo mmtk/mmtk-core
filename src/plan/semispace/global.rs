@@ -101,7 +101,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<Self>> {
+    fn bind_mutator(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> Box<Mutator<Self>> {
         Box::new(create_ss_mutator(tls, self))
     }
 

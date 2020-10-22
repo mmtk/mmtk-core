@@ -1,6 +1,5 @@
 use crate::policy::space::Space;
 
-use super::GenCopyMutator;
 use crate::plan::Allocator;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
@@ -21,6 +20,11 @@ use crate::scheduler::gc_works::*;
 use crate::mmtk::MMTK;
 use super::gc_works::{GenCopyCopyContext, GenCopyNurseryProcessEdges, GenCopyMatureProcessEdges, SanityGCProcessEdges};
 use crate::plan::global::GcStatus;
+use super::mutator::ALLOCATOR_MAPPING;
+use crate::util::alloc::allocators::AllocatorSelector;
+use enum_map::EnumMap;
+use super::mutator::create_gencopy_mutator;
+use crate::plan::mutator_context::Mutator;
 
 
 
@@ -44,7 +48,7 @@ unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
 
 impl <VM: VMBinding> Plan for GenCopy<VM> {
     type VM = VM;
-    type Mutator = GenCopyMutator<VM>;
+    type Mutator = Mutator<Self>;
     type CopyContext = GenCopyCopyContext<VM>;
 
     fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool where Self: Sized {
@@ -143,8 +147,12 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
         scheduler.release_stage.add(Release::new(self));
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<GenCopyMutator<VM>> {
-        Box::new(GenCopyMutator::new(tls, self))
+    fn bind_mutator(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> Box<Mutator<Self>> {
+        Box::new(create_gencopy_mutator(tls, mmtk))
+    }
+
+    fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector> {
+        &*ALLOCATOR_MAPPING
     }
 
     fn prepare(&self, tls: OpaquePointer) {
@@ -198,6 +206,10 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
+
+    fn in_nursery(&self) -> bool {
+        self.in_nursery.load(Ordering::SeqCst)
+    }
 }
 
 
@@ -220,10 +232,6 @@ impl <VM: VMBinding> GenCopy<VM> {
         } else {
             &self.copyspace1
         }
-    }
-
-    pub fn in_nursery(&self) -> bool {
-        self.in_nursery.load(Ordering::SeqCst)
     }
 
     pub fn in_sanity(&self) -> bool {

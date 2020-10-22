@@ -7,6 +7,7 @@ use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
 use crate::vm::VMBinding;
+use crate::plan::barriers::{Barrier, WriteTarget};
 
 use enum_map::EnumMap;
 
@@ -35,6 +36,7 @@ unsafe impl <P: Plan> Sync for MutatorConfig<P> {}
 #[repr(C)]
 pub struct Mutator<P: Plan> {
     pub allocators: Allocators<P::VM>,
+    pub barrier: Box<dyn Barrier>,
     pub mutator_tls: OpaquePointer,
     pub plan: &'static P,
     pub config: MutatorConfig<P>,
@@ -84,6 +86,10 @@ impl <P: Plan<Mutator=Self>> MutatorContext<P::VM> for Mutator<P> {
     fn get_tls(&self) -> OpaquePointer {
         self.mutator_tls
     }
+
+    fn barrier(&mut self) -> &mut dyn Barrier {
+        &mut *self.barrier
+    }
 }
 
 // TODO: We should be able to remove this trait, as we removed per-plan mutator implementation, and there is no other type that implements this trait.
@@ -105,12 +111,19 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
         bytes: usize,
         allocator: AllocationType,
     );
-    fn flush_remembered_sets(&mut self) {}
+    fn flush_remembered_sets(&mut self) {
+        self.barrier().flush();
+    }
     fn flush(&mut self) {
         self.flush_remembered_sets();
     }
     fn get_tls(&self) -> OpaquePointer;
+    fn barrier(&mut self) -> &mut dyn Barrier;
 
-    fn record_modified_node(&mut self, obj: ObjectReference) {}
-    fn record_modified_edge(&mut self, slot: Address) {}
+    fn record_modified_node(&mut self, obj: ObjectReference) {
+        self.barrier().post_write_barrier(WriteTarget::Object(obj));
+    }
+    fn record_modified_edge(&mut self, slot: Address) {
+        self.barrier().post_write_barrier(WriteTarget::Slot(slot));
+    }
 }

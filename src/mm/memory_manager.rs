@@ -60,7 +60,7 @@ pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: OpaquePointer,
 ) -> Box<Mutator<SelectedPlan<VM>>> {
-    SelectedPlan::bind_mutator(&mmtk.plan, tls)
+    SelectedPlan::bind_mutator(&mmtk.plan, tls, mmtk)
 }
 
 pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<SelectedPlan<VM>>>) {

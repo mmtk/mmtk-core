@@ -5,7 +5,7 @@ use crate::plan::Phase;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-
+use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::MutatorConfig;
 use enum_map::enum_map;
 use enum_map::EnumMap;
@@ -33,6 +33,7 @@ pub fn create_nogc_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
+        barrier: box NoBarrier,
         mutator_tls,
         config,
         plan,

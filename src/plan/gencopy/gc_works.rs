@@ -193,10 +193,10 @@ impl <VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
     #[inline]
     fn process_edge(&mut self, slot: Address) {
         let object = unsafe { slot.load::<ObjectReference>() };
-        assert!(!self.plan().nursery.in_space(object)
+        assert!(!self.plan().nursery.in_space(object),
             "Invalid edge: {:?} -> {:?}", slot, object
         );
-        assert!(!self.plan().fromspace().in_space(object)
+        assert!(!self.plan().fromspace().in_space(object),
             "Invalid edge: {:?} -> {:?}", slot, object
         );
         self.trace_object(object);

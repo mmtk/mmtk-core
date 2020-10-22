@@ -92,9 +92,13 @@ pub trait Plan: Sized + 'static + Sync + Send {
     // unsafe because this can only be called once by the init thread
     fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<Self::VM>);
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::Mutator>;
+    fn bind_mutator(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> Box<Self::Mutator>;
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector>;
+
+    fn in_nursery(&self) -> bool {
+        false
+    }
 
     #[cfg(feature = "sanity")]
     fn enter_sanity(&self) {

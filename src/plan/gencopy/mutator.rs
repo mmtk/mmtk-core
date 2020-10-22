@@ -1,130 +1,67 @@
-use crate::plan::mutator_context::{CommonMutatorContext, MutatorContext};
+use crate::plan::mutator_context::Mutator;
 use crate::plan::Allocator as AllocationType;
+use crate::plan::Phase;
+use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::policy::space::Space;
+use crate::plan::SelectedPlan;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
-use crate::util::{Address, ObjectReference};
-use crate::scheduler::MMTkScheduler;
-use super::gc_works::GenCopyProcessModBuf;
-use super::GenCopy;
-use crate::vm::*;
-use std::mem;
-use crate::policy::space::Space;
 use crate::plan::Plan;
+use crate::plan::barriers::*;
+use crate::plan::mutator_context::MutatorConfig;
+use crate::util::{Address, ObjectReference};
+use super::GenCopy;
+use super::gc_works::*;
+use crate::vm::VMBinding;
+use crate::MMTK;
+use enum_map::enum_map;
+use enum_map::EnumMap;
 
-#[repr(C)]
-pub struct GenCopyMutator<VM: VMBinding> {
-    ss: BumpAllocator<VM>,
-    plan: &'static GenCopy<VM>,
-    common: CommonMutatorContext<VM>,
-    modbuf: Box<(Vec<ObjectReference>, Vec<Address>)>,
+pub fn gencopy_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<GenCopy<VM>>, _tls: OpaquePointer) {
+    // Do nothing
 }
 
-impl <VM: VMBinding> MutatorContext<VM> for GenCopyMutator<VM> {
-    fn common(&self) -> &CommonMutatorContext<VM> {
-        &self.common
+pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<GenCopy<VM>>, _tls: OpaquePointer) {
+    // rebind the allocation bump pointer to the nursery space
+    let bump_allocator = unsafe {
+        mutator
+            .allocators
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
     }
-
-    fn prepare(&mut self, _tls: OpaquePointer) {
-        // Do nothing
-        self.flush_remembered_sets();
-    }
-
-    fn release(&mut self, _tls: OpaquePointer) {
-        self.ss.rebind(Some(&self.plan.nursery));
-        debug_assert!(self.modbuf.0.len() == 0);
-        debug_assert!(self.modbuf.1.len() == 0);
-    }
-
-    fn alloc(
-        &mut self,
-        size: usize,
-        align: usize,
-        offset: isize,
-        allocator: AllocationType,
-    ) -> Address {
-        trace!(
-            "MutatorContext.alloc({}, {}, {}, {:?})",
-            size,
-            align,
-            offset,
-            allocator
-        );
-        debug_assert!(
-            self.ss.get_space().unwrap() as *const _ == &self.plan.nursery as *const _,
-            "bumpallocator {:?} holds wrong space, ss.space: {:?}, tospace: {:?}",
-            self as *const _,
-            self.ss.get_space().unwrap() as *const _,
-            self.plan.tospace() as *const _
-        );
-        match allocator {
-            AllocationType::Default => self.ss.alloc(size, align, offset),
-            _ => self.common.alloc(size, align, offset, allocator),
-        }
-    }
-
-    fn post_alloc(
-        &mut self,
-        object: ObjectReference,
-        _type: ObjectReference,
-        _bytes: usize,
-        allocator: AllocationType,
-    ) {
-        // debug_assert!(self.ss.get_space().unwrap() as *const _ == self.plan.tospace() as *const _);
-        match allocator {
-            AllocationType::Default => {}
-            _ => self.common.post_alloc(object, _type, _bytes, allocator),
-        }
-    }
-
-    fn get_tls(&self) -> OpaquePointer {
-        self.ss.tls
-    }
-
-    fn record_modified_node(&mut self, obj: ObjectReference) {
-        if !self.plan.nursery.in_space(obj) {
-            self.enqueue_node(obj);
-        }
-    }
-    fn record_modified_edge(&mut self, slot: Address) {
-        if !self.plan.nursery.address_in_space(slot) {
-            self.enqueue_edge(slot);
-        }
-    }
-
-    fn flush_remembered_sets(&mut self) {
-        let mut modified_nodes = vec![];
-        mem::swap(&mut modified_nodes, &mut self.modbuf.0);
-        let mut modified_edges = vec![];
-        mem::swap(&mut modified_edges, &mut self.modbuf.1);
-        debug_assert!(!self.plan.scheduler.final_stage.is_activated(), "{:?}", self as *const _);
-        self.plan.scheduler.closure_stage.add(GenCopyProcessModBuf {
-            modified_nodes, modified_edges
-        });
-    }
+    .downcast_mut::<BumpAllocator<VM>>()
+    .unwrap();
+    bump_allocator.rebind(Some(&mutator.plan.nursery));
 }
 
-impl <VM: VMBinding> GenCopyMutator<VM> {
-    pub fn new(tls: OpaquePointer, plan: &'static GenCopy<VM>) -> Self {
-        Self {
-            ss: BumpAllocator::new(tls, Some(&plan.nursery), plan),
-            plan,
-            common: CommonMutatorContext::<VM>::new(tls, plan, &plan.common),
-            modbuf: box (vec![], vec![]),
-        }
-    }
+lazy_static! {
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
+        AllocationType::Default => AllocatorSelector::BumpPointer(0),
+        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
+        AllocationType::Los => AllocatorSelector::LargeObject(0),
+    };
+}
 
-    fn enqueue_node(&mut self, obj: ObjectReference) {
-        self.modbuf.0.push(obj);
-        if self.modbuf.0.len() >= 512 {
-            self.flush();
-        }
-    }
+pub fn create_gencopy_mutator<VM: VMBinding>(
+    mutator_tls: OpaquePointer,
+    mmtk: &'static MMTK<VM>,
+) -> Mutator<GenCopy<VM>> {
+    let config = MutatorConfig {
+        allocator_mapping: &*ALLOCATOR_MAPPING,
+        space_mapping: box vec![
+            (AllocatorSelector::BumpPointer(0), &mmtk.plan.nursery),
+            (AllocatorSelector::BumpPointer(1), mmtk.plan.fromspace()),
+            (AllocatorSelector::BumpPointer(2), mmtk.plan.tospace()),
+        ],
+        prepare_func: &gencopy_mutator_prepare,
+        release_func: &gencopy_mutator_release,
+    };
 
-    fn enqueue_edge(&mut self, slot: Address) {
-        self.modbuf.1.push(slot);
-        if self.modbuf.1.len() >= 512 {
-            self.flush();
-        }
+    Mutator {
+        allocators: Allocators::<VM>::new(mutator_tls, &mmtk.plan, &config.space_mapping),
+        barrier: box FieldRememberingBarrier::<GenCopyNurseryProcessEdges::<VM>>::new(mmtk, &mmtk.plan.nursery),
+        mutator_tls,
+        config,
+        plan: &mmtk.plan,
     }
 }

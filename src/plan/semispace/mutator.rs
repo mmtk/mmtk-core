@@ -7,7 +7,7 @@ use crate::plan::SelectedPlan;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
-
+use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::util::{Address, ObjectReference};
 use super::SemiSpace;
@@ -59,6 +59,7 @@ pub fn create_ss_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
+        barrier: box NoBarrier,
         mutator_tls,
         config,
         plan,
