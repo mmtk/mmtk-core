@@ -101,11 +101,11 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
         }
     }
 
-    fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<VM>) {
-        self.common.gc_init(heap_size, mmtk);
-        self.nursery.init(&mmtk.vm_map);
-        self.copyspace0.init(&mmtk.vm_map);
-        self.copyspace1.init(&mmtk.vm_map);
+    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap, scheduler: &Arc<MMTkScheduler<VM>>) {
+        self.common.gc_init(heap_size, vm_map, scheduler);
+        self.nursery.init(&vm_map);
+        self.copyspace0.init(&vm_map);
+        self.copyspace1.init(&vm_map);
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {

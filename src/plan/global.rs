@@ -90,7 +90,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
     }
 
     // unsafe because this can only be called once by the init thread
-    fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<Self::VM>);
+    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap, scheduler: &Arc<MMTkScheduler<Self::VM>>);
 
     fn bind_mutator(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> Box<Self::Mutator>;
 
@@ -135,7 +135,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
                 return false;
             }*/
             self.log_poll(space, "Triggering collection");
-            self.base().control_collector_context.as_ref().unwrap().request();
+            self.base().control_collector_context.request();
             return true;
         }
 
@@ -232,7 +232,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
             self.base()
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
-            self.base().control_collector_context.as_ref().unwrap().request();
+            self.base().control_collector_context.request();
             <Self::VM as VMBinding>::VMCollection::block_for_gc(tls);
         }
     }
@@ -279,7 +279,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub cur_collection_attempts: AtomicUsize,
     // Lock used for out of memory handling
     pub oom_lock: Mutex<()>,
-    pub control_collector_context: Option<ControllerCollectorContext<VM>>,
+    pub control_collector_context: ControllerCollectorContext<VM>,
     pub stats: Stats,
     mmapper: &'static Mmapper,
     pub vm_map: &'static VMMap,
@@ -311,7 +311,6 @@ pub fn create_vm_space<VM: VMBinding>(
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
 
-    use crate::util::constants::LOG_BYTES_IN_MBYTE;
     use crate::util::conversions::raw_align_up;
     use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
@@ -368,7 +367,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             max_collection_attempts: AtomicUsize::new(0),
             cur_collection_attempts: AtomicUsize::new(0),
             oom_lock: Mutex::new(()),
-            control_collector_context: None,
+            control_collector_context: ControllerCollectorContext::new(),
             stats: Stats::new(),
             mmapper,
             heap,
@@ -379,27 +378,27 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
-    pub fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<VM>) {
-        mmtk.vm_map.boot();
-        mmtk.vm_map.finalize_static_space_map(
+    pub fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap, scheduler: &Arc<MMTkScheduler<VM>>) {
+        vm_map.boot();
+        vm_map.finalize_static_space_map(
             self.heap.get_discontig_start(),
             self.heap.get_discontig_end(),
         );
         self.heap
             .total_pages
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);
-        self.control_collector_context = Some(ControllerCollectorContext::new(mmtk));
+        self.control_collector_context.init(scheduler);
 
         #[cfg(feature = "base_spaces")]
         {
             let unsync = unsafe { &mut *self.unsync.get() };
             #[cfg(feature = "code_space")]
-            unsync.code_space.init(mmtk.vm_map);
+            unsync.code_space.init(vm_map);
             #[cfg(feature = "ro_space")]
-            unsync.ro_space.init(mmtk.vm_map);
+            unsync.ro_space.init(vm_map);
             #[cfg(feature = "vm_space")]
             {
-                unsync.vm_space.init(mmtk.vm_map);
+                unsync.vm_space.init(vm_map);
                 unsync.vm_space.ensure_mapped();
             }
         }
@@ -682,11 +681,11 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
-    pub fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<VM>) {
-        self.base.gc_init(heap_size, mmtk);
+    pub fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap, scheduler: &Arc<MMTkScheduler<VM>>) {
+        self.base.gc_init(heap_size, vm_map, scheduler);
         let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.immortal.init(&mmtk.vm_map);
-        unsync.los.init(&mmtk.vm_map);
+        unsync.immortal.init(vm_map);
+        unsync.los.init(vm_map);
     }
 
     pub fn get_pages_used(&self) -> usize {

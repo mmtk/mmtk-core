@@ -66,7 +66,7 @@ impl <VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
         }
         debug_assert!(!self.plan().fromspace().in_space(object));
         debug_assert!(self.plan().tospace().in_space(object));
-        return object;
+        object
     }
     #[inline]
     fn process_edge(&mut self, slot: Address) {
@@ -147,7 +147,7 @@ pub struct GenCopyProcessModBuf {
 
 impl <VM: VMBinding> GCWork<VM> for GenCopyProcessModBuf {
     #[inline]
-    fn do_work(&mut self, worker: &'static mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         if mmtk.plan.in_nursery() {
             let mut modified_nodes = vec![];
             ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);

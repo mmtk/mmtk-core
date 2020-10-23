@@ -69,11 +69,11 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         }
     }
 
-    fn gc_init(&mut self, heap_size: usize, mmtk: &'static MMTK<VM>) {
-        self.base.gc_init(heap_size, mmtk);
+    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap, scheduler: &Arc<MMTkScheduler<VM>>) {
+        self.base.gc_init(heap_size, vm_map, scheduler);
 
         // FIXME correctly initialize spaces based on options
-        self.nogc_space.init(&mmtk.vm_map);
+        self.nogc_space.init(&vm_map);
     }
 
     fn base(&self) -> &BasePlan<VM> {

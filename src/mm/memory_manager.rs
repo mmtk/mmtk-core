@@ -37,18 +37,12 @@ use crate::vm::VMBinding;
 // * TraceLocal: Scanning::* as &mut TraceLocal
 
 pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
-    mmtk.plan.base().control_collector_context.as_ref().unwrap().run(tls);
+    mmtk.plan.base().control_collector_context.run(tls);
 }
 
-pub fn gc_init<VM: VMBinding>(mmtk: &MMTK<VM>, heap_size: usize) {
+pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
     crate::util::logger::init().unwrap();
-    let mmtk_mut = unsafe { &mut *(mmtk as *const _ as *mut MMTK<VM>) };
-    mmtk_mut.plan.gc_init(heap_size, unsafe { &*(mmtk as *const _) });
-
-    // TODO: We should have an option so we know whether we should spawn the controller.
-    //    thread::spawn(|| {
-    //        SINGLETON.plan.common().control_collector_context.run(UNINITIALIZED_OPAQUE_POINTER )
-    //    });
+    mmtk.plan.gc_init(heap_size, &mmtk.vm_map, &mmtk.scheduler);
 }
 
 pub fn bind_mutator<VM: VMBinding>(

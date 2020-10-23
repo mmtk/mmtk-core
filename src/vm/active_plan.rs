@@ -26,7 +26,7 @@ pub trait ActivePlan<VM: VMBinding> {
     // This function is used by space and phase to refer to the current plan.
     // Possibly we should remove the use of this function, and remove this function?
     fn global() -> &'static SelectedPlan<VM>;
-    unsafe fn worker(tls: OpaquePointer) -> &'static mut GCWorker<VM>;
+    fn worker(tls: OpaquePointer) -> &'static mut GCWorker<VM>;
     /// # Safety
     /// TODO: I am not sure why this is unsafe.
     unsafe fn is_mutator(tls: OpaquePointer) -> bool;

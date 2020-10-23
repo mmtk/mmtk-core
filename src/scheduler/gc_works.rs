@@ -11,6 +11,18 @@ use std::sync::Mutex;
 
 
 
+pub struct ScheduleCollection;
+
+unsafe impl Sync for ScheduleCollection {}
+
+impl <VM: VMBinding> GCWork<VM> for ScheduleCollection {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        mmtk.plan.schedule_collection(worker.scheduler());
+    }
+}
+
+impl <VM: VMBinding> CoordinatorWork<MMTK<VM>> for ScheduleCollection {}
+
 /// GC Preparation Work (include updating global states)
 pub struct Prepare<P: Plan> {
     pub plan: &'static P,
@@ -254,15 +266,15 @@ pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
     pub edges: Vec<Address>,
     pub nodes: Vec<ObjectReference>,
     pub mmtk: Option<&'static MMTK<E::VM>>,
-    pub worker: Option<&'static GCWorker<E::VM>>,
+    pub worker_tls: Option<OpaquePointer>,
 }
 
 impl <E: ProcessEdgesWork> ProcessEdgesBase<E> {
     pub fn new(edges: Vec<Address>) -> Self {
-        Self { edges, nodes: vec![], mmtk: None, worker: None }
+        Self { edges, nodes: vec![], mmtk: None, worker_tls: None }
     }
-    pub fn worker(&self) -> &'static GCWorker<E::VM> {
-        &self.worker.unwrap()
+    pub fn worker(&self) -> &'static mut GCWorker<E::VM> {
+        <E::VM as VMBinding>::VMActivePlan::worker(self.worker_tls.unwrap())
     }
     pub fn mmtk(&self) -> &'static MMTK<E::VM> {
         self.mmtk.unwrap()
@@ -282,7 +294,7 @@ pub trait ProcessEdgesWork: Send + Sync + 'static + Sized + DerefMut + Deref<Tar
 
     #[inline]
     fn process_node(&mut self, object: ObjectReference) {
-        if self.nodes.len() == 0 {
+        if self.nodes.is_empty() {
             self.nodes.reserve(Self::CAPACITY);
         }
         self.nodes.push(object);
@@ -312,12 +324,12 @@ pub trait ProcessEdgesWork: Send + Sync + 'static + Sized + DerefMut + Deref<Tar
 
 impl <E: ProcessEdgesWork> GCWork<E::VM> for E {
     #[inline]
-    default fn do_work(&mut self, worker: &'static mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    default fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessEdgesWork");
         self.mmtk = Some(mmtk);
-        self.worker = Some(worker);
+        self.worker_tls = Some(worker.tls);
         self.process_edges();
-        if self.nodes.len() > 0 {
+        if !self.nodes.is_empty() {
             let mut new_nodes = Vec::with_capacity(Self::CAPACITY);
             mem::swap(&mut new_nodes, &mut self.nodes);
             self.mmtk.unwrap().scheduler.closure_stage.add(ScanObjects::<Self>::new(new_nodes, false));
@@ -368,7 +380,7 @@ impl <E: ProcessEdgesWork> ProcessModBuf<E> {
 
 impl <E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     #[inline]
-    fn do_work(&mut self, worker: &'static mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if mmtk.plan.in_nursery() {
             let mut modified_nodes = vec![];
             ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);

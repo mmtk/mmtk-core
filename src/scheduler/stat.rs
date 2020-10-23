@@ -14,13 +14,12 @@ pub struct SchedulerStat {
 
 impl SchedulerStat {
     fn work_name(&self, name: &str) -> String {
-        let end_index = name.find('<').unwrap_or(name.len());
+        let end_index = name.find('<').unwrap_or_else(|| name.len());
         let name = name[..end_index].to_owned();
-        let name = match name.rfind(':') {
+        match name.rfind(':') {
             Some(start_index) => name[(start_index + 1)..end_index].to_owned(),
             _ => name,
-        };
-        name
+        }
     }
 
     fn geomean(&self, values: &[f64]) -> f64 {
@@ -65,7 +64,7 @@ impl SchedulerStat {
             stat.insert(format!("works.{}.time.geomean", self.work_name(n)), format!("{:.2}", geomean));
         }
         let durations = total_durations.iter().map(|d| d.as_nanos() as f64).collect::<Vec<_>>();
-        if durations.len() > 0 {
+        if !durations.is_empty() {
             stat.insert("total-works.time.geomean".to_owned(), format!("{:.2}", self.geomean(&durations)));
             stat.insert("total-works.time.min".to_owned(), format!("{:.2}", self.min(&durations)));
             stat.insert("total-works.time.max".to_owned(), format!("{:.2}", self.max(&durations)));
@@ -98,28 +97,20 @@ impl SchedulerStat {
     }
 }
 
-pub struct WorkStatGuard<'a> {
+pub struct WorkStat {
     type_id: TypeId,
     type_name: &'static str,
     start_time: SystemTime,
-    worker_stat: &'a mut WorkerLocalStat,
 }
 
-impl <'a> Drop for WorkStatGuard<'a> {
-    fn drop(&mut self) {
-        if !self.worker_stat.is_enabled() { return };
-        self.worker_stat.work_id_name_map.insert(self.type_id, self.type_name);
-        if self.worker_stat.work_counts.contains_key(&self.type_id) {
-            *self.worker_stat.work_counts.get_mut(&self.type_id).unwrap() += 1;
-        } else {
-            self.worker_stat.work_counts.insert(self.type_id, 1);
-        }
+impl WorkStat {
+    #[inline(always)]
+    pub fn end_of_work(&self, worker_stat: &mut WorkerLocalStat,) {
+        if !worker_stat.is_enabled() { return };
+        worker_stat.work_id_name_map.insert(self.type_id, self.type_name);
+        *worker_stat.work_counts.entry(self.type_id).or_insert(0) += 1;
         let duration = self.start_time.elapsed().unwrap();
-        if self.worker_stat.work_durations.contains_key(&self.type_id) {
-            self.worker_stat.work_durations.get_mut(&self.type_id).unwrap().push(duration);
-        } else {
-            self.worker_stat.work_durations.insert(self.type_id, vec![ duration ]);
-        }
+        worker_stat.work_durations.entry(self.type_id).or_insert_with(Vec::new).push(duration);
     }
 }
 
@@ -141,12 +132,11 @@ impl WorkerLocalStat {
         self.enabled.store(true, Ordering::SeqCst);
     }
     #[inline]
-    pub fn measure_work(&mut self, work_id: TypeId, work_name: &'static str) -> WorkStatGuard<'_> {
-        WorkStatGuard {
+    pub fn measure_work(&mut self, work_id: TypeId, work_name: &'static str) -> WorkStat {
+        WorkStat {
             type_id: work_id,
             type_name: work_name,
             start_time: SystemTime::now(),
-            worker_stat: self,
         }
     }
 }

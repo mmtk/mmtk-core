@@ -1,14 +1,11 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex, Arc};
 use std::marker::PhantomData;
-
-use crate::mmtk::MMTK;
-
-use crate::plan::Plan;
-
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::scheduler::*;
+use crate::scheduler::gc_works::ScheduleCollection;
+use std::sync::RwLock;
 
 struct RequestSync {
     tls: OpaquePointer,
@@ -19,17 +16,22 @@ struct RequestSync {
 pub struct ControllerCollectorContext<VM: VMBinding> {
     request_sync: Mutex<RequestSync>,
     request_condvar: Condvar,
-
-    pub mmtk: &'static MMTK<VM>,
-    pub scheduler: Arc<MMTkScheduler<VM>>,
+    scheduler: RwLock<Option<Arc<MMTkScheduler<VM>>>>,
     request_flag: AtomicBool,
     phantom: PhantomData<VM>,
 }
 
 unsafe impl <VM: VMBinding> Sync for ControllerCollectorContext<VM> {}
 
+// Clippy says we need this...
+impl <VM: VMBinding> Default for ControllerCollectorContext<VM> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl <VM: VMBinding> ControllerCollectorContext<VM> {
-    pub fn new(mmtk: &'static MMTK<VM>) -> Self {
+    pub fn new() -> Self {
         ControllerCollectorContext {
             request_sync: Mutex::new(RequestSync {
                 tls: OpaquePointer::UNINITIALIZED,
@@ -37,12 +39,16 @@ impl <VM: VMBinding> ControllerCollectorContext<VM> {
                 last_request_count: -1,
             }),
             request_condvar: Condvar::new(),
-
-            scheduler: mmtk.scheduler.clone(),
-            mmtk,
+            scheduler: RwLock::new(None),
             request_flag: AtomicBool::new(false),
             phantom: PhantomData,
         }
+    }
+
+    pub fn init(&self, scheduler: &Arc<MMTkScheduler<VM>>) {
+        let mut scheduler_guard = self.scheduler.write().unwrap();
+        debug_assert!(scheduler_guard.is_none());
+        *scheduler_guard = Some(scheduler.clone());
     }
 
     pub fn run(&self, tls: OpaquePointer) {
@@ -71,9 +77,10 @@ impl <VM: VMBinding> ControllerCollectorContext<VM> {
 
             // debug!("[STWController: Triggering worker threads...]");
             // self.scheduler.mutators_stopped();
-            self.mmtk.plan.schedule_collection(&self.scheduler);
-
-            self.scheduler.wait_for_completion();
+            let scheduler = self.scheduler.read().unwrap();
+            let scheduler = scheduler.as_ref().unwrap();
+            scheduler.set_initializer(Some(ScheduleCollection));
+            scheduler.wait_for_completion();
             debug!("[STWController: Worker threads complete!]");
             // debug!("[STWController: Resuming mutators...]");
             // VM::VMCollection::resume_mutators(tls);

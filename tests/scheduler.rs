@@ -14,7 +14,7 @@ use rand::{thread_rng, Rng};
 struct Sort(&'static mut [usize]);
 
 impl Work<()> for Sort {
-    fn do_work(&mut self, worker: &'static mut Worker<()>, _context: &'static ()) {
+    fn do_work(&mut self, worker: &mut Worker<()>, _context: &'static ()) {
         if self.0.len() <= 1 { return /* Do nothing */ }
         worker.scheduler().unconstrained_works.add(Partition(unsafe { &mut *(self.0 as *mut _) }));
     }
@@ -26,14 +26,14 @@ impl Work<()> for Sort {
 struct Partition(&'static mut [usize]);
 
 impl Work<()> for Partition {
-    fn do_work(&mut self, worker: &'static mut Worker<()>, _context: &'static ()) {
+    fn do_work(&mut self, worker: &mut Worker<()>, _context: &'static ()) {
         assert!(self.0.len() >= 2);
 
         // 1. Partition
 
         let pivot: usize = self.0[0];
-        let le = self.0.iter().skip(1).filter(|v| **v <= pivot).map(|v| *v).collect::<Vec<_>>();
-        let gt = self.0.iter().skip(1).filter(|v| **v > pivot).map(|v| *v).collect::<Vec<_>>();
+        let le = self.0.iter().skip(1).filter(|v| **v <= pivot).copied().collect::<Vec<_>>();
+        let gt = self.0.iter().skip(1).filter(|v| **v > pivot).copied().collect::<Vec<_>>();
 
         let pivot_index = le.len();
         for (i, v) in le.iter().enumerate() {

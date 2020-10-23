@@ -15,7 +15,11 @@ use SINGLETON;
 
 #[no_mangle]
 pub extern "C" fn gc_init(heap_size: usize) {
-    memory_manager::gc_init(&SINGLETON, heap_size)
+    // # Safety
+    // Casting `SINGLETON` as mutable is safe because `gc_init` will only be executed once by a single thread during startup.
+    #[allow(clippy::cast_ref_to_mut)]
+    let singleton_mut = unsafe { &mut *(&*SINGLETON as *const MMTK<DummyVM> as *mut MMTK<DummyVM>) };
+    memory_manager::gc_init(singleton_mut, heap_size)
 }
 
 #[no_mangle]

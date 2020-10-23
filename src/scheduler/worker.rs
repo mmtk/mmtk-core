@@ -58,16 +58,12 @@ impl <C: Context> Worker<C> {
         &self.scheduler
     }
 
-    pub fn local(&self) -> &mut C::WorkerLocal {
-        unsafe { &mut *(self.local.as_ref().unwrap() as *const _ as *mut _) }
+    pub fn local(&mut self) -> &mut C::WorkerLocal {
+        self.local.as_mut().unwrap()
     }
 
     pub fn init(&mut self, tls: OpaquePointer) {
         self.tls = tls;
-    }
-
-    pub unsafe fn as_mut<'a>(&'static self) -> &'a mut Self {
-        &mut *(self as *const _ as *mut _)
     }
 
     pub fn run(&'static mut self, context: &'static C) {
@@ -76,7 +72,7 @@ impl <C: Context> Worker<C> {
         loop {
             let mut work = self.scheduler().poll(self);
             debug_assert!(!self.is_parked());
-            work.do_work_with_stat(unsafe { self.as_mut() }, context);
+            work.do_work_with_stat(self, context);
         }
     }
 }

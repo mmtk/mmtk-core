@@ -38,6 +38,7 @@ pub struct Scheduler<C: Context> {
     coordinator_worker: Option<Worker<C>>,
     /// A message channel to send new coordinator works and other actions to the coordinator thread
     pub channel: (Sender<CoordinatorMessage<C>>, Receiver<CoordinatorMessage<C>>),
+    startup: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
     finalizer: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
 }
 
@@ -59,6 +60,7 @@ impl <C: Context> Scheduler<C> {
             context: None,
             coordinator_worker: None,
             channel: channel(),
+            startup: Mutex::new(None),
             finalizer: Mutex::new(None),
         })
     }
@@ -81,6 +83,10 @@ impl <C: Context> Scheduler<C> {
         self_mut.final_stage.set_open_condition(move || {
             self.unconstrained_works.is_drained() && self.prepare_stage.is_drained() && self.closure_stage.is_drained() && self.release_stage.is_drained() && self.worker_group().all_parked()
         });
+    }
+
+    pub fn set_initializer<W: CoordinatorWork<C>>(&self, w: Option<W>) {
+        *self.startup.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<C>>);
     }
 
     pub fn set_finalizer<W: CoordinatorWork<C>>(&self, w: Option<W>) {
@@ -123,6 +129,10 @@ impl <C: Context> Scheduler<C> {
 
     /// Drain the message queue and execute coordinator works
     pub fn wait_for_completion(&self) {
+        // At the start of a GC, we probably already have received a `ScheduleCollection` work. Run it now.
+        if let Some(initializer) = self.startup.lock().unwrap().take() {
+            self.process_coordinator_work(initializer);
+        }
         loop {
             let message = self.channel.1.recv().unwrap();
             match message {
@@ -139,9 +149,8 @@ impl <C: Context> Scheduler<C> {
             }
         }
         for message in self.channel.1.try_iter() {
-            match message {
-                CoordinatorMessage::Work(work) => self.process_coordinator_work(work),
-                _ => {}
+            if let CoordinatorMessage::Work(work) = message {
+                self.process_coordinator_work(work);
             }
         }
         self.deactivate_all();
@@ -259,7 +268,7 @@ pub type MMTkScheduler<VM> = Scheduler<MMTK<VM>>;
 
 impl <VM: VMBinding> MMTkScheduler<VM> {
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
-        mmtk.plan.base().control_collector_context.as_ref().unwrap().clear_request();
+        mmtk.plan.base().control_collector_context.clear_request();
         debug_assert!(!self.prepare_stage.is_activated());
         self.prepare_stage.activate();
         let _guard = self.worker_monitor.0.lock().unwrap();

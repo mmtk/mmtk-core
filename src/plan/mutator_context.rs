@@ -9,6 +9,8 @@ use crate::plan::barriers::{Barrier, WriteTarget};
 
 use enum_map::EnumMap;
 
+type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
+
 // This struct is part of the Mutator struct.
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
 #[repr(C)]
@@ -18,7 +20,7 @@ pub struct MutatorConfig<P: Plan> {
     // Mapping between allocator selector and spaces. Each pair represents a mapping.
     // Put this behind a box, so it is a pointer-sized field.
     #[allow(clippy::box_vec)]
-    pub space_mapping: Box<Vec<(AllocatorSelector, &'static dyn Space<P::VM>)>>,
+    pub space_mapping: Box<SpaceMapping<P::VM>>,
     // Plan-specific code for mutator prepare/release
     pub prepare_func: &'static dyn Fn(&mut Mutator<P>, OpaquePointer),
     pub release_func: &'static dyn Fn(&mut Mutator<P>, OpaquePointer),
