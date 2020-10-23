@@ -1,32 +1,32 @@
 use crate::policy::space::Space;
 
+use super::gc_works::{
+    GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges, SanityGCProcessEdges,
+};
+use super::mutator::create_gencopy_mutator;
+use super::mutator::ALLOCATOR_MAPPING;
+use crate::mmtk::MMTK;
+use crate::plan::global::BasePlan;
+use crate::plan::global::CommonPlan;
+use crate::plan::global::GcStatus;
+use crate::plan::mutator_context::Mutator;
 use crate::plan::Allocator;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
-use crate::util::heap::VMRequest;
-use crate::util::OpaquePointer;
-use crate::plan::global::BasePlan;
-use crate::plan::global::CommonPlan;
+use crate::scheduler::gc_works::*;
+use crate::scheduler::*;
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
+use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::OpaquePointer;
 use crate::vm::*;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use crate::scheduler::*;
-use crate::scheduler::gc_works::*;
-use crate::mmtk::MMTK;
-use super::gc_works::{GenCopyCopyContext, GenCopyNurseryProcessEdges, GenCopyMatureProcessEdges, SanityGCProcessEdges};
-use crate::plan::global::GcStatus;
-use super::mutator::ALLOCATOR_MAPPING;
-use crate::util::alloc::allocators::AllocatorSelector;
 use enum_map::EnumMap;
-use super::mutator::create_gencopy_mutator;
-use crate::plan::mutator_context::Mutator;
-
-
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 pub type SelectedPlan<VM> = GenCopy<VM>;
 
@@ -46,12 +46,15 @@ pub struct GenCopy<VM: VMBinding> {
 
 unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
 
-impl <VM: VMBinding> Plan for GenCopy<VM> {
+impl<VM: VMBinding> Plan for GenCopy<VM> {
     type VM = VM;
     type Mutator = Mutator<Self>;
     type CopyContext = GenCopyCopyContext<VM>;
 
-    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool where Self: Sized {
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
+    where
+        Self: Sized,
+    {
         let nursery_full = self.nursery.reserved_pages() >= (NURSERY_SIZE / 4096);
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
         space_full || nursery_full || heap_full
@@ -101,7 +104,12 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
         }
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap, scheduler: &Arc<MMTkScheduler<VM>>) {
+    fn gc_init(
+        &mut self,
+        heap_size: usize,
+        vm_map: &'static VMMap,
+        scheduler: &Arc<MMTkScheduler<VM>>,
+    ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
         self.nursery.init(&vm_map);
         self.copyspace0.init(&vm_map);
@@ -117,16 +125,20 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         if in_nursery {
-            scheduler.unconstrained_works.add(StopMutators::<GenCopyNurseryProcessEdges<VM>>::new());
+            scheduler
+                .unconstrained_works
+                .add(StopMutators::<GenCopyNurseryProcessEdges<VM>>::new());
         } else {
-            scheduler.unconstrained_works.add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
+            scheduler
+                .unconstrained_works
+                .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
         }
         // Prepare global/collectors/mutators
         scheduler.prepare_stage.add(Prepare::new(self));
         // Release global/collectors/mutators
         scheduler.release_stage.add(Release::new(self));
         // Resume mutators
-        if cfg!(feature="gencopy_sanity_gc") {
+        if cfg!(feature = "gencopy_sanity_gc") {
             scheduler.final_stage.add(ScheduleSanityGC);
         }
         scheduler.set_finalizer(Some(EndOfGC));
@@ -138,16 +150,24 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         for mutator in <VM as VMBinding>::VMActivePlan::mutators() {
-            scheduler.prepare_stage.add(ScanStackRoot::<SanityGCProcessEdges<VM>>(mutator));
+            scheduler
+                .prepare_stage
+                .add(ScanStackRoot::<SanityGCProcessEdges<VM>>(mutator));
         }
-        scheduler.prepare_stage.add(ScanVMSpecificRoots::<SanityGCProcessEdges<VM>>::new());
+        scheduler
+            .prepare_stage
+            .add(ScanVMSpecificRoots::<SanityGCProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
         scheduler.prepare_stage.add(Prepare::new(self));
         // Release global/collectors/mutators
         scheduler.release_stage.add(Release::new(self));
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> Box<Mutator<Self>> {
+    fn bind_mutator(
+        &'static self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> Box<Mutator<Self>> {
         Box::new(create_gencopy_mutator(tls, mmtk))
     }
 
@@ -161,7 +181,8 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
             self.common.prepare(tls, true);
             self.nursery.prepare(true);
             if !self.in_nursery() {
-                self.hi.store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
+                self.hi
+                    .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
             }
             let hi = self.hi.load(Ordering::SeqCst);
             self.copyspace0.prepare(hi);
@@ -196,7 +217,9 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        self.nursery.reserved_pages() + self.tospace().reserved_pages() + self.common.get_pages_used()
+        self.nursery.reserved_pages()
+            + self.tospace().reserved_pages()
+            + self.common.get_pages_used()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -212,8 +235,7 @@ impl <VM: VMBinding> Plan for GenCopy<VM> {
     }
 }
 
-
-impl <VM: VMBinding> GenCopy<VM> {
+impl<VM: VMBinding> GenCopy<VM> {
     fn request_full_heap_collection(&self) -> bool {
         self.get_total_pages() <= self.get_pages_reserved()
     }

@@ -1,7 +1,7 @@
 use crate::plan::{Plan, SelectedPlan};
+use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::scheduler::*;
 use std::marker::PhantomData;
 
 pub struct MutatorIter<VM: VMBinding> {
@@ -9,7 +9,7 @@ pub struct MutatorIter<VM: VMBinding> {
     phantom: PhantomData<VM>,
 }
 
-impl <VM: VMBinding> Iterator for MutatorIter<VM> {
+impl<VM: VMBinding> Iterator for MutatorIter<VM> {
     type Item = &'static mut <SelectedPlan<VM> as Plan>::Mutator;
 
     fn next(&mut self) -> Option<Self::Item> {

@@ -1,3 +1,4 @@
+use crate::plan::barriers::{Barrier, WriteTarget};
 use crate::plan::global::Plan;
 use crate::plan::Allocator as AllocationType;
 use crate::policy::space::Space;
@@ -5,7 +6,6 @@ use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
-use crate::plan::barriers::{Barrier, WriteTarget};
 
 use enum_map::EnumMap;
 
@@ -26,8 +26,8 @@ pub struct MutatorConfig<P: Plan> {
     pub release_func: &'static dyn Fn(&mut Mutator<P>, OpaquePointer),
 }
 
-unsafe impl <P: Plan> Send for MutatorConfig<P> {}
-unsafe impl <P: Plan> Sync for MutatorConfig<P> {}
+unsafe impl<P: Plan> Send for MutatorConfig<P> {}
+unsafe impl<P: Plan> Sync for MutatorConfig<P> {}
 
 // We are trying to make this struct fixed-sized so that VM bindings can easily define a type to have the exact same layout as this struct.
 // Currently Mutator is fixed sized, and we should try keep this invariant:
@@ -42,7 +42,7 @@ pub struct Mutator<P: Plan> {
     pub config: MutatorConfig<P>,
 }
 
-impl <P: Plan<Mutator=Self>> MutatorContext<P::VM> for Mutator<P> {
+impl<P: Plan<Mutator = Self>> MutatorContext<P::VM> for Mutator<P> {
     fn prepare(&mut self, tls: OpaquePointer) {
         (*self.config.prepare_func)(self, tls)
     }

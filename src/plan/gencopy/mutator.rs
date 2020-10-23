@@ -1,22 +1,28 @@
+use super::gc_works::*;
+use super::GenCopy;
+use crate::plan::barriers::*;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::Allocator as AllocationType;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
-use crate::plan::barriers::*;
-use crate::plan::mutator_context::MutatorConfig;
-use super::GenCopy;
-use super::gc_works::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn gencopy_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<GenCopy<VM>>, _tls: OpaquePointer) {
+pub fn gencopy_mutator_prepare<VM: VMBinding>(
+    _mutator: &mut Mutator<GenCopy<VM>>,
+    _tls: OpaquePointer,
+) {
     // Do nothing
 }
 
-pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<GenCopy<VM>>, _tls: OpaquePointer) {
+pub fn gencopy_mutator_release<VM: VMBinding>(
+    mutator: &mut Mutator<GenCopy<VM>>,
+    _tls: OpaquePointer,
+) {
     // rebind the allocation bump pointer to the nursery space
     let bump_allocator = unsafe {
         mutator
@@ -53,7 +59,10 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, &mmtk.plan, &config.space_mapping),
-        barrier: box FieldRememberingBarrier::<GenCopyNurseryProcessEdges::<VM>>::new(mmtk, &mmtk.plan.nursery),
+        barrier: box FieldRememberingBarrier::<GenCopyNurseryProcessEdges<VM>>::new(
+            mmtk,
+            &mmtk.plan.nursery,
+        ),
         mutator_tls,
         config,
         plan: &mmtk.plan,

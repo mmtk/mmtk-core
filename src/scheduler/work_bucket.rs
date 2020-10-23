@@ -1,33 +1,32 @@
-use std::sync::{Mutex, Condvar, Arc};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use super::work::Work;
-use std::collections::BinaryHeap;
-use std::cmp;
 use super::*;
 use spin::RwLock;
-
-
+use std::cmp;
+use std::collections::BinaryHeap;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
 
 struct PrioritizedWork<C: Context> {
     priority: usize,
     work: Box<dyn Work<C>>,
 }
 
-impl <C: Context> PartialEq for PrioritizedWork<C> {
+impl<C: Context> PartialEq for PrioritizedWork<C> {
     fn eq(&self, other: &Self) -> bool {
-        self.priority == other.priority && &self.work.as_ref() as *const _ == &other.work.as_ref() as *const _
+        self.priority == other.priority
+            && &self.work.as_ref() as *const _ == &other.work.as_ref() as *const _
     }
 }
 
-impl <C: Context> Eq for PrioritizedWork<C> {}
+impl<C: Context> Eq for PrioritizedWork<C> {}
 
-impl <C: Context> Ord for PrioritizedWork<C> {
+impl<C: Context> Ord for PrioritizedWork<C> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.priority.cmp(&other.priority)
     }
 }
 
-impl <C: Context> PartialOrd for PrioritizedWork<C> {
+impl<C: Context> PartialOrd for PrioritizedWork<C> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
@@ -42,10 +41,10 @@ pub struct WorkBucket<C: Context> {
     can_open: Option<Box<dyn Fn() -> bool>>,
 }
 
-unsafe impl <C: Context> Send for WorkBucket<C> {}
-unsafe impl <C: Context> Sync for WorkBucket<C> {}
+unsafe impl<C: Context> Send for WorkBucket<C> {}
+unsafe impl<C: Context> Sync for WorkBucket<C> {}
 
-impl <C: Context> WorkBucket<C> {
+impl<C: Context> WorkBucket<C> {
     pub fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
         Self {
             active: AtomicBool::new(active),
@@ -82,13 +81,20 @@ impl <C: Context> WorkBucket<C> {
     }
     /// Disable the bucket
     pub fn deactivate(&self) {
-        debug_assert!(self.queue.read().is_empty(), "Bucket not drained before close");
+        debug_assert!(
+            self.queue.read().is_empty(),
+            "Bucket not drained before close"
+        );
         self.active.store(false, Ordering::SeqCst);
-        self.active_priority.store(usize::max_value(), Ordering::SeqCst);
+        self.active_priority
+            .store(usize::max_value(), Ordering::SeqCst);
     }
     /// Add a work packet to this bucket, with a given priority
     pub fn add_with_priority<W: Work<C>>(&self, priority: usize, work: W) {
-        self.queue.write().push(PrioritizedWork { priority, work: box work });
+        self.queue.write().push(PrioritizedWork {
+            priority,
+            work: box work,
+        });
         self.notify_one_worker(); // FIXME: Performance
     }
     /// Add a work packet to this bucket, with a default priority (1000)
@@ -106,7 +112,9 @@ impl <C: Context> WorkBucket<C> {
     }
     /// Get a work packet (with the greatest priority) from this bucket
     pub fn poll(&self) -> Option<Box<dyn Work<C>>> {
-        if !self.active.load(Ordering::SeqCst) { return None }
+        if !self.active.load(Ordering::SeqCst) {
+            return None;
+        }
         self.queue.write().pop().map(|v| v.work)
     }
     pub fn set_open_condition(&mut self, pred: impl Fn() -> bool + 'static) {

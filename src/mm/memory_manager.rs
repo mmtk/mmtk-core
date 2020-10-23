@@ -88,7 +88,11 @@ pub fn get_allocator_mapping<VM: VMBinding>(
     mmtk.plan.get_allocator_mapping()[allocator]
 }
 
-pub fn start_worker<VM: VMBinding>(tls: OpaquePointer, worker: &'static mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+pub fn start_worker<VM: VMBinding>(
+    tls: OpaquePointer,
+    worker: &'static mut GCWorker<VM>,
+    mmtk: &'static MMTK<VM>,
+) {
     worker.init(tls);
     worker.run(mmtk);
 }

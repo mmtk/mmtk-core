@@ -12,6 +12,7 @@ pub mod heap;
 pub mod int_array_freelist;
 pub mod logger;
 pub mod memory;
+pub mod metadata;
 pub mod opaque_pointer;
 pub mod options;
 pub mod queue;
@@ -22,7 +23,6 @@ pub mod sanity;
 pub mod statistics;
 mod synchronized_counter;
 pub mod treadmill;
-pub mod metadata;
 
 #[cfg(test)]
 pub mod test_util;

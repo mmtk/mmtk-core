@@ -1,30 +1,28 @@
-use crate::policy::space::Space;
-use crate::plan::Allocator;
-use crate::plan::Plan;
-use crate::policy::copyspace::CopySpace;
-use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::heap::VMRequest;
-use crate::util::OpaquePointer;
+use super::gc_works::{SSCopyContext, SSProcessEdges};
+use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::GcStatus;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::semispace::mutator::create_ss_mutator;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
+use crate::plan::Allocator;
+use crate::plan::Plan;
+use crate::policy::copyspace::CopySpace;
+use crate::policy::space::Space;
+use crate::scheduler::gc_works::*;
+use crate::scheduler::*;
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
+use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::scheduler::*;
-use crate::scheduler::gc_works::*;
-use crate::mmtk::MMTK;
-use super::gc_works::{SSCopyContext, SSProcessEdges};
-use crate::plan::global::GcStatus;
-
-
+use std::sync::Arc;
 
 use enum_map::EnumMap;
 
@@ -78,7 +76,12 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         }
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap, scheduler: &Arc<MMTkScheduler<VM>>) {
+    fn gc_init(
+        &mut self,
+        heap_size: usize,
+        vm_map: &'static VMMap,
+        scheduler: &Arc<MMTkScheduler<VM>>,
+    ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
 
         self.copyspace0.init(&vm_map);
@@ -89,7 +92,9 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.unconstrained_works.add(StopMutators::<SSProcessEdges<VM>>::new());
+        scheduler
+            .unconstrained_works
+            .add(StopMutators::<SSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
         scheduler.prepare_stage.add(Prepare::new(self));
         // Release global/collectors/mutators
@@ -98,7 +103,11 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer, _mmtk: &'static MMTK<Self::VM>) -> Box<Mutator<Self>> {
+    fn bind_mutator(
+        &'static self,
+        tls: OpaquePointer,
+        _mmtk: &'static MMTK<Self::VM>,
+    ) -> Box<Mutator<Self>> {
         Box::new(create_ss_mutator(tls, self))
     }
 
@@ -109,20 +118,22 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn prepare(&self, tls: OpaquePointer) {
         self.common.prepare(tls, true);
 
-        #[cfg(feature = "sanity")] self.fromspace().unprotect();
+        #[cfg(feature = "sanity")]
+        self.fromspace().unprotect();
 
-        self.hi.store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
-        // prepare each of the collected regions
+        self.hi
+            .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
+                                                                       // prepare each of the collected regions
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
 
-        #[cfg(feature = "sanity")] {
+        #[cfg(feature = "sanity")]
+        {
             use crate::util::sanity::sanity_checker::SanityChecker;
             println!("Pre GC sanity check");
             SanityChecker::new(tls, &self).check();
         }
-
     }
 
     fn release(&self, tls: OpaquePointer) {

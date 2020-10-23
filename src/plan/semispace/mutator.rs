@@ -1,20 +1,26 @@
+use super::SemiSpace;
+use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::Allocator as AllocationType;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
-use crate::plan::barriers::NoBarrier;
-use crate::plan::mutator_context::MutatorConfig;
-use super::SemiSpace;
 use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn ss_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<SemiSpace<VM>>, _tls: OpaquePointer) {
+pub fn ss_mutator_prepare<VM: VMBinding>(
+    _mutator: &mut Mutator<SemiSpace<VM>>,
+    _tls: OpaquePointer,
+) {
     // Do nothing
 }
 
-pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<SemiSpace<VM>>, _tls: OpaquePointer) {
+pub fn ss_mutator_release<VM: VMBinding>(
+    mutator: &mut Mutator<SemiSpace<VM>>,
+    _tls: OpaquePointer,
+) {
     // rebind the allocation bump pointer to the appropriate semispace
     let bump_allocator = unsafe {
         mutator

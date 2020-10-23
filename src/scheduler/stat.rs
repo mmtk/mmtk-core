@@ -1,9 +1,7 @@
 use std::any::TypeId;
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime};
 use std::sync::atomic::{AtomicBool, Ordering};
-
-
+use std::time::{Duration, SystemTime};
 
 #[derive(Default)]
 pub struct SchedulerStat {
@@ -31,14 +29,18 @@ impl SchedulerStat {
     fn min(&self, values: &[f64]) -> f64 {
         let mut min = values[0];
         for v in values {
-            if *v < min { min = *v }
+            if *v < min {
+                min = *v
+            }
         }
         min
     }
     fn max(&self, values: &[f64]) -> f64 {
         let mut max = values[0];
         for v in values {
-            if *v > max { max = *v }
+            if *v > max {
+                max = *v
+            }
         }
         max
     }
@@ -50,7 +52,10 @@ impl SchedulerStat {
         for (t, c) in &self.work_counts {
             total_count += c;
             let n = self.work_id_name_map[t];
-            stat.insert(format!("works.{}.count", self.work_name(n)), format!("{}", c));
+            stat.insert(
+                format!("works.{}.count", self.work_name(n)),
+                format!("{}", c),
+            );
         }
         stat.insert("total-works.count".to_owned(), format!("{}", total_count));
         // Work execution times
@@ -60,14 +65,34 @@ impl SchedulerStat {
                 total_durations.push(*d);
             }
             let n = self.work_id_name_map[t];
-            let geomean = self.geomean(&durations.iter().map(|d| d.as_nanos() as f64).collect::<Vec<_>>());
-            stat.insert(format!("works.{}.time.geomean", self.work_name(n)), format!("{:.2}", geomean));
+            let geomean = self.geomean(
+                &durations
+                    .iter()
+                    .map(|d| d.as_nanos() as f64)
+                    .collect::<Vec<_>>(),
+            );
+            stat.insert(
+                format!("works.{}.time.geomean", self.work_name(n)),
+                format!("{:.2}", geomean),
+            );
         }
-        let durations = total_durations.iter().map(|d| d.as_nanos() as f64).collect::<Vec<_>>();
+        let durations = total_durations
+            .iter()
+            .map(|d| d.as_nanos() as f64)
+            .collect::<Vec<_>>();
         if !durations.is_empty() {
-            stat.insert("total-works.time.geomean".to_owned(), format!("{:.2}", self.geomean(&durations)));
-            stat.insert("total-works.time.min".to_owned(), format!("{:.2}", self.min(&durations)));
-            stat.insert("total-works.time.max".to_owned(), format!("{:.2}", self.max(&durations)));
+            stat.insert(
+                "total-works.time.geomean".to_owned(),
+                format!("{:.2}", self.geomean(&durations)),
+            );
+            stat.insert(
+                "total-works.time.min".to_owned(),
+                format!("{:.2}", self.min(&durations)),
+            );
+            stat.insert(
+                "total-works.time.max".to_owned(),
+                format!("{:.2}", self.max(&durations)),
+            );
         }
 
         stat
@@ -105,12 +130,20 @@ pub struct WorkStat {
 
 impl WorkStat {
     #[inline(always)]
-    pub fn end_of_work(&self, worker_stat: &mut WorkerLocalStat,) {
-        if !worker_stat.is_enabled() { return };
-        worker_stat.work_id_name_map.insert(self.type_id, self.type_name);
+    pub fn end_of_work(&self, worker_stat: &mut WorkerLocalStat) {
+        if !worker_stat.is_enabled() {
+            return;
+        };
+        worker_stat
+            .work_id_name_map
+            .insert(self.type_id, self.type_name);
         *worker_stat.work_counts.entry(self.type_id).or_insert(0) += 1;
         let duration = self.start_time.elapsed().unwrap();
-        worker_stat.work_durations.entry(self.type_id).or_insert_with(Vec::new).push(duration);
+        worker_stat
+            .work_durations
+            .entry(self.type_id)
+            .or_insert_with(Vec::new)
+            .push(duration);
     }
 }
 
@@ -140,4 +173,3 @@ impl WorkerLocalStat {
         }
     }
 }
-

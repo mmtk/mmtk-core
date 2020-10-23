@@ -57,16 +57,13 @@ mod mm;
 mod mmtk;
 mod plan;
 pub mod policy;
-pub mod vm;
 pub mod scheduler;
+pub mod vm;
 
 pub use crate::mm::memory_manager;
 pub use crate::mmtk::MMTK;
-pub use crate::plan::selected_plan::{
-    SelectedConstraints, SelectedPlan,
-};
+pub use crate::plan::selected_plan::{SelectedConstraints, SelectedPlan};
 pub use crate::plan::{
-    Allocator, CollectorContext, Mutator, MutatorContext, ParallelCollector, Plan, TraceLocal,
-    TransitiveClosure,
-    CopyContext,
+    Allocator, CollectorContext, CopyContext, Mutator, MutatorContext, ParallelCollector, Plan,
+    TraceLocal, TransitiveClosure,
 };

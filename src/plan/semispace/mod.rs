@@ -1,7 +1,7 @@
 pub mod constraints;
+mod gc_works;
 mod global;
 mod mutator;
-mod gc_works;
 
 pub use self::global::SemiSpace;
 

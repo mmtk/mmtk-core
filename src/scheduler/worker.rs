@@ -1,13 +1,11 @@
-use super::*;
+use super::stat::WorkerLocalStat;
 use super::work_bucket::*;
+use super::*;
+use crate::mmtk::MMTK;
 use crate::util::OpaquePointer;
-use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
-use crate::mmtk::MMTK;
-use super::stat::WorkerLocalStat;
-
-
+use std::sync::{Arc, Weak};
 
 pub struct Worker<C: Context> {
     pub tls: OpaquePointer,
@@ -21,13 +19,17 @@ pub struct Worker<C: Context> {
     pub stat: WorkerLocalStat,
 }
 
-unsafe impl <C: Context> Sync for Worker<C> {}
-unsafe impl <C: Context> Send for Worker<C> {}
+unsafe impl<C: Context> Sync for Worker<C> {}
+unsafe impl<C: Context> Send for Worker<C> {}
 
 pub type GCWorker<VM> = Worker<MMTK<VM>>;
 
-impl <C: Context> Worker<C> {
-    pub fn new(ordinal: usize, group: Option<Weak<WorkerGroup<C>>>, scheduler: Weak<Scheduler<C>>) -> Self {
+impl<C: Context> Worker<C> {
+    pub fn new(
+        ordinal: usize,
+        group: Option<Weak<WorkerGroup<C>>>,
+        scheduler: Weak<Scheduler<C>>,
+    ) -> Self {
         let scheduler = scheduler.upgrade().unwrap();
         Self {
             tls: OpaquePointer::UNINITIALIZED,
@@ -77,18 +79,17 @@ impl <C: Context> Worker<C> {
     }
 }
 
-
 pub struct WorkerGroup<C: Context> {
     pub workers: Vec<Worker<C>>,
 }
 
-impl <C: Context> WorkerGroup<C> {
+impl<C: Context> WorkerGroup<C> {
     pub fn new(workers: usize, scheduler: Weak<Scheduler<C>>) -> Arc<Self> {
-        let mut group = Arc::new(Self {
-            workers: vec![]
-        });
+        let mut group = Arc::new(Self { workers: vec![] });
         let group_weak = Arc::downgrade(&group);
-        unsafe { Arc::get_mut_unchecked(&mut group) }.workers = (0..workers).map(|i| Worker::new(i, Some(group_weak.clone()), scheduler.clone())).collect();
+        unsafe { Arc::get_mut_unchecked(&mut group) }.workers = (0..workers)
+            .map(|i| Worker::new(i, Some(group_weak.clone()), scheduler.clone()))
+            .collect();
         group
     }
 

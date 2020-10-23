@@ -1,14 +1,14 @@
+mod context;
 #[allow(clippy::module_inception)]
 mod scheduler;
-mod worker;
+pub mod stat;
 mod work;
 mod work_bucket;
-mod context;
-pub mod stat;
+mod worker;
 
-pub use scheduler::*;
 pub use context::*;
-pub use worker::*;
+pub use scheduler::*;
 pub use work::*;
+pub use worker::*;
 
 pub mod gc_works;

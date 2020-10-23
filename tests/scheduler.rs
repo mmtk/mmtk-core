@@ -2,21 +2,24 @@
 
 #![feature(is_sorted)]
 
-use mmtk::util::OpaquePointer;
-use mmtk::scheduler::*;
 use lazy_static::lazy_static;
-use std::sync::Arc;
+use mmtk::scheduler::*;
+use mmtk::util::OpaquePointer;
 use rand::{thread_rng, Rng};
-
-
+use std::sync::Arc;
 
 /// A work-packet to (quick)sort a slice of array
 struct Sort(&'static mut [usize]);
 
 impl Work<()> for Sort {
     fn do_work(&mut self, worker: &mut Worker<()>, _context: &'static ()) {
-        if self.0.len() <= 1 { return /* Do nothing */ }
-        worker.scheduler().unconstrained_works.add(Partition(unsafe { &mut *(self.0 as *mut _) }));
+        if self.0.len() <= 1 {
+            return; /* Do nothing */
+        }
+        worker
+            .scheduler()
+            .unconstrained_works
+            .add(Partition(unsafe { &mut *(self.0 as *mut _) }));
     }
 }
 
@@ -32,8 +35,20 @@ impl Work<()> for Partition {
         // 1. Partition
 
         let pivot: usize = self.0[0];
-        let le = self.0.iter().skip(1).filter(|v| **v <= pivot).copied().collect::<Vec<_>>();
-        let gt = self.0.iter().skip(1).filter(|v| **v > pivot).copied().collect::<Vec<_>>();
+        let le = self
+            .0
+            .iter()
+            .skip(1)
+            .filter(|v| **v <= pivot)
+            .copied()
+            .collect::<Vec<_>>();
+        let gt = self
+            .0
+            .iter()
+            .skip(1)
+            .filter(|v| **v > pivot)
+            .copied()
+            .collect::<Vec<_>>();
 
         let pivot_index = le.len();
         for (i, v) in le.iter().enumerate() {
@@ -46,15 +61,14 @@ impl Work<()> for Partition {
 
         // 2. Create two `Sort` work packets
 
-        let left: &'static mut [usize] = unsafe { &mut *(&mut self.0[.. pivot_index] as *mut _) };
-        let right: &'static mut [usize] = unsafe { &mut *(&mut self.0[pivot_index + 1 ..] as *mut _) };
+        let left: &'static mut [usize] = unsafe { &mut *(&mut self.0[..pivot_index] as *mut _) };
+        let right: &'static mut [usize] =
+            unsafe { &mut *(&mut self.0[pivot_index + 1..] as *mut _) };
 
         worker.scheduler().unconstrained_works.add(Sort(left));
         worker.scheduler().unconstrained_works.add(Sort(right));
     }
 }
-
-
 
 lazy_static! {
     static ref SCHEDULER: Arc<Scheduler<()>> = Scheduler::new();
@@ -74,7 +88,9 @@ fn quicksort() {
     // println!("Original: {:?}", data);
 
     SCHEDULER.initialize(NUM_WORKERS, &(), OpaquePointer::UNINITIALIZED);
-    SCHEDULER.unconstrained_works.add(Sort(unsafe { &mut *(data as *mut _) }));
+    SCHEDULER
+        .unconstrained_works
+        .add(Sort(unsafe { &mut *(data as *mut _) }));
     SCHEDULER.wait_for_completion();
 
     // println!("Sorted: {:?}", data);

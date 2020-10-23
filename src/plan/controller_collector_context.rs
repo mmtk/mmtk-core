@@ -1,11 +1,11 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Condvar, Mutex, Arc};
-use std::marker::PhantomData;
+use crate::scheduler::gc_works::ScheduleCollection;
+use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::scheduler::*;
-use crate::scheduler::gc_works::ScheduleCollection;
+use std::marker::PhantomData;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
+use std::sync::{Arc, Condvar, Mutex};
 
 struct RequestSync {
     tls: OpaquePointer,
@@ -21,16 +21,16 @@ pub struct ControllerCollectorContext<VM: VMBinding> {
     phantom: PhantomData<VM>,
 }
 
-unsafe impl <VM: VMBinding> Sync for ControllerCollectorContext<VM> {}
+unsafe impl<VM: VMBinding> Sync for ControllerCollectorContext<VM> {}
 
 // Clippy says we need this...
-impl <VM: VMBinding> Default for ControllerCollectorContext<VM> {
+impl<VM: VMBinding> Default for ControllerCollectorContext<VM> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl <VM: VMBinding> ControllerCollectorContext<VM> {
+impl<VM: VMBinding> ControllerCollectorContext<VM> {
     pub fn new() -> Self {
         ControllerCollectorContext {
             request_sync: Mutex::new(RequestSync {

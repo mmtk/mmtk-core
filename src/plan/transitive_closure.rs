@@ -1,5 +1,5 @@
-use crate::util::{Address, ObjectReference};
 use crate::scheduler::gc_works::ProcessEdgesWork;
+use crate::util::{Address, ObjectReference};
 
 pub trait TransitiveClosure {
     // The signature of this function changes during the port
@@ -9,7 +9,7 @@ pub trait TransitiveClosure {
     fn process_node(&mut self, object: ObjectReference);
 }
 
-impl <T: ProcessEdgesWork> TransitiveClosure for T {
+impl<T: ProcessEdgesWork> TransitiveClosure for T {
     fn process_edge(&mut self, _slot: Address) {
         unreachable!();
     }

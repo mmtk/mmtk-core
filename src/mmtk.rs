@@ -1,8 +1,8 @@
 use crate::plan::phase::PhaseManager;
 use crate::plan::Plan;
 use crate::plan::SelectedPlan;
-use crate::scheduler::Scheduler;
 use crate::policy::space::SFTMap;
+use crate::scheduler::Scheduler;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::OpaquePointer;
@@ -44,14 +44,16 @@ pub struct MMTK<VM: VMBinding> {
     inside_harness: AtomicBool,
 }
 
-unsafe impl <VM: VMBinding> Send for MMTK<VM> {}
-unsafe impl <VM: VMBinding> Sync for MMTK<VM> {}
+unsafe impl<VM: VMBinding> Send for MMTK<VM> {}
+unsafe impl<VM: VMBinding> Sync for MMTK<VM> {}
 
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
         let scheduler = Scheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone(), unsafe { &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>) });
+        let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone(), unsafe {
+            &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>)
+        });
         let phase_manager = PhaseManager::new(&plan.base().stats);
         MMTK {
             plan,

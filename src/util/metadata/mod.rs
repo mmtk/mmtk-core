@@ -1,11 +1,9 @@
-use crate::util::Address;
 use crate::util::constants::*;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::Address;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU8, Ordering};
-
-
 
 pub trait PerChunkMetadata: Sized + 'static {
     const LOG_BYTES_IN_CHUNK: usize = LOG_BYTES_IN_CHUNK;
@@ -45,7 +43,8 @@ impl MarkBitMap {
 }
 
 const BITS_IN_BITMAP: usize = <MarkBitMap as PerChunkMetadata>::BYTES_IN_CHUNK >> LOG_BYTES_IN_WORD;
-const BYTES_IN_BITMAP: usize = conversions::raw_align_up(BITS_IN_BITMAP, BITS_IN_BYTE) >> LOG_BITS_IN_BYTE;
+const BYTES_IN_BITMAP: usize =
+    conversions::raw_align_up(BITS_IN_BITMAP, BITS_IN_BYTE) >> LOG_BITS_IN_BYTE;
 const PAGES_IN_BITMAP: usize = (BYTES_IN_BITMAP + BYTES_IN_PAGE - 1) >> LOG_BYTES_IN_PAGE;
 
 impl PerChunkMetadata for MarkBitMap {
@@ -61,6 +60,6 @@ impl Deref for MarkBitMap {
 
 impl PartialEq for MarkBitMap {
     fn eq(&self, other: &Self) -> bool {
-        self as *const _ == other as * const _
+        self as *const _ == other as *const _
     }
 }

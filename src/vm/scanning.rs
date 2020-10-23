@@ -1,8 +1,8 @@
-use crate::plan::{TraceLocal, TransitiveClosure, Mutator, SelectedPlan};
+use crate::plan::{Mutator, SelectedPlan, TraceLocal, TransitiveClosure};
+use crate::scheduler::gc_works::ProcessEdgesWork;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::scheduler::gc_works::ProcessEdgesWork;
 
 pub trait Scanning<VM: VMBinding> {
     /// Scan stack roots after all mutators are paused
@@ -21,13 +21,15 @@ pub trait Scanning<VM: VMBinding> {
     /// Scan all thread roots and create `RootsEdge` work packets
     ///
     /// TODO: Smaller work granularity
-    fn scan_objects<W: ProcessEdgesWork<VM=VM>>(objects: &[ObjectReference]);
+    fn scan_objects<W: ProcessEdgesWork<VM = VM>>(objects: &[ObjectReference]);
     /// Scan all the mutators for roots
-    fn scan_thread_roots<W: ProcessEdgesWork<VM=VM>>();
+    fn scan_thread_roots<W: ProcessEdgesWork<VM = VM>>();
     /// Scan one mutator for roots
-    fn scan_thread_root<W: ProcessEdgesWork<VM=VM>>(mutator: &'static mut Mutator<SelectedPlan<VM>>);
+    fn scan_thread_root<W: ProcessEdgesWork<VM = VM>>(
+        mutator: &'static mut Mutator<SelectedPlan<VM>>,
+    );
     /// The creation of all root scan tasks (except thread scanning) goes here
-    fn scan_vm_specific_roots<W: ProcessEdgesWork<VM=VM>>();
+    fn scan_vm_specific_roots<W: ProcessEdgesWork<VM = VM>>();
     fn compute_static_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);
     fn compute_global_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);
     fn compute_thread_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);

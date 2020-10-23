@@ -1,3 +1,4 @@
+pub mod barriers;
 pub mod collector_context;
 pub mod controller_collector_context;
 pub mod global;
@@ -9,7 +10,6 @@ pub mod plan_constraints;
 mod trace;
 pub mod tracelocal;
 pub mod transitive_closure;
-pub mod barriers;
 
 pub use self::collector_context::CollectorContext;
 pub use self::global::Allocator;

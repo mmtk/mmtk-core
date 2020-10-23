@@ -14,7 +14,9 @@ unsafe impl Sync for OpaquePointer {}
 unsafe impl Send for OpaquePointer {}
 
 impl Default for OpaquePointer {
-    fn default() -> Self { Self::UNINITIALIZED }
+    fn default() -> Self {
+        Self::UNINITIALIZED
+    }
 }
 
 impl OpaquePointer {

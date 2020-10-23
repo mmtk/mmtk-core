@@ -1,10 +1,13 @@
 use super::controller_collector_context::ControllerCollectorContext;
 use super::MutatorContext;
+use crate::mmtk::MMTK;
 use crate::plan::phase::Phase;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
+use crate::scheduler::*;
+use crate::util::constants::*;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -13,18 +16,15 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
-use crate::util::{ObjectReference, Address};
 use crate::util::OpaquePointer;
+use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
-use crate::scheduler::*;
-use crate::mmtk::MMTK;
 use std::cell::UnsafeCell;
+use std::marker::PhantomData;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::marker::PhantomData;
-use crate::util::constants::*;
 
 use crate::util::alloc::allocators::AllocatorSelector;
 use enum_map::EnumMap;
@@ -35,9 +35,29 @@ pub trait CopyContext: Sized + 'static + Sync + Send {
     fn new(mmtk: &'static MMTK<Self::VM>) -> Self;
     fn prepare(&mut self);
     fn release(&mut self);
-    fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, allocator: Allocator) -> Address;
-    fn post_copy(&mut self, _obj: ObjectReference, _tib: Address, _bytes: usize, _allocator: Allocator) {}
-    fn copy_check_allocator(&self, _from: ObjectReference, bytes: usize, align: usize, allocator: Allocator) -> Allocator {
+    fn alloc_copy(
+        &mut self,
+        original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+        allocator: Allocator,
+    ) -> Address;
+    fn post_copy(
+        &mut self,
+        _obj: ObjectReference,
+        _tib: Address,
+        _bytes: usize,
+        _allocator: Allocator,
+    ) {
+    }
+    fn copy_check_allocator(
+        &self,
+        _from: ObjectReference,
+        bytes: usize,
+        align: usize,
+        allocator: Allocator,
+    ) -> Allocator {
         let large = crate::util::alloc::allocator::get_maximum_aligned_size::<Self::VM>(
             bytes,
             align,
@@ -53,14 +73,21 @@ pub trait CopyContext: Sized + 'static + Sync + Send {
 
 pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
 
-impl <VM: VMBinding> CopyContext for NoCopy<VM> {
+impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     type VM = VM;
     fn new(_mmtk: &'static MMTK<Self::VM>) -> Self {
         Self(PhantomData)
     }
     fn prepare(&mut self) {}
     fn release(&mut self) {}
-    fn alloc_copy(&mut self, _original: ObjectReference, _bytes: usize, _align: usize, _offset: isize, _allocator: Allocator) -> Address {
+    fn alloc_copy(
+        &mut self,
+        _original: ObjectReference,
+        _bytes: usize,
+        _align: usize,
+        _offset: isize,
+        _allocator: Allocator,
+    ) -> Address {
         unreachable!()
     }
 }
@@ -90,9 +117,18 @@ pub trait Plan: Sized + 'static + Sync + Send {
     }
 
     // unsafe because this can only be called once by the init thread
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap, scheduler: &Arc<MMTkScheduler<Self::VM>>);
+    fn gc_init(
+        &mut self,
+        heap_size: usize,
+        vm_map: &'static VMMap,
+        scheduler: &Arc<MMTkScheduler<Self::VM>>,
+    );
 
-    fn bind_mutator(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> Box<Self::Mutator>;
+    fn bind_mutator(
+        &'static self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> Box<Self::Mutator>;
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector>;
 
@@ -378,7 +414,12 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
-    pub fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap, scheduler: &Arc<MMTkScheduler<VM>>) {
+    pub fn gc_init(
+        &mut self,
+        heap_size: usize,
+        vm_map: &'static VMMap,
+        scheduler: &Arc<MMTkScheduler<VM>>,
+    ) {
         vm_map.boot();
         vm_map.finalize_static_space_map(
             self.heap.get_discontig_start(),
@@ -471,17 +512,23 @@ impl<VM: VMBinding> BasePlan<VM> {
     pub fn prepare(&self, _tls: OpaquePointer, _primary: bool) {
         #[cfg(feature = "base_spaces")]
         let unsync = unsafe { &mut *self.unsync.get() };
-        #[cfg(feature = "code_space")] unsync.code_space.prepare();
-        #[cfg(feature = "ro_space")] unsync.ro_space.prepare();
-        #[cfg(feature = "vm_space")] unsync.vm_space.prepare();
+        #[cfg(feature = "code_space")]
+        unsync.code_space.prepare();
+        #[cfg(feature = "ro_space")]
+        unsync.ro_space.prepare();
+        #[cfg(feature = "vm_space")]
+        unsync.vm_space.prepare();
     }
 
     pub fn release(&self, _tls: OpaquePointer, _primary: bool) {
         #[cfg(feature = "base_spaces")]
         let unsync = unsafe { &mut *self.unsync.get() };
-        #[cfg(feature = "code_space")] unsync.code_space.release();
-        #[cfg(feature = "ro_space")] unsync.ro_space.release();
-        #[cfg(feature = "vm_space")] unsync.vm_space.release();
+        #[cfg(feature = "code_space")]
+        unsync.code_space.release();
+        #[cfg(feature = "ro_space")]
+        unsync.ro_space.release();
+        #[cfg(feature = "vm_space")]
+        unsync.vm_space.release();
     }
 
     pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, _primary: bool) {
@@ -681,7 +728,12 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
-    pub fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap, scheduler: &Arc<MMTkScheduler<VM>>) {
+    pub fn gc_init(
+        &mut self,
+        heap_size: usize,
+        vm_map: &'static VMMap,
+        scheduler: &Arc<MMTkScheduler<VM>>,
+    ) {
         self.base.gc_init(heap_size, vm_map, scheduler);
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.immortal.init(vm_map);
