@@ -1,7 +1,6 @@
 use super::controller_collector_context::ControllerCollectorContext;
 use super::MutatorContext;
 use crate::mmtk::MMTK;
-use crate::plan::phase::Phase;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -19,11 +18,10 @@ use crate::util::statistics::stats::Stats;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
-use crate::vm::Scanning;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
-use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -531,84 +529,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         unsync.vm_space.release();
     }
 
-    pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, _primary: bool) {
-        {
-            #[cfg(feature = "base_spaces")]
-            let unsync = &mut *self.unsync.get();
-
-            #[cfg(feature = "code_space")]
-            {
-                match phase {
-                    Phase::Prepare => unsync.code_space.prepare(),
-                    &Phase::Release => unsync.code_space.release(),
-                    _ => {}
-                }
-            }
-
-            #[cfg(feature = "ro_space")]
-            {
-                match phase {
-                    Phase::Prepare => unsync.ro_space.prepare(),
-                    &Phase::Release => unsync.ro_space.release(),
-                    _ => {}
-                }
-            }
-
-            #[cfg(feature = "vm_space")]
-            {
-                match phase {
-                    Phase::Prepare => unsync.vm_space.prepare(),
-                    &Phase::Release => unsync.vm_space.release(),
-                    _ => {}
-                }
-            }
-
-            match phase {
-                Phase::SetCollectionKind => {
-                    self.cur_collection_attempts.store(
-                        if self.is_user_triggered_collection() {
-                            1
-                        } else {
-                            self.determine_collection_attempts()
-                        },
-                        Ordering::Relaxed,
-                    );
-
-                    let emergency_collection = !self.is_internal_triggered_collection()
-                        && self.last_collection_was_exhaustive()
-                        && self.cur_collection_attempts.load(Ordering::Relaxed) > 1;
-                    self.emergency_collection
-                        .store(emergency_collection, Ordering::Relaxed);
-
-                    if emergency_collection {
-                        self.force_full_heap_collection();
-                    }
-                }
-                Phase::Initiate => {
-                    self.set_gc_status(GcStatus::GcPrepare);
-                }
-                Phase::PrepareStacks => {
-                    self.stacks_prepared.store(true, atomic::Ordering::SeqCst);
-                }
-                Phase::Prepare => {}
-                Phase::Closure => {}
-                &Phase::StackRoots => {
-                    VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
-                    self.set_gc_status(GcStatus::GcProper);
-                }
-                &Phase::Roots => {
-                    VM::VMScanning::reset_thread_counter();
-                    self.set_gc_status(GcStatus::GcProper);
-                }
-                &Phase::Release => {}
-                Phase::Complete => {
-                    self.set_gc_status(GcStatus::NotInGC);
-                }
-                _ => panic!("Global phase not handled!"),
-            }
-        }
-    }
-
     pub fn set_collection_kind(&self) {
         self.cur_collection_attempts.store(
             if self.is_user_triggered_collection() {
@@ -775,22 +695,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         unsync.immortal.release();
         unsync.los.release(primary);
         self.base.release(tls, primary)
-    }
-
-    pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, primary: bool) {
-        let unsync = &mut *self.unsync.get();
-        match phase {
-            Phase::Prepare => {
-                unsync.immortal.prepare();
-                unsync.los.prepare(primary);
-            }
-            &Phase::Release => {
-                unsync.immortal.release();
-                unsync.los.release(primary);
-            }
-            _ => {}
-        }
-        self.base.collection_phase(tls, phase, primary)
     }
 
     pub fn stacks_prepared(&self) -> bool {

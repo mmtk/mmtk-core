@@ -1,14 +1,13 @@
+use crate::plan::SelectedPlan;
 use crate::plan::{TraceLocal, TransitiveClosure};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Scanning;
-
-use crate::plan::Plan;
-use crate::plan::SelectedPlan;
 use std::collections::{HashSet, LinkedList};
 
 use crate::vm::VMBinding;
 
+#[allow(dead_code)]
 pub struct SanityChecker<'a, VM: VMBinding> {
     roots: Vec<Address>,
     values: LinkedList<ObjectReference>,
@@ -29,27 +28,28 @@ impl<'a, VM: VMBinding> SanityChecker<'a, VM> {
     }
 
     pub fn check(&mut self) {
-        self.plan.enter_sanity();
+        unimplemented!("Need to adapt to the work-packets system")
+        // self.plan.enter_sanity();
 
-        println!("Sanity stackroots, collector");
-        VM::VMScanning::compute_thread_roots(self, self.tls);
-        println!("Sanity stackroots, global");
-        VM::VMScanning::notify_initial_thread_scan_complete(false, self.tls);
-        println!("Sanity roots, collector");
-        VM::VMScanning::compute_global_roots(self, self.tls);
-        VM::VMScanning::compute_static_roots(self, self.tls);
-        VM::VMScanning::compute_bootimage_roots(self, self.tls);
-        println!("Sanity roots, global");
-        VM::VMScanning::reset_thread_counter();
+        // println!("Sanity stackroots, collector");
+        // VM::VMScanning::compute_thread_roots(self, self.tls);
+        // println!("Sanity stackroots, global");
+        // VM::VMScanning::notify_initial_thread_scan_complete(false, self.tls);
+        // println!("Sanity roots, collector");
+        // VM::VMScanning::compute_global_roots(self, self.tls);
+        // VM::VMScanning::compute_static_roots(self, self.tls);
+        // VM::VMScanning::compute_bootimage_roots(self, self.tls);
+        // println!("Sanity roots, global");
+        // VM::VMScanning::reset_thread_counter();
 
-        self.process_roots();
-        self.complete_trace();
+        // self.process_roots();
+        // self.complete_trace();
 
-        self.roots.clear();
-        self.values.clear();
-        self.refs.clear();
+        // self.roots.clear();
+        // self.values.clear();
+        // self.refs.clear();
 
-        self.plan.leave_sanity();
+        // self.plan.leave_sanity();
     }
 }
 

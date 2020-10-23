@@ -1,4 +1,4 @@
-use crate::plan::{Mutator, SelectedPlan, TraceLocal, TransitiveClosure};
+use crate::plan::{Mutator, SelectedPlan, TransitiveClosure};
 use crate::scheduler::gc_works::ProcessEdgesWork;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
@@ -28,12 +28,8 @@ pub trait Scanning<VM: VMBinding> {
     fn scan_thread_root<W: ProcessEdgesWork<VM = VM>>(
         mutator: &'static mut Mutator<SelectedPlan<VM>>,
     );
+    // TODO: compute_new_thread_roots
     /// The creation of all root scan tasks (except thread scanning) goes here
     fn scan_vm_specific_roots<W: ProcessEdgesWork<VM = VM>>();
-    fn compute_static_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);
-    fn compute_global_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);
-    fn compute_thread_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);
-    fn compute_new_thread_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);
-    fn compute_bootimage_roots<T: TraceLocal>(trace: &mut T, tls: OpaquePointer);
     fn supports_return_barrier() -> bool;
 }

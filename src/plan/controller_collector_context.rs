@@ -56,34 +56,21 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
             self.request_sync.lock().unwrap().tls = tls;
         }
 
-        // Safe provided that we don't hold a &mut to this struct
-        // before executing run()
-        // let workers = unsafe { &*self.workers.get() };
-
         loop {
             debug!("[STWController: Waiting for request...]");
             self.wait_for_request();
             debug!("[STWController: Request recieved.]");
-
-            // debug!("[STWController: Stopping the world...]");
-            // VM::VMCollection::stop_all_mutators(tls);
 
             // For heap growth logic
             // FIXME: This is not used. However, we probably want to set a 'user_triggered' flag
             // when GC is requested.
             // let user_triggered_collection: bool = SelectedPlan::is_user_triggered_collection();
 
-            // self.clear_request();
-
-            // debug!("[STWController: Triggering worker threads...]");
-            // self.scheduler.mutators_stopped();
             let scheduler = self.scheduler.read().unwrap();
             let scheduler = scheduler.as_ref().unwrap();
             scheduler.set_initializer(Some(ScheduleCollection));
             scheduler.wait_for_completion();
             debug!("[STWController: Worker threads complete!]");
-            // debug!("[STWController: Resuming mutators...]");
-            // VM::VMCollection::resume_mutators(tls);
         }
     }
 

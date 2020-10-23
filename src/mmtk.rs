@@ -1,4 +1,3 @@
-use crate::plan::phase::PhaseManager;
 use crate::plan::Plan;
 use crate::plan::SelectedPlan;
 use crate::policy::space::SFTMap;
@@ -33,7 +32,6 @@ lazy_static! {
 
 pub struct MMTK<VM: VMBinding> {
     pub plan: SelectedPlan<VM>,
-    pub phase_manager: PhaseManager,
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
     pub sftmap: &'static SFTMap,
@@ -54,10 +52,8 @@ impl<VM: VMBinding> MMTK<VM> {
         let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone(), unsafe {
             &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>)
         });
-        let phase_manager = PhaseManager::new(&plan.base().stats);
         MMTK {
             plan,
-            phase_manager,
             vm_map: &VM_MAP,
             mmapper: &MMAPPER,
             sftmap: &SFT_MAP,
