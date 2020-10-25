@@ -1,26 +1,28 @@
-use crate::plan::{SelectedPlan, Plan};
-use crate::plan::{TraceLocal, TransitiveClosure};
-use crate::util::OpaquePointer;
-use crate::util::{Address, ObjectReference};
-use crate::vm::Scanning;
-use std::collections::{HashSet, LinkedList};
+use crate::plan::Plan;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
+use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
-use std::ops::{Deref, DerefMut};
+use std::collections::HashSet;
 use std::marker::PhantomData;
-
+use std::ops::{Deref, DerefMut};
 
 #[allow(dead_code)]
 pub struct SanityChecker {
     refs: HashSet<ObjectReference>,
 }
 
+impl Default for SanityChecker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SanityChecker {
     pub fn new() -> Self {
         Self {
-            refs: HashSet::new()
+            refs: HashSet::new(),
         }
     }
 }
@@ -94,7 +96,6 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
         }
     }
 }
-
 
 #[derive(Default)]
 pub struct SanityGCProcessEdges<VM: VMBinding> {

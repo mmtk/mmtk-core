@@ -1,8 +1,6 @@
-use crate::policy::space::Space;
-
-use super::gc_works::{
-    GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges, SanityGCProcessEdges,
-};
+#[cfg(feature = "sanity")]
+use super::gc_works::SanityGCProcessEdges;
+use super::gc_works::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
 use super::mutator::create_gencopy_mutator;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::mmtk::MMTK;
@@ -13,6 +11,7 @@ use crate::plan::mutator_context::Mutator;
 use crate::plan::Allocator;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
+use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -22,13 +21,13 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
+#[cfg(feature = "sanity")]
+use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::*;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::*;
 
 pub type SelectedPlan<VM> = GenCopy<VM>;
 

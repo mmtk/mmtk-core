@@ -5,7 +5,10 @@ use crate::plan::transitive_closure::TransitiveClosure;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
+#[cfg(feature = "sanity")]
+use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::*;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -14,19 +17,17 @@ use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
+#[cfg(feature = "sanity")]
+use crate::util::sanity::sanity_checker::*;
 use crate::util::statistics::stats::Stats;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
+use enum_map::EnumMap;
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use crate::scheduler::gc_works::*;
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::*;
-use crate::util::alloc::allocators::AllocatorSelector;
-use enum_map::EnumMap;
 
 pub trait CopyContext: Sized + 'static + Sync + Send {
     type VM: VMBinding;

@@ -4,17 +4,18 @@ use crate::policy::space::SFTMap;
 use crate::scheduler::Scheduler;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::OpaquePointer;
-
+use crate::util::heap::layout::map::Map;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::reference_processor::ReferenceProcessors;
-use std::default::Default;
-use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
-use crate::util::heap::layout::map::Map;
+use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use std::sync::{Arc, Mutex};
+use std::default::Default;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+#[cfg(feature = "sanity")]
+use std::sync::Mutex;
 
 // TODO: remove this singleton at some point to allow multiple instances of MMTK
 // This helps refactoring.
