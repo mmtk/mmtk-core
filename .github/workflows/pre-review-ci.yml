@@ -19,6 +19,9 @@ jobs:
           # This overwrites the default toolchain with the toolchain specified above.
           override: true
 
+      # An outside collaborator should not be able to run workflows if their PR includes changes to workflows
+      - run: echo "Workflows for this PR should be cancelled"
+
       # Setup Environments
       - name: Setup Environments
         run: ./.github/scripts/ci-setup.sh
