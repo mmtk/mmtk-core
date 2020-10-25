@@ -6,6 +6,7 @@ use std::any::{type_name, TypeId};
 
 pub trait Work<C: Context>: 'static + Send + Sync {
     fn do_work(&mut self, worker: &mut Worker<C>, context: &'static C);
+    #[inline]
     fn do_work_with_stat(&mut self, worker: &mut Worker<C>, context: &'static C) {
         let stat = worker
             .stat

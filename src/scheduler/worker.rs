@@ -17,6 +17,7 @@ pub struct Worker<C: Context> {
     pub local_works: WorkBucket<C>,
     pub sender: Sender<CoordinatorMessage<C>>,
     pub stat: WorkerLocalStat,
+    context: Option<&'static C>,
 }
 
 unsafe impl<C: Context> Sync for Worker<C> {}
@@ -41,6 +42,7 @@ impl<C: Context> Worker<C> {
             sender: scheduler.channel.0.clone(),
             scheduler,
             stat: Default::default(),
+            context: None,
         }
     }
 
@@ -60,6 +62,7 @@ impl<C: Context> Worker<C> {
         &self.scheduler
     }
 
+    #[inline]
     pub fn local(&mut self) -> &mut C::WorkerLocal {
         self.local.as_mut().unwrap()
     }
@@ -68,7 +71,12 @@ impl<C: Context> Worker<C> {
         self.tls = tls;
     }
 
+    pub fn do_work(&'static mut self, mut work: impl Work<C>) {
+        work.do_work(self, self.context.unwrap());
+    }
+
     pub fn run(&'static mut self, context: &'static C) {
+        self.context = Some(context);
         self.local = Some(C::WorkerLocal::new(context));
         self.parked.store(false, Ordering::SeqCst);
         loop {

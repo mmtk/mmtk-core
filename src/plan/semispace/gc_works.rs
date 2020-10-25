@@ -71,16 +71,9 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
-        if self.plan().tospace().in_space(object) {
-            return self.plan().tospace().trace_object(
-                self,
-                object,
-                super::global::ALLOC_SS,
-                self.worker().local(),
-            );
-        }
-        if self.plan().fromspace().in_space(object) {
-            return self.plan().fromspace().trace_object(
+        let from_space = self.plan().fromspace();
+        if from_space.in_space(object) {
+            return from_space.trace_object(
                 self,
                 object,
                 super::global::ALLOC_SS,
@@ -88,18 +81,19 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
             );
         }
         object
-        // self.plan().common.trace_object(self, object)
     }
 }
 
 impl<VM: VMBinding> Deref for SSProcessEdges<VM> {
     type Target = ProcessEdgesBase<Self>;
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base
     }
 }
 
 impl<VM: VMBinding> DerefMut for SSProcessEdges<VM> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }

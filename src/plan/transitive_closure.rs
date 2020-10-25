@@ -13,6 +13,7 @@ impl<T: ProcessEdgesWork> TransitiveClosure for T {
     fn process_edge(&mut self, _slot: Address) {
         unreachable!();
     }
+    #[inline]
     fn process_node(&mut self, object: ObjectReference) {
         ProcessEdgesWork::process_node(self, object);
     }

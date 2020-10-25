@@ -119,6 +119,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         self.from_space.load(Ordering::SeqCst)
     }
 
+    #[inline]
     pub fn trace_object<T: TransitiveClosure>(
         &self,
         trace: &mut T,

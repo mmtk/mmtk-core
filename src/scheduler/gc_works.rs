@@ -282,29 +282,46 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
     }
 }
 
-#[derive(Default)]
 pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
     pub edges: Vec<Address>,
     pub nodes: Vec<ObjectReference>,
     pub mmtk: Option<&'static MMTK<E::VM>>,
-    pub worker_tls: Option<OpaquePointer>,
+    worker: *mut GCWorker<E::VM>,
+}
+
+unsafe impl<E: ProcessEdgesWork> Sync for ProcessEdgesBase<E> {}
+unsafe impl<E: ProcessEdgesWork> Send for ProcessEdgesBase<E> {}
+
+impl<E: ProcessEdgesWork> Default for ProcessEdgesBase<E> {
+    fn default() -> Self {
+        Self {
+            edges: vec![],
+            nodes: vec![],
+            mmtk: None,
+            worker: 0 as _,
+        }
+    }
 }
 
 impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
     pub fn new(edges: Vec<Address>) -> Self {
         Self {
             edges,
-            nodes: vec![],
-            mmtk: None,
-            worker_tls: None,
+            ..Self::default()
         }
     }
-    pub fn worker(&self) -> &'static mut GCWorker<E::VM> {
-        <E::VM as VMBinding>::VMActivePlan::worker(self.worker_tls.unwrap())
+    pub fn set_worker(&mut self, worker: &mut GCWorker<E::VM>) {
+        self.worker = worker;
     }
+    #[inline]
+    pub fn worker(&self) -> &'static mut GCWorker<E::VM> {
+        unsafe { &mut *self.worker }
+    }
+    #[inline]
     pub fn mmtk(&self) -> &'static MMTK<E::VM> {
         self.mmtk.unwrap()
     }
+    #[inline]
     pub fn plan(&self) -> &'static SelectedPlan<E::VM> {
         &self.mmtk.unwrap().plan
     }
@@ -317,6 +334,7 @@ pub trait ProcessEdgesWork:
     type VM: VMBinding;
     const CAPACITY: usize = 4096;
     const OVERWRITE_REFERENCE: bool = true;
+    const SCAN_OBJECTS_IMMEDIATELY: bool = true;
     fn new(edges: Vec<Address>, roots: bool) -> Self;
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 
@@ -326,14 +344,30 @@ pub trait ProcessEdgesWork:
             self.nodes.reserve(Self::CAPACITY);
         }
         self.nodes.push(object);
-        if self.nodes.len() >= Self::CAPACITY {
-            let mut new_nodes = Vec::with_capacity(Self::CAPACITY);
-            mem::swap(&mut new_nodes, &mut self.nodes);
+        // No need to flush this `nodes` local buffer to some global pool.
+        // The max length of `nodes` buffer is equal to `CAPACITY` (when every edge produces a node)
+        // So maximum 1 `ScanObjects` work can be created from `nodes` buffer
+    }
+
+    #[cold]
+    fn flush(&mut self) {
+        let mut new_nodes = Vec::with_capacity(Self::CAPACITY);
+        mem::swap(&mut new_nodes, &mut self.nodes);
+        let scan_objects_work = ScanObjects::<Self>::new(new_nodes, false);
+
+        if Self::SCAN_OBJECTS_IMMEDIATELY {
+            // We execute this `scan_objects_work` immediately.
+            // This is expected to be a useful optimization because,
+            // say for _pmd_ with 200M heap, we're likely to have 50000~60000 `ScanObjects` works
+            // being dispatched (similar amount to `ProcessEdgesWork`).
+            // Executing these works now can remarkably reduce the global synchronization time.
+            self.worker().do_work(scan_objects_work);
+        } else {
             self.mmtk
                 .unwrap()
                 .scheduler
                 .closure_stage
-                .add(ScanObjects::<Self>::new(new_nodes, false));
+                .add(scan_objects_work);
         }
     }
 
@@ -359,16 +393,10 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     default fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessEdgesWork");
         self.mmtk = Some(mmtk);
-        self.worker_tls = Some(worker.tls);
+        self.set_worker(worker);
         self.process_edges();
         if !self.nodes.is_empty() {
-            let mut new_nodes = Vec::with_capacity(Self::CAPACITY);
-            mem::swap(&mut new_nodes, &mut self.nodes);
-            self.mmtk
-                .unwrap()
-                .scheduler
-                .closure_stage
-                .add(ScanObjects::<Self>::new(new_nodes, false));
+            self.flush();
         }
         trace!("ProcessEdgesWork End");
     }
