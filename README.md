@@ -42,3 +42,5 @@ to test the `alloc` function.
 Please DO NOT build MMTk manually,
 as machine generated code is involved during the build process (e.g. `src/vm/jikesrvm/entrypoint.rs` and `src/vm/jikesrvm/inc.asm`).
 Instead, please invoke the `buildit` script from JikesRVM.
+
+An outside collaborator should be able to run our CI if the PR does not change workflow. 
