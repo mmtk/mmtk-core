@@ -351,7 +351,7 @@ pub trait ProcessEdgesWork:
 
     #[cold]
     fn flush(&mut self) {
-        let mut new_nodes = Vec::with_capacity(Self::CAPACITY);
+        let mut new_nodes = vec![];
         mem::swap(&mut new_nodes, &mut self.nodes);
         let scan_objects_work = ScanObjects::<Self>::new(new_nodes, false);
 
