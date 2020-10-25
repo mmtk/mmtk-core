@@ -23,6 +23,8 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+#[cfg(feature = "sanity")]
+use crate::util::sanity::sanity_checker::*;
 
 use enum_map::EnumMap;
 
@@ -100,6 +102,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         // Release global/collectors/mutators
         scheduler.release_stage.add(Release::new(self));
         // Resume mutators
+        #[cfg(feature = "sanity")]
+        scheduler.final_stage.add(ScheduleSanityGC);
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
@@ -127,36 +131,10 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
-
-        #[cfg(feature = "sanity")]
-        {
-            use crate::util::sanity::sanity_checker::SanityChecker;
-            println!("Pre GC sanity check");
-            SanityChecker::new(tls, &self).check();
-        }
     }
 
     fn release(&self, tls: OpaquePointer) {
         self.common.release(tls, true);
-        // #[cfg(feature = "sanity")]
-        // {
-        //     use crate::util::constants::LOG_BYTES_IN_PAGE;
-        //     use libc::memset;
-        //     if self.fromspace().common().contiguous {
-        //         let fromspace_start = self.fromspace().common().start;
-        //         let fromspace_commited =
-        //             self.fromspace().get_page_resource().committed_pages();
-        //         let commited_bytes = fromspace_commited * (1 << LOG_BYTES_IN_PAGE);
-        //         println!(
-        //             "Destroying fromspace {}~{}",
-        //             fromspace_start,
-        //             fromspace_start + commited_bytes
-        //         );
-        //         memset(fromspace_start.to_mut_ptr(), 0xFF, commited_bytes);
-        //     } else {
-        //         println!("Fromspace is discontiguous, not destroying")
-        //     }
-        // }
         // release the collected region
         self.fromspace().release();
     }

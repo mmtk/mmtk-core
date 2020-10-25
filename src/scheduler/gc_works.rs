@@ -156,7 +156,7 @@ impl<ScanEdges: ProcessEdgesWork> StopMutators<ScanEdges> {
 }
 
 lazy_static! {
-    static ref MUTATOR_ITERATOR_LOCK: Mutex<()> = Mutex::new(());
+    pub static ref MUTATOR_ITERATOR_LOCK: Mutex<()> = Mutex::new(());
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
@@ -437,15 +437,5 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
         } else {
             // Do nothing
         }
-    }
-}
-
-#[derive(Default)]
-pub struct ScheduleSanityGC;
-
-impl<VM: VMBinding> GCWork<VM> for ScheduleSanityGC {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        worker.scheduler().reset_state();
-        mmtk.plan.schedule_sanity_collection(worker.scheduler());
     }
 }

@@ -1,146 +1,145 @@
-use crate::plan::SelectedPlan;
+use crate::plan::{SelectedPlan, Plan};
 use crate::plan::{TraceLocal, TransitiveClosure};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Scanning;
 use std::collections::{HashSet, LinkedList};
+use crate::scheduler::gc_works::*;
+use crate::scheduler::*;
+use crate::vm::*;
+use crate::MMTK;
+use std::ops::{Deref, DerefMut};
+use std::marker::PhantomData;
 
-use crate::vm::VMBinding;
 
 #[allow(dead_code)]
-pub struct SanityChecker<'a, VM: VMBinding> {
-    roots: Vec<Address>,
-    values: LinkedList<ObjectReference>,
+pub struct SanityChecker {
     refs: HashSet<ObjectReference>,
-    tls: OpaquePointer,
-    plan: &'a SelectedPlan<VM>,
 }
 
-impl<'a, VM: VMBinding> SanityChecker<'a, VM> {
-    pub fn new(tls: OpaquePointer, plan: &'a SelectedPlan<VM>) -> Self {
-        SanityChecker {
-            roots: Vec::new(),
-            values: LinkedList::new(),
-            refs: HashSet::new(),
-            tls,
-            plan,
+impl SanityChecker {
+    pub fn new() -> Self {
+        Self {
+            refs: HashSet::new()
         }
-    }
-
-    pub fn check(&mut self) {
-        unimplemented!("Need to adapt to the work-packets system")
-        // self.plan.enter_sanity();
-
-        // println!("Sanity stackroots, collector");
-        // VM::VMScanning::compute_thread_roots(self, self.tls);
-        // println!("Sanity stackroots, global");
-        // VM::VMScanning::notify_initial_thread_scan_complete(false, self.tls);
-        // println!("Sanity roots, collector");
-        // VM::VMScanning::compute_global_roots(self, self.tls);
-        // VM::VMScanning::compute_static_roots(self, self.tls);
-        // VM::VMScanning::compute_bootimage_roots(self, self.tls);
-        // println!("Sanity roots, global");
-        // VM::VMScanning::reset_thread_counter();
-
-        // self.process_roots();
-        // self.complete_trace();
-
-        // self.roots.clear();
-        // self.values.clear();
-        // self.refs.clear();
-
-        // self.plan.leave_sanity();
     }
 }
 
-impl<'a, VM: VMBinding> TransitiveClosure for SanityChecker<'a, VM> {
-    fn process_edge(&mut self, slot: Address) {
-        trace!("process_edge({:?})", slot);
-        let object: ObjectReference = unsafe { slot.load() };
-        let new_object = self.trace_object(object);
-        if self.overwrite_reference_during_trace() {
-            unsafe { slot.store(new_object) };
-        }
-    }
+#[derive(Default)]
+pub struct ScheduleSanityGC;
 
-    fn process_node(&mut self, object: ObjectReference) {
-        self.values.push_back(object);
+impl<VM: VMBinding> GCWork<VM> for ScheduleSanityGC {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        worker.scheduler().reset_state();
+        mmtk.plan.schedule_sanity_collection(worker.scheduler());
     }
 }
 
-impl<'a, VM: VMBinding> TraceLocal for SanityChecker<'a, VM> {
-    fn process_roots(&mut self) {
-        loop {
-            if self.roots.is_empty() {
-                break;
-            }
-            let slot = self.roots.pop().unwrap();
-            self.process_root_edge(slot, true);
+pub struct SanityPrepare<P: Plan> {
+    pub plan: &'static P,
+}
+
+unsafe impl<P: Plan> Sync for SanityPrepare<P> {}
+
+impl<P: Plan> SanityPrepare<P> {
+    pub fn new(plan: &'static P) -> Self {
+        Self { plan }
+    }
+}
+
+impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+        mmtk.plan.enter_sanity();
+        {
+            let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
+            sanity_checker.refs.clear();
+        }
+        let _guard = MUTATOR_ITERATOR_LOCK.lock().unwrap();
+        for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
+            let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::Mutator) };
+            mmtk.scheduler
+                .prepare_stage
+                .add(PrepareMutator::<P>::new(&self.plan, mutator));
+        }
+        for w in &worker.group().unwrap().workers {
+            w.local_works.add(PrepareCollector::default());
+        }
+    }
+}
+
+pub struct SanityRelease<P: Plan> {
+    pub plan: &'static P,
+}
+
+unsafe impl<P: Plan> Sync for SanityRelease<P> {}
+
+impl<P: Plan> SanityRelease<P> {
+    pub fn new(plan: &'static P) -> Self {
+        Self { plan }
+    }
+}
+
+impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+        mmtk.plan.leave_sanity();
+        let _guard = MUTATOR_ITERATOR_LOCK.lock().unwrap();
+        for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
+            let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::Mutator) };
+            mmtk.scheduler
+                .release_stage
+                .add(ReleaseMutator::<P>::new(self.plan, mutator));
+        }
+        for w in &worker.group().unwrap().workers {
+            w.local_works.add(ReleaseCollector::default());
+        }
+    }
+}
+
+
+#[derive(Default)]
+pub struct SanityGCProcessEdges<VM: VMBinding> {
+    base: ProcessEdgesBase<SanityGCProcessEdges<VM>>,
+    phantom: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> Deref for SanityGCProcessEdges<VM> {
+    type Target = ProcessEdgesBase<Self>;
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl<VM: VMBinding> DerefMut for SanityGCProcessEdges<VM> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
+
+impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
+    type VM = VM;
+    const OVERWRITE_REFERENCE: bool = false;
+    fn new(edges: Vec<Address>, _roots: bool) -> Self {
+        Self {
+            base: ProcessEdgesBase::new(edges),
+            ..Default::default()
         }
     }
 
-    fn process_root_edge(&mut self, slot: Address, untraced: bool) {
-        trace!("process_root_edge({:?}, {:?})", slot, untraced);
-        let object: ObjectReference = unsafe { slot.load() };
-        let new_object = self.trace_object(object);
-        if self.overwrite_reference_during_trace() {
-            unsafe { slot.store(new_object) };
-        }
-    }
-
+    #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
         }
-
-        if !self.refs.contains(&object) {
+        let mut sanity_checker = self.mmtk().sanity_checker.lock().unwrap();
+        if !sanity_checker.refs.contains(&object) {
             // FIXME steveb consider VM-specific integrity check on reference.
             if !object.is_sane() {
                 panic!("Invalid reference {:?}", object);
             }
             // Object is not "marked"
-            self.refs.insert(object); // "Mark" it
-            self.process_node(object);
+            sanity_checker.refs.insert(object); // "Mark" it
+            ProcessEdgesWork::process_node(self, object);
         }
         object
-    }
-
-    fn complete_trace(&mut self) {
-        self.process_roots();
-
-        loop {
-            if self.values.is_empty() {
-                break;
-            }
-
-            let object = self.values.pop_front().unwrap();
-            let tls = self.tls;
-            VM::VMScanning::scan_object(self, object, tls);
-        }
-    }
-
-    fn release(&mut self) {
-        unimplemented!()
-    }
-
-    fn process_interior_edge(&mut self, target: ObjectReference, slot: Address, _root: bool) {
-        let interior_ref: Address = unsafe { slot.load() };
-        let offset = interior_ref - target.to_address();
-        let new_target = self.trace_object(target);
-        if self.overwrite_reference_during_trace() {
-            unsafe { slot.store(new_target.to_address() + offset) };
-        }
-    }
-
-    fn overwrite_reference_during_trace(&self) -> bool {
-        false
-    }
-
-    fn report_delayed_root_edge(&mut self, slot: Address) {
-        self.roots.push(slot);
-    }
-
-    fn will_not_move_in_current_collection(&self, _obj: ObjectReference) -> bool {
-        true
     }
 }

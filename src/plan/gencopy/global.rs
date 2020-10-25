@@ -27,6 +27,8 @@ use crate::vm::*;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+#[cfg(feature = "sanity")]
+use crate::util::sanity::sanity_checker::*;
 
 pub type SelectedPlan<VM> = GenCopy<VM>;
 
@@ -138,12 +140,12 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         // Release global/collectors/mutators
         scheduler.release_stage.add(Release::new(self));
         // Resume mutators
-        if cfg!(feature = "gencopy_sanity_gc") {
-            scheduler.final_stage.add(ScheduleSanityGC);
-        }
+        #[cfg(feature = "sanity")]
+        scheduler.final_stage.add(ScheduleSanityGC);
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
+    #[cfg(feature = "sanity")]
     fn schedule_sanity_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         println!("sanity gc");
         self.in_sanity.store(true, Ordering::SeqCst);

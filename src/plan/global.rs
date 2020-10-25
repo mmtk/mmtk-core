@@ -17,13 +17,14 @@ use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
-use crate::vm::Collection;
-use crate::vm::VMBinding;
+use crate::vm::*;
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-
+use crate::scheduler::gc_works::*;
+#[cfg(feature = "sanity")]
+use crate::util::sanity::sanity_checker::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use enum_map::EnumMap;
 
@@ -103,7 +104,23 @@ pub trait Plan: Sized + 'static + Sync + Send {
     ) -> Self;
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
-    fn schedule_sanity_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>) {}
+    #[cfg(feature = "sanity")]
+    fn schedule_sanity_collection(&'static self, scheduler: &MMTkScheduler<Self::VM>) {
+        self.base().inside_sanity.store(true, Ordering::SeqCst);
+        // Stop & scan mutators (mutator scanning can happen before STW)
+        for mutator in <Self::VM as VMBinding>::VMActivePlan::mutators() {
+            scheduler
+                .prepare_stage
+                .add(ScanStackRoot::<SanityGCProcessEdges<Self::VM>>(mutator));
+        }
+        scheduler
+            .prepare_stage
+            .add(ScanVMSpecificRoots::<SanityGCProcessEdges<Self::VM>>::new());
+        // Prepare global/collectors/mutators
+        scheduler.prepare_stage.add(SanityPrepare::new(self));
+        // Release global/collectors/mutators
+        scheduler.release_stage.add(SanityRelease::new(self));
+    }
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
