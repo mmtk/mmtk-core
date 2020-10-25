@@ -1,5 +1,3 @@
-#[cfg(feature = "sanity")]
-use super::gc_works::SanityGCProcessEdges;
 use super::gc_works::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
 use super::mutator::create_gencopy_mutator;
 use super::mutator::ALLOCATOR_MAPPING;
@@ -41,7 +39,6 @@ pub struct GenCopy<VM: VMBinding> {
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
     in_nursery: AtomicBool,
-    in_sanity: AtomicBool,
     pub scheduler: &'static MMTkScheduler<VM>,
 }
 
@@ -100,7 +97,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             ),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
             in_nursery: AtomicBool::default(),
-            in_sanity: AtomicBool::default(),
             scheduler,
         }
     }
@@ -120,7 +116,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         let in_nursery = !self.request_full_heap_collection();
         self.in_nursery.store(in_nursery, Ordering::SeqCst);
-        self.in_sanity.store(false, Ordering::SeqCst);
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
 
@@ -144,26 +139,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
-    #[cfg(feature = "sanity")]
-    fn schedule_sanity_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
-        println!("sanity gc");
-        self.in_sanity.store(true, Ordering::SeqCst);
-
-        // Stop & scan mutators (mutator scanning can happen before STW)
-        for mutator in <VM as VMBinding>::VMActivePlan::mutators() {
-            scheduler
-                .prepare_stage
-                .add(ScanStackRoot::<SanityGCProcessEdges<VM>>(mutator));
-        }
-        scheduler
-            .prepare_stage
-            .add(ScanVMSpecificRoots::<SanityGCProcessEdges<VM>>::new());
-        // Prepare global/collectors/mutators
-        scheduler.prepare_stage.add(Prepare::new(self));
-        // Release global/collectors/mutators
-        scheduler.release_stage.add(Release::new(self));
-    }
-
     fn bind_mutator(
         &'static self,
         tls: OpaquePointer,
@@ -177,39 +152,22 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn prepare(&self, tls: OpaquePointer) {
-        // self.fromspace().unprotect();
-        if !self.in_sanity() {
-            self.common.prepare(tls, true);
-            self.nursery.prepare(true);
-            if !self.in_nursery() {
-                self.hi
-                    .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
-            }
-            let hi = self.hi.load(Ordering::SeqCst);
-            self.copyspace0.prepare(hi);
-            self.copyspace1.prepare(!hi);
-        } else {
-            self.common.prepare(tls, true);
-            self.nursery.sanity_prepare();
-            self.copyspace0.sanity_prepare();
-            self.copyspace1.sanity_prepare();
+        self.common.prepare(tls, true);
+        self.nursery.prepare(true);
+        if !self.in_nursery() {
+            self.hi
+                .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
         }
+        let hi = self.hi.load(Ordering::SeqCst);
+        self.copyspace0.prepare(hi);
+        self.copyspace1.prepare(!hi);
     }
 
     fn release(&self, tls: OpaquePointer) {
-        if !self.in_sanity() {
-            self.common.release(tls, true);
-            self.nursery.release();
-            if !self.in_nursery() {
-                self.fromspace().release();
-            }
-        } else {
-            self.common.release(tls, true);
-            self.nursery.sanity_release();
-            if !self.in_nursery() {
-                self.fromspace().sanity_release();
-            }
-            // self.copyspace1.sanity_release();
+        self.common.release(tls, true);
+        self.nursery.release();
+        if !self.in_nursery() {
+            self.fromspace().release();
         }
     }
 
@@ -255,9 +213,5 @@ impl<VM: VMBinding> GenCopy<VM> {
         } else {
             &self.copyspace1
         }
-    }
-
-    pub fn in_sanity(&self) -> bool {
-        self.in_sanity.load(Ordering::SeqCst)
     }
 }
