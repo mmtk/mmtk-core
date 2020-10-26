@@ -1,5 +1,7 @@
 set -xe
 
+. $(dirname "$0")/ci-common.sh
+
 # Execute this script under the root folder of this repo. Otherwise it will fail.
 
 # Build plans
@@ -17,7 +19,9 @@ cargo build --features nogc,sanity
 cargo build --features semispace,sanity
 
 # Build different implementations of heap layout
-cargo build --target i686-unknown-linux-gnu --features nogc
-cargo build --target i686-unknown-linux-gnu --features nogc,force_32bit_heap_layout
-cargo build --target x86_64-unknown-linux-gnu --features nogc
-cargo build --target x86_64-unknown-linux-gnu --features nogc,force_32bit_heap_layout
+cargo build --features nogc,force_32bit_heap_layout
+# For x86_64-linux, also see if we can build for i686
+if [[ $arch == "x86_64" && $os == "linux" ]]; then
+    cargo build --target i686-unknown-linux-gnu --features nogc
+    cargo build --target i686-unknown-linux-gnu --features nogc,force_32bit_heap_layout
+fi

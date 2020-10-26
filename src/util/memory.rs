@@ -10,17 +10,18 @@ pub fn zero(start: Address, len: usize) {
 
 /// Demand-zero mmap:
 /// This function guarantees to zero all mapped memory.
-///
-/// On linux, this is achieved by using the `MAP_ANON` mmap flag.
-///
-/// ***TODO: Unimplemented for other OSes***
-#[cfg(target_os = "linux")]
 pub fn dzmmap(start: Address, size: usize) -> Result<Address> {
     let prot = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
     let result: *mut c_void = unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) };
-    if Address::from_mut_ptr(result) == start {
-        Ok(Address::from_mut_ptr(result))
+    let addr = Address::from_mut_ptr(result);
+    if addr == start {
+        // On linux, we don't need to zero the memory. This is achieved by using the `MAP_ANON` mmap flag.
+        #[cfg(not(target_os = "linux"))]
+        {
+            zero(addr, size);
+        }
+        Ok(addr)
     } else {
         assert!(result as usize <= 127,
                 "mmap with MAP_FIXED has unexpected behavior: demand zero mmap with MAP_FIXED on {:?} returned some other address {:?}",

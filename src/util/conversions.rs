@@ -91,9 +91,9 @@ mod tests {
 
     #[test]
     fn test_page_align() {
-        let addr = unsafe { Address::from_usize(0x0001_2345_6789) };
+        let addr = unsafe { Address::from_usize(0x2345_6789) };
         assert_eq!(page_align_down(addr), unsafe {
-            Address::from_usize(0x0001_2345_6000)
+            Address::from_usize(0x2345_6000)
         });
         assert!(!is_page_aligned(addr));
         assert!(is_page_aligned(page_align_down(addr)));
@@ -101,12 +101,12 @@ mod tests {
 
     #[test]
     fn test_chunk_align() {
-        let addr = unsafe { Address::from_usize(0x0001_2345_6789) };
+        let addr = unsafe { Address::from_usize(0x2345_6789) };
         assert_eq!(chunk_align_down(addr), unsafe {
-            Address::from_usize(0x1_2340_0000)
+            Address::from_usize(0x2340_0000)
         });
         assert_eq!(chunk_align_up(addr), unsafe {
-            Address::from_usize(0x1_2380_0000)
+            Address::from_usize(0x2380_0000)
         });
     }
 }
