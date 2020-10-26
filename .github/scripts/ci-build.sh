@@ -19,7 +19,6 @@ cargo build --features nogc,sanity
 cargo build --features semispace,sanity
 
 # Build different implementations of heap layout
-cargo build --features nogc
 cargo build --features nogc,force_32bit_heap_layout
 # For x86_64-linux, also see if we can build for i686
 if [[ $arch == "x86_64" && $os == "linux" ]]; then
