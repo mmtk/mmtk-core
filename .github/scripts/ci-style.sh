@@ -1,30 +1,33 @@
 set -xe
 
-export RUSTFLAGS="-D warnings"
-targets=("x86_64-unknown-linux-gnu" "i686-unknown-linux-gnu" "x86_64-apple-darwin")
+. $(dirname "$0")/ci-common.sh
 
-for t in "${targets[@]}"
-do
+export RUSTFLAGS="-D warnings"
+
 # check plan
-cargo clippy --target $t --features nogc
-cargo clippy --target $t --features nogc_lock_free
-cargo clippy --target $t --features nogc_no_zeroing
-cargo clippy --target $t --features semispace
+cargo clippy --features nogc
+cargo clippy --features nogc_lock_free
+cargo clippy --features nogc_no_zeroing
+cargo clippy --features semispace
 # check features
-cargo clippy --target $t --features nogc,sanity
-cargo clippy --target $t --features semispace,sanity
-cargo clippy --target $t --features nogc,vm_space,code_space,ro_space
-cargo clippy --target $t --features nogc,lockfreeimmortalspace
-cargo clippy --target $t --features semispace,vm_space,code_space,ro_space
+cargo clippy --features nogc,sanity
+cargo clippy --features semispace,sanity
+cargo clippy --features nogc,vm_space,code_space,ro_space
+cargo clippy --features nogc,lockfreeimmortalspace
+cargo clippy --features semispace,vm_space,code_space,ro_space
 # check for tests
-cargo clippy --target $t --tests --features nogc
+cargo clippy --tests --features nogc
 # check for dummyvm
-cargo clippy --target $t --manifest-path=vmbindings/dummyvm/Cargo.toml --features nogc
-cargo clippy --target $t --manifest-path=vmbindings/dummyvm/Cargo.toml --features semispace
+cargo clippy --manifest-path=vmbindings/dummyvm/Cargo.toml --features nogc
+cargo clippy --manifest-path=vmbindings/dummyvm/Cargo.toml --features semispace
 # check for different implementations of heap layout
-cargo clippy --target $t --features nogc
-cargo clippy --target $t --features nogc,force_32bit_heap_layout
-done
+cargo clippy --features nogc
+cargo clippy --features nogc,force_32bit_heap_layout
+# For x86_64-linux, also check for i686
+if [[ $arch == "x86_64" && $os == "linux" ]]; then
+    cargo clippy --target x86_64-unknown-linux-gnu --features nogc
+    cargo clippy --target x86_64-unknown-linux-gnu --features nogc,force_32bit_heap_layout
+fi 
 
 # check format
 cargo fmt -- --check
