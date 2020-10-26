@@ -19,8 +19,11 @@ cargo build --features semispace,sanity
 # Build different implementations of heap layout
 cargo build --features nogc
 cargo build --features nogc,force_32bit_heap_layout
-# For linux, also see if we can build for i686 (assuming we are using x86_64)
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+
+arch=`rustc --print cfg | grep target_arch | cut -f2 -d"\""`
+os=`rustc --print cfg | grep target_os | cut -f2 -d"\""`
+# For x86_64-linux, also see if we can build for i686
+if [[ $arch == "x86_64" && $os == "linux" ]]; then
     cargo build --target i686-unknown-linux-gnu --features nogc
     cargo build --target i686-unknown-linux-gnu --features nogc,force_32bit_heap_layout
 fi
