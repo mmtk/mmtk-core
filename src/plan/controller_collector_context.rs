@@ -68,6 +68,7 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
 
             let scheduler = self.scheduler.read().unwrap();
             let scheduler = scheduler.as_ref().unwrap();
+            scheduler.initialize_worker(tls);
             scheduler.set_initializer(Some(ScheduleCollection));
             scheduler.wait_for_completion();
             debug!("[STWController: Worker threads complete!]");

@@ -183,20 +183,10 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
                 if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
                     mmtk.scheduler.prepare_stage.add(ScanStackRoots::<E>::new());
                 } else {
-                    #[cfg(debug_assertions)]
-                    let mut i = 0;
                     for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                        #[cfg(debug_assertions)]
-                        {
-                            i += 1;
-                        }
                         mmtk.scheduler
                             .prepare_stage
                             .add(ScanStackRoot::<E>(mutator));
-                    }
-                    #[cfg(debug_assertions)]
-                    {
-                        assert_eq!(<E::VM as VMBinding>::VMActivePlan::number_of_mutators(), i);
                     }
                 }
             }

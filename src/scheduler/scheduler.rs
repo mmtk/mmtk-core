@@ -103,6 +103,12 @@ impl<C: Context> Scheduler<C> {
         });
     }
 
+    pub fn initialize_worker(self: &Arc<Self>, tls: OpaquePointer) {
+        let mut self_mut = self.clone();
+        let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
+        self_mut.coordinator_worker.as_mut().unwrap().init(tls);
+    }
+
     pub fn set_initializer<W: CoordinatorWork<C>>(&self, w: Option<W>) {
         *self.startup.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<C>>);
     }
