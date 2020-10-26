@@ -17,7 +17,10 @@ cargo build --features nogc,sanity
 cargo build --features semispace,sanity
 
 # Build different implementations of heap layout
-cargo build --target i686-unknown-linux-gnu --features nogc
-cargo build --target i686-unknown-linux-gnu --features nogc,force_32bit_heap_layout
-cargo build --target x86_64-unknown-linux-gnu --features nogc
-cargo build --target x86_64-unknown-linux-gnu --features nogc,force_32bit_heap_layout
+cargo build --features nogc
+cargo build --features nogc,force_32bit_heap_layout
+# For linux, also see if we can build for i686 (assuming we are using x86_64)
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    cargo build --target i686-unknown-linux-gnu --features nogc
+    cargo build --target i686-unknown-linux-gnu --features nogc,force_32bit_heap_layout
+fi

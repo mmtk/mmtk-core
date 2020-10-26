@@ -1,26 +1,30 @@
 set -xe
 
 export RUSTFLAGS="-D warnings"
+targets=("x86_64-unknown-linux-gnu" "i686-unknown-linux-gnu" "x86_64-apple-darwin")
+
+for t in "${targets[@]}"
+do
 # check plan
-cargo clippy --features nogc
-cargo clippy --features nogc_lock_free
-cargo clippy --features nogc_no_zeroing
-cargo clippy --features semispace
+cargo clippy --target $t --features nogc
+cargo clippy --target $t --features nogc_lock_free
+cargo clippy --target $t --features nogc_no_zeroing
+cargo clippy --target $t --features semispace
 # check features
-cargo clippy --features nogc,sanity
-cargo clippy --features semispace,sanity
-cargo clippy --features nogc,vm_space,code_space,ro_space
-cargo clippy --features nogc,lockfreeimmortalspace
-cargo clippy --features semispace,vm_space,code_space,ro_space
+cargo clippy --target $t --features nogc,sanity
+cargo clippy --target $t --features semispace,sanity
+cargo clippy --target $t --features nogc,vm_space,code_space,ro_space
+cargo clippy --target $t --features nogc,lockfreeimmortalspace
+cargo clippy --target $t --features semispace,vm_space,code_space,ro_space
 # check for tests
-cargo clippy --tests --features nogc
+cargo clippy --target $t --tests --features nogc
 # check for dummyvm
-cargo clippy --manifest-path=vmbindings/dummyvm/Cargo.toml --features nogc
-cargo clippy --manifest-path=vmbindings/dummyvm/Cargo.toml --features semispace
+cargo clippy --target $t --manifest-path=vmbindings/dummyvm/Cargo.toml --features nogc
+cargo clippy --target $t --manifest-path=vmbindings/dummyvm/Cargo.toml --features semispace
 # check for different implementations of heap layout
-cargo clippy --target i686-unknown-linux-gnu --features nogc
-cargo clippy --target i686-unknown-linux-gnu --features nogc,force_32bit_heap_layout
-cargo clippy --target x86_64-unknown-linux-gnu --features nogc
-cargo clippy --target x86_64-unknown-linux-gnu --features nogc,force_32bit_heap_layout
+cargo clippy --target $t --features nogc
+cargo clippy --target $t --features nogc,force_32bit_heap_layout
+done
+
 # check format
 cargo fmt -- --check
