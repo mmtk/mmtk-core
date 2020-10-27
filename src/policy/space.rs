@@ -95,10 +95,12 @@ pub struct SFTMap {
     sft: Vec<*const (dyn SFT + Sync)>,
 }
 
+static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
+
 impl SFTMap {
     pub fn new() -> Self {
         SFTMap {
-            sft: vec![&EmptySpaceSFT {}; MAX_CHUNKS],
+            sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
         }
     }
     // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
@@ -122,7 +124,7 @@ impl SFTMap {
     }
 
     pub fn clear(&self, chunk_idx: usize) {
-        self.set(chunk_idx, &EmptySpaceSFT {});
+        self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
 
     fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
