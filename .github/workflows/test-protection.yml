@@ -1,0 +1,15 @@
+name: Test workflow protection
+
+on:
+  pull_request
+
+jobs:
+  test-github-hosted-runner:
+    runs-on: ubuntu-18.04
+    steps:
+      - run: echo "Hello Github-hosted Runner!"
+  
+  test-self-hosted-runner:
+    runs-on: [self-hosted, linux, freq-scaling-on]
+    steps:
+      - run: echo "Hello Self-hosted Runner!"
