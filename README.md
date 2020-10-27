@@ -1,44 +1,84 @@
 # MMTk
 
 MMTk is a framework for the design and implementation of memory managers.
-This repo hosts the Rust port of MMTk.
+This repository hosts the Rust port of MMTk.
+
+## Contents
+
+* [Requirements](#requirements)
+* [Build](#build)
+* [Usage](#Usage)
+* [Tests](#tests)
+* [Bindings](#Bindings)
+
+## Requirements
+
+We maintain an up to date list of the prerequisite for building MMTk and its bindings in the [mmtk-docker](https://github.com/mmtk/mmtk-docker) repository.
 
 ## Build
+
+Buidling MMTk needs a nightly Rust toolchain.
+As the Rust language and its libraries (crates) are frequently evolving, we recommand using the nightly toolchain specified in the [mmtk-docker](https://github.com/mmtk/mmtk-docker).
+
 ```bash
-cargo +nightly build --no-default-features --features <space seperated features>
+# replace nightly-YYYY-MM-DD with the correct toolchain version
+Export RUSTUP_TOOLCHAIN=nightly-YYYY-MM-DD
+
+cargo build --features <space seperated features>
 ```
 
 The available features can be seen by examining `Cargo.toml`.
-Currently, there are two different VMs to choose from (JikesRVM and OpenJDK),
-and there are three different plans to choose from (NoGC, SemiSpace and G1).
 By passing the `--features` flag to the Rust compiler,
 we conditionally compile VM or plan specific code.
 You can optionally enable sanity checks by add `sanity` to the set of features
 you want to use.
 
+Currently, there are two different plans to choose from:
+
+* `--features nogc` for NoGC, and 
+* `--features semispace` for SemiSpace.
+
 You can pass the `--release` flag to the `cargo build` command to use the
 optimizing compiler of Rust for better performance.
 
-Cross compilation can be done by using the `--target` flag.
-
 The artefact produced produced by the build process can be found under
-`target/debug` (or `target/release` for release build).
+`target/debug` (or `target/release` for the release build).
 
 ## Usage
+
 The API exposed by MMTk can be found under `api/mmtk.h`.
 A client of the memory manager can use MMTk like a C library in the standard way.
 A simple example client that uses MMTk for just allocation can be found under
 `examples/main.c`.
 
 ## Tests
-The Rust unit tests can be found under `tests`.
-Currently,
-the CI will run all the Rust unit tests.
-The CI will also build both the 32-bit and 64-bit versions of MMTk for each plan
-to test the `alloc` function.
 
-## VM specific notes
-### JikesRVM
-Please DO NOT build MMTk manually,
-as machine generated code is involved during the build process (e.g. `src/vm/jikesrvm/entrypoint.rs` and `src/vm/jikesrvm/inc.asm`).
-Instead, please invoke the `buildit` script from JikesRVM.
+The unit tests of MMTk are written in Rust, in the same location as the unit they are testing.
+Each test is marked by `#[test]` as required by Rust.
+
+The following commands may be used to run unit tests for a specific set of features:
+
+```bash
+# replace nightly-YYYY-MM-DD with the correct toolchain version
+Export RUSTUP_TOOLCHAIN=nightly-YYYY-MM-DD
+
+cargo test --features <space seperated features>
+```
+
+For instance, the unit tests for the NoGC plan may be run as:
+
+```bash
+cargo build --features nogc
+```
+
+Currently, the CI runs all the MMTk unit tests.
+
+## Bindings
+
+We are maintaining three VM bindings available for MMTk. These bindings are accessible in the following repositories:
+
+* [OpenJDK](https://github.com/mmtk/mmtk-openjdk),
+* [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm),
+* [V8](https://github.com/mmtk/mmtk-v8).
+
+For more information on these bindings, please visit their repositories.
