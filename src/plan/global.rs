@@ -33,6 +33,7 @@ pub trait CopyContext: Sized + 'static + Sync + Send {
     type VM: VMBinding;
     const MAX_NON_LOS_COPY_BYTES: usize = MAX_INT;
     fn new(mmtk: &'static MMTK<Self::VM>) -> Self;
+    fn init(&mut self, tls: OpaquePointer);
     fn prepare(&mut self);
     fn release(&mut self);
     fn alloc_copy(
@@ -78,6 +79,7 @@ impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     fn new(_mmtk: &'static MMTK<Self::VM>) -> Self {
         Self(PhantomData)
     }
+    fn init(&mut self, _tls: OpaquePointer) {}
     fn prepare(&mut self) {}
     fn release(&mut self) {}
     fn alloc_copy(

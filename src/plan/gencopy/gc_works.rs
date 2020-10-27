@@ -24,6 +24,9 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
             ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
         }
     }
+    fn init(&mut self, tls: OpaquePointer) {
+        self.ss.tls = tls;
+    }
     fn prepare(&mut self) {
         self.ss.rebind(Some(self.plan.tospace()));
     }

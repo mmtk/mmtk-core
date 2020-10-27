@@ -78,6 +78,8 @@ impl<C: Context> Worker<C> {
     pub fn run(&'static mut self, context: &'static C) {
         self.context = Some(context);
         self.local = Some(C::WorkerLocal::new(context));
+        let tls = self.tls;
+        self.local().init(tls);
         self.parked.store(false, Ordering::SeqCst);
         loop {
             let mut work = self.scheduler().poll(self);

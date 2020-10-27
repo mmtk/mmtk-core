@@ -23,6 +23,9 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
             ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
         }
     }
+    fn init(&mut self, tls: OpaquePointer) {
+        self.ss.tls = tls;
+    }
     fn prepare(&mut self) {
         self.ss.rebind(Some(self.plan.tospace()));
     }
@@ -71,16 +74,23 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
-        let from_space = self.plan().fromspace();
-        if from_space.in_space(object) {
-            return from_space.trace_object(
+        if self.plan().tospace().in_space(object) {
+            return self.plan().tospace().trace_object(
                 self,
                 object,
                 super::global::ALLOC_SS,
                 self.worker().local(),
             );
         }
-        object
+        if self.plan().fromspace().in_space(object) {
+            return self.plan().fromspace().trace_object(
+                self,
+                object,
+                super::global::ALLOC_SS,
+                self.worker().local(),
+            );
+        }
+        self.plan().common.trace_object(self, object)
     }
 }
 

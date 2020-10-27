@@ -241,9 +241,10 @@ pub struct ScanStackRoot<Edges: ProcessEdgesWork>(
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
-        <E::VM as VMBinding>::VMScanning::scan_thread_root::<E>(unsafe {
-            &mut *(self.0 as *mut _)
-        });
+        <E::VM as VMBinding>::VMScanning::scan_thread_root::<E>(
+            unsafe { &mut *(self.0 as *mut _) },
+            worker.tls,
+        );
         self.0.flush();
         let old = SCANNED_STACKS.fetch_add(1, Ordering::SeqCst);
         if old + 1 == <E::VM as VMBinding>::VMActivePlan::number_of_mutators() {

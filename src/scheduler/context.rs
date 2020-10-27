@@ -20,6 +20,7 @@ impl Context for () {
 
 pub trait WorkerLocal<C: Context> {
     fn new(context: &'static C) -> Self;
+    fn init(&mut self, _tls: OpaquePointer) {}
 }
 
 impl<C: Context> WorkerLocal<C> for () {
@@ -38,5 +39,8 @@ impl<VM: VMBinding> Context for MMTK<VM> {
 impl<VM: VMBinding> WorkerLocal<MMTK<VM>> for <SelectedPlan<VM> as Plan>::CopyContext {
     fn new(mmtk: &'static MMTK<VM>) -> Self {
         <<SelectedPlan<VM> as Plan>::CopyContext as CopyContext>::new(mmtk)
+    }
+    fn init(&mut self, tls: OpaquePointer) {
+        CopyContext::init(self, tls);
     }
 }

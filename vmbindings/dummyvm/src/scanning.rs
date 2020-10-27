@@ -16,7 +16,7 @@ impl Scanning<DummyVM> for VMScanning {
     fn scan_thread_roots<W: ProcessEdgesWork<VM=DummyVM>>() {
         unimplemented!()
     }
-    fn scan_thread_root<W: ProcessEdgesWork<VM=DummyVM>>(_mutator: &'static mut Mutator<SelectedPlan<DummyVM>>) {
+    fn scan_thread_root<W: ProcessEdgesWork<VM=DummyVM>>(_mutator: &'static mut Mutator<SelectedPlan<DummyVM>>, _tls: OpaquePointer) {
         unimplemented!()
     }
     fn scan_vm_specific_roots<W: ProcessEdgesWork<VM=DummyVM>>() {

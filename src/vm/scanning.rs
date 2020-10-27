@@ -27,6 +27,7 @@ pub trait Scanning<VM: VMBinding> {
     /// Scan one mutator for roots
     fn scan_thread_root<W: ProcessEdgesWork<VM = VM>>(
         mutator: &'static mut Mutator<SelectedPlan<VM>>,
+        tls: OpaquePointer,
     );
     // TODO: compute_new_thread_roots
     /// The creation of all root scan tasks (except thread scanning) goes here
