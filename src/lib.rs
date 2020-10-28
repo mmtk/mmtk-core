@@ -13,17 +13,17 @@
 //! and highly reusable designs. It includes components such as allocators, spaces and
 //! work packets that GC implementers can choose from to compose their own GC plan easily.
 //!
-//! Logically this crate includes these major parts:
-//! * GC components
+//! Logically, this crate includes these major parts:
+//! * GC components:
 //!   * [Allocators](util/alloc/allocator/trait.Allocator.html): handlers of allocation requests which allocate objects to the bound space.
 //!   * [Spaces](policy/space/trait.Space.html): memory regions in the heap with defined semantics and behaviors.
-//!   * [Work packets](scheduler/work/trait.GCWork.html): the unit of GC works scheduled by the MMTk's scheduler.
+//!   * [Work packets](scheduler/work/trait.GCWork.html): units of GC works scheduled by the MMTk's scheduler.
 //! * [GC plans](plan/global/trait.Plan.html): GC algorithms composed from components.
-//!   *Note that currently the choice of plans is through Rust features, which is a build-time config, so only one plan is present in the generated binary
+//!   *Note that currently the choice of plans is made through Rust features, which is a build-time config, so only one plan is present in the generated binary
 //!   and in this documentation. We plan to make this a run-time config so that users can choose GC plans at boot time.*
-//! * [Heap implementations](util/heap/index.html): the underlying implementation of memory resources that support spaces.
+//! * [Heap implementations](util/heap/index.html): the underlying implementations of memory resources that support spaces.
 //! * [Scheduler](scheduler/scheduler/struct.Scheduler.html): the MMTk scheduler to allow flexible and parallel execution of GC works.
-//! * Interfaces: a bi-direcitonal interface between MMTk and a language implementation,
+//! * Interfaces: bi-directional interfaces between MMTk and language implementations
 //!   i.e. [the memory manager API](memory_manager/index.html) that allows a language's memory manager to use MMTk
 //!   and [the VMBinding trait](vm/trait.VMBinding.html) that allows MMTk to call the language implementation.
 
