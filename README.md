@@ -19,11 +19,11 @@ We maintain an up to date list of the prerequisite for building MMTk and its bin
 Building MMTk needs a nightly Rust toolchain.
 As the Rust language and its libraries (crates) are frequently evolving, we recommend using the nightly toolchain specified in the [mmtk-dev](https://github.com/mmtk/mmtk-dev).
 
-```bash
-# replace nightly-YYYY-MM-DD with the correct toolchain version
-Export RUSTUP_TOOLCHAIN=nightly-YYYY-MM-DD
+```console
+$ # replace nightly-YYYY-MM-DD with the correct toolchain version
+$ Export RUSTUP_TOOLCHAIN=nightly-YYYY-MM-DD
 
-cargo build --features <space separated features>
+$ cargo build --features <space separated features>
 ```
 
 It is compulsory to specify one of the available GC plans as a feature at build time. Currently, there are two different plans to choose from:
@@ -77,8 +77,8 @@ We use both unit tests and VM binding tests to test MMTk in our CI.
 
 MMTk uses Rust's testing framework for unit tests. For example, you can use the following to run unit tests for the `nogc` plan.
 
-```bash
-cargo test --features nogc
+```console
+$ cargo test --features nogc
 ```
 
 A full list of all the unit tests we run in our CI can be found [here](.github/scripts/ci-test.sh).
