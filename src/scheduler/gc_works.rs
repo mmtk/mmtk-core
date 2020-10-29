@@ -108,6 +108,8 @@ impl<P: Plan> GCWork<P::VM> for Release<P> {
         for w in &worker.group().unwrap().workers {
             w.local_works.add(ReleaseCollector::default());
         }
+        // TODO: Process weak references properly
+        mmtk.reference_processors.clear();
     }
 }
 
