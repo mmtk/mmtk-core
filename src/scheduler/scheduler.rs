@@ -66,6 +66,11 @@ impl<C: Context> Scheduler<C> {
         })
     }
 
+    #[inline]
+    pub fn num_workers(&self) -> usize {
+        self.worker_group.as_ref().unwrap().worker_count()
+    }
+
     pub fn initialize(
         self: &'static Arc<Self>,
         num_workers: usize,
