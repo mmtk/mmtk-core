@@ -3,20 +3,39 @@ use super::*;
 use spin::RwLock;
 use std::cmp;
 use std::collections::BinaryHeap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+
+/// A unique work-packet id for each instance of work-packet
+#[derive(Eq, PartialEq, Clone, Copy)]
+struct WorkUID(u64);
+
+impl WorkUID {
+    pub fn new() -> Self {
+        static WORK_UID: AtomicU64 = AtomicU64::new(0);
+        Self(WORK_UID.fetch_add(1, Ordering::Relaxed))
+    }
+}
 
 struct PrioritizedWork<C: Context> {
     priority: usize,
+    work_uid: WorkUID,
     work: Box<dyn Work<C>>,
 }
 
+impl<C: Context> PrioritizedWork<C> {
+    pub fn new(priority: usize, work: Box<dyn Work<C>>) -> Self {
+        Self {
+            priority,
+            work,
+            work_uid: WorkUID::new(),
+        }
+    }
+}
+
 impl<C: Context> PartialEq for PrioritizedWork<C> {
-    #[allow(clippy::vtable_address_comparisons)]
     fn eq(&self, other: &Self) -> bool {
-        // FIXME: incorrect dyn pointer comparison
-        self.priority == other.priority
-            && self.work.as_ref() as *const _ == other.work.as_ref() as *const _
+        self.priority == other.priority && self.work_uid == other.work_uid
     }
 }
 
@@ -86,10 +105,9 @@ impl<C: Context> WorkBucket<C> {
     }
     /// Add a work packet to this bucket, with a given priority
     pub fn add_with_priority<W: Work<C>>(&self, priority: usize, work: W) {
-        self.queue.write().push(PrioritizedWork {
-            priority,
-            work: box work,
-        });
+        self.queue
+            .write()
+            .push(PrioritizedWork::new(priority, box work));
         self.notify_one_worker(); // FIXME: Performance
     }
     /// Add a work packet to this bucket, with a default priority (1000)
@@ -100,7 +118,7 @@ impl<C: Context> WorkBucket<C> {
         {
             let mut queue = self.queue.write();
             for w in works {
-                queue.push(PrioritizedWork { priority, work: w });
+                queue.push(PrioritizedWork::new(priority, w));
             }
         }
         self.notify_all_workers(); // FIXME: Performance

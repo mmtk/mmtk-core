@@ -16,17 +16,6 @@ pub trait Work<C: Context>: 'static + Send + Sync {
     }
 }
 
-impl<VM: VMBinding> PartialEq for Box<dyn Work<VM>> {
-    /// Address comparison. Two different work instances cannot have the same address
-    /// FIXME: Incorrect!
-    #[allow(clippy::vtable_address_comparisons)]
-    fn eq(&self, other: &Self) -> bool {
-        self.as_ref() as *const dyn Work<VM> == other.as_ref() as *const dyn Work<VM>
-    }
-}
-
-impl<VM: VMBinding> Eq for Box<dyn Work<VM>> {}
-
 /// A special kind of work that will execute on the coorddinator (i.e. controller) thread
 ///
 /// The coorddinator thread holds the global monitor lock when executing `CoordinatorWork`s.
