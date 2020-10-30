@@ -8,6 +8,7 @@ on:
 jobs:
   pre-code-review-checks:
     runs-on: ubuntu-18.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v2
       - name: Install latest nightly
