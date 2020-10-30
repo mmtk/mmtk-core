@@ -345,6 +345,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub inside_sanity: AtomicBool,
     // A counter for per-mutator stack scanning
     pub scanned_stacks: AtomicUsize,
+    pub mutator_iterator_lock: Mutex<()>,
 }
 
 #[cfg(feature = "base_spaces")]
@@ -432,6 +433,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
             scanned_stacks: AtomicUsize::new(0),
+            mutator_iterator_lock: Mutex::new(()),
         }
     }
 
