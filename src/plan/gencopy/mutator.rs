@@ -38,6 +38,7 @@ pub fn gencopy_mutator_release<VM: VMBinding>(
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::BumpPointer(0),
+        // TODO: JikesRVM support
         AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
         AllocationType::Los => AllocatorSelector::LargeObject(0),
     };
