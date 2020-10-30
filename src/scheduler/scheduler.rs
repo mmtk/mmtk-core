@@ -10,7 +10,7 @@ use crate::vm::VMBinding;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, RwLock};
 
 pub enum CoordinatorMessage<C: Context> {
     Work(Box<dyn CoordinatorWork<C>>),
@@ -33,7 +33,7 @@ pub struct Scheduler<C: Context> {
     /// Condition Variable for worker synchronization
     pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
     context: Option<&'static C>,
-    coordinator_worker: Option<Worker<C>>,
+    coordinator_worker: Option<RwLock<Worker<C>>>,
     /// A message channel to send new coordinator works and other actions to the coordinator thread
     pub channel: (
         Sender<CoordinatorMessage<C>>,
@@ -81,7 +81,7 @@ impl<C: Context> Scheduler<C> {
         let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
 
         self_mut.context = Some(context);
-        self_mut.coordinator_worker = Some(Worker::new(0, Arc::downgrade(&self), true));
+        self_mut.coordinator_worker = Some(RwLock::new(Worker::new(0, Arc::downgrade(&self), true)));
         self_mut.worker_group = Some(WorkerGroup::new(num_workers, Arc::downgrade(&self)));
         self.worker_group
             .as_ref()
@@ -109,9 +109,8 @@ impl<C: Context> Scheduler<C> {
     }
 
     pub fn initialize_worker(self: &Arc<Self>, tls: OpaquePointer) {
-        let mut self_mut = self.clone();
-        let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
-        self_mut.coordinator_worker.as_mut().unwrap().init(tls);
+        let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
+        coordinator_worker.init(tls);
     }
 
     pub fn set_initializer<W: CoordinatorWork<C>>(&self, w: Option<W>) {
@@ -150,10 +149,9 @@ impl<C: Context> Scheduler<C> {
 
     /// Execute coordinator works, in the controller thread
     fn process_coordinator_work(&self, mut work: Box<dyn CoordinatorWork<C>>) {
-        let worker_ptr = self.coordinator_worker.as_ref().unwrap() as *const _ as *mut Worker<C>;
+        let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
         let context = self.context.unwrap();
-        let worker = unsafe { &mut *worker_ptr };
-        work.do_work_with_stat(worker, context);
+        work.do_work_with_stat(&mut coordinator_worker, context);
     }
 
     /// Drain the message queue and execute coordinator works
@@ -292,7 +290,8 @@ impl<C: Context> Scheduler<C> {
         for worker in &self.worker_group().workers {
             worker.stat.enable();
         }
-        self.coordinator_worker.as_ref().unwrap().stat.enable();
+        let coordinator_worker = self.coordinator_worker.as_ref().unwrap().read().unwrap();
+        coordinator_worker.stat.enable();
     }
 
     pub fn statistics(&self) -> HashMap<String, String> {
@@ -300,7 +299,8 @@ impl<C: Context> Scheduler<C> {
         for worker in &self.worker_group().workers {
             summary.merge(&worker.stat);
         }
-        summary.merge(&self.coordinator_worker.as_ref().unwrap().stat);
+        let coordinator_worker = self.coordinator_worker.as_ref().unwrap().read().unwrap();
+        summary.merge(&coordinator_worker.stat);
         summary.harness_stat()
     }
 }
