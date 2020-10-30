@@ -11,6 +11,8 @@ pub struct SchedulerStat {
 }
 
 impl SchedulerStat {
+    /// Extract the work-packet name from the full type name.
+    /// i.e. simplifies `crate::scheduler::gc_works::SomeWorkPacket<Semispace>` to `SomeWorkPacket`.
     fn work_name(&self, name: &str) -> String {
         let end_index = name.find('<').unwrap_or_else(|| name.len());
         let name = name[..end_index].to_owned();

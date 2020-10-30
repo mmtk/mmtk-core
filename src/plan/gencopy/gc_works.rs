@@ -95,9 +95,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
         debug_assert!(!self.plan().nursery.in_space(new_object));
-        if Self::OVERWRITE_REFERENCE {
-            unsafe { slot.store(new_object) };
-        }
+        unsafe { slot.store(new_object) };
     }
 }
 

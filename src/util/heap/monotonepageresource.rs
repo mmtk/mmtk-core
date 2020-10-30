@@ -18,7 +18,6 @@ use super::PageResource;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::vm::VMBinding;
 use libc::{c_void, memset};
-use std::sync::atomic::Ordering;
 
 pub struct MonotonePageResource<VM: VMBinding> {
     common: CommonPageResource<VM>,
@@ -57,7 +56,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
     }
 
     fn reserve_pages(&self, pages: usize) -> usize {
-        self.common().reserved.fetch_add(pages, Ordering::Relaxed);
+        self.common().reserve(pages);
         pages
     }
 

@@ -1,8 +1,10 @@
 use super::*;
 use crate::util::OpaquePointer;
-use crate::vm::{Collection, VMBinding};
-use crate::{CopyContext, Plan, SelectedPlan, MMTK};
 
+/// The global context for the whole scheduling system.
+/// This context is globally accessable for all work-packets, workers and the scheduler.
+///
+/// For mmtk, the global context is `MMTK<VM>`.
 pub trait Context: 'static + Send + Sync + Sized {
     type WorkerLocal: WorkerLocal<Self>;
     fn spawn_worker(worker: &'static Worker<Self>, _tls: OpaquePointer, context: &'static Self) {
@@ -14,33 +16,20 @@ pub trait Context: 'static + Send + Sync + Sized {
     }
 }
 
+/// A default implementation for scheduling systems that does not require a global context.
 impl Context for () {
     type WorkerLocal = ();
 }
 
+/// Thread-local data for each worker thread.
+///
+/// For mmtk, each gc can define their own worker-local data, to contain their required copy allocators and other stuffs.
 pub trait WorkerLocal<C: Context> {
     fn new(context: &'static C) -> Self;
     fn init(&mut self, _tls: OpaquePointer) {}
 }
 
+/// A default implementation for scheduling systems that does not require a worker-local context.
 impl<C: Context> WorkerLocal<C> for () {
     fn new(_: &'static C) -> Self {}
-}
-
-trait GCWorkerLocal<VM: VMBinding> = WorkerLocal<MMTK<VM>>;
-
-impl<VM: VMBinding> Context for MMTK<VM> {
-    type WorkerLocal = <SelectedPlan<VM> as Plan>::CopyContext;
-    fn spawn_worker(worker: &GCWorker<VM>, tls: OpaquePointer, _context: &'static Self) {
-        VM::VMCollection::spawn_worker_thread(tls, Some(worker));
-    }
-}
-
-impl<VM: VMBinding> WorkerLocal<MMTK<VM>> for <SelectedPlan<VM> as Plan>::CopyContext {
-    fn new(mmtk: &'static MMTK<VM>) -> Self {
-        <<SelectedPlan<VM> as Plan>::CopyContext as CopyContext>::new(mmtk)
-    }
-    fn init(&mut self, tls: OpaquePointer) {
-        CopyContext::init(self, tls);
-    }
 }

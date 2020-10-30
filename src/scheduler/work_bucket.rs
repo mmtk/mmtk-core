@@ -3,7 +3,7 @@ use super::*;
 use spin::RwLock;
 use std::cmp;
 use std::collections::BinaryHeap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 
 struct PrioritizedWork<C: Context> {
@@ -12,9 +12,11 @@ struct PrioritizedWork<C: Context> {
 }
 
 impl<C: Context> PartialEq for PrioritizedWork<C> {
+    #[allow(clippy::vtable_address_comparisons)]
     fn eq(&self, other: &Self) -> bool {
+        // FIXME: incorrect dyn pointer comparison
         self.priority == other.priority
-            && &self.work.as_ref() as *const _ == &other.work.as_ref() as *const _
+            && self.work.as_ref() as *const _ == other.work.as_ref() as *const _
     }
 }
 
@@ -37,7 +39,6 @@ pub struct WorkBucket<C: Context> {
     /// A priority queue
     queue: RwLock<BinaryHeap<PrioritizedWork<C>>>,
     monitor: Arc<(Mutex<()>, Condvar)>,
-    pub active_priority: AtomicUsize,
     can_open: Option<Box<dyn Fn() -> bool>>,
 }
 
@@ -50,7 +51,6 @@ impl<C: Context> WorkBucket<C> {
             active: AtomicBool::new(active),
             queue: Default::default(),
             monitor,
-            active_priority: AtomicUsize::new(usize::max_value()),
             can_open: None,
         }
     }
@@ -64,9 +64,6 @@ impl<C: Context> WorkBucket<C> {
     }
     pub fn is_activated(&self) -> bool {
         self.active.load(Ordering::SeqCst)
-    }
-    pub fn active_priority(&self) -> usize {
-        self.active_priority.load(Ordering::SeqCst)
     }
     /// Enable the bucket
     pub fn activate(&self) {
@@ -86,8 +83,6 @@ impl<C: Context> WorkBucket<C> {
             "Bucket not drained before close"
         );
         self.active.store(false, Ordering::SeqCst);
-        self.active_priority
-            .store(usize::max_value(), Ordering::SeqCst);
     }
     /// Add a work packet to this bucket, with a given priority
     pub fn add_with_priority<W: Work<C>>(&self, priority: usize, work: W) {

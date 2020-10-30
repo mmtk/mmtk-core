@@ -56,12 +56,10 @@ impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
             let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
             sanity_checker.refs.clear();
         }
-        let _guard = MUTATOR_ITERATOR_LOCK.lock().unwrap();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::Mutator) };
             mmtk.scheduler
                 .prepare_stage
-                .add(PrepareMutator::<P>::new(&self.plan, mutator));
+                .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &worker.group().unwrap().workers {
             w.local_works.add(PrepareCollector::default());
@@ -84,12 +82,10 @@ impl<P: Plan> SanityRelease<P> {
 impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.plan.leave_sanity();
-        let _guard = MUTATOR_ITERATOR_LOCK.lock().unwrap();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::Mutator) };
             mmtk.scheduler
                 .release_stage
-                .add(ReleaseMutator::<P>::new(self.plan, mutator));
+                .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &worker.group().unwrap().workers {
             w.local_works.add(ReleaseCollector::default());

@@ -13,6 +13,7 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -53,7 +54,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     where
         Self: Sized,
     {
-        let nursery_full = self.nursery.reserved_pages() >= (NURSERY_SIZE / 4096);
+        let nursery_full = self.nursery.reserved_pages() >= (NURSERY_SIZE >> LOG_BYTES_IN_PAGE);
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
         space_full || nursery_full || heap_full
     }

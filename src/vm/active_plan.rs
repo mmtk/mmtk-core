@@ -3,13 +3,20 @@ use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
+use std::sync::{Mutex, MutexGuard};
 
-pub struct MutatorIter<VM: VMBinding> {
+lazy_static! {
+    // FIXME: Support for multiple mmtk instances.
+    static ref MUTATOR_ITERATOR_LOCK: Mutex<()> = Mutex::new(());
+}
+
+pub struct SynchronizedMutatorIterator<'a, VM: VMBinding> {
+    _guard: MutexGuard<'a, ()>,
     start: bool,
     phantom: PhantomData<VM>,
 }
 
-impl<VM: VMBinding> Iterator for MutatorIter<VM> {
+impl<'a, VM: VMBinding> Iterator for SynchronizedMutatorIterator<'a, VM> {
     type Item = &'static mut <SelectedPlan<VM> as Plan>::Mutator;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -36,8 +43,9 @@ pub trait ActivePlan<VM: VMBinding> {
     fn collector_count() -> usize;
     fn reset_mutator_iterator();
     fn get_next_mutator() -> Option<&'static mut <SelectedPlan<VM> as Plan>::Mutator>;
-    fn mutators() -> MutatorIter<VM> {
-        MutatorIter {
+    fn mutators<'a>() -> SynchronizedMutatorIterator<'a, VM> {
+        SynchronizedMutatorIterator {
+            _guard: MUTATOR_ITERATOR_LOCK.lock().unwrap(),
             start: true,
             phantom: PhantomData,
         }

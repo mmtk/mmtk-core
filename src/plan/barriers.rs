@@ -1,11 +1,6 @@
-#[cfg(feature = "copyspace")]
-use crate::policy::copyspace::CopySpace;
-#[cfg(feature = "copyspace")]
 use crate::policy::space::Space;
-#[cfg(feature = "copyspace")]
 use crate::scheduler::gc_works::*;
 use crate::util::*;
-#[cfg(feature = "copyspace")]
 use crate::MMTK;
 
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address
@@ -26,46 +21,49 @@ impl Barrier for NoBarrier {
     fn post_write_barrier(&mut self, _target: WriteTarget) {}
 }
 
-#[cfg(feature = "copyspace")]
-pub struct FieldRememberingBarrier<E: ProcessEdgesWork> {
-    mmtk: &'static MMTK<E::VM>,
-    nursery: &'static CopySpace<E::VM>,
-    modbuf: Box<(Vec<ObjectReference>, Vec<Address>)>,
+#[derive(Default)]
+pub struct ModBuffer {
+    modified_nodes: Vec<ObjectReference>,
+    modified_edges: Vec<Address>,
 }
 
-#[cfg(feature = "copyspace")]
-impl<E: ProcessEdgesWork> FieldRememberingBarrier<E> {
+pub struct FieldRememberingBarrier<E: ProcessEdgesWork, S: Space<E::VM>> {
+    mmtk: &'static MMTK<E::VM>,
+    nursery: &'static S,
+    mod_buffer: ModBuffer,
+}
+
+impl<E: ProcessEdgesWork, S: Space<E::VM>> FieldRememberingBarrier<E, S> {
     #[allow(unused)]
-    pub fn new(mmtk: &'static MMTK<E::VM>, nursery: &'static CopySpace<E::VM>) -> Self {
+    pub fn new(mmtk: &'static MMTK<E::VM>, nursery: &'static S) -> Self {
         Self {
             mmtk,
             nursery,
-            modbuf: box Default::default(),
+            mod_buffer: ModBuffer::default(),
         }
     }
 
     fn enqueue_node(&mut self, obj: ObjectReference) {
-        self.modbuf.0.push(obj);
-        if self.modbuf.0.len() >= 512 {
+        self.mod_buffer.modified_nodes.push(obj);
+        if self.mod_buffer.modified_nodes.len() >= E::CAPACITY {
             self.flush();
         }
     }
 
     fn enqueue_edge(&mut self, slot: Address) {
-        self.modbuf.1.push(slot);
-        if self.modbuf.1.len() >= 512 {
+        self.mod_buffer.modified_edges.push(slot);
+        if self.mod_buffer.modified_edges.len() >= 512 {
             self.flush();
         }
     }
 }
 
-#[cfg(feature = "copyspace")]
-impl<E: ProcessEdgesWork> Barrier for FieldRememberingBarrier<E> {
+impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for FieldRememberingBarrier<E, S> {
     fn flush(&mut self) {
         let mut modified_nodes = vec![];
-        std::mem::swap(&mut modified_nodes, &mut self.modbuf.0);
+        std::mem::swap(&mut modified_nodes, &mut self.mod_buffer.modified_nodes);
         let mut modified_edges = vec![];
-        std::mem::swap(&mut modified_edges, &mut self.modbuf.1);
+        std::mem::swap(&mut modified_edges, &mut self.mod_buffer.modified_edges);
         debug_assert!(
             !self.mmtk.scheduler.final_stage.is_activated(),
             "{:?}",

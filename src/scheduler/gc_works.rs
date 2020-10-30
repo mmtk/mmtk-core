@@ -6,8 +6,7 @@ use crate::*;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::atomic::Ordering;
 
 pub struct ScheduleCollection;
 
@@ -38,12 +37,10 @@ impl<P: Plan> GCWork<P::VM> for Prepare<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Prepare Global");
         self.plan.prepare(worker.tls);
-        let _guard = MUTATOR_ITERATOR_LOCK.lock().unwrap();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::Mutator) };
             mmtk.scheduler
                 .prepare_stage
-                .add(PrepareMutator::<P>::new(self.plan, mutator));
+                .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &worker.group().unwrap().workers {
             w.local_works.add(PrepareCollector::default());
@@ -52,21 +49,22 @@ impl<P: Plan> GCWork<P::VM> for Prepare<P> {
 }
 
 /// GC Preparation Work (include updating global states)
-pub struct PrepareMutator<P: Plan> {
-    pub plan: &'static P,
-    pub mutator: &'static mut P::Mutator,
+pub struct PrepareMutator<VM: VMBinding> {
+    // The mutator reference has static lifetime.
+    // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
+    pub mutator: &'static mut Mutator<SelectedPlan<VM>>,
 }
 
-unsafe impl<P: Plan> Sync for PrepareMutator<P> {}
+unsafe impl<VM: VMBinding> Sync for PrepareMutator<VM> {}
 
-impl<P: Plan> PrepareMutator<P> {
-    pub fn new(plan: &'static P, mutator: &'static mut P::Mutator) -> Self {
-        Self { plan, mutator }
+impl<VM: VMBinding> PrepareMutator<VM> {
+    pub fn new(mutator: &'static mut Mutator<SelectedPlan<VM>>) -> Self {
+        Self { mutator }
     }
 }
 
-impl<P: Plan> GCWork<P::VM> for PrepareMutator<P> {
-    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, _mmtk: &'static MMTK<P::VM>) {
+impl<VM: VMBinding> GCWork<VM> for PrepareMutator<VM> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Prepare Mutator");
         self.mutator.prepare(worker.tls);
     }
@@ -98,12 +96,10 @@ impl<P: Plan> GCWork<P::VM> for Release<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Release Global");
         self.plan.release(worker.tls);
-        let _guard = MUTATOR_ITERATOR_LOCK.lock().unwrap();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            let mutator = unsafe { &mut *(mutator as *mut _ as *mut P::Mutator) };
             mmtk.scheduler
                 .release_stage
-                .add(ReleaseMutator::<P>::new(self.plan, mutator));
+                .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &worker.group().unwrap().workers {
             w.local_works.add(ReleaseCollector::default());
@@ -113,21 +109,22 @@ impl<P: Plan> GCWork<P::VM> for Release<P> {
     }
 }
 
-pub struct ReleaseMutator<P: Plan> {
-    pub plan: &'static P,
-    pub mutator: &'static mut P::Mutator,
+pub struct ReleaseMutator<VM: VMBinding> {
+    // The mutator reference has static lifetime.
+    // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
+    pub mutator: &'static mut Mutator<SelectedPlan<VM>>,
 }
 
-unsafe impl<P: Plan> Sync for ReleaseMutator<P> {}
+unsafe impl<VM: VMBinding> Sync for ReleaseMutator<VM> {}
 
-impl<P: Plan> ReleaseMutator<P> {
-    pub fn new(plan: &'static P, mutator: &'static mut P::Mutator) -> Self {
-        Self { plan, mutator }
+impl<VM: VMBinding> ReleaseMutator<VM> {
+    pub fn new(mutator: &'static mut Mutator<SelectedPlan<VM>>) -> Self {
+        Self { mutator }
     }
 }
 
-impl<P: Plan> GCWork<P::VM> for ReleaseMutator<P> {
-    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, _mmtk: &'static MMTK<P::VM>) {
+impl<VM: VMBinding> GCWork<VM> for ReleaseMutator<VM> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Release Mutator");
         self.mutator.release(worker.tls);
     }
@@ -157,20 +154,15 @@ impl<ScanEdges: ProcessEdgesWork> StopMutators<ScanEdges> {
     }
 }
 
-lazy_static! {
-    pub static ref MUTATOR_ITERATOR_LOCK: Mutex<()> = Mutex::new(());
-}
-
 impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if worker.is_coordinator() {
             trace!("stop_all_mutators start");
-            debug_assert_eq!(SCANNED_STACKS.load(Ordering::SeqCst), 0);
+            debug_assert_eq!(mmtk.plan.base().scanned_stacks.load(Ordering::SeqCst), 0);
             <E::VM as VMBinding>::VMCollection::stop_all_mutators::<E>(worker.tls);
             trace!("stop_all_mutators end");
             mmtk.scheduler.notify_mutators_paused(mmtk);
             if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
-                let _guard = MUTATOR_ITERATOR_LOCK.lock().unwrap();
                 // Prepare mutators if necessary
                 // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
                 if !mmtk.plan.common().stacks_prepared() {
@@ -216,8 +208,6 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
 impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for EndOfGC {}
 
-static SCANNED_STACKS: AtomicUsize = AtomicUsize::new(0);
-
 #[derive(Default)]
 pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
 
@@ -248,9 +238,13 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
             worker.tls,
         );
         self.0.flush();
-        let old = SCANNED_STACKS.fetch_add(1, Ordering::SeqCst);
+        let old = mmtk
+            .plan
+            .base()
+            .scanned_stacks
+            .fetch_add(1, Ordering::SeqCst);
         if old + 1 == <E::VM as VMBinding>::VMActivePlan::number_of_mutators() {
-            SCANNED_STACKS.store(0, Ordering::SeqCst);
+            mmtk.plan.base().scanned_stacks.store(0, Ordering::SeqCst);
             <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
                 false, worker.tls,
             );
