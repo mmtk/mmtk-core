@@ -42,7 +42,7 @@ impl<P: Plan> GCWork<P::VM> for Prepare<P> {
                 .prepare_stage
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
-        for w in &worker.group().unwrap().workers {
+        for w in &mmtk.scheduler.worker_group().workers {
             w.local_works.add(PrepareCollector::default());
         }
     }
@@ -101,7 +101,7 @@ impl<P: Plan> GCWork<P::VM> for Release<P> {
                 .release_stage
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
-        for w in &worker.group().unwrap().workers {
+        for w in &mmtk.scheduler.worker_group().workers {
             w.local_works.add(ReleaseCollector::default());
         }
         // TODO: Process weak references properly

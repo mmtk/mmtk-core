@@ -11,13 +11,13 @@ pub struct Worker<C: Context> {
     pub tls: OpaquePointer,
     pub ordinal: usize,
     pub parked: AtomicBool,
-    group: Option<Arc<WorkerGroup<C>>>,
     scheduler: Arc<Scheduler<C>>,
     local: Option<C::WorkerLocal>,
     pub local_works: WorkBucket<C>,
     pub sender: Sender<CoordinatorMessage<C>>,
     pub stat: WorkerLocalStat,
     context: Option<&'static C>,
+    is_coordinator: bool,
 }
 
 unsafe impl<C: Context> Sync for Worker<C> {}
@@ -26,23 +26,19 @@ unsafe impl<C: Context> Send for Worker<C> {}
 pub type GCWorker<VM> = Worker<MMTK<VM>>;
 
 impl<C: Context> Worker<C> {
-    pub fn new(
-        ordinal: usize,
-        group: Option<Weak<WorkerGroup<C>>>,
-        scheduler: Weak<Scheduler<C>>,
-    ) -> Self {
+    pub fn new(ordinal: usize, scheduler: Weak<Scheduler<C>>, is_coordinator: bool) -> Self {
         let scheduler = scheduler.upgrade().unwrap();
         Self {
             tls: OpaquePointer::UNINITIALIZED,
             ordinal,
             parked: AtomicBool::new(true),
-            group: group.map(|g| g.upgrade().unwrap()),
             local: None,
             local_works: WorkBucket::new(true, scheduler.worker_monitor.clone()),
             sender: scheduler.channel.0.clone(),
             scheduler,
             stat: Default::default(),
             context: None,
+            is_coordinator,
         }
     }
 
@@ -50,12 +46,8 @@ impl<C: Context> Worker<C> {
         self.parked.load(Ordering::SeqCst)
     }
 
-    pub fn group(&self) -> Option<&WorkerGroup<C>> {
-        self.group.as_ref().map(|g| &g as &WorkerGroup<C>)
-    }
-
     pub fn is_coordinator(&self) -> bool {
-        self.group.is_none()
+        self.is_coordinator
     }
 
     pub fn scheduler(&self) -> &Scheduler<C> {
@@ -95,12 +87,11 @@ pub struct WorkerGroup<C: Context> {
 
 impl<C: Context> WorkerGroup<C> {
     pub fn new(workers: usize, scheduler: Weak<Scheduler<C>>) -> Arc<Self> {
-        let mut group = Arc::new(Self { workers: vec![] });
-        let group_weak = Arc::downgrade(&group);
-        unsafe { Arc::get_mut_unchecked(&mut group) }.workers = (0..workers)
-            .map(|i| Worker::new(i, Some(group_weak.clone()), scheduler.clone()))
-            .collect();
-        group
+        Arc::new(Self {
+            workers: (0..workers)
+                .map(|i| Worker::new(i, scheduler.clone(), false))
+                .collect(),
+        })
     }
 
     pub fn worker_count(&self) -> usize {

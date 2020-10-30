@@ -81,7 +81,7 @@ impl<C: Context> Scheduler<C> {
         let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
 
         self_mut.context = Some(context);
-        self_mut.coordinator_worker = Some(Worker::new(0, None, Arc::downgrade(&self)));
+        self_mut.coordinator_worker = Some(Worker::new(0, Arc::downgrade(&self), true));
         self_mut.worker_group = Some(WorkerGroup::new(num_workers, Arc::downgrade(&self)));
         self.worker_group
             .as_ref()
@@ -275,7 +275,7 @@ impl<C: Context> Scheduler<C> {
             }
             // Park this worker
             worker.parked.store(true, Ordering::SeqCst);
-            if worker.group().unwrap().all_parked() {
+            if self.worker_group().all_parked() {
                 worker
                     .sender
                     .send(CoordinatorMessage::AllWorkerParked)
