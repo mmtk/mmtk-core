@@ -16,25 +16,26 @@ We maintain an up to date list of the prerequisite for building MMTk and its bin
 
 ## Build
 
-Building MMTk needs a nightly Rust toolchain.
+Building MMTk requires a nightly Rust toolchain.
 As the Rust language and its libraries (crates) are frequently evolving, we recommend using the nightly toolchain specified in the [mmtk-dev](https://github.com/mmtk/mmtk-dev).
 
 ```console
-$ # replace nightly-YYYY-MM-DD with the correct toolchain version
+$ # replace nightly-YYYY-MM-DD with the toolchain version specified in mmtk-dev
 $ Export RUSTUP_TOOLCHAIN=nightly-YYYY-MM-DD
 
 $ cargo build --features <space separated features>
 ```
 
-It is compulsory to specify one of the available GC plans as a feature at build time. Currently, there are two different plans to choose from:
+You must specify a GC plan as a feature at build time.
+Currently, there are two different plans to choose from:
 
 * `--features nogc` for NoGC, and
 * `--features semispace` for SemiSpace.
 
 A full list of available features can be seen by examining [`Cargo.toml`](Cargo.toml).
 By passing the `--features` flag to the Rust compiler,
-we conditionally compile plan specific code.
-You can optionally enable sanity checks by add `sanity` to the set of features
+we conditionally compile plan-specific code.
+You can optionally enable sanity checks by adding `sanity` to the set of features
 you want to use.
 
 You can pass the `--release` flag to the `cargo build` command to use the
@@ -43,7 +44,7 @@ optimizing compiler of Rust for better performance.
 The artefact produced produced by the build process can be found under
 `target/debug` (or `target/release` for the release build).
 
-[`ci-build.sh`](.github/scripts/ci-build.sh) shows the builds we are testing in our CI.
+[`ci-build.sh`](.github/scripts/ci-build.sh) shows the builds we builds tested by the CI.
 
 ## Usage
 
@@ -51,7 +52,7 @@ MMTk does not run standalone. You would need to integrate MMTk with a language i
 
 ### Try out our current bindings
 
-We are maintaining three VM bindings for MMTk. These bindings are accessible in the following repositories:
+We maintain three VM bindings for MMTk. These bindings are accessible in the following repositories:
 
 * [OpenJDK](https://github.com/mmtk/mmtk-openjdk),
 * [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm),
@@ -63,15 +64,15 @@ For more information on these bindings, please visit their repositories.
 
 MMTk provides a bi-directional interface with the language VM.
 
-1. MMTk exposes a set of [API](src/mm/memory_manager.rs). The language VM can call into MMTk by using those APIs.
-2. MMTk provides a trait [`VMBinding`](src/vm/mod.rs) that each language VM should implement. MMTk use `VMBinding` to call into the VM.
+1. MMTk exposes a set of [APIs](src/mm/memory_manager.rs). The language VM can call into MMTk by using those APIs.
+2. MMTk provides a trait [`VMBinding`](src/vm/mod.rs) that each language VM must implement. MMTk use `VMBinding` to call into the VM.
 
-To integrate MMTk with your language implementation, you would need to provide an implementation of `VMBinding`, and
+To integrate MMTk with your language implementation, you need to provide an implementation of `VMBinding`, and
 you can optionally call MMTk's API for your needs.
 
 ## Tests
 
-We use both unit tests and VM binding tests to test MMTk in our CI.
+We use both unit tests and VM binding tests to test MMTk in the CI.
 
 ### Unit tests
 
