@@ -122,9 +122,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn prepare(&self, tls: OpaquePointer) {
         self.common.prepare(tls, true);
 
-        #[cfg(feature = "sanity")]
-        self.fromspace().unprotect();
-
         self.hi
             .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
                                                                        // prepare each of the collected regions
