@@ -11,9 +11,9 @@ pub trait Work<C: Context>: 'static + Send + Sync {
         let stat = worker
             .stat
             .measure_work(TypeId::of::<Self>(), type_name::<Self>());
-        trace!("+ work {:?} start", type_name::<Self>());
+        info!("+ work {:?} start", type_name::<Self>());
         self.do_work(worker, context);
-        trace!("- work {:?} end", type_name::<Self>());
+        info!("- work {:?} end", type_name::<Self>());
         stat.end_of_work(&mut worker.stat);
     }
 }
