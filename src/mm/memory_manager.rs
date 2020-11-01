@@ -1,3 +1,21 @@
+//! VM-to-MMTk interface: safe Rust APIs.
+
+/// This module provides a safe Rust API for mmtk-core.
+/// We expect the VM binding to inherit and extend this API by:
+/// 1. adding their VM-specific functions
+/// 2. exposing the functions to native if necessary. And the VM binding needs to manage the unsafety
+///    for exposing this safe API to FFI.
+
+/// For example, for mutators, this API provides a Box<Mutator>, and requires a &mut Mutator for allocation.
+/// A VM binding can borrow a mutable reference directly from Box<Mutator>, and call alloc(). Alternatively,
+/// it can turn the Box pointer to a native pointer (*mut Mutator), then forge a mut reference from the native
+/// pointer. In either way, the VM binding code needs to guarantee the safety.
+
+/// How the VM gets mutator/collector/tracelocal handles:
+/// * Mutator: from bind_mutator() as Box<Mutator>
+/// * Collector: from Collection::spawn_worker_thread() as &mut Collector
+/// * TraceLocal: Scanning::* as &mut TraceLocal
+
 use std::sync::atomic::Ordering;
 
 use crate::plan::mutator_context::{Mutator, MutatorContext};
@@ -19,22 +37,6 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-
-// This file provides a safe Rust API for mmtk-core.
-// We expect the VM binding to inherit and extend this API by:
-// 1. adding their VM-specific functions
-// 2. exposing the functions to native if necessary. And the VM binding needs to manage the unsafety
-//    for exposing this safe API to FFI.
-
-// For example, for mutators, this API provides a Box<Mutator>, and requires a &mut Mutator for allocation.
-// A VM binding can borrow a mutable reference directly from Box<Mutator>, and call alloc(). Alternatively,
-// it can turn the Box pointer to a native pointer (*mut Mutator), then forge a mut reference from the native
-// pointer. In either way, the VM binding code needs to guarantee the safety.
-
-// How the VM gets mutator/collector/tracelocal handles:
-// * Mutator: from bind_mutator() as Box<Mutator>
-// * Collector: from Collection::spawn_worker_thread() as &mut Collector
-// * TraceLocal: Scanning::* as &mut TraceLocal
 
 pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
     mmtk.plan.base().control_collector_context.run(tls);

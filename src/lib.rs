@@ -22,7 +22,8 @@
 //! Logically, this crate includes these major parts:
 //! * GC components:
 //!   * [Allocators](util/alloc/allocator/trait.Allocator.html): handlers of allocation requests which allocate objects to the bound space.
-//!   * [Spaces](policy/space/trait.Space.html): memory regions in the heap with defined semantics and behaviors.
+//!   * [Policies](policy/space/trait.Space.html): definitions of semantics and behaviors for memory regions. 
+//!      Each space is an instance of a policy, and takes up a unique proportion of the heap.
 //!   * [Work packets](scheduler/work/trait.GCWork.html): units of GC works scheduled by the MMTk's scheduler.
 //! * [GC plans](plan/global/trait.Plan.html): GC algorithms composed from components.
 //!   *Note that currently the choice of plans is made through Rust features, which is a build-time config, so only one plan is present in the generated binary
@@ -60,9 +61,11 @@ pub mod policy;
 pub mod scheduler;
 pub mod vm;
 
+#[doc(no_inline)]
+pub use crate::plan::selected_plan::{SelectedConstraints, SelectedPlan};
+
 pub use crate::mm::memory_manager;
 pub use crate::mmtk::MMTK;
-pub use crate::plan::selected_plan::{SelectedConstraints, SelectedPlan};
 pub use crate::plan::{
     Allocator, CopyContext, Mutator, MutatorContext, Plan, TraceLocal, TransitiveClosure,
 };

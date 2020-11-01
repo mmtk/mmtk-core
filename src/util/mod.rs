@@ -1,3 +1,5 @@
+//! Utilities used by other modules, including allocators, heap implementation, etc.
+
 #[macro_use]
 pub mod macros;
 #[macro_use]

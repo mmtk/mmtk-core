@@ -1,3 +1,5 @@
+//! MMTk-to-VM interface: the VMBinding trait.
+
 use crate::util::constants::*;
 
 mod active_plan;

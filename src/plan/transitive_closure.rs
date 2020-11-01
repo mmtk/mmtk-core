@@ -1,6 +1,8 @@
 use crate::scheduler::gc_works::ProcessEdgesWork;
 use crate::util::{Address, ObjectReference};
 
+/// This trait is the fundamental mechanism for performing a
+/// transitive closure over an object graph.
 pub trait TransitiveClosure {
     // The signature of this function changes during the port
     // because the argument `ObjectReference source` is never used in the original version

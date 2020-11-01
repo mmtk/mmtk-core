@@ -17,8 +17,6 @@ use std::sync::Arc;
 #[cfg(feature = "sanity")]
 use std::sync::Mutex;
 
-// TODO: remove this singleton at some point to allow multiple instances of MMTK
-// This helps refactoring.
 lazy_static! {
     // I am not sure if we should include these mmappers as part of MMTk struct.
     // The considerations are:
@@ -32,6 +30,8 @@ lazy_static! {
     pub static ref SFT_MAP: SFTMap = SFTMap::new();
 }
 
+/// An MMTk instance. MMTk allows mutiple instances to run independently, and each instance gives users a separate heap. 
+/// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
     pub plan: SelectedPlan<VM>,
     pub vm_map: &'static VMMap,
