@@ -1,5 +1,4 @@
 use crate::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION;
-use crate::vm::unboxed_size_constants;
 
 /**
  * Modes.
@@ -80,7 +79,10 @@ pub const MIN_INT: usize = i32::min_value() as u32 as usize; // 0x8000_0000
  * VM-Specific sizes
  */
 
-pub const LOG_BYTES_IN_ADDRESS: u8 = unboxed_size_constants::LOG_BYTES_IN_ADDRESS as u8;
+#[cfg(target_pointer_width = "32")]
+pub const LOG_BYTES_IN_ADDRESS: u8 = 2;
+#[cfg(target_pointer_width = "64")]
+pub const LOG_BYTES_IN_ADDRESS: u8 = 3;
 pub const BYTES_IN_ADDRESS: usize = 1 << LOG_BYTES_IN_ADDRESS;
 pub const LOG_BITS_IN_ADDRESS: usize = LOG_BITS_IN_BYTE as usize + LOG_BYTES_IN_ADDRESS as usize;
 pub const BITS_IN_ADDRESS: usize = 1 << LOG_BITS_IN_ADDRESS;
