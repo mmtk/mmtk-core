@@ -90,7 +90,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.4.1"
+          ref: "remove-jikesrvm-binding-mmtk-submodule"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -213,7 +213,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.4.1"
+          ref: "remove-jikesrvm-binding-mmtk-submodule"
           path: ci-perf-kit
           submodules: true
       # setup
