@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["attempt_to_forward",""],["clear_forwarding_bits",""],["forward_object",""],["is_forwarded",""],["is_forwarded_or_being_forwarded",""],["set_forwarding_pointer",""],["spin_and_get_forwarded_object",""],["state_is_being_forwarded",""],["state_is_forwarded_or_being_forwarded",""]]});

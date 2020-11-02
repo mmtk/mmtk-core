@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["dzmmap","Demand-zero mmap: This function guarantees to zero all mapped memory."],["mprotect",""],["munprotect",""],["zero",""]]});

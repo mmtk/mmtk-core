@@ -1,0 +1,198 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `ObjectModel` trait in crate `mmtk`."><meta name="keywords" content="rust, rustlang, rust-lang, ObjectModel"><title>mmtk::vm::ObjectModel - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc trait"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../mmtk/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Trait ObjectModel</p><div class="sidebar-elems"><div class="block items"><a class="sidebar-title" href="#associated-const">Associated Constants</a><div class="sidebar-links"><a href="#associatedconstant.GC_BYTE_OFFSET">GC_BYTE_OFFSET</a></div><a class="sidebar-title" href="#required-methods">Required Methods</a><div class="sidebar-links"><a href="#tymethod.array_base_offset_trapdoor">array_base_offset_trapdoor</a><a href="#tymethod.attempt_available_bits">attempt_available_bits</a><a href="#tymethod.copy">copy</a><a href="#tymethod.copy_to">copy_to</a><a href="#tymethod.dump_object">dump_object</a><a href="#tymethod.gc_header_offset">gc_header_offset</a><a href="#tymethod.get_align_offset_when_copied">get_align_offset_when_copied</a><a href="#tymethod.get_align_when_copied">get_align_when_copied</a><a href="#tymethod.get_array_base_offset">get_array_base_offset</a><a href="#tymethod.get_array_length">get_array_length</a><a href="#tymethod.get_array_length_offset">get_array_length_offset</a><a href="#tymethod.get_current_size">get_current_size</a><a href="#tymethod.get_gc_byte">get_gc_byte</a><a href="#tymethod.get_next_object">get_next_object</a><a href="#tymethod.get_object_end_address">get_object_end_address</a><a href="#tymethod.get_object_from_start_address">get_object_from_start_address</a><a href="#tymethod.get_reference_when_copied_to">get_reference_when_copied_to</a><a href="#tymethod.get_size_when_copied">get_size_when_copied</a><a href="#tymethod.get_type_descriptor">get_type_descriptor</a><a href="#tymethod.is_acyclic">is_acyclic</a><a href="#tymethod.is_array">is_array</a><a href="#tymethod.is_primitive_array">is_primitive_array</a><a href="#tymethod.object_start_ref">object_start_ref</a><a href="#tymethod.prepare_available_bits">prepare_available_bits</a><a href="#tymethod.read_available_bits_word">read_available_bits_word</a><a href="#tymethod.read_available_byte">read_available_byte</a><a href="#tymethod.ref_to_address">ref_to_address</a><a href="#tymethod.write_available_bits_word">write_available_bits_word</a><a href="#tymethod.write_available_byte">write_available_byte</a></div><a class="sidebar-title" href="#implementors">Implementors</a></div><p class='location'><a href='../index.html'>mmtk</a>::<wbr><a href='index.html'>vm</a></p><script>window.sidebarCurrent = {name: 'ObjectModel', ty: 'trait', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/mmtk/vm/object_model.rs.html#14-220' title='goto source code'>[src]</a></span><span class='in-band'>Trait <a href='../index.html'>mmtk</a>::<wbr><a href='index.html'>vm</a>::<wbr><a class="trait" href=''>ObjectModel</a></span></h1><div class="docblock type-decl hidden-by-usual-hider"><pre class='rust trait'>pub trait ObjectModel&lt;VM:&nbsp;<a class="trait" href="../../mmtk/vm/trait.VMBinding.html" title="trait mmtk::vm::VMBinding">VMBinding</a>&gt; {
+    const <a href='#associatedconstant.GC_BYTE_OFFSET' class="constant"><b>GC_BYTE_OFFSET</b></a>: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>;
+
+    fn <a href='#tymethod.get_gc_byte' class='fnname'>get_gc_byte</a>(o: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; &amp;'static <a class="struct" href="https://doc.rust-lang.org/nightly/core/sync/atomic/struct.AtomicU8.html" title="struct core::sync::atomic::AtomicU8">AtomicU8</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.copy' class='fnname'>copy</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;from: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;allocator: <a class="enum" href="../../mmtk/enum.Allocator.html" title="enum mmtk::Allocator">Allocator</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;copy_context: &amp;mut impl <a class="trait" href="../../mmtk/trait.CopyContext.html" title="trait mmtk::CopyContext">CopyContext</a><br>&nbsp;&nbsp;&nbsp;&nbsp;) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.copy_to' class='fnname'>copy_to</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;from: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;to: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;region: <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a><br>&nbsp;&nbsp;&nbsp;&nbsp;) -&gt; <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.get_reference_when_copied_to' class='fnname'>get_reference_when_copied_to</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;from: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;to: <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a><br>&nbsp;&nbsp;&nbsp;&nbsp;) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.get_size_when_copied' class='fnname'>get_size_when_copied</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.get_align_when_copied' class='fnname'>get_align_when_copied</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.get_align_offset_when_copied' class='fnname'>get_align_offset_when_copied</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.get_current_size' class='fnname'>get_current_size</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.get_next_object' class='fnname'>get_next_object</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>;
+<div class='item-spacer'></div>    unsafe fn <a href='#tymethod.get_object_from_start_address' class='fnname'>get_object_from_start_address</a>(start: <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.get_object_end_address' class='fnname'>get_object_end_address</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.get_type_descriptor' class='fnname'>get_type_descriptor</a>(reference: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">&amp;'static [</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.i8.html">i8</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">]</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.is_array' class='fnname'>is_array</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.is_primitive_array' class='fnname'>is_primitive_array</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.get_array_length' class='fnname'>get_array_length</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.attempt_available_bits' class='fnname'>attempt_available_bits</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;old: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a><br>&nbsp;&nbsp;&nbsp;&nbsp;) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.prepare_available_bits' class='fnname'>prepare_available_bits</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.write_available_byte' class='fnname'>write_available_byte</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, val: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a>);
+<div class='item-spacer'></div>    fn <a href='#tymethod.read_available_byte' class='fnname'>read_available_byte</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.write_available_bits_word' class='fnname'>write_available_bits_word</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, val: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>);
+<div class='item-spacer'></div>    fn <a href='#tymethod.read_available_bits_word' class='fnname'>read_available_bits_word</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.gc_header_offset' class='fnname'>gc_header_offset</a>() -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.object_start_ref' class='fnname'>object_start_ref</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.ref_to_address' class='fnname'>ref_to_address</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.is_acyclic' class='fnname'>is_acyclic</a>(typeref: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.dump_object' class='fnname'>dump_object</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>);
+<div class='item-spacer'></div>    fn <a href='#tymethod.get_array_base_offset' class='fnname'>get_array_base_offset</a>() -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.array_base_offset_trapdoor' class='fnname'>array_base_offset_trapdoor</a>&lt;T&gt;(o: T) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a>;
+<div class='item-spacer'></div>    fn <a href='#tymethod.get_array_length_offset' class='fnname'>get_array_length_offset</a>() -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a>;
+}</pre></div><div class='docblock'><p>VM-specific methods for object model.</p>
+<p>MMTk requires <em>at least one byte</em> (or possibly a few bits in ceratin plans) for MMTk as per-object metadata.
+MMTk currently assumes the available byte/bits are in the <em>header words</em> --
+this is a strict requirement, and we are looking to revamp the design and support VMs that do not have header words for objects.</p>
+<p>Note that depending on the selected GC plan, only a subset of the methods provided here will be used.</p>
+</div>
+            <h2 id='associated-const' class='small-section-header'>Associated Constants<a href='#associated-const' class='anchor'></a></h2><div class='methods'><h3 id='associatedconstant.GC_BYTE_OFFSET' class='method'><code>const <a href='#associatedconstant.GC_BYTE_OFFSET' class="constant"><b>GC_BYTE_OFFSET</b></a>: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a></code></h3><div class='docblock'><p>The offset of the byte available for GC in the header word from the object reference.</p>
+</div></div><span class='loading-content'>Loading content...</span>
+            <h2 id='required-methods' class='small-section-header'>Required methods<a href='#required-methods' class='anchor'></a></h2><div class='methods'><h3 id='tymethod.get_gc_byte' class='method'><code>fn <a href='#tymethod.get_gc_byte' class='fnname'>get_gc_byte</a>(o: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; &amp;'static <a class="struct" href="https://doc.rust-lang.org/nightly/core/sync/atomic/struct.AtomicU8.html" title="struct core::sync::atomic::AtomicU8">AtomicU8</a></code></h3><div class='docblock'><p>Get a reference of the GC byte for an object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>o</code>: The object to get the GC byte from.</li>
+</ul>
+</div><h3 id='tymethod.copy' class='method'><code>fn <a href='#tymethod.copy' class='fnname'>copy</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;from: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;allocator: <a class="enum" href="../../mmtk/enum.Allocator.html" title="enum mmtk::Allocator">Allocator</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;copy_context: &amp;mut impl <a class="trait" href="../../mmtk/trait.CopyContext.html" title="trait mmtk::CopyContext">CopyContext</a><br>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a></code></h3><div class='docblock'><p>Copy an object and returns the address of the new object. Usually in the implementation of this method,
+<code>alloc_copy()</code> and <code>post_copy()</code> from a plan's <a href="../trait.CopyContext.html"><code>CopyContext</code></a> are used for copying.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>from</code>: The addres of the object to be copied.</li>
+<li><code>allocator</code>: The allocation semantic to use.</li>
+<li><code>copy_context</code>: The <code>CopyContext</code> for the GC thread.</li>
+</ul>
+</div><h3 id='tymethod.copy_to' class='method'><code>fn <a href='#tymethod.copy_to' class='fnname'>copy_to</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;from: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;to: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;region: <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a><br>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a></code></h3><div class='docblock'><p>Copy an object. This is required
+for delayed-copy collectors such as compacting collectors. During the
+collection, MMTk reserves a region in the heap for an object as per
+requirements found from <code>ObjectModel</code> and then asks <code>ObjectModel</code> to
+determine what the object's reference will be post-copy. Return the address
+past the end of the copied object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>from</code>: The address of the object to be copied.</li>
+<li><code>to</code>: The target location.</li>
+<li>`region: The start of the region that was reserved for this object.</li>
+</ul>
+</div><h3 id='tymethod.get_reference_when_copied_to' class='method'><code>fn <a href='#tymethod.get_reference_when_copied_to' class='fnname'>get_reference_when_copied_to</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;from: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;to: <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a><br>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a></code></h3><div class='docblock'><p>Return the reference that an object will be referred to after it is copied
+to the specified region. Used in delayed-copy collectors such as compacting
+collectors.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>from</code>: The object to be copied.</li>
+<li><code>to</code>: The region to be copied to.</li>
+</ul>
+</div><h3 id='tymethod.get_size_when_copied' class='method'><code>fn <a href='#tymethod.get_size_when_copied' class='fnname'>get_size_when_copied</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a></code></h3><div class='docblock'><p>Return the size required to copy an object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to be queried.</li>
+</ul>
+</div><h3 id='tymethod.get_align_when_copied' class='method'><code>fn <a href='#tymethod.get_align_when_copied' class='fnname'>get_align_when_copied</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a></code></h3><div class='docblock'><p>Return the alignment requirement for a copy of this object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The obejct to be queried.</li>
+</ul>
+</div><h3 id='tymethod.get_align_offset_when_copied' class='method'><code>fn <a href='#tymethod.get_align_offset_when_copied' class='fnname'>get_align_offset_when_copied</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a></code></h3><div class='docblock'><p>Return the alignment offset requirements for a copy of this object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to be queried.</li>
+</ul>
+</div><h3 id='tymethod.get_current_size' class='method'><code>fn <a href='#tymethod.get_current_size' class='fnname'>get_current_size</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a></code></h3><div class='docblock'><p>Return the size used by an object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to be queried.</li>
+</ul>
+</div><h3 id='tymethod.get_next_object' class='method'><code>fn <a href='#tymethod.get_next_object' class='fnname'>get_next_object</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a></code></h3><div class='docblock'><p>Return the object reference for the next object in the heap under
+contiguous allocation.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The current object.</li>
+</ul>
+</div><h3 id='tymethod.get_object_from_start_address' class='method'><code>unsafe fn <a href='#tymethod.get_object_from_start_address' class='fnname'>get_object_from_start_address</a>(start: <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a></code></h3><div class='docblock'><p>Perform a linear scan and find the next object from a address.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>start</code>: The start address of the object.</li>
+</ul>
+<h1 id="safety" class="section-header"><a href="#safety">Safety</a></h1>
+<p>We would expect ObjectReferences point to valid objects,
+but an arbitrary memory region specified by an address may not reside an object.</p>
+</div><h3 id='tymethod.get_object_end_address' class='method'><code>fn <a href='#tymethod.get_object_end_address' class='fnname'>get_object_end_address</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a></code></h3><div class='docblock'><p>Return a pointer to the address just past the end of the object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to be queried.</li>
+</ul>
+</div><h3 id='tymethod.get_type_descriptor' class='method'><code>fn <a href='#tymethod.get_type_descriptor' class='fnname'>get_type_descriptor</a>(reference: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">&amp;'static [</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.i8.html">i8</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">]</a></code></h3><div class='docblock'><p>Get the type descriptor for an object.</p>
+<p>TODO: Do we need this? If so, determine lifetime, return byte[]</p>
+<p>Arguments:</p>
+<ul>
+<li><code>reference</code>: The object to be queried.</li>
+</ul>
+</div><h3 id='tymethod.is_array' class='method'><code>fn <a href='#tymethod.is_array' class='fnname'>is_array</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></h3><div class='docblock'><p>Return whether the passed object is an array.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to be queried.</li>
+</ul>
+</div><h3 id='tymethod.is_primitive_array' class='method'><code>fn <a href='#tymethod.is_primitive_array' class='fnname'>is_primitive_array</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></h3><div class='docblock'><p>Return whether the passed object is a primitive array.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to be queried.</li>
+</ul>
+</div><h3 id='tymethod.get_array_length' class='method'><code>fn <a href='#tymethod.get_array_length' class='fnname'>get_array_length</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a></code></h3><div class='docblock'><p>Return the array length (in elements). It is undefined behavior if the object is not an array.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The array to be queried.</li>
+</ul>
+</div><h3 id='tymethod.attempt_available_bits' class='method'><code>fn <a href='#tymethod.attempt_available_bits' class='fnname'>attempt_available_bits</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;old: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;new: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a><br>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></h3><div class='docblock'><p>Attempt to set the bits available for memory manager use in an
+object. The attempt will only be successful if the current value
+of the bits matches <code>old</code>. The comparison with the
+current value and setting are atomic with respect to other
+allocators. Return true if the bits were set, false otherwise.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to set bits to.</li>
+<li><code>old</code>: The required current value of the bits.</li>
+<li><code>new</code>: The desired new value of the bits.</li>
+</ul>
+</div><h3 id='tymethod.prepare_available_bits' class='method'><code>fn <a href='#tymethod.prepare_available_bits' class='fnname'>prepare_available_bits</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a></code></h3><div class='docblock'><p>Get the value of bits available for memory manager use in an
+object, in preparation for setting those bits.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to get bits from.</li>
+</ul>
+</div><h3 id='tymethod.write_available_byte' class='method'><code>fn <a href='#tymethod.write_available_byte' class='fnname'>write_available_byte</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, val: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a>)</code></h3><div class='docblock'><p>Set the byte available for memory manager use in an object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to set the byte to.</li>
+<li><code>val</code>: The new value of the byte.</li>
+</ul>
+</div><h3 id='tymethod.read_available_byte' class='method'><code>fn <a href='#tymethod.read_available_byte' class='fnname'>read_available_byte</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a></code></h3><div class='docblock'><p>Read the byte available for memory manager use in an object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to get the byte from.</li>
+</ul>
+</div><h3 id='tymethod.write_available_bits_word' class='method'><code>fn <a href='#tymethod.write_available_bits_word' class='fnname'>write_available_bits_word</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, val: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>)</code></h3><div class='docblock'><p>Sets the bits available for memory manager use in an object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to set bits to.</li>
+<li><code>val</code>: The new values of the bits.</li>
+</ul>
+</div><h3 id='tymethod.read_available_bits_word' class='method'><code>fn <a href='#tymethod.read_available_bits_word' class='fnname'>read_available_bits_word</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a></code></h3><div class='docblock'><p>Read the bits available for memory manager use in an object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to read bits from.</li>
+</ul>
+</div><h3 id='tymethod.gc_header_offset' class='method'><code>fn <a href='#tymethod.gc_header_offset' class='fnname'>gc_header_offset</a>() -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a></code></h3><div class='stability'><div class='stab deprecated'><span class='emoji'>👎</span> Deprecated</div></div><div class='docblock'><p>Get the offset of the memory management header from the object
+reference address.</p>
+</div><h3 id='tymethod.object_start_ref' class='method'><code>fn <a href='#tymethod.object_start_ref' class='fnname'>object_start_ref</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a></code></h3><div class='docblock'><p>Return the lowest address of the storage associated with an object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to be queried.</li>
+</ul>
+</div><h3 id='tymethod.ref_to_address' class='method'><code>fn <a href='#tymethod.ref_to_address' class='fnname'>ref_to_address</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a></code></h3><div class='docblock'><p>Return an address guaranteed to be inside the storage assocatied
+with and object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to be queried.</li>
+</ul>
+</div><h3 id='tymethod.is_acyclic' class='method'><code>fn <a href='#tymethod.is_acyclic' class='fnname'>is_acyclic</a>(typeref: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></h3><div class='stability'><div class='stab deprecated'><span class='emoji'>👎</span> Deprecated</div></div><div class='docblock'><p>Check if a reference of the given type in another object is
+inherently acyclic. The type is given as a TIB.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>typeref</code>: The type of the reference (as a TIB).</li>
+</ul>
+</div><h3 id='tymethod.dump_object' class='method'><code>fn <a href='#tymethod.dump_object' class='fnname'>dump_object</a>(object: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>)</code></h3><div class='docblock'><p>Dump debugging information for an object.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>object</code>: The object to be dumped.</li>
+</ul>
+</div><h3 id='tymethod.get_array_base_offset' class='method'><code>fn <a href='#tymethod.get_array_base_offset' class='fnname'>get_array_base_offset</a>() -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a></code></h3><div class='stability'><div class='stab deprecated'><span class='emoji'>👎</span> Deprecated</div></div><h3 id='tymethod.array_base_offset_trapdoor' class='method'><code>fn <a href='#tymethod.array_base_offset_trapdoor' class='fnname'>array_base_offset_trapdoor</a>&lt;T&gt;(o: T) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a></code></h3><div class='stability'><div class='stab deprecated'><span class='emoji'>👎</span> Deprecated</div></div><h3 id='tymethod.get_array_length_offset' class='method'><code>fn <a href='#tymethod.get_array_length_offset' class='fnname'>get_array_length_offset</a>() -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a></code></h3><div class='stability'><div class='stab deprecated'><span class='emoji'>👎</span> Deprecated</div></div></div><span class='loading-content'>Loading content...</span>
+            <h2 id='implementors' class='small-section-header'>Implementors<a href='#implementors' class='anchor'></a></h2><div class='item-list' id='implementors-list'></div><span class='loading-content'>Loading content...</span><script type="text/javascript" src="../../implementors/mmtk/vm/trait.ObjectModel.js" async></script></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "mmtk";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

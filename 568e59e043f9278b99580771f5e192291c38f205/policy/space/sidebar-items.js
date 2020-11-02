@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["required_chunks",""]],"struct":[["CommonSpace",""],["SFTMap",""],["SpaceOptions",""]],"trait":[["SFT","Space Function Table (SFT)."],["Space",""]]});
