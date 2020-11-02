@@ -12,12 +12,12 @@ This repository hosts the Rust port of MMTk.
 
 ## Requirements
 
-We maintain an up to date list of the prerequisite for building MMTk and its bindings in the [mmtk-dev](https://github.com/mmtk/mmtk-dev) repository.
+We maintain an up to date list of the prerequisite for building MMTk and its bindings in the [mmtk-dev-env](https://github.com/mmtk/mmtk-dev-env) repository.
 
 ## Build
 
 Building MMTk requires a nightly Rust toolchain.
-As the Rust language and its libraries (crates) are frequently evolving, we recommend using the nightly toolchain specified in the [mmtk-dev](https://github.com/mmtk/mmtk-dev).
+As the Rust language and its libraries (crates) are frequently evolving, we recommend using the nightly toolchain specified in the [mmtk-dev-env](https://github.com/mmtk/mmtk-dev-env).
 
 ```console
 $ # replace nightly-YYYY-MM-DD with the toolchain version specified in mmtk-dev
