@@ -154,7 +154,7 @@ pub fn start_worker<VM: VMBinding>(
 /// 
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
-/// * `tls`: The thread that enables the collection (unused).
+/// * `tls`: The thread that enables the collection.
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
     mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
     VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread

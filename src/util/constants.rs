@@ -100,35 +100,3 @@ pub const BITS_IN_PAGE: usize = 1 << LOG_BITS_IN_PAGE;
 
 /* Assume byte-addressability */
 pub const LOG_BYTES_IN_ADDRESS_SPACE: u8 = BITS_IN_ADDRESS as u8;
-
-/*
- * This value specifies the <i>minimum</i> allocation alignment
- * requirement of the VM.  When making allocation requests, both
- * <code>align</code> and <code>offset</code> must be multiples of
- * <code>MIN_ALIGNMENT</code>.
- *
- * This value is required to be a power of 2.
- */
-
-//////////////// FIXME: High coupling with JavaHeader /////////////////////
-
-/*pub const LOG_MIN_ALIGNMENT: u8 = unboxed_size_constants::LOG_MIN_ALIGNMENT;
-pub const MIN_ALIGNMENT: usize = 1 << LOG_MIN_ALIGNMENT;
-
-/**
- * The maximum alignment request the vm will make. This must be a
- * power of two multiple of the minimum alignment.
- */
-pub const MAX_ALIGNMENT: usize = MIN_ALIGNMENT << unboxed_size_constants::MAX_ALIGNMENT_SHIFT;
-
-/**
- * The VM will add at most this value minus BYTES_IN_INT bytes of
- * padding to the front of an object that it places in a region of
- * memory. This value must be a power of 2.
- */
-pub const MAX_BYTES_PADDING: usize = unboxed_size_constants::MAX_BYTES_PADDING;
-
-/**
- * A bit-pattern used to fill alignment gaps.
- */
-pub const ALIGNMENT_VALUE: usize = unboxed_size_constants::ALIGNMENT_VALUE;*/

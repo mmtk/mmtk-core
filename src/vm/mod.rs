@@ -28,6 +28,7 @@ pub use self::object_model::ObjectModel;
 pub use self::reference_glue::ReferenceGlue;
 pub use self::scanning::Scanning;
 
+/// The `VMBinding` trait associates with each trait, and provides VM-specific constants.
 pub trait VMBinding
 where
     Self: Sized + 'static + Send + Sync + Default,
@@ -38,19 +39,25 @@ where
     type VMActivePlan: ActivePlan<Self>;
     type VMReferenceGlue: ReferenceGlue<Self>;
 
+    /// A value to fill in alignment gaps. This value can be used for debugging.
     const ALIGNMENT_VALUE: usize = 0xdead_beef;
+    /// Allowed minimal alignment.
     const LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
+    /// Allowed minimal alignment in bytes.
     const MIN_ALIGNMENT: usize = 1 << Self::LOG_MIN_ALIGNMENT;
     #[cfg(target_arch = "x86")]
+    /// Allowed maximum alignment as shift by min alignment.    
     const MAX_ALIGNMENT_SHIFT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
     #[cfg(target_arch = "x86_64")]
+    /// Allowed maximum alignment as shift by min alignment.    
     const MAX_ALIGNMENT_SHIFT: usize = LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
 
+    /// Allowed maximum alignment in bytes.
     const MAX_ALIGNMENT: usize = Self::MIN_ALIGNMENT << Self::MAX_ALIGNMENT_SHIFT;
 
-    // This value is used to assert if the cursor is reasonable after last allocation.
-    // At the end of an allocation, the allocation cursor should be aligned to this value.
-    // Note that MMTk does not attempt to do anything to align the cursor to this value, but
-    // it merely asserts with this constant.
+    /// This value is used to assert if the cursor is reasonable after allocations.
+    /// At the end of an allocation, the allocation cursor should be aligned to this value.
+    /// Note that MMTk does not attempt to do anything to align the cursor to this value, but
+    /// it merely asserts with this constant.
     const ALLOC_END_ALIGNMENT: usize = 1;
 }
