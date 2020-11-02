@@ -25,7 +25,7 @@ jobs:
       - name: Copy docs
         run: |
           mkdir -p to_publish/docs
-          cp -r target/doc/mmtk/* to_publish/docs/
+          cp -r target/doc/* to_publish/docs/
       - name: Deploy to Github Page
         uses: peaceiris/actions-gh-pages@v3
         with:
