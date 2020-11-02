@@ -20,7 +20,7 @@ jobs:
         run: ./.github/scripts/ci-doc.sh
       - name: Copy docs
         run: |
-          mkdir docs
+          mkdir -p docs/${GITHUB_SHA}
           cp -r target/doc/mmtk/* docs/${GITHUB_SHA}/
       - name: Deploy to Github Page
         uses: peaceiris/actions-gh-pages@v3
