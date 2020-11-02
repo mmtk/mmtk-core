@@ -1,0 +1,31 @@
+name: Generate doc
+
+on:
+  pull_request
+
+jobs:
+  rustdoc:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2020-07-08
+          components: rustfmt, clippy
+          target: i686-unknown-linux-gnu
+          # This overwrites the default toolchain with the toolchain specified above.
+          override: true    
+      - name: Generate rustdoc
+        run: ./.github/scripts/ci-doc.sh
+      - name: Copy docs
+        run: |
+          mkdir to_publish
+          cp -r target/doc/mmtk/* to_publish/${GITHUB_SHA}/
+      - name: Deploy to Github Page
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          publish_dir: to_publish
+          publish_branch: gh-pages
+          keep_files: true
