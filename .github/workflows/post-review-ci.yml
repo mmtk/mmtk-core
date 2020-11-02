@@ -145,7 +145,7 @@ jobs:
         uses: qinsoon/comment-env-vars@1.0.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          default_env: 'OPENJDK_BINDING_REVISION=master'
+          default_env: 'OPENJDK_BINDING_REF=master'
       - name: Checkout OpenJDK Binding
         uses: actions/checkout@v2
         with:
@@ -153,7 +153,7 @@ jobs:
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           path: mmtk-openjdk
           submodules: true
-          ref: ${{ env.OPENJDK_BINDING_REVISION }}
+          ref: ${{ env.OPENJDK_BINDING_REF }}
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
       - name: Setup
