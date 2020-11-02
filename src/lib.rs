@@ -66,10 +66,6 @@ pub use crate::plan::selected_plan::{SelectedConstraints, SelectedPlan};
 
 pub use crate::mm::memory_manager;
 pub use crate::mmtk::MMTK;
-<<<<<<< HEAD
-=======
-pub use crate::plan::selected_plan::{SelectedConstraints, SelectedPlan};
->>>>>>> master
 pub use crate::plan::{
     Allocator, CopyContext, Mutator, MutatorContext, Plan, TraceLocal, TransitiveClosure,
 };
