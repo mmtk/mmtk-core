@@ -36,7 +36,7 @@ unsafe impl<P: Plan> Sync for MutatorConfig<P> {}
 // We are trying to make this struct fixed-sized so that VM bindings can easily define a type to have the exact same layout as this struct.
 // Currently Mutator is fixed sized, and we should try keep this invariant:
 // - Allocators are fixed-length arrays of allocators.
-// - MutatorConfig has 3 pointers/refs (including one fat pointer), and is fixed sized.
+// - MutatorConfig only has pointers/refs (including fat pointers), and is fixed sized.
 #[repr(C)]
 pub struct Mutator<P: Plan> {
     pub allocators: Allocators<P::VM>,
