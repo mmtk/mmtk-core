@@ -30,7 +30,7 @@ lazy_static! {
     pub static ref SFT_MAP: SFTMap = SFTMap::new();
 }
 
-/// An MMTk instance. MMTk allows mutiple instances to run independently, and each instance gives users a separate heap. 
+/// An MMTk instance. MMTk allows mutiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
     pub plan: SelectedPlan<VM>,

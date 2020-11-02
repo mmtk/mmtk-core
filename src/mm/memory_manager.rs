@@ -34,7 +34,7 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 
 /// Run the main loop for the GC controller thread. This method does not return.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 /// * `tls`: The thread that will be used as the GC controller.
@@ -42,9 +42,9 @@ pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointe
     mmtk.plan.base().control_collector_context.run(tls);
 }
 
-/// Initializes an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html) 
+/// Initializes an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)
 /// instance and before using any of the methods provided in MMTk.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance to initialize.
 /// * `heap_size`: The heap size for the MMTk instance in bytes.
@@ -55,10 +55,10 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
 
 /// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should
 /// store the returned mutator in a thread local storage that can be accessed efficiently.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
-/// * `tls`: The thread that will be associated with the mutator. 
+/// * `tls`: The thread that will be associated with the mutator.
 pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: OpaquePointer,
@@ -67,7 +67,7 @@ pub fn bind_mutator<VM: VMBinding>(
 }
 
 /// Reclaim a mutator that is no longer needed.
-/// 
+///
 /// Arguments:
 /// * `mutator`: The reference to the mutator to be destroyed.
 pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<SelectedPlan<VM>>>) {
@@ -75,7 +75,7 @@ pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<SelectedPlan<VM>>>) {
 }
 
 /// Flush the mutator's local states.
-/// 
+///
 /// Arguments:
 /// * `mutator`: The reference to the mutator.
 pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<SelectedPlan<VM>>) {
@@ -84,7 +84,7 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<SelectedPlan<VM>>) {
 
 /// Allocate memory for an object. For performance reasons, a VM should
 /// implement the allocation fast-path on their side rather than just calling this function.
-/// 
+///
 /// Arguments:
 /// * `mutator`: The mutator to perform this allocation request.
 /// * `size`: The number of bytes required for the object.
@@ -104,7 +104,7 @@ pub fn alloc<VM: VMBinding>(
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are
 /// required. For performance reasons, a VM should implement the post alloc fast-path on their side
 /// rather than just calling this function.
-/// 
+///
 /// Arguments:
 /// * `mutator`: The mutator to perform post-alloc actions.
 /// * `refer`: The newly allocated object.
@@ -121,9 +121,9 @@ pub fn post_alloc<VM: VMBinding>(
     mutator.post_alloc(refer, type_refer, bytes, allocator);
 }
 
-/// Return an AllocatorSelector for the given allocation semantic. This method is provided 
+/// Return an AllocatorSelector for the given allocation semantic. This method is provided
 /// so that VM compilers may call it to help generate allocation fastpath.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 /// * `allocator`: The allocation semantic to query.
@@ -135,7 +135,7 @@ pub fn get_allocator_mapping<VM: VMBinding>(
 }
 
 /// Run the main loop for a GC worker. This method does not return.
-/// 
+///
 /// Arguments:
 /// * `tls`: The thread that will be used as the GC worker.
 /// * `worker`: The reference to the GC worker.
@@ -151,7 +151,7 @@ pub fn start_worker<VM: VMBinding>(
 
 /// Allow MMTk to trigger garbage collection. A VM should only call this method when it is ready for the mechanisms required for
 /// collection during the boot process.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 /// * `tls`: The thread that enables the collection.
@@ -162,7 +162,7 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePoin
 }
 
 /// Process MMTk run-time options.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 /// * `name`: The name of the option.
@@ -172,7 +172,7 @@ pub fn process<VM: VMBinding>(mmtk: &'static MMTK<VM>, name: &str, value: &str) 
 }
 
 /// Return used memory in bytes.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 pub fn used_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
@@ -180,7 +180,7 @@ pub fn used_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 }
 
 /// Return free memory in bytes.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 pub fn free_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
@@ -200,7 +200,7 @@ pub fn last_heap_address() -> Address {
 }
 
 /// Return the total memory in bytes.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
@@ -215,7 +215,7 @@ pub fn scan_region() {
 }
 
 /// Trigger a garbage collection as requested by the user.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 /// * `tls`: The thread that triggers this colleciton request.
@@ -224,7 +224,7 @@ pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: Opaqu
 }
 
 /// Is the object alive?
-/// 
+///
 /// Arguments:
 /// * `object`: The object reference to query.
 pub fn is_live_object(object: ObjectReference) -> bool {
@@ -232,7 +232,7 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 }
 
 /// Is the object in the mapped memory?
-/// 
+///
 /// Arguments:
 /// * `object`: The object reference to query.
 pub fn is_mapped_object(object: ObjectReference) -> bool {
@@ -240,7 +240,7 @@ pub fn is_mapped_object(object: ObjectReference) -> bool {
 }
 
 /// Is the address in the mapped memory?
-/// 
+///
 /// Arguments:
 /// * `address`: The address to query.
 pub fn is_mapped_address(address: Address) -> bool {
@@ -250,7 +250,7 @@ pub fn is_mapped_address(address: Address) -> bool {
 /// Check that if a garbage collection is in progress and if the given
 /// object is not movable.  If it is movable error messages are
 /// logged and the system exits.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 /// * `object`: The object to check.
@@ -259,7 +259,7 @@ pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {
 }
 
 /// Add a reference to the list of weak references.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 /// * `reff`: The weak reference to add.
@@ -274,7 +274,7 @@ pub fn add_weak_candidate<VM: VMBinding>(
 }
 
 /// Add a reference to the list of soft references.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 /// * `reff`: The soft reference to add.
@@ -289,7 +289,7 @@ pub fn add_soft_candidate<VM: VMBinding>(
 }
 
 /// Add a reference to the list of phantom references.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 /// * `reff`: The phantom reference to add.
@@ -303,10 +303,9 @@ pub fn add_phantom_candidate<VM: VMBinding>(
         .add_phantom_candidate::<VM>(reff, referent);
 }
 
-
 /// Generic hook to allow benchmarks to be harnessed. We do a full heap
 /// GC, and then start recording statistics for MMTk.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 /// * `tls`: The thread that calls the function (and triggers a collection).
@@ -314,10 +313,9 @@ pub fn harness_begin<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
     mmtk.harness_begin(tls);
 }
 
-
 /// Generic hook to allow benchmarks to be harnessed. We stop collecting
 /// statistics, and print stats values.
-/// 
+///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
 pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {

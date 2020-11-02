@@ -32,29 +32,29 @@ pub trait ActivePlan<VM: VMBinding> {
     fn global() -> &'static SelectedPlan<VM>;
 
     /// Return a `GCWorker` reference for the thread.
-    /// 
+    ///
     /// Arguments:
     /// * `tls`: The thread to query.
     fn worker(tls: OpaquePointer) -> &'static mut GCWorker<VM>;
 
     /// Return whether there is a mutator created and associated with the thread.
-    /// 
+    ///
     /// Arguments:
     /// * `tls`: The thread to query.
-    /// 
+    ///
     /// # Safety
     /// TODO: I am not sure why this is unsafe.
     unsafe fn is_mutator(tls: OpaquePointer) -> bool;
 
     /// Return a `Mutator` reference for the thread.
-    /// 
+    ///
     /// Arguments:
     /// * `tls`: The thread to query.
-    /// 
+    ///
     /// # Safety
     /// TODO: I am not sure why this is unsafe.
     unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan<VM> as Plan>::Mutator;
-    
+
     /// Return the number of GC collectors. This is unused by MMTk now, and will be removed.
     #[deprecated]
     fn collector_count() -> usize;
@@ -62,7 +62,7 @@ pub trait ActivePlan<VM: VMBinding> {
     /// Reset the mutator iterator so that `get_next_mutator()` should return the first mutator.
     fn reset_mutator_iterator();
 
-    /// Return the next mutator if there is any. This method assumes that the VM implements stateful type 
+    /// Return the next mutator if there is any. This method assumes that the VM implements stateful type
     /// to remember which mutator is returned and guarantees to return the next when called again. This does
     /// not need to be thread safe.
     fn get_next_mutator() -> Option<&'static mut <SelectedPlan<VM> as Plan>::Mutator>;

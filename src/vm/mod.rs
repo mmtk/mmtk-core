@@ -1,11 +1,11 @@
 //! MMTk-to-VM interface: the VMBinding trait.
-//! 
-//! This module provides VM-specific traits that serve as MMTK-to-VM interfaces. 
+//!
+//! This module provides VM-specific traits that serve as MMTK-to-VM interfaces.
 //! Each VM binding needs to provide an implementation for each of the traits.
 //! MMTk requires the interfaces to be efficient, as some of the methods are called frequently
 //! during collection (e.g. the methods for `ObjectModel`). We rely on cross-crate *link-time-optimization*
 //! to remove the overhead of MMTk invoking methods on those traits.
-//! 
+//!
 //! It is recommended for a VM binding that uses mmtk-core to do the following to ensure LTO is enabled for performance.
 //! 1. Add the following section in the manifest file of a VM binding (`Cargo.toml`). This enables LTO for the release build:
 //!    ```

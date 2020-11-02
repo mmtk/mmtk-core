@@ -11,7 +11,6 @@
 /// In addition to tracking virtual memory use and the mapping to
 /// policy, spaces also manage memory consumption (<i>used</i> virtual
 /// memory).
-
 pub mod space;
 
 #[cfg(feature = "immortalspace")]
