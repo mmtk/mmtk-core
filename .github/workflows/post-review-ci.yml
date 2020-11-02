@@ -32,12 +32,13 @@ jobs:
           ref: ${{ env.JIKESRVM_BINDING_REF }}
       - name: Overwrite MMTk core in JikesRVM binding
         run: |
-          rm -rf mmtk-jikesrvm/repos/mmtk-core
           cp -r mmtk-core mmtk-jikesrvm/repos
       - name: Setup
         run: |
           cd mmtk-jikesrvm
           RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./.github/scripts/ci-setup.sh
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
       - name: Test
         run: |
           cd mmtk-jikesrvm

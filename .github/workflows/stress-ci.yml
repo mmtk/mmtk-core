@@ -23,6 +23,10 @@ jobs:
       # setup
       - name: Overwrite MMTk core in JikesRVM binding
         run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
+      - name: Setup
+        run: |
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-jikesrvm/mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-jikesrvm/mmtk/Cargo.toml
       # SemiSpace
       - name: Build SemiSpace
         run: |
