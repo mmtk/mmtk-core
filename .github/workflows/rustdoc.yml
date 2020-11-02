@@ -15,13 +15,15 @@ jobs:
           components: rustfmt, clippy
           target: i686-unknown-linux-gnu
           # This overwrites the default toolchain with the toolchain specified above.
-          override: true    
+          override: true
+      - name: Append sha to crate version
+        run: sed -i 's/version = "[0-9]\+.[0-9]\+.[0-9]\+/&-${GITHUB_SHA}/' Cargo.toml
       - name: Generate rustdoc
         run: ./.github/scripts/ci-doc.sh
       - name: Copy docs
         run: |
-          mkdir -p to_publish/docs/${GITHUB_SHA}
-          cp -r target/doc/mmtk/* to_publish/docs/${GITHUB_SHA}/
+          mkdir -p to_publish/docs
+          cp -r target/doc/mmtk/* to_publish/docs/
       - name: Deploy to Github Page
         uses: peaceiris/actions-gh-pages@v3
         with:
