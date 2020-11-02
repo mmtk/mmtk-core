@@ -1,0 +1,145 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../mmtk/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1"> 1</span>
+<span id="2"> 2</span>
+<span id="3"> 3</span>
+<span id="4"> 4</span>
+<span id="5"> 5</span>
+<span id="6"> 6</span>
+<span id="7"> 7</span>
+<span id="8"> 8</span>
+<span id="9"> 9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">incomplete_features</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_fn</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">integer_atomics</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">drain_filter</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">nll</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">box_syntax</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">maybe_uninit_ref</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">maybe_uninit_extra</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">get_mut_unchecked</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">arbitrary_self_types</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">associated_type_defaults</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">specialization</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
+
+<span class="doccomment">//! Memory Management ToolKit (MMTk) is a portable and high performance memory manager</span>
+<span class="doccomment">//! that includes various garbage collection algorithms and provides clean and efficient</span>
+<span class="doccomment">//! interfaces to cooperate with language implementations. MMTk features highly modular</span>
+<span class="doccomment">//! and highly reusable designs. It includes components such as allocators, spaces and</span>
+<span class="doccomment">//! work packets that GC implementers can choose from to compose their own GC plan easily.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Logically, this crate includes these major parts:</span>
+<span class="doccomment">//! * GC components:</span>
+<span class="doccomment">//!   * [Allocators](util/alloc/allocator/trait.Allocator.html): handlers of allocation requests which allocate objects to the bound space.</span>
+<span class="doccomment">//!   * [Policies](policy/space/trait.Space.html): definitions of semantics and behaviors for memory regions.</span>
+<span class="doccomment">//!      Each space is an instance of a policy, and takes up a unique proportion of the heap.</span>
+<span class="doccomment">//!   * [Work packets](scheduler/work/trait.GCWork.html): units of GC works scheduled by the MMTk&#39;s scheduler.</span>
+<span class="doccomment">//! * [GC plans](plan/global/trait.Plan.html): GC algorithms composed from components.</span>
+<span class="doccomment">//!   *Note that currently the choice of plans is made through Rust features, which is a build-time config, so only one plan is present in the generated binary</span>
+<span class="doccomment">//!   and in this documentation. We plan to make this a run-time config so that users can choose GC plans at boot time.*</span>
+<span class="doccomment">//! * [Heap implementations](util/heap/index.html): the underlying implementations of memory resources that support spaces.</span>
+<span class="doccomment">//! * [Scheduler](scheduler/scheduler/struct.Scheduler.html): the MMTk scheduler to allow flexible and parallel execution of GC works.</span>
+<span class="doccomment">//! * Interfaces: bi-directional interfaces between MMTk and language implementations</span>
+<span class="doccomment">//!   i.e. [the memory manager API](memory_manager/index.html) that allows a language&#39;s memory manager to use MMTk</span>
+<span class="doccomment">//!   and [the VMBinding trait](vm/trait.VMBinding.html) that allows MMTk to call the language implementation.</span>
+
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">custom_derive</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">enum_derive</span>;
+
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">libc</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target</span> <span class="op">=</span> <span class="string">&quot;x86_64-unknown-linux-gnu&quot;</span>)]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic_traits</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">crossbeam_deque</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">num_cpus</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">downcast_rs</span>;
+
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">util</span>;
+<span class="kw">mod</span> <span class="ident">mm</span>;
+<span class="kw">mod</span> <span class="ident">mmtk</span>;
+<span class="kw">mod</span> <span class="ident">plan</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">policy</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">scheduler</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">vm</span>;
+
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">no_inline</span>)]</span>
+<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">selected_plan</span>::{<span class="ident">SelectedConstraints</span>, <span class="ident">SelectedPlan</span>};
+
+<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mm</span>::<span class="ident">memory_manager</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">MMTK</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{
+    <span class="ident">Allocator</span>, <span class="ident">CopyContext</span>, <span class="ident">Mutator</span>, <span class="ident">MutatorContext</span>, <span class="ident">Plan</span>, <span class="ident">TraceLocal</span>, <span class="ident">TransitiveClosure</span>,
+};
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "mmtk";</script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
