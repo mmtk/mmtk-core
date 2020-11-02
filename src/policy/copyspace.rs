@@ -1,20 +1,18 @@
-use crate::plan::Allocator;
 use crate::plan::TransitiveClosure;
+use crate::plan::{Allocator, CopyContext};
+use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::forwarding_word as ForwardingWord;
-use crate::util::heap::VMRequest;
-use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::OpaquePointer;
-use crate::util::{Address, ObjectReference};
-
-use crate::policy::space::SpaceOptions;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
-use crate::vm::VMBinding;
-//use crate::mmtk::SFT_MAP;
+use crate::util::heap::VMRequest;
+use crate::util::heap::{MonotonePageResource, PageResource};
+use crate::util::{Address, ObjectReference};
+use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::cell::UnsafeCell;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 unsafe impl<VM: VMBinding> Sync for CopySpace<VM> {}
 
@@ -23,19 +21,19 @@ const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 pub struct CopySpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
     pr: MonotonePageResource<VM>,
-    from_space: bool,
+    from_space: AtomicBool,
 }
 
 impl<VM: VMBinding> SFT for CopySpace<VM> {
     fn is_live(&self, object: ObjectReference) -> bool {
-        !self.from_space || ForwardingWord::is_forwarded::<VM>(object)
+        !self.from_space() || ForwardingWord::is_forwarded::<VM>(object)
     }
     fn is_movable(&self) -> bool {
         true
     }
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
-        !self.from_space
+        !self.from_space()
     }
     fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
 }
@@ -102,35 +100,35 @@ impl<VM: VMBinding> CopySpace<VM> {
                 )
             },
             common: UnsafeCell::new(common),
-            from_space,
+            from_space: AtomicBool::new(from_space),
         }
     }
 
-    pub fn prepare(&mut self, from_space: bool) {
-        self.from_space = from_space;
+    pub fn prepare(&self, from_space: bool) {
+        self.from_space.store(from_space, Ordering::SeqCst);
     }
 
-    /// # Safety
-    /// TODO: I am not sure why this is unsafe.
-    pub unsafe fn release(&mut self) {
-        self.pr.reset();
-        self.from_space = false;
+    pub fn release(&self) {
+        unsafe {
+            self.pr.reset();
+        }
+        self.from_space.store(false, Ordering::SeqCst);
     }
 
+    fn from_space(&self) -> bool {
+        self.from_space.load(Ordering::SeqCst)
+    }
+
+    #[inline]
     pub fn trace_object<T: TransitiveClosure>(
         &self,
         trace: &mut T,
         object: ObjectReference,
         allocator: Allocator,
-        tls: OpaquePointer,
+        copy_context: &mut impl CopyContext,
     ) -> ObjectReference {
-        trace!(
-            "copyspace.trace_object(, {:?}, {:?}, {:?})",
-            object,
-            allocator,
-            tls
-        );
-        if !self.from_space {
+        trace!("copyspace.trace_object(, {:?}, {:?})", object, allocator,);
+        if !self.from_space() {
             return object;
         }
         trace!("attempting to forward");
@@ -144,7 +142,8 @@ impl<VM: VMBinding> CopySpace<VM> {
             new_object
         } else {
             trace!("... no it isn't. Copying");
-            let new_object = ForwardingWord::forward_object::<VM>(object, allocator, tls);
+            let new_object =
+                ForwardingWord::forward_object::<VM, _>(object, allocator, copy_context);
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copying [{:?} -> {:?}]", object, new_object);

@@ -1,11 +1,11 @@
-use super::gc_works::{SSCopyContext, SSProcessEdges};
+use super::gc_works::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
+use super::mutator::create_gencopy_mutator;
+use super::mutator::ALLOCATOR_MAPPING;
 use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::mutator_context::Mutator;
-use crate::plan::semispace::mutator::create_ss_mutator;
-use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::Allocator;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
@@ -13,6 +13,7 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -22,39 +23,60 @@ use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
-use crate::vm::VMBinding;
+use crate::vm::*;
+use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use enum_map::EnumMap;
-
-pub type SelectedPlan<VM> = SemiSpace<VM>;
+pub type SelectedPlan<VM> = GenCopy<VM>;
 
 pub const ALLOC_SS: Allocator = Allocator::Default;
+pub const NURSERY_SIZE: usize = 16 * 1024 * 1024;
 
-pub struct SemiSpace<VM: VMBinding> {
+pub struct GenCopy<VM: VMBinding> {
+    pub nursery: CopySpace<VM>,
     pub hi: AtomicBool,
     pub copyspace0: CopySpace<VM>,
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
+    in_nursery: AtomicBool,
+    pub scheduler: &'static MMTkScheduler<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
+unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
 
-impl<VM: VMBinding> Plan for SemiSpace<VM> {
+impl<VM: VMBinding> Plan for GenCopy<VM> {
     type VM = VM;
     type Mutator = Mutator<Self>;
-    type CopyContext = SSCopyContext<VM>;
+    type CopyContext = GenCopyCopyContext<VM>;
+
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
+    where
+        Self: Sized,
+    {
+        let nursery_full = self.nursery.reserved_pages() >= (NURSERY_SIZE >> LOG_BYTES_IN_PAGE);
+        let heap_full = self.get_pages_reserved() > self.get_total_pages();
+        space_full || nursery_full || heap_full
+    }
 
     fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<Self::VM>,
+        scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
-        SemiSpace {
+        GenCopy {
+            nursery: CopySpace::new(
+                "nursery",
+                false,
+                true,
+                VMRequest::fixed_extent(NURSERY_SIZE, false),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
             hi: AtomicBool::new(false),
             copyspace0: CopySpace::new(
                 "copyspace0",
@@ -75,6 +97,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
                 &mut heap,
             ),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
+            in_nursery: AtomicBool::default(),
+            scheduler,
         }
     }
 
@@ -85,18 +109,27 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
-
+        self.nursery.init(&vm_map);
         self.copyspace0.init(&vm_map);
         self.copyspace1.init(&vm_map);
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+        let in_nursery = !self.request_full_heap_collection();
+        self.in_nursery.store(in_nursery, Ordering::SeqCst);
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
+
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler
-            .unconstrained_works
-            .add(StopMutators::<SSProcessEdges<VM>>::new());
+        if in_nursery {
+            scheduler
+                .unconstrained_works
+                .add(StopMutators::<GenCopyNurseryProcessEdges<VM>>::new());
+        } else {
+            scheduler
+                .unconstrained_works
+                .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
+        }
         // Prepare global/collectors/mutators
         scheduler.prepare_stage.add(Prepare::new(self));
         // Release global/collectors/mutators
@@ -110,9 +143,9 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn bind_mutator(
         &'static self,
         tls: OpaquePointer,
-        _mmtk: &'static MMTK<Self::VM>,
+        mmtk: &'static MMTK<Self::VM>,
     ) -> Box<Mutator<Self>> {
-        Box::new(create_ss_mutator(tls, self))
+        Box::new(create_gencopy_mutator(tls, mmtk))
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector> {
@@ -121,10 +154,11 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
     fn prepare(&self, tls: OpaquePointer) {
         self.common.prepare(tls, true);
-
-        self.hi
-            .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
-                                                                       // prepare each of the collected regions
+        self.nursery.prepare(true);
+        if !self.in_nursery() {
+            self.hi
+                .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
+        }
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
@@ -132,16 +166,20 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
     fn release(&self, tls: OpaquePointer) {
         self.common.release(tls, true);
-        // release the collected region
-        self.fromspace().release();
+        self.nursery.release();
+        if !self.in_nursery() {
+            self.fromspace().release();
+        }
     }
 
     fn get_collection_reserve(&self) -> usize {
-        self.tospace().reserved_pages()
+        self.nursery.reserved_pages() + self.tospace().reserved_pages()
     }
 
     fn get_pages_used(&self) -> usize {
-        self.tospace().reserved_pages() + self.common.get_pages_used()
+        self.nursery.reserved_pages()
+            + self.tospace().reserved_pages()
+            + self.common.get_pages_used()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -151,9 +189,17 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
+
+    fn in_nursery(&self) -> bool {
+        self.in_nursery.load(Ordering::SeqCst)
+    }
 }
 
-impl<VM: VMBinding> SemiSpace<VM> {
+impl<VM: VMBinding> GenCopy<VM> {
+    fn request_full_heap_collection(&self) -> bool {
+        self.get_total_pages() <= self.get_pages_reserved()
+    }
+
     pub fn tospace(&self) -> &CopySpace<VM> {
         if self.hi.load(Ordering::SeqCst) {
             &self.copyspace1

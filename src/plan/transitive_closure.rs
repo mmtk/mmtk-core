@@ -1,3 +1,4 @@
+use crate::scheduler::gc_works::ProcessEdgesWork;
 use crate::util::{Address, ObjectReference};
 
 pub trait TransitiveClosure {
@@ -6,4 +7,14 @@ pub trait TransitiveClosure {
     // See issue #5
     fn process_edge(&mut self, slot: Address);
     fn process_node(&mut self, object: ObjectReference);
+}
+
+impl<T: ProcessEdgesWork> TransitiveClosure for T {
+    fn process_edge(&mut self, _slot: Address) {
+        unreachable!();
+    }
+    #[inline]
+    fn process_node(&mut self, object: ObjectReference) {
+        ProcessEdgesWork::process_node(self, object);
+    }
 }

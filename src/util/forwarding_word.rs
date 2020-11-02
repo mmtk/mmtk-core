@@ -1,10 +1,9 @@
-use crate::util::OpaquePointer;
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use std::sync::atomic::Ordering;
 
-use crate::plan::Allocator;
+use crate::plan::{Allocator, CopyContext};
 use crate::vm::VMBinding;
 
 // ...00
@@ -57,12 +56,12 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
 }
 
-pub fn forward_object<VM: VMBinding>(
+pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     object: ObjectReference,
     allocator: Allocator,
-    tls: OpaquePointer,
+    copy_context: &mut CC,
 ) -> ObjectReference {
-    let new_object = VM::VMObjectModel::copy(object, allocator, tls);
+    let new_object = VM::VMObjectModel::copy(object, allocator, copy_context);
     let forwarded = (FORWARDED as usize) << VM::VMObjectModel::GC_BYTE_OFFSET;
     VM::VMObjectModel::write_available_bits_word(
         object,

@@ -95,10 +95,12 @@ pub struct SFTMap {
     sft: Vec<*const (dyn SFT + Sync)>,
 }
 
+static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
+
 impl SFTMap {
     pub fn new() -> Self {
         SFTMap {
-            sft: vec![&EmptySpaceSFT {}; MAX_CHUNKS],
+            sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
         }
     }
     // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
@@ -122,7 +124,7 @@ impl SFTMap {
     }
 
     pub fn clear(&self, chunk_idx: usize) {
-        self.set(chunk_idx, &EmptySpaceSFT {});
+        self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
 
     fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
@@ -184,13 +186,17 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         }
     }
 
-    fn in_space(&self, object: ObjectReference) -> bool {
-        let start = VM::VMObjectModel::ref_to_address(object);
+    fn address_in_space(&self, start: Address) -> bool {
         if !self.common().descriptor.is_contiguous() {
             self.common().vm_map().get_descriptor_for_address(start) == self.common().descriptor
         } else {
             start >= self.common().start && start < self.common().start + self.common().extent
         }
+    }
+
+    fn in_space(&self, object: ObjectReference) -> bool {
+        let start = VM::VMObjectModel::ref_to_address(object);
+        self.address_in_space(start)
     }
 
     /// # Safety

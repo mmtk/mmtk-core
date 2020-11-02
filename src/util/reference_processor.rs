@@ -31,6 +31,12 @@ impl ReferenceProcessors {
         }
     }
 
+    pub fn clear(&self) {
+        self.soft.clear();
+        self.weak.clear();
+        self.phantom.clear();
+    }
+
     pub fn add_soft_candidate<VM: VMBinding>(
         &self,
         reff: ObjectReference,
@@ -166,6 +172,13 @@ impl ReferenceProcessor {
     #[allow(clippy::mut_from_ref)]
     unsafe fn sync_mut(&self) -> &mut ReferenceProcessorSync {
         (&mut *self.sync.get()).get_mut().unwrap()
+    }
+
+    pub fn clear(&self) {
+        let mut sync = self.sync().lock().unwrap();
+        sync.references.clear();
+        sync.unforwarded_references = None;
+        sync.nursery_index = 0;
     }
 
     pub fn add_candidate<VM: VMBinding>(&self, reff: ObjectReference, referent: ObjectReference) {

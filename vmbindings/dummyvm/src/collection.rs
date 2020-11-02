@@ -1,12 +1,15 @@
 use mmtk::vm::Collection;
-use mmtk::{MutatorContext, ParallelCollector};
+use mmtk::MutatorContext;
 use mmtk::util::OpaquePointer;
+use mmtk::MMTK;
+use mmtk::scheduler::*;
+use mmtk::scheduler::gc_works::*;
 use DummyVM;
 
 pub struct VMCollection {}
 
 impl Collection<DummyVM> for VMCollection {
-    fn stop_all_mutators(_tls: OpaquePointer) {
+    fn stop_all_mutators<E: ProcessEdgesWork<VM=DummyVM>>(_tls: OpaquePointer) {
         unimplemented!()
     }
 
@@ -18,7 +21,7 @@ impl Collection<DummyVM> for VMCollection {
         unimplemented!();
     }
 
-    fn spawn_worker_thread<T: ParallelCollector<DummyVM>>(_tls: OpaquePointer, _ctx: Option<&mut T>) {
+    fn spawn_worker_thread(_tls: OpaquePointer, _ctx: Option<&Worker<MMTK<DummyVM>>>) {
         unimplemented!();
     }
 

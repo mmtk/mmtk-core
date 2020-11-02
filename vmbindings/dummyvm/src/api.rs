@@ -6,14 +6,20 @@ use std::ffi::CStr;
 use mmtk::memory_manager;
 use mmtk::Allocator;
 use mmtk::util::{ObjectReference, OpaquePointer, Address};
-use mmtk::{SelectedTraceLocal, SelectedCollector, SelectedPlan};
+use mmtk::SelectedPlan;
+use mmtk::scheduler::GCWorker;
 use mmtk::Mutator;
+use mmtk::MMTK;
 use DummyVM;
 use SINGLETON;
 
 #[no_mangle]
 pub extern "C" fn gc_init(heap_size: usize) {
-    memory_manager::gc_init(&SINGLETON, heap_size)
+    // # Safety
+    // Casting `SINGLETON` as mutable is safe because `gc_init` will only be executed once by a single thread during startup.
+    #[allow(clippy::cast_ref_to_mut)]
+    let singleton_mut = unsafe { &mut *(&*SINGLETON as *const MMTK<DummyVM> as *mut MMTK<DummyVM>) };
+    memory_manager::gc_init(singleton_mut, heap_size)
 }
 
 #[no_mangle]
@@ -22,23 +28,23 @@ pub extern "C" fn start_control_collector(tls: OpaquePointer) {
 }
 
 #[no_mangle]
-pub extern "C" fn bind_mutator(tls: OpaquePointer) -> *mut Mutator<DummyVM, SelectedPlan<DummyVM>> {
+pub extern "C" fn bind_mutator(tls: OpaquePointer) -> *mut Mutator<SelectedPlan<DummyVM>> {
     Box::into_raw(memory_manager::bind_mutator(&SINGLETON, tls))
 }
 
 #[no_mangle]
-pub extern "C" fn destroy_mutator(mutator: *mut Mutator<DummyVM, SelectedPlan<DummyVM>>) {
+pub extern "C" fn destroy_mutator(mutator: *mut Mutator<SelectedPlan<DummyVM>>) {
     memory_manager::destroy_mutator(unsafe { Box::from_raw(mutator) })
 }
 
 #[no_mangle]
-pub extern "C" fn alloc(mutator: *mut Mutator<DummyVM, SelectedPlan<DummyVM>>, size: usize,
+pub extern "C" fn alloc(mutator: *mut Mutator<SelectedPlan<DummyVM>>, size: usize,
                     align: usize, offset: isize, allocator: Allocator) -> Address {
     memory_manager::alloc::<DummyVM>(unsafe { &mut *mutator }, size, align, offset, allocator)
 }
 
 #[no_mangle]
-pub extern "C" fn post_alloc(mutator: *mut Mutator<DummyVM, SelectedPlan<DummyVM>>, refer: ObjectReference, type_refer: ObjectReference,
+pub extern "C" fn post_alloc(mutator: *mut Mutator<SelectedPlan<DummyVM>>, refer: ObjectReference, type_refer: ObjectReference,
                                         bytes: usize, allocator: Allocator) {
     memory_manager::post_alloc::<DummyVM>(unsafe { &mut *mutator }, refer, type_refer, bytes, allocator)
 }
@@ -49,23 +55,8 @@ pub extern "C" fn will_never_move(object: ObjectReference) -> bool {
 }
 
 #[no_mangle]
-pub extern "C" fn report_delayed_root_edge(trace_local: *mut SelectedTraceLocal<DummyVM>, addr: Address) {
-    memory_manager::report_delayed_root_edge(&SINGLETON, unsafe { &mut *trace_local }, addr)
-}
-
-#[no_mangle]
-pub extern "C" fn will_not_move_in_current_collection(trace_local: *mut SelectedTraceLocal<DummyVM>, obj: ObjectReference) -> bool {
-    memory_manager::will_not_move_in_current_collection(&SINGLETON, unsafe { &mut *trace_local }, obj)
-}
-
-#[no_mangle]
-pub extern "C" fn process_interior_edge(trace_local: *mut SelectedTraceLocal<DummyVM>, target: ObjectReference, slot: Address, root: bool) {
-    memory_manager::process_interior_edge(&SINGLETON, unsafe { &mut *trace_local }, target, slot, root)
-}
-
-#[no_mangle]
-pub extern "C" fn start_worker(tls: OpaquePointer, worker: *mut SelectedCollector<DummyVM>) {
-    memory_manager::start_worker::<DummyVM>(tls, unsafe { worker.as_mut().unwrap() })
+pub extern "C" fn start_worker(tls: OpaquePointer, worker: &'static mut GCWorker<DummyVM>, mmtk: &'static MMTK<DummyVM>) {
+    memory_manager::start_worker::<DummyVM>(tls, worker, mmtk)
 }
 
 #[no_mangle]
@@ -92,21 +83,6 @@ pub extern "C" fn total_bytes() -> usize {
 #[cfg(feature = "sanity")]
 pub extern "C" fn scan_region() {
     memory_manager::scan_region(&SINGLETON)
-}
-
-#[no_mangle]
-pub extern "C" fn trace_get_forwarded_referent(trace_local: *mut SelectedTraceLocal<DummyVM>, object: ObjectReference) -> ObjectReference{
-    memory_manager::trace_get_forwarded_referent::<DummyVM>(unsafe { &mut *trace_local }, object)
-}
-
-#[no_mangle]
-pub extern "C" fn trace_get_forwarded_reference(trace_local: *mut SelectedTraceLocal<DummyVM>, object: ObjectReference) -> ObjectReference{
-    memory_manager::trace_get_forwarded_reference::<DummyVM>(unsafe { &mut *trace_local }, object)
-}
-
-#[no_mangle]
-pub extern "C" fn trace_retain_referent(trace_local: *mut SelectedTraceLocal<DummyVM>, object: ObjectReference) -> ObjectReference{
-    memory_manager::trace_retain_referent::<DummyVM>(unsafe { &mut *trace_local }, object)
 }
 
 #[no_mangle]

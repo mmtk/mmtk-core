@@ -16,6 +16,7 @@ pub mod api;
 #[cfg(test)]
 mod tests;
 
+#[derive(Default)]
 pub struct DummyVM;
 
 impl VMBinding for DummyVM {

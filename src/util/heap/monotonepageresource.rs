@@ -55,6 +55,11 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         &mut self.common
     }
 
+    fn reserve_pages(&self, pages: usize) -> usize {
+        self.common().reserve(pages);
+        pages
+    }
+
     fn alloc_pages(
         &self,
         reserved_pages: usize,
@@ -92,10 +97,17 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             let region_start = Self::get_region_start(sync.cursor + pages_to_bytes(required_pages));
             let region_delta = region_start.get_offset(sync.cursor);
             if region_delta >= 0 {
+                new_chunk = true;
                 /* start new region, so adjust pages and return address accordingly */
                 required_pages +=
                     bytes_to_pages(region_delta as usize) + self.meta_data_pages_per_region;
                 rtn = region_start + pages_to_bytes(self.meta_data_pages_per_region);
+            }
+        } else {
+            let region_start = Self::get_region_start(sync.cursor + pages_to_bytes(required_pages));
+            let region_delta = region_start.get_offset(sync.cursor);
+            if region_delta >= 0 {
+                new_chunk = true;
             }
         }
         let bytes = pages_to_bytes(required_pages);

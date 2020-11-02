@@ -1,5 +1,8 @@
+use crate::mmtk::MMTK;
 use crate::util::statistics::counter::{Counter, LongCounter};
 use crate::util::statistics::Timer;
+use crate::vm::VMBinding;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -112,11 +115,12 @@ impl Stats {
         }
     }
 
-    pub fn print_stats(&self) {
+    pub fn print_stats<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
         println!(
             "============================ MMTk Statistics Totals ============================"
         );
-        self.print_column_names();
+        let scheduler_stat = mmtk.scheduler.statistics();
+        self.print_column_names(&scheduler_stat);
         print!("{}\t", self.get_phase() / 2);
         let counter = self.counters.lock().unwrap();
         for iter in &(*counter) {
@@ -131,6 +135,9 @@ impl Stats {
                 print!("\t");
             }
         }
+        for value in scheduler_stat.values() {
+            print!("{}\t", value);
+        }
         println!();
         print!("Total time: ");
         self.total_time.lock().unwrap().print_total(None);
@@ -138,7 +145,7 @@ impl Stats {
         println!("------------------------------ End MMTk Statistics -----------------------------")
     }
 
-    pub fn print_column_names(&self) {
+    pub fn print_column_names(&self, scheduler_stat: &HashMap<String, String>) {
         print!("GC\t");
         let counter = self.counters.lock().unwrap();
         for iter in &(*counter) {
@@ -148,6 +155,9 @@ impl Stats {
             } else {
                 print!("{}.mu\t{}.gc\t", c.name(), c.name());
             }
+        }
+        for name in scheduler_stat.keys() {
+            print!("{}\t", name);
         }
         println!();
     }
@@ -167,9 +177,9 @@ impl Stats {
         }
     }
 
-    pub fn stop_all(&self) {
+    pub fn stop_all<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
         self.stop_all_counters();
-        self.print_stats();
+        self.print_stats(mmtk);
     }
 
     fn stop_all_counters(&self) {

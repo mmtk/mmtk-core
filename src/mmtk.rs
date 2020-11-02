@@ -1,19 +1,21 @@
-use crate::plan::phase::PhaseManager;
 use crate::plan::Plan;
 use crate::plan::SelectedPlan;
 use crate::policy::space::SFTMap;
+use crate::scheduler::Scheduler;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::OpaquePointer;
-
+use crate::util::heap::layout::map::Map;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::reference_processor::ReferenceProcessors;
+#[cfg(feature = "sanity")]
+use crate::util::sanity::sanity_checker::SanityChecker;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
-
-use crate::util::heap::layout::map::Map;
-use crate::vm::VMBinding;
 use std::sync::Arc;
+#[cfg(feature = "sanity")]
+use std::sync::Mutex;
 
 // TODO: remove this singleton at some point to allow multiple instances of MMTK
 // This helps refactoring.
@@ -32,29 +34,37 @@ lazy_static! {
 
 pub struct MMTK<VM: VMBinding> {
     pub plan: SelectedPlan<VM>,
-    pub phase_manager: PhaseManager,
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
     pub sftmap: &'static SFTMap,
     pub reference_processors: ReferenceProcessors,
     pub options: Arc<UnsafeOptionsWrapper>,
-
+    pub scheduler: Arc<Scheduler<Self>>,
+    #[cfg(feature = "sanity")]
+    pub sanity_checker: Mutex<SanityChecker>,
     inside_harness: AtomicBool,
 }
 
+unsafe impl<VM: VMBinding> Send for MMTK<VM> {}
+unsafe impl<VM: VMBinding> Sync for MMTK<VM> {}
+
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
+        let scheduler = Scheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone());
-        let phase_manager = PhaseManager::new(&plan.base().stats);
+        let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone(), unsafe {
+            &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>)
+        });
         MMTK {
             plan,
-            phase_manager,
             vm_map: &VM_MAP,
             mmapper: &MMAPPER,
             sftmap: &SFT_MAP,
             reference_processors: ReferenceProcessors::new(),
             options,
+            scheduler,
+            #[cfg(feature = "sanity")]
+            sanity_checker: Mutex::new(SanityChecker::new()),
             inside_harness: AtomicBool::new(false),
         }
     }
@@ -64,10 +74,11 @@ impl<VM: VMBinding> MMTK<VM> {
         self.plan.handle_user_collection_request(tls, true);
         self.inside_harness.store(true, Ordering::SeqCst);
         self.plan.base().stats.start_all();
+        self.scheduler.enable_stat();
     }
 
-    pub fn harness_end(&self) {
-        self.plan.base().stats.stop_all();
+    pub fn harness_end(&'static self) {
+        self.plan.base().stats.stop_all(self);
         self.inside_harness.store(false, Ordering::SeqCst);
     }
 }

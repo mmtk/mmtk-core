@@ -1,3 +1,4 @@
+#![allow(incomplete_features)]
 #![feature(asm)]
 #![feature(const_fn)]
 #![feature(integer_atomics)]
@@ -6,6 +7,11 @@
 #![feature(box_syntax)]
 #![feature(maybe_uninit_ref)]
 #![feature(maybe_uninit_extra)]
+#![feature(get_mut_unchecked)]
+#![feature(arbitrary_self_types)]
+#![feature(associated_type_defaults)]
+#![feature(specialization)]
+#![feature(trait_alias)]
 
 //! Memory Management ToolKit (MMTk) is a portable and high performance memory manager
 //! that includes various garbage collection algorithms and provides clean and efficient
@@ -51,14 +57,12 @@ mod mm;
 mod mmtk;
 mod plan;
 pub mod policy;
+pub mod scheduler;
 pub mod vm;
 
 pub use crate::mm::memory_manager;
 pub use crate::mmtk::MMTK;
-pub use crate::plan::selected_plan::{
-    SelectedCollector, SelectedConstraints, SelectedPlan, SelectedTraceLocal,
-};
+pub use crate::plan::selected_plan::{SelectedConstraints, SelectedPlan};
 pub use crate::plan::{
-    Allocator, CollectorContext, Mutator, MutatorContext, ParallelCollector, Plan, TraceLocal,
-    TransitiveClosure,
+    Allocator, CopyContext, Mutator, MutatorContext, Plan, TraceLocal, TransitiveClosure,
 };

@@ -1,10 +1,15 @@
 use super::controller_collector_context::ControllerCollectorContext;
-use super::{MutatorContext, ParallelCollector, TraceLocal};
-use crate::plan::phase::Phase;
+use super::MutatorContext;
+use crate::mmtk::MMTK;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
+#[cfg(feature = "sanity")]
+use crate::scheduler::gc_works::*;
+use crate::scheduler::*;
+use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::constants::*;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -12,31 +17,114 @@ use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
+#[cfg(feature = "sanity")]
+use crate::util::sanity::sanity_checker::*;
 use crate::util::statistics::stats::Stats;
-use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
-use crate::vm::Collection;
-use crate::vm::Scanning;
-use crate::vm::VMBinding;
+use crate::util::{Address, ObjectReference};
+use crate::vm::*;
+use enum_map::EnumMap;
 use std::cell::UnsafeCell;
-use std::sync::atomic::{self, AtomicBool, AtomicUsize, Ordering};
+use std::marker::PhantomData;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::util::alloc::allocators::AllocatorSelector;
-use enum_map::EnumMap;
+pub trait CopyContext: Sized + 'static + Sync + Send {
+    type VM: VMBinding;
+    const MAX_NON_LOS_COPY_BYTES: usize = MAX_INT;
+    fn new(mmtk: &'static MMTK<Self::VM>) -> Self;
+    fn init(&mut self, tls: OpaquePointer);
+    fn prepare(&mut self);
+    fn release(&mut self);
+    fn alloc_copy(
+        &mut self,
+        original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+        allocator: Allocator,
+    ) -> Address;
+    fn post_copy(
+        &mut self,
+        _obj: ObjectReference,
+        _tib: Address,
+        _bytes: usize,
+        _allocator: Allocator,
+    ) {
+    }
+    fn copy_check_allocator(
+        &self,
+        _from: ObjectReference,
+        bytes: usize,
+        align: usize,
+        allocator: Allocator,
+    ) -> Allocator {
+        let large = crate::util::alloc::allocator::get_maximum_aligned_size::<Self::VM>(
+            bytes,
+            align,
+            Self::VM::MIN_ALIGNMENT,
+        ) > Self::MAX_NON_LOS_COPY_BYTES;
+        if large {
+            Allocator::Los
+        } else {
+            allocator
+        }
+    }
+}
 
-pub trait Plan<VM: VMBinding>: Sized {
-    type MutatorT: MutatorContext<VM>;
-    type TraceLocalT: TraceLocal;
-    type CollectorT: ParallelCollector<VM>;
+pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
+
+impl<VM: VMBinding> CopyContext for NoCopy<VM> {
+    type VM = VM;
+    fn new(_mmtk: &'static MMTK<Self::VM>) -> Self {
+        Self(PhantomData)
+    }
+    fn init(&mut self, _tls: OpaquePointer) {}
+    fn prepare(&mut self) {}
+    fn release(&mut self) {}
+    fn alloc_copy(
+        &mut self,
+        _original: ObjectReference,
+        _bytes: usize,
+        _align: usize,
+        _offset: isize,
+        _allocator: Allocator,
+    ) -> Address {
+        unreachable!()
+    }
+}
+
+pub trait Plan: Sized + 'static + Sync + Send {
+    type VM: VMBinding;
+    type Mutator: MutatorContext<Self::VM>;
+    type CopyContext: CopyContext;
 
     fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
+        scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self;
-    fn base(&self) -> &BasePlan<VM>;
-    fn common(&self) -> &CommonPlan<VM> {
+    fn base(&self) -> &BasePlan<Self::VM>;
+    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
+    #[cfg(feature = "sanity")]
+    fn schedule_sanity_collection(&'static self, scheduler: &MMTkScheduler<Self::VM>) {
+        self.base().inside_sanity.store(true, Ordering::SeqCst);
+        // Stop & scan mutators (mutator scanning can happen before STW)
+        for mutator in <Self::VM as VMBinding>::VMActivePlan::mutators() {
+            scheduler
+                .prepare_stage
+                .add(ScanStackRoot::<SanityGCProcessEdges<Self::VM>>(mutator));
+        }
+        scheduler
+            .prepare_stage
+            .add(ScanVMSpecificRoots::<SanityGCProcessEdges<Self::VM>>::new());
+        // Prepare global/collectors/mutators
+        scheduler.prepare_stage.add(SanityPrepare::new(self));
+        // Release global/collectors/mutators
+        scheduler.release_stage.add(SanityRelease::new(self));
+    }
+    fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
     fn mmapper(&self) -> &'static Mmapper {
@@ -47,14 +135,24 @@ pub trait Plan<VM: VMBinding>: Sized {
     }
 
     // unsafe because this can only be called once by the init thread
-    fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap);
+    fn gc_init(
+        &mut self,
+        heap_size: usize,
+        vm_map: &'static VMMap,
+        scheduler: &Arc<MMTkScheduler<Self::VM>>,
+    );
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Self::MutatorT>;
-    /// # Safety
-    /// Only the primary collector thread can call this.
-    unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase);
+    fn bind_mutator(
+        &'static self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> Box<Self::Mutator>;
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector>;
+
+    fn in_nursery(&self) -> bool {
+        false
+    }
 
     #[cfg(feature = "sanity")]
     fn enter_sanity(&self) {
@@ -75,7 +173,10 @@ pub trait Plan<VM: VMBinding>: Sized {
         self.base().initialized.load(Ordering::SeqCst)
     }
 
-    fn poll(&self, space_full: bool, space: &dyn Space<VM>) -> bool {
+    fn prepare(&self, tls: OpaquePointer);
+    fn release(&self, tls: OpaquePointer);
+
+    fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
         if self.collection_required(space_full, space) {
             // FIXME
             /*if space == META_DATA_SPACE {
@@ -108,7 +209,7 @@ pub trait Plan<VM: VMBinding>: Sized {
         false
     }
 
-    fn log_poll(&self, space: &dyn Space<VM>, message: &'static str) {
+    fn log_poll(&self, space: &dyn Space<Self::VM>, message: &'static str) {
         info!("  [POLL] {}: {}", space.get_name(), message);
     }
 
@@ -120,7 +221,7 @@ pub trait Plan<VM: VMBinding>: Sized {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required(&self, space_full: bool, _space: &dyn Space<VM>) -> bool
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
     where
         Self: Sized,
     {
@@ -186,7 +287,7 @@ pub trait Plan<VM: VMBinding>: Sized {
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
             self.base().control_collector_context.request();
-            VM::VMCollection::block_for_gc(tls);
+            <Self::VM as VMBinding>::VMCollection::block_for_gc(tls);
         }
     }
 
@@ -242,6 +343,9 @@ pub struct BasePlan<VM: VMBinding> {
     pub unsync: UnsafeCell<BaseUnsync<VM>>,
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
+    // A counter for per-mutator stack scanning
+    pub scanned_stacks: AtomicUsize,
+    pub mutator_iterator_lock: Mutex<()>,
 }
 
 #[cfg(feature = "base_spaces")]
@@ -264,7 +368,6 @@ pub fn create_vm_space<VM: VMBinding>(
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
 
-    use crate::util::constants::LOG_BYTES_IN_MBYTE;
     use crate::util::conversions::raw_align_up;
     use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
@@ -329,10 +432,17 @@ impl<VM: VMBinding> BasePlan<VM> {
             options,
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
+            scanned_stacks: AtomicUsize::new(0),
+            mutator_iterator_lock: Mutex::new(()),
         }
     }
 
-    pub fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
+    pub fn gc_init(
+        &mut self,
+        heap_size: usize,
+        vm_map: &'static VMMap,
+        scheduler: &Arc<MMTkScheduler<VM>>,
+    ) {
         vm_map.boot();
         vm_map.finalize_static_space_map(
             self.heap.get_discontig_start(),
@@ -341,6 +451,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.heap
             .total_pages
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);
+        self.control_collector_context.init(scheduler);
 
         #[cfg(feature = "base_spaces")]
         {
@@ -421,81 +532,46 @@ impl<VM: VMBinding> BasePlan<VM> {
         panic!("No special case for space in trace_object");
     }
 
-    pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, _primary: bool) {
-        {
-            #[cfg(feature = "base_spaces")]
-            let unsync = &mut *self.unsync.get();
+    pub fn prepare(&self, _tls: OpaquePointer, _primary: bool) {
+        #[cfg(feature = "base_spaces")]
+        let unsync = unsafe { &mut *self.unsync.get() };
+        #[cfg(feature = "code_space")]
+        unsync.code_space.prepare();
+        #[cfg(feature = "ro_space")]
+        unsync.ro_space.prepare();
+        #[cfg(feature = "vm_space")]
+        unsync.vm_space.prepare();
+    }
 
-            #[cfg(feature = "code_space")]
-            {
-                match phase {
-                    Phase::Prepare => unsync.code_space.prepare(),
-                    &Phase::Release => unsync.code_space.release(),
-                    _ => {}
-                }
-            }
+    pub fn release(&self, _tls: OpaquePointer, _primary: bool) {
+        #[cfg(feature = "base_spaces")]
+        let unsync = unsafe { &mut *self.unsync.get() };
+        #[cfg(feature = "code_space")]
+        unsync.code_space.release();
+        #[cfg(feature = "ro_space")]
+        unsync.ro_space.release();
+        #[cfg(feature = "vm_space")]
+        unsync.vm_space.release();
+    }
 
-            #[cfg(feature = "ro_space")]
-            {
-                match phase {
-                    Phase::Prepare => unsync.ro_space.prepare(),
-                    &Phase::Release => unsync.ro_space.release(),
-                    _ => {}
-                }
-            }
+    pub fn set_collection_kind(&self) {
+        self.cur_collection_attempts.store(
+            if self.is_user_triggered_collection() {
+                1
+            } else {
+                self.determine_collection_attempts()
+            },
+            Ordering::Relaxed,
+        );
 
-            #[cfg(feature = "vm_space")]
-            {
-                match phase {
-                    Phase::Prepare => unsync.vm_space.prepare(),
-                    &Phase::Release => unsync.vm_space.release(),
-                    _ => {}
-                }
-            }
+        let emergency_collection = !self.is_internal_triggered_collection()
+            && self.last_collection_was_exhaustive()
+            && self.cur_collection_attempts.load(Ordering::Relaxed) > 1;
+        self.emergency_collection
+            .store(emergency_collection, Ordering::Relaxed);
 
-            match phase {
-                Phase::SetCollectionKind => {
-                    self.cur_collection_attempts.store(
-                        if self.is_user_triggered_collection() {
-                            1
-                        } else {
-                            self.determine_collection_attempts()
-                        },
-                        Ordering::Relaxed,
-                    );
-
-                    let emergency_collection = !self.is_internal_triggered_collection()
-                        && self.last_collection_was_exhaustive()
-                        && self.cur_collection_attempts.load(Ordering::Relaxed) > 1;
-                    self.emergency_collection
-                        .store(emergency_collection, Ordering::Relaxed);
-
-                    if emergency_collection {
-                        self.force_full_heap_collection();
-                    }
-                }
-                Phase::Initiate => {
-                    self.set_gc_status(GcStatus::GcPrepare);
-                }
-                Phase::PrepareStacks => {
-                    self.stacks_prepared.store(true, atomic::Ordering::SeqCst);
-                }
-                Phase::Prepare => {}
-                Phase::Closure => {}
-                &Phase::StackRoots => {
-                    VM::VMScanning::notify_initial_thread_scan_complete(false, tls);
-                    self.set_gc_status(GcStatus::GcProper);
-                }
-                &Phase::Roots => {
-                    VM::VMScanning::reset_thread_counter();
-                    self.set_gc_status(GcStatus::GcProper);
-                }
-                &Phase::Release => {}
-                Phase::Complete => {
-                    self.set_gc_status(GcStatus::NotInGC);
-                }
-                _ => panic!("Global phase not handled!"),
-            }
+        if emergency_collection {
+            self.force_full_heap_collection();
         }
     }
 
@@ -597,8 +673,13 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
-    pub fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
-        self.base.gc_init(heap_size, vm_map);
+    pub fn gc_init(
+        &mut self,
+        heap_size: usize,
+        vm_map: &'static VMMap,
+        scheduler: &Arc<MMTkScheduler<VM>>,
+    ) {
+        self.base.gc_init(heap_size, vm_map, scheduler);
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.immortal.init(vm_map);
         unsync.los.init(vm_map);
@@ -627,20 +708,18 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.trace_object(trace, object)
     }
 
-    pub unsafe fn collection_phase(&self, tls: OpaquePointer, phase: &Phase, primary: bool) {
-        let unsync = &mut *self.unsync.get();
-        match phase {
-            Phase::Prepare => {
-                unsync.immortal.prepare();
-                unsync.los.prepare(primary);
-            }
-            &Phase::Release => {
-                unsync.immortal.release();
-                unsync.los.release(primary);
-            }
-            _ => {}
-        }
-        self.base.collection_phase(tls, phase, primary)
+    pub fn prepare(&self, tls: OpaquePointer, primary: bool) {
+        let unsync = unsafe { &mut *self.unsync.get() };
+        unsync.immortal.prepare();
+        unsync.los.prepare(primary);
+        self.base.prepare(tls, primary)
+    }
+
+    pub fn release(&self, tls: OpaquePointer, primary: bool) {
+        let unsync = unsafe { &mut *self.unsync.get() };
+        unsync.immortal.release();
+        unsync.los.release(primary);
+        self.base.release(tls, primary)
     }
 
     pub fn stacks_prepared(&self) -> bool {

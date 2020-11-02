@@ -1,24 +1,21 @@
-use crate::plan::{Phase, Plan};
-use crate::policy::space::Space;
-#[allow(unused_imports)]
-use crate::util::heap::VMRequest;
-use crate::util::OpaquePointer;
-
-use std::cell::UnsafeCell;
-
-use super::NoGCCollector;
-use super::NoGCTraceLocal;
-use crate::plan::global::BasePlan;
+use crate::mmtk::MMTK;
+use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::mutator_context::Mutator;
 use crate::plan::nogc::mutator::create_nogc_mutator;
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::Allocator;
+use crate::plan::Plan;
+use crate::policy::space::Space;
+use crate::scheduler::MMTkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
+#[allow(unused_imports)]
+use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
@@ -31,25 +28,22 @@ use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalS
 pub type SelectedPlan<VM> = NoGC<VM>;
 
 pub struct NoGC<VM: VMBinding> {
-    pub unsync: UnsafeCell<NoGCUnsync<VM>>,
     pub base: BasePlan<VM>,
+    pub nogc_space: NoGCImmortalSpace<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
 
-pub struct NoGCUnsync<VM: VMBinding> {
-    pub nogc_space: NoGCImmortalSpace<VM>,
-}
-
-impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
-    type MutatorT = Mutator<VM, Self>;
-    type TraceLocalT = NoGCTraceLocal<VM>;
-    type CollectorT = NoGCCollector<VM>;
+impl<VM: VMBinding> Plan for NoGC<VM> {
+    type VM = VM;
+    type Mutator = Mutator<Self>;
+    type CopyContext = NoCopy<VM>;
 
     fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
+        _scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
         #[cfg(not(feature = "nogc_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
@@ -70,28 +64,40 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         );
 
         NoGC {
-            unsync: UnsafeCell::new(NoGCUnsync { nogc_space }),
+            nogc_space,
             base: BasePlan::new(vm_map, mmapper, options, heap),
         }
     }
 
-    fn gc_init(&self, heap_size: usize, vm_map: &'static VMMap) {
-        self.base.gc_init(heap_size, vm_map);
+    fn gc_init(
+        &mut self,
+        heap_size: usize,
+        vm_map: &'static VMMap,
+        scheduler: &Arc<MMTkScheduler<VM>>,
+    ) {
+        self.base.gc_init(heap_size, vm_map, scheduler);
 
         // FIXME correctly initialize spaces based on options
-        let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.nogc_space.init(vm_map);
+        self.nogc_space.init(&vm_map);
     }
 
     fn base(&self) -> &BasePlan<VM> {
         &self.base
     }
 
-    fn bind_mutator(&'static self, tls: OpaquePointer) -> Box<Mutator<VM, Self>> {
+    fn bind_mutator(
+        &'static self,
+        tls: OpaquePointer,
+        _mmtk: &'static MMTK<Self::VM>,
+    ) -> Box<Mutator<Self>> {
         Box::new(create_nogc_mutator(tls, self))
     }
 
-    unsafe fn collection_phase(&self, _tls: OpaquePointer, _phase: &Phase) {
+    fn prepare(&self, _tls: OpaquePointer) {
+        unreachable!()
+    }
+
+    fn release(&self, _tls: OpaquePointer) {
         unreachable!()
     }
 
@@ -99,19 +105,15 @@ impl<VM: VMBinding> Plan<VM> for NoGC<VM> {
         &*ALLOCATOR_MAPPING
     }
 
+    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<VM>) {
+        unreachable!("GC triggered in nogc")
+    }
+
     fn get_pages_used(&self) -> usize {
-        let unsync = unsafe { &*self.unsync.get() };
-        unsync.nogc_space.reserved_pages()
+        self.nogc_space.reserved_pages()
     }
 
     fn handle_user_collection_request(&self, _tls: OpaquePointer, _force: bool) {
         println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
-    }
-}
-
-impl<VM: VMBinding> NoGC<VM> {
-    pub fn get_immortal_space(&self) -> &'static NoGCImmortalSpace<VM> {
-        let unsync = unsafe { &*self.unsync.get() };
-        &unsync.nogc_space
     }
 }

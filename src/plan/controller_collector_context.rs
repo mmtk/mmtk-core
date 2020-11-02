@@ -1,16 +1,11 @@
-use super::ParallelCollectorGroup;
-
-use std::cell::UnsafeCell;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Condvar, Mutex};
-
-use crate::vm::Collection;
-
-use crate::plan::selected_plan::SelectedPlan;
-use crate::plan::Plan;
-
+use crate::scheduler::gc_works::ScheduleCollection;
+use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+use std::marker::PhantomData;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::RwLock;
+use std::sync::{Arc, Condvar, Mutex};
 
 struct RequestSync {
     tls: OpaquePointer,
@@ -21,12 +16,19 @@ struct RequestSync {
 pub struct ControllerCollectorContext<VM: VMBinding> {
     request_sync: Mutex<RequestSync>,
     request_condvar: Condvar,
-
-    pub workers: UnsafeCell<ParallelCollectorGroup<VM, <SelectedPlan<VM> as Plan<VM>>::CollectorT>>,
+    scheduler: RwLock<Option<Arc<MMTkScheduler<VM>>>>,
     request_flag: AtomicBool,
+    phantom: PhantomData<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for ControllerCollectorContext<VM> {}
+
+// Clippy says we need this...
+impl<VM: VMBinding> Default for ControllerCollectorContext<VM> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl<VM: VMBinding> ControllerCollectorContext<VM> {
     pub fn new() -> Self {
@@ -37,13 +39,16 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
                 last_request_count: -1,
             }),
             request_condvar: Condvar::new(),
-
-            workers: UnsafeCell::new(ParallelCollectorGroup::<
-                VM,
-                <SelectedPlan<VM> as Plan<VM>>::CollectorT,
-            >::new()),
+            scheduler: RwLock::new(None),
             request_flag: AtomicBool::new(false),
+            phantom: PhantomData,
         }
+    }
+
+    pub fn init(&self, scheduler: &Arc<MMTkScheduler<VM>>) {
+        let mut scheduler_guard = self.scheduler.write().unwrap();
+        debug_assert!(scheduler_guard.is_none());
+        *scheduler_guard = Some(scheduler.clone());
     }
 
     pub fn run(&self, tls: OpaquePointer) {
@@ -51,31 +56,22 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
             self.request_sync.lock().unwrap().tls = tls;
         }
 
-        // Safe provided that we don't hold a &mut to this struct
-        // before executing run()
-        let workers = unsafe { &*self.workers.get() };
-
         loop {
             debug!("[STWController: Waiting for request...]");
             self.wait_for_request();
             debug!("[STWController: Request recieved.]");
-            debug!("[STWController: Stopping the world...]");
-            VM::VMCollection::stop_all_mutators(tls);
 
             // For heap growth logic
             // FIXME: This is not used. However, we probably want to set a 'user_triggered' flag
             // when GC is requested.
             // let user_triggered_collection: bool = SelectedPlan::is_user_triggered_collection();
 
-            self.clear_request();
-
-            debug!("[STWController: Triggering worker threads...]");
-            workers.trigger_cycle();
-
-            workers.wait_for_cycle();
+            let scheduler = self.scheduler.read().unwrap();
+            let scheduler = scheduler.as_ref().unwrap();
+            scheduler.initialize_worker(tls);
+            scheduler.set_initializer(Some(ScheduleCollection));
+            scheduler.wait_for_completion();
             debug!("[STWController: Worker threads complete!]");
-            debug!("[STWController: Resuming mutators...]");
-            VM::VMCollection::resume_mutators(tls);
         }
     }
 
@@ -104,11 +100,5 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
         while guard.last_request_count == guard.request_count {
             guard = self.request_condvar.wait(guard).unwrap();
         }
-    }
-}
-
-impl<VM: VMBinding> Default for ControllerCollectorContext<VM> {
-    fn default() -> Self {
-        Self::new()
     }
 }

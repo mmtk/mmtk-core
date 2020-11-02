@@ -1,14 +1,18 @@
-use crate::plan::Allocator;
-use crate::util::OpaquePointer;
+use crate::plan::CopyContext;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
+use crate::Allocator;
 use std::sync::atomic::AtomicU8;
 
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/vm/ObjectModel.java
 pub trait ObjectModel<VM: VMBinding> {
     const GC_BYTE_OFFSET: usize;
     fn get_gc_byte(o: ObjectReference) -> &'static AtomicU8;
-    fn copy(from: ObjectReference, allocator: Allocator, tls: OpaquePointer) -> ObjectReference;
+    fn copy(
+        from: ObjectReference,
+        allocator: Allocator,
+        copy_context: &mut impl CopyContext,
+    ) -> ObjectReference;
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address;
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference;
     fn get_size_when_copied(object: ObjectReference) -> usize;
@@ -19,7 +23,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// # Safety
     /// We would expect ObjectReferences point to valid objects,
     /// but an arbitrary Address may not reside an object. This conversion is unsafe,
-    /// and it is the user's responsibility to ensure the safety.    
+    /// and it is the user's responsibility to ensure the safety.
     unsafe fn get_object_from_start_address(start: Address) -> ObjectReference;
     fn get_object_end_address(object: ObjectReference) -> Address;
     // FIXME: determine lifetime, returns byte[]
