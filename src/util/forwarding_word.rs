@@ -58,10 +58,10 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
 
 pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     object: ObjectReference,
-    allocator: AllocationSemantics,
+    semantics: AllocationSemantics,
     copy_context: &mut CC,
 ) -> ObjectReference {
-    let new_object = VM::VMObjectModel::copy(object, allocator, copy_context);
+    let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
     let forwarded = (FORWARDED as usize) << VM::VMObjectModel::GC_BYTE_OFFSET;
     VM::VMObjectModel::write_available_bits_word(
         object,

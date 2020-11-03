@@ -124,10 +124,10 @@ impl<VM: VMBinding> CopySpace<VM> {
         &self,
         trace: &mut T,
         object: ObjectReference,
-        allocator: AllocationSemantics,
+        semantics: AllocationSemantics,
         copy_context: &mut impl CopyContext,
     ) -> ObjectReference {
-        trace!("copyspace.trace_object(, {:?}, {:?})", object, allocator,);
+        trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
         if !self.from_space() {
             return object;
         }
@@ -143,7 +143,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         } else {
             trace!("... no it isn't. Copying");
             let new_object =
-                ForwardingWord::forward_object::<VM, _>(object, allocator, copy_context);
+                ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context);
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copying [{:?} -> {:?}]", object, new_object);

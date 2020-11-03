@@ -45,14 +45,14 @@ pub trait CopyContext: Sized + 'static + Sync + Send {
         bytes: usize,
         align: usize,
         offset: isize,
-        allocator: AllocationSemantics,
+        semantics: AllocationSemantics,
     ) -> Address;
     fn post_copy(
         &mut self,
         _obj: ObjectReference,
         _tib: Address,
         _bytes: usize,
-        _allocator: AllocationSemantics,
+        _semantics: AllocationSemantics,
     ) {
     }
     fn copy_check_allocator(
@@ -60,7 +60,7 @@ pub trait CopyContext: Sized + 'static + Sync + Send {
         _from: ObjectReference,
         bytes: usize,
         align: usize,
-        allocator: AllocationSemantics,
+        semantics: AllocationSemantics,
     ) -> AllocationSemantics {
         let large = crate::util::alloc::allocator::get_maximum_aligned_size::<Self::VM>(
             bytes,
@@ -70,7 +70,7 @@ pub trait CopyContext: Sized + 'static + Sync + Send {
         if large {
             AllocationSemantics::Los
         } else {
-            allocator
+            semantics
         }
     }
 }
@@ -91,7 +91,7 @@ impl<VM: VMBinding> CopyContext for NoCopy<VM> {
         _bytes: usize,
         _align: usize,
         _offset: isize,
-        _allocator: AllocationSemantics,
+        _semantics: AllocationSemantics,
     ) -> Address {
         unreachable!()
     }

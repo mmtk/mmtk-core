@@ -14,7 +14,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         unimplemented!()
     }
 
-    fn copy(_from: ObjectReference, _allocator: AllocationSemantics, _copy_context: &mut impl CopyContext) -> ObjectReference {
+    fn copy(_from: ObjectReference, _semantics: AllocationSemantics, _copy_context: &mut impl CopyContext) -> ObjectReference {
         unimplemented!()
     }
 
