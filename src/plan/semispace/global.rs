@@ -6,7 +6,7 @@ use crate::plan::global::GcStatus;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::semispace::mutator::create_ss_mutator;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
-use crate::plan::Allocator;
+use crate::plan::AllocationSemantic;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
@@ -30,7 +30,7 @@ use enum_map::EnumMap;
 
 pub type SelectedPlan<VM> = SemiSpace<VM>;
 
-pub const ALLOC_SS: Allocator = Allocator::Default;
+pub const ALLOC_SS: AllocationSemantic = AllocationSemantic::Default;
 
 pub struct SemiSpace<VM: VMBinding> {
     pub hi: AtomicBool,
@@ -115,7 +115,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         Box::new(create_ss_mutator(tls, self))
     }
 
-    fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector> {
+    fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantic, AllocatorSelector> {
         &*ALLOCATOR_MAPPING
     }
 

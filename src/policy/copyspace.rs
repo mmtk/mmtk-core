@@ -1,5 +1,5 @@
 use crate::plan::TransitiveClosure;
-use crate::plan::{Allocator, CopyContext};
+use crate::plan::{AllocationSemantic, CopyContext};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
@@ -124,7 +124,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         &self,
         trace: &mut T,
         object: ObjectReference,
-        allocator: Allocator,
+        allocator: AllocationSemantic,
         copy_context: &mut impl CopyContext,
     ) -> ObjectReference {
         trace!("copyspace.trace_object(, {:?}, {:?})", object, allocator,);

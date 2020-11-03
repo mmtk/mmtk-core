@@ -1,6 +1,6 @@
 use mmtk::vm::ObjectModel;
 use mmtk::util::{Address, ObjectReference};
-use mmtk::Allocator;
+use mmtk::AllocationSemantic;
 use mmtk::CopyContext;
 use DummyVM;
 use std::sync::atomic::AtomicU8;
@@ -14,7 +14,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         unimplemented!()
     }
 
-    fn copy(_from: ObjectReference, _allocator: Allocator, _copy_context: &mut impl CopyContext) -> ObjectReference {
+    fn copy(_from: ObjectReference, _allocator: AllocationSemantic, _copy_context: &mut impl CopyContext) -> ObjectReference {
         unimplemented!()
     }
 

@@ -45,14 +45,14 @@ pub trait CopyContext: Sized + 'static + Sync + Send {
         bytes: usize,
         align: usize,
         offset: isize,
-        allocator: Allocator,
+        allocator: AllocationSemantic,
     ) -> Address;
     fn post_copy(
         &mut self,
         _obj: ObjectReference,
         _tib: Address,
         _bytes: usize,
-        _allocator: Allocator,
+        _allocator: AllocationSemantic,
     ) {
     }
     fn copy_check_allocator(
@@ -60,15 +60,15 @@ pub trait CopyContext: Sized + 'static + Sync + Send {
         _from: ObjectReference,
         bytes: usize,
         align: usize,
-        allocator: Allocator,
-    ) -> Allocator {
+        allocator: AllocationSemantic,
+    ) -> AllocationSemantic {
         let large = crate::util::alloc::allocator::get_maximum_aligned_size::<Self::VM>(
             bytes,
             align,
             Self::VM::MIN_ALIGNMENT,
         ) > Self::MAX_NON_LOS_COPY_BYTES;
         if large {
-            Allocator::Los
+            AllocationSemantic::Los
         } else {
             allocator
         }
@@ -91,7 +91,7 @@ impl<VM: VMBinding> CopyContext for NoCopy<VM> {
         _bytes: usize,
         _align: usize,
         _offset: isize,
-        _allocator: Allocator,
+        _allocator: AllocationSemantic,
     ) -> Address {
         unreachable!()
     }
@@ -156,7 +156,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
         mmtk: &'static MMTK<Self::VM>,
     ) -> Box<Self::Mutator>;
 
-    fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector>;
+    fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantic, AllocatorSelector>;
 
     fn in_nursery(&self) -> bool {
         false
@@ -750,7 +750,7 @@ use enum_map::Enum;
 /// Each allocation request requires a desired semantic for the object to allocate.
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, Enum)]
-pub enum Allocator {
+pub enum AllocationSemantic {
     Default = 0,
     Immortal = 1,
     Los = 2,

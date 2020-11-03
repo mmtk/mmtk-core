@@ -3,7 +3,7 @@ use super::GenCopy;
 use crate::plan::barriers::*;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
-use crate::plan::Allocator as AllocationType;
+use crate::plan::AllocationSemantic as AllocationType;
 use crate::policy::copyspace::CopySpace;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
