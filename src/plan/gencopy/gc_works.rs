@@ -40,7 +40,7 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
         bytes: usize,
         align: usize,
         offset: isize,
-        _allocator: crate::AllocationSemantic,
+        _allocator: crate::AllocationSemantics,
     ) -> Address {
         debug_assert!(VM::VMActivePlan::global().base().gc_in_progress_proper());
         self.ss.alloc(bytes, align, offset)
@@ -51,7 +51,7 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
         obj: ObjectReference,
         _tib: Address,
         _bytes: usize,
-        _allocator: crate::AllocationSemantic,
+        _allocator: crate::AllocationSemantics,
     ) {
         forwarding_word::clear_forwarding_bits::<VM>(obj);
     }

@@ -26,7 +26,7 @@ use crate::plan::selected_plan;
 use crate::util::alloc::allocators::AllocatorSelector;
 
 use crate::mmtk::MMTK;
-use crate::plan::AllocationSemantic;
+use crate::plan::AllocationSemantics;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
@@ -96,7 +96,7 @@ pub fn alloc<VM: VMBinding>(
     size: usize,
     align: usize,
     offset: isize,
-    allocator: AllocationSemantic,
+    allocator: AllocationSemantics,
 ) -> Address {
     mutator.alloc(size, align, offset, allocator)
 }
@@ -116,7 +116,7 @@ pub fn post_alloc<VM: VMBinding>(
     refer: ObjectReference,
     type_refer: ObjectReference,
     bytes: usize,
-    allocator: AllocationSemantic,
+    allocator: AllocationSemantics,
 ) {
     mutator.post_alloc(refer, type_refer, bytes, allocator);
 }
@@ -129,7 +129,7 @@ pub fn post_alloc<VM: VMBinding>(
 /// * `allocator`: The allocation semantic to query.
 pub fn get_allocator_mapping<VM: VMBinding>(
     mmtk: &MMTK<VM>,
-    allocator: AllocationSemantic,
+    allocator: AllocationSemantics,
 ) -> AllocatorSelector {
     mmtk.plan.get_allocator_mapping()[allocator]
 }

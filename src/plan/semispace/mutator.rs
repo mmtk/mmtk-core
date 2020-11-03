@@ -2,7 +2,7 @@ use super::SemiSpace;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
-use crate::plan::AllocationSemantic as AllocationType;
+use crate::plan::AllocationSemantics as AllocationType;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;

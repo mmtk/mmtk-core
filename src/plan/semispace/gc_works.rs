@@ -39,7 +39,7 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
         bytes: usize,
         align: usize,
         offset: isize,
-        _allocator: crate::AllocationSemantic,
+        _allocator: crate::AllocationSemantics,
     ) -> Address {
         self.ss.alloc(bytes, align, offset)
     }
@@ -49,7 +49,7 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
         obj: ObjectReference,
         _tib: Address,
         _bytes: usize,
-        _allocator: crate::AllocationSemantic,
+        _allocator: crate::AllocationSemantics,
     ) {
         forwarding_word::clear_forwarding_bits::<VM>(obj);
     }
