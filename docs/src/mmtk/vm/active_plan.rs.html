@@ -107,7 +107,7 @@
 
 <span class="doccomment">/// VM-specific methods for the current plan.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ActivePlan</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Return a referemce to the current plan.</span>
+    <span class="doccomment">/// Return a reference to the current plan.</span>
     <span class="comment">// TODO: I don&#39;t know how this can be implemented when we have multiple MMTk instances.</span>
     <span class="comment">// This function is used by space and phase to refer to the current plan.</span>
     <span class="comment">// Possibly we should remove the use of this function, and remove this function?</span>
@@ -141,7 +141,7 @@
     <span class="attribute">#[<span class="ident">deprecated</span>]</span>
     <span class="kw">fn</span> <span class="ident">collector_count</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
 
-    <span class="doccomment">/// Reset the mutator iterator so that `get_next_mutator()` should return the first mutator.</span>
+    <span class="doccomment">/// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.</span>
     <span class="kw">fn</span> <span class="ident">reset_mutator_iterator</span>();
 
     <span class="doccomment">/// Return the next mutator if there is any. This method assumes that the VM implements stateful type</span>
@@ -158,7 +158,7 @@
         }
     }
 
-    <span class="doccomment">/// Return a total count of mutators.</span>
+    <span class="doccomment">/// Return the total count of mutators.</span>
     <span class="kw">fn</span> <span class="ident">number_of_mutators</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
 }
 </pre></div>

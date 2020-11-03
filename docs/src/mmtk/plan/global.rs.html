@@ -791,7 +791,7 @@
 
 <span class="doccomment">/// A GC worker&#39;s context for copying GCs.</span>
 <span class="doccomment">/// Each GC plan should provide their implementation of a CopyContext.</span>
-<span class="doccomment">/// For non-coping GC, NoCopy can be used.</span>
+<span class="doccomment">/// For non-copying GC, NoCopy can be used.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">CopyContext</span>: <span class="ident">Sized</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span> {
     <span class="kw">type</span> <span class="ident">VM</span>: <span class="ident">VMBinding</span>;
     <span class="kw">const</span> <span class="ident">MAX_NON_LOS_COPY_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">MAX_INT</span>;

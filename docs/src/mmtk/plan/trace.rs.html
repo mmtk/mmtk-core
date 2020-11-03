@@ -36,7 +36,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 
 <span class="doccomment">/// This trait describes the core functionality for a transitive</span>
-<span class="doccomment">/// closure over the heap. Any class implementign this trait holds the global state, TraceLocal</span>
+<span class="doccomment">/// closure over the heap. Any class implementing this trait holds the global state, TraceLocal</span>
 <span class="doccomment">/// and its implementers handle per-thread state.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Trace</span> {
     <span class="kw">pub</span> <span class="ident">values</span>: <span class="ident">SharedQueue</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>,

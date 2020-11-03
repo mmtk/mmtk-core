@@ -31,7 +31,7 @@
 <div class='item-spacer'></div>    fn <a href='#tymethod.array_base_offset_trapdoor' class='fnname'>array_base_offset_trapdoor</a>&lt;T&gt;(o: T) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a>;
 <div class='item-spacer'></div>    fn <a href='#tymethod.get_array_length_offset' class='fnname'>get_array_length_offset</a>() -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.isize.html">isize</a>;
 }</pre></div><div class='docblock'><p>VM-specific methods for object model.</p>
-<p>MMTk requires <em>at least one byte</em> (or possibly a few bits in ceratin plans) for MMTk as per-object metadata.
+<p>MMTk requires <em>at least one byte</em> (or possibly a few bits in certain plans) for MMTk as per-object metadata.
 MMTk currently assumes the available byte/bits are in the <em>header words</em> --
 this is a strict requirement, and we are looking to revamp the design and support VMs that do not have header words for objects.</p>
 <p>Note that depending on the selected GC plan, only a subset of the methods provided here will be used.</p>
@@ -43,11 +43,11 @@ this is a strict requirement, and we are looking to revamp the design and suppor
 <ul>
 <li><code>o</code>: The object to get the GC byte from.</li>
 </ul>
-</div><h3 id='tymethod.copy' class='method'><code>fn <a href='#tymethod.copy' class='fnname'>copy</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;from: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;allocator: <a class="enum" href="../../mmtk/enum.Allocator.html" title="enum mmtk::Allocator">Allocator</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;copy_context: &amp;mut impl <a class="trait" href="../../mmtk/trait.CopyContext.html" title="trait mmtk::CopyContext">CopyContext</a><br>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a></code></h3><div class='docblock'><p>Copy an object and returns the address of the new object. Usually in the implementation of this method,
+</div><h3 id='tymethod.copy' class='method'><code>fn <a href='#tymethod.copy' class='fnname'>copy</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;from: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;allocator: <a class="enum" href="../../mmtk/enum.Allocator.html" title="enum mmtk::Allocator">Allocator</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;copy_context: &amp;mut impl <a class="trait" href="../../mmtk/trait.CopyContext.html" title="trait mmtk::CopyContext">CopyContext</a><br>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a></code></h3><div class='docblock'><p>Copy an object and return the address of the new object. Usually in the implementation of this method,
 <code>alloc_copy()</code> and <code>post_copy()</code> from a plan's <a href="../trait.CopyContext.html"><code>CopyContext</code></a> are used for copying.</p>
 <p>Arguments:</p>
 <ul>
-<li><code>from</code>: The addres of the object to be copied.</li>
+<li><code>from</code>: The address of the object to be copied.</li>
 <li><code>allocator</code>: The allocation semantic to use.</li>
 <li><code>copy_context</code>: The <code>CopyContext</code> for the GC thread.</li>
 </ul>

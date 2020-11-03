@@ -332,8 +332,8 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! For example, for mutators, this API provides a `Box&lt;Mutator&gt;`, and requires a `&amp;mut Mutator` for allocation.</span>
 <span class="doccomment">//! A VM binding can borrow a mutable reference directly from `Box&lt;Mutator&gt;`, and call `alloc()`. Alternatively,</span>
-<span class="doccomment">//! it can turn the Box pointer to a native pointer (`*mut Mutator`), then forge a mut reference from the native</span>
-<span class="doccomment">//! pointer. In either way, the VM binding code needs to guarantee the safety.</span>
+<span class="doccomment">//! it can turn the `Box` pointer to a native pointer (`*mut Mutator`), and forge a mut reference from the native</span>
+<span class="doccomment">//! pointer. Either way, the VM binding code needs to guarantee the safety.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">Ordering</span>;
 
@@ -360,17 +360,17 @@
 <span class="doccomment">/// Run the main loop for the GC controller thread. This method does not return.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `tls`: The thread that will be used as the GC controller.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_control_collector</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">control_collector_context</span>.<span class="ident">run</span>(<span class="ident">tls</span>);
 }
 
-<span class="doccomment">/// Initializes an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)</span>
-<span class="doccomment">/// instance and before using any of the methods provided in MMTk.</span>
+<span class="doccomment">/// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)</span>
+<span class="doccomment">/// instance but before using any of the methods provided in MMTk.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance to initialize.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance to initialize.</span>
 <span class="doccomment">/// * `heap_size`: The heap size for the MMTk instance in bytes.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gc_init</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">heap_size</span>: <span class="ident">usize</span>) {
     <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">logger</span>::<span class="ident">init</span>().<span class="ident">unwrap</span>();
@@ -381,7 +381,7 @@
 <span class="doccomment">/// store the returned mutator in a thread local storage that can be accessed efficiently.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `tls`: The thread that will be associated with the mutator.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bind_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
@@ -393,7 +393,7 @@
 <span class="doccomment">/// Reclaim a mutator that is no longer needed.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mutator`: The reference to the mutator to be destroyed.</span>
+<span class="doccomment">/// * `mutator`: A reference to the mutator to be destroyed.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">destroy_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">SelectedPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
     <span class="ident">drop</span>(<span class="ident">mutator</span>);
 }
@@ -401,7 +401,7 @@
 <span class="doccomment">/// Flush the mutator&#39;s local states.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mutator`: The reference to the mutator.</span>
+<span class="doccomment">/// * `mutator`: A reference to the mutator.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">SelectedPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
     <span class="ident">mutator</span>.<span class="ident">flush</span>()
 }
@@ -446,7 +446,7 @@
 }
 
 <span class="doccomment">/// Return an AllocatorSelector for the given allocation semantic. This method is provided</span>
-<span class="doccomment">/// so that VM compilers may call it to help generate allocation fastpath.</span>
+<span class="doccomment">/// so that VM compilers may call it to help generate allocation fast-path.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
@@ -458,12 +458,12 @@
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_allocator_mapping</span>()[<span class="ident">allocator</span>]
 }
 
-<span class="doccomment">/// Run the main loop for a GC worker. This method does not return.</span>
+<span class="doccomment">/// Run the main loop of a GC worker. This method does not return.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `tls`: The thread that will be used as the GC worker.</span>
-<span class="doccomment">/// * `worker`: The reference to the GC worker.</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `worker`: A reference to the GC worker.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_worker</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
     <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
@@ -477,8 +477,8 @@
 <span class="doccomment">/// collection during the boot process.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
-<span class="doccomment">/// * `tls`: The thread that enables the collection.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
+<span class="doccomment">/// * `tls`: The thread that wants to enable the collection.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_collection</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
     <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">initialize</span>(<span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">threads</span>, <span class="ident">mmtk</span>, <span class="ident">tls</span>);
     <span class="ident">VM</span>::<span class="ident">VMCollection</span>::<span class="ident">spawn_worker_thread</span>(<span class="ident">tls</span>, <span class="prelude-val">None</span>); <span class="comment">// spawn controller thread</span>
@@ -488,7 +488,7 @@
 <span class="doccomment">/// Process MMTk run-time options.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `name`: The name of the option.</span>
 <span class="doccomment">/// * `value`: The value of the option (as a string).</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">process</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
@@ -498,7 +498,7 @@
 <span class="doccomment">/// Return used memory in bytes.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">used_bytes</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_pages_used</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
 }
@@ -506,18 +506,18 @@
 <span class="doccomment">/// Return free memory in bytes.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">free_bytes</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_free_pages</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
 }
 
-<span class="doccomment">/// Return the start adress of the heap. *Note that currently MMTk use</span>
+<span class="doccomment">/// Return the starting address of the heap. *Note that currently MMTk uses</span>
 <span class="doccomment">/// a fixed address range as heap.*</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">starting_heap_address</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
     <span class="ident">HEAP_START</span>
 }
 
-<span class="doccomment">/// Return the end adress of the heap. *Note that currently MMTk use</span>
+<span class="doccomment">/// Return the ending address of the heap. *Note that currently MMTk uses</span>
 <span class="doccomment">/// a fixed address range as heap.*</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">last_heap_address</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
     <span class="ident">HEAP_END</span>
@@ -526,7 +526,7 @@
 <span class="doccomment">/// Return the total memory in bytes.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">total_bytes</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_total_pages</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
 }
@@ -541,8 +541,8 @@
 <span class="doccomment">/// Trigger a garbage collection as requested by the user.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
-<span class="doccomment">/// * `tls`: The thread that triggers this colleciton request.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
+<span class="doccomment">/// * `tls`: The thread that triggers this collection request.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_user_collection_request</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">handle_user_collection_request</span>(<span class="ident">tls</span>, <span class="bool-val">false</span>);
 }
@@ -576,7 +576,7 @@
 <span class="doccomment">/// logged and the system exits.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `object`: The object to check.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">modify_check</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">modify_check</span>(<span class="ident">object</span>);
@@ -585,7 +585,7 @@
 <span class="doccomment">/// Add a reference to the list of weak references.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `reff`: The weak reference to add.</span>
 <span class="doccomment">/// * `referent`: The object that the reference points to.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_weak_candidate</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
@@ -600,7 +600,7 @@
 <span class="doccomment">/// Add a reference to the list of soft references.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `reff`: The soft reference to add.</span>
 <span class="doccomment">/// * `referent`: The object that the reference points to.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_soft_candidate</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
@@ -615,7 +615,7 @@
 <span class="doccomment">/// Add a reference to the list of phantom references.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `reff`: The phantom reference to add.</span>
 <span class="doccomment">/// * `referent`: The object that the reference points to.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_phantom_candidate</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
@@ -631,7 +631,7 @@
 <span class="doccomment">/// GC, and then start recording statistics for MMTk.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `tls`: The thread that calls the function (and triggers a collection).</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">harness_begin</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
     <span class="ident">mmtk</span>.<span class="ident">harness_begin</span>(<span class="ident">tls</span>);
@@ -641,7 +641,7 @@
 <span class="doccomment">/// statistics, and print stats values.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">harness_end</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
     <span class="ident">mmtk</span>.<span class="ident">harness_end</span>();
 }

@@ -76,11 +76,11 @@
     <span class="doccomment">/// * `referent`: The referent object reference.</span>
     <span class="kw">fn</span> <span class="ident">set_referent</span>(<span class="ident">reff</span>: <span class="ident">ObjectReference</span>, <span class="ident">referent</span>: <span class="ident">ObjectReference</span>);
 
-    <span class="doccomment">/// Process a reference with the current semantics. Return an updated reference (e.g. with a new address)</span>
-    <span class="doccomment">/// if the reference is still live, otherwise return a null object reference.</span>
+    <span class="doccomment">/// Process a reference with the current semantics and return an updated reference (e.g. with a new address)</span>
+    <span class="doccomment">/// if the reference is still alive, otherwise return a null object reference.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `trace`: The reference to a `TraceLocal` object for this reference.</span>
+    <span class="doccomment">/// * `trace`: A reference to a `TraceLocal` object for this reference.</span>
     <span class="doccomment">/// * `reference`: The address of the reference. This may or may not be the address of a heap object, depending on the VM.</span>
     <span class="doccomment">/// * `tls`: The GC thread that is processing this reference.</span>
     <span class="kw">fn</span> <span class="ident">process_reference</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TraceLocal</span><span class="op">&gt;</span>(

@@ -173,7 +173,7 @@
 <span class="comment">// We are trying to make this struct fixed-sized so that VM bindings can easily define a type to have the exact same layout as this struct.</span>
 <span class="comment">// Currently Mutator is fixed sized, and we should try keep this invariant:</span>
 <span class="comment">// - Allocators are fixed-length arrays of allocators.</span>
-<span class="comment">// - MutatorConfig has 3 pointers/refs (including one fat pointer), and is fixed sized.</span>
+<span class="comment">// - MutatorConfig only has pointers/refs (including fat pointers), and is fixed sized.</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">allocators</span>: <span class="ident">Allocators</span><span class="op">&lt;</span><span class="ident">P</span>::<span class="ident">VM</span><span class="op">&gt;</span>,

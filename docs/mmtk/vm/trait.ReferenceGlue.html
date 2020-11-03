@@ -17,11 +17,11 @@
 <li><code>reff</code>: The object reference for the reference.</li>
 <li><code>referent</code>: The referent object reference.</li>
 </ul>
-</div><h3 id='tymethod.process_reference' class='method'><code>fn <a href='#tymethod.process_reference' class='fnname'>process_reference</a>&lt;T:&nbsp;<a class="trait" href="../../mmtk/trait.TraceLocal.html" title="trait mmtk::TraceLocal">TraceLocal</a>&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;trace: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;mut </a>T, <br>&nbsp;&nbsp;&nbsp;&nbsp;reference: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;tls: <a class="struct" href="../../mmtk/util/opaque_pointer/struct.OpaquePointer.html" title="struct mmtk::util::opaque_pointer::OpaquePointer">OpaquePointer</a><br>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a></code></h3><div class='docblock'><p>Process a reference with the current semantics. Return an updated reference (e.g. with a new address)
-if the reference is still live, otherwise return a null object reference.</p>
+</div><h3 id='tymethod.process_reference' class='method'><code>fn <a href='#tymethod.process_reference' class='fnname'>process_reference</a>&lt;T:&nbsp;<a class="trait" href="../../mmtk/trait.TraceLocal.html" title="trait mmtk::TraceLocal">TraceLocal</a>&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;trace: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;mut </a>T, <br>&nbsp;&nbsp;&nbsp;&nbsp;reference: <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;tls: <a class="struct" href="../../mmtk/util/opaque_pointer/struct.OpaquePointer.html" title="struct mmtk::util::opaque_pointer::OpaquePointer">OpaquePointer</a><br>) -&gt; <a class="struct" href="../../mmtk/util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a></code></h3><div class='docblock'><p>Process a reference with the current semantics and return an updated reference (e.g. with a new address)
+if the reference is still alive, otherwise return a null object reference.</p>
 <p>Arguments:</p>
 <ul>
-<li><code>trace</code>: The reference to a <code>TraceLocal</code> object for this reference.</li>
+<li><code>trace</code>: A reference to a <code>TraceLocal</code> object for this reference.</li>
 <li><code>reference</code>: The address of the reference. This may or may not be the address of a heap object, depending on the VM.</li>
 <li><code>tls</code>: The GC thread that is processing this reference.</li>
 </ul>

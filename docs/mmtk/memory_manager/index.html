@@ -8,8 +8,8 @@ for exposing this safe API to FFI.</li>
 </ol>
 <p>For example, for mutators, this API provides a <code>Box&lt;Mutator&gt;</code>, and requires a <code>&amp;mut Mutator</code> for allocation.
 A VM binding can borrow a mutable reference directly from <code>Box&lt;Mutator&gt;</code>, and call <code>alloc()</code>. Alternatively,
-it can turn the Box pointer to a native pointer (<code>*mut Mutator</code>), then forge a mut reference from the native
-pointer. In either way, the VM binding code needs to guarantee the safety.</p>
+it can turn the <code>Box</code> pointer to a native pointer (<code>*mut Mutator</code>), and forge a mut reference from the native
+pointer. Either way, the VM binding code needs to guarantee the safety.</p>
 </div><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
 <table><tr class='module-item'><td><a class="fn" href="fn.add_phantom_candidate.html" title='mmtk::memory_manager::add_phantom_candidate fn'>add_phantom_candidate</a></td><td class='docblock-short'><p>Add a reference to the list of phantom references.</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.add_soft_candidate.html" title='mmtk::memory_manager::add_soft_candidate fn'>add_soft_candidate</a></td><td class='docblock-short'><p>Add a reference to the list of soft references.</p>
@@ -23,10 +23,10 @@ store the returned mutator in a thread local storage that can be accessed effici
 collection during the boot process.</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.flush_mutator.html" title='mmtk::memory_manager::flush_mutator fn'>flush_mutator</a></td><td class='docblock-short'><p>Flush the mutator's local states.</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.free_bytes.html" title='mmtk::memory_manager::free_bytes fn'>free_bytes</a></td><td class='docblock-short'><p>Return free memory in bytes.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.gc_init.html" title='mmtk::memory_manager::gc_init fn'>gc_init</a></td><td class='docblock-short'><p>Initializes an MMTk instance. A VM should call this method after creating an <a href="../mmtk/struct.MMTK.html">MMTK</a>
-instance and before using any of the methods provided in MMTk.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.gc_init.html" title='mmtk::memory_manager::gc_init fn'>gc_init</a></td><td class='docblock-short'><p>Initialize an MMTk instance. A VM should call this method after creating an <a href="../mmtk/struct.MMTK.html">MMTK</a>
+instance but before using any of the methods provided in MMTk.</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.get_allocator_mapping.html" title='mmtk::memory_manager::get_allocator_mapping fn'>get_allocator_mapping</a></td><td class='docblock-short'><p>Return an AllocatorSelector for the given allocation semantic. This method is provided
-so that VM compilers may call it to help generate allocation fastpath.</p>
+so that VM compilers may call it to help generate allocation fast-path.</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.handle_user_collection_request.html" title='mmtk::memory_manager::handle_user_collection_request fn'>handle_user_collection_request</a></td><td class='docblock-short'><p>Trigger a garbage collection as requested by the user.</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.harness_begin.html" title='mmtk::memory_manager::harness_begin fn'>harness_begin</a></td><td class='docblock-short'><p>Generic hook to allow benchmarks to be harnessed. We do a full heap
 GC, and then start recording statistics for MMTk.</p>
@@ -35,7 +35,7 @@ statistics, and print stats values.</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.is_live_object.html" title='mmtk::memory_manager::is_live_object fn'>is_live_object</a></td><td class='docblock-short'><p>Is the object alive?</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.is_mapped_address.html" title='mmtk::memory_manager::is_mapped_address fn'>is_mapped_address</a></td><td class='docblock-short'><p>Is the address in the mapped memory?</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.is_mapped_object.html" title='mmtk::memory_manager::is_mapped_object fn'>is_mapped_object</a></td><td class='docblock-short'><p>Is the object in the mapped memory?</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.last_heap_address.html" title='mmtk::memory_manager::last_heap_address fn'>last_heap_address</a></td><td class='docblock-short'><p>Return the end adress of the heap. <em>Note that currently MMTk use
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.last_heap_address.html" title='mmtk::memory_manager::last_heap_address fn'>last_heap_address</a></td><td class='docblock-short'><p>Return the ending address of the heap. <em>Note that currently MMTk uses
 a fixed address range as heap.</em></p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.modify_check.html" title='mmtk::memory_manager::modify_check fn'>modify_check</a></td><td class='docblock-short'><p>Check that if a garbage collection is in progress and if the given
 object is not movable.  If it is movable error messages are
@@ -45,8 +45,8 @@ required. For performance reasons, a VM should implement the post alloc fast-pat
 rather than just calling this function.</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.process.html" title='mmtk::memory_manager::process fn'>process</a></td><td class='docblock-short'><p>Process MMTk run-time options.</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.start_control_collector.html" title='mmtk::memory_manager::start_control_collector fn'>start_control_collector</a></td><td class='docblock-short'><p>Run the main loop for the GC controller thread. This method does not return.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.start_worker.html" title='mmtk::memory_manager::start_worker fn'>start_worker</a></td><td class='docblock-short'><p>Run the main loop for a GC worker. This method does not return.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.starting_heap_address.html" title='mmtk::memory_manager::starting_heap_address fn'>starting_heap_address</a></td><td class='docblock-short'><p>Return the start adress of the heap. <em>Note that currently MMTk use
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.start_worker.html" title='mmtk::memory_manager::start_worker fn'>start_worker</a></td><td class='docblock-short'><p>Run the main loop of a GC worker. This method does not return.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.starting_heap_address.html" title='mmtk::memory_manager::starting_heap_address fn'>starting_heap_address</a></td><td class='docblock-short'><p>Return the starting address of the heap. <em>Note that currently MMTk uses
 a fixed address range as heap.</em></p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.total_bytes.html" title='mmtk::memory_manager::total_bytes fn'>total_bytes</a></td><td class='docblock-short'><p>Return the total memory in bytes.</p>
 </td></tr><tr class='module-item'><td><a class="fn" href="fn.used_bytes.html" title='mmtk::memory_manager::used_bytes fn'>used_bytes</a></td><td class='docblock-short'><p>Return used memory in bytes.</p>
