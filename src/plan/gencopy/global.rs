@@ -6,7 +6,7 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::mutator_context::Mutator;
-use crate::plan::Allocator;
+use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
@@ -30,7 +30,7 @@ use std::sync::Arc;
 
 pub type SelectedPlan<VM> = GenCopy<VM>;
 
-pub const ALLOC_SS: Allocator = Allocator::Default;
+pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 pub const NURSERY_SIZE: usize = 16 * 1024 * 1024;
 
 pub struct GenCopy<VM: VMBinding> {
@@ -148,7 +148,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         Box::new(create_gencopy_mutator(tls, mmtk))
     }
 
-    fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector> {
+    fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
         &*ALLOCATOR_MAPPING
     }
 

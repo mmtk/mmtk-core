@@ -28,7 +28,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.4.2"
+          ref: "0.4.3"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -84,7 +84,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.4.2"
+          ref: "0.4.3"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -139,7 +139,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.4.2"
+          ref: "0.4.3"
           path: ci-perf-kit
           submodules: true
       # setup

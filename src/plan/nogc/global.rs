@@ -3,7 +3,7 @@ use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::mutator_context::Mutator;
 use crate::plan::nogc::mutator::create_nogc_mutator;
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
-use crate::plan::Allocator;
+use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::scheduler::MMTkScheduler;
@@ -101,7 +101,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!()
     }
 
-    fn get_allocator_mapping(&self) -> &'static EnumMap<Allocator, AllocatorSelector> {
+    fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
         &*ALLOCATOR_MAPPING
     }
 

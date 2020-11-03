@@ -1,7 +1,7 @@
 use crate::plan::CopyContext;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
-use crate::Allocator;
+use crate::AllocationSemantics;
 use std::sync::atomic::AtomicU8;
 
 /// VM-specific methods for object model.
@@ -26,11 +26,11 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `from`: The address of the object to be copied.
-    /// * `allocator`: The allocation semantic to use.
+    /// * `semantics`: The allocation semantic to use.
     /// * `copy_context`: The `CopyContext` for the GC thread.
     fn copy(
         from: ObjectReference,
-        allocator: Allocator,
+        semantics: AllocationSemantics,
         copy_context: &mut impl CopyContext,
     ) -> ObjectReference;
 

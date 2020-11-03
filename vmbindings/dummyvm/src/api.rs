@@ -4,7 +4,7 @@
 use libc::c_char;
 use std::ffi::CStr;
 use mmtk::memory_manager;
-use mmtk::Allocator;
+use mmtk::AllocationSemantics;
 use mmtk::util::{ObjectReference, OpaquePointer, Address};
 use mmtk::SelectedPlan;
 use mmtk::scheduler::GCWorker;
@@ -39,14 +39,14 @@ pub extern "C" fn destroy_mutator(mutator: *mut Mutator<SelectedPlan<DummyVM>>) 
 
 #[no_mangle]
 pub extern "C" fn alloc(mutator: *mut Mutator<SelectedPlan<DummyVM>>, size: usize,
-                    align: usize, offset: isize, allocator: Allocator) -> Address {
-    memory_manager::alloc::<DummyVM>(unsafe { &mut *mutator }, size, align, offset, allocator)
+                    align: usize, offset: isize, semantics: AllocationSemantics) -> Address {
+    memory_manager::alloc::<DummyVM>(unsafe { &mut *mutator }, size, align, offset, semantics)
 }
 
 #[no_mangle]
 pub extern "C" fn post_alloc(mutator: *mut Mutator<SelectedPlan<DummyVM>>, refer: ObjectReference, type_refer: ObjectReference,
-                                        bytes: usize, allocator: Allocator) {
-    memory_manager::post_alloc::<DummyVM>(unsafe { &mut *mutator }, refer, type_refer, bytes, allocator)
+                                        bytes: usize, semantics: AllocationSemantics) {
+    memory_manager::post_alloc::<DummyVM>(unsafe { &mut *mutator }, refer, type_refer, bytes, semantics)
 }
 
 #[no_mangle]

@@ -6,7 +6,7 @@ pub mod plan_constraints;
 mod trace;
 pub mod tracelocal;
 pub mod transitive_closure;
-pub use self::global::Allocator;
+pub use self::global::AllocationSemantics;
 pub use self::global::CopyContext;
 pub use self::global::Plan;
 pub use self::mutator_context::Mutator;

@@ -1,6 +1,6 @@
 use crate::plan::barriers::{Barrier, WriteTarget};
 use crate::plan::global::Plan;
-use crate::plan::Allocator as AllocationType;
+use crate::plan::AllocationSemantics as AllocationType;
 use crate::policy::space::Space;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::OpaquePointer;

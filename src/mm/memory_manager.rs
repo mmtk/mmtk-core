@@ -26,7 +26,7 @@ use crate::plan::selected_plan;
 use crate::util::alloc::allocators::AllocatorSelector;
 
 use crate::mmtk::MMTK;
-use crate::plan::Allocator;
+use crate::plan::AllocationSemantics;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
@@ -90,15 +90,15 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<SelectedPlan<VM>>) {
 /// * `size`: The number of bytes required for the object.
 /// * `align`: Required alignment for the object.
 /// * `offset`: Offset associated with the alignment.
-/// * `allocator`: The allocation semantic required for the allocation.
+/// * `semantics`: The allocation semantic required for the allocation.
 pub fn alloc<VM: VMBinding>(
     mutator: &mut Mutator<SelectedPlan<VM>>,
     size: usize,
     align: usize,
     offset: isize,
-    allocator: Allocator,
+    semantics: AllocationSemantics,
 ) -> Address {
-    mutator.alloc(size, align, offset, allocator)
+    mutator.alloc(size, align, offset, semantics)
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are
@@ -110,15 +110,15 @@ pub fn alloc<VM: VMBinding>(
 /// * `refer`: The newly allocated object.
 /// * `type_refer`: The type reference for the instance being created (unused).
 /// * `bytes`: The size of the space allocated for the object (in bytes).
-/// * `allocator`: The allocation semantics used for the allocation.
+/// * `semantics`: The allocation semantics used for the allocation.
 pub fn post_alloc<VM: VMBinding>(
     mutator: &mut Mutator<SelectedPlan<VM>>,
     refer: ObjectReference,
     type_refer: ObjectReference,
     bytes: usize,
-    allocator: Allocator,
+    semantics: AllocationSemantics,
 ) {
-    mutator.post_alloc(refer, type_refer, bytes, allocator);
+    mutator.post_alloc(refer, type_refer, bytes, semantics);
 }
 
 /// Return an AllocatorSelector for the given allocation semantic. This method is provided
@@ -126,12 +126,12 @@ pub fn post_alloc<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `mmtk`: The reference to an MMTk instance.
-/// * `allocator`: The allocation semantic to query.
+/// * `semantics`: The allocation semantic to query.
 pub fn get_allocator_mapping<VM: VMBinding>(
     mmtk: &MMTK<VM>,
-    allocator: Allocator,
+    semantics: AllocationSemantics,
 ) -> AllocatorSelector {
-    mmtk.plan.get_allocator_mapping()[allocator]
+    mmtk.plan.get_allocator_mapping()[semantics]
 }
 
 /// Run the main loop of a GC worker. This method does not return.

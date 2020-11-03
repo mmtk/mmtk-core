@@ -3,7 +3,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use std::sync::atomic::Ordering;
 
-use crate::plan::{Allocator, CopyContext};
+use crate::plan::{AllocationSemantics, CopyContext};
 use crate::vm::VMBinding;
 
 // ...00
@@ -58,10 +58,10 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
 
 pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     object: ObjectReference,
-    allocator: Allocator,
+    semantics: AllocationSemantics,
     copy_context: &mut CC,
 ) -> ObjectReference {
-    let new_object = VM::VMObjectModel::copy(object, allocator, copy_context);
+    let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
     let forwarded = (FORWARDED as usize) << VM::VMObjectModel::GC_BYTE_OFFSET;
     VM::VMObjectModel::write_available_bits_word(
         object,
