@@ -805,14 +805,14 @@
         <span class="ident">bytes</span>: <span class="ident">usize</span>,
         <span class="ident">align</span>: <span class="ident">usize</span>,
         <span class="ident">offset</span>: <span class="ident">isize</span>,
-        <span class="ident">allocator</span>: <span class="ident">Allocator</span>,
+        <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span>;
     <span class="kw">fn</span> <span class="ident">post_copy</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">_obj</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">_tib</span>: <span class="ident">Address</span>,
         <span class="ident">_bytes</span>: <span class="ident">usize</span>,
-        <span class="ident">_allocator</span>: <span class="ident">Allocator</span>,
+        <span class="ident">_semantics</span>: <span class="ident">AllocationSemantics</span>,
     ) {
     }
     <span class="kw">fn</span> <span class="ident">copy_check_allocator</span>(
@@ -820,17 +820,17 @@
         <span class="ident">_from</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">bytes</span>: <span class="ident">usize</span>,
         <span class="ident">align</span>: <span class="ident">usize</span>,
-        <span class="ident">allocator</span>: <span class="ident">Allocator</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Allocator</span> {
+        <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AllocationSemantics</span> {
         <span class="kw">let</span> <span class="ident">large</span> <span class="op">=</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">allocator</span>::<span class="ident">get_maximum_aligned_size</span>::<span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">VM</span><span class="op">&gt;</span>(
             <span class="ident">bytes</span>,
             <span class="ident">align</span>,
             <span class="self">Self</span>::<span class="ident">VM</span>::<span class="ident">MIN_ALIGNMENT</span>,
         ) <span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">MAX_NON_LOS_COPY_BYTES</span>;
         <span class="kw">if</span> <span class="ident">large</span> {
-            <span class="ident">Allocator</span>::<span class="ident">Los</span>
+            <span class="ident">AllocationSemantics</span>::<span class="ident">Los</span>
         } <span class="kw">else</span> {
-            <span class="ident">allocator</span>
+            <span class="ident">semantics</span>
         }
     }
 }
@@ -851,7 +851,7 @@
         <span class="ident">_bytes</span>: <span class="ident">usize</span>,
         <span class="ident">_align</span>: <span class="ident">usize</span>,
         <span class="ident">_offset</span>: <span class="ident">isize</span>,
-        <span class="ident">_allocator</span>: <span class="ident">Allocator</span>,
+        <span class="ident">_semantics</span>: <span class="ident">AllocationSemantics</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
         <span class="macro">unreachable</span><span class="macro">!</span>()
     }
@@ -916,7 +916,7 @@
         <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">VM</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Mutator</span><span class="op">&gt;</span>;
 
-    <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">Allocator</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span>;
 
     <span class="kw">fn</span> <span class="ident">in_nursery</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="bool-val">false</span>
@@ -1510,7 +1510,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 <span class="doccomment">/// Each allocation request requires a desired semantic for the object to allocate.</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">i32</span>)]</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">Enum</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Allocator</span> {
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AllocationSemantics</span> {
     <span class="ident">Default</span> <span class="op">=</span> <span class="number">0</span>,
     <span class="ident">Immortal</span> <span class="op">=</span> <span class="number">1</span>,
     <span class="ident">Los</span> <span class="op">=</span> <span class="number">2</span>,

@@ -108,7 +108,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">ObjectModel</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">Ordering</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">Allocator</span>, <span class="ident">CopyContext</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">AllocationSemantics</span>, <span class="ident">CopyContext</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 
 <span class="comment">// ...00</span>
@@ -163,10 +163,10 @@
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">forward_object</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">CC</span>: <span class="ident">CopyContext</span><span class="op">&gt;</span>(
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    <span class="ident">allocator</span>: <span class="ident">Allocator</span>,
+    <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
     <span class="ident">copy_context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CC</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
-    <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">copy</span>(<span class="ident">object</span>, <span class="ident">allocator</span>, <span class="ident">copy_context</span>);
+    <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">copy</span>(<span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>);
     <span class="kw">let</span> <span class="ident">forwarded</span> <span class="op">=</span> (<span class="ident">FORWARDED</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">GC_BYTE_OFFSET</span>;
     <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">write_available_bits_word</span>(
         <span class="ident">object</span>,

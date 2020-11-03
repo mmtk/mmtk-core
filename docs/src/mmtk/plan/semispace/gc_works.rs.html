@@ -150,7 +150,7 @@
         <span class="ident">bytes</span>: <span class="ident">usize</span>,
         <span class="ident">align</span>: <span class="ident">usize</span>,
         <span class="ident">offset</span>: <span class="ident">isize</span>,
-        <span class="ident">_allocator</span>: <span class="kw">crate</span>::<span class="ident">Allocator</span>,
+        <span class="ident">_semantics</span>: <span class="kw">crate</span>::<span class="ident">AllocationSemantics</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
         <span class="self">self</span>.<span class="ident">ss</span>.<span class="ident">alloc</span>(<span class="ident">bytes</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
     }
@@ -160,7 +160,7 @@
         <span class="ident">obj</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">_tib</span>: <span class="ident">Address</span>,
         <span class="ident">_bytes</span>: <span class="ident">usize</span>,
-        <span class="ident">_allocator</span>: <span class="kw">crate</span>::<span class="ident">Allocator</span>,
+        <span class="ident">_semantics</span>: <span class="kw">crate</span>::<span class="ident">AllocationSemantics</span>,
     ) {
         <span class="ident">forwarding_word</span>::<span class="ident">clear_forwarding_bits</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">obj</span>);
     }

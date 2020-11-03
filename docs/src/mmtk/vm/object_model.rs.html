@@ -222,7 +222,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">CopyContext</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">Allocator</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">AllocationSemantics</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">AtomicU8</span>;
 
 <span class="doccomment">/// VM-specific methods for object model.</span>
@@ -247,11 +247,11 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `from`: The address of the object to be copied.</span>
-    <span class="doccomment">/// * `allocator`: The allocation semantic to use.</span>
+    <span class="doccomment">/// * `semantics`: The allocation semantic to use.</span>
     <span class="doccomment">/// * `copy_context`: The `CopyContext` for the GC thread.</span>
     <span class="kw">fn</span> <span class="ident">copy</span>(
         <span class="ident">from</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">allocator</span>: <span class="ident">Allocator</span>,
+        <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
         <span class="ident">copy_context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span>;
 

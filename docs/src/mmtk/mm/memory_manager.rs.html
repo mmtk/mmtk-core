@@ -350,7 +350,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">allocators</span>::<span class="ident">AllocatorSelector</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">MMTK</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">Allocator</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">AllocationSemantics</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_PAGE</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_END</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>;
@@ -414,15 +414,15 @@
 <span class="doccomment">/// * `size`: The number of bytes required for the object.</span>
 <span class="doccomment">/// * `align`: Required alignment for the object.</span>
 <span class="doccomment">/// * `offset`: Offset associated with the alignment.</span>
-<span class="doccomment">/// * `allocator`: The allocation semantic required for the allocation.</span>
+<span class="doccomment">/// * `semantics`: The allocation semantic required for the allocation.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">alloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">SelectedPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">size</span>: <span class="ident">usize</span>,
     <span class="ident">align</span>: <span class="ident">usize</span>,
     <span class="ident">offset</span>: <span class="ident">isize</span>,
-    <span class="ident">allocator</span>: <span class="ident">Allocator</span>,
+    <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
-    <span class="ident">mutator</span>.<span class="ident">alloc</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="ident">allocator</span>)
+    <span class="ident">mutator</span>.<span class="ident">alloc</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="ident">semantics</span>)
 }
 
 <span class="doccomment">/// Perform post-allocation actions, usually initializing object metadata. For many allocators none are</span>
@@ -434,15 +434,15 @@
 <span class="doccomment">/// * `refer`: The newly allocated object.</span>
 <span class="doccomment">/// * `type_refer`: The type reference for the instance being created (unused).</span>
 <span class="doccomment">/// * `bytes`: The size of the space allocated for the object (in bytes).</span>
-<span class="doccomment">/// * `allocator`: The allocation semantics used for the allocation.</span>
+<span class="doccomment">/// * `semantics`: The allocation semantics used for the allocation.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_alloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">SelectedPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">refer</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">type_refer</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">bytes</span>: <span class="ident">usize</span>,
-    <span class="ident">allocator</span>: <span class="ident">Allocator</span>,
+    <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
 ) {
-    <span class="ident">mutator</span>.<span class="ident">post_alloc</span>(<span class="ident">refer</span>, <span class="ident">type_refer</span>, <span class="ident">bytes</span>, <span class="ident">allocator</span>);
+    <span class="ident">mutator</span>.<span class="ident">post_alloc</span>(<span class="ident">refer</span>, <span class="ident">type_refer</span>, <span class="ident">bytes</span>, <span class="ident">semantics</span>);
 }
 
 <span class="doccomment">/// Return an AllocatorSelector for the given allocation semantic. This method is provided</span>
@@ -450,12 +450,12 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: The reference to an MMTk instance.</span>
-<span class="doccomment">/// * `allocator`: The allocation semantic to query.</span>
+<span class="doccomment">/// * `semantics`: The allocation semantic to query.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">allocator</span>: <span class="ident">Allocator</span>,
+    <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AllocatorSelector</span> {
-    <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_allocator_mapping</span>()[<span class="ident">allocator</span>]
+    <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_allocator_mapping</span>()[<span class="ident">semantics</span>]
 }
 
 <span class="doccomment">/// Run the main loop of a GC worker. This method does not return.</span>

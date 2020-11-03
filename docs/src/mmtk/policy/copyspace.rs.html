@@ -185,7 +185,7 @@
 <span id="185">185</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">TransitiveClosure</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">Allocator</span>, <span class="ident">CopyContext</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">AllocationSemantics</span>, <span class="ident">CopyContext</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">SpaceOptions</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">CARD_META_PAGES_PER_REGION</span>;
@@ -310,10 +310,10 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">allocator</span>: <span class="ident">Allocator</span>,
+        <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
         <span class="ident">copy_context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
-        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;copyspace.trace_object(, {:?}, {:?})&quot;</span>, <span class="ident">object</span>, <span class="ident">allocator</span>,);
+        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;copyspace.trace_object(, {:?}, {:?})&quot;</span>, <span class="ident">object</span>, <span class="ident">semantics</span>,);
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">from_space</span>() {
             <span class="kw">return</span> <span class="ident">object</span>;
         }
@@ -329,7 +329,7 @@
         } <span class="kw">else</span> {
             <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;... no it isn&#39;t. Copying&quot;</span>);
             <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span>
-                <span class="ident">ForwardingWord</span>::<span class="ident">forward_object</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="kw">_</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">allocator</span>, <span class="ident">copy_context</span>);
+                <span class="ident">ForwardingWord</span>::<span class="ident">forward_object</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="kw">_</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>);
             <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Forwarding pointer&quot;</span>);
             <span class="ident">trace</span>.<span class="ident">process_node</span>(<span class="ident">new_object</span>);
             <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Copying [{:?} -&gt; {:?}]&quot;</span>, <span class="ident">object</span>, <span class="ident">new_object</span>);
