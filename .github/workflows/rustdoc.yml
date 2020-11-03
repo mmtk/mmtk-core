@@ -1,0 +1,36 @@
+name: Generate doc
+
+# Triggerred when a new commit is pushed to master
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  publish-rustdoc-as-ghpages:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2020-07-08
+          components: rustfmt, clippy
+          target: i686-unknown-linux-gnu
+          # This overwrites the default toolchain with the toolchain specified above.
+          override: true
+      - name: Append sha to crate version
+        run: |
+          sed -i 's/version = "[0-9]\+.[0-9]\+.[0-9]\+/&-'${GITHUB_SHA}'/' Cargo.toml
+      - name: Generate rustdoc
+        run: ./.github/scripts/ci-doc.sh
+      - name: Copy docs
+        run: |
+          mkdir -p to_publish/docs
+          cp -r target/doc/* to_publish/docs/
+      - name: Deploy to Github Page
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          publish_dir: to_publish
+          publish_branch: gh-pages

@@ -23,21 +23,51 @@ impl<'a, VM: VMBinding> Iterator for SynchronizedMutatorIterator<'a, VM> {
     }
 }
 
+/// VM-specific methods for the current plan.
 pub trait ActivePlan<VM: VMBinding> {
+    /// Return a reference to the current plan.
     // TODO: I don't know how this can be implemented when we have multiple MMTk instances.
     // This function is used by space and phase to refer to the current plan.
     // Possibly we should remove the use of this function, and remove this function?
     fn global() -> &'static SelectedPlan<VM>;
+
+    /// Return a `GCWorker` reference for the thread.
+    ///
+    /// Arguments:
+    /// * `tls`: The thread to query.
     fn worker(tls: OpaquePointer) -> &'static mut GCWorker<VM>;
+
+    /// Return whether there is a mutator created and associated with the thread.
+    ///
+    /// Arguments:
+    /// * `tls`: The thread to query.
+    ///
     /// # Safety
     /// TODO: I am not sure why this is unsafe.
     unsafe fn is_mutator(tls: OpaquePointer) -> bool;
+
+    /// Return a `Mutator` reference for the thread.
+    ///
+    /// Arguments:
+    /// * `tls`: The thread to query.
+    ///
     /// # Safety
     /// TODO: I am not sure why this is unsafe.
     unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan<VM> as Plan>::Mutator;
+
+    /// Return the number of GC collectors. This is unused by MMTk now, and will be removed.
+    #[deprecated]
     fn collector_count() -> usize;
+
+    /// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.
     fn reset_mutator_iterator();
+
+    /// Return the next mutator if there is any. This method assumes that the VM implements stateful type
+    /// to remember which mutator is returned and guarantees to return the next when called again. This does
+    /// not need to be thread safe.
     fn get_next_mutator() -> Option<&'static mut <SelectedPlan<VM> as Plan>::Mutator>;
+
+    /// A utility method to provide a thread-safe mutator iterator from `reset_mutator_iterator()` and `get_next_mutator()`.
     fn mutators<'a>() -> SynchronizedMutatorIterator<'a, VM> {
         SynchronizedMutatorIterator {
             _guard: Self::global().base().mutator_iterator_lock.lock().unwrap(),
@@ -45,5 +75,7 @@ pub trait ActivePlan<VM: VMBinding> {
             phantom: PhantomData,
         }
     }
+
+    /// Return the total count of mutators.
     fn number_of_mutators() -> usize;
 }

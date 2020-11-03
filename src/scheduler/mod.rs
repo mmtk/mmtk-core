@@ -1,3 +1,5 @@
+//! A general scheduler implementation. MMTk uses it to schedule GC-related works.
+
 mod context;
 mod mmtk_context;
 #[allow(clippy::module_inception)]
