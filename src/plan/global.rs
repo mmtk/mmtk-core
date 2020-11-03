@@ -31,7 +31,7 @@ use std::sync::{Arc, Mutex};
 
 /// A GC worker's context for copying GCs.
 /// Each GC plan should provide their implementation of a CopyContext.
-/// For non-coping GC, NoCopy can be used.
+/// For non-copying GC, NoCopy can be used.
 pub trait CopyContext: Sized + 'static + Sync + Send {
     type VM: VMBinding;
     const MAX_NON_LOS_COPY_BYTES: usize = MAX_INT;

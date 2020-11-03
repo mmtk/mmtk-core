@@ -2,7 +2,7 @@ use crate::util::queue::SharedQueue;
 use crate::util::{Address, ObjectReference};
 
 /// This trait describes the core functionality for a transitive
-/// closure over the heap. Any class implementign this trait holds the global state, TraceLocal
+/// closure over the heap. Any class implementing this trait holds the global state, TraceLocal
 /// and its implementers handle per-thread state.
 pub struct Trace {
     pub values: SharedQueue<ObjectReference>,

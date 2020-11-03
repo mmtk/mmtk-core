@@ -30,11 +30,11 @@ pub trait ReferenceGlue<VM: VMBinding> {
     /// * `referent`: The referent object reference.
     fn set_referent(reff: ObjectReference, referent: ObjectReference);
 
-    /// Process a reference with the current semantics. Return an updated reference (e.g. with a new address)
-    /// if the reference is still live, otherwise return a null object reference.
+    /// Process a reference with the current semantics and return an updated reference (e.g. with a new address)
+    /// if the reference is still alive, otherwise return a null object reference.
     ///
     /// Arguments:
-    /// * `trace`: The reference to a `TraceLocal` object for this reference.
+    /// * `trace`: A reference to a `TraceLocal` object for this reference.
     /// * `reference`: The address of the reference. This may or may not be the address of a heap object, depending on the VM.
     /// * `tls`: The GC thread that is processing this reference.
     fn process_reference<T: TraceLocal>(

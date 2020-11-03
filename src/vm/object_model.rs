@@ -6,7 +6,7 @@ use std::sync::atomic::AtomicU8;
 
 /// VM-specific methods for object model.
 ///
-/// MMTk requires *at least one byte* (or possibly a few bits in ceratin plans) for MMTk as per-object metadata.
+/// MMTk requires *at least one byte* (or possibly a few bits in certain plans) for MMTk as per-object metadata.
 /// MMTk currently assumes the available byte/bits are in the *header words* --
 /// this is a strict requirement, and we are looking to revamp the design and support VMs that do not have header words for objects.
 ///
@@ -21,11 +21,11 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `o`: The object to get the GC byte from.
     fn get_gc_byte(o: ObjectReference) -> &'static AtomicU8;
 
-    /// Copy an object and returns the address of the new object. Usually in the implementation of this method,
+    /// Copy an object and return the address of the new object. Usually in the implementation of this method,
     /// `alloc_copy()` and `post_copy()` from a plan's [`CopyContext`](../trait.CopyContext.html) are used for copying.
     ///
     /// Arguments:
-    /// * `from`: The addres of the object to be copied.
+    /// * `from`: The address of the object to be copied.
     /// * `allocator`: The allocation semantic to use.
     /// * `copy_context`: The `CopyContext` for the GC thread.
     fn copy(

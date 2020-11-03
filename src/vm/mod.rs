@@ -12,7 +12,7 @@
 //!    [profile.release]
 //!    lto = true
 //!    ```
-//! 1. Make sure that the crate type for a VM binding supports LTO. To our knowledge, `staticlib` and `cdylib` support LTO, and
+//! 2. Make sure that the crate type for a VM binding supports LTO. To our knowledge, `staticlib` and `cdylib` support LTO, and
 //! `rlib` does *not* support LTO.
 
 use crate::util::constants::*;

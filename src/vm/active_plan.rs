@@ -25,7 +25,7 @@ impl<'a, VM: VMBinding> Iterator for SynchronizedMutatorIterator<'a, VM> {
 
 /// VM-specific methods for the current plan.
 pub trait ActivePlan<VM: VMBinding> {
-    /// Return a referemce to the current plan.
+    /// Return a reference to the current plan.
     // TODO: I don't know how this can be implemented when we have multiple MMTk instances.
     // This function is used by space and phase to refer to the current plan.
     // Possibly we should remove the use of this function, and remove this function?
@@ -59,7 +59,7 @@ pub trait ActivePlan<VM: VMBinding> {
     #[deprecated]
     fn collector_count() -> usize;
 
-    /// Reset the mutator iterator so that `get_next_mutator()` should return the first mutator.
+    /// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.
     fn reset_mutator_iterator();
 
     /// Return the next mutator if there is any. This method assumes that the VM implements stateful type
@@ -76,6 +76,6 @@ pub trait ActivePlan<VM: VMBinding> {
         }
     }
 
-    /// Return a total count of mutators.
+    /// Return the total count of mutators.
     fn number_of_mutators() -> usize;
 }
