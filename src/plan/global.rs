@@ -29,6 +29,9 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+/// A GC worker's context for copying GCs.
+/// Each GC plan should provide their implementation of a CopyContext.
+/// For non-copying GC, NoCopy can be used.
 pub trait CopyContext: Sized + 'static + Sync + Send {
     type VM: VMBinding;
     const MAX_NON_LOS_COPY_BYTES: usize = MAX_INT;
@@ -94,6 +97,11 @@ impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     }
 }
 
+/// A plan describes the global core functionality for all memory management schemes.
+/// All global MMTk plans should implement this trait.
+///
+/// The global instance defines and manages static resources
+/// (such as memory and virtual memory resources).
 pub trait Plan: Sized + 'static + Sync + Send {
     type VM: VMBinding;
     type Mutator: MutatorContext<Self::VM>;
@@ -738,6 +746,8 @@ impl<VM: VMBinding> CommonPlan<VM> {
 }
 
 use enum_map::Enum;
+/// Allocation semantics that MMTk provides.
+/// Each allocation request requires a desired semantic for the object to allocate.
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, Enum)]
 pub enum Allocator {

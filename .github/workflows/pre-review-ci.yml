@@ -39,3 +39,7 @@ jobs:
       # Style checks
       - name: Style checks
         run: ./.github/scripts/ci-style.sh
+
+      # Document check
+      - name: Rustdoc
+        run: ./.github/scripts/ci-doc.sh
