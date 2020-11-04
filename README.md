@@ -20,7 +20,7 @@ Building MMTk requires a nightly Rust toolchain.
 As the Rust language and its libraries (crates) are frequently evolving, we recommend using the nightly toolchain specified in the [mmtk-dev-env](https://github.com/mmtk/mmtk-dev-env).
 
 ```console
-$ # replace nightly-YYYY-MM-DD with the toolchain version specified in mmtk-dev
+$ # replace nightly-YYYY-MM-DD with the toolchain version specified in mmtk-dev-env
 $ Export RUSTUP_TOOLCHAIN=nightly-YYYY-MM-DD
 
 $ cargo build --features <space separated features>
