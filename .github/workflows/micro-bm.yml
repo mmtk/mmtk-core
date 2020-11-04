@@ -1,7 +1,10 @@
 name: Post Code Review Checks (Micro Benchmarks)
 
 on:
-  pull_request
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches:
+      - master
 
 jobs:
   openjdk-microbm:
