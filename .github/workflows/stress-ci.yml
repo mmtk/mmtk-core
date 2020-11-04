@@ -1,12 +1,7 @@
 name: Stress Test CI
 
-# on:
-#   push:
-#     branches:
-#       - master
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
+  push:
     branches:
       - master
 
