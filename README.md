@@ -1,7 +1,7 @@
 # MMTk
 
-![crates.io](https://img.shields.io/crates/v/mmtk.svg)
-![docs.rs](https://docs.rs/mmtk/badge.svg)
+[![crates.io](https://img.shields.io/crates/v/mmtk.svg)](https://crates.io/crates/mmtk)
+[![docs.rs](https://docs.rs/mmtk/badge.svg)](https://docs.rs/mmtk/)
 [![project chat](https://img.shields.io/badge/zulip-join_chat-brightgreen.svg)](https://mmtk.zulipchat.com/)
 
 MMTk is a framework for the design and implementation of memory managers.
