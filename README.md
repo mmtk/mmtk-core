@@ -1,5 +1,9 @@
 # MMTk
 
+![crates.io](https://img.shields.io/crates/v/mmtk.svg)
+![docs.rs](https://docs.rs/mmtk/badge.svg)
+[![project chat](https://img.shields.io/badge/zulip-join_chat-brightgreen.svg)](https://mmtk.zulipchat.com/)
+
 MMTk is a framework for the design and implementation of memory managers.
 This repository hosts the Rust port of MMTk.
 
