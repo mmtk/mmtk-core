@@ -20,7 +20,7 @@ Building MMTk requires a nightly Rust toolchain.
 As the Rust language and its libraries (crates) are frequently evolving, we recommend using the nightly toolchain specified in the [mmtk-dev-env](https://github.com/mmtk/mmtk-dev-env).
 
 ```console
-$ # replace nightly-YYYY-MM-DD with the toolchain version specified in mmtk-dev
+$ # replace nightly-YYYY-MM-DD with the toolchain version specified in mmtk-dev-env
 $ Export RUSTUP_TOOLCHAIN=nightly-YYYY-MM-DD
 
 $ cargo build --features <space separated features>
@@ -44,7 +44,7 @@ optimizing compiler of Rust for better performance.
 The artefact produced produced by the build process can be found under
 `target/debug` (or `target/release` for the release build).
 
-[`ci-build.sh`](.github/scripts/ci-build.sh) shows the builds we builds tested by the CI.
+[`ci-build.sh`](.github/scripts/ci-build.sh) shows the builds tested by the CI.
 
 ## Usage
 
