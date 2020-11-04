@@ -44,7 +44,7 @@ optimizing compiler of Rust for better performance.
 The artefact produced produced by the build process can be found under
 `target/debug` (or `target/release` for the release build).
 
-[`ci-build.sh`](.github/scripts/ci-build.sh) shows the builds we builds tested by the CI.
+[`ci-build.sh`](.github/scripts/ci-build.sh) shows the builds tested by the CI.
 
 ## Usage
 
