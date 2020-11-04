@@ -16,6 +16,9 @@ name = "mmtk"
 crate-type = ["rlib"]
 doctest = false
 
+[package.metadata.docs.rs]
+features = ["semispace"]
+
 [dependencies]
 custom_derive = "0.1"
 enum_derive = "0.1"
