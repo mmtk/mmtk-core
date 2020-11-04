@@ -1,12 +1,8 @@
 name: Performance Regression CI
 
 # Triggerred when a new commit is pushed to master
-# on:
-#   push:
-#     branches:
-#       - master
 on:
-  pull_request:
+  push:
     branches:
       - master
 
@@ -58,14 +54,14 @@ jobs:
           export FROM_DATE=2020-07-10
           JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
-      # - name: Deploy to Github Page
-      #   uses: peaceiris/actions-gh-pages@v3
-      #   with:
-      #     personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
-      #     external_repository: mmtk/ci-perf-result
-      #     publish_dir: ./reports
-      #     publish_branch: gh-pages
-      #     keep_files: true
+      - name: Deploy to Github Page
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          external_repository: mmtk/ci-perf-result
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          keep_files: true
     
   # OpenJDK
   openjdk-perf-regression:
@@ -119,14 +115,14 @@ jobs:
           export FROM_DATE=2020-07-10
           ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
-      # - name: Deploy to Github Page
-      #   uses: peaceiris/actions-gh-pages@v3
-      #   with:
-      #     personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
-      #     external_repository: mmtk/ci-perf-result
-      #     publish_dir: ./reports
-      #     publish_branch: gh-pages
-      #     keep_files: true
+      - name: Deploy to Github Page
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          external_repository: mmtk/ci-perf-result
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          keep_files: true
 
   openjdk-mutator-perf:
     runs-on: [self-hosted, Linux, freq-scaling-off]
@@ -180,11 +176,11 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-1.6.0-openjdk-amd64
           ./ci-perf-kit/scripts/mutator-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
-      # - name: Deploy to Github Page
-      #   uses: peaceiris/actions-gh-pages@v3
-      #   with:
-      #     personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
-      #     external_repository: mmtk/ci-perf-result
-      #     publish_dir: ./reports
-      #     publish_branch: gh-pages
-      #     keep_files: true
+      - name: Deploy to Github Page
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          external_repository: mmtk/ci-perf-result
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          keep_files: true
