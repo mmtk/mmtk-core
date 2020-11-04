@@ -33,7 +33,7 @@ jobs:
           submodules: true
       # setup
       - name: Overwrite MMTk core in JikesRVM binding
-        run: rsync -avLe mmtk-core/* mmtk-jikesrvm/repos/mmtk-core/
+        run: cp -r mmtk-core mmtk-jikesrvm/repos/
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
@@ -90,6 +90,11 @@ jobs:
       # setup
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
+      # cleanup previosu build
+      - name: Cleanup previous build
+        run: |
+          rm -rf mmtk-openjdk/repos/openjdk/scratch
+          rm -rf mmtk-openjdk/repos/openjdk/build
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
@@ -145,6 +150,11 @@ jobs:
       # setup
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
+      # cleanup previosu build
+      - name: Cleanup previous build
+        run: |
+          rm -rf mmtk-openjdk/repos/openjdk/scratch
+          rm -rf mmtk-openjdk/repos/openjdk/build        
       - id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
         run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"          
