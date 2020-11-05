@@ -42,6 +42,10 @@ pub fn address_to_chunk_index(addr: Address) -> usize {
     addr >> LOG_BYTES_IN_CHUNK
 }
 
+pub fn addr_range_to_chunks(start: Address, end: Address) -> usize {
+    address_to_chunk_index(end) - address_to_chunk_index(start) + 1
+}
+
 pub const fn raw_align_up(val: usize, align: usize) -> usize {
     // See https://github.com/rust-lang/rust/blob/e620d0f337d0643c757bab791fc7d88d63217704/src/libcore/alloc.rs#L192
     val.wrapping_add(align).wrapping_sub(1) & !align.wrapping_sub(1)

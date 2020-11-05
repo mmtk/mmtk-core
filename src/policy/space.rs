@@ -228,7 +228,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      */
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
         if new_chunk {
-            let chunks = conversions::bytes_to_chunks_up(bytes);
+            let chunks = conversions::addr_range_to_chunks(start, start + bytes);
             SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
         }
     }
