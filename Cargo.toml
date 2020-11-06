@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["The MMTk Developers <>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -15,6 +15,9 @@ keywords = ["gc", "allocation"]
 name = "mmtk"
 crate-type = ["rlib"]
 doctest = false
+
+[package.metadata.docs.rs]
+features = ["semispace"]
 
 [dependencies]
 custom_derive = "0.1"
