@@ -133,7 +133,6 @@ impl SFTMap {
         unsafe { &*res }
     }
 
-    // #[allow(clippy::not_unsafe_ptr_arg_deref)]
     fn log_update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
         let first = start.chunk_index();
         let end = start + (chunks << LOG_BYTES_IN_CHUNK);
@@ -153,7 +152,9 @@ impl SFTMap {
             end_chunk,
             first + chunks
         );
+    }
 
+    fn trace_sft_map(&self) {
         // print the entire SFT map
         const SPACE_PER_LINE: usize = 10;
         for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
@@ -172,12 +173,15 @@ impl SFTMap {
     }
 
     pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+        if DEBUG_SFT {
+            self.log_update(space, start, chunks);
+        }
         let first = start.chunk_index();
         for chunk in first..(first + chunks) {
             self.set(chunk, space);
         }
         if DEBUG_SFT {
-            self.log_update(space, start, chunks);
+            self.trace_sft_map();
         }
     }
 
@@ -200,7 +204,9 @@ impl SFTMap {
         debug_assert!(
             (unsafe { self_mut.sft[chunk].as_ref() }.unwrap().name() == "empty")
                 || (unsafe { sft.as_ref() }.unwrap().name() == "empty"),
-            "attempt to overwrite a non-empty chunk in SFT map"
+            "attempt to overwrite a non-empty chunk in SFT map (from {} to {})",
+            unsafe { self_mut.sft[chunk].as_ref() }.unwrap().name(),
+            unsafe { sft.as_ref() }.unwrap().name()
         );
         self_mut.sft[chunk] = sft;
     }
@@ -291,8 +297,18 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
+        trace!(
+            "Grow space from {} for {} bytes (new chunk = {})",
+            start,
+            bytes,
+            new_chunk
+        );
+        debug_assert!(
+            (new_chunk && start.is_aligned_to(BYTES_IN_CHUNK)) || !new_chunk,
+            "should only grow space for new chunks at chunk-aligned start address"
+        );
         if new_chunk {
-            let chunks = conversions::addr_range_to_chunks(start, start + bytes);
+            let chunks = conversions::bytes_to_chunks_up(bytes);
             SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
         }
     }
