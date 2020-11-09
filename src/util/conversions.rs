@@ -42,6 +42,10 @@ pub fn address_to_chunk_index(addr: Address) -> usize {
     addr >> LOG_BYTES_IN_CHUNK
 }
 
+pub fn chunk_index_to_address(chunk: usize) -> Address {
+    unsafe { Address::from_usize(chunk << LOG_BYTES_IN_CHUNK) }
+}
+
 pub fn addr_range_to_chunks(start: Address, end: Address) -> usize {
     address_to_chunk_index(end) - address_to_chunk_index(start) + 1
 }

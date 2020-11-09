@@ -34,6 +34,9 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for LockFreeImmortalSpace<VM> {}
 
 impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
+    fn name(&self) -> &str {
+        self.get_name()
+    }
     fn is_live(&self, _object: ObjectReference) -> bool {
         unimplemented!()
     }

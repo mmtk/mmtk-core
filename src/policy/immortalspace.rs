@@ -27,6 +27,9 @@ const GC_MARK_BIT_MASK: u8 = 1;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
+    fn name(&self) -> &str {
+        self.get_name()
+    }
     fn is_live(&self, _object: ObjectReference) -> bool {
         true
     }
