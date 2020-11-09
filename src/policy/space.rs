@@ -133,6 +133,23 @@ impl SFTMap {
         unsafe { &*res }
     }
 
+    fn trace_print_map(&self) {
+        const SPACE_PER_LINE: usize = 10;
+        for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
+            let max = if i + SPACE_PER_LINE > self.sft.len() {
+                self.sft.len()
+            } else {
+                i + SPACE_PER_LINE
+            };
+            let chunks: Vec<usize> = (i..max).collect();
+            let space_names: Vec<&str> = chunks
+                .iter()
+                .map(|&x| unsafe { &*self.sft[x] }.name())
+                .collect();
+            trace!("Chunk {}: {}", i, space_names.join(","));
+        }
+    }
+
     pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
         let first = start.chunk_index();
         for chunk in first..(first + chunks) {
@@ -156,20 +173,7 @@ impl SFTMap {
                 end_chunk,
                 first + chunks
             );
-            const SPACE_PER_LINE: usize = 10;
-            for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
-                let max = if i + SPACE_PER_LINE > self.sft.len() {
-                    self.sft.len()
-                } else {
-                    i + SPACE_PER_LINE
-                };
-                let chunks: Vec<usize> = (i..max).collect();
-                let space_names: Vec<&str> = chunks
-                    .iter()
-                    .map(|&x| unsafe { &*self.sft[x] }.name())
-                    .collect();
-                trace!("Chunk {}: {}", i, space_names.join(","));
-            }
+            self.trace_print_map();
         }
     }
 
