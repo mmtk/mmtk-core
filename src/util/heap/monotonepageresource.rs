@@ -67,12 +67,18 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         zeroed: bool,
         tls: OpaquePointer,
     ) -> Address {
-        debug!("In MonotonePageResource, reserved_pages = {}, required_pages = {}", reserved_pages, immut_required_pages);
+        debug!(
+            "In MonotonePageResource, reserved_pages = {}, required_pages = {}",
+            reserved_pages, immut_required_pages
+        );
         let mut required_pages = immut_required_pages;
         let mut new_chunk = false;
         let mut sync = self.sync.lock().unwrap();
         let mut rtn = sync.cursor;
-        debug!("cursor = {}, sentinel = {}, current_chunk = {}", sync.cursor, sync.sentinel, sync.current_chunk);
+        debug!(
+            "cursor = {}, sentinel = {}, current_chunk = {}",
+            sync.cursor, sync.sentinel, sync.current_chunk
+        );
 
         if cfg!(debug = "true") {
             /*

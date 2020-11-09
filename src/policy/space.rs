@@ -123,7 +123,12 @@ impl SFTMap {
     pub fn get(&self, address: Address) -> &'static dyn SFT {
         let res = self.sft[address.chunk_index()];
         if DEBUG_SFT {
-            trace!("Get SFT for {} #{} = {}", address, address.chunk_index(), unsafe { &(*res) }.name());
+            trace!(
+                "Get SFT for {} #{} = {}",
+                address,
+                address.chunk_index(),
+                unsafe { &(*res) }.name()
+            );
         }
         unsafe { &*res }
     }
@@ -135,10 +140,22 @@ impl SFTMap {
         }
         if DEBUG_SFT {
             let end = start + (chunks << LOG_BYTES_IN_CHUNK);
-            debug!("Update SFT for [{}, {}) as {}", start, end, unsafe { &(*space) }.name());
+            debug!(
+                "Update SFT for [{}, {}) as {}",
+                start,
+                end,
+                unsafe { &(*space) }.name()
+            );
             let start_chunk = chunk_index_to_address(first);
             let end_chunk = chunk_index_to_address(first + chunks);
-            debug!("Update SFT for {} chunks of [{} #{}, {} #{})", chunks, start_chunk, first, end_chunk, first + chunks);
+            debug!(
+                "Update SFT for {} chunks of [{} #{}, {} #{})",
+                chunks,
+                start_chunk,
+                first,
+                end_chunk,
+                first + chunks
+            );
             const SPACE_PER_LINE: usize = 10;
             for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
                 let max = if i + SPACE_PER_LINE > self.sft.len() {
@@ -147,7 +164,10 @@ impl SFTMap {
                     i + SPACE_PER_LINE
                 };
                 let chunks: Vec<usize> = (i..max).collect();
-                let space_names: Vec<&str> = chunks.iter().map(|&x| unsafe {&*self.sft[x]}.name()).collect();
+                let space_names: Vec<&str> = chunks
+                    .iter()
+                    .map(|&x| unsafe { &*self.sft[x] }.name())
+                    .collect();
                 trace!("Chunk {}: {}", i, space_names.join(","));
             }
         }
@@ -169,7 +189,11 @@ impl SFTMap {
          */
         let self_mut: &mut Self = unsafe { self.mut_self() };
         // It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
-        assert!((self_mut.sft[chunk] == (&EMPTY_SPACE_SFT) as *const _) || (sft == (&EMPTY_SPACE_SFT) as *const _), "attempt to overwrite a non-empty chunk in SFT map");
+        assert!(
+            (self_mut.sft[chunk] == (&EMPTY_SPACE_SFT) as *const _)
+                || (sft == (&EMPTY_SPACE_SFT) as *const _),
+            "attempt to overwrite a non-empty chunk in SFT map"
+        );
         self_mut.sft[chunk] = sft;
     }
 }
@@ -474,7 +498,13 @@ impl<VM: VMBinding> CommonSpace<VM> {
         vm_map.insert(start, extent, rtn.descriptor);
 
         if DEBUG_SPACE {
-            println!("Created space {} [{}, {}) for {} bytes", rtn.name, start, start + extent, extent);
+            println!(
+                "Created space {} [{}, {}) for {} bytes",
+                rtn.name,
+                start,
+                start + extent,
+                extent
+            );
         }
 
         rtn
