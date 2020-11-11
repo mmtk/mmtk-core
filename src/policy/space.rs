@@ -534,6 +534,13 @@ impl<VM: VMBinding> CommonSpace<VM> {
         rtn
     }
 
+    pub fn init(&self, sft: *const (dyn SFT + Sync)) {
+        // For contiguous space, we eagerly initialize SFT map based on its address range.
+        if self.contiguous {
+            SFT_MAP.update(sft, self.start, bytes_to_chunks_up(self.extent));
+        }
+    }
+
     pub fn vm_map(&self) -> &'static VMMap {
         self.vm_map
     }
