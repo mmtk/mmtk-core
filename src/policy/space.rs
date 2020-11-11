@@ -59,14 +59,15 @@ pub trait SFT {
 /// Print debug info for SFT. Should be false when committed.
 const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 
-unsafe impl Sync for SFTMap {}
-
 #[derive(Debug)]
 struct EmptySpaceSFT {}
 unsafe impl Sync for EmptySpaceSFT {}
+
+const EMPTY_SFT_NAME: &str = "empty";
+
 impl SFT for EmptySpaceSFT {
     fn name(&self) -> &str {
-        "empty"
+        EMPTY_SFT_NAME
     }
     fn is_live(&self, object: ObjectReference) -> bool {
         panic!(
@@ -102,6 +103,7 @@ impl SFT for EmptySpaceSFT {
 pub struct SFTMap {
     sft: Vec<*const (dyn SFT + Sync)>,
 }
+unsafe impl Sync for SFTMap {}
 
 static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
@@ -172,6 +174,8 @@ impl SFTMap {
         }
     }
 
+    /// Update SFT map for the given address range.
+    /// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
     pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
         if DEBUG_SFT {
             self.log_update(space, start, chunks);
@@ -201,13 +205,18 @@ impl SFTMap {
          */
         let self_mut: &mut Self = unsafe { self.mut_self() };
         // It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
-        debug_assert!(
-            (unsafe { self_mut.sft[chunk].as_ref() }.unwrap().name() == "empty")
-                || (unsafe { sft.as_ref() }.unwrap().name() == "empty"),
-            "attempt to overwrite a non-empty chunk in SFT map (from {} to {})",
-            unsafe { self_mut.sft[chunk].as_ref() }.unwrap().name(),
-            unsafe { sft.as_ref() }.unwrap().name()
-        );
+        if cfg!(debug_assertions) {
+            let old = unsafe { self_mut.sft[chunk].as_ref() }.unwrap().name();
+            let new = unsafe { sft.as_ref() }.unwrap().name();
+            // Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,
+            // in which case, we still set SFT map again.
+            debug_assert!(
+                old == EMPTY_SFT_NAME || new == EMPTY_SFT_NAME || old == new,
+                "attempt to overwrite a non-empty chunk in SFT map (from {} to {})",
+                old,
+                new
+            );
+        }
         self_mut.sft[chunk] = sft;
     }
 }
