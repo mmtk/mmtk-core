@@ -29,17 +29,21 @@ jobs:
           ref: ${{ env.V8_BINDING_REF }}
       - name: Overwrite MMTk core in V8 binding
         run: |
-          cp -r mmtk-core mmtk-v8/repos
+          rm -rf mmtk-v8/repos/*
+          mkdir -p mmtk-v8/repos/mmtk-core
+          cp -r mmtk-core/* mmtk-v8/repos/mmtk-core
+          ls mmtk-v8/repos/mmtk-core
       - name: Setup
         run: |
           cd mmtk-v8
           RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./.github/scripts/ci-setup.sh
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+          cat mmtk/Cargo.toml
       - name: Test
         run: |
           cd mmtk-v8
-          RUSTUP_TOOLCHAIN=nightly-2020-07-08 V8_ROOT=repos/ .github/scripts/ci-test.sh
+          RUSTUP_TOOLCHAIN=nightly-2020-07-08 V8_ROOT=$GITHUB_WORKSPACE/v8_deps .github/scripts/ci-test.sh
 
   # JikesRVM
   jikesrvm-binding-test:
