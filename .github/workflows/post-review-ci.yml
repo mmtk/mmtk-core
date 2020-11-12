@@ -27,7 +27,7 @@ jobs:
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           path: mmtk-v8
           ref: ${{ env.V8_BINDING_REF }}
-        - name: Overwrite MMTk core in V8 binding
+      - name: Overwrite MMTk core in V8 binding
         run: |
           cp -r mmtk-core mmtk-v8/repos
       - name: Setup
