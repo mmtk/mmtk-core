@@ -18,7 +18,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Note: Currently only the `true` value is supported.
     const HAS_GC_BYTE: bool = true;
     /// The offset of the GC byte from the object reference.
-    const GC_BYTE_OFFSET: usize = 0;
+    const GC_BYTE_OFFSET: isize = 0;
 
     /// Get a reference of the GC byte for an object.
     ///
