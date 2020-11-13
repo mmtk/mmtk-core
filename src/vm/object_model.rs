@@ -12,7 +12,7 @@ use crate::AllocationSemantics;
 /// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.
 pub trait ObjectModel<VM: VMBinding> {
     /// Whether an exclusive GC byte in each object's header word is available for MMTk.
-    /// If such as byte is not available in the VM, MMTk will handle it in its own memory.
+    /// If such a byte is not available in the VM, MMTk will handle it in its own memory.
     ///
     /// Note: Currently only the `true` value is supported.
     const HAS_GC_BYTE: bool = true;

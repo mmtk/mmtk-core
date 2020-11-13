@@ -25,3 +25,7 @@ pub fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 
 pub fn get_gc_byte_value<VM: VMBinding>(object: ObjectReference) -> u8 {
     get_gc_byte::<VM>(object).load(Ordering::SeqCst)
 }
+
+pub fn get_gc_byte_offset<VM: VMBinding>() -> isize {
+    VM::VMObjectModel::GC_BYTE_OFFSET
+}
