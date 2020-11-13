@@ -20,13 +20,6 @@ pub trait ObjectModel<VM: VMBinding> {
     /// The offset of the GC byte from the object reference.
     const GC_BYTE_OFFSET: isize = 0;
 
-    /// Get a reference of the GC byte for an object.
-    ///
-    /// Arguments:
-    /// * `o`: The object to get the GC byte from.
-    #[deprecated]
-    fn get_gc_byte(o: ObjectReference) -> &'static AtomicU8;
-
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,
     /// `alloc_copy()` and `post_copy()` from a plan's [`CopyContext`](../trait.CopyContext.html) are used for copying.
     ///
