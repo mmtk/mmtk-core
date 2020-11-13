@@ -24,6 +24,7 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `o`: The object to get the GC byte from.
+    #[deprecated]
     fn get_gc_byte(o: ObjectReference) -> &'static AtomicU8;
 
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,
