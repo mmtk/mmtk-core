@@ -9,7 +9,7 @@ on:
 jobs:
   openjdk-microbm:
     runs-on: [self-hosted, Linux, freq-scaling-off]
-    if: contains(github.event.pull_request.labels.*.name, 'PR-approved') || contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
       - name: Check Revisions
         uses: qinsoon/comment-env-vars@1.0.1

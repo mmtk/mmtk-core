@@ -2,7 +2,6 @@ use crate::plan::CopyContext;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::AllocationSemantics;
-use std::sync::atomic::AtomicU8;
 
 /// VM-specific methods for object model.
 ///
