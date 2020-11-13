@@ -1,5 +1,5 @@
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
-use crate::util::{Address, ObjectReference, gc_byte};
+use crate::util::{gc_byte, Address, ObjectReference};
 use crate::vm::ObjectModel;
 use std::sync::atomic::Ordering;
 
@@ -45,12 +45,11 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
     if gc_byte & FORWARDING_MASK == FORWARDED {
         let status_word = VM::VMObjectModel::read_available_bits_word(object);
-        let a = 
-            if VM::VMObjectModel::HAS_GC_BYTE {
-                status_word & !((FORWARDING_MASK as usize) << VM::VMObjectModel::GC_BYTE_OFFSET)
-            } else {
-                todo!("\"HAS_GC_BYTE == false\" is not supported yet");
-            };
+        let a = if VM::VMObjectModel::HAS_GC_BYTE {
+            status_word & !((FORWARDING_MASK as usize) << VM::VMObjectModel::GC_BYTE_OFFSET)
+        } else {
+            todo!("\"HAS_GC_BYTE == false\" is not supported yet");
+        };
         unsafe { Address::from_usize(a).to_object_reference() }
     } else {
         panic!(
@@ -67,12 +66,11 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     copy_context: &mut CC,
 ) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
-    let forwarded = 
-        if VM::VMObjectModel::HAS_GC_BYTE {
-            (FORWARDED as usize) << VM::VMObjectModel::GC_BYTE_OFFSET
-        } else {
-            todo!("\"HAS_GC_BYTE == false\" is not supported yet");
-        };
+    let forwarded = if VM::VMObjectModel::HAS_GC_BYTE {
+        (FORWARDED as usize) << VM::VMObjectModel::GC_BYTE_OFFSET
+    } else {
+        todo!("\"HAS_GC_BYTE == false\" is not supported yet");
+    };
     VM::VMObjectModel::write_available_bits_word(
         object,
         new_object.to_address().as_usize() | forwarded,
@@ -81,12 +79,11 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
 }
 
 pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: ObjectReference) {
-    let forwarded = 
-        if VM::VMObjectModel::HAS_GC_BYTE {
-            (FORWARDED as usize) << VM::VMObjectModel::GC_BYTE_OFFSET
-        } else {
-            todo!("\"HAS_GC_BYTE == false\" is not supported yet");
-        };
+    let forwarded = if VM::VMObjectModel::HAS_GC_BYTE {
+        (FORWARDED as usize) << VM::VMObjectModel::GC_BYTE_OFFSET
+    } else {
+        todo!("\"HAS_GC_BYTE == false\" is not supported yet");
+    };
     VM::VMObjectModel::write_available_bits_word(object, ptr.to_address().as_usize() | forwarded);
 }
 

@@ -8,6 +8,7 @@ pub mod address;
 pub mod alloc;
 pub mod constants;
 pub mod forwarding_word;
+pub mod gc_byte;
 pub mod generic_freelist;
 pub mod header_byte;
 pub mod heap;
@@ -19,7 +20,6 @@ pub mod options;
 pub mod queue;
 pub mod raw_memory_freelist;
 pub mod reference_processor;
-pub mod gc_byte;
 #[cfg(feature = "sanity")]
 pub mod sanity;
 pub mod statistics;
