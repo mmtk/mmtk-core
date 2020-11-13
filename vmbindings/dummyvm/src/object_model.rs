@@ -3,7 +3,6 @@ use mmtk::util::{Address, ObjectReference};
 use mmtk::AllocationSemantics;
 use mmtk::CopyContext;
 use DummyVM;
-use std::sync::atomic::AtomicU8;
 
 pub struct VMObjectModel {}
 

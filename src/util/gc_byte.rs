@@ -1,7 +1,7 @@
 use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use std::sync::atomic::AtomicU8;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 /// Return the GC byte of an object.
 ///
@@ -20,4 +20,8 @@ pub fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 
     } else {
         todo!("\"HAS_GC_BYTE == false\" is not supported yet")
     }
+}
+
+pub fn get_gc_byte_value<VM: VMBinding>(object: ObjectReference) -> u8 {
+    get_gc_byte::<VM>(object).load(Ordering::SeqCst)
 }

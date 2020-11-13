@@ -45,7 +45,7 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
     if gc_byte & FORWARDING_MASK == FORWARDED {
         let status_word = VM::VMObjectModel::read_available_bits_word(object);
-        let a = gc_byte::get_gc_byte(object);
+        let a = status_word & !((FORWARDING_MASK as usize) << gc_byte::get_gc_byte_value::<VM>(object));
         unsafe { Address::from_usize(a).to_object_reference() }
     } else {
         panic!(
@@ -62,7 +62,7 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     copy_context: &mut CC,
 ) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
-    let forwarded = gc_byte::get_gc_byte(object);
+    let forwarded = (FORWARDED as usize) << gc_byte::get_gc_byte_value::<VM>(object);
     VM::VMObjectModel::write_available_bits_word(
         object,
         new_object.to_address().as_usize() | forwarded,
@@ -71,7 +71,7 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
 }
 
 pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: ObjectReference) {
-    let forwarded = gc_byte::get_gc_byte(object);
+    let forwarded = (FORWARDED as usize) << gc_byte::get_gc_byte_value::<VM>(object);
     VM::VMObjectModel::write_available_bits_word(object, ptr.to_address().as_usize() | forwarded);
 }
 
