@@ -25,6 +25,9 @@ pub struct CopySpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for CopySpace<VM> {
+    fn name(&self) -> &str {
+        self.get_name()
+    }
     fn is_live(&self, object: ObjectReference) -> bool {
         !self.from_space() || ForwardingWord::is_forwarded::<VM>(object)
     }
@@ -59,6 +62,7 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         // Borrow-checker fighting so that we can have a cyclic reference
         let me = unsafe { &*(self as *const Self) };
         self.pr.bind_space(me);
+        self.common().init(self.as_sft());
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {

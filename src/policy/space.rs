@@ -48,6 +48,7 @@ use downcast_rs::Downcast;
  * table of SFT rather than Space.
  */
 pub trait SFT {
+    fn name(&self) -> &str;
     fn is_live(&self, object: ObjectReference) -> bool;
     fn is_movable(&self) -> bool;
     #[cfg(feature = "sanity")]
@@ -55,11 +56,19 @@ pub trait SFT {
     fn initialize_header(&self, object: ObjectReference, alloc: bool);
 }
 
-unsafe impl Sync for SFTMap {}
+/// Print debug info for SFT. Should be false when committed.
+const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 
+#[derive(Debug)]
 struct EmptySpaceSFT {}
 unsafe impl Sync for EmptySpaceSFT {}
+
+const EMPTY_SFT_NAME: &str = "empty";
+
 impl SFT for EmptySpaceSFT {
+    fn name(&self) -> &str {
+        EMPTY_SFT_NAME
+    }
     fn is_live(&self, object: ObjectReference) -> bool {
         panic!(
             "Called is_live() on {:x}, which maps to an empty space",
@@ -94,6 +103,7 @@ impl SFT for EmptySpaceSFT {
 pub struct SFTMap {
     sft: Vec<*const (dyn SFT + Sync)>,
 }
+unsafe impl Sync for SFTMap {}
 
 static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
@@ -113,13 +123,69 @@ impl SFTMap {
     }
 
     pub fn get(&self, address: Address) -> &'static dyn SFT {
-        unsafe { &*self.sft[address.chunk_index()] }
+        let res = self.sft[address.chunk_index()];
+        if DEBUG_SFT {
+            trace!(
+                "Get SFT for {} #{} = {}",
+                address,
+                address.chunk_index(),
+                unsafe { &(*res) }.name()
+            );
+        }
+        unsafe { &*res }
     }
 
+    fn log_update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+        let first = start.chunk_index();
+        let end = start + (chunks << LOG_BYTES_IN_CHUNK);
+        debug!(
+            "Update SFT for [{}, {}) as {}",
+            start,
+            end,
+            unsafe { &(*space) }.name()
+        );
+        let start_chunk = chunk_index_to_address(first);
+        let end_chunk = chunk_index_to_address(first + chunks);
+        debug!(
+            "Update SFT for {} chunks of [{} #{}, {} #{})",
+            chunks,
+            start_chunk,
+            first,
+            end_chunk,
+            first + chunks
+        );
+    }
+
+    fn trace_sft_map(&self) {
+        // print the entire SFT map
+        const SPACE_PER_LINE: usize = 10;
+        for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
+            let max = if i + SPACE_PER_LINE > self.sft.len() {
+                self.sft.len()
+            } else {
+                i + SPACE_PER_LINE
+            };
+            let chunks: Vec<usize> = (i..max).collect();
+            let space_names: Vec<&str> = chunks
+                .iter()
+                .map(|&x| unsafe { &*self.sft[x] }.name())
+                .collect();
+            trace!("Chunk {}: {}", i, space_names.join(","));
+        }
+    }
+
+    /// Update SFT map for the given address range.
+    /// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
     pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+        if DEBUG_SFT {
+            self.log_update(space, start, chunks);
+        }
         let first = start.chunk_index();
         for chunk in first..(first + chunks) {
             self.set(chunk, space);
+        }
+        if DEBUG_SFT {
+            self.trace_sft_map();
         }
     }
 
@@ -138,6 +204,19 @@ impl SFTMap {
          * old (valid) space or an empty space, both of which are valid.
          */
         let self_mut: &mut Self = unsafe { self.mut_self() };
+        // It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
+        if cfg!(debug_assertions) {
+            let old = unsafe { self_mut.sft[chunk].as_ref() }.unwrap().name();
+            let new = unsafe { sft.as_ref() }.unwrap().name();
+            // Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,
+            // in which case, we still set SFT map again.
+            debug_assert!(
+                old == EMPTY_SFT_NAME || new == EMPTY_SFT_NAME || old == new,
+                "attempt to overwrite a non-empty chunk in SFT map (from {} to {})",
+                old,
+                new
+            );
+        }
         self_mut.sft[chunk] = sft;
     }
 }
@@ -227,6 +306,16 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
+        trace!(
+            "Grow space from {} for {} bytes (new chunk = {})",
+            start,
+            bytes,
+            new_chunk
+        );
+        debug_assert!(
+            (new_chunk && start.is_aligned_to(BYTES_IN_CHUNK)) || !new_chunk,
+            "should only grow space for new chunks at chunk-aligned start address"
+        );
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
             SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
@@ -363,7 +452,8 @@ pub struct SpaceOptions {
     pub vmrequest: VMRequest,
 }
 
-const DEBUG: bool = false;
+/// Print debug info for SFT. Should be false when committed.
+const DEBUG_SPACE: bool = cfg!(debug_assertions) && false;
 
 unsafe impl<VM: VMBinding> Sync for CommonSpace<VM> {}
 
@@ -423,13 +513,13 @@ impl<VM: VMBinding> CommonSpace<VM> {
         let start: Address;
         if let VMRequest::RequestFixed { start: _start, .. } = vmrequest {
             start = _start;
-            if start != chunk_align_up(start) {
-                panic!("{} starting on non-aligned boundary: {}", rtn.name, start);
-            }
         } else {
             // FIXME
             //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
             start = heap.reserve(extent, top);
+        }
+        if start != chunk_align_up(start) {
+            panic!("{} starting on non-aligned boundary: {}", rtn.name, start);
         }
 
         rtn.contiguous = true;
@@ -440,11 +530,24 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // VM.memory.setHeapRange(index, start, start.plus(extent));
         vm_map.insert(start, extent, rtn.descriptor);
 
-        if DEBUG {
-            println!("{} {} {} {}", rtn.name, start, start + extent, extent);
+        if DEBUG_SPACE {
+            println!(
+                "Created space {} [{}, {}) for {} bytes",
+                rtn.name,
+                start,
+                start + extent,
+                extent
+            );
         }
 
         rtn
+    }
+
+    pub fn init(&self, sft: *const (dyn SFT + Sync)) {
+        // For contiguous space, we eagerly initialize SFT map based on its address range.
+        if self.contiguous {
+            SFT_MAP.update(sft, self.start, bytes_to_chunks_up(self.extent));
+        }
     }
 
     pub fn vm_map(&self) -> &'static VMMap {
