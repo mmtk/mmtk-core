@@ -336,6 +336,8 @@
 <span id="336">336</span>
 <span id="337">337</span>
 <span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">vmrequest</span>::<span class="ident">HEAP_LAYOUT_64BIT</span>;
@@ -406,10 +408,18 @@
         <span class="ident">zeroed</span>: <span class="ident">bool</span>,
         <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+        <span class="macro">debug</span><span class="macro">!</span>(
+            <span class="string">&quot;In MonotonePageResource, reserved_pages = {}, required_pages = {}&quot;</span>,
+            <span class="ident">reserved_pages</span>, <span class="ident">immut_required_pages</span>
+        );
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">required_pages</span> <span class="op">=</span> <span class="ident">immut_required_pages</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_chunk</span> <span class="op">=</span> <span class="bool-val">false</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sync</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rtn</span> <span class="op">=</span> <span class="ident">sync</span>.<span class="ident">cursor</span>;
+        <span class="macro">debug</span><span class="macro">!</span>(
+            <span class="string">&quot;cursor = {}, sentinel = {}, current_chunk = {}&quot;</span>,
+            <span class="ident">sync</span>.<span class="ident">cursor</span>, <span class="ident">sync</span>.<span class="ident">sentinel</span>, <span class="ident">sync</span>.<span class="ident">current_chunk</span>
+        );
 
         <span class="kw">if</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">debug</span> <span class="op">=</span> <span class="string">&quot;true&quot;</span>) {
             <span class="comment">/*
@@ -436,23 +446,16 @@
             <span class="kw">let</span> <span class="ident">region_start</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">get_region_start</span>(<span class="ident">sync</span>.<span class="ident">cursor</span> <span class="op">+</span> <span class="ident">pages_to_bytes</span>(<span class="ident">required_pages</span>));
             <span class="kw">let</span> <span class="ident">region_delta</span> <span class="op">=</span> <span class="ident">region_start</span>.<span class="ident">get_offset</span>(<span class="ident">sync</span>.<span class="ident">cursor</span>);
             <span class="kw">if</span> <span class="ident">region_delta</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span> {
-                <span class="ident">new_chunk</span> <span class="op">=</span> <span class="bool-val">true</span>;
                 <span class="comment">/* start new region, so adjust pages and return address accordingly */</span>
                 <span class="ident">required_pages</span> <span class="op">+</span><span class="op">=</span>
                     <span class="ident">bytes_to_pages</span>(<span class="ident">region_delta</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">+</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>;
                 <span class="ident">rtn</span> <span class="op">=</span> <span class="ident">region_start</span> <span class="op">+</span> <span class="ident">pages_to_bytes</span>(<span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>);
             }
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">region_start</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">get_region_start</span>(<span class="ident">sync</span>.<span class="ident">cursor</span> <span class="op">+</span> <span class="ident">pages_to_bytes</span>(<span class="ident">required_pages</span>));
-            <span class="kw">let</span> <span class="ident">region_delta</span> <span class="op">=</span> <span class="ident">region_start</span>.<span class="ident">get_offset</span>(<span class="ident">sync</span>.<span class="ident">cursor</span>);
-            <span class="kw">if</span> <span class="ident">region_delta</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span> {
-                <span class="ident">new_chunk</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            }
         }
         <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">pages_to_bytes</span>(<span class="ident">required_pages</span>);
-        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;bytes={}&quot;</span>, <span class="ident">bytes</span>);
+        <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;bytes={}&quot;</span>, <span class="ident">bytes</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">sync</span>.<span class="ident">cursor</span> <span class="op">+</span> <span class="ident">bytes</span>;
-        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;tmp={:?}&quot;</span>, <span class="ident">tmp</span>);
+        <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;tmp={:?}&quot;</span>, <span class="ident">tmp</span>);
 
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">common</span>().<span class="ident">contiguous</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">tmp</span> <span class="op">&gt;</span> <span class="ident">sync</span>.<span class="ident">sentinel</span> {
             <span class="comment">/* we&#39;re out of virtual memory within our discontiguous region, so ask for more */</span>
@@ -484,6 +487,7 @@
             <span class="comment">//debug!(&quot;tmp={:?} &lt;= sync.sentinel={:?}&quot;, tmp, sync.sentinel);</span>
             <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="ident">sync</span>.<span class="ident">cursor</span>;
             <span class="ident">sync</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="ident">tmp</span>;
+            <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;update cursor = {}&quot;</span>, <span class="ident">tmp</span>);
 
             <span class="comment">/* In a contiguous space we can bump along into the next chunk, so preserve the currentChunk invariant */</span>
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">contiguous</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">chunk_align_down</span>(<span class="ident">sync</span>.<span class="ident">cursor</span>) <span class="op">!</span><span class="op">=</span> <span class="ident">sync</span>.<span class="ident">current_chunk</span> {

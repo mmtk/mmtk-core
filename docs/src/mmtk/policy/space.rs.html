@@ -469,6 +469,109 @@
 <span id="469">469</span>
 <span id="470">470</span>
 <span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
@@ -520,6 +623,7 @@
  * table of SFT rather than Space.
  */</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">SFT</span> {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span>;
     <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
     <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
@@ -527,11 +631,19 @@
     <span class="kw">fn</span> <span class="ident">initialize_header</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">alloc</span>: <span class="ident">bool</span>);
 }
 
-<span class="kw">unsafe</span> <span class="kw">impl</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">SFTMap</span> {}
+<span class="doccomment">/// Print debug info for SFT. Should be false when committed.</span>
+<span class="kw">const</span> <span class="ident">DEBUG_SFT</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">debug_assertions</span>) <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="bool-val">false</span>;
 
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">struct</span> <span class="ident">EmptySpaceSFT</span> {}
 <span class="kw">unsafe</span> <span class="kw">impl</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">EmptySpaceSFT</span> {}
+
+<span class="kw">const</span> <span class="ident">EMPTY_SFT_NAME</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;empty&quot;</span>;
+
 <span class="kw">impl</span> <span class="ident">SFT</span> <span class="kw">for</span> <span class="ident">EmptySpaceSFT</span> {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
+        <span class="ident">EMPTY_SFT_NAME</span>
+    }
     <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="macro">panic</span><span class="macro">!</span>(
             <span class="string">&quot;Called is_live() on {:x}, which maps to an empty space&quot;</span>,
@@ -566,6 +678,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SFTMap</span> {
     <span class="ident">sft</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">*</span><span class="kw">const</span> (<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span>)<span class="op">&gt;</span>,
 }
+<span class="kw">unsafe</span> <span class="kw">impl</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">SFTMap</span> {}
 
 <span class="kw">static</span> <span class="ident">EMPTY_SPACE_SFT</span>: <span class="ident">EmptySpaceSFT</span> <span class="op">=</span> <span class="ident">EmptySpaceSFT</span> {};
 
@@ -585,13 +698,69 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">SFT</span> {
-        <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">sft</span>[<span class="ident">address</span>.<span class="ident">chunk_index</span>()] }
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sft</span>[<span class="ident">address</span>.<span class="ident">chunk_index</span>()];
+        <span class="kw">if</span> <span class="ident">DEBUG_SFT</span> {
+            <span class="macro">trace</span><span class="macro">!</span>(
+                <span class="string">&quot;Get SFT for {} #{} = {}&quot;</span>,
+                <span class="ident">address</span>,
+                <span class="ident">address</span>.<span class="ident">chunk_index</span>(),
+                <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span>(<span class="kw-2">*</span><span class="ident">res</span>) }.<span class="ident">name</span>()
+            );
+        }
+        <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">res</span> }
     }
 
+    <span class="kw">fn</span> <span class="ident">log_update</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">*</span><span class="kw">const</span> (<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span>), <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">chunks</span>: <span class="ident">usize</span>) {
+        <span class="kw">let</span> <span class="ident">first</span> <span class="op">=</span> <span class="ident">start</span>.<span class="ident">chunk_index</span>();
+        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> (<span class="ident">chunks</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>);
+        <span class="macro">debug</span><span class="macro">!</span>(
+            <span class="string">&quot;Update SFT for [{}, {}) as {}&quot;</span>,
+            <span class="ident">start</span>,
+            <span class="ident">end</span>,
+            <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span>(<span class="kw-2">*</span><span class="ident">space</span>) }.<span class="ident">name</span>()
+        );
+        <span class="kw">let</span> <span class="ident">start_chunk</span> <span class="op">=</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">first</span>);
+        <span class="kw">let</span> <span class="ident">end_chunk</span> <span class="op">=</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">first</span> <span class="op">+</span> <span class="ident">chunks</span>);
+        <span class="macro">debug</span><span class="macro">!</span>(
+            <span class="string">&quot;Update SFT for {} chunks of [{} #{}, {} #{})&quot;</span>,
+            <span class="ident">chunks</span>,
+            <span class="ident">start_chunk</span>,
+            <span class="ident">first</span>,
+            <span class="ident">end_chunk</span>,
+            <span class="ident">first</span> <span class="op">+</span> <span class="ident">chunks</span>
+        );
+    }
+
+    <span class="kw">fn</span> <span class="ident">trace_sft_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="comment">// print the entire SFT map</span>
+        <span class="kw">const</span> <span class="ident">SPACE_PER_LINE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">10</span>;
+        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> (<span class="number">0</span>..<span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>()).<span class="ident">step_by</span>(<span class="ident">SPACE_PER_LINE</span>) {
+            <span class="kw">let</span> <span class="ident">max</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">i</span> <span class="op">+</span> <span class="ident">SPACE_PER_LINE</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>() {
+                <span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>()
+            } <span class="kw">else</span> {
+                <span class="ident">i</span> <span class="op">+</span> <span class="ident">SPACE_PER_LINE</span>
+            };
+            <span class="kw">let</span> <span class="ident">chunks</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">i</span>..<span class="ident">max</span>).<span class="ident">collect</span>();
+            <span class="kw">let</span> <span class="ident">space_names</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">chunks</span>
+                .<span class="ident">iter</span>()
+                .<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">sft</span>[<span class="ident">x</span>] }.<span class="ident">name</span>())
+                .<span class="ident">collect</span>();
+            <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Chunk {}: {}&quot;</span>, <span class="ident">i</span>, <span class="ident">space_names</span>.<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>));
+        }
+    }
+
+    <span class="doccomment">/// Update SFT map for the given address range.</span>
+    <span class="doccomment">/// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">*</span><span class="kw">const</span> (<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span>), <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">chunks</span>: <span class="ident">usize</span>) {
+        <span class="kw">if</span> <span class="ident">DEBUG_SFT</span> {
+            <span class="self">self</span>.<span class="ident">log_update</span>(<span class="ident">space</span>, <span class="ident">start</span>, <span class="ident">chunks</span>);
+        }
         <span class="kw">let</span> <span class="ident">first</span> <span class="op">=</span> <span class="ident">start</span>.<span class="ident">chunk_index</span>();
         <span class="kw">for</span> <span class="ident">chunk</span> <span class="kw">in</span> <span class="ident">first</span>..(<span class="ident">first</span> <span class="op">+</span> <span class="ident">chunks</span>) {
             <span class="self">self</span>.<span class="ident">set</span>(<span class="ident">chunk</span>, <span class="ident">space</span>);
+        }
+        <span class="kw">if</span> <span class="ident">DEBUG_SFT</span> {
+            <span class="self">self</span>.<span class="ident">trace_sft_map</span>();
         }
     }
 
@@ -610,6 +779,19 @@
          * old (valid) space or an empty space, both of which are valid.
          */</span>
         <span class="kw">let</span> <span class="ident">self_mut</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
+        <span class="comment">// It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.</span>
+        <span class="kw">if</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">debug_assertions</span>) {
+            <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">self_mut</span>.<span class="ident">sft</span>[<span class="ident">chunk</span>].<span class="ident">as_ref</span>() }.<span class="ident">unwrap</span>().<span class="ident">name</span>();
+            <span class="kw">let</span> <span class="ident">new</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">sft</span>.<span class="ident">as_ref</span>() }.<span class="ident">unwrap</span>().<span class="ident">name</span>();
+            <span class="comment">// Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,</span>
+            <span class="comment">// in which case, we still set SFT map again.</span>
+            <span class="macro">debug_assert</span><span class="macro">!</span>(
+                <span class="ident">old</span> <span class="op">=</span><span class="op">=</span> <span class="ident">EMPTY_SFT_NAME</span> <span class="op">|</span><span class="op">|</span> <span class="ident">new</span> <span class="op">=</span><span class="op">=</span> <span class="ident">EMPTY_SFT_NAME</span> <span class="op">|</span><span class="op">|</span> <span class="ident">old</span> <span class="op">=</span><span class="op">=</span> <span class="ident">new</span>,
+                <span class="string">&quot;attempt to overwrite a non-empty chunk in SFT map (from {} to {})&quot;</span>,
+                <span class="ident">old</span>,
+                <span class="ident">new</span>
+            );
+        }
         <span class="ident">self_mut</span>.<span class="ident">sft</span>[<span class="ident">chunk</span>] <span class="op">=</span> <span class="ident">sft</span>;
     }
 }
@@ -699,6 +881,16 @@
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */</span>
     <span class="kw">fn</span> <span class="ident">grow_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>, <span class="ident">new_chunk</span>: <span class="ident">bool</span>) {
+        <span class="macro">trace</span><span class="macro">!</span>(
+            <span class="string">&quot;Grow space from {} for {} bytes (new chunk = {})&quot;</span>,
+            <span class="ident">start</span>,
+            <span class="ident">bytes</span>,
+            <span class="ident">new_chunk</span>
+        );
+        <span class="macro">debug_assert</span><span class="macro">!</span>(
+            (<span class="ident">new_chunk</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_CHUNK</span>)) <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="ident">new_chunk</span>,
+            <span class="string">&quot;should only grow space for new chunks at chunk-aligned start address&quot;</span>
+        );
         <span class="kw">if</span> <span class="ident">new_chunk</span> {
             <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">conversions</span>::<span class="ident">bytes_to_chunks_up</span>(<span class="ident">bytes</span>);
             <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="self">self</span>.<span class="ident">as_sft</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> (<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span>), <span class="ident">start</span>, <span class="ident">chunks</span>);
@@ -835,7 +1027,8 @@
     <span class="kw">pub</span> <span class="ident">vmrequest</span>: <span class="ident">VMRequest</span>,
 }
 
-<span class="kw">const</span> <span class="ident">DEBUG</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
+<span class="doccomment">/// Print debug info for SFT. Should be false when committed.</span>
+<span class="kw">const</span> <span class="ident">DEBUG_SPACE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">debug_assertions</span>) <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="bool-val">false</span>;
 
 <span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
 
@@ -895,13 +1088,13 @@
         <span class="kw">let</span> <span class="ident">start</span>: <span class="ident">Address</span>;
         <span class="kw">if</span> <span class="kw">let</span> <span class="ident">VMRequest</span>::<span class="ident">RequestFixed</span> { <span class="ident">start</span>: <span class="ident">_start</span>, .. } <span class="op">=</span> <span class="ident">vmrequest</span> {
             <span class="ident">start</span> <span class="op">=</span> <span class="ident">_start</span>;
-            <span class="kw">if</span> <span class="ident">start</span> <span class="op">!</span><span class="op">=</span> <span class="ident">chunk_align_up</span>(<span class="ident">start</span>) {
-                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;{} starting on non-aligned boundary: {}&quot;</span>, <span class="ident">rtn</span>.<span class="ident">name</span>, <span class="ident">start</span>);
-            }
         } <span class="kw">else</span> {
             <span class="comment">// FIXME</span>
             <span class="comment">//if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail(&quot;heap is narrowed after regionMap is finalized: &quot; + name);</span>
             <span class="ident">start</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">reserve</span>(<span class="ident">extent</span>, <span class="ident">top</span>);
+        }
+        <span class="kw">if</span> <span class="ident">start</span> <span class="op">!</span><span class="op">=</span> <span class="ident">chunk_align_up</span>(<span class="ident">start</span>) {
+            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;{} starting on non-aligned boundary: {}&quot;</span>, <span class="ident">rtn</span>.<span class="ident">name</span>, <span class="ident">start</span>);
         }
 
         <span class="ident">rtn</span>.<span class="ident">contiguous</span> <span class="op">=</span> <span class="bool-val">true</span>;
@@ -912,11 +1105,24 @@
         <span class="comment">// VM.memory.setHeapRange(index, start, start.plus(extent));</span>
         <span class="ident">vm_map</span>.<span class="ident">insert</span>(<span class="ident">start</span>, <span class="ident">extent</span>, <span class="ident">rtn</span>.<span class="ident">descriptor</span>);
 
-        <span class="kw">if</span> <span class="ident">DEBUG</span> {
-            <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;{} {} {} {}&quot;</span>, <span class="ident">rtn</span>.<span class="ident">name</span>, <span class="ident">start</span>, <span class="ident">start</span> <span class="op">+</span> <span class="ident">extent</span>, <span class="ident">extent</span>);
+        <span class="kw">if</span> <span class="ident">DEBUG_SPACE</span> {
+            <span class="macro">println</span><span class="macro">!</span>(
+                <span class="string">&quot;Created space {} [{}, {}) for {} bytes&quot;</span>,
+                <span class="ident">rtn</span>.<span class="ident">name</span>,
+                <span class="ident">start</span>,
+                <span class="ident">start</span> <span class="op">+</span> <span class="ident">extent</span>,
+                <span class="ident">extent</span>
+            );
         }
 
         <span class="ident">rtn</span>
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">sft</span>: <span class="kw-2">*</span><span class="kw">const</span> (<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span>)) {
+        <span class="comment">// For contiguous space, we eagerly initialize SFT map based on its address range.</span>
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contiguous</span> {
+            <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="ident">sft</span>, <span class="self">self</span>.<span class="ident">start</span>, <span class="ident">bytes_to_chunks_up</span>(<span class="self">self</span>.<span class="ident">extent</span>));
+        }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">vm_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span> {
