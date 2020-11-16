@@ -1,7 +1,7 @@
 use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::AtomicU8;
 
 /// Return the GC byte of an object.
 ///
@@ -22,10 +22,12 @@ pub fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 
     }
 }
 
-pub fn get_gc_byte_value<VM: VMBinding>(object: ObjectReference) -> u8 {
-    get_gc_byte::<VM>(object).load(Ordering::SeqCst)
-}
-
+/// Return the offset of a GC byte relative to its containing header word.
+///
+/// For cases where the constant `GC_BYTE_OFFSET` is negative (e.g. JikesRVM),
+/// this function returns a positive offset
+/// value in the [0 to word size) range.
+///
 pub fn get_relative_offset<VM: VMBinding>() -> isize {
     #[cfg(target_pointer_width = "64")]
     let sys_ptr_width = 64;
