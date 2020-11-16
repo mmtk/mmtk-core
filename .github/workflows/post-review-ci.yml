@@ -17,7 +17,7 @@ jobs:
         with:
           path: mmtk-core
       - name: Check Binding Revision
-        uses: qinsoon/comment-env-vars@1.0.1
+        uses: qinsoon/comment-env-vars@1.0.2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           default_env: 'V8_BINDING_REF=master'
@@ -55,7 +55,7 @@ jobs:
         with:
           path: mmtk-core
       - name: Check Binding Revision
-        uses: qinsoon/comment-env-vars@1.0.1
+        uses: qinsoon/comment-env-vars@1.0.2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           default_env: 'JIKESRVM_BINDING_REF=master'
@@ -85,7 +85,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
       - name: Check Revisions
-        uses: qinsoon/comment-env-vars@1.0.1
+        uses: qinsoon/comment-env-vars@1.0.2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           default_env: 'JIKESRVM_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,JIKESRVM_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
@@ -179,7 +179,7 @@ jobs:
         with:
           path: mmtk-core
       - name: Check Binding Revision
-        uses: qinsoon/comment-env-vars@1.0.1
+        uses: qinsoon/comment-env-vars@1.0.2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           default_env: 'OPENJDK_BINDING_REF=master'
@@ -208,7 +208,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
       - name: Check Revisions
-        uses: qinsoon/comment-env-vars@1.0.1
+        uses: qinsoon/comment-env-vars@1.0.2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
