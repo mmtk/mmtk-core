@@ -67,10 +67,18 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         zeroed: bool,
         tls: OpaquePointer,
     ) -> Address {
+        debug!(
+            "In MonotonePageResource, reserved_pages = {}, required_pages = {}",
+            reserved_pages, immut_required_pages
+        );
         let mut required_pages = immut_required_pages;
         let mut new_chunk = false;
         let mut sync = self.sync.lock().unwrap();
         let mut rtn = sync.cursor;
+        debug!(
+            "cursor = {}, sentinel = {}, current_chunk = {}",
+            sync.cursor, sync.sentinel, sync.current_chunk
+        );
 
         if cfg!(debug = "true") {
             /*
@@ -97,23 +105,16 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             let region_start = Self::get_region_start(sync.cursor + pages_to_bytes(required_pages));
             let region_delta = region_start.get_offset(sync.cursor);
             if region_delta >= 0 {
-                new_chunk = true;
                 /* start new region, so adjust pages and return address accordingly */
                 required_pages +=
                     bytes_to_pages(region_delta as usize) + self.meta_data_pages_per_region;
                 rtn = region_start + pages_to_bytes(self.meta_data_pages_per_region);
             }
-        } else {
-            let region_start = Self::get_region_start(sync.cursor + pages_to_bytes(required_pages));
-            let region_delta = region_start.get_offset(sync.cursor);
-            if region_delta >= 0 {
-                new_chunk = true;
-            }
         }
         let bytes = pages_to_bytes(required_pages);
-        trace!("bytes={}", bytes);
+        debug!("bytes={}", bytes);
         let mut tmp = sync.cursor + bytes;
-        trace!("tmp={:?}", tmp);
+        debug!("tmp={:?}", tmp);
 
         if !self.common().contiguous && tmp > sync.sentinel {
             /* we're out of virtual memory within our discontiguous region, so ask for more */
@@ -145,6 +146,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             //debug!("tmp={:?} <= sync.sentinel={:?}", tmp, sync.sentinel);
             let old = sync.cursor;
             sync.cursor = tmp;
+            debug!("update cursor = {}", tmp);
 
             /* In a contiguous space we can bump along into the next chunk, so preserve the currentChunk invariant */
             if self.common().contiguous && chunk_align_down(sync.cursor) != sync.current_chunk {

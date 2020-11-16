@@ -36,6 +36,9 @@ pub struct LargeObjectSpace<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for LargeObjectSpace<VM> {}
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
+    fn name(&self) -> &str {
+        self.get_name()
+    }
     fn is_live(&self, object: ObjectReference) -> bool {
         self.test_mark_bit(object, self.mark_state)
     }

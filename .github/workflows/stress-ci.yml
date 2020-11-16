@@ -35,7 +35,7 @@ jobs:
       # Set parameters
       - name: Set stress test parameters
         id: stress_test
-        run: echo "::set-env name=MMTK_STRESS_FACTOR::1"
+        run: echo "MMTK_STRESS_FACTOR=1" >> $GITHUB_ENV
       - name: antlr
         if: always()
         run:
@@ -110,8 +110,7 @@ jobs:
       # Set parameters
       - name: Set stress test parameters
         id: stress_test
-        run: |
-          echo "::set-env name=MMTK_STRESS_FACTOR::1"
+        run: echo "MMTK_STRESS_FACTOR=1" >> $GITHUB_ENV
       # Run
       - name: antlr
         if: always()
