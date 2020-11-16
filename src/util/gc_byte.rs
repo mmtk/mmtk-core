@@ -1,7 +1,6 @@
 use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use std::mem;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 /// Return the GC byte of an object.
