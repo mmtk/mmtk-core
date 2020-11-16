@@ -27,6 +27,9 @@ const GC_MARK_BIT_MASK: u8 = 1;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
+    fn name(&self) -> &str {
+        self.get_name()
+    }
     fn is_live(&self, _object: ObjectReference) -> bool {
         true
     }
@@ -68,6 +71,7 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
         // Borrow-checker fighting so that we can have a cyclic reference
         let me = unsafe { &*(self as *const Self) };
         self.pr.bind_space(me);
+        self.common().init(self.as_sft());
     }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")

@@ -1,5 +1,7 @@
+use crate::mmtk::SFT_MAP;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
+use crate::util::conversions::bytes_to_chunks_up;
 use crate::util::heap::PageResource;
 
 use crate::util::ObjectReference;
@@ -34,6 +36,9 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for LockFreeImmortalSpace<VM> {}
 
 impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
+    fn name(&self) -> &str {
+        self.get_name()
+    }
     fn is_live(&self, _object: ObjectReference) -> bool {
         unimplemented!()
     }
@@ -87,6 +92,11 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         self.limit = AVAILABLE_START + total_bytes;
         // Eagerly memory map the entire heap (also zero all the memory)
         crate::util::memory::dzmmap(AVAILABLE_START, total_bytes).unwrap();
+        SFT_MAP.update(
+            self.as_sft(),
+            AVAILABLE_START,
+            bytes_to_chunks_up(total_bytes),
+        );
     }
 
     fn reserved_pages(&self) -> usize {
