@@ -2,7 +2,6 @@ use crate::plan::CopyContext;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::AllocationSemantics;
-use std::sync::atomic::AtomicU8;
 
 /// VM-specific methods for object model.
 ///
@@ -12,14 +11,13 @@ use std::sync::atomic::AtomicU8;
 ///
 /// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.
 pub trait ObjectModel<VM: VMBinding> {
-    /// The offset of the byte available for GC in the header word from the object reference.
-    const GC_BYTE_OFFSET: usize;
-
-    /// Get a reference of the GC byte for an object.
+    /// Whether an exclusive GC byte in each object's header word is available for MMTk.
+    /// If such a byte is not available in the VM, MMTk will handle it in its own memory.
     ///
-    /// Arguments:
-    /// * `o`: The object to get the GC byte from.
-    fn get_gc_byte(o: ObjectReference) -> &'static AtomicU8;
+    /// Note: Currently only the `true` value is supported.
+    const HAS_GC_BYTE: bool = true;
+    /// The offset of the GC byte from the object reference.
+    const GC_BYTE_OFFSET: isize = 0;
 
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,
     /// `alloc_copy()` and `post_copy()` from a plan's [`CopyContext`](../trait.CopyContext.html) are used for copying.
