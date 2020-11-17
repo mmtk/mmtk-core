@@ -216,14 +216,11 @@
 <span id="216">216</span>
 <span id="217">217</span>
 <span id="218">218</span>
-<span id="219">219</span>
-<span id="220">220</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">CopyContext</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">AllocationSemantics</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">AtomicU8</span>;
 
 <span class="doccomment">/// VM-specific methods for object model.</span>
 <span class="doccomment">///</span>
@@ -233,14 +230,13 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ObjectModel</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The offset of the byte available for GC in the header word from the object reference.</span>
-    <span class="kw">const</span> <span class="ident">GC_BYTE_OFFSET</span>: <span class="ident">usize</span>;
-
-    <span class="doccomment">/// Get a reference of the GC byte for an object.</span>
+    <span class="doccomment">/// Whether an exclusive GC byte in each object&#39;s header word is available for MMTk.</span>
+    <span class="doccomment">/// If such a byte is not available in the VM, MMTk will handle it in its own memory.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `o`: The object to get the GC byte from.</span>
-    <span class="kw">fn</span> <span class="ident">get_gc_byte</span>(<span class="ident">o</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicU8</span>;
+    <span class="doccomment">/// Note: Currently only the `true` value is supported.</span>
+    <span class="kw">const</span> <span class="ident">HAS_GC_BYTE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
+    <span class="doccomment">/// The offset of the GC byte from the object reference.</span>
+    <span class="kw">const</span> <span class="ident">GC_BYTE_OFFSET</span>: <span class="ident">isize</span> <span class="op">=</span> <span class="number">0</span>;
 
     <span class="doccomment">/// Copy an object and return the address of the new object. Usually in the implementation of this method,</span>
     <span class="doccomment">/// `alloc_copy()` and `post_copy()` from a plan&#39;s [`CopyContext`](../trait.CopyContext.html) are used for copying.</span>

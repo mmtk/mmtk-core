@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["get_gc_byte","Return the GC byte of an object."],["get_relative_offset","Return the offset of a GC byte relative to its containing header word."]]});
