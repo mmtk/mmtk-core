@@ -8,6 +8,7 @@ use crate::util::header_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
+use crate::util::object_gc_stats::{GCByte, GCForwardingWord};
 use crate::util::treadmill::TreadMill;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
@@ -17,9 +18,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
-const MARK_BIT: usize = 0b01;
-const NURSERY_BIT: usize = 0b10;
-const LOS_BIT_MASK: usize = 0b11;
+const MARK_BIT: u8 = 0b01;
+const NURSERY_BIT: u8 = 0b10;
+const LOS_BIT_MASK: u8 = 0b11;
 
 const USE_PRECEEDING_GC_HEADER: bool = true;
 const PRECEEDING_GC_HEADER_WORDS: usize = 1;
@@ -28,7 +29,7 @@ const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTE
 pub struct LargeObjectSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
     pr: FreeListPageResource<VM>,
-    mark_state: usize,
+    mark_state: u8,
     in_nursery_gc: bool,
     treadmill: TreadMill,
 }
@@ -50,12 +51,12 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_header(&self, object: ObjectReference, alloc: bool) {
-        let old_value = Self::read_gc_word(object);
+        let old_value = GCByte::read::<VM>(object);
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
         if alloc {
             new_value |= NURSERY_BIT;
         }
-        Self::write_gc_word(object, new_value);
+        GCByte::write::<VM>(object, new_value);
         let cell = VM::VMObjectModel::object_start_ref(object)
             - if USE_PRECEEDING_GC_HEADER {
                 PRECEEDING_GC_HEADER_BYTES
@@ -64,8 +65,12 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             };
         self.treadmill.add_to_treadmill(cell, alloc);
         if header_byte::NEEDS_UNLOGGED_BIT {
-            let b = VM::VMObjectModel::read_available_byte(object);
-            VM::VMObjectModel::write_available_byte(object, b | header_byte::UNLOGGED_BIT);
+            GCByte::write::<VM>(
+                object,
+                GCByte::read::<VM>(object) | header_byte::UNLOGGED_BIT,
+            );
+            // let b = VM::VMObjectModel::read_available_byte(object);
+            // VM::VMObjectModel::write_available_byte(object, b | header_byte::UNLOGGED_BIT);
         }
     }
 }
@@ -202,23 +207,20 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    fn test_and_mark(&self, object: ObjectReference, value: usize) -> bool {
+    fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
         let mask = if self.in_nursery_gc {
             LOS_BIT_MASK
         } else {
             MARK_BIT
         };
-        let mut old_value = Self::read_gc_word(object);
+        let mut old_value = GCByte::read::<VM>(object);
         let mut mark_bit = old_value & mask;
         if mark_bit == value {
             return false;
         }
-        while !Self::attempt_gc_word(
-            object,
-            old_value,
-            old_value & (!LOS_BIT_MASK as usize) | value as usize,
-        ) {
-            old_value = Self::read_gc_word(object);
+        while !GCByte::compare_exchange::<VM>(object, old_value, old_value & !LOS_BIT_MASK | value)
+        {
+            old_value = GCByte::read::<VM>(object);
             mark_bit = old_value & mask;
             if mark_bit == value {
                 return false;
@@ -227,47 +229,47 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         true
     }
 
-    fn test_mark_bit(&self, object: ObjectReference, value: usize) -> bool {
-        Self::read_gc_word(object) & MARK_BIT == value
+    fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
+        GCByte::read::<VM>(object) & MARK_BIT == value
     }
 
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        Self::read_gc_word(object) & NURSERY_BIT == NURSERY_BIT
+        GCByte::read::<VM>(object) & NURSERY_BIT == NURSERY_BIT
     }
 
-    fn read_gc_word(o: ObjectReference) -> usize {
-        if USE_PRECEEDING_GC_HEADER {
-            unsafe {
-                (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
-                    .load::<usize>()
-            }
-        } else {
-            VM::VMObjectModel::read_available_bits_word(o)
-        }
-    }
+    // fn read_gc_word(o: ObjectReference) -> usize {
+    //     if USE_PRECEEDING_GC_HEADER {
+    //         unsafe {
+    //             (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
+    //                 .load::<usize>()
+    //         }
+    //     } else {
+    //         object_gc_stats::read_object_status_word(o)
+    //     }
+    // }
 
-    fn write_gc_word(o: ObjectReference, value: usize) {
-        if USE_PRECEEDING_GC_HEADER {
-            unsafe {
-                (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
-                    .store::<usize>(value)
-            };
-        } else {
-            VM::VMObjectModel::write_available_bits_word(o, value);
-        }
-    }
+    // fn write_gc_word(o: ObjectReference, value: usize) {
+    //     if USE_PRECEEDING_GC_HEADER {
+    //         unsafe {
+    //             (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
+    //                 .store::<usize>(value)
+    //         };
+    //     } else {
+    //         object_gc_stats::write_object_status_word(o, value);
+    //     }
+    // }
 
-    fn attempt_gc_word(o: ObjectReference, old: usize, new: usize) -> bool {
-        if USE_PRECEEDING_GC_HEADER {
-            unsafe {
-                (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
-                    .compare_exchange::<AtomicUsize>(old, new, Ordering::SeqCst, Ordering::SeqCst)
-                    .is_ok()
-            }
-        } else {
-            VM::VMObjectModel::attempt_available_bits(o, old, new)
-        }
-    }
+    // fn attempt_gc_word(o: ObjectReference, old: usize, new: usize) -> bool {
+    //     if USE_PRECEEDING_GC_HEADER {
+    //         unsafe {
+    //             (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
+    //                 .compare_exchange::<AtomicUsize>(old, new, Ordering::SeqCst, Ordering::SeqCst)
+    //                 .is_ok()
+    //         }
+    //     } else {
+    //         object_gc_stats::compare_exchange_object_status_word(o, old, new)
+    //     }
+    // }
 }
 
 fn get_super_page(cell: Address) -> Address {

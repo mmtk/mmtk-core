@@ -64,6 +64,7 @@ pub struct SSProcessEdges<VM: VMBinding> {
 impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
     type VM = VM;
     fn new(edges: Vec<Address>, _roots: bool) -> Self {
+        // println!("plan.semispace.gc_works.67({:#?}, \n{})", edges, _roots);
         Self {
             base: ProcessEdgesBase::new(edges),
             ..Default::default()
@@ -74,6 +75,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
+        info!("semispace.trace_object(0x{:x})", object);
         if self.plan().tospace().in_space(object) {
             return self.plan().tospace().trace_object(
                 self,

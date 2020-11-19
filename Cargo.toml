@@ -38,7 +38,7 @@ crossbeam = "0.7.3"
 rand = "0.7.3"
 
 [features]
-default = []
+default = ["single_worker"]
 
 # plans
 nogc = ["immortalspace", "largeobjectspace"]

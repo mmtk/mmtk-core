@@ -703,6 +703,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
+        debug!("plan.global.706({:?})", object);
         let unsync = unsafe { &*self.unsync.get() };
 
         if unsync.immortal.in_space(object) {
