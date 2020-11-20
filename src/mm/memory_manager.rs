@@ -43,13 +43,19 @@ pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointe
 }
 
 /// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)
-/// instance but before using any of the methods provided in MMTk.
+/// instance but before using any of the methods provided in MMTk. This method will attempt to initialize a
+/// logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance to initialize.
 /// * `heap_size`: The heap size for the MMTk instance in bytes.
 pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
-    crate::util::logger::init().unwrap();
+    match crate::util::logger::try_init() {
+        Ok(_) => debug!("MMTk initialized the logger."),
+        Err(_) => debug!(
+            "MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
+        ),
+    }
     mmtk.plan.gc_init(heap_size, &mmtk.vm_map, &mmtk.scheduler);
 }
 
