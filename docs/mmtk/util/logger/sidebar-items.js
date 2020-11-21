@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["init",""]]});
+initSidebarItems({"fn":[["try_init","Attempt to init a env_logger for MMTk."]]});

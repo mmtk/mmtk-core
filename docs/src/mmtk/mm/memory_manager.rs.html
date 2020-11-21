@@ -321,6 +321,12 @@
 <span id="321">321</span>
 <span id="322">322</span>
 <span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
@@ -367,13 +373,19 @@
 }
 
 <span class="doccomment">/// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)</span>
-<span class="doccomment">/// instance but before using any of the methods provided in MMTk.</span>
+<span class="doccomment">/// instance but before using any of the methods provided in MMTk. This method will attempt to initialize a</span>
+<span class="doccomment">/// logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance to initialize.</span>
 <span class="doccomment">/// * `heap_size`: The heap size for the MMTk instance in bytes.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gc_init</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">heap_size</span>: <span class="ident">usize</span>) {
-    <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">logger</span>::<span class="ident">init</span>().<span class="ident">unwrap</span>();
+    <span class="kw">match</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">logger</span>::<span class="ident">try_init</span>() {
+        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;MMTk initialized the logger.&quot;</span>),
+        <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">debug</span><span class="macro">!</span>(
+            <span class="string">&quot;MMTk failed to initialize the logger. Possibly a logger has been initialized by user.&quot;</span>
+        ),
+    }
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">gc_init</span>(<span class="ident">heap_size</span>, <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">vm_map</span>, <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>);
 }
 
