@@ -157,20 +157,23 @@ impl SFTMap {
     }
 
     fn trace_sft_map(&self) {
-        // print the entire SFT map
-        const SPACE_PER_LINE: usize = 10;
-        for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
-            let max = if i + SPACE_PER_LINE > self.sft.len() {
-                self.sft.len()
-            } else {
-                i + SPACE_PER_LINE
-            };
-            let chunks: Vec<usize> = (i..max).collect();
-            let space_names: Vec<&str> = chunks
-                .iter()
-                .map(|&x| unsafe { &*self.sft[x] }.name())
-                .collect();
-            trace!("Chunk {}: {}", i, space_names.join(","));
+        // For large heaps, it takes long to iterate each chunk. So check log level first.
+        if log::log_enabled!(log::Level::Trace) {
+            // print the entire SFT map
+            const SPACE_PER_LINE: usize = 10;
+            for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
+                let max = if i + SPACE_PER_LINE > self.sft.len() {
+                    self.sft.len()
+                } else {
+                    i + SPACE_PER_LINE
+                };
+                let chunks: Vec<usize> = (i..max).collect();
+                let space_names: Vec<&str> = chunks
+                    .iter()
+                    .map(|&x| unsafe { &*self.sft[x] }.name())
+                    .collect();
+                trace!("Chunk {}: {}", i, space_names.join(","));
+            }
         }
     }
 
