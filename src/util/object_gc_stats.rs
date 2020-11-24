@@ -21,7 +21,7 @@ impl GCByte {
     fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 {
         if VM::VMObjectModel::HAS_GC_BYTE {
             unsafe {
-                &*(object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET / 8).to_ptr::<AtomicU8>()
+                &*(object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET).to_ptr::<AtomicU8>()
             }
         } else {
             todo!("\"HAS_GC_BYTE == false\" is not supported yet")
@@ -51,12 +51,15 @@ pub struct GCForwardingWord {}
 
 impl GCForwardingWord {
     fn get_object_status_word_address<VM: VMBinding>(object: ObjectReference) -> Address {
-        // let res = VM::VMObjectModel::object_start_ref(object) + STATUS_WORD_OFFSET;
-        let res = object.to_address()
-            + ((VM::VMObjectModel::GC_BYTE_OFFSET / constants::BITS_IN_ADDRESS as isize + 1)
-                * constants::BITS_IN_ADDRESS as isize
-                / 8);
-        // debug!("get_object_status_word_address({:#?}) -> {:x}", object, res);
+        // let res = object.to_address() - 12;
+        let obj_lowest_addr = VM::VMObjectModel::object_start_ref(object);
+        let abs_gc_byte_offset = (object.to_address() - obj_lowest_addr) as isize + VM::VMObjectModel::GC_BYTE_OFFSET;
+        let res = if abs_gc_byte_offset >= constants::BYTES_IN_ADDRESS as isize {
+            obj_lowest_addr
+        } else {
+            object.to_address() + (VM::VMObjectModel::GC_BYTE_OFFSET + 1)
+        };
+        debug!("get_object_status_word_address({:#?}) -> {:x}", object, res);
         res
     }
 
