@@ -707,11 +707,11 @@ impl<VM: VMBinding> CommonPlan<VM> {
         let unsync = unsafe { &*self.unsync.get() };
 
         if unsync.immortal.in_space(object) {
-            info!("trace_object: object in immortal space");
+            // info!("trace_object: object in immortal space");
             return unsync.immortal.trace_object(trace, object);
         }
         if unsync.los.in_space(object) {
-            info!("trace_object: object in los");
+            // info!("trace_object: object in los");
             return unsync.los.trace_object(trace, object);
         }
         self.base.trace_object(trace, object)

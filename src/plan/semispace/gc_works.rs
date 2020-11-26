@@ -76,7 +76,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
             return object;
         }
         let res = if self.plan().tospace().in_space(object) {
-            info!("in_to_space");
+            // info!("in_to_space");
             self.plan().tospace().trace_object(
                 self,
                 object,
@@ -84,7 +84,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
                 self.worker().local(),
             )
         } else if self.plan().fromspace().in_space(object) {
-            info!("in_from_space");
+            // info!("in_from_space");
             self.plan().fromspace().trace_object(
                 self,
                 object,
@@ -94,7 +94,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
         } else {
             self.plan().common.trace_object(self, object)
         };
-        info!("semispace.trace_object(0x{:x}) -> {:?}", object, res);
+        // info!("semispace.trace_object(0x{:x}) -> {:?}", object, res);
 
         res
     }

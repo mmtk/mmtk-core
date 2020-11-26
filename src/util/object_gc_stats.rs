@@ -101,9 +101,12 @@ impl GCForwardingWord {
                 .compare_exchange::<AtomicUsize>(old, new, Ordering::SeqCst, Ordering::SeqCst)
                 .is_ok()
         };
-        info!(
+        trace!(
             "\nGCForwardingWord::compare_exchange({:#?}, old = {:x}, new = {:x}) -> {}\n",
-            object, old, new, res
+            object,
+            old,
+            new,
+            res
         );
         res
     }

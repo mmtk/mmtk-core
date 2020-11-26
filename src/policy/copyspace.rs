@@ -150,7 +150,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context);
             trace!("Forwarding pointer");
             trace.process_node(new_object);
-            info!("Copying [{:?} -> {:?}]", object, new_object);
+            // info!("Copying [{:?} -> {:?}]", object, new_object);
             new_object
         }
     }
