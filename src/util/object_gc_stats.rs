@@ -54,13 +54,12 @@ impl GCForwardingWord {
     fn get_object_status_word_address<VM: VMBinding>(object: ObjectReference) -> Address {
         // let res = object.to_address() - 12;
         let res = match unifiable_gcbyte_forwarding_word_offset::<VM>() {
-            Some(fw_offset) => {
-                object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET + fw_offset
-            }, 
+            Some(fw_offset) => object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET + fw_offset,
             None => {
                 let obj_lowest_addr = VM::VMObjectModel::object_start_ref(object);
                 if VM::VMObjectModel::HAS_GC_BYTE {
-                    let abs_gc_byte_offset = (object.to_address() - obj_lowest_addr) as isize + VM::VMObjectModel::GC_BYTE_OFFSET;
+                    let abs_gc_byte_offset = (object.to_address() - obj_lowest_addr) as isize
+                        + VM::VMObjectModel::GC_BYTE_OFFSET;
                     if abs_gc_byte_offset >= constants::BYTES_IN_ADDRESS as isize {
                         obj_lowest_addr
                     } else {
@@ -119,9 +118,11 @@ impl GCForwardingWord {
 pub(super) fn unifiable_gcbyte_forwarding_word_offset<VM: VMBinding>() -> Option<isize> {
     let gcbyte_dealignment = VM::VMObjectModel::GC_BYTE_OFFSET % constants::BYTES_IN_WORD as isize;
     let res = if VM::VMObjectModel::HAS_GC_BYTE {
-        if gcbyte_dealignment == 0 {    // e.g. JikesRVM
+        if gcbyte_dealignment == 0 {
+            // e.g. JikesRVM
             Some(0)
-        } else if gcbyte_dealignment == (constants::BYTES_IN_WORD - 1) as isize {   // e.g. OpenJDK
+        } else if gcbyte_dealignment == (constants::BYTES_IN_WORD - 1) as isize {
+            // e.g. OpenJDK
             Some(1 - constants::BYTES_IN_WORD as isize)
         } else {
             None

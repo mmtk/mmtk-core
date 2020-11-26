@@ -1,6 +1,8 @@
+use crate::util::object_gc_stats::{
+    unifiable_gcbyte_forwarding_word_offset, GCByte, GCForwardingWord,
+};
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
-use crate::util::{object_gc_stats, constants, Address, ObjectReference};
-use crate::util::object_gc_stats::{GCByte, GCForwardingWord, unifiable_gcbyte_forwarding_word_offset};
+use crate::util::{constants, object_gc_stats, Address, ObjectReference};
 use crate::vm::ObjectModel;
 
 use crate::plan::{AllocationSemantics, CopyContext};
@@ -28,11 +30,7 @@ pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
     if old_value & FORWARDING_MASK != FORWARDING_NOT_TRIGGERED_YET {
         return old_value;
     }
-    while !GCByte::compare_exchange::<VM>(
-        object,
-        old_value,
-        old_value | BEING_FORWARDED,
-    ) {
+    while !GCByte::compare_exchange::<VM>(object, old_value, old_value | BEING_FORWARDED) {
         old_value = GCByte::read::<VM>(object);
         if old_value & FORWARDING_MASK != FORWARDING_NOT_TRIGGERED_YET {
             return old_value;
@@ -51,17 +49,18 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
     if gc_byte & FORWARDING_MASK == FORWARDED {
         let status_word = GCForwardingWord::read::<VM>(object);
-        let res = unsafe { 
+        let res = unsafe {
             match unifiable_gcbyte_forwarding_word_offset::<VM>() {
-                Some(fw_offset) => {    // fw_offset is 0 for JikesRVM and 56 for OpenJDK
+                Some(fw_offset) => {
+                    // fw_offset is 0 for JikesRVM and 56 for OpenJDK
                     Address::from_usize(
-                        status_word & !((FORWARDING_MASK as usize) << 
-                            (-1 * fw_offset * constants::BITS_IN_BYTE as isize))
-                        ).to_object_reference() 
-                },
-                None => {
-                    Address::from_usize(status_word).to_object_reference() 
+                        status_word
+                            & !((FORWARDING_MASK as usize)
+                                << (-1 * fw_offset * constants::BITS_IN_BYTE as isize)),
+                    )
+                    .to_object_reference()
                 }
+                None => Address::from_usize(status_word).to_object_reference(),
             }
         };
         // info!(
@@ -88,10 +87,11 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     match unifiable_gcbyte_forwarding_word_offset::<VM>() {
         Some(fw_offset) => {
             GCForwardingWord::write::<VM>(
-                object, 
-                new_object.to_address().as_usize() | 
-                    (FORWARDED as usize) << (-1 * fw_offset * constants::BITS_IN_BYTE as isize));
-        },
+                object,
+                new_object.to_address().as_usize()
+                    | (FORWARDED as usize) << (-1 * fw_offset * constants::BITS_IN_BYTE as isize),
+            );
+        }
         None => {
             GCByte::write::<VM>(object, FORWARDED);
             GCForwardingWord::write::<VM>(object, new_object.to_address().as_usize());
@@ -104,10 +104,11 @@ pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: Objec
     match unifiable_gcbyte_forwarding_word_offset::<VM>() {
         Some(fw_offset) => {
             GCForwardingWord::write::<VM>(
-                object, 
-                ptr.to_address().as_usize() | 
-                    (FORWARDED as usize) << (-1 * fw_offset * constants::BITS_IN_BYTE as isize));
-        },
+                object,
+                ptr.to_address().as_usize()
+                    | (FORWARDED as usize) << (-1 * fw_offset * constants::BITS_IN_BYTE as isize),
+            );
+        }
         None => {
             GCByte::write::<VM>(object, FORWARDED);
             GCForwardingWord::write::<VM>(object, ptr.to_address().as_usize());
@@ -132,8 +133,5 @@ pub fn state_is_being_forwarded(gc_byte: u8) -> bool {
 }
 
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
-    GCByte::write::<VM>(
-        object,
-        GCByte::read::<VM>(object) & !FORWARDING_MASK,
-    );
+    GCByte::write::<VM>(object, GCByte::read::<VM>(object) & !FORWARDING_MASK);
 }

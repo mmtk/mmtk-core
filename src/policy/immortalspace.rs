@@ -119,7 +119,10 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
     fn test_and_mark(object: ObjectReference, value: u8) -> bool {
         let mut old_value = GCByte::read::<VM>(object);
         let mut mark_bit = old_value & GC_MARK_BIT_MASK;
-        info!("immortal.test_and_mark({:?}, {:x}), old_value = {:x}", object, value, old_value);
+        info!(
+            "immortal.test_and_mark({:?}, {:x}), old_value = {:x}",
+            object, value, old_value
+        );
         if mark_bit == value {
             return false;
         }
