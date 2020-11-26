@@ -17,6 +17,12 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Note: Currently only the `true` value is supported.
     const HAS_GC_BYTE: bool = true;
     /// The offset of the GC byte from the object reference.
+    /// 
+    /// Notes: 
+    ///  - This value is only effective if `HAS_GC_BYTE` is set to `true`.
+    ///  - It is recommanded that GC byte is the low-order byte of the word that contains it. \
+    /// E.g. in a 64-bits little endian system, the recommanded offset is `8*K + 7`.
+    /// 
     const GC_BYTE_OFFSET: isize = 0;
 
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,

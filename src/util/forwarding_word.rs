@@ -1,9 +1,16 @@
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
-use crate::util::{object_gc_stats, Address, ObjectReference};
+use crate::util::{object_gc_stats, constants, Address, ObjectReference};
+use crate::util::object_gc_stats::{GCByte, GCForwardingWord, unifiable_gcbyte_forwarding_word_offset};
 use crate::vm::ObjectModel;
 
 use crate::plan::{AllocationSemantics, CopyContext};
 use crate::vm::VMBinding;
+
+// This boolean shows whether the GC byte is the low-order byte of its containing word.
+//
+// If `true` MMTk uses one store operation to write GC byte and forwarding word,
+// instead of writing them separately.
+// pub(super) static UNIFIABLE_GCBYTE_FORWARDING_WORD: bool = false;
 
 // ...00
 const FORWARDING_NOT_TRIGGERED_YET: u8 = 0;
@@ -17,16 +24,16 @@ const FORWARDING_MASK: u8 = 3;
 const FORWARDING_BITS: usize = 2;
 
 pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
-    let mut old_value = object_gc_stats::GCByte::read::<VM>(object);
+    let mut old_value = GCByte::read::<VM>(object);
     if old_value & FORWARDING_MASK != FORWARDING_NOT_TRIGGERED_YET {
         return old_value;
     }
-    while !object_gc_stats::GCByte::compare_exchange::<VM>(
+    while !GCByte::compare_exchange::<VM>(
         object,
         old_value,
         old_value | BEING_FORWARDED,
     ) {
-        old_value = object_gc_stats::GCByte::read::<VM>(object);
+        old_value = GCByte::read::<VM>(object);
         if old_value & FORWARDING_MASK != FORWARDING_NOT_TRIGGERED_YET {
             return old_value;
         }
@@ -40,21 +47,33 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
 ) -> ObjectReference {
     let mut gc_byte = gc_byte;
     while gc_byte & FORWARDING_MASK == BEING_FORWARDED {
-        gc_byte = object_gc_stats::GCByte::read::<VM>(object);
+        gc_byte = GCByte::read::<VM>(object);
     }
     if gc_byte & FORWARDING_MASK == FORWARDED {
-        let status_word = object_gc_stats::GCForwardingWord::read::<VM>(object);
-        let res = unsafe { Address::from_usize(status_word).to_object_reference() };
-        info!(
-            "**spin_and_get_forwarded_object({:?},{:?}) -> {:?}",
-            object, gc_byte, res
-        );
+        let status_word = GCForwardingWord::read::<VM>(object);
+        let res = unsafe { 
+            match unifiable_gcbyte_forwarding_word_offset::<VM>() {
+                Some(fw_offset) => {    // fw_offset is 0 for JikesRVM and 56 for OpenJDK
+                    Address::from_usize(
+                        status_word & !((FORWARDING_MASK as usize) << 
+                            (-1 * fw_offset * constants::BITS_IN_BYTE as isize))
+                        ).to_object_reference() 
+                },
+                None => {
+                    Address::from_usize(status_word).to_object_reference() 
+                }
+            }
+        };
+        // info!(
+        //     "**spin_and_get_forwarded_object({:?},{:?}) -> {:?}",
+        //     object, gc_byte, res
+        // );
         return res;
     } else {
         panic!(
             "Invalid header value 0x{:x} 0x{:x}",
             gc_byte,
-            object_gc_stats::GCForwardingWord::read::<VM>(object)
+            GCForwardingWord::read::<VM>(object)
         )
     }
 }
@@ -64,24 +83,44 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     semantics: AllocationSemantics,
     copy_context: &mut CC,
 ) -> ObjectReference {
-    info!("**forward_object({:?})", object);
+    // info!("**forward_object({:?})", object);
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
-    object_gc_stats::GCByte::write::<VM>(object, FORWARDED);
-    object_gc_stats::GCForwardingWord::write::<VM>(object, new_object.to_address().as_usize());
+    match unifiable_gcbyte_forwarding_word_offset::<VM>() {
+        Some(fw_offset) => {
+            GCForwardingWord::write::<VM>(
+                object, 
+                new_object.to_address().as_usize() | 
+                    (FORWARDED as usize) << (-1 * fw_offset * constants::BITS_IN_BYTE as isize));
+        },
+        None => {
+            GCByte::write::<VM>(object, FORWARDED);
+            GCForwardingWord::write::<VM>(object, new_object.to_address().as_usize());
+        }
+    };
     new_object
 }
 
 pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: ObjectReference) {
-    object_gc_stats::GCByte::write::<VM>(object, FORWARDED);
-    object_gc_stats::GCForwardingWord::write::<VM>(object, ptr.to_address().as_usize());
+    match unifiable_gcbyte_forwarding_word_offset::<VM>() {
+        Some(fw_offset) => {
+            GCForwardingWord::write::<VM>(
+                object, 
+                ptr.to_address().as_usize() | 
+                    (FORWARDED as usize) << (-1 * fw_offset * constants::BITS_IN_BYTE as isize));
+        },
+        None => {
+            GCByte::write::<VM>(object, FORWARDED);
+            GCForwardingWord::write::<VM>(object, ptr.to_address().as_usize());
+        }
+    }
 }
 
 pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
-    object_gc_stats::GCByte::read::<VM>(object) & FORWARDING_MASK == FORWARDED
+    GCByte::read::<VM>(object) & FORWARDING_MASK == FORWARDED
 }
 
 pub fn is_forwarded_or_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
-    object_gc_stats::GCByte::read::<VM>(object) & FORWARDING_MASK != 0
+    GCByte::read::<VM>(object) & FORWARDING_MASK != 0
 }
 
 pub fn state_is_forwarded_or_being_forwarded(gc_byte: u8) -> bool {
@@ -93,8 +132,8 @@ pub fn state_is_being_forwarded(gc_byte: u8) -> bool {
 }
 
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
-    object_gc_stats::GCByte::write::<VM>(
+    GCByte::write::<VM>(
         object,
-        object_gc_stats::GCByte::read::<VM>(object) & !FORWARDING_MASK,
+        GCByte::read::<VM>(object) & !FORWARDING_MASK,
     );
 }
