@@ -68,8 +68,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 object,
                 GCByte::read::<VM>(object) | header_byte::UNLOGGED_BIT,
             );
-            // let b = VM::VMObjectModel::read_available_byte(object);
-            // VM::VMObjectModel::write_available_byte(object, b | header_byte::UNLOGGED_BIT);
         }
     }
 }
@@ -235,40 +233,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
         GCByte::read::<VM>(object) & NURSERY_BIT == NURSERY_BIT
     }
-
-    // fn read_gc_word(o: ObjectReference) -> usize {
-    //     if USE_PRECEEDING_GC_HEADER {
-    //         unsafe {
-    //             (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
-    //                 .load::<usize>()
-    //         }
-    //     } else {
-    //         object_gc_stats::read_object_status_word(o)
-    //     }
-    // }
-
-    // fn write_gc_word(o: ObjectReference, value: usize) {
-    //     if USE_PRECEEDING_GC_HEADER {
-    //         unsafe {
-    //             (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
-    //                 .store::<usize>(value)
-    //         };
-    //     } else {
-    //         object_gc_stats::write_object_status_word(o, value);
-    //     }
-    // }
-
-    // fn attempt_gc_word(o: ObjectReference, old: usize, new: usize) -> bool {
-    //     if USE_PRECEEDING_GC_HEADER {
-    //         unsafe {
-    //             (VM::VMObjectModel::object_start_ref(o) - PRECEEDING_GC_HEADER_BYTES)
-    //                 .compare_exchange::<AtomicUsize>(old, new, Ordering::SeqCst, Ordering::SeqCst)
-    //                 .is_ok()
-    //         }
-    //     } else {
-    //         object_gc_stats::compare_exchange_object_status_word(o, old, new)
-    //     }
-    // }
 }
 
 fn get_super_page(cell: Address) -> Address {

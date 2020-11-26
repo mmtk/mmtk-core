@@ -50,7 +50,6 @@ pub struct GCForwardingWord {}
 impl GCForwardingWord {
     #[cfg(target_endian = "little")]
     fn get_object_status_word_address<VM: VMBinding>(object: ObjectReference) -> Address {
-        // let res = object.to_address() - 12;
         match unifiable_gcbyte_forwarding_word_offset::<VM>() {
             Some(fw_offset) => object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET + fw_offset,
             None => {
@@ -83,7 +82,7 @@ impl GCForwardingWord {
     }
 
     pub fn write<VM: VMBinding>(object: ObjectReference, val: usize) {
-        // info!("***GCForwardingWord::write({:#?}, {:x})\n", object, val);
+        trace!("GCForwardingWord::write({:#?}, {:x})\n", object, val);
         unsafe {
             Self::get_object_status_word_address::<VM>(object)
                 .atomic_store::<AtomicUsize>(val, Ordering::SeqCst)
@@ -128,42 +127,3 @@ pub(super) fn unifiable_gcbyte_forwarding_word_offset<VM: VMBinding>() -> Option
         None
     }
 }
-
-// fn get_object_status_word_address(object: ObjectReference) -> Address {
-//     let res = object.to_address() + STATUS_WORD_OFFSET;
-//     debug!("get_object_status_word_address({:#?}) -> {:x}", object, res);
-//     res
-// }
-
-// pub fn read_object_status_word(object: ObjectReference) -> usize {
-//     let res = unsafe {
-//         get_object_status_word_address(object).atomic_load::<AtomicUsize>(Ordering::SeqCst)
-//     };
-//     debug!("read_object_status_word({:#?}) -> {:x}", object, res);
-//     res
-// }
-
-// pub fn write_object_status_word(object: ObjectReference, val: usize) {
-//     debug!("write_object_status_word({:#?}, {:x})", object, val);
-//     unsafe {
-//         get_object_status_word_address(object).atomic_store::<AtomicUsize>(val, Ordering::SeqCst)
-//     }
-// }
-
-// pub fn compare_exchange_object_status_word(
-//     object: ObjectReference,
-//     old: usize,
-//     new: usize,
-// ) -> bool {
-//     // TODO(Javad): check whether this atomic operation is too strong
-//     let res = unsafe {
-//         get_object_status_word_address(object)
-//             .compare_exchange::<AtomicUsize>(old, new, Ordering::SeqCst, Ordering::SeqCst)
-//             .is_ok()
-//     };
-//     debug!(
-//         "compare_exchange_object_status_word({:#?}, old = {:x}, new = {:x}) -> {}",
-//         object, old, new, res
-//     );
-//     res
-// }

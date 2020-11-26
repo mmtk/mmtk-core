@@ -19,9 +19,9 @@ pub trait ObjectModel<VM: VMBinding> {
     /// The offset of the GC byte from the object reference.
     ///
     /// Notes:
-    ///  - This value is only effective if `HAS_GC_BYTE` is set to `true`.
+    ///  - This value is only effective when `HAS_GC_BYTE` is set to `true`.
     ///  - It is recommanded that GC byte is the low-order byte of the word that contains it. \
-    /// E.g. in a 64-bits little endian system, the recommanded offset is `8*K + 7`.
+    /// E.g. in a 64-bits little endian system, the recommanded offset is `8*K`.
     ///
     const GC_BYTE_OFFSET: isize = 0;
 

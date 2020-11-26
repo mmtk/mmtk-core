@@ -8,12 +8,6 @@ use crate::vm::ObjectModel;
 use crate::plan::{AllocationSemantics, CopyContext};
 use crate::vm::VMBinding;
 
-// This boolean shows whether the GC byte is the low-order byte of its containing word.
-//
-// If `true` MMTk uses one store operation to write GC byte and forwarding word,
-// instead of writing them separately.
-// pub(super) static UNIFIABLE_GCBYTE_FORWARDING_WORD: bool = false;
-
 // ...00
 const FORWARDING_NOT_TRIGGERED_YET: u8 = 0;
 // ...10
@@ -63,10 +57,6 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
                 None => Address::from_usize(status_word).to_object_reference(),
             }
         }
-    // info!(
-    //     "**spin_and_get_forwarded_object({:?},{:?}) -> {:?}",
-    //     object, gc_byte, res
-    // );
     } else {
         panic!(
             "Invalid header value 0x{:x} 0x{:x}",
@@ -81,7 +71,6 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     semantics: AllocationSemantics,
     copy_context: &mut CC,
 ) -> ObjectReference {
-    // info!("**forward_object({:?})", object);
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
     match unifiable_gcbyte_forwarding_word_offset::<VM>() {
         Some(fw_offset) => {

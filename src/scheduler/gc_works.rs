@@ -385,7 +385,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
         self.set_worker(worker);
         self.process_edges();
         if !self.nodes.is_empty() {
-            // info!("do_work.nodes:\n{:#?}", self.nodes);
             self.flush();
         }
         trace!("ProcessEdgesWork End");

@@ -131,7 +131,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         semantics: AllocationSemantics,
         copy_context: &mut impl CopyContext,
     ) -> ObjectReference {
-        // info!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
+        trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
         if !self.from_space() {
             return object;
         }
@@ -150,7 +150,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context);
             trace!("Forwarding pointer");
             trace.process_node(new_object);
-            // info!("Copying [{:?} -> {:?}]", object, new_object);
+            trace!("Copying [{:?} -> {:?}]", object, new_object);
             new_object
         }
     }
