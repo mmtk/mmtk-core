@@ -11,7 +11,7 @@ use crate::util::header_byte;
 use crate::policy::space::SpaceOptions;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
-use crate::util::object_gc_stats::{GCByte};
+use crate::util::object_gc_stats::GCByte;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 

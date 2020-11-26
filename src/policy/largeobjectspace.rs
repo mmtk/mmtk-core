@@ -8,7 +8,7 @@ use crate::util::header_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
-use crate::util::object_gc_stats::{GCByte};
+use crate::util::object_gc_stats::GCByte;
 use crate::util::treadmill::TreadMill;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};

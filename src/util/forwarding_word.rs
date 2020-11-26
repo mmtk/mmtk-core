@@ -63,10 +63,10 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
                 None => Address::from_usize(status_word).to_object_reference(),
             }
         }
-        // info!(
-        //     "**spin_and_get_forwarded_object({:?},{:?}) -> {:?}",
-        //     object, gc_byte, res
-        // );
+    // info!(
+    //     "**spin_and_get_forwarded_object({:?},{:?}) -> {:?}",
+    //     object, gc_byte, res
+    // );
     } else {
         panic!(
             "Invalid header value 0x{:x} 0x{:x}",

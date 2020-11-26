@@ -1,5 +1,5 @@
 use crate::plan::SelectedConstraints;
-use crate::util::object_gc_stats::{GCByte};
+use crate::util::object_gc_stats::GCByte;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 
