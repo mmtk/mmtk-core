@@ -7,12 +7,11 @@ use crate::util::ObjectReference;
 
 use crate::plan::TransitiveClosure;
 use crate::util::header_byte;
-use crate::vm::ObjectModel;
 
 use crate::policy::space::SpaceOptions;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
-use crate::util::object_gc_stats::{GCByte, GCForwardingWord};
+use crate::util::object_gc_stats::{GCByte};
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 

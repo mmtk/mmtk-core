@@ -2,7 +2,7 @@ use crate::util::object_gc_stats::{
     unifiable_gcbyte_forwarding_word_offset, GCByte, GCForwardingWord,
 };
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
-use crate::util::{constants, object_gc_stats, Address, ObjectReference};
+use crate::util::{constants, Address, ObjectReference};
 use crate::vm::ObjectModel;
 
 use crate::plan::{AllocationSemantics, CopyContext};
@@ -49,25 +49,24 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
     if gc_byte & FORWARDING_MASK == FORWARDED {
         let status_word = GCForwardingWord::read::<VM>(object);
-        let res = unsafe {
+        unsafe {
             match unifiable_gcbyte_forwarding_word_offset::<VM>() {
                 Some(fw_offset) => {
                     // fw_offset is 0 for JikesRVM and 56 for OpenJDK
                     Address::from_usize(
                         status_word
                             & !((FORWARDING_MASK as usize)
-                                << (-1 * fw_offset * constants::BITS_IN_BYTE as isize)),
+                                << (-fw_offset * constants::BITS_IN_BYTE as isize)),
                     )
                     .to_object_reference()
                 }
                 None => Address::from_usize(status_word).to_object_reference(),
             }
-        };
+        }
         // info!(
         //     "**spin_and_get_forwarded_object({:?},{:?}) -> {:?}",
         //     object, gc_byte, res
         // );
-        return res;
     } else {
         panic!(
             "Invalid header value 0x{:x} 0x{:x}",
@@ -89,7 +88,7 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
             GCForwardingWord::write::<VM>(
                 object,
                 new_object.to_address().as_usize()
-                    | (FORWARDED as usize) << (-1 * fw_offset * constants::BITS_IN_BYTE as isize),
+                    | (FORWARDED as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize),
             );
         }
         None => {
@@ -106,7 +105,7 @@ pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: Objec
             GCForwardingWord::write::<VM>(
                 object,
                 ptr.to_address().as_usize()
-                    | (FORWARDED as usize) << (-1 * fw_offset * constants::BITS_IN_BYTE as isize),
+                    | (FORWARDED as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize),
             );
         }
         None => {

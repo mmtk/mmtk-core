@@ -3,8 +3,6 @@ use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
 
-const STATUS_WORD_OFFSET: usize = std::mem::size_of::<usize>();
-
 pub struct GCByte {}
 
 // TODO: we probably need to add non-atomic versions of the read and write methods
@@ -53,7 +51,7 @@ impl GCForwardingWord {
     #[cfg(target_endian = "little")]
     fn get_object_status_word_address<VM: VMBinding>(object: ObjectReference) -> Address {
         // let res = object.to_address() - 12;
-        let res = match unifiable_gcbyte_forwarding_word_offset::<VM>() {
+        match unifiable_gcbyte_forwarding_word_offset::<VM>() {
             Some(fw_offset) => object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET + fw_offset,
             None => {
                 let obj_lowest_addr = VM::VMObjectModel::object_start_ref(object);
@@ -69,9 +67,7 @@ impl GCForwardingWord {
                     obj_lowest_addr
                 }
             }
-        };
-        // info!("get_object_status_word_address({:#?}) -> {:x}", object, res);
-        res
+        }
     }
 
     #[cfg(target_endian = "big")]
@@ -80,12 +76,10 @@ impl GCForwardingWord {
     }
 
     pub fn read<VM: VMBinding>(object: ObjectReference) -> usize {
-        let res = unsafe {
+        unsafe {
             Self::get_object_status_word_address::<VM>(object)
                 .atomic_load::<AtomicUsize>(Ordering::SeqCst)
-        };
-        // info!("***GCForwardingWord::read({:#?}) -> {:x}", object, res);
-        res
+        }
     }
 
     pub fn write<VM: VMBinding>(object: ObjectReference, val: usize) {
@@ -117,7 +111,7 @@ impl GCForwardingWord {
 
 pub(super) fn unifiable_gcbyte_forwarding_word_offset<VM: VMBinding>() -> Option<isize> {
     let gcbyte_dealignment = VM::VMObjectModel::GC_BYTE_OFFSET % constants::BYTES_IN_WORD as isize;
-    let res = if VM::VMObjectModel::HAS_GC_BYTE {
+    if VM::VMObjectModel::HAS_GC_BYTE {
         if gcbyte_dealignment == 0 {
             // e.g. JikesRVM
             Some(0)
@@ -129,9 +123,7 @@ pub(super) fn unifiable_gcbyte_forwarding_word_offset<VM: VMBinding>() -> Option
         }
     } else {
         None
-    };
-
-    res
+    }
 }
 
 // fn get_object_status_word_address(object: ObjectReference) -> Address {

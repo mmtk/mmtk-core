@@ -8,13 +8,12 @@ use crate::util::header_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
-use crate::util::object_gc_stats::{GCByte, GCForwardingWord};
+use crate::util::object_gc_stats::{GCByte};
 use crate::util::treadmill::TreadMill;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);

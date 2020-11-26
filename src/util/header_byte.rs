@@ -1,7 +1,6 @@
 use crate::plan::SelectedConstraints;
-use crate::util::object_gc_stats::{GCByte, GCForwardingWord};
+use crate::util::object_gc_stats::{GCByte};
 use crate::util::ObjectReference;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 
 pub const TOTAL_BITS: usize = 8;
