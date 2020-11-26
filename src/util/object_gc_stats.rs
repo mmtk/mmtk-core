@@ -28,7 +28,7 @@ impl GCByte {
     }
 
     /// Atomically reads the current value of an object's GC byte.
-    /// 
+    ///
     /// Returns an 8-bit unsigned integer
     pub fn read<VM: VMBinding>(object: ObjectReference) -> u8 {
         Self::get_gc_byte::<VM>(object).load(Ordering::SeqCst)
@@ -40,7 +40,7 @@ impl GCByte {
     }
 
     /// Atomically performs the compare-and-exchange operation on the GC byte of an object.
-    /// 
+    ///
     /// Returns `true` if the operation succeeds.
     pub fn compare_exchange<VM: VMBinding>(
         object: ObjectReference,
@@ -58,15 +58,15 @@ pub struct GCForwardingWord {}
 
 impl GCForwardingWord {
     /// Returns the address of the forwarding word of an object.
-    /// 
+    ///
     /// First, depending on the `GC_BYTE_OFFSET` specified by the client VM, MMTk tries to
     ///     use the word that contains the GC byte, as the forwarding word.
-    /// 
-    /// If the first step is not successful, MMTk chooses the word immediately before or after 
+    ///
+    /// If the first step is not successful, MMTk chooses the word immediately before or after
     ///     the word that contains the GC byte.
-    /// 
+    ///
     /// Considering the minimum object storage of 2 words, the seconds step always succeeds.
-    /// 
+    ///
     #[cfg(target_endian = "little")]
     fn get_object_status_word_address<VM: VMBinding>(object: ObjectReference) -> Address {
         match unifiable_gcbyte_forwarding_word_offset::<VM>() {
@@ -81,7 +81,7 @@ impl GCForwardingWord {
                     if abs_gc_byte_offset >= constants::BYTES_IN_ADDRESS as isize {
                         obj_lowest_addr // forwarding word at the lowest address of the object storage
                     } else {
-                        obj_lowest_addr + constants::BYTES_IN_ADDRESS   // forwarding word at the first word after the lowest address of the object storage
+                        obj_lowest_addr + constants::BYTES_IN_ADDRESS // forwarding word at the first word after the lowest address of the object storage
                     }
                 } else {
                     obj_lowest_addr // forwarding word at the lowest address of the object storage
@@ -135,7 +135,7 @@ impl GCForwardingWord {
 // (This function is only used internal to the `util` module)
 //
 // This function checks whether the forwarding word and GC byte can be unified (= the forwarding word fits in the word that contains the GC byte).
-// 
+//
 // Returns `None` if the forwarding word and GC byte can not be unified, or if unifiable,
 // returns `Some(fw_offset)`, where `fw_offset` is the offset of the forwarding word relative to `GC_BYTE_OFFSET`.
 //
