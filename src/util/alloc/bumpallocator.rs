@@ -1,11 +1,7 @@
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
-use crate::util::{Address, ObjectReference};
+use crate::util::Address;
 
-use crate::util::alloc::dump_linear_scan::DumpLinearScan;
-use crate::util::alloc::linear_scan::LinearScan;
 use crate::util::alloc::Allocator;
-
-use crate::vm::ObjectModel;
 
 use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::space::Space;
