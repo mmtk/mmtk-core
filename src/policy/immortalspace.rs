@@ -7,9 +7,9 @@ use crate::util::ObjectReference;
 
 use crate::plan::TransitiveClosure;
 use crate::util::header_byte;
-use crate::vm::ObjectModel;
 
 use crate::policy::space::SpaceOptions;
+use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
@@ -41,12 +41,12 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         true
     }
     fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
-        let old_value = VM::VMObjectModel::read_available_byte(object);
+        let old_value = gc_byte::read_gc_byte::<VM>(object);
         let mut new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
         if header_byte::NEEDS_UNLOGGED_BIT {
             new_value |= header_byte::UNLOGGED_BIT;
         }
-        VM::VMObjectModel::write_available_byte(object, new_value);
+        gc_byte::write_gc_byte::<VM>(object, new_value);
     }
 }
 
@@ -116,17 +116,17 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
     }
 
     fn test_and_mark(object: ObjectReference, value: u8) -> bool {
-        let mut old_value = VM::VMObjectModel::prepare_available_bits(object);
-        let mut mark_bit = (old_value as u8) & GC_MARK_BIT_MASK;
+        let mut old_value = gc_byte::read_gc_byte::<VM>(object);
+        let mut mark_bit = old_value & GC_MARK_BIT_MASK;
         if mark_bit == value {
             return false;
         }
-        while !VM::VMObjectModel::attempt_available_bits(
+        while !gc_byte::compare_exchange_gc_byte::<VM>(
             object,
             old_value,
-            old_value ^ (GC_MARK_BIT_MASK as usize),
+            old_value ^ GC_MARK_BIT_MASK,
         ) {
-            old_value = VM::VMObjectModel::prepare_available_bits(object);
+            old_value = gc_byte::read_gc_byte::<VM>(object);
             mark_bit = (old_value as u8) & GC_MARK_BIT_MASK;
             if mark_bit == value {
                 return false;

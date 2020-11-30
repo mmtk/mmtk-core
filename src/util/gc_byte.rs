@@ -1,9 +1,13 @@
 use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use std::sync::atomic::AtomicU8;
+use std::sync::atomic::{AtomicU8, Ordering};
 
-/// Return the GC byte of an object.
+/// This struct encapsulates operations on the per-object GC byte (metadata)
+pub struct GCByte {}
+
+// TODO: we probably need to add non-atomic versions of the read and write methods
+/// Return the GC byte of an object as an atomic.
 ///
 /// MMTk requires *exactly one byte* for each object as per-object metadata.
 ///
@@ -12,26 +16,35 @@ use std::sync::atomic::AtomicU8;
 /// MMTk uses that byte as the per-object metadata.
 /// Otherwise, MMTk provides the metadata on its side.
 ///
-pub fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 {
+fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 {
     if VM::VMObjectModel::HAS_GC_BYTE {
-        unsafe {
-            &*(object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET / 8).to_ptr::<AtomicU8>()
-        }
+        unsafe { &*(object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET).to_ptr::<AtomicU8>() }
     } else {
         todo!("\"HAS_GC_BYTE == false\" is not supported yet")
     }
 }
 
-/// Return the offset of a GC byte relative to its containing header word.
+/// Atomically reads the current value of an object's GC byte.
 ///
-/// For cases where the constant `GC_BYTE_OFFSET` is negative (e.g. JikesRVM),
-/// this function returns a positive offset
-/// value in the [0 to word size) range.
+/// Returns an 8-bit unsigned integer
+pub fn read_gc_byte<VM: VMBinding>(object: ObjectReference) -> u8 {
+    get_gc_byte::<VM>(object).load(Ordering::SeqCst)
+}
+
+/// Atomically writes a new value to the GC byte of an object
+pub fn write_gc_byte<VM: VMBinding>(object: ObjectReference, val: u8) {
+    get_gc_byte::<VM>(object).store(val, Ordering::SeqCst);
+}
+
+/// Atomically performs the compare-and-exchange operation on the GC byte of an object.
 ///
-pub fn get_relative_offset<VM: VMBinding>() -> isize {
-    #[cfg(target_pointer_width = "64")]
-    let sys_ptr_width = 64;
-    #[cfg(target_pointer_width = "32")]
-    let sys_ptr_width = 32;
-    (VM::VMObjectModel::GC_BYTE_OFFSET).rem_euclid(sys_ptr_width)
+/// Returns `true` if the operation succeeds.
+pub fn compare_exchange_gc_byte<VM: VMBinding>(
+    object: ObjectReference,
+    old_val: u8,
+    new_val: u8,
+) -> bool {
+    get_gc_byte::<VM>(object)
+        .compare_exchange(old_val, new_val, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
 }

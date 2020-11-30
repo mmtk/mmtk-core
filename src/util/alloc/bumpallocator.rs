@@ -1,11 +1,7 @@
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
-use crate::util::{Address, ObjectReference};
+use crate::util::Address;
 
-use crate::util::alloc::dump_linear_scan::DumpLinearScan;
-use crate::util::alloc::linear_scan::LinearScan;
 use crate::util::alloc::Allocator;
-
-use crate::vm::ObjectModel;
 
 use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::space::Space;
@@ -40,47 +36,6 @@ impl<VM: VMBinding> BumpAllocator<VM> {
     pub fn rebind(&mut self, space: Option<&'static dyn Space<VM>>) {
         self.reset();
         self.space = space;
-    }
-
-    pub fn scan(&self) {
-        unsafe {
-            self.scan_region(
-                DumpLinearScan {},
-                self.get_space().unwrap().common().start,
-                Address::zero(),
-            );
-        }
-    }
-
-    fn scan_region<T: LinearScan>(&self, scanner: T, start: Address, end: Address) {
-        // We are diverging from the original implementation
-        let current_limit = if end.is_zero() { self.cursor } else { end };
-
-        let mut current: ObjectReference =
-            unsafe { VM::VMObjectModel::get_object_from_start_address(start) };
-
-        println!("start: {}, first object: {}", start, current);
-
-        /* Loop through each object up to the limit */
-        loop {
-            /* Read end address first, as scan may be destructive */
-            let current_object_end: Address = VM::VMObjectModel::get_object_end_address(current);
-            println!("current object: {} end: {}", current, current_object_end);
-            scanner.scan::<VM>(current);
-            if current_object_end > current_limit {
-                /* We have scanned the last object */
-                break;
-            }
-
-            /* Find the next object from the start address (dealing with alignment gaps, etc.) */
-            let next: ObjectReference =
-                unsafe { VM::VMObjectModel::get_object_from_start_address(current_object_end) };
-            println!("next object: {}", next);
-            /* Must be monotonically increasing */
-            debug_assert!(next.to_address() > current.to_address());
-
-            current = next;
-        }
     }
 }
 
