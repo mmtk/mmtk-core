@@ -4,11 +4,11 @@ use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
+use crate::util::gc_byte;
 use crate::util::header_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
-use crate::util::object_gc_stats::GCByte;
 use crate::util::treadmill::TreadMill;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
@@ -50,12 +50,12 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_header(&self, object: ObjectReference, alloc: bool) {
-        let old_value = GCByte::read::<VM>(object);
+        let old_value = gc_byte::read_gc_byte::<VM>(object);
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
         if alloc {
             new_value |= NURSERY_BIT;
         }
-        GCByte::write::<VM>(object, new_value);
+        gc_byte::write_gc_byte::<VM>(object, new_value);
         let cell = VM::VMObjectModel::object_start_ref(object)
             - if USE_PRECEEDING_GC_HEADER {
                 PRECEEDING_GC_HEADER_BYTES
@@ -64,9 +64,9 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             };
         self.treadmill.add_to_treadmill(cell, alloc);
         if header_byte::NEEDS_UNLOGGED_BIT {
-            GCByte::write::<VM>(
+            gc_byte::write_gc_byte::<VM>(
                 object,
-                GCByte::read::<VM>(object) | header_byte::UNLOGGED_BIT,
+                gc_byte::read_gc_byte::<VM>(object) | header_byte::UNLOGGED_BIT,
             );
         }
     }
@@ -210,14 +210,17 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         } else {
             MARK_BIT
         };
-        let mut old_value = GCByte::read::<VM>(object);
+        let mut old_value = gc_byte::read_gc_byte::<VM>(object);
         let mut mark_bit = old_value & mask;
         if mark_bit == value {
             return false;
         }
-        while !GCByte::compare_exchange::<VM>(object, old_value, old_value & !LOS_BIT_MASK | value)
-        {
-            old_value = GCByte::read::<VM>(object);
+        while !gc_byte::compare_exchange_gc_byte::<VM>(
+            object,
+            old_value,
+            old_value & !LOS_BIT_MASK | value,
+        ) {
+            old_value = gc_byte::read_gc_byte::<VM>(object);
             mark_bit = old_value & mask;
             if mark_bit == value {
                 return false;
@@ -227,11 +230,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
-        GCByte::read::<VM>(object) & MARK_BIT == value
+        gc_byte::read_gc_byte::<VM>(object) & MARK_BIT == value
     }
 
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        GCByte::read::<VM>(object) & NURSERY_BIT == NURSERY_BIT
+        gc_byte::read_gc_byte::<VM>(object) & NURSERY_BIT == NURSERY_BIT
     }
 }
 
