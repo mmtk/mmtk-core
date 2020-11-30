@@ -25,7 +25,7 @@ As the Rust language and its libraries (crates) are frequently evolving, we reco
 
 ```console
 $ # replace nightly-YYYY-MM-DD with the toolchain version specified in mmtk-dev-env
-$ Export RUSTUP_TOOLCHAIN=nightly-YYYY-MM-DD
+$ export RUSTUP_TOOLCHAIN=nightly-YYYY-MM-DD
 
 $ cargo build --features <space separated features>
 ```
