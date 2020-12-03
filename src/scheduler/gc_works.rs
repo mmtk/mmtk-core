@@ -7,6 +7,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
+use super::work_bucket::WorkBucketId;
 
 pub struct ScheduleCollection;
 
@@ -39,7 +40,7 @@ impl<P: Plan> GCWork<P::VM> for Prepare<P> {
         self.plan.prepare(worker.tls);
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.scheduler
-                .prepare_stage
+                .work_buckets[WorkBucketId::Prepare]
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
@@ -98,7 +99,7 @@ impl<P: Plan> GCWork<P::VM> for Release<P> {
         self.plan.release(worker.tls);
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.scheduler
-                .release_stage
+                .work_buckets[WorkBucketId::Release]
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
@@ -175,17 +176,17 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
                 }
                 // Scan mutators
                 if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
-                    mmtk.scheduler.prepare_stage.add(ScanStackRoots::<E>::new());
+                    mmtk.scheduler.work_buckets[WorkBucketId::Prepare].add(ScanStackRoots::<E>::new());
                 } else {
                     for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
                         mmtk.scheduler
-                            .prepare_stage
+                            .work_buckets[WorkBucketId::Prepare]
                             .add(ScanStackRoot::<E>(mutator));
                     }
                 }
             }
             mmtk.scheduler
-                .prepare_stage
+                .work_buckets[WorkBucketId::Prepare]
                 .add(ScanVMSpecificRoots::<E>::new());
         } else {
             mmtk.scheduler
@@ -355,7 +356,7 @@ pub trait ProcessEdgesWork:
             self.mmtk
                 .unwrap()
                 .scheduler
-                .closure_stage
+                .work_buckets[WorkBucketId::Closure]
                 .add(scan_objects_work);
         }
     }
@@ -442,14 +443,14 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
             worker
                 .scheduler()
-                .closure_stage
+                .work_buckets[WorkBucketId::Closure]
                 .add(ScanObjects::<E>::new(modified_nodes, false));
 
             let mut modified_edges = vec![];
             ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
             worker
                 .scheduler()
-                .closure_stage
+                .work_buckets[WorkBucketId::Closure]
                 .add(E::new(modified_edges, true));
         } else {
             // Do nothing

@@ -5,6 +5,7 @@ use std::cmp;
 use std::collections::BinaryHeap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use enum_map::{enum_map, Enum, EnumMap};
 
 /// A unique work-packet id for each instance of work-packet
 #[derive(Eq, PartialEq, Clone, Copy)]
@@ -142,4 +143,13 @@ impl<C: Context> WorkBucket<C> {
         }
         false
     }
+}
+
+#[derive(Debug, Enum, Copy, Clone, Eq, PartialEq)]
+pub enum WorkBucketId {
+    Unconstrained,
+    Prepare,
+    Closure,
+    Release,
+    Final,
 }

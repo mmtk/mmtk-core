@@ -121,16 +121,16 @@ pub trait Plan: Sized + 'static + Sync + Send {
         // Stop & scan mutators (mutator scanning can happen before STW)
         for mutator in <Self::VM as VMBinding>::VMActivePlan::mutators() {
             scheduler
-                .prepare_stage
+                .work_buckets[WorkBucketId::Prepare]
                 .add(ScanStackRoot::<SanityGCProcessEdges<Self::VM>>(mutator));
         }
         scheduler
-            .prepare_stage
+            .work_buckets[WorkBucketId::Prepare]
             .add(ScanVMSpecificRoots::<SanityGCProcessEdges<Self::VM>>::new());
         // Prepare global/collectors/mutators
-        scheduler.prepare_stage.add(SanityPrepare::new(self));
+        scheduler.work_buckets[WorkBucketId::Prepare].add(SanityPrepare::new(self));
         // Release global/collectors/mutators
-        scheduler.release_stage.add(SanityRelease::new(self));
+        scheduler.work_buckets[WorkBucketId::Release].add(SanityRelease::new(self));
     }
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")

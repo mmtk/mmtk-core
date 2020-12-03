@@ -14,5 +14,6 @@ pub use mmtk_context::*;
 pub use scheduler::*;
 pub use work::*;
 pub use worker::*;
+pub use work_bucket::WorkBucketId;
 
 pub mod gc_works;
