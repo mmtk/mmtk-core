@@ -35,13 +35,30 @@
 <span id="35">35</span>
 <span id="36">36</span>
 <span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">ObjectModel</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">AtomicU8</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicU8</span>, <span class="ident">Ordering</span>};
 
-<span class="doccomment">/// Return the GC byte of an object.</span>
+<span class="doccomment">/// This struct encapsulates operations on the per-object GC byte (metadata)</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GCByte</span> {}
+
+<span class="comment">// TODO: we probably need to add non-atomic versions of the read and write methods</span>
+<span class="doccomment">/// Return the GC byte of an object as an atomic.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// MMTk requires *exactly one byte* for each object as per-object metadata.</span>
 <span class="doccomment">///</span>
@@ -50,28 +67,37 @@
 <span class="doccomment">/// MMTk uses that byte as the per-object metadata.</span>
 <span class="doccomment">/// Otherwise, MMTk provides the metadata on its side.</span>
 <span class="doccomment">///</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_gc_byte</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicU8</span> {
+<span class="kw">fn</span> <span class="ident">get_gc_byte</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicU8</span> {
     <span class="kw">if</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">HAS_GC_BYTE</span> {
-        <span class="kw">unsafe</span> {
-            <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">GC_BYTE_OFFSET</span> <span class="op">/</span> <span class="number">8</span>).<span class="ident">to_ptr</span>::<span class="op">&lt;</span><span class="ident">AtomicU8</span><span class="op">&gt;</span>()
-        }
+        <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">GC_BYTE_OFFSET</span>).<span class="ident">to_ptr</span>::<span class="op">&lt;</span><span class="ident">AtomicU8</span><span class="op">&gt;</span>() }
     } <span class="kw">else</span> {
         <span class="macro">todo</span><span class="macro">!</span>(<span class="string">&quot;\&quot;HAS_GC_BYTE == false\&quot; is not supported yet&quot;</span>)
     }
 }
 
-<span class="doccomment">/// Return the offset of a GC byte relative to its containing header word.</span>
+<span class="doccomment">/// Atomically reads the current value of an object&#39;s GC byte.</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// For cases where the constant `GC_BYTE_OFFSET` is negative (e.g. JikesRVM),</span>
-<span class="doccomment">/// this function returns a positive offset</span>
-<span class="doccomment">/// value in the [0 to word size) range.</span>
+<span class="doccomment">/// Returns an 8-bit unsigned integer</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_gc_byte</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
+    <span class="ident">get_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>).<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
+}
+
+<span class="doccomment">/// Atomically writes a new value to the GC byte of an object</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_gc_byte</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">val</span>: <span class="ident">u8</span>) {
+    <span class="ident">get_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>).<span class="ident">store</span>(<span class="ident">val</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+}
+
+<span class="doccomment">/// Atomically performs the compare-and-exchange operation on the GC byte of an object.</span>
 <span class="doccomment">///</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_relative_offset</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">isize</span> {
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-    <span class="kw">let</span> <span class="ident">sys_ptr_width</span> <span class="op">=</span> <span class="number">64</span>;
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="kw">let</span> <span class="ident">sys_ptr_width</span> <span class="op">=</span> <span class="number">32</span>;
-    (<span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">GC_BYTE_OFFSET</span>).<span class="ident">rem_euclid</span>(<span class="ident">sys_ptr_width</span>)
+<span class="doccomment">/// Returns `true` if the operation succeeds.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compare_exchange_gc_byte</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
+    <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+    <span class="ident">old_val</span>: <span class="ident">u8</span>,
+    <span class="ident">new_val</span>: <span class="ident">u8</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="ident">get_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
+        .<span class="ident">compare_exchange</span>(<span class="ident">old_val</span>, <span class="ident">new_val</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
+        .<span class="ident">is_ok</span>()
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "mmtk";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

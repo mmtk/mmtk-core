@@ -186,22 +186,22 @@
             <span class="kw">return</span> <span class="ident">object</span>;
         }
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">plan</span>().<span class="ident">tospace</span>().<span class="ident">in_space</span>(<span class="ident">object</span>) {
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">plan</span>().<span class="ident">tospace</span>().<span class="ident">trace_object</span>(
+            <span class="self">self</span>.<span class="ident">plan</span>().<span class="ident">tospace</span>().<span class="ident">trace_object</span>(
                 <span class="self">self</span>,
                 <span class="ident">object</span>,
                 <span class="kw">super</span>::<span class="ident">global</span>::<span class="ident">ALLOC_SS</span>,
                 <span class="self">self</span>.<span class="ident">worker</span>().<span class="ident">local</span>(),
-            );
-        }
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">plan</span>().<span class="ident">fromspace</span>().<span class="ident">in_space</span>(<span class="ident">object</span>) {
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">plan</span>().<span class="ident">fromspace</span>().<span class="ident">trace_object</span>(
+            )
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">plan</span>().<span class="ident">fromspace</span>().<span class="ident">in_space</span>(<span class="ident">object</span>) {
+            <span class="self">self</span>.<span class="ident">plan</span>().<span class="ident">fromspace</span>().<span class="ident">trace_object</span>(
                 <span class="self">self</span>,
                 <span class="ident">object</span>,
                 <span class="kw">super</span>::<span class="ident">global</span>::<span class="ident">ALLOC_SS</span>,
                 <span class="self">self</span>.<span class="ident">worker</span>().<span class="ident">local</span>(),
-            );
+            )
+        } <span class="kw">else</span> {
+            <span class="self">self</span>.<span class="ident">plan</span>().<span class="ident">common</span>.<span class="ident">trace_object</span>(<span class="self">self</span>, <span class="ident">object</span>)
         }
-        <span class="self">self</span>.<span class="ident">plan</span>().<span class="ident">common</span>.<span class="ident">trace_object</span>(<span class="self">self</span>, <span class="ident">object</span>)
     }
 }
 

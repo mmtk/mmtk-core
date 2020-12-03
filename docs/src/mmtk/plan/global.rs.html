@@ -1297,7 +1297,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
                 }
             }
         }
-        <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;No special case for space in trace_object&quot;</span>);
+        <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;No special case for space in trace_object({:?})&quot;</span>, <span class="ident">_object</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>, <span class="ident">_primary</span>: <span class="ident">bool</span>) {

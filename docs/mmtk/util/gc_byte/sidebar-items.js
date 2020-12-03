@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["get_gc_byte","Return the GC byte of an object."],["get_relative_offset","Return the offset of a GC byte relative to its containing header word."]]});
+initSidebarItems({"fn":[["compare_exchange_gc_byte","Atomically performs the compare-and-exchange operation on the GC byte of an object."],["read_gc_byte","Atomically reads the current value of an object's GC byte."],["write_gc_byte","Atomically writes a new value to the GC byte of an object"]],"struct":[["GCByte","This struct encapsulates operations on the per-object GC byte (metadata)"]]});

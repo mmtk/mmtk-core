@@ -111,60 +111,11 @@
 <span id="111">111</span>
 <span id="112">112</span>
 <span id="113">113</span>
-<span id="114">114</span>
-<span id="115">115</span>
-<span id="116">116</span>
-<span id="117">117</span>
-<span id="118">118</span>
-<span id="119">119</span>
-<span id="120">120</span>
-<span id="121">121</span>
-<span id="122">122</span>
-<span id="123">123</span>
-<span id="124">124</span>
-<span id="125">125</span>
-<span id="126">126</span>
-<span id="127">127</span>
-<span id="128">128</span>
-<span id="129">129</span>
-<span id="130">130</span>
-<span id="131">131</span>
-<span id="132">132</span>
-<span id="133">133</span>
-<span id="134">134</span>
-<span id="135">135</span>
-<span id="136">136</span>
-<span id="137">137</span>
-<span id="138">138</span>
-<span id="139">139</span>
-<span id="140">140</span>
-<span id="141">141</span>
-<span id="142">142</span>
-<span id="143">143</span>
-<span id="144">144</span>
-<span id="145">145</span>
-<span id="146">146</span>
-<span id="147">147</span>
-<span id="148">148</span>
-<span id="149">149</span>
-<span id="150">150</span>
-<span id="151">151</span>
-<span id="152">152</span>
-<span id="153">153</span>
-<span id="154">154</span>
-<span id="155">155</span>
-<span id="156">156</span>
-<span id="157">157</span>
-<span id="158">158</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">dump_linear_scan</span>::<span class="ident">DumpLinearScan</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">linear_scan</span>::<span class="ident">LinearScan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">Allocator</span>;
-
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">ObjectModel</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">selected_plan</span>::<span class="ident">SelectedPlan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">Space</span>;
@@ -199,47 +150,6 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rebind</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
         <span class="self">self</span>.<span class="ident">reset</span>();
         <span class="self">self</span>.<span class="ident">space</span> <span class="op">=</span> <span class="ident">space</span>;
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">unsafe</span> {
-            <span class="self">self</span>.<span class="ident">scan_region</span>(
-                <span class="ident">DumpLinearScan</span> {},
-                <span class="self">self</span>.<span class="ident">get_space</span>().<span class="ident">unwrap</span>().<span class="ident">common</span>().<span class="ident">start</span>,
-                <span class="ident">Address</span>::<span class="ident">zero</span>(),
-            );
-        }
-    }
-
-    <span class="kw">fn</span> <span class="ident">scan_region</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">LinearScan</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">scanner</span>: <span class="ident">T</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">end</span>: <span class="ident">Address</span>) {
-        <span class="comment">// We are diverging from the original implementation</span>
-        <span class="kw">let</span> <span class="ident">current_limit</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">end</span>.<span class="ident">is_zero</span>() { <span class="self">self</span>.<span class="ident">cursor</span> } <span class="kw">else</span> { <span class="ident">end</span> };
-
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">current</span>: <span class="ident">ObjectReference</span> <span class="op">=</span>
-            <span class="kw">unsafe</span> { <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">get_object_from_start_address</span>(<span class="ident">start</span>) };
-
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;start: {}, first object: {}&quot;</span>, <span class="ident">start</span>, <span class="ident">current</span>);
-
-        <span class="comment">/* Loop through each object up to the limit */</span>
-        <span class="kw">loop</span> {
-            <span class="comment">/* Read end address first, as scan may be destructive */</span>
-            <span class="kw">let</span> <span class="ident">current_object_end</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">get_object_end_address</span>(<span class="ident">current</span>);
-            <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;current object: {} end: {}&quot;</span>, <span class="ident">current</span>, <span class="ident">current_object_end</span>);
-            <span class="ident">scanner</span>.<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">current</span>);
-            <span class="kw">if</span> <span class="ident">current_object_end</span> <span class="op">&gt;</span> <span class="ident">current_limit</span> {
-                <span class="comment">/* We have scanned the last object */</span>
-                <span class="kw">break</span>;
-            }
-
-            <span class="comment">/* Find the next object from the start address (dealing with alignment gaps, etc.) */</span>
-            <span class="kw">let</span> <span class="ident">next</span>: <span class="ident">ObjectReference</span> <span class="op">=</span>
-                <span class="kw">unsafe</span> { <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">get_object_from_start_address</span>(<span class="ident">current_object_end</span>) };
-            <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;next object: {}&quot;</span>, <span class="ident">next</span>);
-            <span class="comment">/* Must be monotonically increasing */</span>
-            <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">next</span>.<span class="ident">to_address</span>() <span class="op">&gt;</span> <span class="ident">current</span>.<span class="ident">to_address</span>());
-
-            <span class="ident">current</span> <span class="op">=</span> <span class="ident">next</span>;
-        }
     }
 }
 
