@@ -19,6 +19,11 @@ pub mod nogc;
 #[cfg(feature = "nogc")]
 pub use self::nogc as selected_plan;
 
+#[cfg(feature = "mygc")]
+pub mod mygc;
+#[cfg(feature = "mygc")]
+pub use self::mygc as selected_plan;
+
 #[cfg(feature = "semispace")]
 pub mod semispace;
 #[cfg(feature = "semispace")]

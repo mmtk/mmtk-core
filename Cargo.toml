@@ -17,7 +17,7 @@ crate-type = ["rlib"]
 doctest = false
 
 [package.metadata.docs.rs]
-features = ["semispace"]
+features = ["mygc"]
 
 [dependencies]
 custom_derive = "0.1"
@@ -45,6 +45,7 @@ default = []
 nogc = ["immortalspace", "largeobjectspace"]
 semispace = ["immortalspace", "largeobjectspace", "copyspace"]
 gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
+mygc = ["immortalspace", "largeobjectspace"]
 
 # spaces
 base_spaces = []

@@ -1,8 +1,8 @@
 use crate::mmtk::MMTK;
 use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::mutator_context::Mutator;
-use crate::plan::nogc::mutator::create_nogc_mutator;
-use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::mygc::mutator::create_nogc_mutator;
+use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::policy::space::Space;
@@ -25,16 +25,16 @@ use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
 #[cfg(feature = "nogc_lock_free")]
 use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
 
-pub type SelectedPlan<VM> = NoGC<VM>;
+pub type SelectedPlan<VM> = MyGC<VM>;
 
-pub struct NoGC<VM: VMBinding> {
+pub struct MyGC<VM: VMBinding> {
     pub base: BasePlan<VM>,
     pub nogc_space: NoGCImmortalSpace<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
+unsafe impl<VM: VMBinding> Sync for MyGC<VM> {}
 
-impl<VM: VMBinding> Plan for NoGC<VM> {
+impl<VM: VMBinding> Plan for MyGC<VM> {
     type VM = VM;
     type Mutator = Mutator<Self>;
     type CopyContext = NoCopy<VM>;
@@ -63,7 +63,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
             &mut heap,
         );
 
-        NoGC {
+        MyGC {
             nogc_space,
             base: BasePlan::new(vm_map, mmapper, options, heap),
         }
@@ -90,7 +90,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         tls: OpaquePointer,
         _mmtk: &'static MMTK<Self::VM>,
     ) -> Box<Mutator<Self>> {
-        Box::new(create_nogc_mutator(tls, self))//Box::new(create_nogc_mutator(tls, self))
+        Box::new(create_nogc_mutator(tls, self))
     }
 
     fn prepare(&self, _tls: OpaquePointer) {

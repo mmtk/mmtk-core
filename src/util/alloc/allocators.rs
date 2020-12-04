@@ -3,12 +3,13 @@ use std::mem::MaybeUninit;
 use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator};
+use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator, MyAllocator};
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 
 const MAX_BUMP_ALLOCATORS: usize = 5;
 const MAX_LARGE_OBJECT_ALLOCATORS: usize = 1;
+//const MAX_MY_ALLOCATORS: usize = 5;
 
 // The allocators set owned by each mutator. We provide a fixed number of allocators for each allocator type in the mutator,
 // and each plan will select part of the allocators to use.
@@ -18,6 +19,7 @@ const MAX_LARGE_OBJECT_ALLOCATORS: usize = 1;
 pub struct Allocators<VM: VMBinding> {
     pub bump_pointer: [MaybeUninit<BumpAllocator<VM>>; MAX_BUMP_ALLOCATORS],
     pub large_object: [MaybeUninit<LargeObjectAllocator<VM>>; MAX_LARGE_OBJECT_ALLOCATORS],
+    //pub my_pointer: [MaybeUninit<MyAllocator<VM>>; MAX_MY_ALLOCATORS],
 }
 
 impl<VM: VMBinding> Allocators<VM> {
@@ -50,6 +52,7 @@ impl<VM: VMBinding> Allocators<VM> {
         let mut ret = Allocators {
             bump_pointer: unsafe { MaybeUninit::uninit().assume_init() },
             large_object: unsafe { MaybeUninit::uninit().assume_init() },
+            //pointer: unsafe { MaybeUninit::uninit().assume_init() },
         };
 
         for &(selector, space) in space_mapping.iter() {
