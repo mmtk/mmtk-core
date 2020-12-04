@@ -411,9 +411,9 @@ impl<Edges: ProcessEdgesWork> ScanObjects<Edges> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
-    fn do_work(&mut self, _worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ScanObjects");
-        <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer);
+        <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer, worker);
         trace!("ScanObjects End");
     }
 }

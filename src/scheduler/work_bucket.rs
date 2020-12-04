@@ -105,15 +105,15 @@ impl<C: Context> WorkBucket<C> {
         self.active.store(false, Ordering::SeqCst);
     }
     /// Add a work packet to this bucket, with a given priority
-    pub fn add_with_priority<W: Work<C>>(&self, priority: usize, work: W) {
+    pub fn add_with_priority(&self, priority: usize, work: Box<dyn Work<C>>) {
         self.queue
             .write()
-            .push(PrioritizedWork::new(priority, box work));
+            .push(PrioritizedWork::new(priority, work));
         self.notify_one_worker(); // FIXME: Performance
     }
     /// Add a work packet to this bucket, with a default priority (1000)
     pub fn add<W: Work<C>>(&self, work: W) {
-        self.add_with_priority(1000, work);
+        self.add_with_priority(1000, box work);
     }
     pub fn bulk_add(&self, priority: usize, works: Vec<Box<dyn Work<C>>>) {
         {
