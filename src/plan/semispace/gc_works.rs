@@ -75,22 +75,22 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
             return object;
         }
         if self.plan().tospace().in_space(object) {
-            return self.plan().tospace().trace_object(
+            self.plan().tospace().trace_object(
                 self,
                 object,
                 super::global::ALLOC_SS,
                 self.worker().local(),
-            );
-        }
-        if self.plan().fromspace().in_space(object) {
-            return self.plan().fromspace().trace_object(
+            )
+        } else if self.plan().fromspace().in_space(object) {
+            self.plan().fromspace().trace_object(
                 self,
                 object,
                 super::global::ALLOC_SS,
                 self.worker().local(),
-            );
+            )
+        } else {
+            self.plan().common.trace_object(self, object)
         }
-        self.plan().common.trace_object(self, object)
     }
 }
 
