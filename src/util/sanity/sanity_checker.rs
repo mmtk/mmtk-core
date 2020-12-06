@@ -57,8 +57,7 @@ impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
             sanity_checker.refs.clear();
         }
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler
-                .prepare_stage
+            mmtk.scheduler.work_buckets[WorkBucketId::Prepare]
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
@@ -83,8 +82,7 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.plan.leave_sanity();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler
-                .release_stage
+            mmtk.scheduler.work_buckets[WorkBucketId::Release]
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {

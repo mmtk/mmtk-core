@@ -120,12 +120,10 @@ pub trait Plan: Sized + 'static + Sync + Send {
         self.base().inside_sanity.store(true, Ordering::SeqCst);
         // Stop & scan mutators (mutator scanning can happen before STW)
         for mutator in <Self::VM as VMBinding>::VMActivePlan::mutators() {
-            scheduler
-                .work_buckets[WorkBucketId::Prepare]
+            scheduler.work_buckets[WorkBucketId::Prepare]
                 .add(ScanStackRoot::<SanityGCProcessEdges<Self::VM>>(mutator));
         }
-        scheduler
-            .work_buckets[WorkBucketId::Prepare]
+        scheduler.work_buckets[WorkBucketId::Prepare]
             .add(ScanVMSpecificRoots::<SanityGCProcessEdges<Self::VM>>::new());
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketId::Prepare].add(SanityPrepare::new(self));

@@ -70,9 +70,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for FieldRememberingBarrier<E
             "{:?}",
             self as *const _
         );
-        self.mmtk
-            .scheduler
-            .work_buckets[WorkBucketId::Closure]
+        self.mmtk.scheduler.work_buckets[WorkBucketId::Closure]
             .add(ProcessModBuf::<E>::new(modified_nodes, modified_edges));
     }
     fn post_write_barrier(&mut self, target: WriteTarget) {

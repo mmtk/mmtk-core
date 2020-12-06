@@ -186,15 +186,15 @@ impl<VM: VMBinding> GCWork<VM> for GenCopyProcessModBuf {
         if mmtk.plan.in_nursery() {
             let mut modified_nodes = vec![];
             ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
-            worker.scheduler().work_buckets[WorkBucketId::Closure].add(
-                ScanObjects::<GenCopyNurseryProcessEdges<VM>>::new(modified_nodes, false),
-            );
+            worker.scheduler().work_buckets[WorkBucketId::Closure].add(ScanObjects::<
+                GenCopyNurseryProcessEdges<VM>,
+            >::new(
+                modified_nodes, false
+            ));
 
             let mut modified_edges = vec![];
             ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
-            worker
-                .scheduler()
-                .work_buckets[WorkBucketId::Closure]
+            worker.scheduler().work_buckets[WorkBucketId::Closure]
                 .add(GenCopyNurseryProcessEdges::<VM>::new(modified_edges, true));
         } else {
             // Do nothing

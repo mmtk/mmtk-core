@@ -45,7 +45,10 @@ pub trait Scanning<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `objects`: The slice of object references to be scanned.
-    fn scan_objects<W: ProcessEdgesWork<VM = VM>>(objects: &[ObjectReference], worker: &mut GCWorker<VM>);
+    fn scan_objects<W: ProcessEdgesWork<VM = VM>>(
+        objects: &[ObjectReference],
+        worker: &mut GCWorker<VM>,
+    );
 
     /// Scan all the mutators for roots.
     fn scan_thread_roots<W: ProcessEdgesWork<VM = VM>>();

@@ -7,11 +7,11 @@ use crate::mmtk::MMTK;
 use crate::plan::Plan;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
-use enum_map::{enum_map, Enum, EnumMap};
 
 pub enum CoordinatorMessage<C: Context> {
     Work(Box<dyn CoordinatorWork<C>>),
@@ -137,7 +137,9 @@ impl<C: Context> Scheduler<C> {
     fn update_buckets(&self) {
         let mut buckets_updated = false;
         for (id, bucket) in self.work_buckets.iter() {
-            if id == WorkBucketId::Unconstrained { continue }
+            if id == WorkBucketId::Unconstrained {
+                continue;
+            }
             buckets_updated |= bucket.update();
         }
         if buckets_updated {
@@ -203,7 +205,7 @@ impl<C: Context> Scheduler<C> {
     }
 
     pub fn reset_state(&self) {
-        // self.prepare_stage.deactivate();
+        // self.work_buckets[WorkBucketId::Prepare].deactivate();
         self.work_buckets[WorkBucketId::Closure].deactivate();
         self.work_buckets[WorkBucketId::Release].deactivate();
         self.work_buckets[WorkBucketId::Final].deactivate();

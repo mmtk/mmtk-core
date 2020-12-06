@@ -94,8 +94,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler
-            .work_buckets[WorkBucketId::Unconstrained]
+        scheduler.work_buckets[WorkBucketId::Unconstrained]
             .add(StopMutators::<SSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketId::Prepare].add(Prepare::new(self));
