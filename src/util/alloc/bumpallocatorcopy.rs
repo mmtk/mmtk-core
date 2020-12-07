@@ -70,7 +70,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        println!("allocated with bump allocator");
+        //println!("allocated with bump allocator");
         trace!("alloc_slow");
         // TODO: internalLimit etc.
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);

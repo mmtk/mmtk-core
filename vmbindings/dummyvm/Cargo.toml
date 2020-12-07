@@ -18,6 +18,7 @@ lazy_static = "1.1"
 
 [features]
 default = []
+mygc = ["mmtk/mygc"]
 nogc = ["mmtk/nogc"]
 semispace = ["mmtk/semispace"]
 gencopy = ["mmtk/gencopy"]

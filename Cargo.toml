@@ -45,7 +45,7 @@ default = []
 nogc = ["immortalspace", "largeobjectspace"]
 semispace = ["immortalspace", "largeobjectspace", "copyspace"]
 gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
-mygc = ["immortalspace", "largeobjectspace"]
+mygc = ["immortalspace", "largeobjectspace", "copyspace"]
 
 # spaces
 base_spaces = []

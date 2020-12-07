@@ -1,35 +1,43 @@
+use super::gc_works::{MyCopyContext, MyProcessEdges};
 use crate::mmtk::MMTK;
-use crate::plan::global::{BasePlan, NoCopy};
+use crate::plan::global::BasePlan;
+use crate::plan::global::CommonPlan;
+use crate::plan::global::GcStatus;
 use crate::plan::mutator_context::Mutator;
-use crate::plan::mygc::mutator::create_nogc_mutator;
+use crate::plan::mygc::mutator::create_my_mutator;
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
+use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
-use crate::scheduler::MMTkScheduler;
+use crate::scheduler::gc_works::*;
+use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
-#[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
+#[cfg(feature = "sanity")]
+use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use enum_map::EnumMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-#[cfg(not(feature = "nogc_lock_free"))]
-use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
-#[cfg(feature = "nogc_lock_free")]
-use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
+use enum_map::EnumMap;
 
 pub type SelectedPlan<VM> = MyGC<VM>;
 
+pub const MY_ALLOC: AllocationSemantics = AllocationSemantics::Default;
+
+
 pub struct MyGC<VM: VMBinding> {
-    pub base: BasePlan<VM>,
-    pub nogc_space: NoGCImmortalSpace<VM>,
+    pub hi: AtomicBool,
+    pub copyspace0: CopySpace<VM>,
+    pub copyspace1: CopySpace<VM>,
+    pub common: CommonPlan<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for MyGC<VM> {}
@@ -37,7 +45,7 @@ unsafe impl<VM: VMBinding> Sync for MyGC<VM> {}
 impl<VM: VMBinding> Plan for MyGC<VM> {
     type VM = VM;
     type Mutator = Mutator<Self>;
-    type CopyContext = NoCopy<VM>;
+    type CopyContext = MyCopyContext<VM>;
 
     fn new(
         vm_map: &'static VMMap,
@@ -45,27 +53,29 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         _scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
-        #[cfg(not(feature = "nogc_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        #[cfg(feature = "nogc_lock_free")]
-        let heap = HeapMeta::new(HEAP_START, HEAP_END);
-
-        #[cfg(feature = "nogc_lock_free")]
-        let nogc_space =
-            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")));
-        #[cfg(not(feature = "nogc_lock_free"))]
-        let nogc_space = NoGCImmortalSpace::new(
-            "nogc_space",
-            true,
-            VMRequest::discontiguous(),
-            vm_map,
-            mmapper,
-            &mut heap,
-        );
 
         MyGC {
-            nogc_space,
-            base: BasePlan::new(vm_map, mmapper, options, heap),
+            hi: AtomicBool::new(false),
+            copyspace0: CopySpace::new(
+                "copyspace0",
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            copyspace1: CopySpace::new(
+                "copyspace1",
+                true,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            common: CommonPlan::new(vm_map, mmapper, options, heap),
         }
     }
 
@@ -75,14 +85,28 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
-        self.base.gc_init(heap_size, vm_map, scheduler);
+        self.common.gc_init(heap_size, vm_map, scheduler);
 
-        // FIXME correctly initialize spaces based on options
-        self.nogc_space.init(&vm_map);
+        self.copyspace0.init(&vm_map);
+        self.copyspace1.init(&vm_map);
     }
 
-    fn base(&self) -> &BasePlan<VM> {
-        &self.base
+    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {   
+        println!("MyGC!!");
+        self.base().set_collection_kind();
+        self.base().set_gc_status(GcStatus::GcPrepare);
+        // Stop and scan mutators
+        scheduler
+            .unconstrained_works
+            .add(StopMutators::<MyProcessEdges<VM>>::new());
+        // Prepare global/collectors/mutators
+        scheduler.prepare_stage.add(Prepare::new(self));
+        // Release global/collectors/mutators
+        scheduler.release_stage.add(Release::new(self));
+        // Resume mutators
+        #[cfg(feature = "sanity")]
+        scheduler.final_stage.add(SchedulerSanityGC);
+        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn bind_mutator(
@@ -90,30 +114,61 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         tls: OpaquePointer,
         _mmtk: &'static MMTK<Self::VM>,
     ) -> Box<Mutator<Self>> {
-        Box::new(create_nogc_mutator(tls, self))
+        Box::new(create_my_mutator(tls, self))
     }
-
-    fn prepare(&self, _tls: OpaquePointer) {
-        unreachable!()
-    }
-
-    fn release(&self, _tls: OpaquePointer) {
-        unreachable!()
-    }
-
+    
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<VM>) {
-        unreachable!("GC triggered in nogc")
+    fn prepare(&self, tls: OpaquePointer) {
+        self.common.prepare(tls, true);
+
+        self.hi
+            .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); //flip semi spaces
+        let hi = self.hi.load(Ordering::SeqCst);
+        self.copyspace0.prepare(hi);
+        self.copyspace1.prepare(!hi);        
+    }
+
+    fn release(&self, tls: OpaquePointer) {
+        self.common.release(tls, true);
+        // Release the collected region
+        self.fromspace().release();
+    }
+
+
+    fn get_collection_reserve(&self) -> usize {
+        self.tospace().reserved_pages()
     }
 
     fn get_pages_used(&self) -> usize {
-        self.nogc_space.reserved_pages()
+        self.tospace().reserved_pages() + self.common.get_pages_used()
     }
 
-    fn handle_user_collection_request(&self, _tls: OpaquePointer, _force: bool) {
-        println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
+    fn base(&self) -> &BasePlan<VM> {
+        &self.common.base
+    }
+
+    fn common(&self) -> &CommonPlan<VM> {
+        &self.common
+    }
+}
+
+impl<VM: VMBinding> MyGC<VM> {
+    pub fn tospace(&self) -> &CopySpace<VM> {
+        if self.hi.load(Ordering::SeqCst) {
+            &self.copyspace1
+        } else {
+            &self.copyspace0
+        }
+    }
+
+    pub fn fromspace(&self) -> &CopySpace<VM> {
+        if self.hi.load(Ordering::SeqCst) {
+            &self.copyspace0
+        } else {
+            &self.copyspace1
+        }
     }
 }
