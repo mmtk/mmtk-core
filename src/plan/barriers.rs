@@ -2,6 +2,8 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::util::*;
 use crate::MMTK;
+use std::sync::Mutex;
+use std::collections::HashSet;
 
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address
 pub enum WriteTarget {
@@ -33,6 +35,14 @@ pub struct FieldRememberingBarrier<E: ProcessEdgesWork, S: Space<E::VM>> {
     mod_buffer: ModBuffer,
 }
 
+// TODO(wenyuzhao):
+// This is a temporary solution to object/field remembering, in order to reduce duplicated remset entries.
+// In the future, this will be replaced by using a proper side-metadata storage.
+lazy_static! {
+    pub static ref EDGES: Mutex<HashSet<Address>> = Mutex::default();
+    pub static ref NODES: Mutex<HashSet<ObjectReference>> = Mutex::default();
+}
+
 impl<E: ProcessEdgesWork, S: Space<E::VM>> FieldRememberingBarrier<E, S> {
     #[allow(unused)]
     pub fn new(mmtk: &'static MMTK<E::VM>, nursery: &'static S) -> Self {
@@ -44,16 +54,20 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> FieldRememberingBarrier<E, S> {
     }
 
     fn enqueue_node(&mut self, obj: ObjectReference) {
-        self.mod_buffer.modified_nodes.push(obj);
-        if self.mod_buffer.modified_nodes.len() >= E::CAPACITY {
-            self.flush();
+        if NODES.lock().unwrap().insert(obj) {
+            self.mod_buffer.modified_nodes.push(obj);
+            if self.mod_buffer.modified_nodes.len() >= E::CAPACITY {
+                self.flush();
+            }
         }
     }
 
     fn enqueue_edge(&mut self, slot: Address) {
-        self.mod_buffer.modified_edges.push(slot);
-        if self.mod_buffer.modified_edges.len() >= 512 {
-            self.flush();
+        if EDGES.lock().unwrap().insert(slot) {
+            self.mod_buffer.modified_edges.push(slot);
+            if self.mod_buffer.modified_edges.len() >= 512 {
+                self.flush();
+            }
         }
     }
 }

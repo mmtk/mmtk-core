@@ -7,6 +7,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
+use crate::plan::barriers::{NODES, EDGES};
 
 pub struct ScheduleCollection;
 
@@ -201,6 +202,8 @@ pub struct EndOfGC;
 
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        EDGES.lock().unwrap().clear();
+        NODES.lock().unwrap().clear();
         mmtk.plan.common().base.set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
@@ -435,22 +438,19 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
-    #[inline]
+    #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if mmtk.plan.in_nursery() {
-            let mut modified_nodes = vec![];
-            ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
-            worker
-                .scheduler()
-                .closure_stage
-                .add(ScanObjects::<E>::new(modified_nodes, false));
-
-            let mut modified_edges = vec![];
-            ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
-            worker
-                .scheduler()
-                .closure_stage
-                .add(E::new(modified_edges, true));
+            if !self.modified_nodes.is_empty() {
+                let mut modified_nodes = vec![];
+                ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
+                GCWork::do_work(&mut ScanObjects::<E>::new(modified_nodes, false), worker, mmtk)
+            }
+            if !self.modified_edges.is_empty() {
+                let mut modified_edges = vec![];
+                ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
+                GCWork::do_work(&mut E::new(modified_edges, true), worker, mmtk)
+            }
         } else {
             // Do nothing
         }
