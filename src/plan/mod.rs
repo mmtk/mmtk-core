@@ -34,5 +34,15 @@ pub mod gencopy;
 #[cfg(feature = "gencopy")]
 pub use self::gencopy as selected_plan;
 
+#[cfg(feature = "gencopycopy")]
+pub mod gencopycopy;
+#[cfg(feature = "gencopycopy")]
+pub use self::gencopycopy as selected_plan;
+
+#[cfg(feature = "mygencopy")]
+pub mod mygencopy;
+#[cfg(feature = "mygencopy")]
+pub use self::mygencopy as selected_plan;
+
 pub use self::selected_plan::SelectedConstraints;
 pub use self::selected_plan::SelectedPlan;

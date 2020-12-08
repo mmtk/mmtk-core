@@ -17,7 +17,7 @@ crate-type = ["rlib"]
 doctest = false
 
 [package.metadata.docs.rs]
-features = ["mygc"]
+features = ["mygencopy"]
 
 [dependencies]
 custom_derive = "0.1"
@@ -46,6 +46,8 @@ nogc = ["immortalspace", "largeobjectspace"]
 semispace = ["immortalspace", "largeobjectspace", "copyspace"]
 gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 mygc = ["immortalspace", "largeobjectspace", "copyspace"]
+mygencopy = ["immortalspace", "largeobjectspace", "copyspace"]
+gencopycopy = ["immortalspace", "largeobjectspace", "copyspace"]
 
 # spaces
 base_spaces = []
