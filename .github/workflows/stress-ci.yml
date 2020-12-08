@@ -8,6 +8,7 @@ on:
 jobs:
   jikesrvm-stress-test:
     runs-on: [self-hosted, Linux, freq-scaling-on]
+    timeout-minutes: 720
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -44,10 +45,6 @@ jobs:
         if: always()
         run:
           mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar bloat
-      - name: eclipse
-        if: always()
-        run:
-          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms150M -Xmx150M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse
       - name: fop
         if: always()
         run:
@@ -76,6 +73,10 @@ jobs:
         if: always()
         run:
           mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms100M -Xmx100M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar xalan
+      - name: eclipse
+        if: always()
+        run:
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms150M -Xmx150M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse
 
   openjdk-stress-test:
     runs-on: [self-hosted, Linux, freq-scaling-on]
