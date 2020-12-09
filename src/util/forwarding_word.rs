@@ -227,7 +227,7 @@ pub(super) fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize
 #[cfg(debug_assertions)]
 pub(crate) fn check_alloc_size<VM: VMBinding>(size: usize) {
     debug_assert!(
-        if VM::VMObjectModel::HAS_GC_BYTE ||
+        if !VM::VMObjectModel::HAS_GC_BYTE ||
          gc_byte_offset_in_forwarding_word::<VM>().is_some() {
             size >= constants::BYTES_IN_WORD
         } else {
