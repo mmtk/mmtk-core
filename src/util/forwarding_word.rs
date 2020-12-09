@@ -232,5 +232,7 @@ pub(crate) fn check_alloc_size<VM: VMBinding>(size: usize) {
         size >= constants::BYTES_IN_WORD
     } else {
         size >= 2 * constants::BYTES_IN_WORD
-    });
+    },
+    "allocation size (0x{:x}) is too small!", size
+    );
 }
