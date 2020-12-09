@@ -104,6 +104,8 @@ pub fn alloc<VM: VMBinding>(
     offset: isize,
     semantics: AllocationSemantics,
 ) -> Address {
+    #[cfg(debug_assertions)]
+    crate::util::forwarding_word::check_alloc_size::<VM>(size);
     mutator.alloc(size, align, offset, semantics)
 }
 
