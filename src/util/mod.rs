@@ -20,6 +20,7 @@ pub mod options;
 pub mod queue;
 pub mod raw_memory_freelist;
 pub mod reference_processor;
+pub mod side_metadata;
 #[cfg(feature = "sanity")]
 pub mod sanity;
 pub mod statistics;
