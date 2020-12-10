@@ -1,6 +1,6 @@
-use crate::util::{conversions::*, metadata::map_metadata_pages_for_chunk};
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::{conversions::*, metadata::map_metadata_pages_for_chunk};
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
@@ -221,7 +221,9 @@ impl SFTMap {
                 new
             );
         }
-        if SelectedConstraints::METADATA_PAGES_PER_CHUNK != 0 && self_mut.sft[chunk] == &EMPTY_SPACE_SFT {
+        if SelectedConstraints::METADATA_PAGES_PER_CHUNK != 0
+            && self_mut.sft[chunk] == &EMPTY_SPACE_SFT
+        {
             map_metadata_pages_for_chunk(conversions::chunk_index_to_address(chunk));
         }
         self_mut.sft[chunk] = sft;

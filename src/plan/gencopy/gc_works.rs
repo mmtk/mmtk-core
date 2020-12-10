@@ -2,7 +2,6 @@ use super::global::GenCopy;
 use crate::plan::{CopyContext, Plan};
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
-use crate::scheduler::{GCWork, GCWorker};
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::forwarding_word;
 use crate::util::{Address, ObjectReference, OpaquePointer};
@@ -173,4 +172,3 @@ impl<VM: VMBinding> DerefMut for GenCopyMatureProcessEdges<VM> {
         &mut self.base
     }
 }
-

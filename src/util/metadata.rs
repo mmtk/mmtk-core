@@ -1,11 +1,9 @@
-use super::{Address, memory::dzmmap};
 use super::constants::*;
 use super::conversions;
 use super::heap::layout::vm_layout_constants::*;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use super::{memory::dzmmap, Address};
 use crate::SelectedConstraints;
-
-
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub const METADATA_BASE: Address = HEAP_END;
 
@@ -68,5 +66,9 @@ const fn metadata_start(address: Address) -> Address {
 
 pub fn map_metadata_pages_for_chunk(chunk: Address) {
     let metadata_start = metadata_start(chunk);
-    dzmmap(metadata_start, SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE).unwrap();
+    dzmmap(
+        metadata_start,
+        SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE,
+    )
+    .unwrap();
 }

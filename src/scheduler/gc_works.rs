@@ -1,10 +1,10 @@
-use metadata::BitsReference;
 use super::*;
 use crate::plan::global::GcStatus;
-use crate::util::*;
 use crate::util::constants::*;
+use crate::util::*;
 use crate::vm::*;
 use crate::*;
+use metadata::BitsReference;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
@@ -451,7 +451,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             if !self.modified_nodes.is_empty() {
                 let mut modified_nodes = vec![];
                 ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
-                GCWork::do_work(&mut ScanObjects::<E>::new(modified_nodes, false), worker, mmtk)
+                GCWork::do_work(
+                    &mut ScanObjects::<E>::new(modified_nodes, false),
+                    worker,
+                    mmtk,
+                )
             }
             if !self.modified_edges.is_empty() {
                 let mut modified_edges = vec![];

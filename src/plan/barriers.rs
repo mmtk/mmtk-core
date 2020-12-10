@@ -1,13 +1,9 @@
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
-use crate::util::*;
 use crate::util::constants::*;
-use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::metadata::*;
+use crate::util::*;
 use crate::MMTK;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::collections::HashSet;
 
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address
 pub enum WriteTarget {
