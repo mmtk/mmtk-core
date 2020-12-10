@@ -1,6 +1,8 @@
+use metadata::BitsReference;
 use super::*;
 use crate::plan::global::GcStatus;
 use crate::util::*;
+use crate::util::constants::*;
 use crate::vm::*;
 use crate::*;
 use std::marker::PhantomData;
@@ -438,14 +440,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !self.modified_nodes.is_empty() {
-            use crate::plan::barriers::BitRef;
-            for x in &self.modified_nodes {
-                let bit = BitRef::log_bit_of(x.to_address());
-                bit.attempt(true, false);
+            for obj in &self.modified_nodes {
+                BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b1, 0b0);
             }
-            for x in &self.modified_edges {
-                let bit = BitRef::log_bit_of(*x);
-                bit.attempt(true, false);
+            for edge in &self.modified_edges {
+                BitsReference::of(*edge, LOG_BYTES_IN_WORD, 0).attempt(0b1, 0b0);
             }
         }
         if mmtk.plan.in_nursery() {

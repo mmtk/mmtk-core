@@ -3,6 +3,7 @@ use crate::scheduler::gc_works::*;
 use crate::util::*;
 use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::metadata::*;
 use crate::MMTK;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -38,43 +39,6 @@ pub struct FieldRememberingBarrier<E: ProcessEdgesWork, S: Space<E::VM>> {
     mod_buffer: ModBuffer,
 }
 
-pub struct BitRef {
-    base: Address,
-    word_offset: usize,
-    bit_offset: usize,
-}
-
-impl BitRef {
-    pub fn log_bit_of(addr: Address) -> Self {
-        let base = conversions::metadata_start(addr);
-        let word_index = (addr.as_usize() & (BYTES_IN_CHUNK - 1)) >> LOG_BYTES_IN_WORD;
-        let word_offset = word_index >> LOG_BYTES_IN_WORD;
-        let bit_offset = word_index & (BYTES_IN_WORD - 1);
-        Self {
-            base,
-            word_offset,
-            bit_offset
-        }
-    }
-
-    pub fn attempt(&self, old: bool, new: bool) -> bool {
-        let old_bit = if old { 0b1usize } else { 0b0usize };
-        let new_bit = if new { 0b1usize } else { 0b0usize };
-        let mask = 1 << self.bit_offset;
-        let word = unsafe { &*((self.base.as_usize() + self.word_offset) as *const AtomicUsize) };
-        loop {
-            let old = word.load(Ordering::SeqCst);
-            if ((old & mask) >> self.bit_offset) != old_bit {
-                return false;
-            }
-            let new = (old & !mask) | (new_bit << self.bit_offset);
-            if old == word.compare_and_swap(old, new, Ordering::SeqCst) {
-                return true;
-            }
-        }
-    }
-}
-
 impl<E: ProcessEdgesWork, S: Space<E::VM>> FieldRememberingBarrier<E, S> {
     #[allow(unused)]
     pub fn new(mmtk: &'static MMTK<E::VM>, nursery: &'static S) -> Self {
@@ -86,7 +50,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> FieldRememberingBarrier<E, S> {
     }
 
     fn enqueue_node(&mut self, obj: ObjectReference) {
-        if BitRef::log_bit_of(obj.to_address()).attempt(false, true) {
+        if BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b0, 0b1) {
             self.mod_buffer.modified_nodes.push(obj);
             if self.mod_buffer.modified_nodes.len() >= E::CAPACITY {
                 self.flush();
@@ -95,7 +59,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> FieldRememberingBarrier<E, S> {
     }
 
     fn enqueue_edge(&mut self, slot: Address) {
-        if BitRef::log_bit_of(slot).attempt(false, true) {
+        if BitsReference::of(slot, LOG_BYTES_IN_WORD, 0).attempt(0b0, 0b1) {
             self.mod_buffer.modified_edges.push(slot);
             if self.mod_buffer.modified_edges.len() >= 512 {
                 self.flush();

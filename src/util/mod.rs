@@ -25,6 +25,7 @@ pub mod sanity;
 pub mod statistics;
 mod synchronized_counter;
 pub mod treadmill;
+pub mod metadata;
 
 #[cfg(test)]
 pub mod test_util;
