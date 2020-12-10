@@ -44,5 +44,10 @@ pub mod mygencopy;
 #[cfg(feature = "mygencopy")]
 pub use self::mygencopy as selected_plan;
 
+#[cfg(feature = "marksweep")]
+pub mod marksweep;
+#[cfg(feature = "marksweep")]
+pub use self::marksweep as selected_plan;
+
 pub use self::selected_plan::SelectedConstraints;
 pub use self::selected_plan::SelectedPlan;

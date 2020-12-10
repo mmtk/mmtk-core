@@ -3,13 +3,13 @@ use std::mem::MaybeUninit;
 use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator, MyAllocator};
+use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator, FreeListAllocator};
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 
 const MAX_BUMP_ALLOCATORS: usize = 5;
 const MAX_LARGE_OBJECT_ALLOCATORS: usize = 1;
-//const MAX_MY_ALLOCATORS: usize = 5;
+const MAX_FREE_LIST_ALLOCATORS: usize = 5;
 
 // The allocators set owned by each mutator. We provide a fixed number of allocators for each allocator type in the mutator,
 // and each plan will select part of the allocators to use.
@@ -19,7 +19,7 @@ const MAX_LARGE_OBJECT_ALLOCATORS: usize = 1;
 pub struct Allocators<VM: VMBinding> {
     pub bump_pointer: [MaybeUninit<BumpAllocator<VM>>; MAX_BUMP_ALLOCATORS],
     pub large_object: [MaybeUninit<LargeObjectAllocator<VM>>; MAX_LARGE_OBJECT_ALLOCATORS],
-    //pub my_pointer: [MaybeUninit<MyAllocator<VM>>; MAX_MY_ALLOCATORS],
+    pub free_list: [MaybeUninit<FreeListAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
 }
 
 impl<VM: VMBinding> Allocators<VM> {
@@ -29,6 +29,7 @@ impl<VM: VMBinding> Allocators<VM> {
         match selector {
             AllocatorSelector::BumpPointer(index) => self.bump_pointer[index as usize].get_ref(),
             AllocatorSelector::LargeObject(index) => self.large_object[index as usize].get_ref(),
+            AllocatorSelector::FreeList(index) => self.free_list[index as usize].get_ref(),
         }
     }
 
@@ -41,6 +42,7 @@ impl<VM: VMBinding> Allocators<VM> {
         match selector {
             AllocatorSelector::BumpPointer(index) => self.bump_pointer[index as usize].get_mut(),
             AllocatorSelector::LargeObject(index) => self.large_object[index as usize].get_mut(),
+            AllocatorSelector::FreeList(index) => self.free_list[index as usize].get_mut(),
         }
     }
 
@@ -52,7 +54,7 @@ impl<VM: VMBinding> Allocators<VM> {
         let mut ret = Allocators {
             bump_pointer: unsafe { MaybeUninit::uninit().assume_init() },
             large_object: unsafe { MaybeUninit::uninit().assume_init() },
-            //pointer: unsafe { MaybeUninit::uninit().assume_init() },
+            free_list: unsafe { MaybeUninit::uninit().assume_init() },
         };
 
         for &(selector, space) in space_mapping.iter() {
@@ -71,6 +73,14 @@ impl<VM: VMBinding> Allocators<VM> {
                         plan,
                     ));
                 }
+                AllocatorSelector::FreeList(index) => {
+                    ret.free_list[index as usize].write(FreeListAllocator::new(
+                        mutator_tls,
+                        Some(space),
+                        plan,
+                    ));
+                }
+                
             }
         }
 
@@ -95,4 +105,5 @@ impl<VM: VMBinding> Allocators<VM> {
 pub enum AllocatorSelector {
     BumpPointer(u8),
     LargeObject(u8),
+    FreeList(u8),
 }

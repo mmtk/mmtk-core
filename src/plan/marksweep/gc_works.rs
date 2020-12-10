@@ -1,4 +1,4 @@
-use super::global::MyGC;
+use super::global::MarkSweep;
 use crate::{plan::CopyContext};
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
 pub struct MyCopyContext<VM: VMBinding> {
-    plan: &'static MyGC<VM>,
+    plan: &'static MarkSweep<VM>,
     allocator: FreeListAllocator<VM>,
 }
 
@@ -27,7 +27,7 @@ impl<VM:VMBinding> CopyContext for MyCopyContext<VM> {
         self.allocator.tls = tls;
     }
     fn prepare(&mut self) {
-        self.allocator.rebind(Some(self.plan.tospace()));
+        //self.allocator.rebind(Some(self.plan.tospace()));
     }
     fn release(&mut self) {
         // self.allocator.rebind(Some(self.plan.tospace()));

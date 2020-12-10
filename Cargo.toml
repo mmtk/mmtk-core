@@ -48,6 +48,7 @@ gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 mygc = ["immortalspace", "largeobjectspace", "copyspace"]
 mygencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 gencopycopy = ["immortalspace", "largeobjectspace", "copyspace"]
+marksweep =["immortalspace", "largeobjectspace"]
 
 # spaces
 base_spaces = []
