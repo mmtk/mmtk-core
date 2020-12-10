@@ -38,8 +38,8 @@ pub fn bytes_to_chunks_up(bytes: usize) -> usize {
     (bytes + BYTES_IN_CHUNK - 1) >> LOG_BYTES_IN_CHUNK
 }
 
-pub fn address_to_chunk_index(addr: Address) -> usize {
-    addr >> LOG_BYTES_IN_CHUNK
+pub const fn address_to_chunk_index(addr: Address) -> usize {
+    addr.as_usize() >> LOG_BYTES_IN_CHUNK
 }
 
 pub fn chunk_index_to_address(chunk: usize) -> Address {
@@ -86,6 +86,15 @@ pub fn bytes_to_pages(bytes: usize) -> usize {
     }
 
     pages
+}
+
+pub const fn metadata_start(address: Address) -> Address {
+    // let chunk = chunk_align_down(address);
+    let chunk_index = address_to_chunk_index(address);
+    let metadata_base = HEAP_END;
+    let offset = chunk_index * 16 * 4096;
+    // let x = chunk.as_usize() | (1usize << 45);
+    unsafe { Address::from_usize(metadata_base.as_usize() + offset) }
 }
 
 #[cfg(test)]

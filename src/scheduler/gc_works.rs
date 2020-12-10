@@ -7,7 +7,6 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
-use crate::plan::barriers::{NODES, EDGES};
 
 pub struct ScheduleCollection;
 
@@ -202,8 +201,6 @@ pub struct EndOfGC;
 
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        EDGES.lock().unwrap().clear();
-        NODES.lock().unwrap().clear();
         mmtk.plan.common().base.set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
@@ -440,6 +437,17 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        if !self.modified_nodes.is_empty() {
+            use crate::plan::barriers::BitRef;
+            for x in &self.modified_nodes {
+                let bit = BitRef::log_bit_of(x.to_address());
+                bit.attempt(true, false);
+            }
+            for x in &self.modified_edges {
+                let bit = BitRef::log_bit_of(*x);
+                bit.attempt(true, false);
+            }
+        }
         if mmtk.plan.in_nursery() {
             if !self.modified_nodes.is_empty() {
                 let mut modified_nodes = vec![];

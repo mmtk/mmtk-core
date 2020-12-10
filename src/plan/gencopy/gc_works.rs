@@ -174,30 +174,3 @@ impl<VM: VMBinding> DerefMut for GenCopyMatureProcessEdges<VM> {
     }
 }
 
-#[derive(Default)]
-pub struct GenCopyProcessModBuf {
-    pub modified_nodes: Vec<ObjectReference>,
-    pub modified_edges: Vec<Address>,
-}
-
-impl<VM: VMBinding> GCWork<VM> for GenCopyProcessModBuf {
-    #[inline]
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        if mmtk.plan.in_nursery() {
-            let mut modified_nodes = vec![];
-            ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
-            worker.scheduler().closure_stage.add(
-                ScanObjects::<GenCopyNurseryProcessEdges<VM>>::new(modified_nodes, false),
-            );
-
-            let mut modified_edges = vec![];
-            ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
-            worker
-                .scheduler()
-                .closure_stage
-                .add(GenCopyNurseryProcessEdges::<VM>::new(modified_edges, true));
-        } else {
-            // Do nothing
-        }
-    }
-}

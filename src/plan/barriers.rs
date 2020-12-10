@@ -1,8 +1,11 @@
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::util::*;
+use crate::util::constants::*;
+use crate::util::heap::layout::vm_layout_constants::*;
 use crate::MMTK;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::HashSet;
 
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address
@@ -35,12 +38,41 @@ pub struct FieldRememberingBarrier<E: ProcessEdgesWork, S: Space<E::VM>> {
     mod_buffer: ModBuffer,
 }
 
-// TODO(wenyuzhao):
-// This is a temporary solution to object/field remembering, in order to reduce duplicated remset entries.
-// In the future, this will be replaced by using a proper side-metadata storage.
-lazy_static! {
-    pub static ref EDGES: Mutex<HashSet<Address>> = Mutex::default();
-    pub static ref NODES: Mutex<HashSet<ObjectReference>> = Mutex::default();
+pub struct BitRef {
+    base: Address,
+    word_offset: usize,
+    bit_offset: usize,
+}
+
+impl BitRef {
+    pub fn log_bit_of(addr: Address) -> Self {
+        let base = conversions::metadata_start(addr);
+        let word_index = (addr.as_usize() & (BYTES_IN_CHUNK - 1)) >> LOG_BYTES_IN_WORD;
+        let word_offset = word_index >> LOG_BYTES_IN_WORD;
+        let bit_offset = word_index & (BYTES_IN_WORD - 1);
+        Self {
+            base,
+            word_offset,
+            bit_offset
+        }
+    }
+
+    pub fn attempt(&self, old: bool, new: bool) -> bool {
+        let old_bit = if old { 0b1usize } else { 0b0usize };
+        let new_bit = if new { 0b1usize } else { 0b0usize };
+        let mask = 1 << self.bit_offset;
+        let word = unsafe { &*((self.base.as_usize() + self.word_offset) as *const AtomicUsize) };
+        loop {
+            let old = word.load(Ordering::SeqCst);
+            if ((old & mask) >> self.bit_offset) != old_bit {
+                return false;
+            }
+            let new = (old & !mask) | (new_bit << self.bit_offset);
+            if old == word.compare_and_swap(old, new, Ordering::SeqCst) {
+                return true;
+            }
+        }
+    }
 }
 
 impl<E: ProcessEdgesWork, S: Space<E::VM>> FieldRememberingBarrier<E, S> {
@@ -54,7 +86,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> FieldRememberingBarrier<E, S> {
     }
 
     fn enqueue_node(&mut self, obj: ObjectReference) {
-        if NODES.lock().unwrap().insert(obj) {
+        if BitRef::log_bit_of(obj.to_address()).attempt(false, true) {
             self.mod_buffer.modified_nodes.push(obj);
             if self.mod_buffer.modified_nodes.len() >= E::CAPACITY {
                 self.flush();
@@ -63,7 +95,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> FieldRememberingBarrier<E, S> {
     }
 
     fn enqueue_edge(&mut self, slot: Address) {
-        if EDGES.lock().unwrap().insert(slot) {
+        if BitRef::log_bit_of(slot).attempt(false, true) {
             self.mod_buffer.modified_edges.push(slot);
             if self.mod_buffer.modified_edges.len() >= 512 {
                 self.flush();

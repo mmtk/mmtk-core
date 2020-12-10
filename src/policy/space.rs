@@ -220,6 +220,12 @@ impl SFTMap {
                 new
             );
         }
+        if self_mut.sft[chunk] == &EMPTY_SPACE_SFT {
+            let chunk_start = conversions::chunk_index_to_address(chunk);
+            let metadata_pages = 16;
+            let metadata_start = conversions::metadata_start(chunk_start);
+            crate::util::memory::dzmmap(metadata_start, metadata_pages * 4096).unwrap();
+        }
         self_mut.sft[chunk] = sft;
     }
 }
