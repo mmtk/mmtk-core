@@ -13,7 +13,7 @@ pub struct BitsReference {
     base: Address,
     word_offset: usize,
     bit_offset: usize,
-    log_bits: u8,
+    mask: usize,
 }
 
 impl BitsReference {
@@ -35,7 +35,7 @@ impl BitsReference {
             base,
             word_offset,
             bit_offset,
-            log_bits,
+            mask: ((1 << (1 << log_bits)) - 1) << bit_offset,
         }
     }
 
@@ -44,16 +44,15 @@ impl BitsReference {
     pub fn attempt(&self, old: usize, new: usize) -> bool {
         let old = old << self.bit_offset;
         let new = new << self.bit_offset;
-        let mask = 1 << self.bit_offset;
-        debug_assert!((old & !mask) == 0);
-        debug_assert!((new & !mask) == 0);
+        debug_assert!((old & !self.mask) == 0);
+        debug_assert!((new & !self.mask) == 0);
         let word = unsafe { &*((self.base.as_usize() + self.word_offset) as *const AtomicUsize) };
         loop {
             let old_word = word.load(Ordering::SeqCst);
-            if (old_word & mask) != old {
+            if (old_word & self.mask) != old {
                 return false;
             }
-            let new_word = (old_word & !mask) | new;
+            let new_word = (old_word & !self.mask) | new;
             if old_word == word.compare_and_swap(old_word, new_word, Ordering::SeqCst) {
                 return true;
             }
