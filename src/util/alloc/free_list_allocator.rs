@@ -1,12 +1,10 @@
 //use libc::malloc;
 
-use std::convert::TryInto;
-
-use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
 use crate::util::Address;
 
 use crate::util::alloc::Allocator;
 
+use crate::policy::NODES;
 use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::space::Space;
 use crate::util::OpaquePointer;
@@ -38,27 +36,15 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         self.plan
     }
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-
+        println!("{:?}", NODES.lock().unwrap());
         trace!("alloc");
-        //println!("alloc");
         assert!(offset==0);
-
-        // #[link(name = "c")]
-        // use std::ffi::c_void;
-        // extern "C" {
-        //     fn malloc(size: usize) -> *mut c_void;
-        // }
         
         let ptr = unsafe { libc::calloc(1, size + 8) };
         let a = Address::from_mut_ptr(ptr);
-        //println!("alloc'd to {}", a);
+        unsafe { NODES.lock().unwrap().insert(a.to_object_reference()); }
         a + 8usize
-        //align_allocation_no_fill::<VM>(a, align, offset)
 
-        // let ptr = unsafe { ptr as usize + ptr.align_offset(align) };
-        // println!("result = {}", ptr);
-        // println!("offset = {}", offset);
-        // unsafe { Address::from_usize(ptr) }
     }
 
 

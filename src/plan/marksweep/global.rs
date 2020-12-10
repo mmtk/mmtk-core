@@ -1,5 +1,5 @@
-use super::gc_works::{MyCopyContext, MyProcessEdges};
-use crate::mmtk::MMTK;
+use super::gc_works::{MSProcessEdges};
+use crate::{mmtk::MMTK, plan::global::NoCopy, util::ObjectReference};
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -22,18 +22,21 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{sync::atomic::{AtomicBool, Ordering}};
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::collections::HashSet;
+use crate::policy::space::NODES;
 
 use enum_map::EnumMap;
 
 pub type SelectedPlan<VM> = MarkSweep<VM>;
 
-pub const MY_ALLOC: AllocationSemantics = AllocationSemantics::Default;
-
+//pub const ALLOC_MS: AllocationSemantics = AllocationSemantics::Default;
 
 pub struct MarkSweep<VM: VMBinding> {
     pub common: CommonPlan<VM>,
+    //pub mark_count: Mutex<u8>
 }
 
 unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
@@ -41,7 +44,7 @@ unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
 impl<VM: VMBinding> Plan for MarkSweep<VM> {
     type VM = VM;
     type Mutator = Mutator<Self>;
-    type CopyContext = MyCopyContext<VM>;
+    type CopyContext = NoCopy<VM>;
 
     fn new(
         vm_map: &'static VMMap,
@@ -52,7 +55,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         MarkSweep {
             common: CommonPlan::new(vm_map, mmapper, options, heap),
+            //mark_count: Mutex::new(1)
         }
+    }
+
+    fn is_malloced(&self, object: ObjectReference) -> bool {
+        NODES.lock().unwrap().contains(&object)
     }
 
     fn gc_init(
@@ -71,14 +79,14 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         // Stop and scan mutators
         scheduler
             .unconstrained_works
-            .add(StopMutators::<MyProcessEdges<VM>>::new());
+            .add(StopMutators::<MSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
         scheduler.prepare_stage.add(Prepare::new(self));
         // Release global/collectors/mutators
         scheduler.release_stage.add(Release::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.final_stage.add(SchedulerSanityGC);
+        scheduler.final_stage.add(ScheduleSanityGC);
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
@@ -100,7 +108,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn release(&self, tls: OpaquePointer) {
         //TODO: release dead objects
-        self.common.release(tls, true);
+        
     }
 
 
@@ -122,3 +130,14 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &self.common
     }
 }
+
+// impl<VM: VMBinding> MarkSweep<VM> {
+//     fn get_mark_count(&self) -> u8 {
+//         *self.mark_count.lock().unwrap()
+//     }
+
+//     fn increment_mark_count(&self) {
+//         let mark_count_u8 = self.get_mark_count();
+//         self.mark_count.lock().unwrap().checked_add(1);
+//     }
+// }

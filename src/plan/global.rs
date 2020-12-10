@@ -24,10 +24,11 @@ use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use enum_map::EnumMap;
-use std::cell::UnsafeCell;
+use std::{cell::UnsafeCell, collections::HashSet};
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
 
 /// A GC worker's context for copying GCs.
 /// Each GC plan should provide their implementation of a CopyContext.
@@ -141,6 +142,12 @@ pub trait Plan: Sized + 'static + Sync + Send {
     fn options(&self) -> &Options {
         &self.base().options
     }
+    fn is_malloced(&self, object: ObjectReference) -> bool {
+        false
+    }
+    // fn nodes(&self) -> Mutex<HashSet<ObjectReference>> {
+    //     Mutex::default()
+    // }
 
     // unsafe because this can only be called once by the init thread
     fn gc_init(

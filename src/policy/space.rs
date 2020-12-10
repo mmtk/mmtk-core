@@ -1,6 +1,7 @@
 use crate::util::conversions::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use std::collections::HashSet;
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
@@ -23,7 +24,7 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 
 use crate::vm::VMBinding;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Mutex};
 
 use downcast_rs::Downcast;
 
@@ -54,6 +55,11 @@ pub trait SFT {
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool;
     fn initialize_header(&self, object: ObjectReference, alloc: bool);
+}
+
+
+lazy_static! {
+    pub static ref NODES: Mutex<HashSet<ObjectReference>> = Mutex::default();
 }
 
 /// Print debug info for SFT. Should be false when committed.
