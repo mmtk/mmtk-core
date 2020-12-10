@@ -36,13 +36,16 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         self.plan
     }
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        println!("{:?}", NODES.lock().unwrap());
+        //println!("called free list alloc");
         trace!("alloc");
         assert!(offset==0);
         
         let ptr = unsafe { libc::calloc(1, size + 8) };
         let a = Address::from_mut_ptr(ptr);
-        unsafe { NODES.lock().unwrap().insert(a.to_object_reference()); }
+        unsafe { a.store(0); }
+        unsafe { NODES.lock().unwrap().insert(Address::from_usize(a.as_usize() + 8).to_object_reference()); } //a is the reference to the object, not the mark word
+        //unsafe { NODES.lock().unwrap().insert(a.to_object_reference()); } //a is the reference to the mark word
+        
         a + 8usize
 
     }

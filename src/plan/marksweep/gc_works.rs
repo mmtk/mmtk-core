@@ -31,7 +31,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
         }
 
         //if not marked, mark and call self.process_node
-        let a = object.to_address() - 8;
+        let a: Address = object.to_address() - 8;
         let marking_word: usize = unsafe { a.load() };
         if marking_word == 0usize {
             unsafe { a.store(1) };

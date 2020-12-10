@@ -1,5 +1,5 @@
 use super::gc_works::{MSProcessEdges};
-use crate::{mmtk::MMTK, plan::global::NoCopy, util::ObjectReference};
+use crate::{mmtk::MMTK, plan::{self, global::NoCopy}, util::{Address, ObjectReference}};
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -8,7 +8,6 @@ use crate::plan::marksweep::mutator::create_ms_mutator;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
-use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -16,16 +15,12 @@ use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
-use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use std::{sync::atomic::{AtomicBool, Ordering}};
 use std::sync::Arc;
-use std::sync::Mutex;
-use std::collections::HashSet;
 use crate::policy::space::NODES;
 
 use enum_map::EnumMap;
@@ -103,13 +98,23 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn prepare(&self, tls: OpaquePointer) {
-        self.common.prepare(tls, true);      
+        // Do nothing  
     }
 
     fn release(&self, tls: OpaquePointer) {
-        //TODO: release dead objects
-        
+        println!("called marksweep release");
+        unsafe {
+        let mut NODES_hs = &mut *NODES.lock().unwrap();
+        NODES_hs.retain(|&o| plan::marksweep::global::MarkSweep::<VM>::marked(&o));
+        for object in NODES_hs.iter() {
+            let a: Address = Address::from_usize(object.to_address().as_usize() - 8);
+            let marking_word: usize = unsafe { a.load() };
+            debug_assert!(marking_word != 0usize, "Marking word is 0, should have been removed from NODES");
+            debug_assert!(marking_word == 1usize, "Marking word must be 1 or 0, found {}", marking_word);
+            unsafe { a.store(0) };
+        }
     }
+}
 
 
     fn get_collection_reserve(&self) -> usize {
@@ -131,13 +136,16 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 }
 
-// impl<VM: VMBinding> MarkSweep<VM> {
-//     fn get_mark_count(&self) -> u8 {
-//         *self.mark_count.lock().unwrap()
-//     }
-
-//     fn increment_mark_count(&self) {
-//         let mark_count_u8 = self.get_mark_count();
-//         self.mark_count.lock().unwrap().checked_add(1);
-//     }
-// }
+impl<VM: VMBinding> MarkSweep<VM> {
+    fn marked(&object: &ObjectReference) -> bool {
+        unsafe {
+            let a: Address = Address::from_usize(object.to_address().as_usize() - 8);
+            let marking_word: usize = unsafe { a.load() };
+            if marking_word == 0 {
+                libc::free(a.to_mut_ptr());
+                return false
+            }
+            true
+        }
+    }
+}
