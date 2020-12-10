@@ -88,15 +88,6 @@ pub fn bytes_to_pages(bytes: usize) -> usize {
     pages
 }
 
-pub const fn metadata_start(address: Address) -> Address {
-    // let chunk = chunk_align_down(address);
-    let chunk_index = address_to_chunk_index(address);
-    let metadata_base = HEAP_END;
-    let offset = chunk_index * 16 * 4096;
-    // let x = chunk.as_usize() | (1usize << 45);
-    unsafe { Address::from_usize(metadata_base.as_usize() + offset) }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::util::conversions::*;

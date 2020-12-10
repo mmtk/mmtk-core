@@ -1,4 +1,4 @@
-use crate::util::conversions::*;
+use crate::util::{conversions::*, metadata::map_metadata_pages_for_chunk};
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -21,6 +21,7 @@ use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
+use crate::SelectedConstraints;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -220,11 +221,8 @@ impl SFTMap {
                 new
             );
         }
-        if self_mut.sft[chunk] == &EMPTY_SPACE_SFT {
-            let chunk_start = conversions::chunk_index_to_address(chunk);
-            let metadata_pages = 16;
-            let metadata_start = conversions::metadata_start(chunk_start);
-            crate::util::memory::dzmmap(metadata_start, metadata_pages * 4096).unwrap();
+        if SelectedConstraints::METADATA_PAGES_PER_CHUNK != 0 && self_mut.sft[chunk] == &EMPTY_SPACE_SFT {
+            map_metadata_pages_for_chunk(conversions::chunk_index_to_address(chunk));
         }
         self_mut.sft[chunk] = sft;
     }
