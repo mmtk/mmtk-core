@@ -233,8 +233,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
         // debug_assert!(tls != 0);
-        let allow_poll = unsafe { VM::VMActivePlan::is_mutator(tls) }
-            && VM::VMActivePlan::global().is_initialized();
+        let allow_poll =
+            VM::VMActivePlan::is_mutator(tls) && VM::VMActivePlan::global().is_initialized();
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();
