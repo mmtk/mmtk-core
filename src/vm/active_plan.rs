@@ -35,7 +35,7 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `tls`: The thread to query.
-    /// 
+    ///
     /// # Safety
     /// The caller needs to make sure that the thread is a GC worker thread.
     unsafe fn worker(tls: OpaquePointer) -> &'static mut GCWorker<VM>;
@@ -50,7 +50,7 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `tls`: The thread to query.
-    /// 
+    ///
     /// # Safety
     /// The caller needs to make sure that the thread is a mutator thread.
     unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan<VM> as Plan>::Mutator;
