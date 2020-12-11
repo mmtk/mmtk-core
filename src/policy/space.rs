@@ -58,9 +58,6 @@ pub trait SFT {
 }
 
 
-lazy_static! {
-    pub static ref NODES: Mutex<HashSet<ObjectReference>> = Mutex::default();
-}
 
 /// Print debug info for SFT. Should be false when committed.
 const DEBUG_SFT: bool = cfg!(debug_assertions) && false;

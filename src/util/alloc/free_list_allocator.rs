@@ -1,18 +1,13 @@
-//use libc::malloc;
+
 
 use crate::util::Address;
-
+use crate::policy::malloc::*;
 use crate::util::alloc::Allocator;
-
-use crate::policy::NODES;
+use crate::plan::global::Plan;
 use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::space::Space;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-
-//const BYTES_IN_PAGE: usize = 1 << 12;
-//const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
-//const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 #[repr(C)]
 pub struct FreeListAllocator<VM: VMBinding> {
@@ -39,12 +34,19 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         //println!("called free list alloc");
         trace!("alloc");
         assert!(offset==0);
-        
+        unsafe {
+            if malloc_memory_full() {
+                self.plan.handle_user_collection_request(self.tls, true);
+            }
+            debug_assert!(!malloc_memory_full(), "FreeListAllocator: Out of memory!");
+        }
+
+
         let ptr = unsafe { libc::calloc(1, size + 8) };
         let a = Address::from_mut_ptr(ptr);
         unsafe { a.store(0); }
+        unsafe { MEMORY_ALLOCATED += libc::malloc_usable_size(a.to_mut_ptr()); }
         unsafe { NODES.lock().unwrap().insert(Address::from_usize(a.as_usize() + 8).to_object_reference()); } //a is the reference to the object, not the mark word
-        //unsafe { NODES.lock().unwrap().insert(a.to_object_reference()); } //a is the reference to the mark word
         
         a + 8usize
 

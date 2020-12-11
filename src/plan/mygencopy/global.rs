@@ -111,11 +111,6 @@ impl<VM: VMBinding> Plan for MyGenCopy<VM> {
 
 
         println!("MyGenCopy!! {}", in_nursery);
-        // static mut A: usize = 0;
-        // unsafe {
-        //     debug_assert!(A == 0);
-        //     A += 1;
-        // }
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         // Stop & scan mutators
@@ -139,7 +134,6 @@ impl<VM: VMBinding> Plan for MyGenCopy<VM> {
     }
 
     fn bind_mutator(
-        //again, copy of semispace
         &'static self,
         tls: OpaquePointer,
         mmtk: &'static MMTK<Self::VM>,

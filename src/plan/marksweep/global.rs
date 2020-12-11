@@ -1,5 +1,6 @@
 use super::gc_works::{MSProcessEdges};
-use crate::{mmtk::MMTK, plan::{self, global::NoCopy}, util::{Address, ObjectReference}};
+use crate::{mmtk::MMTK, plan::{self, global::NoCopy}, policy::space::Space, util::{Address, ObjectReference}};
+use crate::policy::malloc::*;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -21,7 +22,6 @@ use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::sync::Arc;
-use crate::policy::space::NODES;
 
 use enum_map::EnumMap;
 
@@ -58,6 +58,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         NODES.lock().unwrap().contains(&object)
     }
 
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
+    where
+            Self: Sized, {
+        unsafe { malloc_memory_full() }
+    }
+
     fn gc_init(
         &mut self,
         heap_size: usize,
@@ -68,7 +74,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {   
-        println!("MarkSweep!!");
+        //println!("MarkSweep!!");
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         // Stop and scan mutators
@@ -104,18 +110,17 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn release(&self, tls: OpaquePointer) {
         println!("called marksweep release");
         unsafe {
-        let mut NODES_hs = &mut *NODES.lock().unwrap();
-        NODES_hs.retain(|&o| plan::marksweep::global::MarkSweep::<VM>::marked(&o));
-        for object in NODES_hs.iter() {
-            let a: Address = Address::from_usize(object.to_address().as_usize() - 8);
-            let marking_word: usize = unsafe { a.load() };
-            debug_assert!(marking_word != 0usize, "Marking word is 0, should have been removed from NODES");
-            debug_assert!(marking_word == 1usize, "Marking word must be 1 or 0, found {}", marking_word);
-            unsafe { a.store(0) };
+            let mut NODES_hs = &mut *NODES.lock().unwrap();
+            NODES_hs.retain(|&o| plan::marksweep::global::MarkSweep::<VM>::marked(&o));
+            for object in NODES_hs.iter() {
+                let a: Address = Address::from_usize(object.to_address().as_usize() - 8);
+                let marking_word: usize = unsafe { a.load() };
+                debug_assert!(marking_word != 0usize, "Marking word is 0, should have been removed from NODES");
+                debug_assert!(marking_word == 1usize, "Marking word must be 1 or 0, found {}", marking_word);
+                a.store(0);
+            }
         }
     }
-}
-
 
     fn get_collection_reserve(&self) -> usize {
         0
@@ -142,7 +147,12 @@ impl<VM: VMBinding> MarkSweep<VM> {
             let a: Address = Address::from_usize(object.to_address().as_usize() - 8);
             let marking_word: usize = unsafe { a.load() };
             if marking_word == 0 {
-                libc::free(a.to_mut_ptr());
+                let obj_size = libc::malloc_usable_size(a.to_mut_ptr());
+                debug_assert!(MEMORY_ALLOCATED >= obj_size, "Attempting to free an object sized {} when memory allocated is {}", obj_size, MEMORY_ALLOCATED);
+                MEMORY_ALLOCATED -= obj_size;
+                //println!("freeing object sized {}, memory allocated now {}", obj_size, MEMORY_ALLOCATED);
+                debug_assert!(MEMORY_ALLOCATED >= 0, "amount of memory allocated cannot be negative!");
+                libc::free(a.to_mut_ptr()); 
                 return false
             }
             true

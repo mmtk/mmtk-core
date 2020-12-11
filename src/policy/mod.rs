@@ -12,6 +12,7 @@
 /// policy, spaces also manage memory consumption (<i>used</i> virtual
 /// memory).
 pub mod space;
+pub mod malloc;
 
 #[cfg(feature = "immortalspace")]
 pub mod immortalspace;
@@ -25,4 +26,4 @@ pub mod largeobjectspace;
 #[cfg(feature = "lockfreeimmortalspace")]
 pub mod lockfreeimmortalspace;
 
-pub use space::NODES;
+
