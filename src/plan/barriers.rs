@@ -23,53 +23,38 @@ impl Barrier for NoBarrier {
     fn post_write_barrier(&mut self, _target: WriteTarget) {}
 }
 
-#[derive(Default)]
-pub struct ModBuffer {
-    modified_nodes: Vec<ObjectReference>,
-    modified_edges: Vec<Address>,
-}
-
-pub struct FieldRememberingBarrier<E: ProcessEdgesWork, S: Space<E::VM>> {
+pub struct ObjectRememberingBarrier<E: ProcessEdgesWork, S: Space<E::VM>> {
     mmtk: &'static MMTK<E::VM>,
     nursery: &'static S,
-    mod_buffer: ModBuffer,
+    modbuf: Vec<ObjectReference>,
 }
 
-impl<E: ProcessEdgesWork, S: Space<E::VM>> FieldRememberingBarrier<E, S> {
+impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
     #[allow(unused)]
     pub fn new(mmtk: &'static MMTK<E::VM>, nursery: &'static S) -> Self {
         Self {
             mmtk,
             nursery,
-            mod_buffer: ModBuffer::default(),
+            modbuf: vec![],
         }
     }
 
+    #[inline(always)]
     fn enqueue_node(&mut self, obj: ObjectReference) {
         if BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b0, 0b1) {
-            self.mod_buffer.modified_nodes.push(obj);
-            if self.mod_buffer.modified_nodes.len() >= E::CAPACITY {
-                self.flush();
-            }
-        }
-    }
-
-    fn enqueue_edge(&mut self, slot: Address) {
-        if BitsReference::of(slot, LOG_BYTES_IN_WORD, 0).attempt(0b0, 0b1) {
-            self.mod_buffer.modified_edges.push(slot);
-            if self.mod_buffer.modified_edges.len() >= 512 {
+            self.modbuf.push(obj);
+            if self.modbuf.len() >= E::CAPACITY {
                 self.flush();
             }
         }
     }
 }
 
-impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for FieldRememberingBarrier<E, S> {
+impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for ObjectRememberingBarrier<E, S> {
+    #[cold]
     fn flush(&mut self) {
-        let mut modified_nodes = vec![];
-        std::mem::swap(&mut modified_nodes, &mut self.mod_buffer.modified_nodes);
-        let mut modified_edges = vec![];
-        std::mem::swap(&mut modified_edges, &mut self.mod_buffer.modified_edges);
+        let mut modbuf = vec![];
+        std::mem::swap(&mut modbuf, &mut self.modbuf);
         debug_assert!(
             !self.mmtk.scheduler.final_stage.is_activated(),
             "{:?}",
@@ -78,8 +63,10 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for FieldRememberingBarrier<E
         self.mmtk
             .scheduler
             .closure_stage
-            .add(ProcessModBuf::<E>::new(modified_nodes, modified_edges));
+            .add(ProcessModBuf::<E>::new(modbuf));
     }
+
+    #[inline(always)]
     fn post_write_barrier(&mut self, target: WriteTarget) {
         match target {
             WriteTarget::Object(obj) => {
@@ -87,11 +74,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for FieldRememberingBarrier<E
                     self.enqueue_node(obj);
                 }
             }
-            WriteTarget::Slot(slot) => {
-                if !self.nursery.address_in_space(slot) {
-                    self.enqueue_edge(slot);
-                }
-            }
+            _ => unreachable!(),
         }
     }
 }

@@ -421,16 +421,14 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
 
 #[derive(Default)]
 pub struct ProcessModBuf<E: ProcessEdgesWork> {
-    modified_nodes: Vec<ObjectReference>,
-    modified_edges: Vec<Address>,
+    modbuf: Vec<ObjectReference>,
     phantom: PhantomData<E>,
 }
 
 impl<E: ProcessEdgesWork> ProcessModBuf<E> {
-    pub fn new(modified_nodes: Vec<ObjectReference>, modified_edges: Vec<Address>) -> Self {
+    pub fn new(modbuf: Vec<ObjectReference>) -> Self {
         Self {
-            modified_nodes,
-            modified_edges,
+            modbuf,
             phantom: PhantomData,
         }
     }
@@ -439,28 +437,16 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        if !self.modified_nodes.is_empty() {
-            for obj in &self.modified_nodes {
+        if !self.modbuf.is_empty() {
+            for obj in &self.modbuf {
                 BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b1, 0b0);
-            }
-            for edge in &self.modified_edges {
-                BitsReference::of(*edge, LOG_BYTES_IN_WORD, 0).attempt(0b1, 0b0);
             }
         }
         if mmtk.plan.in_nursery() {
-            if !self.modified_nodes.is_empty() {
-                let mut modified_nodes = vec![];
-                ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
-                GCWork::do_work(
-                    &mut ScanObjects::<E>::new(modified_nodes, false),
-                    worker,
-                    mmtk,
-                )
-            }
-            if !self.modified_edges.is_empty() {
-                let mut modified_edges = vec![];
-                ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
-                GCWork::do_work(&mut E::new(modified_edges, true), worker, mmtk)
+            if !self.modbuf.is_empty() {
+                let mut modbuf = vec![];
+                ::std::mem::swap(&mut modbuf, &mut self.modbuf);
+                GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk)
             }
         } else {
             // Do nothing

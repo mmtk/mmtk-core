@@ -130,7 +130,8 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
     fn record_modified_node(&mut self, obj: ObjectReference) {
         self.barrier().post_write_barrier(WriteTarget::Object(obj));
     }
-    fn record_modified_edge(&mut self, slot: Address) {
-        self.barrier().post_write_barrier(WriteTarget::Slot(slot));
+    // TODO(wenyuzhao): Remove this. Looks like OpenJDK will never call this method.
+    fn record_modified_edge(&mut self, _slot: Address) {
+        unreachable!()
     }
 }
