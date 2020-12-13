@@ -146,7 +146,7 @@ pub fn get_allocator_mapping<VM: VMBinding>(
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn start_worker<VM: VMBinding>(
     tls: OpaquePointer,
-    worker: &'static mut GCWorker<VM>,
+    worker: &mut GCWorker<VM>,
     mmtk: &'static MMTK<VM>,
 ) {
     worker.init(tls);
