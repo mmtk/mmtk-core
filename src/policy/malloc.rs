@@ -1,24 +1,26 @@
 use std::sync::Mutex;
 use std::collections::HashSet;
+use std::collections::HashMap;
 use crate::util::ObjectReference;
 // use crate::policy::space::Space;
 // use super::space::{CommonSpace, SFT};
 
 lazy_static! {
     pub static ref NODES: Mutex<HashSet<ObjectReference>> = Mutex::default();
+    // pub static ref MEMORY_MAP: Mutex<HashMap<ObjectReference, usize>> = Mutex::default();
+    pub static ref MEMORY_ALLOCATED: Mutex<usize> = Mutex::default();
 }
-pub static mut MEMORY_ALLOCATED: usize = 0;
-pub const MALLOC_MEMORY: usize = 100000000;
+pub const MALLOC_MEMORY: usize = 1000000000;
 
 pub unsafe fn malloc_memory_full() -> bool {
-    MEMORY_ALLOCATED >= MALLOC_MEMORY
+    *MEMORY_ALLOCATED.lock().unwrap() >= MALLOC_MEMORY
 }
 
 
 // lazy_static! {
 //     pub static ref NODES: Mutex<HashSet<ObjectReference>> = Mutex::default();
 // }
-// pub const MALLOC_MEMORY: usize = 10000000;//1000000000;
+// pub const MALLOC_MEMORY: usize = 1000000000;
 // // pub static mut MEMORY_ALLOCATED: usize = 0;
 
 // pub struct MallocSpace {

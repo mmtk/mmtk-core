@@ -240,6 +240,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
     where
         Self: Sized,
     {
+        unreachable!("col_req");
         let stress_force_gc = self.stress_test_gc_required();
         debug!(
             "self.get_pages_reserved()={}, self.get_total_pages()={}",
