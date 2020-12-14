@@ -104,6 +104,13 @@ pub fn alloc<VM: VMBinding>(
     offset: isize,
     semantics: AllocationSemantics,
 ) -> Address {
+    // MMTk has assumptions about minimal object size.
+    // We need to make sure that all allocations comply with the allocation.
+    // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
+    // object size (the VM does not need to know this). However, for the VM bindings we support at the moment,
+    // their object sizes are all larger than MMTk's min object size, so we simply put an assertion here.
+    // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
+    // meet the min object size in the fastpath.
     #[cfg(debug_assertions)]
     crate::util::forwarding_word::check_alloc_size::<VM>(size);
     mutator.alloc(size, align, offset, semantics)

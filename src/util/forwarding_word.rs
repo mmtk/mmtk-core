@@ -228,8 +228,12 @@ pub(super) fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize
 pub(crate) fn check_alloc_size<VM: VMBinding>(size: usize) {
     debug_assert!(
         if !VM::VMObjectModel::HAS_GC_BYTE || gc_byte_offset_in_forwarding_word::<VM>().is_some() {
+            // If there is no gc byte, the min object size is 1 word. We save forwarding pointer in the word.
+            // If the gc byte is low/high order byte, the min object size is 1 word. We save forwarding pointer
+            // in the word that contains the gc byte.
             size >= constants::BYTES_IN_WORD
         } else {
+            // For none of the above cases, the min object size is 2 word. We save forwarding pointer in the next word that does not contain the gc byte.
             size >= 2 * constants::BYTES_IN_WORD
         },
         "allocation size (0x{:x}) is too small!",
