@@ -20,7 +20,7 @@ impl ActivePlan<DummyVM> for VMActivePlan {
         unimplemented!()
     }
 
-    fn is_mutator(_tls: OpaquePointer) -> bool {
+    unsafe fn is_mutator(_tls: OpaquePointer) -> bool {
         // FIXME
         true
     }
