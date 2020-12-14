@@ -31,31 +31,20 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         self.plan
     }
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        //println!("called free list alloc");
         trace!("alloc");
         assert!(offset==0);
         unsafe {
             if malloc_memory_full() {
-                //println!("memory full! calling handle_user_collection_request");
                 self.plan.handle_user_collection_request(self.tls, true);
-                //println!("call to handle_user_collection_request complete, mem now {}", *MEMORY_ALLOCATED.lock().unwrap());
-                debug_assert!(!malloc_memory_full(), "FreeListAllocator: Out of memory!");
-            
+                assert!(!malloc_memory_full(), "FreeListAllocator: Out of memory!");
             }
-            
-
-
             let ptr = libc::calloc(1, size + 8);
-            let a = Address::from_mut_ptr(ptr);
-            let obj_size = libc::malloc_usable_size(a.to_mut_ptr());
+            let address = Address::from_mut_ptr(ptr);
+            let obj_size = libc::malloc_usable_size(ptr);
             let mut mem = MEMORY_ALLOCATED.lock().unwrap();
             *mem += obj_size;
-            
-            println!("allocated: {}", *mem);
-            // MEMORY_MAP.lock().unwrap().insert(a.to_object_reference(), obj_size);
-            NODES.lock().unwrap().insert(Address::from_usize(a.as_usize() + 8).to_object_reference()); //a is the reference to the object, not the mark word
-            
-            a + 8usize
+            NODES.lock().unwrap().insert(Address::from_usize(address.as_usize() + 8).to_object_reference()); //NODES contains the reference to the object, not the mark word
+            address + 8usize
         }
     }
 
