@@ -44,7 +44,10 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `tls`: The thread to query.
-    fn is_mutator(tls: OpaquePointer) -> bool;
+    ///
+    /// # Safety
+    /// The caller needs to make sure that the thread is valid (a value passed in by the VM binding through API).
+    unsafe fn is_mutator(tls: OpaquePointer) -> bool;
 
     /// Return a `Mutator` reference for the thread.
     ///
