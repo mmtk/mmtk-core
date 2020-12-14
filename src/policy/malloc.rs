@@ -1,12 +1,14 @@
 use std::sync::Mutex;
 use std::collections::HashSet;
 use std::collections::HashMap;
+use bit_vec::BitVec;
 use crate::util::ObjectReference;
 // use crate::policy::space::Space;
 // use super::space::{CommonSpace, SFT};
 
 lazy_static! {
     pub static ref NODES: Mutex<HashSet<ObjectReference>> = Mutex::default();
+    //pub static ref NODES: Mutex<BitVec> = Mutex::default();
     // pub static ref MEMORY_MAP: Mutex<HashMap<ObjectReference, usize>> = Mutex::default();
     pub static ref MEMORY_ALLOCATED: Mutex<usize> = Mutex::default();
 }

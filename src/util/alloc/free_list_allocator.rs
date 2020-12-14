@@ -39,8 +39,9 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                 //println!("memory full! calling handle_user_collection_request");
                 self.plan.handle_user_collection_request(self.tls, true);
                 //println!("call to handle_user_collection_request complete, mem now {}", *MEMORY_ALLOCATED.lock().unwrap());
+                debug_assert!(!malloc_memory_full(), "FreeListAllocator: Out of memory!");
+            
             }
-            //debug_assert!(!malloc_memory_full(), "FreeListAllocator: Out of memory!");
             
 
 
@@ -50,7 +51,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             let mut mem = MEMORY_ALLOCATED.lock().unwrap();
             *mem += obj_size;
             
-            //println!("allocated: {}", *mem);
+            println!("allocated: {}", *mem);
             // MEMORY_MAP.lock().unwrap().insert(a.to_object_reference(), obj_size);
             NODES.lock().unwrap().insert(Address::from_usize(a.as_usize() + 8).to_object_reference()); //a is the reference to the object, not the mark word
             

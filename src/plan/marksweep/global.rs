@@ -161,7 +161,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
             let marking_word: usize = unsafe { a.load() };
             let mut mem = MEMORY_ALLOCATED.lock().unwrap();
             if marking_word == 0 {
-                //println!("allocated: {}", *mem);
+                println!("allocated: {}", *mem);
                 let obj_size = libc::malloc_usable_size(a.to_mut_ptr());
                 // debug_assert!(*MEMORY_MAP.lock().unwrap().get(&a.to_object_reference()).unwrap() == obj_size, "object was stored with size {} but released with size {}",MEMORY_MAP.lock().unwrap().get(&a.to_object_reference()).unwrap(),obj_size);
                 debug_assert!(*mem >= obj_size, "Attempting to free an object sized {} when total memory allocated is {}", obj_size, mem);

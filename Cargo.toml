@@ -33,6 +33,7 @@ atomic-traits = "0.2.0"
 atomic = "0.4.6"
 spin = "0.5.2"
 env_logger = "0.8.2"
+bit-vec = "0.6.3"
 
 [dev-dependencies]
 crossbeam = "0.7.3"
