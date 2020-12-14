@@ -189,6 +189,13 @@
 <span id="189">189</span>
 <span id="190">190</span>
 <span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">address</span>::<span class="ident">Address</span>;
 
@@ -342,7 +349,14 @@
                 <span class="kw">return</span> <span class="ident">result</span>;
             }
 
-            <span class="kw">if</span> <span class="ident">emergency_collection</span> {
+            <span class="comment">// It is possible to have cases where a thread is blocked for another GC (non emergency)</span>
+            <span class="comment">// immediately after being blocked for a GC (emergency) (e.g. in stress test), that is saying the thread does not</span>
+            <span class="comment">// leave this loop between the two GCs. The local var &#39;emergency_collection&#39; was set to true</span>
+            <span class="comment">// after the first GC. But when we execute this check below, we just finished the second GC,</span>
+            <span class="comment">// which is not emergency. In such case, we will give a false OOM.</span>
+            <span class="comment">// We cannot just rely on the local var. Instead, we get the emergency colleciton value again,</span>
+            <span class="comment">// and check both.</span>
+            <span class="kw">if</span> <span class="ident">emergency_collection</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">is_emergency_collection</span>() {
                 <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Emergency collection&quot;</span>);
                 <span class="comment">// Report allocation success to assist OutOfMemory handling.</span>
                 <span class="kw">let</span> <span class="ident">guard</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">oom_lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
