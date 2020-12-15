@@ -23,7 +23,7 @@ use crate::util::{Address, ObjectReference, OpaquePointer};
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::vm::VMBinding;
-use std::sync::Arc;
+use std::{ops::Sub, sync::Arc};
 
 use enum_map::EnumMap;
 
@@ -52,9 +52,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         }
     }
 
-    fn is_malloced(&self, object: ObjectReference) -> bool {
-        NODES.lock().unwrap().contains(&object)
-    }
+
 
     fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
     where
@@ -106,15 +104,34 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn release(&self, tls: OpaquePointer) {
         unsafe {
+
+            //using hashset
             let mut NODES_mut = &mut *NODES.lock().unwrap();
             NODES_mut.retain(|&o| MarkSweep::<VM>::marked(&o));
             for object in NODES_mut.iter() {
-                let a: Address = Address::from_usize(object.to_address().as_usize() - 8);
+                let a: Address = object.to_address().sub(8);
                 let marking_word: usize = a.load();
                 debug_assert!(marking_word != 0usize, "Marking word is 0, should have been removed from NODES");
                 debug_assert!(marking_word == 1usize, "Marking word must be 1 or 0, found {}", marking_word);
                 a.store(0);
             }
+
+            //using bitmaps 
+            // let mut MALLOCED_mut = &mut *MALLOCED.lock().unwrap();
+            // let mut MARKED_mut = &mut *MARKED.lock().unwrap();
+            // let mut to_free = MALLOCED_mut.clone();
+            // to_free.xor(MARKED_mut);
+            // let count: usize = 0;
+            // let max = to_free.len();
+
+            // while count < max {
+            //     if to_free.get(count).unwrap() {
+            //         MALLOCED_mut.set(count, false);
+            //         MARKED_mut.set(count, false);
+            //         let object = index_to_object_reference(count);
+            //         libc::free(object.to_address().to_mut_ptr());
+            //     }
+            // }
         }
     }
 
@@ -139,7 +156,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 impl<VM: VMBinding> MarkSweep<VM> {
     fn marked(&object: &ObjectReference) -> bool {
         unsafe {
-            let address: Address = Address::from_usize(object.to_address().as_usize() - 8);
+            let address: Address = object.to_address().sub(8);
             let marking_word: usize = address.load();
             let mut mem = MEMORY_ALLOCATED.lock().unwrap();
             if marking_word == 0 {

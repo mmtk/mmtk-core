@@ -6,8 +6,9 @@ use crate::util::forwarding_word;
 use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::VMBinding;
 use crate::MMTK;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Sub};
 use std::ops::{Deref, DerefMut};
+use crate::policy::malloc::*;
 
 #[derive(Default)]
 pub struct MSProcessEdges<VM: VMBinding> {
@@ -30,25 +31,26 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
             return object;
         }
 
+        //using bitmaps
+        // let mut MARKED_mut = MARKED.lock().unwrap();
         //if not marked, mark and call self.process_node
-        let a: Address = object.to_address() - 8;
-        let marking_word: usize = unsafe { a.load() };
+        // let index = object_reference_to_index(object);
+        // let mark = MARKED_mut.get(index).unwrap();
+
+        // if !mark {
+        //     MARKED_mut.set(index, true);
+        //     self.process_node(object);
+        // }
+        
+        //using hashset
+        //if not marked, mark and call self.process_node
+        let mark_address: Address = object.to_address().sub(8);
+        let marking_word: usize = unsafe { mark_address.load() };
         if marking_word == 0usize {
-            unsafe { a.store(1) };
+            unsafe { mark_address.store(1) };
             self.process_node(object);
         }
         object
-            //     unsafe { a.store(mark_count_u8)};
-            //     self.process_node(object);
-
-
-        // let marking_word: usize = unsafe { a.load() };
-        // let mark_count_u8 = plan;
-        // if marking_word != mark_count_u8 as usize {
-        //     unsafe { a.store(mark_count_u8)};
-        //     self.process_node(object);
-        // }
-        // object
     }
 }
 

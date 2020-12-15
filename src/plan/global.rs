@@ -142,12 +142,6 @@ pub trait Plan: Sized + 'static + Sync + Send {
     fn options(&self) -> &Options {
         &self.base().options
     }
-    fn is_malloced(&self, object: ObjectReference) -> bool {
-        false
-    }
-    // fn nodes(&self) -> Mutex<HashSet<ObjectReference>> {
-    //     Mutex::default()
-    // }
 
     // unsafe because this can only be called once by the init thread
     fn gc_init(
@@ -240,6 +234,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
     where
         Self: Sized,
     {
+        #[cfg(feature="marksweep")]
         unreachable!("col_req");
         let stress_force_gc = self.stress_test_gc_required();
         debug!(
