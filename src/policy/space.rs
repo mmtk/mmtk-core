@@ -317,7 +317,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
-        println!(
+        trace!(
             "Grow space from {} for {} bytes (new chunk = {})",
             start,
             bytes,
@@ -332,7 +332,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
         }
         if start == conversions::chunk_align_down(start) {
-            c
+            // metadata::initialize(start, self.as_sft());
         }
     }
 

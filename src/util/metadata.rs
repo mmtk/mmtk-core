@@ -16,6 +16,9 @@ pub struct BitsReference {
 }
 
 impl BitsReference {
+    pub fn word(&self) -> Address {
+        self.base + self.word_offset
+    }
     /// `log_granularity`: Logarithmic value of the bytes granularity.
     ///
     /// `log_bits`: Logarithmic value of number of bits this struct is referencing
@@ -59,15 +62,6 @@ impl BitsReference {
     }
 }
 
-#[repr(C)]
-pub struct PerChunkMetadata;
-
-impl PerChunkMetadata {
-    pub fn from_address(address: Address) -> &'static Self {
-
-    }
-}
-
 const fn metadata_start(address: Address) -> Address {
     let chunk_index = conversions::address_to_chunk_index(address);
     let offset = (chunk_index * SelectedConstraints::METADATA_PAGES_PER_CHUNK) << LOG_BYTES_IN_PAGE;
@@ -86,4 +80,20 @@ pub fn map_metadata_pages_for_chunk(chunk: Address, sft: &dyn SFT) {
     //     unreachable!();
     //     crate::util::memory::fill(metadata_start, SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE, 0xff);
     // }
+}
+
+
+pub fn initialize(chunk: Address, sft: &dyn SFT) {
+    let ms = metadata_start(chunk);
+    // dzmmap(
+    //     metadata_start,
+    //     SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE,
+    // )
+    // .unwrap();
+    if sft.is_nursery() {
+        // println!("chunk {:?} meta {:?} .. {:?}", chunk, ms, ms + (SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE));
+        // assert_eq!(metadata_start(chunk + BYTES_IN_CHUNK), ms + (SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE));
+        // unreachable!();
+        // crate::util::memory::fill(ms, SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE, 0xff);
+    }
 }
