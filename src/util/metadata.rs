@@ -84,16 +84,10 @@ pub fn map_metadata_pages_for_chunk(chunk: Address, sft: &dyn SFT) {
 
 
 pub fn initialize(chunk: Address, sft: &dyn SFT) {
-    let ms = metadata_start(chunk);
-    // dzmmap(
-    //     metadata_start,
-    //     SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE,
-    // )
-    // .unwrap();
+    let metadata_start = metadata_start(chunk);
     if sft.is_nursery() {
-        // println!("chunk {:?} meta {:?} .. {:?}", chunk, ms, ms + (SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE));
-        // assert_eq!(metadata_start(chunk + BYTES_IN_CHUNK), ms + (SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE));
-        // unreachable!();
-        // crate::util::memory::fill(ms, SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE, 0xff);
+        if unsafe { metadata_start.load::<u8>() != 0xff } {
+            crate::util::memory::fill(metadata_start, SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE, 0xff);
+        }
     }
 }

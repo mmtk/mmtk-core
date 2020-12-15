@@ -332,7 +332,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
         }
         if start == conversions::chunk_align_down(start) {
-            // metadata::initialize(start, self.as_sft());
+            metadata::initialize(start, self.as_sft());
         }
     }
 

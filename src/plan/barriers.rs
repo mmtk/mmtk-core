@@ -41,12 +41,6 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
 
     #[inline(always)]
     fn enqueue_node(&mut self, obj: ObjectReference) {
-        // println!("Meta word {:?}", BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).word());
-        let slow = BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0);
-        // unsafe {
-        //     assert!(slow >= Address::from_usize(0x200800000000));
-        //     assert!(slow < Address::from_usize(0x200800040000));
-        // }
         if BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b0, 0b1) {
             self.modbuf.push(obj);
             if self.modbuf.len() >= E::CAPACITY {
@@ -76,9 +70,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for ObjectRememberingBarrier<
     fn post_write_barrier(&mut self, target: WriteTarget) {
         match target {
             WriteTarget::Object(obj) => {
-                if !self.nursery.in_space(obj) {
-                    self.enqueue_node(obj);
-                }
+                self.enqueue_node(obj);
             }
             _ => unreachable!(),
         }
