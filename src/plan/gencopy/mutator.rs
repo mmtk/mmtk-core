@@ -24,7 +24,7 @@ pub fn gencopy_mutator_release<VM: VMBinding>(
     mutator: &mut Mutator<GenCopy<VM>>,
     _tls: OpaquePointer,
 ) {
-    // rebind the allocation bump pointer to the nursery space
+    // reset nursery allocator
     let bump_allocator = unsafe {
         mutator
             .allocators
@@ -32,7 +32,7 @@ pub fn gencopy_mutator_release<VM: VMBinding>(
     }
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
-    bump_allocator.rebind(Some(&mutator.plan.nursery));
+    bump_allocator.reset();
 }
 
 lazy_static! {
