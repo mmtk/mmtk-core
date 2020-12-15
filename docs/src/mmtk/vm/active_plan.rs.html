@@ -78,7 +78,6 @@
 <span id="78">78</span>
 <span id="79">79</span>
 <span id="80">80</span>
-<span id="81">81</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">Plan</span>, <span class="ident">SelectedPlan</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="kw-2">*</span>;
@@ -117,7 +116,10 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `tls`: The thread to query.</span>
-    <span class="kw">fn</span> <span class="ident">worker</span>(<span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// The caller needs to make sure that the thread is a GC worker thread.</span>
+    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">worker</span>(<span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Return whether there is a mutator created and associated with the thread.</span>
     <span class="doccomment">///</span>
@@ -125,7 +127,7 @@
     <span class="doccomment">/// * `tls`: The thread to query.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// TODO: I am not sure why this is unsafe.</span>
+    <span class="doccomment">/// The caller needs to make sure that the thread is valid (a value passed in by the VM binding through API).</span>
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">is_mutator</span>(<span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
 
     <span class="doccomment">/// Return a `Mutator` reference for the thread.</span>
@@ -134,12 +136,8 @@
     <span class="doccomment">/// * `tls`: The thread to query.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// TODO: I am not sure why this is unsafe.</span>
+    <span class="doccomment">/// The caller needs to make sure that the thread is a mutator thread.</span>
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">mutator</span>(<span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="op">&lt;</span><span class="ident">SelectedPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">as</span> <span class="ident">Plan</span><span class="op">&gt;</span>::<span class="ident">Mutator</span>;
-
-    <span class="doccomment">/// Return the number of GC collectors. This is unused by MMTk now, and will be removed.</span>
-    <span class="attribute">#[<span class="ident">deprecated</span>]</span>
-    <span class="kw">fn</span> <span class="ident">collector_count</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
 
     <span class="doccomment">/// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.</span>
     <span class="kw">fn</span> <span class="ident">reset_mutator_iterator</span>();

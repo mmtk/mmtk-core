@@ -326,7 +326,7 @@
             <span class="comment">// Try to allocate using the slow path</span>
             <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">alloc_slow_once</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
 
-            <span class="kw">if</span> <span class="kw">unsafe</span> { <span class="op">!</span><span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="ident">tls</span>) } {
+            <span class="kw">if</span> <span class="op">!</span><span class="kw">unsafe</span> { <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="ident">tls</span>) } {
                 <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">result</span>.<span class="ident">is_zero</span>());
                 <span class="kw">return</span> <span class="ident">result</span>;
             }

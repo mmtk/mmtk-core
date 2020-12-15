@@ -183,7 +183,7 @@
         <span class="ident">work</span>.<span class="ident">do_work</span>(<span class="self">self</span>, <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">unwrap</span>());
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">C</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">C</span>) {
         <span class="self">self</span>.<span class="ident">context</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">context</span>);
         <span class="self">self</span>.<span class="ident">local</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">C</span>::<span class="ident">WorkerLocal</span>::<span class="ident">new</span>(<span class="ident">context</span>));
         <span class="kw">let</span> <span class="ident">tls</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">tls</span>;

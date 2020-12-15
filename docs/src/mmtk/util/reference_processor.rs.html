@@ -329,8 +329,6 @@
 <span id="329">329</span>
 <span id="330">330</span>
 <span id="331">331</span>
-<span id="332">332</span>
-<span id="333">333</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">UnsafeCell</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Mutex</span>;
@@ -618,9 +616,7 @@
         }
 
         <span class="comment">/* flush out any remset entries generated during the above activities */</span>
-        <span class="kw">unsafe</span> {
-            <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">mutator</span>(<span class="ident">tls</span>).<span class="ident">flush_remembered_sets</span>();
-        }
+        <span class="kw">unsafe</span> { <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">mutator</span>(<span class="ident">tls</span>) }.<span class="ident">flush_remembered_sets</span>();
         <span class="kw">if</span> <span class="ident">TRACE</span> {
             <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Ending ReferenceProcessor.scan({:?})&quot;</span>, <span class="self">self</span>.<span class="ident">semantics</span>);
         }
