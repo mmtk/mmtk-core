@@ -114,17 +114,15 @@ pub fn alloc<VM: VMBinding>(
 /// Arguments:
 /// * `mutator`: The mutator to perform post-alloc actions.
 /// * `refer`: The newly allocated object.
-/// * `type_refer`: The type reference for the instance being created (unused).
 /// * `bytes`: The size of the space allocated for the object (in bytes).
 /// * `semantics`: The allocation semantics used for the allocation.
 pub fn post_alloc<VM: VMBinding>(
     mutator: &mut Mutator<SelectedPlan<VM>>,
     refer: ObjectReference,
-    type_refer: ObjectReference,
     bytes: usize,
     semantics: AllocationSemantics,
 ) {
-    mutator.post_alloc(refer, type_refer, bytes, semantics);
+    mutator.post_alloc(refer, bytes, semantics);
 }
 
 /// Return an AllocatorSelector for the given allocation semantic. This method is provided
@@ -148,7 +146,7 @@ pub fn get_allocator_mapping<VM: VMBinding>(
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn start_worker<VM: VMBinding>(
     tls: OpaquePointer,
-    worker: &'static mut GCWorker<VM>,
+    worker: &mut GCWorker<VM>,
     mmtk: &'static MMTK<VM>,
 ) {
     worker.init(tls);
@@ -156,11 +154,13 @@ pub fn start_worker<VM: VMBinding>(
 }
 
 /// Allow MMTk to trigger garbage collection. A VM should only call this method when it is ready for the mechanisms required for
-/// collection during the boot process.
+/// collection during the boot process. MMTk will invoke Collection::spawn_worker_thread() to create GC threads during
+/// this funciton call.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-/// * `tls`: The thread that wants to enable the collection.
+/// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
+///   Collection::spawn_worker_thread() so that the VM knows the context.
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
     mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
     VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
@@ -211,13 +211,6 @@ pub fn last_heap_address() -> Address {
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
     mmtk.plan.get_total_pages() << LOG_BYTES_IN_PAGE
-}
-
-/// Perform a linear scan through a single contiguous region.
-#[cfg(feature = "sanity")]
-#[deprecated]
-pub fn scan_region() {
-    crate::util::sanity::memory_scan::scan_region();
 }
 
 /// Trigger a garbage collection as requested by the user.

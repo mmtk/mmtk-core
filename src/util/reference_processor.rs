@@ -284,9 +284,7 @@ impl ReferenceProcessor {
         }
 
         /* flush out any remset entries generated during the above activities */
-        unsafe {
-            VM::VMActivePlan::mutator(tls).flush_remembered_sets();
-        }
+        unsafe { VM::VMActivePlan::mutator(tls) }.flush_remembered_sets();
         if TRACE {
             trace!("Ending ReferenceProcessor.scan({:?})", self.semantics);
         }
