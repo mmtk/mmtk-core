@@ -1,12 +1,12 @@
 # Preliminaries
 ## Set up MMTK-core and binding
 1.	Recommend use of openjdk because it has the most implemented features, some things in tute will specifically refer to openjdk but the tute can be done with any binding. 
-a.	Build debug option: fast-debug for testing speed? Or slow-debug for faster build time? First build will take a long time regardless but further builds do not take as long. Only need to rebuild ‘build’ folder.
+a.	Build debug option: Need to define a build to use
 2.	Make sure openjdk setup works (use tests from binding readme). Explain how to do multiple builds? (Maybe raise as issue for binding readme instead)
 ## Create mygc
-6.	Copy mmtk-openjdk/repos/mmtk-core/src/plan/nogc
-a.	Refactor name in all files in plan to mygc
-b.	Maybe remove extra features (lock-free etc) because they are not needed for the tutorial?
+1.	Copy mmtk-openjdk/repos/mmtk-core/src/plan/nogc
+2.	Refactor name in all files in plan to mygc
+3.	Maybe remove extra features (lock-free etc) because they are not needed for the tutorial?
 4.	Add mygc to cargo, core plan cargo, plan/mod
 5.	Bring attention to important aspects within plan?
 * Where is the allocator? (mutator.rs – note lack of r/w barrier)
