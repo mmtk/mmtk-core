@@ -105,7 +105,7 @@ pub fn alloc<VM: VMBinding>(
     semantics: AllocationSemantics,
 ) -> Address {
     // MMTk has assumptions about minimal object size.
-    // We need to make sure that all allocations comply with the allocation.
+    // We need to make sure that all allocations comply with the min object size.
     // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
     // object size (the VM does not need to know this). However, for the VM bindings we support at the moment,
     // their object sizes are all larger than MMTk's min object size, so we simply put an assertion here.
