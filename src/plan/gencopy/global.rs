@@ -68,7 +68,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         GenCopy {
-            nursery: CopySpace::new(
+            nursery: CopySpace::new_nursery(
                 "nursery",
                 false,
                 true,

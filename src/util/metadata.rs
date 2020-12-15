@@ -4,6 +4,7 @@ use super::heap::layout::vm_layout_constants::*;
 use super::{memory::dzmmap, Address};
 use crate::SelectedConstraints;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use crate::policy::space::*;
 
 pub const METADATA_BASE: Address = HEAP_END;
 
@@ -58,17 +59,31 @@ impl BitsReference {
     }
 }
 
+#[repr(C)]
+pub struct PerChunkMetadata;
+
+impl PerChunkMetadata {
+    pub fn from_address(address: Address) -> &'static Self {
+
+    }
+}
+
 const fn metadata_start(address: Address) -> Address {
     let chunk_index = conversions::address_to_chunk_index(address);
     let offset = (chunk_index * SelectedConstraints::METADATA_PAGES_PER_CHUNK) << LOG_BYTES_IN_PAGE;
     unsafe { Address::from_usize(METADATA_BASE.as_usize() + offset) }
 }
 
-pub fn map_metadata_pages_for_chunk(chunk: Address) {
+pub fn map_metadata_pages_for_chunk(chunk: Address, sft: &dyn SFT) {
     let metadata_start = metadata_start(chunk);
     dzmmap(
         metadata_start,
         SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE,
     )
     .unwrap();
+    // if sft.is_nursery() {
+    //     println!("chunk {:?}", chunk);
+    //     unreachable!();
+    //     crate::util::memory::fill(metadata_start, SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE, 0xff);
+    // }
 }

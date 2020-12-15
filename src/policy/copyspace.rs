@@ -22,11 +22,15 @@ pub struct CopySpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
     pr: MonotonePageResource<VM>,
     from_space: AtomicBool,
+    is_nursery: bool,
 }
 
 impl<VM: VMBinding> SFT for CopySpace<VM> {
     fn name(&self) -> &str {
         self.get_name()
+    }
+    fn is_nursery(&self) -> bool {
+        self.is_nursery
     }
     fn is_live(&self, object: ObjectReference) -> bool {
         !self.from_space() || ForwardingWord::is_forwarded::<VM>(object)
@@ -105,7 +109,22 @@ impl<VM: VMBinding> CopySpace<VM> {
             },
             common: UnsafeCell::new(common),
             from_space: AtomicBool::new(from_space),
+            is_nursery: false,
         }
+    }
+
+    pub fn new_nursery(
+        name: &'static str,
+        from_space: bool,
+        zeroed: bool,
+        vmrequest: VMRequest,
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        heap: &mut HeapMeta,
+    ) -> Self {
+        let mut space = Self::new(name, from_space, zeroed, vmrequest, vm_map, mmapper, heap);
+        space.is_nursery = true;
+        space
     }
 
     pub fn prepare(&self, from_space: bool) {

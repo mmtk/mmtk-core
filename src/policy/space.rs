@@ -22,6 +22,7 @@ use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::SelectedConstraints;
+use crate::util::metadata;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -50,6 +51,7 @@ use downcast_rs::Downcast;
  */
 pub trait SFT {
     fn name(&self) -> &str;
+    fn is_nursery(&self) -> bool { false }
     fn is_live(&self, object: ObjectReference) -> bool;
     fn is_movable(&self) -> bool;
     #[cfg(feature = "sanity")]
@@ -224,7 +226,7 @@ impl SFTMap {
         if SelectedConstraints::METADATA_PAGES_PER_CHUNK != 0
             && self_mut.sft[chunk] == &EMPTY_SPACE_SFT
         {
-            map_metadata_pages_for_chunk(conversions::chunk_index_to_address(chunk));
+            map_metadata_pages_for_chunk(conversions::chunk_index_to_address(chunk), unsafe { &*sft });
         }
         self_mut.sft[chunk] = sft;
     }
@@ -315,7 +317,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
-        trace!(
+        println!(
             "Grow space from {} for {} bytes (new chunk = {})",
             start,
             bytes,
@@ -328,6 +330,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
             SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
+        }
+        if start == conversions::chunk_align_down(start) {
+            c
         }
     }
 
