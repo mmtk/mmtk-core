@@ -51,8 +51,14 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
             (AllocatorSelector::BumpPointer(0), &mmtk.plan.nursery),
-            (AllocatorSelector::BumpPointer(1), mmtk.plan.common.get_immortal()),
-            (AllocatorSelector::LargeObject(0), mmtk.plan.common.get_los()),
+            (
+                AllocatorSelector::BumpPointer(1),
+                mmtk.plan.common.get_immortal(),
+            ),
+            (
+                AllocatorSelector::LargeObject(0),
+                mmtk.plan.common.get_los(),
+            ),
         ],
         prepare_func: &gencopy_mutator_prepare,
         release_func: &gencopy_mutator_release,
