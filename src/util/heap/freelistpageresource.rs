@@ -250,7 +250,11 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     }
 
     fn free_contiguous_chunk(&mut self, chunk: Address) {
-        let num_chunks = self.vm_map().lock().unwrap().get_contiguous_region_chunks(chunk);
+        let num_chunks = self
+            .vm_map()
+            .lock()
+            .unwrap()
+            .get_contiguous_region_chunks(chunk);
         debug_assert!(num_chunks == 1 || self.meta_data_pages_per_region == 0);
         /* nail down all pages associated with the chunk, so it is no longer on our free list */
         let mut chunk_start = conversions::bytes_to_pages(chunk - self.start);

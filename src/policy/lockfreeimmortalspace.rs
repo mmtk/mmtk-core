@@ -8,10 +8,10 @@ use crate::util::ObjectReference;
 
 use crate::plan::Plan;
 use crate::util::conversions;
-use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{
     AVAILABLE_BYTES, AVAILABLE_END, AVAILABLE_START,
 };
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::opaque_pointer::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::vm::*;
@@ -38,6 +38,9 @@ unsafe impl<VM: VMBinding> Sync for LockFreeImmortalSpace<VM> {}
 impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn name(&self) -> &str {
         self.get_name()
+    }
+    fn descriptor(&self) -> SpaceDescriptor {
+        self.common().descriptor
     }
     fn is_live(&self, _object: ObjectReference) -> bool {
         unimplemented!()

@@ -272,7 +272,12 @@ pub trait Plan: Sized + 'static + Sync + Send {
 
     #[inline]
     fn stress_test_gc_required(&self) -> bool {
-        let pages = self.base().vm_map.lock().unwrap().get_cumulative_committed_pages();
+        let pages = self
+            .base()
+            .vm_map
+            .lock()
+            .unwrap()
+            .get_cumulative_committed_pages();
         trace!("stress_gc pages={}", pages);
 
         if self.is_initialized()
@@ -420,7 +425,12 @@ impl<VM: VMBinding> BasePlan<VM> {
                     &mut heap,
                 ),
                 #[cfg(feature = "vm_space")]
-                vm_space: create_vm_space(vm_map.clone(), mmapper, &mut heap, options.vm_space_size),
+                vm_space: create_vm_space(
+                    vm_map.clone(),
+                    mmapper,
+                    &mut heap,
+                    options.vm_space_size,
+                ),
             }),
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),

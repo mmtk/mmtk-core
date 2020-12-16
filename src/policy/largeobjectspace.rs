@@ -7,6 +7,7 @@ use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
 use crate::util::gc_byte;
 use crate::util::header_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use crate::util::treadmill::TreadMill;
@@ -15,7 +16,6 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::{Arc, Mutex};
-use crate::util::heap::space_descriptor::SpaceDescriptor;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -131,7 +131,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             pr: if vmrequest.is_discontiguous() {
                 FreeListPageResource::new_discontiguous(0, &mut vm_map_lock)
             } else {
-                FreeListPageResource::new_contiguous(common.start, common.extent, 0, &mut vm_map_lock)
+                FreeListPageResource::new_contiguous(
+                    common.start,
+                    common.extent,
+                    0,
+                    &mut vm_map_lock,
+                )
             },
             common: UnsafeCell::new(common),
             mark_state: 0,

@@ -6,11 +6,11 @@ use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::ObjectReference;
 
 use crate::plan::TransitiveClosure;
-use crate::util::header_byte;
-use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::policy::space::SpaceOptions;
 use crate::util::gc_byte;
+use crate::util::header_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;

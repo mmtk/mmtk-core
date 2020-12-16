@@ -26,7 +26,7 @@ use crate::util::OpaquePointer;
 use crate::vm::*;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub type SelectedPlan<VM> = GenCopy<VM>;
 
@@ -60,7 +60,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn new(
-        vm_map: &'static VMMap,
+        vm_map: Arc<Mutex<VMMap>>,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         scheduler: &'static MMTkScheduler<Self::VM>,
@@ -73,7 +73,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                 false,
                 true,
                 VMRequest::fixed_extent(NURSERY_SIZE, false),
-                vm_map,
+                vm_map.clone(),
                 mmapper,
                 &mut heap,
             ),
@@ -83,7 +83,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                 false,
                 true,
                 VMRequest::discontiguous(),
-                vm_map,
+                vm_map.clone(),
                 mmapper,
                 &mut heap,
             ),
@@ -92,7 +92,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                 true,
                 true,
                 VMRequest::discontiguous(),
-                vm_map,
+                vm_map.clone(),
                 mmapper,
                 &mut heap,
             ),
@@ -105,13 +105,13 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     fn gc_init(
         &mut self,
         heap_size: usize,
-        vm_map: &'static VMMap,
+        vm_map: &mut VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
-        self.nursery.init(&vm_map);
-        self.copyspace0.init(&vm_map);
-        self.copyspace1.init(&vm_map);
+        self.nursery.init();
+        self.copyspace0.init();
+        self.copyspace1.init();
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {

@@ -84,7 +84,9 @@ pub trait PageResource<VM: VMBinding>: 'static {
             .committed
             .fetch_add(actual_pages, Ordering::Relaxed);
         if unsafe { VM::VMActivePlan::is_mutator(tls) } {
-            self.vm_map().lock().unwrap()
+            self.vm_map()
+                .lock()
+                .unwrap()
                 .add_to_cumulative_committed_pages(actual_pages);
         }
     }

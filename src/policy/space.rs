@@ -23,9 +23,9 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 
 use crate::vm::VMBinding;
+use downcast_rs::Downcast;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
-use downcast_rs::Downcast;
 
 /**
  * Space Function Table (SFT).
@@ -290,11 +290,16 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// FIXME: This does not sound like 'unsafe', it is more like 'incorrect'. Any allocator/mutator may do slowpath allocation, and call this.
     unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
         // FIXME
-        let new_head: Address = self.common().vm_map().lock().unwrap().allocate_contiguous_chunks(
-            self.common().descriptor,
-            chunks,
-            self.common().head_discontiguous_region,
-        );
+        let new_head: Address = self
+            .common()
+            .vm_map()
+            .lock()
+            .unwrap()
+            .allocate_contiguous_chunks(
+                self.common().descriptor,
+                chunks,
+                self.common().head_discontiguous_region,
+            );
         if new_head.is_zero() {
             return Address::zero();
         }
@@ -369,10 +374,19 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn release_discontiguous_chunks(&mut self, chunk: Address) {
         debug_assert!(chunk == conversions::chunk_align_down(chunk));
         if chunk == self.common().head_discontiguous_region {
-            let next = self.common().vm_map().lock().unwrap().get_next_contiguous_region(chunk);
-            self.common_mut().head_discontiguous_region = next;                
+            let next = self
+                .common()
+                .vm_map()
+                .lock()
+                .unwrap()
+                .get_next_contiguous_region(chunk);
+            self.common_mut().head_discontiguous_region = next;
         }
-        self.common().vm_map().lock().unwrap().free_contiguous_chunks(chunk);
+        self.common()
+            .vm_map()
+            .lock()
+            .unwrap()
+            .free_contiguous_chunks(chunk);
     }
 
     fn release_multiple_pages(&mut self, start: Address);
@@ -381,7 +395,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// TODO: I am not sure why this is unsafe.
     unsafe fn release_all_chunks(&self) {
         self.common()
-            .vm_map().lock().unwrap()
+            .vm_map()
+            .lock()
+            .unwrap()
             .free_all_chunks(self.common().head_discontiguous_region);
         self.unsafe_common_mut().head_discontiguous_region = Address::zero();
     }
@@ -415,11 +431,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         } else {
             let mut a = common.head_discontiguous_region;
             while !a.is_zero() {
-                print!(
-                    "{}->{}",
-                    a,
-                    a + vm_map.get_contiguous_region_size(a) - 1
-                );
+                print!("{}->{}", a, a + vm_map.get_contiguous_region_size(a) - 1);
                 a = vm_map.get_next_contiguous_region(a);
                 if !a.is_zero() {
                     print!(" ");

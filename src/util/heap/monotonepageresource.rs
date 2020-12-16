@@ -192,11 +192,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
 }
 
 impl<VM: VMBinding> MonotonePageResource<VM> {
-    pub fn new_contiguous(
-        start: Address,
-        bytes: usize,
-        meta_data_pages_per_region: usize,
-    ) -> Self {
+    pub fn new_contiguous(start: Address, bytes: usize, meta_data_pages_per_region: usize) -> Self {
         let sentinel = start + bytes;
 
         MonotonePageResource {
@@ -323,13 +319,12 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
 
     fn move_to_next_chunk(&self, guard: &mut MutexGuard<MonotonePageResourceSync>) -> bool {
         let vm_map = self.vm_map().lock().unwrap();
-        guard.current_chunk = vm_map
-            .get_next_contiguous_region(guard.current_chunk);
+        guard.current_chunk = vm_map.get_next_contiguous_region(guard.current_chunk);
         if guard.current_chunk.is_zero() {
             false
         } else {
-            guard.cursor = guard.current_chunk
-                + vm_map.get_contiguous_region_size(guard.current_chunk);
+            guard.cursor =
+                guard.current_chunk + vm_map.get_contiguous_region_size(guard.current_chunk);
             true
         }
     }

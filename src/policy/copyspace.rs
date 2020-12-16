@@ -5,6 +5,7 @@ use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::forwarding_word as ForwardingWord;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
@@ -14,7 +15,6 @@ use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use crate::util::heap::space_descriptor::SpaceDescriptor;
 
 unsafe impl<VM: VMBinding> Sync for CopySpace<VM> {}
 
