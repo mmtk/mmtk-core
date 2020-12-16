@@ -213,7 +213,7 @@ impl Map for Map32 {
     }
 
     fn get_discontig_freelist_pr_ordinal(&self, pr: &CommonFreeListPageResource) -> usize {
-        // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.        
+        // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         self_mut.shared_fl_map[self.shared_discontig_fl_count] =
             Some(unsafe { &*(pr as *const CommonFreeListPageResource) });
