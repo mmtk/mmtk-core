@@ -49,6 +49,7 @@ use downcast_rs::Downcast;
  */
 pub trait SFT {
     fn name(&self) -> &str;
+    fn descriptor(&self) -> SpaceDescriptor;
     fn is_live(&self, object: ObjectReference) -> bool;
     fn is_movable(&self) -> bool;
     #[cfg(feature = "sanity")]
@@ -68,6 +69,9 @@ const EMPTY_SFT_NAME: &str = "empty";
 impl SFT for EmptySpaceSFT {
     fn name(&self) -> &str {
         EMPTY_SFT_NAME
+    }
+    fn descriptor(&self) -> SpaceDescriptor {
+        SpaceDescriptor::UNINITIALIZED
     }
     fn is_live(&self, object: ObjectReference) -> bool {
         panic!(
@@ -270,8 +274,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn address_in_space(&self, start: Address) -> bool {
         if !self.common().descriptor.is_contiguous() {
-            // FIXME: need fast implementation, use SFT
-            self.common().vm_map().lock().unwrap().get_descriptor_for_address(start) == self.common().descriptor
+            SFT_MAP.get(start).descriptor() == self.common().descriptor
         } else {
             start >= self.common().start && start < self.common().start + self.common().extent
         }

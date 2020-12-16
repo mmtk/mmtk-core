@@ -14,6 +14,7 @@ use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 
 unsafe impl<VM: VMBinding> Sync for CopySpace<VM> {}
 
@@ -28,6 +29,9 @@ pub struct CopySpace<VM: VMBinding> {
 impl<VM: VMBinding> SFT for CopySpace<VM> {
     fn name(&self) -> &str {
         self.get_name()
+    }
+    fn descriptor(&self) -> SpaceDescriptor {
+        self.common().descriptor
     }
     fn is_live(&self, object: ObjectReference) -> bool {
         !self.from_space() || ForwardingWord::is_forwarded::<VM>(object)

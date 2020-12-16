@@ -7,7 +7,7 @@ use crate::util::ObjectReference;
 
 use crate::plan::TransitiveClosure;
 use crate::util::header_byte;
-
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::policy::space::SpaceOptions;
 use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -30,6 +30,9 @@ const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn name(&self) -> &str {
         self.get_name()
+    }
+    fn descriptor(&self) -> SpaceDescriptor {
+        self.common().descriptor
     }
     fn is_live(&self, _object: ObjectReference) -> bool {
         true

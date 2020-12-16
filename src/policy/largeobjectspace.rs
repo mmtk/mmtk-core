@@ -15,6 +15,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::{Arc, Mutex};
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -39,6 +40,9 @@ unsafe impl<VM: VMBinding> Sync for LargeObjectSpace<VM> {}
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn name(&self) -> &str {
         self.get_name()
+    }
+    fn descriptor(&self) -> SpaceDescriptor {
+        self.common().descriptor
     }
     fn is_live(&self, object: ObjectReference) -> bool {
         self.test_mark_bit(object, self.mark_state)
