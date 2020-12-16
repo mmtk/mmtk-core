@@ -9,7 +9,7 @@ This tutorial is intended to.. **TODO: Finish description.**
 
 ## Preliminaries
 ### Set up MMTK-core and binding
-This tutorial can be completed with any binding. However, OpenJDK has the most feature-rich binding currently, so this section will focus on setting it up. For the other bindings, please follow the README files in their respective repos: [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm), [V8](https://github.com/mmtk/mmtk-v8).
+This tutorial can be completed with any binding. For the sake of simplicity, this tutorial is going to only use the OpenJDK binding. This will only be relevant for this section of the tutorial. To set up one the other bindings, please follow the README files in their respective repos: [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm), [V8](https://github.com/mmtk/mmtk-v8).
 It may be useful to fork the below repositories to your own account, but it is not required for this tutorial.
 1. Clone the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk).
 2. Clone this repository and the [OpenJDK VM repository](https://github.com/mmtk/openjdk). Place them both in the /repos folder in mmtk-openjdk.
@@ -20,18 +20,23 @@ A few benchmarks of varying size will be used throughout the tutorial. **TODO: N
 
 You will need to build multiple versions of the VM in this tutorial. 
 1. To select which garbage collector (GC) plan you would like to use in a given build, you can either use the `MMTK_PLAN` environment variable, or the `--features` flag when building the binding. For example, using `export MMTK_PLAN=semispace` or `--features semispace` will build using the Semispace GC (the default plan). 
-2. The build will always be placed in `./build`. If you would like to keep a build, rename the old `./build` folder. By changing the file path in commands, benchmarks can still be run on the  Otherwise, deleting the entire folder before rebuilding will ensure an error-free build. **TODO: Check if this is actually needed - just adding the plan variable to the folder name or not deleting anything in advance would be easier, but seemed to cause the build to be incomplete when I was doing the pseudo-tutorial.**
+2. The build will always be placed in `./build`. If you would like to keep a build, rename the old `./build` folder. By changing the file path in commands, benchmarks can still be run on the  Otherwise, deleting the entire folder before rebuilding will ensure an error-free build. **TODO: Check if this is actually needed - just adding the plan variable to the folder name or not deleting anything in advance would be easier esp for slower machines, but seemed to cause the build to be incomplete when I was doing the pseudo-tutorial.**
 3. Try building NoGC. If you then run a DeCapo benchmark, such as `lusearch`, it should fail upon attempting to run a garbage collection.
 4. Try building Semispace. The DeCapo benchmark should now pass, as garbage will be collected.
 
 ### Create mygc
-1. Copy mmtk-openjdk/repos/mmtk-core/src/plan/nogc
-2. Refactor name in all files in plan to mygc
-3. Maybe remove extra features (lock-free etc) because they are not needed for the tutorial?
-4. Add mygc to cargo, core plan cargo, plan/mod
-5. Bring attention to important aspects within plan? 
+This tutorial will walk through creating a new garbage collector. For this, you will need to make a copy of NoGC as a base.
+1. Create a copy of the folder `mmtk-openjdk/repos/mmtk-core/src/plan/nogc`. Rename it to `mygc`.
+2. In each file within `mygc`, rename any reference to `nogc` to `mygc`. You will also have to separately rename any reference to `NoGC` to `MyGC`. 
+3. In order to build using `mygc`, you will need to change the following files:
+    1. `mmtk-core/src/plan/mod.rs`:
+    2. `mmtk-core/Cargo.toml`:
+    3. `mmtk-openjdk/mmtk/Cargo.toml`:
+NoGC has some features that are not needed when using it as a base for other GCs. **Delete refs to lock-free?**
+
+At this point, you should familiarise yourself with the NoGC plan.
    * Where is the allocator? (mutator.rs – note lack of r/w barrier)
-   * What happens if garbage has to be collected?
+   * What happens if garbage has to be collected? (panic)
    * Talk about aspects of constructors?
    
 ***
