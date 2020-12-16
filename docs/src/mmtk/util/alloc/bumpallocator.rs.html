@@ -142,7 +142,7 @@
         <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">limit</span>;
     }
 
-    <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">zero</span>() };
         <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">zero</span>() };
     }
