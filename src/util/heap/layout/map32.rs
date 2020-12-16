@@ -239,7 +239,9 @@ impl Map for Map32 {
 impl Map32 {
     /// # Safety
     ///
-    /// This should only be called by a single thread. Otherwise, use mut_self_with_sync()
+    /// The caller needs to guarantee there is no race condition. Either only one single thread
+    /// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).
+    /// In other cases, use mut_self_with_sync().
     #[allow(clippy::cast_ref_to_mut)]
     #[allow(clippy::mut_from_ref)]
     unsafe fn mut_self(&self) -> &mut Self {
