@@ -24,7 +24,7 @@ pub fn gencopy_mutator_release<VM: VMBinding>(
     mutator: &mut Mutator<GenCopy<VM>>,
     _tls: OpaquePointer,
 ) {
-    // rebind the allocation bump pointer to the nursery space
+    // reset nursery allocator
     let bump_allocator = unsafe {
         mutator
             .allocators
@@ -32,13 +32,12 @@ pub fn gencopy_mutator_release<VM: VMBinding>(
     }
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
-    bump_allocator.rebind(Some(&mutator.plan.nursery));
+    bump_allocator.reset();
 }
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::BumpPointer(0),
-        // TODO: JikesRVM support
         AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
         AllocationType::Los => AllocatorSelector::LargeObject(0),
     };
@@ -52,8 +51,14 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
             (AllocatorSelector::BumpPointer(0), &mmtk.plan.nursery),
-            (AllocatorSelector::BumpPointer(1), mmtk.plan.fromspace()),
-            (AllocatorSelector::BumpPointer(2), mmtk.plan.tospace()),
+            (
+                AllocatorSelector::BumpPointer(1),
+                mmtk.plan.common.get_immortal(),
+            ),
+            (
+                AllocatorSelector::LargeObject(0),
+                mmtk.plan.common.get_los(),
+            ),
         ],
         prepare_func: &gencopy_mutator_prepare,
         release_func: &gencopy_mutator_release,
