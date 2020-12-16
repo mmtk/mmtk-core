@@ -15,7 +15,6 @@ use super::layout::Mmapper;
 
 use super::PageResource;
 
-use crate::util::heap::layout::heap_layout::VMMap;
 use crate::vm::VMBinding;
 use libc::{c_void, memset};
 
@@ -197,7 +196,6 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         start: Address,
         bytes: usize,
         meta_data_pages_per_region: usize,
-        _vm_map: &'static VMMap,
     ) -> Self {
         let sentinel = start + bytes;
 
@@ -218,7 +216,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         }
     }
 
-    pub fn new_discontiguous(meta_data_pages_per_region: usize, _vm_map: &'static VMMap) -> Self {
+    pub fn new_discontiguous(meta_data_pages_per_region: usize) -> Self {
         MonotonePageResource {
             common: CommonPageResource::new(false, true),
 
@@ -324,16 +322,14 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
     }
 
     fn move_to_next_chunk(&self, guard: &mut MutexGuard<MonotonePageResourceSync>) -> bool {
-        guard.current_chunk = self
-            .vm_map()
+        let vm_map = self.vm_map().lock().unwrap();
+        guard.current_chunk = vm_map
             .get_next_contiguous_region(guard.current_chunk);
         if guard.current_chunk.is_zero() {
             false
         } else {
             guard.cursor = guard.current_chunk
-                + self
-                    .vm_map()
-                    .get_contiguous_region_size(guard.current_chunk);
+                + vm_map.get_contiguous_region_size(guard.current_chunk);
             true
         }
     }

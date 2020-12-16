@@ -108,7 +108,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
     type CopyContext: CopyContext;
 
     fn new(
-        vm_map: &'static VMMap,
+        vm_map: Arc<Mutex<VMMap>>,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         scheduler: &'static MMTkScheduler<Self::VM>,
@@ -146,7 +146,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
     fn gc_init(
         &mut self,
         heap_size: usize,
-        vm_map: &'static VMMap,
+        vm_map: &mut VMMap,
         scheduler: &Arc<MMTkScheduler<Self::VM>>,
     );
 
@@ -272,7 +272,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
 
     #[inline]
     fn stress_test_gc_required(&self) -> bool {
-        let pages = self.base().vm_map.get_cumulative_committed_pages();
+        let pages = self.base().vm_map.lock().unwrap().get_cumulative_committed_pages();
         trace!("stress_gc pages={}", pages);
 
         if self.is_initialized()
@@ -344,7 +344,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub control_collector_context: ControllerCollectorContext<VM>,
     pub stats: Stats,
     mmapper: &'static Mmapper,
-    pub vm_map: &'static VMMap,
+    pub vm_map: Arc<Mutex<VMMap>>,
     pub options: Arc<UnsafeOptionsWrapper>,
     pub heap: HeapMeta,
     #[cfg(feature = "base_spaces")]
@@ -368,7 +368,7 @@ pub struct BaseUnsync<VM: VMBinding> {
 
 #[cfg(feature = "vm_space")]
 pub fn create_vm_space<VM: VMBinding>(
-    vm_map: &'static VMMap,
+    vm_map: Arc<Mutex<VMMap>>,
     mmapper: &'static Mmapper,
     heap: &mut HeapMeta,
     boot_segment_bytes: usize,
@@ -393,7 +393,7 @@ pub fn create_vm_space<VM: VMBinding>(
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'heap' only needs to be mutable for certain features
     pub fn new(
-        vm_map: &'static VMMap,
+        vm_map: Arc<Mutex<VMMap>>,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
@@ -406,7 +406,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     "code_space",
                     true,
                     VMRequest::discontiguous(),
-                    vm_map,
+                    vm_map.clone(),
                     mmapper,
                     &mut heap,
                 ),
@@ -415,12 +415,12 @@ impl<VM: VMBinding> BasePlan<VM> {
                     "ro_space",
                     true,
                     VMRequest::discontiguous(),
-                    vm_map,
+                    vm_map.clone(),
                     mmapper,
                     &mut heap,
                 ),
                 #[cfg(feature = "vm_space")]
-                vm_space: create_vm_space(vm_map, mmapper, &mut heap, options.vm_space_size),
+                vm_space: create_vm_space(vm_map.clone(), mmapper, &mut heap, options.vm_space_size),
             }),
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),
@@ -448,7 +448,7 @@ impl<VM: VMBinding> BasePlan<VM> {
     pub fn gc_init(
         &mut self,
         heap_size: usize,
-        vm_map: &'static VMMap,
+        vm_map: &mut VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
         vm_map.boot();
@@ -465,12 +465,12 @@ impl<VM: VMBinding> BasePlan<VM> {
         {
             let unsync = unsafe { &mut *self.unsync.get() };
             #[cfg(feature = "code_space")]
-            unsync.code_space.init(vm_map);
+            unsync.code_space.init();
             #[cfg(feature = "ro_space")]
-            unsync.ro_space.init(vm_map);
+            unsync.ro_space.init();
             #[cfg(feature = "vm_space")]
             {
-                unsync.vm_space.init(vm_map);
+                unsync.vm_space.init();
                 unsync.vm_space.ensure_mapped();
             }
         }
@@ -653,7 +653,7 @@ pub struct CommonUnsync<VM: VMBinding> {
 
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(
-        vm_map: &'static VMMap,
+        vm_map: Arc<Mutex<VMMap>>,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
@@ -664,7 +664,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     "immortal",
                     true,
                     VMRequest::discontiguous(),
-                    vm_map,
+                    vm_map.clone(),
                     mmapper,
                     &mut heap,
                 ),
@@ -672,7 +672,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     "los",
                     true,
                     VMRequest::discontiguous(),
-                    vm_map,
+                    vm_map.clone(),
                     mmapper,
                     &mut heap,
                 ),
@@ -684,13 +684,13 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn gc_init(
         &mut self,
         heap_size: usize,
-        vm_map: &'static VMMap,
+        vm_map: &mut VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
         self.base.gc_init(heap_size, vm_map, scheduler);
         let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.immortal.init(vm_map);
-        unsync.los.init(vm_map);
+        unsync.immortal.init();
+        unsync.los.init();
     }
 
     pub fn get_pages_used(&self) -> usize {

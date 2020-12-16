@@ -56,7 +56,8 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
             "MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
         ),
     }
-    mmtk.plan.gc_init(heap_size, &mmtk.vm_map, &mmtk.scheduler);
+    let mut vm_map = mmtk.vm_map.lock().unwrap();
+    mmtk.plan.gc_init(heap_size, &mut vm_map, &mmtk.scheduler);
 }
 
 /// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should

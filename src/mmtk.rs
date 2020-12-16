@@ -14,7 +14,6 @@ use crate::vm::VMBinding;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-#[cfg(feature = "sanity")]
 use std::sync::Mutex;
 
 lazy_static! {
@@ -25,7 +24,7 @@ lazy_static! {
     // 2. These mmappers are possibly global across multiple MMTk instances, as they manage the
     //    entire address space.
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
-    pub static ref VM_MAP: VMMap = VMMap::new();
+    pub static ref VM_MAP: Arc<Mutex<VMMap>> = Arc::new(Mutex::new(VMMap::new()));
     pub static ref MMAPPER: Mmapper = Mmapper::new();
     pub static ref SFT_MAP: SFTMap = SFTMap::new();
 }
@@ -34,7 +33,7 @@ lazy_static! {
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
     pub plan: SelectedPlan<VM>,
-    pub vm_map: &'static VMMap,
+    pub vm_map: Arc<Mutex<VMMap>>,
     pub mmapper: &'static Mmapper,
     pub sftmap: &'static SFTMap,
     pub reference_processors: ReferenceProcessors,
@@ -52,12 +51,12 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
         let scheduler = Scheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone(), unsafe {
+        let plan = SelectedPlan::new(VM_MAP.clone(), &MMAPPER, options.clone(), unsafe {
             &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>)
         });
         MMTK {
             plan,
-            vm_map: &VM_MAP,
+            vm_map: VM_MAP.clone(),
             mmapper: &MMAPPER,
             sftmap: &SFT_MAP,
             reference_processors: ReferenceProcessors::new(),

@@ -139,7 +139,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         start: Address,
         bytes: usize,
         meta_data_pages_per_region: usize,
-        vm_map: &'static VMMap,
+        vm_map: &mut VMMap,
     ) -> Self {
         let pages = conversions::bytes_to_pages(bytes);
         // We use MaybeUninit::uninit().assume_init(), which is nul, for a Box value, which cannot be null.
@@ -176,7 +176,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         flpr
     }
 
-    pub fn new_discontiguous(meta_data_pages_per_region: usize, vm_map: &'static VMMap) -> Self {
+    pub fn new_discontiguous(meta_data_pages_per_region: usize, vm_map: &mut VMMap) -> Self {
         // We use MaybeUninit::uninit().assume_init(), which is nul, for a Box value, which cannot be null.
         // FIXME: We should try either remove this kind of circular dependency or use MaybeUninit<T> instead of Box<T>
         #[allow(invalid_value)]
@@ -250,7 +250,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     }
 
     fn free_contiguous_chunk(&mut self, chunk: Address) {
-        let num_chunks = self.vm_map().get_contiguous_region_chunks(chunk);
+        let num_chunks = self.vm_map().lock().unwrap().get_contiguous_region_chunks(chunk);
         debug_assert!(num_chunks == 1 || self.meta_data_pages_per_region == 0);
         /* nail down all pages associated with the chunk, so it is no longer on our free list */
         let mut chunk_start = conversions::bytes_to_pages(chunk - self.start);

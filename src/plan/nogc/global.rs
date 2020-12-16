@@ -19,6 +19,7 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 #[cfg(not(feature = "nogc_lock_free"))]
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
@@ -40,7 +41,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     type CopyContext = NoCopy<VM>;
 
     fn new(
-        vm_map: &'static VMMap,
+        vm_map: Arc<Mutex<VMMap>>,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         _scheduler: &'static MMTkScheduler<Self::VM>,
@@ -58,7 +59,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
             "nogc_space",
             true,
             VMRequest::discontiguous(),
-            vm_map,
+            vm_map.clone(),
             mmapper,
             &mut heap,
         );
@@ -72,13 +73,13 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     fn gc_init(
         &mut self,
         heap_size: usize,
-        vm_map: &'static VMMap,
+        vm_map: &mut VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
         self.base.gc_init(heap_size, vm_map, scheduler);
 
         // FIXME correctly initialize spaces based on options
-        self.nogc_space.init(&vm_map);
+        self.nogc_space.init();
     }
 
     fn base(&self) -> &BasePlan<VM> {

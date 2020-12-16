@@ -14,6 +14,7 @@ use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use std::sync::{Arc, Mutex};
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -82,7 +83,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
-    fn init(&mut self, _vm_map: &'static VMMap) {
+    fn init(&mut self) {
         let me = unsafe { &*(self as *const Self) };
         self.pr.bind_space(me);
     }
@@ -105,7 +106,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
-        vm_map: &'static VMMap,
+        vm_map: Arc<Mutex<VMMap>>,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
@@ -117,15 +118,16 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 zeroed,
                 vmrequest,
             },
-            vm_map,
+            vm_map.clone(),
             mmapper,
             heap,
         );
+        let mut vm_map_lock = vm_map.lock().unwrap();
         LargeObjectSpace {
             pr: if vmrequest.is_discontiguous() {
-                FreeListPageResource::new_discontiguous(0, vm_map)
+                FreeListPageResource::new_discontiguous(0, &mut vm_map_lock)
             } else {
-                FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
+                FreeListPageResource::new_contiguous(common.start, common.extent, 0, &mut vm_map_lock)
             },
             common: UnsafeCell::new(common),
             mark_state: 0,

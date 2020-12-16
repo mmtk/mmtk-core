@@ -13,6 +13,7 @@ use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 unsafe impl<VM: VMBinding> Sync for CopySpace<VM> {}
 
@@ -58,7 +59,7 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         &mut *self.common.get()
     }
 
-    fn init(&mut self, _vm_map: &'static VMMap) {
+    fn init(&mut self) {
         // Borrow-checker fighting so that we can have a cyclic reference
         let me = unsafe { &*(self as *const Self) };
         self.pr.bind_space(me);
@@ -76,7 +77,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         from_space: bool,
         zeroed: bool,
         vmrequest: VMRequest,
-        vm_map: &'static VMMap,
+        vm_map: Arc<Mutex<VMMap>>,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
@@ -94,13 +95,12 @@ impl<VM: VMBinding> CopySpace<VM> {
         );
         CopySpace {
             pr: if vmrequest.is_discontiguous() {
-                MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
+                MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION)
             } else {
                 MonotonePageResource::new_contiguous(
                     common.start,
                     common.extent,
                     META_DATA_PAGES_PER_REGION,
-                    vm_map,
                 )
             },
             common: UnsafeCell::new(common),

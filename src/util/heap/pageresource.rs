@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use super::layout::map::Map;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::vm::VMBinding;
+use std::sync::Mutex;
 
 pub trait PageResource<VM: VMBinding>: 'static {
     /// Allocate pages from this resource.
@@ -83,7 +84,7 @@ pub trait PageResource<VM: VMBinding>: 'static {
             .committed
             .fetch_add(actual_pages, Ordering::Relaxed);
         if unsafe { VM::VMActivePlan::is_mutator(tls) } {
-            self.vm_map()
+            self.vm_map().lock().unwrap()
                 .add_to_cumulative_committed_pages(actual_pages);
         }
     }
@@ -102,7 +103,7 @@ pub trait PageResource<VM: VMBinding>: 'static {
 
     fn common(&self) -> &CommonPageResource<VM>;
     fn common_mut(&mut self) -> &mut CommonPageResource<VM>;
-    fn vm_map(&self) -> &'static VMMap {
+    fn vm_map(&self) -> &Mutex<VMMap> {
         self.common().space.unwrap().common().vm_map()
     }
 }

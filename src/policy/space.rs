@@ -24,7 +24,7 @@ use crate::util::heap::HeapMeta;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
-
+use std::sync::{Arc, Mutex};
 use downcast_rs::Downcast;
 
 /**
@@ -228,7 +228,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
-    fn init(&mut self, vm_map: &'static VMMap);
+    fn init(&mut self);
 
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
@@ -270,7 +270,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn address_in_space(&self, start: Address) -> bool {
         if !self.common().descriptor.is_contiguous() {
-            self.common().vm_map().get_descriptor_for_address(start) == self.common().descriptor
+            // FIXME: need fast implementation, use SFT
+            self.common().vm_map().lock().unwrap().get_descriptor_for_address(start) == self.common().descriptor
         } else {
             start >= self.common().start && start < self.common().start + self.common().extent
         }
@@ -286,7 +287,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// FIXME: This does not sound like 'unsafe', it is more like 'incorrect'. Any allocator/mutator may do slowpath allocation, and call this.
     unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
         // FIXME
-        let new_head: Address = self.common().vm_map().allocate_contiguous_chunks(
+        let new_head: Address = self.common().vm_map().lock().unwrap().allocate_contiguous_chunks(
             self.common().descriptor,
             chunks,
             self.common().head_discontiguous_region,
@@ -365,10 +366,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn release_discontiguous_chunks(&mut self, chunk: Address) {
         debug_assert!(chunk == conversions::chunk_align_down(chunk));
         if chunk == self.common().head_discontiguous_region {
-            self.common_mut().head_discontiguous_region =
-                self.common().vm_map().get_next_contiguous_region(chunk);
+            let next = self.common().vm_map().lock().unwrap().get_next_contiguous_region(chunk);
+            self.common_mut().head_discontiguous_region = next;                
         }
-        self.common().vm_map().free_contiguous_chunks(chunk);
+        self.common().vm_map().lock().unwrap().free_contiguous_chunks(chunk);
     }
 
     fn release_multiple_pages(&mut self, start: Address);
@@ -377,12 +378,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// TODO: I am not sure why this is unsafe.
     unsafe fn release_all_chunks(&self) {
         self.common()
-            .vm_map()
+            .vm_map().lock().unwrap()
             .free_all_chunks(self.common().head_discontiguous_region);
         self.unsafe_common_mut().head_discontiguous_region = Address::zero();
     }
 
     fn print_vm_map(&self) {
+        let vm_map = self.common().vm_map().lock().unwrap();
         let common = self.common();
         print!("{} ", common.name);
         if common.immortal {
@@ -413,9 +415,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 print!(
                     "{}->{}",
                     a,
-                    a + self.common().vm_map().get_contiguous_region_size(a) - 1
+                    a + vm_map.get_contiguous_region_size(a) - 1
                 );
-                a = self.common().vm_map().get_next_contiguous_region(a);
+                a = vm_map.get_next_contiguous_region(a);
                 if !a.is_zero() {
                     print!(" ");
                 }
@@ -441,7 +443,7 @@ pub struct CommonSpace<VM: VMBinding> {
     pub extent: usize,
     pub head_discontiguous_region: Address,
 
-    pub vm_map: &'static VMMap,
+    pub vm_map: Arc<Mutex<VMMap>>,
     pub mmapper: &'static Mmapper,
 
     p: PhantomData<VM>,
@@ -463,7 +465,7 @@ unsafe impl<VM: VMBinding> Sync for CommonSpace<VM> {}
 impl<VM: VMBinding> CommonSpace<VM> {
     pub fn new(
         opt: SpaceOptions,
-        vm_map: &'static VMMap,
+        vm_map: Arc<Mutex<VMMap>>,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
@@ -478,7 +480,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             start: unsafe { Address::zero() },
             extent: 0,
             head_discontiguous_region: unsafe { Address::zero() },
-            vm_map,
+            vm_map: vm_map.clone(),
             mmapper,
             p: PhantomData,
         };
@@ -531,7 +533,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // FIXME
         rtn.descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
         // VM.memory.setHeapRange(index, start, start.plus(extent));
-        vm_map.insert(start, extent, rtn.descriptor);
+        vm_map.lock().unwrap().insert(start, extent, rtn.descriptor);
 
         if DEBUG_SPACE {
             println!(
@@ -553,8 +555,8 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
     }
 
-    pub fn vm_map(&self) -> &'static VMMap {
-        self.vm_map
+    pub fn vm_map(&self) -> &Mutex<VMMap> {
+        &self.vm_map
     }
 }
 

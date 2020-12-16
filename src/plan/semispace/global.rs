@@ -24,7 +24,7 @@ use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use enum_map::EnumMap;
 
@@ -47,7 +47,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     type CopyContext = SSCopyContext<VM>;
 
     fn new(
-        vm_map: &'static VMMap,
+        vm_map: Arc<Mutex<VMMap>>,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         _scheduler: &'static MMTkScheduler<Self::VM>,
@@ -61,7 +61,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
                 false,
                 true,
                 VMRequest::discontiguous(),
-                vm_map,
+                vm_map.clone(),
                 mmapper,
                 &mut heap,
             ),
@@ -70,7 +70,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
                 true,
                 true,
                 VMRequest::discontiguous(),
-                vm_map,
+                vm_map.clone(),
                 mmapper,
                 &mut heap,
             ),
@@ -81,13 +81,13 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn gc_init(
         &mut self,
         heap_size: usize,
-        vm_map: &'static VMMap,
+        vm_map: &mut VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
 
-        self.copyspace0.init(&vm_map);
-        self.copyspace1.init(&vm_map);
+        self.copyspace0.init();
+        self.copyspace1.init();
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
