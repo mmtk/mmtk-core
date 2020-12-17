@@ -22,8 +22,10 @@ First, set up OpenJDK, MMTK, and the binding:
 
 You will need to build multiple versions of the VM in this tutorial. 
 1. To select which garbage collector (GC) plan you would like to use in a given build, you can either use the `MMTK_PLAN` environment variable, or the `--features` flag when building the binding. For example, using `export MMTK_PLAN=semispace` or `--features semispace` will build using the Semispace GC (the default plan). 
-2. The build will always be placed in `mmtk-openjdk/repos/openjdk/build`. If you would like to keep a build, rename the old `build` folder. You will be able to test these renamed builds by changing the file path in the test command. This can be useful for making quick comparisons between GCs. Otherwise, deleting the `build` folder before rebuilding will help prevent errors. **TODO: Check if this is actually needed - just adding the plan variable to the folder name or not deleting anything in advance would be easier esp for slower machines, but seemed to cause the build to be incomplete when I was doing the pseudo-tutorial.**
-2. ALT: **If just the internal folder name needs changing** The build will always generate in `mmtk-openjdk/repos/openjdk/build`. If you would like to keep a build, you can change the name of its folder. If you used the environment variable `MMTK_PLAN` earlier, adding it to the folder name (eg `linux-x86_64-normal-server-$MMTK_PLAN-$DEBUG_LEVEL`) when generating a build is an easy way to do this. If you plan to overwrite a build, deleting the folder you are writing over will help prevent errors.
+2. The build will always generate in `mmtk-openjdk/repos/openjdk/build`. If you would like to keep a build, you can rename either the `build` folder or the folder generated within it (eg `inux-x86_64-normal-server-$DEBUG_LEVEL`). 
+   1. If you rename the internal folder, you *must* add to the start of the folder name, otherwise the build will not generate correctly (e.g. `NOGC_linux-x86_64-normal-server-$DEBUG_LEVEL` will work, but `inux-x86_64-normal-server-$DEBUG_LEVEL-NOGC` will lead to an incomplete build being generated). **I think, at least...**
+   2. Renaming the `build` folder will also work, and is less error-prone than renaming the folder within it.
+   3. If you plan to completely overwrite a build, deleting the folder you are writing over will help prevent errors.
 3. Try building using NoGC. If you then run a benchmark test large enough to trigger a collection, such as DeCapo's `lusearch`, it should fail when the collection is triggered with the error message **TODO: Add error message**. A small test should complete without problems. **TODO: Find or create mini test!**
 4. Try building using Semispace. The DeCapo benchmark should now pass, as garbage will be collected, and the **small test** should run the same as it did for NoGC.
 
@@ -33,29 +35,31 @@ A few benchmarks of varying size will be used throughout the tutorial. If you ha
 ### Create MyGC
 NoGC is a GC plan that only allocates memory, and does not have a collector. We're going to use it as a base for building a new garbage collector.
 1. Each plan is stored in `mmtk-openjdk/repos/mmtk-core/src/plan`. Navigate there and create a copy of the folder `nogc`. Rename it to `mygc`.
-2. In *each file* within `mygc`, rename any reference to `nogc` to `mygc` (select one occurrence, and then either right click and select "Change all occurrences" or use the shortcut CTRL-F2). You will also have to separately rename any reference to `NoGC` to `MyGC`. 
-3. In order to build using `mygc`, you will need to add lines to the following files:
-    1. `mmtk-core/src/plan/mod.rs`, under the import statements:
+2. Open up the search menu with CRTL-F. Make sure case-sensitive search is on.
+3. In *each file* within `mygc`, rename any reference to `nogc` to `mygc` (select one occurrence, and then either right click and select "Change all occurrences" or use the shortcut CTRL-F2). You will also have to separately rename any reference to `NoGC` to `MyGC`. 
+4. In order to build using `mygc`, you will need to make some changes to the following files:
+    1. `mmtk-core/src/plan/mod.rs`, under the import statements, add:
     ```rust
     #[cfg(feature = "mygc")]
     pub mod mygc;
     #[cfg(feature = "mygc")]
     pub use self::mygc as selected_plan;
     ```
-    2. `mmtk-core/Cargo.toml`, under `#plans`: 
+    2. `mmtk-core/Cargo.toml`, under `#plans`, add: 
     ```rust
     mygc = ["immortalspace", "largeobjectspace"]
     ```
-    3. `mmtk-openjdk/mmtk/Cargo.toml`, under `[features]`: 
+    3. `mmtk-openjdk/mmtk/Cargo.toml`, under `[features]`, add: 
     ```rust 
     mygc = ["mmtk/mygc"] 
     ```
     
-Note that all of the above changes almost exactly copy the NoGC entries in each of these files. However, NoGC has some features that are not needed for this tutorial. Remove references to them now. 
+Note that all of the above changes almost exactly copy the NoGC entries in each of these files. However, NoGC has some features that are not needed for this tutorial. Remove references to them in the MyGC plan now. 
 1. Within `nogc/global.rs`, find any use of `#[cfg(feature = "mygc_lock_free")]` and delete both it *and the line below it*.
 2. Then, delete any use of the above line's negation, `#[cfg(not(feature = "mygc_lock_free"))]`, this time without changing the line below it.
 
-Test MyGC with the **small test** and DeCapo benchmark. **TODO: Fill out test section**
+You can now build MyGC. Use the same method as in the binding README, using either `export MMTK_PLAN=mygc` or `--features mygc`.
+Once this has compiled, test MyGC with the **small test** and DeCapo benchmark. It should work identically to NoGC. **TODO: Fill out test section**
 
 At this point, you should familiarise yourself with the MyGC plan if you haven't already. Try answering the following questions:
 **NOTE: These are intended to be really simple questions, mostly aimed at those unfamiliar with garbage collection. They just get the reader to look at the code in the collector and start thinking about how it's working, and hopefully encourage them to do some independant reading if they come across something they don't understand.**
