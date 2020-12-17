@@ -1,6 +1,8 @@
 # MMTK Tutorial
-Currently, this file is just dot points to be expanded upon later.
-This tutorial is intended to.. **TODO: Finish description.**
+
+In this tutorial, you will build multiple garbage collectors using MMTK from scratch. 
+ 
+**TODO: Finish description.**
 
 ## Contents
 * [Preliminaries](#preliminaries)
@@ -9,8 +11,8 @@ This tutorial is intended to.. **TODO: Finish description.**
 * [Further Reading](#further-reading)
 
 ## Preliminaries
-### Set up MMTK-core and binding
-This tutorial can be completed with any binding. For the sake of simplicity, this tutorial is going to only use the OpenJDK binding. If you would like to use another binding, you will need to  follow the README files in their respective repositories to set them up, and use alternate benchmarks for testing. [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm), [V8](https://github.com/mmtk/mmtk-v8). It may be useful to fork the relevant repositories to your own account, but it is not required for this tutorial.
+### Set up MMTK and OpenJDK
+This tutorial can be completed with any binding. However, for the sake of simplicity, only the setup for the OpenJDK binding will be described in detail here. If you would like to use another binding, you will need to follow the README files in their respective repositories to set them up, and use alternate benchmarks for testing. [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm), [V8](https://github.com/mmtk/mmtk-v8). Also, while it may be useful to fork the relevant repositories to your own account, it is not required for this tutorial.
 
 First, set up OpenJDK, MMTK, and the binding:
 1. Clone the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk).
