@@ -3,7 +3,6 @@ Currently, this file is just dot points to be expanded upon later.
 This tutorial is intended to.. **TODO: Finish description.**
 
 ## Contents
-**TODO: Links to sections go here.**
 * [Preliminaries](#preliminaries)
 * [Building a Semispace Collector](#building-a-semispace-collector)
 * ?
@@ -11,21 +10,22 @@ This tutorial is intended to.. **TODO: Finish description.**
 
 ## Preliminaries
 ### Set up MMTK-core and binding
-This tutorial can be completed with any binding. For the sake of simplicity, this tutorial is going to only use the OpenJDK binding. This will only be relevant for this section of the tutorial. To set up one the other bindings, please follow the README files in their respective repos: [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm), [V8](https://github.com/mmtk/mmtk-v8).
+This tutorial can be completed with any binding. For the sake of simplicity, this tutorial is going to only use the OpenJDK binding. If you would like to use another binding, you will need to  follow the README files in their respective repositories to set them up, and use alternate benchmarks for testing. [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm), [V8](https://github.com/mmtk/mmtk-v8).
 
 It may be useful to fork the below repositories to your own account, but it is not required for this tutorial.
 1. Clone the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk).
-2. Clone this repository and the [OpenJDK VM repository](https://github.com/mmtk/openjdk). Place them both in the /repos folder in mmtk-openjdk.
+2. Clone this repository and the [OpenJDK VM repository](https://github.com/mmtk/openjdk). Place them both in `mmtk-openjdk/repos`.
 4. Follow the instructions in the README of this repository and the binding repository to make sure they are set up correctly.
 
 A few benchmarks of varying size will be used throughout the tutorial. **TODO: Not sure if this is best placed here.**
 1. DeCapo: Fetch using `wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar`.
 
+
 You will need to build multiple versions of the VM in this tutorial. 
 1. To select which garbage collector (GC) plan you would like to use in a given build, you can either use the `MMTK_PLAN` environment variable, or the `--features` flag when building the binding. For example, using `export MMTK_PLAN=semispace` or `--features semispace` will build using the Semispace GC (the default plan). 
 2. The build will always be placed in `./build`. If you would like to keep a build, rename the old `./build` folder. By changing the file path in commands, benchmarks can still be run on the  Otherwise, deleting the entire folder before rebuilding will ensure an error-free build. **TODO: Check if this is actually needed - just adding the plan variable to the folder name or not deleting anything in advance would be easier esp for slower machines, but seemed to cause the build to be incomplete when I was doing the pseudo-tutorial.**
-3. Try building NoGC. If you then run a DeCapo benchmark, such as `lusearch`, it should fail upon attempting to run a garbage collection.
-4. Try building Semispace. The DeCapo benchmark should now pass, as garbage will be collected.
+3. Try building using NoGC. If you then run a benchmark test large enough to trigger a collection, such as DeCapo's `lusearch`, it should fail when the collection is triggered with the error message **TODO: Add error message**. A small test should complete without problems. **TODO: Find or create mini test!**
+4. Try building using Semispace. The DeCapo benchmark should now pass, as garbage will be collected, and the **small test** should run the same as it did for NoGC.
 
 ### Create mygc
 This tutorial will walk through creating a new garbage collector. For this, you will need to make a copy of NoGC as a base.
@@ -48,12 +48,17 @@ This tutorial will walk through creating a new garbage collector. For this, you 
     mygc = ["mmtk/mygc"] 
     ```
     
-Note that all of the above changes almost exactly copy the NoGC entries in each of these files. However, NoGC has some features that are not needed for this tutorial. The below change will not **(TODO: Verify.)** change the functionality of the GC, as the reference to the lock-free feature was removed from the Cargo files above, but will clean up code that is not needed.
-1. Within `nogc/global.rs`, find any use of `#[cfg(feature = "nogc_lock_free")]` and delete both it *and the line below it*.
-2. Then, find any use of the above line's negation, `#[cfg(not(feature = "nogc_lock_free"))]` and delete *just that line*.
+Note that all of the above changes almost exactly copy the NoGC entries in each of these files. However, NoGC has some features that are not needed for this tutorial. Remove references to them now. 
+1. Within `nogc/global.rs`, find any use of `#[cfg(feature = "mygc_lock_free")]` and delete both it *and the line below it*.
+2. Then, find any use of the above line's negation, `#[cfg(not(feature = "mygc_lock_free"))]` and delete *just that line*.
+
+Test MyGC with the **small test** and DeCapo benchmark. **TODO: Fill out test section**
 
 At this point, you should familiarise yourself with the MyGC plan if you haven't already. Try answering the following questions:
-   * Where is the allocator?
+**NOTE: These are intended to be really simple questions. They just get the user to look at the code in the collector and start thinking about how it's working, and hopefully encourage them to do some independant reading if they come across something they don't understand.**
+   * Where is the allocator defined?
+   * How many memory spaces are there?
+   * What kind of memory space policy is used?
    * What happens if garbage has to be collected?
    * **TODO: Talk about aspects of constructors?**
    
@@ -77,6 +82,8 @@ Less guided exercise: Add “young” copyspace which all new objects go to befo
 
 ## Further reading: 
 - [MMTK Crate Documentation](https://www.mmtk.io/mmtk-core/mmtk/index.html)
-- GC handbook ([O’Reilly access](https://learning.oreilly.com/library/view/the-garbage-collection/9781315388007/?ar))
+- Original MMTK papers:
+  - [*Oil and Water? High Performance Garbage Collection in Java with MMTk*](https://www.mmtk.io/assets/pubs/mmtk-icse-2004.pdf) (Blackburn, Cheng, McKinley, 2004)
+  - [*Myths and realities: The performance impact of garbage collection*](https://www.mmtk.io/assets/pubs/mmtk-sigmetrics-2004.pdf) (Blackburn, Cheng, McKinley, 2004)
+- [*The Garbage Collection Handbook*](https://learning.oreilly.com/library/view/the-garbage-collection/9781315388007) (Jones, Hosking, Moss, 2016)
 - Videos: [MPLR 2020 Keynote](https://www.youtube.com/watch?v=3L6XEVaYAmU), [Deconstructing the Garbage-First Collector](https://www.youtube.com/watch?v=MAk6RdApGLs)
-- Original MMTK papers
