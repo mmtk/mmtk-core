@@ -10,28 +10,29 @@ This tutorial is intended to.. **TODO: Finish description.**
 
 ## Preliminaries
 ### Set up MMTK-core and binding
-This tutorial can be completed with any binding. For the sake of simplicity, this tutorial is going to only use the OpenJDK binding. If you would like to use another binding, you will need to  follow the README files in their respective repositories to set them up, and use alternate benchmarks for testing. [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm), [V8](https://github.com/mmtk/mmtk-v8).
+This tutorial can be completed with any binding. For the sake of simplicity, this tutorial is going to only use the OpenJDK binding. If you would like to use another binding, you will need to  follow the README files in their respective repositories to set them up, and use alternate benchmarks for testing. [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm), [V8](https://github.com/mmtk/mmtk-v8). It may be useful to fork the relevant repositories to your own account, but it is not required for this tutorial.
 
-It may be useful to fork the below repositories to your own account, but it is not required for this tutorial.
+First, set up OpenJDK, MMTK, and the binding:
 1. Clone the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk).
 2. Clone this repository and the [OpenJDK VM repository](https://github.com/mmtk/openjdk). Place them both in `mmtk-openjdk/repos`.
-4. Follow the instructions in the README of this repository and the binding repository to make sure they are set up correctly.
-
-A few benchmarks of varying size will be used throughout the tutorial. **TODO: Not sure if this is best placed here.**
-1. DeCapo: Fetch using `wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar`.
+4. Follow the instructions in the README of this repository and the binding repository to make sure they are set up correctly. **This feels like a bad way of doing this. Maybe expand on exact sections, since I talk about multiple build setups below.**
 
 
 You will need to build multiple versions of the VM in this tutorial. 
 1. To select which garbage collector (GC) plan you would like to use in a given build, you can either use the `MMTK_PLAN` environment variable, or the `--features` flag when building the binding. For example, using `export MMTK_PLAN=semispace` or `--features semispace` will build using the Semispace GC (the default plan). 
-2. The build will always be placed in `./build`. If you would like to keep a build, rename the old `./build` folder. By changing the file path in commands, benchmarks can still be run on the  Otherwise, deleting the entire folder before rebuilding will ensure an error-free build. **TODO: Check if this is actually needed - just adding the plan variable to the folder name or not deleting anything in advance would be easier esp for slower machines, but seemed to cause the build to be incomplete when I was doing the pseudo-tutorial.**
+2. The build will always be placed in `mmtk-openjdk/repos/openjdk/build`. If you would like to keep a build, rename the old `build` folder. You will be able to test these renamed builds by changing the file path in the test command. This can be useful for making quick comparisons between GCs. Otherwise, deleting the `build` folder before rebuilding will help prevent errors. **TODO: Check if this is actually needed - just adding the plan variable to the folder name or not deleting anything in advance would be easier esp for slower machines, but seemed to cause the build to be incomplete when I was doing the pseudo-tutorial.**
+2. ALT: **If just the internal folder name needs changing** The build will always generate in `mmtk-openjdk/repos/openjdk/build`. If you would like to keep a build, you can change the name of its folder. If you used the environment variable `MMTK_PLAN` earlier, adding it to the folder name (eg `linux-x86_64-normal-server-$MMTK_PLAN-$DEBUG_LEVEL`) when generating a build is an easy way to do this. If you plan to overwrite a build, deleting the folder you are writing over will help prevent errors.
 3. Try building using NoGC. If you then run a benchmark test large enough to trigger a collection, such as DeCapo's `lusearch`, it should fail when the collection is triggered with the error message **TODO: Add error message**. A small test should complete without problems. **TODO: Find or create mini test!**
 4. Try building using Semispace. The DeCapo benchmark should now pass, as garbage will be collected, and the **small test** should run the same as it did for NoGC.
 
-### Create mygc
-This tutorial will walk through creating a new garbage collector. For this, you will need to make a copy of NoGC as a base.
-1. Each garbage collector plan is stored in `mmtk-openjdk/repos/mmtk-core/src/plan`. Navigate there and create a copy of the folder `nogc`. Rename it to `mygc`.
+A few benchmarks of varying size will be used throughout the tutorial. If you haven't already, set them up now. **TODO: Not sure if this is best placed here.**
+1. DeCapo: Fetch using `wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar`.
+
+### Create MyGC
+NoGC is a GC plan that only allocates memory, and does not have a collector. We're going to use it as a base for building a new garbage collector.
+1. Each plan is stored in `mmtk-openjdk/repos/mmtk-core/src/plan`. Navigate there and create a copy of the folder `nogc`. Rename it to `mygc`.
 2. In *each file* within `mygc`, rename any reference to `nogc` to `mygc` (select one occurrence, and then either right click and select "Change all occurrences" or use the shortcut CTRL-F2). You will also have to separately rename any reference to `NoGC` to `MyGC`. 
-3. In order to build using `mygc`, you will need to add the following files:
+3. In order to build using `mygc`, you will need to add lines to the following files:
     1. `mmtk-core/src/plan/mod.rs`, under the import statements:
     ```rust
     #[cfg(feature = "mygc")]
@@ -50,17 +51,18 @@ This tutorial will walk through creating a new garbage collector. For this, you 
     
 Note that all of the above changes almost exactly copy the NoGC entries in each of these files. However, NoGC has some features that are not needed for this tutorial. Remove references to them now. 
 1. Within `nogc/global.rs`, find any use of `#[cfg(feature = "mygc_lock_free")]` and delete both it *and the line below it*.
-2. Then, find any use of the above line's negation, `#[cfg(not(feature = "mygc_lock_free"))]` and delete *just that line*.
+2. Then, delete any use of the above line's negation, `#[cfg(not(feature = "mygc_lock_free"))]`, this time without changing the line below it.
 
 Test MyGC with the **small test** and DeCapo benchmark. **TODO: Fill out test section**
 
 At this point, you should familiarise yourself with the MyGC plan if you haven't already. Try answering the following questions:
-**NOTE: These are intended to be really simple questions. They just get the user to look at the code in the collector and start thinking about how it's working, and hopefully encourage them to do some independant reading if they come across something they don't understand.**
+**NOTE: These are intended to be really simple questions, mostly aimed at those unfamiliar with garbage collection. They just get the reader to look at the code in the collector and start thinking about how it's working, and hopefully encourage them to do some independant reading if they come across something they don't understand.**
    * Where is the allocator defined?
    * How many memory spaces are there?
    * What kind of memory space policy is used?
    * What happens if garbage has to be collected?
    * **TODO: Talk about aspects of constructors?**
+   
    
 ***
 ## Building a Semispace Collector
