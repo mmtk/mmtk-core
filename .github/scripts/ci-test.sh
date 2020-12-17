@@ -2,6 +2,7 @@ set -xe
 
 cargo test --features nogc
 cargo test --features semispace
+cargo test --features nogc,force_32bit_heap_layout
 python examples/build.py
 
 # Test with DummyVM (each test in a separate run)
