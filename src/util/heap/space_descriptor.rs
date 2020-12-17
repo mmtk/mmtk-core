@@ -99,7 +99,7 @@ impl SpaceDescriptor {
         unsafe { Address::from_usize(self.get_index() << heap_parameters::LOG_SPACE_SIZE_64) }
     }
 
-    #[cfg(taget_pointer_width = "32")]
+    #[cfg(target_pointer_width = "32")]
     pub fn get_start(self) -> Address {
         debug_assert!(self.is_contiguous());
 
