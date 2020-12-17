@@ -2,7 +2,13 @@ set -xe
 
 cargo test --features nogc
 cargo test --features semispace
-cargo test --features nogc,force_32bit_heap_layout
+
+# For x86_64-linux, also check for i686
+if [[ $arch == "x86_64" && $os == "linux" ]]; then
+    cargo test --features nogc --target i686-unknown-linux-gnu
+    cargo test --features semispace --target i686-unknown-linux-gnu
+fi
+
 python examples/build.py
 
 # Test with DummyVM (each test in a separate run)

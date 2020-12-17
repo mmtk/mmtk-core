@@ -1,4 +1,3 @@
-use super::vmrequest::HEAP_LAYOUT_64BIT;
 use crate::util::constants::*;
 use crate::util::heap::layout::heap_parameters;
 use crate::util::heap::layout::vm_layout_constants;
@@ -13,9 +12,11 @@ const TYPE_CONTIGUOUS_HI: usize = 3;
 const TYPE_MASK: usize = (1 << TYPE_BITS) - 1;
 const SIZE_SHIFT: usize = TYPE_BITS;
 const SIZE_BITS: usize = 10;
+#[cfg(target_pointer_width = "32")]
 const SIZE_MASK: usize = ((1 << SIZE_BITS) - 1) << SIZE_SHIFT;
 const EXPONENT_SHIFT: usize = SIZE_SHIFT + SIZE_BITS;
 const EXPONENT_BITS: usize = 5;
+#[cfg(target_pointer_width = "32")]
 const EXPONENT_MASK: usize = ((1 << EXPONENT_BITS) - 1) << EXPONENT_SHIFT;
 const MANTISSA_SHIFT: usize = EXPONENT_SHIFT + EXPONENT_BITS;
 const MANTISSA_BITS: usize = 14;
@@ -36,7 +37,7 @@ impl SpaceDescriptor {
 
     pub fn create_descriptor_from_heap_range(start: Address, end: Address) -> SpaceDescriptor {
         let top = end == vm_layout_constants::HEAP_END;
-        if HEAP_LAYOUT_64BIT {
+        if cfg!(target_pointer_width = "64") {
             let space_index = if start > vm_layout_constants::HEAP_END {
                 ::std::usize::MAX
             } else {
@@ -93,38 +94,35 @@ impl SpaceDescriptor {
         (self.0 & TYPE_MASK) == TYPE_CONTIGUOUS_HI
     }
 
+    #[cfg(target_pointer_width = "64")]
     pub fn get_start(self) -> Address {
-        if HEAP_LAYOUT_64BIT {
-            // This should not be called for 32 bits. So its fine, it won't overflow in 64bit.
-            #[allow(arithmetic_overflow)]
-            unsafe {
-                Address::from_usize(self.get_index() << heap_parameters::LOG_SPACE_SIZE_64)
-            }
-        } else {
-            debug_assert!(self.is_contiguous());
-
-            let descriptor = self.0;
-            let mantissa = descriptor >> MANTISSA_SHIFT;
-            let exponent = (descriptor & EXPONENT_MASK) >> EXPONENT_SHIFT;
-            unsafe { Address::from_usize(mantissa << (BASE_EXPONENT + exponent)) }
-        }
+        unsafe { Address::from_usize(self.get_index() << heap_parameters::LOG_SPACE_SIZE_64) }
     }
 
+    #[cfg(taget_pointer_width = "32")]
+    pub fn get_start(self) -> Address {
+        debug_assert!(self.is_contiguous());
+
+        let descriptor = self.0;
+        let mantissa = descriptor >> MANTISSA_SHIFT;
+        let exponent = (descriptor & EXPONENT_MASK) >> EXPONENT_SHIFT;
+        unsafe { Address::from_usize(mantissa << (BASE_EXPONENT + exponent)) }
+    }
+
+    #[cfg(target_pointer_width = "64")]
     pub fn get_extent(self) -> usize {
-        if HEAP_LAYOUT_64BIT {
-            return vm_layout_constants::SPACE_SIZE_64;
-        }
+        vm_layout_constants::SPACE_SIZE_64
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    pub fn get_extent(self) -> usize {
         debug_assert!(self.is_contiguous());
         let chunks = (self.0 & SIZE_MASK) >> SIZE_SHIFT;
         chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK
     }
 
-    // FIXME: This function should only work for 64 bit heap.
-    // However, HEAP_LAYOUT_64BIT is a constant at the moment (which is not correct), and
-    // we do want this function failed the assertion if HEAP_LAYOUT_64BIT is no longer constantly true.
-    #[allow(clippy::assertions_on_constants)]
+    #[cfg(target_pointer_width = "64")]
     pub fn get_index(self) -> usize {
-        debug_assert!(HEAP_LAYOUT_64BIT);
         (self.0 & INDEX_MASK) >> INDEX_SHIFT
     }
 }
@@ -159,7 +157,7 @@ mod tests {
         assert!(d.is_contiguous());
         assert!(!d.is_contiguous_hi());
         assert_eq!(d.get_start(), HEAP_START);
-        if HEAP_LAYOUT_64BIT {
+        if cfg!(target_pointer_width = "64") {
             assert_eq!(d.get_extent(), SPACE_SIZE_64);
         } else {
             assert_eq!(d.get_extent(), TEST_SPACE_SIZE);
@@ -175,7 +173,7 @@ mod tests {
         assert!(!d.is_empty());
         assert!(d.is_contiguous());
         assert!(!d.is_contiguous_hi());
-        if HEAP_LAYOUT_64BIT {
+        if cfg!(target_pointer_width = "64") {
             assert_eq!(d.get_start(), HEAP_START);
             assert_eq!(d.get_extent(), SPACE_SIZE_64);
         } else {
@@ -193,7 +191,7 @@ mod tests {
         assert!(!d.is_empty());
         assert!(d.is_contiguous());
         assert!(d.is_contiguous_hi());
-        if HEAP_LAYOUT_64BIT {
+        if cfg!(target_pointer_width = "64") {
             assert_eq!(d.get_start(), HEAP_END - SPACE_SIZE_64);
             assert_eq!(d.get_extent(), SPACE_SIZE_64);
         } else {
