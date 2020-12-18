@@ -33,7 +33,7 @@ A few benchmarks of varying size will be used throughout the tutorial. If you ha
    ```
    * Run HelloWorld by using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac HelloWorld.java` followed by `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java HelloWorld` in `openjdk`.
    
-2. The Computer Language Benchmarks Game **fannkuchredux** (toy benchmark, allocates a small amount of memory but not enough to trigger a collection): Copy code from [here](https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/master/bencher/programs/fannkuchredux/fannkuchredux.java) into a new file named "fannkuchredux.java" in `mmtk-openjdk/repos/openjdk`.
+2. The Computer Language Benchmarks Game **fannkuchredux** (toy benchmark, allocates a small amount of memory but not enough to trigger a collection): [Copy this code](https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/master/bencher/programs/fannkuchredux/fannkuchredux.java) into a new file named "fannkuchredux.java" in `mmtk-openjdk/repos/openjdk`.
    * Run fannkuchredux by using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac fannkuchredux.java` followed by `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java fannkuchredux` in `openjdk`.
    
 3. **DeCapo** benchmark suite (most complex, will trigger multiple collections): Fetch using `wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar`.
@@ -120,7 +120,7 @@ At this point, you should familiarise yourself with the MyGC plan if you haven't
    * What kind of memory space policy is used?
    * What happens if garbage has to be collected?
    
-[Back to table of contents](#contents)
+[**Back to table of contents**](#contents)
 ***
 ## Building a Semispace Collector
 ### Allocation: Add copyspaces
@@ -139,7 +139,7 @@ Add the two copyspaces and change the alloc/mut to work with these spaces
 ### Adding another copyspace
 Less guided exercise: Add “young” copyspace which all new objects go to before moving to the fromspace. 
 
-[Back to table of contents](#contents)
+[**Back to table of contents**](#contents)
 ***
 ## Further reading: 
 - [MMTK Crate Documentation](https://www.mmtk.io/mmtk-core/mmtk/index.html)
