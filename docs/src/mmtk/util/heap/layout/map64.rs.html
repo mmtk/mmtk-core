@@ -232,6 +232,17 @@
 <span id="232">232</span>
 <span id="233">233</span>
 <span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">map</span>::<span class="ident">Map</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="kw-2">*</span>;
@@ -289,6 +300,8 @@
     <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">extent</span>: <span class="ident">usize</span>, <span class="ident">descriptor</span>: <span class="ident">SpaceDescriptor</span>) {
         <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="self">Self</span>::<span class="ident">is_space_start</span>(<span class="ident">start</span>));
         <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">extent</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">SPACE_SIZE_64</span>);
+        <span class="comment">// Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,</span>
+        <span class="comment">// as each space will update different indices.</span>
         <span class="kw">let</span> <span class="ident">self_mut</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
         <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">space_index</span>(<span class="ident">start</span>).<span class="ident">unwrap</span>();
         <span class="ident">self_mut</span>.<span class="ident">descriptor_map</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="ident">descriptor</span>;
@@ -305,6 +318,7 @@
         <span class="kw-2">mut</span> <span class="ident">units</span>: <span class="ident">usize</span>,
         <span class="ident">grain</span>: <span class="ident">i32</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">FreeList</span><span class="op">&gt;</span> {
+        <span class="comment">// This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.</span>
         <span class="kw">let</span> <span class="ident">self_mut</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">pr</span>.<span class="ident">get_start</span>();
         <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">space_index</span>(<span class="ident">start</span>).<span class="ident">unwrap</span>();
@@ -347,6 +361,8 @@
         <span class="ident">_head</span>: <span class="ident">Address</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
         <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="self">Self</span>::<span class="ident">space_index</span>(<span class="ident">descriptor</span>.<span class="ident">get_start</span>()).<span class="ident">unwrap</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">descriptor</span>.<span class="ident">get_index</span>());
+        <span class="comment">// Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,</span>
+        <span class="comment">// as each space will update different indices.</span>
         <span class="kw">let</span> <span class="ident">self_mut</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
 
         <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">descriptor</span>.<span class="ident">get_index</span>();
@@ -391,6 +407,8 @@
     }
 
     <span class="kw">fn</span> <span class="ident">boot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="comment">// This is only called during boot process by a single thread calling gc_init().</span>
+        <span class="comment">// It is fine to get a mutable reference.</span>
         <span class="kw">let</span> <span class="ident">self_mut</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
         <span class="kw">for</span> <span class="ident">pr</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">MAX_SPACES</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">fl</span>) <span class="op">=</span> <span class="ident">self_mut</span>.<span class="ident">fl_map</span>[<span class="ident">pr</span>] {
@@ -402,6 +420,8 @@
     }
 
     <span class="kw">fn</span> <span class="ident">finalize_static_space_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_from</span>: <span class="ident">Address</span>, <span class="ident">_to</span>: <span class="ident">Address</span>) {
+        <span class="comment">// This is only called during boot process by a single thread calling gc_init().</span>
+        <span class="comment">// It is fine to get a mutable reference.</span>
         <span class="kw">let</span> <span class="ident">self_mut</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
         <span class="kw">for</span> <span class="ident">pr</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">MAX_SPACES</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">fl</span>) <span class="op">=</span> <span class="ident">self_mut</span>.<span class="ident">fl_page_resources</span>[<span class="ident">pr</span>] {
@@ -441,9 +461,11 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Map64</span> {
-    <span class="comment">// This is a temporary solution to allow unsafe mut reference. We do not want several occurrence</span>
-    <span class="comment">// of the same unsafe code.</span>
-    <span class="comment">// FIXME: We need a safe implementation.</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The caller needs to guarantee there is no race condition. Either only one single thread</span>
+    <span class="doccomment">/// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).</span>
+    <span class="doccomment">/// In other cases, use mut_self_with_sync().</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">cast_ref_to_mut</span>)]</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">mut_from_ref</span>)]</span>
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">mut_self</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span> {
