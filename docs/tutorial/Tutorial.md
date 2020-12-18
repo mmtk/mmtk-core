@@ -1,10 +1,10 @@
-# MMTK Tutorial
+# MMTk Tutorial
 
 In this tutorial, you will build multiple garbage collectors using MMTK from scratch. 
- 
 **TODO: Finish description.**
 
 ## Contents
+* [Introduction](#introduction)
 * [Preliminaries](#preliminaries)
   * [Set up MMTK and OpenJDK](#set-up-mmtk-and-openjdk)
     * [Basic set up](#basic-set-up)
@@ -15,12 +15,41 @@ In this tutorial, you will build multiple garbage collectors using MMTK from scr
 * ?
 * [Further Reading](#further-reading)
 
+
+## Introduction
+### What *is* the MMTk?
+The Memory Management Toolkit (MMTk) is a framework to design and implement memory managers. It has a core (this repository) written in Rust, and bindings that allow it to work with OpenJDK, V8, and JikesRVM, with more bindings currently in development.  **TODO: expand?**
+
+### Terminology
+
+*allocator*: Handles allocation requests. Allocates objects into memory.
+
+*collector*: Finds and frees memory used by 'dead' objects. 
+
+*dead*: An object that can no longer be accessed by any other object is dead.
+
+*live*: An object that can still be accessed by other objects is live/alive.
+
+*mutator*: Something that 'mutates', or changes, the objects stored in memory. That is to say, this is a running program.
+
+*plan*: (MMTk-specific) A garbage collection algorithm composed from components.
+
+*policy*: (MMTk-specific) A definition of the semantics and behaviour of a memory region. Memory spaces are instances of policies.
+
+*scheduler*: (MMTk-specific) Schedules GC works so that they can safely be run in parallel.
+
+*work packet*: (MMTk-specific) A unit of GC work **Need better description**
+
+See also: [Further Reading](#further-reading)
+
+[**Back to table of contents**](#contents)
+***
 ## Preliminaries
-### Set up MMTK and OpenJDK
+### Set up MMTk and OpenJDK
 #### Basic set up
 This tutorial can be completed with any binding. However, for the sake of simplicity, only the setup for the OpenJDK binding will be described in detail here. If you would like to use another binding, you will need to follow the README files in their respective repositories ([JikesRVM](https://github.com/mmtk/mmtk-jikesrvm), [V8](https://github.com/mmtk/mmtk-v8)) to set them up, and find appropriate benchmarks for testing. Also, while it may be useful to fork the relevant repositories to your own account, it is not required for this tutorial.
 
-First, set up OpenJDK, MMTK, and the binding:
+First, set up OpenJDK, MMTk, and the binding:
 1. Clone the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk).
 2. Clone this repository and the [OpenJDK VM repository](https://github.com/mmtk/openjdk). Place them both in `mmtk-openjdk/repos`.
 4. Ensure you can build OpenJDK according to the instructions in the READMEs of [this repository](/../master/README.md) and the [OpenJDK binding repository](https://github.com/mmtk/mmtk-openjdk/blob/master/README.md).
@@ -151,8 +180,8 @@ Less guided exercise: Add “young” copyspace which all new objects go to befo
 [**Back to table of contents**](#contents)
 ***
 ## Further reading: 
-- [MMTK Crate Documentation](https://www.mmtk.io/mmtk-core/mmtk/index.html)
-- Original MMTK papers:
+- [MMTk Crate Documentation](https://www.mmtk.io/mmtk-core/mmtk/index.html)
+- Original MMTk papers:
   - [*Oil and Water? High Performance Garbage Collection in Java with MMTk*](https://www.mmtk.io/assets/pubs/mmtk-icse-2004.pdf) (Blackburn, Cheng, McKinley, 2004)
   - [*Myths and realities: The performance impact of garbage collection*](https://www.mmtk.io/assets/pubs/mmtk-sigmetrics-2004.pdf) (Blackburn, Cheng, McKinley, 2004)
 - [*The Garbage Collection Handbook*](https://learning.oreilly.com/library/view/the-garbage-collection/9781315388007) (Jones, Hosking, Moss, 2016)
