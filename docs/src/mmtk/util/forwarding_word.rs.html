@@ -363,10 +363,10 @@
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_forwarding_bits</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="ident">gc_byte</span>::<span class="ident">write_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-        <span class="ident">object</span>,
-        <span class="ident">gc_byte</span>::<span class="ident">read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) <span class="op">&amp;</span> <span class="op">!</span><span class="ident">FORWARDING_MASK</span>,
-    );
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">old_val</span> <span class="op">=</span> <span class="ident">gc_byte</span>::<span class="ident">read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
+    <span class="kw">while</span> <span class="op">!</span><span class="ident">gc_byte</span>::<span class="ident">compare_exchange_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">old_val</span>, <span class="ident">old_val</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">FORWARDING_MASK</span>) {
+        <span class="ident">old_val</span> <span class="op">=</span> <span class="ident">gc_byte</span>::<span class="ident">read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
+    }
 }
 
 <span class="doccomment">/// Returns the address of the forwarding word of an object.</span>
