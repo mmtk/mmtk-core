@@ -23,19 +23,19 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">vm_layout_constants</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">mmapper</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">mmapper</span>::<span class="ident">Mmapper</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">mod</span> <span class="ident">byte_map_mmapper</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">byte_map_mmapper</span>::<span class="ident">ByteMapMmapper</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>, <span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>)))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">mod</span> <span class="ident">fragmented_mapper</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>, <span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>)))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">fragmented_mapper</span>::<span class="ident">FragmentedMapper</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">heap_layout</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">map</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">map32</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>, <span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>)))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">map64</span>;
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../../../";window.currentCrate = "mmtk";</script><script src="../../../../../main.js"></script><script src="../../../../../source-script.js"></script><script src="../../../../../source-files.js"></script><script defer src="../../../../../search-index.js"></script></body></html>

@@ -337,10 +337,8 @@
 <span id="337">337</span>
 <span id="338">338</span>
 <span id="339">339</span>
-<span id="340">340</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>;
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">vmrequest</span>::<span class="ident">HEAP_LAYOUT_64BIT</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">required_chunks</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">address</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>::<span class="kw-2">*</span>;
@@ -543,7 +541,7 @@
         <span class="kw">let</span> <span class="ident">sentinel</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span>;
 
         <span class="ident">MonotonePageResource</span> {
-            <span class="ident">common</span>: <span class="ident">CommonPageResource</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="ident">HEAP_LAYOUT_64BIT</span>),
+            <span class="ident">common</span>: <span class="ident">CommonPageResource</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)),
 
             <span class="ident">meta_data_pages_per_region</span>,
             <span class="ident">sync</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">MonotonePageResourceSync</span> {

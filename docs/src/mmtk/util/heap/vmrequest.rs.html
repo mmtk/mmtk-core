@@ -76,24 +76,10 @@
 <span id="76">76</span>
 <span id="77">77</span>
 <span id="78">78</span>
-<span id="79">79</span>
-<span id="80">80</span>
-<span id="81">81</span>
-<span id="82">82</span>
-<span id="83">83</span>
-<span id="84">84</span>
-<span id="85">85</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
-
-<span class="comment">////////// FIXME //////////////</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>))]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_LAYOUT_32BIT</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>, <span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>)))]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_LAYOUT_32BIT</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>; <span class="comment">// FIXME SERIOUSLY</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_LAYOUT_64BIT</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="op">!</span><span class="ident">HEAP_LAYOUT_32BIT</span>;
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">VMRequest</span> {
@@ -129,14 +115,14 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">discontiguous</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">if</span> <span class="ident">HEAP_LAYOUT_64BIT</span> {
+        <span class="kw">if</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="kw">return</span> <span class="self">Self</span>::<span class="ident">common64bit</span>(<span class="bool-val">false</span>);
         }
         <span class="ident">VMRequest</span>::<span class="ident">RequestDiscontiguous</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fixed_size</span>(<span class="ident">mb</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">if</span> <span class="ident">HEAP_LAYOUT_64BIT</span> {
+        <span class="kw">if</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="kw">return</span> <span class="self">Self</span>::<span class="ident">common64bit</span>(<span class="bool-val">false</span>);
         }
         <span class="ident">VMRequest</span>::<span class="ident">RequestExtent</span> {
@@ -146,14 +132,14 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fraction</span>(<span class="ident">frac</span>: <span class="ident">f32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">if</span> <span class="ident">HEAP_LAYOUT_64BIT</span> {
+        <span class="kw">if</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="kw">return</span> <span class="self">Self</span>::<span class="ident">common64bit</span>(<span class="bool-val">false</span>);
         }
         <span class="ident">VMRequest</span>::<span class="ident">RequestFraction</span> { <span class="ident">frac</span>, <span class="ident">top</span>: <span class="bool-val">false</span> }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">high_fixed_size</span>(<span class="ident">mb</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">if</span> <span class="ident">HEAP_LAYOUT_64BIT</span> {
+        <span class="kw">if</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="kw">return</span> <span class="self">Self</span>::<span class="ident">common64bit</span>(<span class="bool-val">true</span>);
         }
         <span class="ident">VMRequest</span>::<span class="ident">RequestExtent</span> {
@@ -163,7 +149,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fixed_extent</span>(<span class="ident">extent</span>: <span class="ident">usize</span>, <span class="ident">top</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">if</span> <span class="ident">HEAP_LAYOUT_64BIT</span> {
+        <span class="kw">if</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="kw">return</span> <span class="self">Self</span>::<span class="ident">common64bit</span>(<span class="ident">top</span>);
         }
         <span class="ident">VMRequest</span>::<span class="ident">RequestExtent</span> { <span class="ident">extent</span>, <span class="ident">top</span> }

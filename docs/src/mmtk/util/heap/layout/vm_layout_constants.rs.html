@@ -136,18 +136,24 @@
 <span id="136">136</span>
 <span id="137">137</span>
 <span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">heap_parameters</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 
-<span class="comment">///////// FIXME ////////////</span>
-<span class="kw">use</span> <span class="kw">super</span>::<span class="kw">super</span>::<span class="ident">vmrequest</span>::{<span class="ident">HEAP_LAYOUT_32BIT</span>, <span class="ident">HEAP_LAYOUT_64BIT</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>::{<span class="ident">chunk_align_down</span>, <span class="ident">chunk_align_up</span>};
 
 <span class="doccomment">/** log_2 of the addressable virtual space */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_ADDRESS_SPACE</span>: <span class="ident">usize</span> <span class="op">=</span>
-    <span class="macro">if_then_else_usize</span><span class="macro">!</span>(<span class="ident">HEAP_LAYOUT_32BIT</span>, <span class="number">32</span>, <span class="ident">LOG_SPACE_SIZE_64</span> <span class="op">+</span> <span class="ident">LOG_MAX_SPACES</span>);
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_ADDRESS_SPACE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_SPACE_SIZE_64</span> <span class="op">+</span> <span class="ident">LOG_MAX_SPACES</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_ADDRESS_SPACE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">32</span>;
 <span class="doccomment">/**
  * log_2 of the coarsest unit of address space allocation.
  * &lt;p&gt;
@@ -174,7 +180,10 @@
  * An upper bound on the extent of any space in the
  * current memory layout
  */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_SPACE_EXTENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="macro">if_then_else_usize</span><span class="macro">!</span>(<span class="ident">HEAP_LAYOUT_64BIT</span>, <span class="ident">LOG_SPACE_SIZE_64</span>, <span class="number">31</span>);
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_SPACE_EXTENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_SPACE_SIZE_64</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_SPACE_EXTENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">31</span>;
 
 <span class="doccomment">/**
  * An upper bound on the extent of any space in the
@@ -184,24 +193,24 @@
 
 <span class="comment">// FIXME: HEAP_START, HEAP_END are VM-dependent</span>
 <span class="doccomment">/** Lowest virtual address used by the virtual machine */</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_START</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">chunk_align_down</span>(<span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0x6000_0000</span>) });
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>, <span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>)))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_START</span>: <span class="ident">Address</span> <span class="op">=</span>
     <span class="ident">chunk_align_down</span>(<span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0x0000_0200_0000_0000usize</span>) });
 
 <span class="doccomment">/** Highest virtual address used by the virtual machine */</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_END</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">chunk_align_up</span>(<span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0xb000_0000</span>) });
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>, <span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>)))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_END</span>: <span class="ident">Address</span> <span class="op">=</span>
     <span class="ident">chunk_align_up</span>(<span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0x0000_2000_0000_0000usize</span>) });
 
 <span class="doccomment">/// vm-sapce size (currently only used by jikesrvm)</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">VM_SPACE_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span>
     <span class="ident">chunk_align_up</span>(<span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0x800_0000</span>) }).<span class="ident">as_usize</span>();
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>, <span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;force_32bit_heap_layout&quot;</span>)))]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">VM_SPACE_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span>
     <span class="ident">chunk_align_up</span>(<span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0xdc0_0000</span>) }).<span class="ident">as_usize</span>();
 
@@ -248,7 +257,10 @@
  * Number of bits to shift a space index into/out of a virtual address.
  */</span>
 <span class="comment">/* In a 32-bit model, use a dummy value so that the compiler doesn&#39;t barf. */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_SHIFT_64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="macro">if_then_else_usize</span><span class="macro">!</span>(<span class="ident">HEAP_LAYOUT_64BIT</span>, <span class="ident">LOG_SPACE_SIZE_64</span>, <span class="number">0</span>);
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_SHIFT_64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_SHIFT_64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_SPACE_SIZE_64</span>;
 
 <span class="doccomment">/**
  * Bitwise mask to isolate a space index in a virtual address.
@@ -256,10 +268,10 @@
  * We can&#39;t express this constant in a 32-bit environment, hence the
  * conditional definition.
  */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_MASK_64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="macro">if_then_else_zero_usize</span><span class="macro">!</span>(
-    <span class="ident">HEAP_LAYOUT_64BIT</span>,
-    ((<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MAX_SPACES</span>) <span class="op">-</span> <span class="number">1</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">SPACE_SHIFT_64</span>
-);
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_MASK_64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_MASK_64</span>: <span class="ident">usize</span> <span class="op">=</span> ((<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MAX_SPACES</span>) <span class="op">-</span> <span class="number">1</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">SPACE_SHIFT_64</span>;
 
 <span class="comment">/*
  * Size of each space in the 64-bit memory layout

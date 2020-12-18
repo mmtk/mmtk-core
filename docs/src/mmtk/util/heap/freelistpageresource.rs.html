@@ -356,16 +356,12 @@
 <span id="356">356</span>
 <span id="357">357</span>
 <span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">layout</span>::<span class="ident">map</span>::<span class="ident">Map</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">layout</span>::<span class="ident">Mmapper</span>;
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">vmrequest</span>::<span class="ident">HEAP_LAYOUT_64BIT</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">PageResource</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">Space</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">address</span>::<span class="ident">Address</span>;
@@ -392,9 +388,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">resize_freelist</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">start_address</span>: <span class="ident">Address</span>) {
-        <span class="comment">// debug_assert!((HEAP_LAYOUT_64BIT || !contiguous) &amp;&amp; !Plan.isInitialized());</span>
         <span class="self">self</span>.<span class="ident">start</span> <span class="op">=</span> <span class="ident">start_address</span>.<span class="ident">align_up</span>(<span class="ident">BYTES_IN_REGION</span>);
-        <span class="comment">// self.free_list.resize_freelist();</span>
     }
 }
 
@@ -519,7 +513,7 @@
             );
             <span class="ident">common_flpr</span>
         };
-        <span class="kw">let</span> <span class="ident">growable</span> <span class="op">=</span> <span class="ident">HEAP_LAYOUT_64BIT</span>;
+        <span class="kw">let</span> <span class="ident">growable</span> <span class="op">=</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">flpr</span> <span class="op">=</span> <span class="ident">FreeListPageResource</span> {
             <span class="ident">common</span>: <span class="ident">CommonPageResource</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="ident">growable</span>),
             <span class="ident">common_flpr</span>,
