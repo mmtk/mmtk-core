@@ -26,7 +26,8 @@ You will need to build multiple versions of the VM in this tutorial.
    1. If you rename the internal folder, you *must* add to the start of the folder name, otherwise the build will not generate correctly (e.g. `NOGC_linux-x86_64-normal-server-$DEBUG_LEVEL` will work, but `inux-x86_64-normal-server-$DEBUG_LEVEL-NOGC` will lead to an incomplete build being generated). **I think, at least...**
    2. Renaming the `build` folder will also work, and is less error-prone than renaming the folder within it.
    3. If you plan to completely overwrite a build, deleting the folder you are writing over will help prevent errors.
-3. Try building using NoGC. If you then run a benchmark test large enough to trigger a collection, such as DeCapo's `lusearch`, it should fail when the collection is triggered with the error message **TODO: Add error message**. A small test should complete without problems. **TODO: Find or create mini test!**
+3. Try building using NoGC. If you then run a benchmark test large enough to trigger a collection, such as DeCapo's `lusearch`, it should fail when the collection is triggered. A small test should complete without problems. **TODO: Find or create mini test!**
+**TODO: Image of code?**
 4. Try building using Semispace. The DeCapo benchmark should now pass, as garbage will be collected, and the **small test** should run the same as it did for NoGC.
 
 A few benchmarks of varying size will be used throughout the tutorial. If you haven't already, set them up now. **TODO: Not sure if this is best placed here.**
