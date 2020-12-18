@@ -13,7 +13,7 @@ In this tutorial, you will build multiple garbage collectors using MMTK from scr
 ## Preliminaries
 ### Set up MMTK and OpenJDK
 #### Basic set up
-This tutorial can be completed with any binding. However, for the sake of simplicity, only the setup for the OpenJDK binding will be described in detail here. If you would like to use another binding, you will need to follow the README files in their respective repositories to set them up, and use alternate benchmarks for testing. [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm), [V8](https://github.com/mmtk/mmtk-v8). Also, while it may be useful to fork the relevant repositories to your own account, it is not required for this tutorial.
+This tutorial can be completed with any binding. However, for the sake of simplicity, only the setup for the OpenJDK binding will be described in detail here. If you would like to use another binding, you will need to follow the README files in their respective repositories ([JikesRVM](https://github.com/mmtk/mmtk-jikesrvm), [V8](https://github.com/mmtk/mmtk-v8)) to set them up, and find appropriate benchmarks for testing. Also, while it may be useful to fork the relevant repositories to your own account, it is not required for this tutorial.
 
 First, set up OpenJDK, MMTK, and the binding:
 1. Clone the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk).
