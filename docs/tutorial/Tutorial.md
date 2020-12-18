@@ -42,7 +42,7 @@ A few benchmarks of varying size will be used throughout the tutorial. If you ha
    * Run fannkuchredux by using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac fannkuchredux.java` followed by `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java fannkuchredux` in `openjdk`.
    
 3. **DeCapo** benchmark suite (most complex, will trigger multiple collections): Fetch using `wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar`.
-   * DeCapo contains a variety of benchmarks, but this tutorial will only be using `lusearch`. Run the `lusearch` benchmark using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch` in `openjdk`. 
+   * DeCapo contains a variety of benchmarks, but this tutorial will only be using lusearch. Run the lusearch benchmark using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch` in `openjdk`. 
 
 #### Working with multiple VM builds
 You will need to build multiple versions of the VM in this tutorial. You should familiarise yourself with how to do this now.
@@ -52,7 +52,7 @@ You will need to build multiple versions of the VM in this tutorial. You should 
    2. If you rename the internal folder, there is a possibility that the new build will generate incorrectly. If a build appears to generate strangely quickly, it probably generated badly.
    3. A renamed build folder can be tested by changing the file path in commands as appropriate.
    4. If you plan to completely overwrite a build, deleting the folder you are writing over will help prevent errors.
-3. Try building using NoGC. Both HelloWorld and the fannkuchredux benchmark should run without issue. If you then run a benchmark test large enough to trigger a collection, such as DeCapo's `lusearch`, it should fail when the collection is triggered. The messages and errors produced should look identical or nearly identical to the log below.
+3. Try building using NoGC. Both HelloWorld and the fannkuchredux benchmark should run without issue. If you then run lusearch, it should fail when a collection is triggered. The messages and errors produced should look identical or nearly identical to the log below.
 ```
 $ ./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch
 Using scaled threading model. 24 processors detected, 24 threads used to drive the workload, in a possible range of [1,64]
@@ -87,7 +87,7 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 fatal runtime error: failed to initiate panic, error 5
 Aborted (core dumped)
 ```
-4. If you haven't already, try building using Semispace. The DeCapo benchmark should now pass, as garbage will be collected, and the smaller benchmarks should run the same as they did while using NoGC.
+4. If you haven't already, try building using Semispace. lusearch should now pass, as garbage will be collected, and the smaller benchmarks should run the same as they did while using NoGC.
 
 
 ### Create MyGC
