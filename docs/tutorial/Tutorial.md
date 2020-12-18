@@ -99,7 +99,7 @@ NoGC is a GC plan that only allocates memory, and does not have a collector. We'
 1. Each plan is stored in `mmtk-openjdk/repos/mmtk-core/src/plan`. Navigate there and create a copy of the folder `nogc`. Rename it to `mygc`.
 2. Open up the search menu with CRTL-F. Make sure case-sensitive search is enabled.
 3. In *each file* within `mygc`, rename any reference to `nogc` to `mygc` (select one occurrence, and then either right click and select "Change all occurrences" or use the shortcut CTRL-F2). You will also have to separately rename any reference to `NoGC` to `MyGC`. 
-4. In order to build using `mygc`, you will need to make some changes to the following files:
+4. In order to build using MyGC, you will need to make some changes to the following files:
     1. `mmtk-core/src/plan/mod.rs`, under the import statements, add:
     ```rust
     #[cfg(feature = "mygc")]
