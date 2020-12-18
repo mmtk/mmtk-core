@@ -6,6 +6,11 @@ In this tutorial, you will build multiple garbage collectors using MMTK from scr
 
 ## Contents
 * [Preliminaries](#preliminaries)
+  * [Set up MMTK and OpenJDK](#set-up-mmtk-and-openjdk)
+    * [Basic set up](#basic-set-up)
+    * [Set up benchmarks](#set-up-benchmarks)
+    * [Working with multiple VM builds](#working-with-multiple-vm-builds)
+  * [Create MyGC](#create-mygc)
 * [Building a Semispace Collector](#building-a-semispace-collector)
 * ?
 * [Further Reading](#further-reading)
