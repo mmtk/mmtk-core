@@ -26,6 +26,7 @@ First, set up OpenJDK, MMTK, and the binding:
 4. Ensure you can build OpenJDK according to the instructions in the READMEs of [this repository](/../master/README.md) and the [OpenJDK binding repository](https://github.com/mmtk/mmtk-openjdk/blob/master/README.md).
 
 
+
 #### Set up benchmarks
 A few benchmarks of varying size will be used throughout the tutorial. If you haven't already, set them up now.
 1. **HelloWorld** (simplest, will never trigger GC): Copy the following code into a new Java file titled "HelloWorld.java" in `mmtk-openjdk/repos/openjdk`:
@@ -43,6 +44,8 @@ A few benchmarks of varying size will be used throughout the tutorial. If you ha
    
 3. **DeCapo** benchmark suite (most complex, will trigger multiple collections): Fetch using `wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar`.
    * DeCapo contains a variety of benchmarks, but this tutorial will only be using lusearch. Run the lusearch benchmark using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch` in `openjdk`. 
+
+
 
 #### Working with multiple VM builds
 You will need to build multiple versions of the VM in this tutorial. You should familiarise yourself with how to do this now.
@@ -88,6 +91,7 @@ fatal runtime error: failed to initiate panic, error 5
 Aborted (core dumped)
 ```
 4. If you haven't already, try building using Semispace. lusearch should now pass, as garbage will be collected, and the smaller benchmarks should run the same as they did while using NoGC.
+
 
 
 ### Create MyGC
