@@ -121,11 +121,7 @@ pub fn state_is_being_forwarded(gc_byte: u8) -> bool {
 
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
     let mut old_val = gc_byte::read_gc_byte::<VM>(object);
-    while !gc_byte::compare_exchange_gc_byte::<VM>(
-        object,
-        old_val,
-        old_val & !FORWARDING_MASK,
-    ){
+    while !gc_byte::compare_exchange_gc_byte::<VM>(object, old_val, old_val & !FORWARDING_MASK) {
         old_val = gc_byte::read_gc_byte::<VM>(object);
     }
 }
