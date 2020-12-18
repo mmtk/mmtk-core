@@ -1,4 +1,6 @@
 
+use atomic::Ordering;
+
 use crate::util::Address;
 use crate::policy::malloc::*;
 use crate::util::alloc::Allocator;
@@ -38,39 +40,31 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                 assert!(!malloc_memory_full(), "FreeListAllocator: Out of memory!");
             }
 
-            //using hashset
-            let ptr = libc::calloc(1, size + 8);
-            let address = Address::from_mut_ptr(ptr);
-            let object = address.to_object_reference();
-            let block_size = libc::malloc_usable_size(ptr);
-            let mut mem = MEMORY_ALLOCATED.lock().unwrap();
-            *mem += block_size;
-            println!("allocated object sized {} into block sized {} at {:b}, index of {:b}", size + 8, block_size, address.as_usize(), object_reference_to_index(object));
-
-            NODES.lock().unwrap().insert(address.add(8).to_object_reference()); //NODES contains the reference to the object, not the mark word
-            address.add(8)
-            // println!("allocated to address = {a}/{a:b}", a=address.as_usize());
-
-            //using bitmap
-            // let ptr = libc::calloc(1, size);
-            // let address = Address::from_mut_ptr(ptr);
-            // let object = address.to_object_reference();
-            // let obj_size = libc::malloc_usable_size(ptr);
-            // let mut mem = MEMORY_ALLOCATED.lock().unwrap();
-            // *mem += obj_size;
-
-            // let mut MALLOCED_mut = MALLOCED.lock().unwrap();
-            // let mut MARKED_mut = MARKED.lock().unwrap();
-            // let index = object_reference_to_index(object);
-            // println!("index = {}", index);
-            // let grow_by = index - MALLOCED_mut.capacity() + 1;
-            // if grow_by >= 0 {
-            //     MALLOCED_mut.grow(grow_by, false);
-            //     MARKED_mut.grow(grow_by, false);
-            // }
-            // MALLOCED_mut.set(index, true);
-
-            // address
+            if USE_HASHSET {
+                //using hashset
+                let ptr = libc::calloc(1, size + 8);
+                let address = Address::from_mut_ptr(ptr);
+                let object = address.to_object_reference();
+                let allocated_memory = libc::malloc_usable_size(ptr);
+                let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
+                *total_memory_allocated += allocated_memory;
+                // println!("Allocated {} bytes, total {} bytes.", allocated_memory, total_memory_allocated);
+                // println!("allocated object sized {} into block sized {} at {:b}, index of {:b}", size + 8, allocated_memory, address.as_usize(), object_reference_to_index(object));
+                NODES.lock().unwrap().insert(address.add(8).to_object_reference()); //NODES contains the reference to the object, not the mark word
+                
+                address.add(8)
+            } else {
+                //using bitmap
+                let ptr = libc::calloc(1, size);
+                let address = Address::from_mut_ptr(ptr);
+                let object = address.to_object_reference();
+                let allocated_memory = libc::malloc_usable_size(ptr);
+                let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
+                *total_memory_allocated += allocated_memory;
+                create_metadata(address);
+                // println!("alloced {}", total_memory_allocated);
+                address
+            }
         }
     }
 

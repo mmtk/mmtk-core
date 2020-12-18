@@ -31,26 +31,24 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
             return object;
         }
 
-        //using bitmaps
-        // let mut MARKED_mut = MARKED.lock().unwrap();
-        //if not marked, mark and call self.process_node
-        // let index = object_reference_to_index(object);
-        // let mark = MARKED_mut.get(index).unwrap();
-
-        // if !mark {
-        //     MARKED_mut.set(index, true);
-        //     self.process_node(object);
-        // }
-        
-        //using hashset
-        //if not marked, mark and call self.process_node
-        let mark_address: Address = object.to_address().sub(8);
-        let marking_word: usize = unsafe { mark_address.load() };
-        if marking_word == 0usize {
-            unsafe { mark_address.store(1) };
-            self.process_node(object);
+        if USE_HASHSET {
+            // using hashset
+            // if not marked, mark and call self.process_node
+            let mark_address: Address = object.to_address().sub(8);
+            let marking_word: usize = unsafe { mark_address.load() };
+            if marking_word == 0usize {
+                unsafe { mark_address.store(1) };
+                self.process_node(object);
+            }
+            object
+        } else {
+            //using bitmaps
+            if !is_marked(object) {
+                mark(object);
+                self.process_node(object);
+            }
+            object
         }
-        object
     }
 }
 

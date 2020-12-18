@@ -23,6 +23,7 @@ use crate::util::{Address, ObjectReference, OpaquePointer};
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::vm::VMBinding;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::{ops::Sub, sync::Arc};
 
 use enum_map::EnumMap;
@@ -103,35 +104,61 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn release(&self, tls: OpaquePointer) {
+        println!("release");
+        {
+            let total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
+            println!("total memory allocated = {}", *total_memory_allocated);
+        }
         unsafe {
+            if USE_HASHSET {
+                //using hashset
+                let mut NODES_mut = &mut *NODES.lock().unwrap();
+                NODES_mut.retain(|&o| MarkSweep::<VM>::marked(&o));
+                for object in NODES_mut.iter() {
+                    let a: Address = object.to_address().sub(8);
+                    let marking_word: usize = a.load();
+                    debug_assert!(marking_word != 0usize, "Marking word is 0, should have been removed from NODES");
+                    debug_assert!(marking_word == 1usize, "Marking word must be 1 or 0, found {}", marking_word);
+                    a.store(0);
+                }
+            } else {
+                //using bitmaps
 
-            //using hashset
-            let mut NODES_mut = &mut *NODES.lock().unwrap();
-            NODES_mut.retain(|&o| MarkSweep::<VM>::marked(&o));
-            for object in NODES_mut.iter() {
-                let a: Address = object.to_address().sub(8);
-                let marking_word: usize = a.load();
-                debug_assert!(marking_word != 0usize, "Marking word is 0, should have been removed from NODES");
-                debug_assert!(marking_word == 1usize, "Marking word must be 1 or 0, found {}", marking_word);
-                a.store(0);
+                let ref mut metadata_table = METADATA_TABLE.write().unwrap();
+                let chunks = metadata_table.len();
+                let mut chunk_index = 0;
+                while chunk_index < chunks {
+                    let mut row = metadata_table[chunk_index].as_mut().unwrap();
+                    let ref mut malloced = row.1;
+                    let ref mut marked = row.2;
+                    let mut bytemap_index = 0;
+                    while bytemap_index < malloced.len() {
+                        if malloced[bytemap_index].load(Ordering::SeqCst) == 1 {
+                            if marked[bytemap_index].load(Ordering::SeqCst) == 0 {
+                                let chunk_start = row.0.load(Ordering::SeqCst);
+                                let address = bytemap_index_to_address(bytemap_index, chunk_start);
+                                let ptr = address.to_mut_ptr();
+                                let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
+                                let freed_memory = libc::malloc_usable_size(ptr);
+                                *total_memory_allocated -= freed_memory;
+                                libc::free(ptr);
+                                malloced[bytemap_index] = AtomicU8::new(0);
+                                marked[bytemap_index] = AtomicU8::new(0);
+                            } else {
+                                marked[bytemap_index] = AtomicU8::new(0);
+                            }
+                        }
+                        bytemap_index += 1;
+                    }
+                    chunk_index += 1;
+                }
+
+                println!("done freeing");
+                let total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
+                println!("total memory allocated = {}", *total_memory_allocated);
             }
 
-            //using bitmaps 
-            // let mut MALLOCED_mut = &mut *MALLOCED.lock().unwrap();
-            // let mut MARKED_mut = &mut *MARKED.lock().unwrap();
-            // let mut to_free = MALLOCED_mut.clone();
-            // to_free.xor(MARKED_mut);
-            // let count: usize = 0;
-            // let max = to_free.len();
 
-            // while count < max {
-            //     if to_free.get(count).unwrap() {
-            //         MALLOCED_mut.set(count, false);
-            //         MARKED_mut.set(count, false);
-            //         let object = index_to_object_reference(count);
-            //         libc::free(object.to_address().to_mut_ptr());
-            //     }
-            // }
         }
     }
 
@@ -140,8 +167,8 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        let mem = MEMORY_ALLOCATED.lock().unwrap();
-        MALLOC_MEMORY - *mem
+        let total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
+        MALLOC_MEMORY - *total_memory_allocated
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -158,12 +185,13 @@ impl<VM: VMBinding> MarkSweep<VM> {
         unsafe {
             let address: Address = object.to_address().sub(8);
             let marking_word: usize = address.load();
-            let mut mem = MEMORY_ALLOCATED.lock().unwrap();
+            let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
             if marking_word == 0 {
-                let obj_size = libc::malloc_usable_size(address.to_mut_ptr());
-                debug_assert!(*mem >= obj_size, "Attempting to free an object sized {} when total memory allocated is {}", obj_size, mem);
-                *mem -= obj_size;
-                debug_assert!(*mem >= 0, "amount of memory allocated cannot be negative!");
+                let freed_memory = libc::malloc_usable_size(address.to_mut_ptr());
+                debug_assert!(*total_memory_allocated >= freed_memory, "Attempting to free an object sized {} when total memory allocated is {}", freed_memory, total_memory_allocated);
+                *total_memory_allocated -= freed_memory;
+                debug_assert!(*total_memory_allocated >= 0, "amount of memory allocated cannot be negative!");
+                // println!("Freed {} bytes, total {} bytes.", freed_memory, total_memory_allocated);
                 libc::free(address.to_mut_ptr()); 
                 return false
             }
