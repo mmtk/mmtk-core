@@ -18,7 +18,12 @@ In this tutorial, you will build multiple garbage collectors using MMTK from scr
 
 ## Introduction
 ### What *is* the MMTk?
-The Memory Management Toolkit (MMTk) is a framework to design and implement memory managers. It has a core (this repository) written in Rust, and bindings that allow it to work with OpenJDK, V8, and JikesRVM, with more bindings currently in development.  **TODO: expand?**
+The Memory Management Toolkit (MMTk) is a framework to design and implement memory managers. It has a core (this repository) written in Rust, and bindings that allow it to work with OpenJDK, V8, and JikesRVM, with more bindings currently in development. The toolkit has a number of pre-built collectors, and is intended to make it relatively simple to expand upon or build new collectors. Many elements common between collectors can be easily implemented.
+
+### What will this tutorial be covering?
+This tutorial is intended to get you comfortable with building garbage collectors in the MMTk.
+
+You will first be guided through building a Semispace collector. After that, you will extend this collector in various ways that are not particularly practical, but introduce different concepts implemented in the MMTk. These exersizes will be less guided, but hints and functional solutions will be available in case you get stuck. There will also be questions at various points in the tutorial, intended to encourage you to think about what the code is *doing* and potentially motivate further research.
 
 ### Terminology
 
@@ -27,6 +32,8 @@ The Memory Management Toolkit (MMTk) is a framework to design and implement memo
 *collector*: Finds and frees memory used by 'dead' objects. 
 
 *dead*: An object that can no longer be accessed by any other object is dead.
+
+*GC work (unit), GC worker*: A worker that performs garbage collection operations using a single thread.
 
 *live*: An object that can still be accessed by other objects is live/alive.
 
@@ -38,7 +45,7 @@ The Memory Management Toolkit (MMTk) is a framework to design and implement memo
 
 *scheduler*: (MMTk-specific) Schedules GC works so that they can safely be run in parallel.
 
-*work packet*: (MMTk-specific) A unit of GC work **Need better description**
+*work packet*: (MMTk-specific) Contains an instance of a GC worker.
 
 See also: [Further Reading](#further-reading)
 
