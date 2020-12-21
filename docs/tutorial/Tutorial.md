@@ -71,8 +71,8 @@ A few benchmarks of varying size will be used throughout the tutorial. If you ha
 2. The Computer Language Benchmarks Game **fannkuchredux** (toy benchmark, allocates a small amount of memory but not enough to trigger a collection): [Copy this code](https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/master/bencher/programs/fannkuchredux/fannkuchredux.java) into a new file named "fannkuchredux.java" in `mmtk-openjdk/repos/openjdk`.
    * Run fannkuchredux by using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac fannkuchredux.java` followed by `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java fannkuchredux` in `openjdk`.
    
-3. **DeCapo** benchmark suite (most complex, will trigger multiple collections): Fetch using `wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar`.
-   * DeCapo contains a variety of benchmarks, but this tutorial will only be using lusearch. Run the lusearch benchmark using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch` in `openjdk`. 
+3. **DaCapo** benchmark suite (most complex, will trigger multiple collections): Fetch using `wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar`.
+   * DaCapo contains a variety of benchmarks, but this tutorial will only be using lusearch. Run the lusearch benchmark using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch` in `openjdk`. 
 
 
 
@@ -126,8 +126,8 @@ Aborted (core dumped)
 ### Create MyGC
 NoGC is a GC plan that only allocates memory, and does not have a collector. We're going to use it as a base for building a new garbage collector.
 1. Each plan is stored in `mmtk-openjdk/repos/mmtk-core/src/plan`. Navigate there and create a copy of the folder `nogc`. Rename it to `mygc`.
-2. Open up the search menu with CRTL-F. Make sure case-sensitive search is enabled.
-3. In *each file* within `mygc`, rename any reference to `nogc` to `mygc` (select one occurrence, and then either right click and select "Change all occurrences" or use the shortcut CTRL-F2). You will also have to separately rename any reference to `NoGC` to `MyGC`. 
+3. In *each file* within `mygc`, rename any reference to `nogc` to `mygc`. You will also have to separately rename any reference to `NoGC` to `MyGC`.
+   - For example, in Visual Studio Code, you can (making sure sensitivity is selected in the search function) select one instance of `nogc` and either right click and select "Change all instances" or use the CTRL-F2 shortcut, and then type `mygc`, and repeat for `NoGC`.
 4. In order to build using MyGC, you will need to make some changes to the following files:
     1. `mmtk-core/src/plan/mod.rs`, under the import statements, add:
     ```rust
