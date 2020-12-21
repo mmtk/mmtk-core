@@ -9,16 +9,12 @@ use crate::policy::space::*;
 pub const METADATA_BASE: Address = HEAP_END;
 
 pub struct BitsReference {
-    base: Address,
     word_offset: usize,
     bit_offset: usize,
     mask: usize,
 }
 
 impl BitsReference {
-    pub fn word(&self) -> Address {
-        self.base + self.word_offset
-    }
     /// `log_granularity`: Logarithmic value of the bytes granularity.
     ///
     /// `log_bits`: Logarithmic value of number of bits this struct is referencing
@@ -27,14 +23,12 @@ impl BitsReference {
     ///
     /// _e.g. for {8-byte -> 1-bit} mapping, `log_granularity` = 3 (i.e. log2(8 bytes)), `log_bits` = 0  (i.e. log2(1 bit))._
     pub const fn of(addr: Address, log_granularity: u8, log_bits: u8) -> Self {
-        let base = metadata_start(addr);
-        let unit_index = (addr.as_usize() & (BYTES_IN_CHUNK - 1)) >> log_granularity;
+        let unit_index = addr.as_usize() >> log_granularity;
         let log_units_in_metadata_word = LOG_BITS_IN_WORD - (log_bits as usize);
         let word_offset = unit_index >> log_units_in_metadata_word << LOG_BYTES_IN_WORD;
         let bit_offset = (unit_index & ((1 << log_units_in_metadata_word) - 1)) << log_bits;
 
         Self {
-            base,
             word_offset,
             bit_offset,
             mask: ((1 << (1 << log_bits)) - 1) << bit_offset,
@@ -48,7 +42,7 @@ impl BitsReference {
         let new = new << self.bit_offset;
         debug_assert!((old & !self.mask) == 0);
         debug_assert!((new & !self.mask) == 0);
-        let word = unsafe { &*((self.base.as_usize() + self.word_offset) as *const AtomicUsize) };
+        let word = unsafe { &*((METADATA_BASE.as_usize() + self.word_offset) as *const AtomicUsize) };
         loop {
             let old_word = word.load(Ordering::SeqCst);
             if (old_word & self.mask) != old {
