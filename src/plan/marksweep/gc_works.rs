@@ -1,14 +1,16 @@
-use super::global::MarkSweep;
-use crate::policy::space::Space;
+
+use atomic::Ordering;
+
 use crate::scheduler::gc_works::*;
-use crate::util::alloc::{Allocator, FreeListAllocator};
-use crate::util::forwarding_word;
-use crate::util::{Address, ObjectReference, OpaquePointer};
+use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
-use crate::MMTK;
 use std::{marker::PhantomData, ops::Sub};
 use std::ops::{Deref, DerefMut};
 use crate::policy::malloc::*;
+
+pub struct WriteMallocBits {
+
+}
 
 #[derive(Default)]
 pub struct MSProcessEdges<VM: VMBinding> {
@@ -27,6 +29,8 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
     }
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        // println!("trace");
+        // unreachable!();
         if object.is_null() {
             return object;
         }
@@ -43,12 +47,26 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
             object
         } else {
             //using bitmaps
-            if !is_marked(object) {
-                mark(object);
+            if !MARKED.lock().unwrap().contains(&object) { 
+                // !is_marked(object) {
+                // assert!(!MARKED.lock().unwrap().contains(&object));
+                // println!("setting mark bit for obj {}", object.to_address().as_usize());
+                MARKED.lock().unwrap().insert(object);
+                let buffer_full = {
+                    let mut mark_buffer = MARK_BUFFER.lock().unwrap();
+                    mark_buffer.push((object.to_address(),1));
+                    mark_buffer.len() >= 16
+                };
+                if buffer_full {
+                    write_mark_bits();
+                }
+                // unsafe { MARK_BUFFER.lock().unwrap().push(vec![(object.to_address(),1)]) };
+                // set_mark_bit(object);
                 self.process_node(object);
             }
             object
         }
+        
     }
 }
 
