@@ -272,17 +272,15 @@ pub trait Plan: Sized + 'static + Sync + Send {
 
     #[inline]
     fn stress_test_gc_required(&self) -> bool {
-        let pages = self.base().vm_map.get_cumulative_committed_pages();
-        trace!("stress_gc pages={}", pages);
-
+        let stress_factor = self.base().options.stress_factor;
         if self.is_initialized()
-            && (pages ^ self.base().last_stress_pages.load(Ordering::Relaxed)
-                > self.options().stress_factor)
+            && (self.base().allocation_count.load(Ordering::Relaxed) > stress_factor)
         {
-            self.base()
-                .last_stress_pages
-                .store(pages, Ordering::Relaxed);
+            trace!("Stress GC: allocation_count = {}, stress_factor = {}",
+                   self.base().allocation_count.load(Ordering::Relaxed),
+                   stress_factor);
             trace!("Doing stress GC");
+            self.base().allocation_count.store(0, Ordering::Relaxed);
             true
         } else {
             false
@@ -354,6 +352,8 @@ pub struct BasePlan<VM: VMBinding> {
     // A counter for per-mutator stack scanning
     pub scanned_stacks: AtomicUsize,
     pub mutator_iterator_lock: Mutex<()>,
+    // Allocation count
+    pub allocation_count: AtomicUsize,
 }
 
 #[cfg(feature = "base_spaces")]
@@ -442,6 +442,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             inside_sanity: AtomicBool::new(false),
             scanned_stacks: AtomicUsize::new(0),
             mutator_iterator_lock: Mutex::new(()),
+            allocation_count: AtomicUsize::new(0),
         }
     }
 

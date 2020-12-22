@@ -155,7 +155,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             // leave this loop between the two GCs. The local var 'emergency_collection' was set to true
             // after the first GC. But when we execute this check below, we just finished the second GC,
             // which is not emergency. In such case, we will give a false OOM.
-            // We cannot just rely on the local var. Instead, we get the emergency colleciton value again,
+            // We cannot just rely on the local var. Instead, we get the emergency collection value again,
             // and check both.
             if emergency_collection && self.get_plan().is_emergency_collection() {
                 trace!("Emergency collection");
