@@ -55,6 +55,9 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
+    fn get_name(&self) -> &'static str {
+        "LockFreeImmortalSpace"
+    }
     fn as_space(&self) -> &dyn Space<VM> {
         self
     }

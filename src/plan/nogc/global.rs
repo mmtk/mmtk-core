@@ -21,9 +21,9 @@ use enum_map::EnumMap;
 use std::sync::Arc;
 
 #[cfg(not(feature = "nogc_lock_free"))]
-use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
+pub use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
 #[cfg(feature = "nogc_lock_free")]
-use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
+pub use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
 
 pub type SelectedPlan<VM> = NoGC<VM>;
 
@@ -88,9 +88,9 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     fn bind_mutator(
         &'static self,
         tls: OpaquePointer,
-        _mmtk: &'static MMTK<Self::VM>,
+        mmtk: &'static MMTK<Self::VM>,
     ) -> Box<Mutator<Self>> {
-        Box::new(create_nogc_mutator(tls, self))
+        Box::new(create_nogc_mutator(tls, mmtk))
     }
 
     fn prepare(&self, _tls: OpaquePointer) {
