@@ -128,7 +128,7 @@ pub fn create_metadata(address: Address) {
 }
 
 pub fn is_malloced(object: ObjectReference) -> bool {
-    let nodes_result = NODES.lock().unwrap().contains(&object);
+    // let nodes_result = NODES.lock().unwrap().contains(&object);
     // println!("checking address {}", object.to_address());
     if !MALLOC_BUFFER.lock().unwrap().is_empty() {
         write_malloc_bits();
@@ -140,11 +140,11 @@ pub fn is_malloced(object: ObjectReference) -> bool {
     match chunk_index {
         Some(index) => {
             let r = METADATA_TABLE.read().unwrap()[index].1[address_to_bitmap_index(object.to_address())] == 1;
-            assert!(r == nodes_result, "for address {}, testing hashset gives {}, testing metadata_table gives {}", object.to_address(), nodes_result, r);
+            // assert!(r == nodes_result, "for address {}, testing hashset gives {}, testing metadata_table gives {}", object.to_address(), nodes_result, r);
             r
         },
         None => {
-            assert!(nodes_result == false);
+            // assert!(nodes_result == false);
             false
         },
     }

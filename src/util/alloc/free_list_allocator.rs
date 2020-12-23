@@ -65,7 +65,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                 let allocated_memory = libc::malloc_usable_size(ptr);
                 let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
                 *total_memory_allocated += allocated_memory;
-                NODES.lock().unwrap().insert(object);
+                // NODES.lock().unwrap().insert(object);
                 create_metadata(address);
                 // println!("alloced {}", total_memory_allocated);
                 // println!("allocing address {}, buffer = {:?}", address, MALLOC_BUFFER.lock().unwrap());

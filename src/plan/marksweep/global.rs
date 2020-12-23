@@ -175,7 +175,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                                 //     local_mark_buffer.clear();
                                 // }
                                 // println!("flushed buffers if needed");
-                                NODES.lock().unwrap().remove(unsafe { &address.to_object_reference() });
+                                // NODES.lock().unwrap().remove(unsafe { &address.to_object_reference() });
                             } else {
                                 // marked[bitmap_index] = AtomicU8::new(0);
                                 let chunk_start = row.0;
