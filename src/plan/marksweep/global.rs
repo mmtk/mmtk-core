@@ -134,17 +134,15 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                 let mut malloc_count = 0;
                 let mut mark_count = 0;
                 while chunk_index < chunks {
-                    let row = metadata_table[chunk_index].as_ref().unwrap();
+                    let row = &metadata_table[chunk_index];
                     let ref malloced = row.1;
                     let ref marked = row.2;
                     let mut bitmap_index = 0;
-                    let freeing_necessary = malloced[bitmap_index].load(Ordering::SeqCst) == 1 && marked[bitmap_index].load(Ordering::SeqCst) == 0;
-                    println!("here 1");
-                    while bitmap_index < BYTES_IN_CHUNK {
-                        if malloced[bitmap_index].load(Ordering::SeqCst) == 1 {
+                    while bitmap_index < BYTES_IN_CHUNK/16 {
+                        if malloced[bitmap_index] == 1 {
                             malloc_count += 1;
-                            if marked[bitmap_index].load(Ordering::SeqCst) == 0 {
-                                let chunk_start = row.0.load(Ordering::SeqCst);
+                            if marked[bitmap_index] == 0 {
+                                let chunk_start = row.0;
                                 let address = bitmap_index_to_address(bitmap_index, chunk_start);
                                 let ptr = address.to_mut_ptr();
                                 let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
@@ -160,6 +158,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                                 //It doesn't seem like this will work, we need to lock metadata_table for reading to see whether or not the object needs to be freed
                                 //It doesn't seem wise to lock and unlock it for every word in every chunk we've malloced to.
                                 //So we can't call write_malloc_bits(), which needs to lock metadata_table for writing
+                                //It may be worthwhile trying locking metadata_table for writing for the entire release() fn and creating a second write_malloc_bits() which accepts a locked table as an argument
                                 // println!("about to flush buffers");
                                 // if local_malloc_buffer.len() >= 16 {
                                 //     MALLOC_BUFFER.lock().unwrap().append(&mut local_malloc_buffer);
@@ -179,7 +178,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                                 NODES.lock().unwrap().remove(unsafe { &address.to_object_reference() });
                             } else {
                                 // marked[bitmap_index] = AtomicU8::new(0);
-                                let chunk_start = row.0.load(Ordering::SeqCst);
+                                let chunk_start = row.0;
                                 let address = bitmap_index_to_address(bitmap_index, chunk_start);
                                 local_mark_buffer.push((address,0));
                                 mark_count += 1;
@@ -200,6 +199,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                 println!("after writing, malloc buffer size = {}, mark buffer size = {}", MALLOC_BUFFER.lock().unwrap().len(), MARK_BUFFER.lock().unwrap().len());
                 let total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
                 println!("total memory allocated = {}", *total_memory_allocated);
+                PHASE = Phase::Allocation;
 
             }
 

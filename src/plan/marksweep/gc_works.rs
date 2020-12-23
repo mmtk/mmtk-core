@@ -47,21 +47,24 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
             object
         } else {
             //using bitmaps
-            if !MARKED.lock().unwrap().contains(&object) { 
+            // MARK_BUFFER.lock();
+            if !is_marked(object) { 
                 // !is_marked(object) {
                 // assert!(!MARKED.lock().unwrap().contains(&object));
                 // println!("setting mark bit for obj {}", object.to_address().as_usize());
-                MARKED.lock().unwrap().insert(object);
                 let buffer_full = {
                     let mut mark_buffer = MARK_BUFFER.lock().unwrap();
+                    // println!("adding address {} to the mark buffer", object.to_address());
                     mark_buffer.push((object.to_address(),1));
                     mark_buffer.len() >= 16
                 };
                 if buffer_full {
                     write_mark_bits();
                 }
-                // unsafe { MARK_BUFFER.lock().unwrap().push(vec![(object.to_address(),1)]) };
-                // set_mark_bit(object);
+                
+                // println!("adding obj at address {} to the hashset", object.to_address());
+                // MARKED.lock().unwrap().insert(object);
+                // println!("done adding {} to hashset", object.to_address());
                 self.process_node(object);
             }
             object

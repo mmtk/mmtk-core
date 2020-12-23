@@ -1,4 +1,6 @@
 
+use atomic::Ordering;
+
 use crate::util::Address;
 use crate::policy::malloc::*;
 use crate::util::alloc::Allocator;
@@ -30,11 +32,10 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         self.plan
     }
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        // println!("allocing, malloc buffer size = {}", MALLOC_BUFFER.lock().unwrap().len());
         trace!("alloc");
         assert!(offset==0);
         unsafe {
-            if malloc_memory_full() {
+            if malloc_memory_full() && PHASE == Phase::Allocation {
                 PHASE = Phase::Marking;
                 println!("collection time!");
                 self.plan.handle_user_collection_request(self.tls, true);
@@ -64,10 +65,10 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                 let allocated_memory = libc::malloc_usable_size(ptr);
                 let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
                 *total_memory_allocated += allocated_memory;
-                // add_to_list(address);
                 NODES.lock().unwrap().insert(object);
                 create_metadata(address);
                 // println!("alloced {}", total_memory_allocated);
+                // println!("allocing address {}, buffer = {:?}", address, MALLOC_BUFFER.lock().unwrap());
                 address
             }
         }
