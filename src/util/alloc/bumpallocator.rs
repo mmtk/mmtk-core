@@ -111,16 +111,17 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         let new_cursor = result + size;
 
         if new_cursor > self.cursor + self.limit.as_usize() {
-            return self.acquire_block(size, align, offset, true);
+            self.acquire_block(size, align, offset, true)
         } else {
             let base = &self.plan.base();
-            let is_mutator = unsafe { VM::VMActivePlan::is_mutator(self.tls) }
-                && self.plan.is_initialized();
+            let is_mutator =
+                unsafe { VM::VMActivePlan::is_mutator(self.tls) } && self.plan.is_initialized();
 
             if is_mutator
                 && (base.allocation_count.load(Ordering::Relaxed) > base.options.stress_factor)
             {
-                trace!("Stress GC: allocation_count = {} more than stress_factor = {}",
+                trace!(
+                    "Stress GC: allocation_count = {} more than stress_factor = {}",
                     base.allocation_count.load(Ordering::Relaxed),
                     base.options.stress_factor
                 );
@@ -132,8 +133,10 @@ impl<VM: VMBinding> BumpAllocator<VM> {
 
             if is_mutator {
                 let current_allocation_count = base.allocation_count.load(Ordering::Relaxed);
-                base.allocation_count.store(current_allocation_count + alloc_size, Ordering::Relaxed);
-                trace!("Stress GC: allocation_count = {}",
+                base.allocation_count
+                    .store(current_allocation_count + alloc_size, Ordering::Relaxed);
+                trace!(
+                    "Stress GC: allocation_count = {}",
                     base.allocation_count.load(Ordering::Relaxed)
                 );
             }
@@ -152,7 +155,13 @@ impl<VM: VMBinding> BumpAllocator<VM> {
     }
 
     #[inline]
-    fn acquire_block(&mut self, size: usize, align: usize, offset: isize, stress_test: bool) -> Address {
+    fn acquire_block(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: isize,
+        stress_test: bool,
+    ) -> Address {
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
         let acquired_start = self
             .space
@@ -166,7 +175,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
                 "Acquired a new block of size {} with start address {}",
                 block_size,
                 acquired_start
-                );
+            );
             if !stress_test {
                 self.set_limit(acquired_start, acquired_start + block_size);
             } else {

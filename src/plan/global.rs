@@ -276,9 +276,11 @@ pub trait Plan: Sized + 'static + Sync + Send {
         if self.is_initialized()
             && (self.base().allocation_count.load(Ordering::Relaxed) > stress_factor)
         {
-            trace!("Stress GC: allocation_count = {}, stress_factor = {}",
-                   self.base().allocation_count.load(Ordering::Relaxed),
-                   stress_factor);
+            trace!(
+                "Stress GC: allocation_count = {}, stress_factor = {}",
+                self.base().allocation_count.load(Ordering::Relaxed),
+                stress_factor
+            );
             trace!("Doing stress GC");
             self.base().allocation_count.store(0, Ordering::Relaxed);
             true
