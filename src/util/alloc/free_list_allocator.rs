@@ -37,7 +37,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         unsafe {
             if malloc_memory_full() && PHASE == Phase::Allocation {
                 PHASE = Phase::Marking;
-                println!("collection time!");
+                println!("\ntriggering collection");
                 self.plan.handle_user_collection_request(self.tls, true);
                 println!("collection done");
                 assert!(!malloc_memory_full(), "FreeListAllocator: Out of memory!");

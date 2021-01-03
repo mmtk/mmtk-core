@@ -47,20 +47,13 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
             object
         } else {
             //using bitmaps
-            // MARK_BUFFER.lock();
             if !is_marked(object) { 
-                // !is_marked(object) {
-                // assert!(!MARKED.lock().unwrap().contains(&object));
-                // println!("setting mark bit for obj {}", object.to_address().as_usize());
-                let buffer_full = {
-                    let mut mark_buffer = MARK_BUFFER.lock().unwrap();
-                    // println!("adding address {} to the mark buffer", object.to_address());
-                    mark_buffer.push((object.to_address(),1));
-                    mark_buffer.len() >= 16
-                };
-                if buffer_full {
-                    write_mark_bits();
-                }
+                let ref mut metadata_table = METADATA_TABLE.write().unwrap();
+                let chunk_index = address_to_chunk_index_with_write(object.to_address(), metadata_table).unwrap();
+                let ref mut row = metadata_table[chunk_index];
+                let ref mut marked = row.2;
+                let index = address_to_bitmap_index(object.to_address());
+                marked[index] = 1;
                 
                 // println!("adding obj at address {} to the hashset", object.to_address());
                 // MARKED.lock().unwrap().insert(object);

@@ -124,19 +124,15 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                 }
             } else {
                 //using bitmaps
-                write_malloc_bits();
-                write_mark_bits();
-                let mut local_malloc_buffer: Vec<(Address,u8)> = vec![];
-                let mut local_mark_buffer: Vec<(Address,u8)> = vec![];
                 let chunks = METADATA_TABLE.read().unwrap().len();
-                {let ref mut metadata_table = METADATA_TABLE.read().unwrap();
+                {let ref mut metadata_table = METADATA_TABLE.write().unwrap();
                 let mut chunk_index = 0;
                 let mut malloc_count = 0;
                 let mut mark_count = 0;
                 while chunk_index < chunks {
-                    let row = &metadata_table[chunk_index];
-                    let ref malloced = row.1;
-                    let ref marked = row.2;
+                    let mut row = &mut metadata_table[chunk_index];
+                    let ref mut malloced = row.1;
+                    let ref mut marked = row.2;
                     let mut bitmap_index = 0;
                     while bitmap_index < BYTES_IN_CHUNK/16 {
                         if malloced[bitmap_index] == 1 {
@@ -148,39 +144,13 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                                 let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
                                 let freed_memory = libc::malloc_usable_size(ptr);
                                 *total_memory_allocated -= freed_memory;
-                                // println!("freeing something");
                                 libc::free(ptr);
-                                // malloced[bitmap_index] = AtomicU8::new(0);
-                                // marked[bitmap_index] = AtomicU8::new(0);
-                                local_malloc_buffer.push((address,0));
-                                local_mark_buffer.push((address,0));
-
-                                //It doesn't seem like this will work, we need to lock metadata_table for reading to see whether or not the object needs to be freed
-                                //It doesn't seem wise to lock and unlock it for every word in every chunk we've malloced to.
-                                //So we can't call write_malloc_bits(), which needs to lock metadata_table for writing
-                                //It may be worthwhile trying locking metadata_table for writing for the entire release() fn and creating a second write_malloc_bits() which accepts a locked table as an argument
-                                // println!("about to flush buffers");
-                                // if local_malloc_buffer.len() >= 16 {
-                                //     MALLOC_BUFFER.lock().unwrap().append(&mut local_malloc_buffer);
-                                //     drop(metadata_table);
-                                //     write_malloc_bits();
-                                //     let ref mut metadata_table = METADATA_TABLE.read().unwrap();
-                                //     local_malloc_buffer.clear();
-                                // }
-                                // if local_mark_buffer.len() >= 16 {
-                                //     MARK_BUFFER.lock().unwrap().append(&mut local_mark_buffer);
-                                //     drop(metadata_table);
-                                //     write_mark_bits();
-                                //     let ref metadata_table = METADATA_TABLE.read().unwrap();
-                                //     local_mark_buffer.clear();
-                                // }
-                                // println!("flushed buffers if needed");
-                                // NODES.lock().unwrap().remove(unsafe { &address.to_object_reference() });
+                                malloced[bitmap_index] = 0;
+                                marked[bitmap_index] = 0;
                             } else {
-                                // marked[bitmap_index] = AtomicU8::new(0);
+                                marked[bitmap_index] = 0;
                                 let chunk_start = row.0;
                                 let address = bitmap_index_to_address(bitmap_index, chunk_start);
-                                local_mark_buffer.push((address,0));
                                 mark_count += 1;
                             }
                         }
@@ -191,12 +161,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                 println!("done freeing, found {} objects malloced of which {} were marked", malloc_count, mark_count);
 
                 }
-                MALLOC_BUFFER.lock().unwrap().append(&mut local_malloc_buffer);
-                MARK_BUFFER.lock().unwrap().append(&mut local_mark_buffer);
-                println!("malloc buffer size = {}, mark buffer size = {}", MALLOC_BUFFER.lock().unwrap().len(), MARK_BUFFER.lock().unwrap().len());
-                write_malloc_bits();
-                write_mark_bits();
-                println!("after writing, malloc buffer size = {}, mark buffer size = {}", MALLOC_BUFFER.lock().unwrap().len(), MARK_BUFFER.lock().unwrap().len());
+                
                 let total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
                 println!("total memory allocated = {}", *total_memory_allocated);
                 PHASE = Phase::Allocation;
