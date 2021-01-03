@@ -34,6 +34,8 @@ jobs:
       # setup
       - name: Overwrite MMTk core in JikesRVM binding
         run: cp -r mmtk-core mmtk-jikesrvm/repos/
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
@@ -47,7 +49,6 @@ jobs:
       # run
       - name: Performance Run
         run: |
-          export RUSTUP_TOOLCHAIN=nightly-2020-07-08
           export RESULT_REPO=mmtk/ci-perf-result
           export RESULT_REPO_BRANCH=self-hosted
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
@@ -90,6 +91,8 @@ jobs:
       # setup
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
       # cleanup previosu build
       - name: Cleanup previous build
         run: |
@@ -108,7 +111,6 @@ jobs:
       # run
       - name: Performance Run
         run: |
-          export RUSTUP_TOOLCHAIN=nightly-2020-07-08
           export RESULT_REPO=mmtk/ci-perf-result
           export RESULT_REPO_BRANCH=self-hosted
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
@@ -150,6 +152,8 @@ jobs:
       # setup
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
       # cleanup previosu build
       - name: Cleanup previous build
         run: |
@@ -168,7 +172,6 @@ jobs:
       # run
       - name: Performance Run
         run: |
-          export RUSTUP_TOOLCHAIN=nightly-2020-07-08
           export RESULT_REPO=mmtk/ci-perf-result
           export RESULT_REPO_BRANCH=self-hosted
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
