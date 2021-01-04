@@ -47,6 +47,8 @@ You will first be guided through building a Semispace collector. After that, you
 
 *work packet*: (MMTk-specific) Contains an instance of a GC worker.
 
+*zeroing*: **TODO**
+
 See also: [Further Reading](#further-reading)
 
 [**Back to table of contents**](#contents)
@@ -169,8 +171,7 @@ Note that all of the above changes almost exactly copy the NoGC entries in each 
 
 After you rebuild OpenJDK (and the MMTk core), you can use MyGC. Try testing it with the each of the three benchmarks. It should work identically to NoGC.
 
-At this point, you should familiarise yourself with the MyGC plan if you haven't already. Try answering the following questions:
-**NOTE: These are intended to be really simple questions, mostly aimed at those unfamiliar with garbage collection. They just get the reader to look at the code in the collector and start thinking about how it's working, and hopefully encourage them to do some independant reading if they come across something they don't understand.**
+At this point, you should familiarise yourself with the MyGC plan if you haven't already. Try answering the following questions by looking at the code and [Further Reading](#further-reading): 
    * Where is the allocator defined?
    * How many memory spaces are there?
    * What kind of memory space policy is used?
@@ -182,18 +183,51 @@ At this point, you should familiarise yourself with the MyGC plan if you haven't
 
 ***
 ## Building a Semispace Collector
+### What is a Semispace collector?
+**TODO: Add section intro**
+
 ### Allocation: Add copyspaces
-Add the two copyspaces and change the alloc/mut to work with these spaces
-1. global.rs: add imports (CommonPlan, AtomicBool)
-   * pub struct MyGC: Remove old. Add copyspaces. Add ‘hi’ to/from indicator. Replace base plan with common plan.
-   * impl Plan for MyGC: new: init things. gc_init: init things.
+The first step of changing the MyGC plan into a Semispace plan is to add the two copyspaces that the collector will allocate memory into. This requires adding two copyspaces, code to properly initialise and prepare the new spaces, and a copy context.
+
+1. First, in `global.rs`, replace the old immortal space with two copyspaces.
+   1. change as few imports as possible for this step. Need CommonPlan, AtomicBool,
+   2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
+      - Delete the two lines in the thing.
+      - Add `pub hi: AtomicBool,`. This is a thread-safe bool indicating which copyspace is the to-space.
+      - Add `pub copyspace0: CopySpace<VM>,` and `pub copyspace1: CopySpace<VM>,`. These are the two copyspaces.
+      - Add `pub common: CommonPlan<VM>,`. Semispace uses the common plan rather than the base plan. 
+    3. Change `impl<VM: VMBinding> Plan for MyGC<VM> {`. This section initialises and prepares the objects in MyGC that you just defined.
+       - Delete the definition of `mygc_space`. Instead, we will define the two copyspaces here.
+       - Define one of the copyspaces by adding the following code: **TODO: Make sure this works. Semispace doesn't use variables, and I'm not confident enough in my rust to say this'll work for sure. But doing it this way makes it easier to write the little excersize below.**
+         ```rust
+         let copyspace0 = CopySpace::new(
+                "copyspace0",
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            );
+            ```
+         You may have noticed that the CopySpace initialisation requires one more bool compared to ImmortalSpace. The definitions for these spaces are stored in `mmtk-core/policy`. By looking in these files, add a comment defining which bool has what function. Then, copy the above code again, renaming it `copyspace1`, and setting it so that it is a fromspace rather than a tospace.
+       - Finally, replace the definition of MyGC with the following:
+       ```rust
+       MyGC {
+            hi: AtomicBool::new(false),
+            copyspace0,
+            copyspace1,
+            common: CommonPlan::new(vm_map, mmapper, options, heap),
+        }
+       ```
+            
+   
 2. mutator.rs
    * change value maps in lazy_static - going to need different space types for SemiSpace. 
    * create_mygc_mutator: Change space_mapping. tospace gets an immortal space, fromspace gets a large-object space (los). Only from is going to have a collection in it. To and from are swapped each collection, and are of equal size. This means that there’s no chance for tospace to run out of memory, but it isn’t the most efficient system.
 3. add mut prep/release functions
 4. Test allocation is working
    * How?
-   
    
 ### Collector: Implement garbage collection
 1. Implement work packet. Make new file gc_works. This file implements CopyContext and ProcessEdges. The former provides context for when the gc needs to collect, and ProcessEdges ?
