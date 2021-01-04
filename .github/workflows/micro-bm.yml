@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mmtk/mmtk-openjdk
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           path: mmtk-openjdk-trunk
           submodules: true
           ref: ${{ env.OPENJDK_BINDING_TRUNK_REF }}
@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mmtk/mmtk-openjdk
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           path: mmtk-openjdk-branch
           submodules: true
           ref: ${{ env.OPENJDK_BINDING_BRANCH_REF }}
@@ -53,7 +53,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mmtk/ci-perf-kit
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           ref: "0.4.3"
           path: ci-perf-kit
           submodules: true

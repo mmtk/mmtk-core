@@ -3,8 +3,10 @@ name: Post Code Review Checks
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
-    branches:
-      - master
+    branches-ignore:
+      - '**'    
+    # branches:
+    #   - master
 
 jobs:
   v8-binding-test:
