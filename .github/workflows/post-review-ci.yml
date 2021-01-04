@@ -33,16 +33,18 @@ jobs:
           rm -rf mmtk-v8/repos/*
           mkdir -p mmtk-v8/repos/mmtk-core
           cp -r mmtk-core/* mmtk-v8/repos/mmtk-core
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
       - name: Setup
         run: |
           cd mmtk-v8
-          RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./.github/scripts/ci-setup.sh
+          ./.github/scripts/ci-setup.sh
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
       - name: Test
         run: |
           cd mmtk-v8
-          RUSTUP_TOOLCHAIN=nightly-2020-07-08 V8_ROOT=$GITHUB_WORKSPACE/v8_deps .github/scripts/ci-test.sh
+          V8_ROOT=$GITHUB_WORKSPACE/v8_deps .github/scripts/ci-test.sh
 
   # JikesRVM
   jikesrvm-binding-test:
@@ -70,16 +72,18 @@ jobs:
       - name: Overwrite MMTk core in JikesRVM binding
         run: |
           cp -r mmtk-core mmtk-jikesrvm/repos
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
       - name: Setup
         run: |
           cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./.github/scripts/ci-setup.sh
+          ./.github/scripts/ci-setup.sh
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
       - name: Test
         run: |
           cd mmtk-jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./.github/scripts/ci-test.sh
+          ./.github/scripts/ci-test.sh
   jikesrvm-perf-compare:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
@@ -131,6 +135,9 @@ jobs:
           path: ci-perf-kit
           submodules: true
       # setup
+      # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
       - name: Setup
         run: |
           mkdir -p ci-perf-kit/running/benchmarks/dacapo
@@ -139,7 +146,7 @@ jobs:
       - name: Compare Performance
         id: run
         run: |
-          JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm-trunk/ mmtk-core-trunk/ mmtk-jikesrvm-branch/ mmtk-core-branch/ jikesrvm-compare-report.md
+          JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm-trunk/ mmtk-core-trunk/ mmtk-jikesrvm-branch/ mmtk-core-branch/ jikesrvm-compare-report.md
       # set report.md to output
       - uses: pCYSl5EDgo/cat@master
         id: cat
@@ -193,16 +200,18 @@ jobs:
           ref: ${{ env.OPENJDK_BINDING_REF }}
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
       - name: Setup
         run: |
           cd mmtk-openjdk
-          RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./.github/scripts/ci-setup.sh
+          ./.github/scripts/ci-setup.sh
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
       - name: Test
         run: |
           cd mmtk-openjdk
-          RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./.github/scripts/ci-test.sh
+          ./.github/scripts/ci-test.sh
   openjdk-perf-compare:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
@@ -254,6 +263,9 @@ jobs:
           path: ci-perf-kit
           submodules: true
       # setup
+      # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV      
       - name: Setup
         run: |
           mkdir -p ci-perf-kit/running/benchmarks/dacapo
@@ -262,7 +274,7 @@ jobs:
       - name: Compare Performance
         id: run
         run: |
-          RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./ci-perf-kit/scripts/openjdk-compare.sh mmtk-openjdk-trunk/ mmtk-core-trunk/ mmtk-openjdk-branch/ mmtk-core-branch/ openjdk-compare-report.md
+          ./ci-perf-kit/scripts/openjdk-compare.sh mmtk-openjdk-trunk/ mmtk-core-trunk/ mmtk-openjdk-branch/ mmtk-core-branch/ openjdk-compare-report.md
       # set report.md to output
       - uses: pCYSl5EDgo/cat@master
         id: cat
