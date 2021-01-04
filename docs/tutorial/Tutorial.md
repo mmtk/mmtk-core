@@ -84,7 +84,8 @@ A few benchmarks of varying size will be used throughout the tutorial. If you ha
 
 
 #### Working with multiple VM builds
-**REMOVE AFTER RUN-TIME PLAN CHOICE IS IMPLEMENTED**
+**TODO: Fix up this section to reflect build-time GC choice when implemented. See below for draft.**
+
 You will need to build multiple versions of the VM in this tutorial. You should familiarise yourself with how to do this now.
 1. To select which garbage collector (GC) plan you would like to use in a given build, you can either use the `MMTK_PLAN` environment variable, or the `--features` flag when building the binding. For example, using `export MMTK_PLAN=semispace` or `--features semispace` will build using the Semispace GC (the default plan). 
 2. The build will always generate in `mmtk-openjdk/repos/openjdk/build`. If you would like to keep a build (for instance, to make quick performance comparisons), you can rename either the `build` folder or the folder generated within it (eg `inux-x86_64-normal-server-$DEBUG_LEVEL`). 
