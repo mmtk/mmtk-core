@@ -84,6 +84,7 @@ A few benchmarks of varying size will be used throughout the tutorial. If you ha
 
 
 #### Working with multiple VM builds
+**REMOVE AFTER RUN-TIME PLAN CHOICE IS IMPLEMENTED**
 You will need to build multiple versions of the VM in this tutorial. You should familiarise yourself with how to do this now.
 1. To select which garbage collector (GC) plan you would like to use in a given build, you can either use the `MMTK_PLAN` environment variable, or the `--features` flag when building the binding. For example, using `export MMTK_PLAN=semispace` or `--features semispace` will build using the Semispace GC (the default plan). 
 2. The build will always generate in `mmtk-openjdk/repos/openjdk/build`. If you would like to keep a build (for instance, to make quick performance comparisons), you can rename either the `build` folder or the folder generated within it (eg `inux-x86_64-normal-server-$DEBUG_LEVEL`). 
@@ -129,13 +130,22 @@ Aborted (core dumped)
 4. If you haven't already, try building using Semispace. lusearch should now pass, as garbage will be collected, and the smaller benchmarks should run the same as they did while using NoGC.
 
 
+**DRAFT FOR RUN-TIME GC CHOICE**
+You can select which garbage collection plan to use by adding an argument to a run command (**TODO: wording**). For example, ``TODO: insert actual command here!`` will run the \[TODO] benchmark with the Semispace GC, whereas ``TODO: insert command here!`` will run it with NoGC. 
+
+1. Try using NoGC first. Both HelloWorld and fannkuchredux should run without issue. If you then run lusearch, it should fail when a collection is triggered. The messages and errors produced should look identical or nearly identical to the log below. **TODO: Insert accurate log.**
+2. If you haven't already, try using Semispace. lusearch should now pass, as garbage will be collected, and the smaller benchmarks should run the same as they did while using NoGC, as they didn't collect garbage in the first place.
+3. When you modify a GC, you will have to rebuild the MMTk core to apply any changes. With many VMs, you will also need to rebuild the VM. 
+   1. For OpenJDK, the core will rebuild alongside the VM (**TODO: confirm**).
+**A lot of the old section can be reused here.**
+
 
 ### Create MyGC
 NoGC is a GC plan that only allocates memory, and does not have a collector. We're going to use it as a base for building a new garbage collector.
 1. Each plan is stored in `mmtk-openjdk/repos/mmtk-core/src/plan`. Navigate there and create a copy of the folder `nogc`. Rename it to `mygc`.
 3. In *each file* within `mygc`, rename any reference to `nogc` to `mygc`. You will also have to separately rename any reference to `NoGC` to `MyGC`.
-   - For example, in Visual Studio Code, you can (making sure sensitivity is selected in the search function) select one instance of `nogc` and either right click and select "Change all instances" or use the CTRL-F2 shortcut, and then type `mygc`, and repeat for `NoGC`.
-4. In order to build using MyGC, you will need to make some changes to the following files:
+   - For example, in Visual Studio Code, you can (making sure case sensitivity is selected in the search function) select one instance of `nogc` and either right click and select "Change all instances" or use the CTRL-F2 shortcut, and then type `mygc`, and repeat for `NoGC`.
+4. In order to use MyGC, you will need to make some changes to the following files:
     1. `mmtk-core/src/plan/mod.rs`, under the import statements, add:
     ```rust
     #[cfg(feature = "mygc")]
@@ -156,7 +166,7 @@ Note that all of the above changes almost exactly copy the NoGC entries in each 
 1. Within `mygc/global.rs`, find any use of `#[cfg(feature = "mygc_lock_free")]` and delete both it *and the line below it*.
 2. Then, delete any use of the above line's negation, `#[cfg(not(feature = "mygc_lock_free"))]`, this time without changing the line below it.
 
-You can now build MyGC. Try testing it with the each of the three benchmarks. It should work identically to NoGC.
+After you rebuild OpenJDK (and the MMTk core), you can use MyGC. Try testing it with the each of the three benchmarks. It should work identically to NoGC.
 
 At this point, you should familiarise yourself with the MyGC plan if you haven't already. Try answering the following questions:
 **NOTE: These are intended to be really simple questions, mostly aimed at those unfamiliar with garbage collection. They just get the reader to look at the code in the collector and start thinking about how it's working, and hopefully encourage them to do some independant reading if they come across something they don't understand.**
@@ -166,6 +176,9 @@ At this point, you should familiarise yourself with the MyGC plan if you haven't
    * What happens if garbage has to be collected?
    
 [**Back to table of contents**](#contents)
+
+
+
 ***
 ## Building a Semispace Collector
 ### Allocation: Add copyspaces
@@ -179,6 +192,8 @@ Add the two copyspaces and change the alloc/mut to work with these spaces
 3. add mut prep/release functions
 4. Test allocation is working
    * How?
+   
+   
 ### Collector: Implement garbage collection
 1. Implement work packet. Make new file gc_works. This file implements CopyContext and ProcessEdges. The former provides context for when the gc needs to collect, and ProcessEdges ?
 ### Adding another copyspace
