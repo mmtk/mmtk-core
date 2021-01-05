@@ -49,8 +49,9 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                 let address = Address::from_mut_ptr(ptr);
                 let object = address.to_object_reference();
                 let allocated_memory = malloc_usable_size(ptr);
-                let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
-                *total_memory_allocated += allocated_memory;
+                MEMORY_ALLOCATED.fetch_add(allocated_memory, Ordering::SeqCst);
+                // let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
+                // *total_memory_allocated += allocated_memory;
                 // println!("Allocated {} bytes, total {} bytes.", allocated_memory, total_memory_allocated);
                 // println!("allocated object sized {} into block sized {} at {:b}, index of {:b}", size + 8, allocated_memory, address.as_usize(), object_reference_to_index(object));
                 NODES.lock().unwrap().insert(address.add(8).to_object_reference()); //NODES contains the reference to the object, not the mark word
@@ -62,8 +63,9 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                 let address = Address::from_mut_ptr(ptr);
                 let object = address.to_object_reference();
                 let allocated_memory = malloc_usable_size(ptr);
-                let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
-                *total_memory_allocated += allocated_memory;
+                MEMORY_ALLOCATED.fetch_add(allocated_memory, Ordering::SeqCst);
+                // let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
+                // *total_memory_allocated += allocated_memory;
                 // NODES.lock().unwrap().insert(object);
                 create_metadata(address);
                 // println!("alloced {}", total_memory_allocated);

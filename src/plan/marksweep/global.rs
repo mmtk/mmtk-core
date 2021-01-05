@@ -26,6 +26,7 @@ use crate::util::sanity::sanity_checker::*;
 use crate::vm::VMBinding;
 use std::{ops::Sub, sync::Arc};
 
+use atomic::Ordering;
 use enum_map::EnumMap;
 
 pub type SelectedPlan<VM> = MarkSweep<VM>;
@@ -108,8 +109,8 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn release(&self, tls: OpaquePointer) {
         println!("global::release()");
         {
-            let total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
-            println!("total memory allocated = {}", *total_memory_allocated);
+            let total_memory_allocated = MEMORY_ALLOCATED.load(Ordering::SeqCst);
+            println!("total memory allocated = {}", total_memory_allocated);
         }
         unsafe {
             if USE_HASHSET {
@@ -142,9 +143,8 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                                 let chunk_start = row.0;
                                 let address = bitmap_index_to_address(bitmap_index, chunk_start);
                                 let ptr = address.to_mut_ptr();
-                                let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
                                 let freed_memory = malloc_usable_size(ptr);
-                                *total_memory_allocated -= freed_memory;
+                                MEMORY_ALLOCATED.fetch_sub(freed_memory, Ordering::SeqCst);
                                 free(ptr);
                                 malloced[bitmap_index] = 0;
                                 marked[bitmap_index] = 0;
@@ -163,8 +163,8 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
                 }
                 
-                let total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
-                println!("total memory allocated = {}", *total_memory_allocated);
+                let total_memory_allocated = MEMORY_ALLOCATED.load(Ordering::SeqCst);
+                println!("total memory allocated = {}", total_memory_allocated);
 
             }
 
@@ -177,8 +177,8 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        let total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
-        MALLOC_MEMORY - *total_memory_allocated
+        0
+        // MALLOC_MEMORY - MEMORY_ALLOCATED.load(Ordering::SeqCst)
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -195,12 +195,13 @@ impl<VM: VMBinding> MarkSweep<VM> {
         unsafe {
             let address: Address = object.to_address().sub(8);
             let marking_word: usize = address.load();
-            let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
+            let total_memory_allocated = MEMORY_ALLOCATED.load(Ordering::SeqCst);
             if marking_word == 0 {
                 let freed_memory = libc::malloc_usable_size(address.to_mut_ptr());
-                debug_assert!(*total_memory_allocated >= freed_memory, "Attempting to free an object sized {} when total memory allocated is {}", freed_memory, total_memory_allocated);
-                *total_memory_allocated -= freed_memory;
-                debug_assert!(*total_memory_allocated >= 0, "amount of memory allocated cannot be negative!");
+                debug_assert!(total_memory_allocated >= freed_memory, "Attempting to free an object sized {} when total memory allocated is {}", freed_memory, total_memory_allocated);
+                MEMORY_ALLOCATED.fetch_sub(freed_memory, Ordering::SeqCst);
+                // *total_memory_allocated -= freed_memory;
+                debug_assert!(total_memory_allocated >= 0, "amount of memory allocated cannot be negative!");
                 // println!("Freed {} bytes, total {} bytes.", freed_memory, total_memory_allocated);
                 libc::free(address.to_mut_ptr()); 
                 return false

@@ -1,4 +1,4 @@
-use std::sync::{Mutex};
+use std::sync::{Mutex, atomic::AtomicUsize};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::collections::HashSet;
 use crate::util::Address;
@@ -9,7 +9,6 @@ use crate::util::conversions;
 lazy_static! {
     pub static ref NODES: Mutex<HashSet<ObjectReference>> = Mutex::default();
     // pub static ref MARKED: Mutex<HashSet<ObjectReference>> = Mutex::default();
-    pub static ref MEMORY_ALLOCATED: Mutex<usize> = Mutex::default();
     pub static ref METADATA_TABLE: RwLock<Vec<(usize, Vec<u8>, Vec<u8>)>> = RwLock::default();
     pub static ref MALLOC_BUFFER: Mutex<Vec<Address>> = Mutex::default();
     // pub static ref MARK_BUFFER: Mutex<Vec<Address>> = Mutex::default();
@@ -17,9 +16,11 @@ lazy_static! {
 }
 pub const MALLOC_MEMORY: usize = 90000000;
 pub const USE_HASHSET: bool = false;
+pub static MEMORY_ALLOCATED: AtomicUsize = AtomicUsize::new(0);
 
 // Import calloc, free, and malloc_usable_size from the library specified in Cargo.toml:45
 
+use atomic::Ordering;
 #[cfg(feature = "malloc_jemalloc")]
 pub use jemalloc_sys::{free, malloc_usable_size, calloc};
 
@@ -28,18 +29,18 @@ use libc::{c_void, size_t};
 use mimalloc_sys::{mi_free, mi_malloc_usable_size, mi_calloc};
 
 #[cfg(feature = "malloc_mimalloc")]
-pub fn malloc_usable_size(p: *const c_void) -> size_t {
-    unsafe { mi_malloc_usable_size(p) }
+pub unsafe fn malloc_usable_size(p: *const c_void) -> size_t {
+    mi_malloc_usable_size(p)
 }
 
 #[cfg(feature = "malloc_mimalloc")]
-pub fn free(p: *mut c_void) {
-    unsafe { mi_free(p); }
+pub unsafe fn free(p: *mut c_void) {
+    mi_free(p);
 }
 
 #[cfg(feature = "malloc_mimalloc")]
-pub fn calloc(count: size_t, size: size_t) -> *mut c_void {
-    unsafe { mi_calloc(count, size) }
+pub unsafe fn calloc(count: size_t, size: size_t) -> *mut c_void {
+    mi_calloc(count, size)
 }
 
 #[cfg(not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc")))]
@@ -75,9 +76,6 @@ pub fn write_malloc_bits() {
             }
         };
         let bitmap_index = address_to_bitmap_index(address);
-        // if bit == 1 {
-        //     println!("marking address {}, chunk_index = {}, bitmap_index = {}", address, chunk_index, bitmap_index);
-        // }
         let mut row = &mut metadata_table[chunk_index];
         row.1[bitmap_index] = 1;
         // println!("written to table");
@@ -119,7 +117,7 @@ pub fn write_malloc_bits() {
 // }
 
 pub unsafe fn malloc_memory_full() -> bool {
-    *MEMORY_ALLOCATED.lock().unwrap() >= MALLOC_MEMORY
+    MEMORY_ALLOCATED.load(Ordering::SeqCst) >= MALLOC_MEMORY
 }
 
 pub fn create_metadata(address: Address) {
@@ -162,7 +160,7 @@ pub fn is_malloced(object: ObjectReference) -> bool {
 
 }
 
-// We have an entry for each word
+// There is an entry for each word
 pub fn address_to_bitmap_index(address: Address) -> usize {
     (address - conversions::chunk_align_down(address)) / 16
 }
