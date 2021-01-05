@@ -188,9 +188,10 @@ At this point, you should familiarise yourself with the MyGC plan if you haven't
 
 ### Allocation: Add copyspaces
 The first step of changing the MyGC plan into a Semispace plan is to add the two copyspaces that the collector will allocate memory into. This requires adding two copyspaces, code to properly initialise and prepare the new spaces, and a copy context.
+**I don't like the formatting here. It's cluttered and hard to read.**
 
 1. First, in `global.rs`, replace the old immortal space with two copyspaces.
-   1. change as few imports as possible for this step. Need CommonPlan, AtomicBool,
+   1. change as few imports as possible for this step. Need CommonPlan, AtomicBool, CopySpace. Remove line for allow unused imports. Maybe do these as needed.
    2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
       - Delete the two lines in the thing.
       - Add `pub hi: AtomicBool,`. This is a thread-safe bool indicating which copyspace is the to-space.
@@ -210,7 +211,9 @@ The first step of changing the MyGC plan into a Semispace plan is to add the two
                 &mut heap,
             );
             ```
-         You may have noticed that the CopySpace initialisation requires one more bool compared to ImmortalSpace. The definitions for these spaces are stored in `mmtk-core/policy`. By looking in these files, add a comment to the above code noting which bool has what function. Then, copy the above code again, renaming it `copyspace1`, and setting it so that it is a fromspace rather than a tospace.
+         You may have noticed that the CopySpace initialisation requires one more bool compared to ImmortalSpace. 
+         
+         The definitions for these spaces are stored in `mmtk-core/policy`. By looking in these files, add a comment to the above code noting which bool has what function. Then, copy the above code again, renaming it `copyspace1`, and setting it so that it is a fromspace rather than a tospace.
        - Finally, replace the old MyGC initializer with the following:
        ```rust
        MyGC {
@@ -221,33 +224,33 @@ The first step of changing the MyGC plan into a Semispace plan is to add the two
         }
        ```
    4. The plan now has the components it needs for allocation, but not the instructions for how to make use of them.
-      - Add a function called `common` that returns a reference to the common plan.
+      - Add a method to Plan for MyGC called `common` that returns a reference to the common plan.
         ```rust
         fn common(&self) -> &CommonPlan<VM> {
           &self.common
         }
         ```
-      - Find the function `base` and change it so that it calls the base plan *through* the common plan.
+      - Find the method `base` and change it so that it calls the base plan *through* the common plan.
         ```rust
         fn base(&self) -> &BasePlan<VM> {
          &self.common.base
         }
         ```
-      - Find the function `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
-      - *Are prepare and release needed for this?* Find the function `prepare`. TODO
-      - Find the function `release`. TODO
-      - *is this needed here?* Add the following function, still within the implementations for Plan for MyGC. **TODO: Find a better way to word this.**
+      - Find the method `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
+      - Find the method `prepare`. TODO
+      - Find the method `release`. TODO
+      - *is this needed here?* Add the following method to Plan for MyGC. **TODO: Find a better way to word this.**
         ```rust
         fn get_collection_reserve(&self) -> usize {
          self.tospace().reserved_pages()
         }
         ```
-      - Add a new section of implementations for MyGC outside of the implementations for Plan for MyGC.
+      - Add a new section of methods for MyGC (outside of the methods for Plan for MyGC).
         ```rust
         impl<VM: VMBinding> MyGC<VM> {
         }
         ```
-      - To this, add two functions, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. Try writing tospace on your own before looking at the code below, and then write fromspace.
+      - To this, add two methods, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. Try writing tospace on your own before looking at the code below, and then write fromspace.
       ```rust
       pub fn tospace(&self) -> &CopySpace<VM> {
         if self.hi.load(Ordering::SeqCst) {
