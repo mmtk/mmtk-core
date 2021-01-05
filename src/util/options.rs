@@ -69,11 +69,11 @@ macro_rules! options {
                 // we set the option to its value (if it is a valid value). Otherwise, use the defualt value.
                 const PREFIX: &str = "MMTK_";
                 for (key, val) in std::env::vars() {
-                    if key.starts_with(PREFIX) {
-                        // strip the prefix, and get the lower case string
-                        let rest_of_key: &str = &key[PREFIX.len()..].to_lowercase();
-                        match rest_of_key {
-                            $(stringify!($name) => { options.set_from_str(rest_of_key, &val); },)*
+                    // strip the prefix, and get the lower case string
+                    if let Some(rest_of_key) = key.strip_prefix(PREFIX) {
+                        let lowercase: &str = &rest_of_key.to_lowercase();
+                        match lowercase {
+                            $(stringify!($name) => { options.set_from_str(lowercase, &val); },)*
                             _ => {}
                         }
                     }
