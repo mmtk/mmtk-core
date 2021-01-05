@@ -47,7 +47,7 @@ You will first be guided through building a Semispace collector. After that, you
 
 *work packet*: (MMTk-specific) Contains an instance of a GC worker.
 
-*zeroing*: **TODO**
+*zeroing*, *zero initialization*: Initializing and resetting unused memory bits to have a value of 0, generally to improve memory safety.
 
 See also: [Further Reading](#further-reading)
 
@@ -210,8 +210,8 @@ The first step of changing the MyGC plan into a Semispace plan is to add the two
                 &mut heap,
             );
             ```
-         You may have noticed that the CopySpace initialisation requires one more bool compared to ImmortalSpace. The definitions for these spaces are stored in `mmtk-core/policy`. By looking in these files, add a comment defining which bool has what function. Then, copy the above code again, renaming it `copyspace1`, and setting it so that it is a fromspace rather than a tospace.
-       - Finally, replace the definition of MyGC with the following:
+         You may have noticed that the CopySpace initialisation requires one more bool compared to ImmortalSpace. The definitions for these spaces are stored in `mmtk-core/policy`. By looking in these files, add a comment to the above code noting which bool has what function. Then, copy the above code again, renaming it `copyspace1`, and setting it so that it is a fromspace rather than a tospace.
+       - Finally, replace the old MyGC initializer with the following:
        ```rust
        MyGC {
             hi: AtomicBool::new(false),
@@ -220,7 +220,43 @@ The first step of changing the MyGC plan into a Semispace plan is to add the two
             common: CommonPlan::new(vm_map, mmapper, options, heap),
         }
        ```
-            
+   4. The plan now has the components it needs for allocation, but not the instructions for how to make use of them.
+      - Add a function called `common` that returns a reference to the common plan.
+        ```rust
+        fn common(&self) -> &CommonPlan<VM> {
+          &self.common
+        }
+        ```
+      - Find the function `base` and change it so that it calls the base plan *through* the common plan.
+        ```rust
+        fn base(&self) -> &BasePlan<VM> {
+         &self.common.base
+        }
+        ```
+      - Find the function `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
+      - *Are prepare and release needed for this?* Find the function `prepare`. TODO
+      - Find the function `release`. TODO
+      - *is this needed here?* Add the following function, still within the implementations for Plan for MyGC. **TODO: Find a better way to word this.**
+        ```rust
+        fn get_collection_reserve(&self) -> usize {
+         self.tospace().reserved_pages()
+        }
+        ```
+      - Add a new section of implementations for MyGC outside of the implementations for Plan for MyGC.
+        ```rust
+        impl<VM: VMBinding> MyGC<VM> {
+        }
+        ```
+      - To this, add two functions, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. Try writing tospace on your own before looking at the code below, and then write fromspace.
+      ```rust
+      pub fn tospace(&self) -> &CopySpace<VM> {
+        if self.hi.load(Ordering::SeqCst) {
+            &self.copyspace1
+        } else {
+            &self.copyspace0
+        }
+      }
+      ```
    
 2. mutator.rs
    * change value maps in lazy_static - going to need different space types for SemiSpace. 
