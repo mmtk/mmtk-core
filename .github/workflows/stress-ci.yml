@@ -24,6 +24,8 @@ jobs:
       # setup
       - name: Overwrite MMTk core in JikesRVM binding
         run: cp -r mmtk-core mmtk-jikesrvm/repos/
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
       - name: Setup
         run: |
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-jikesrvm/mmtk/Cargo.toml
@@ -32,7 +34,7 @@ jobs:
       - name: Build SemiSpace
         run: |
           cd mmtk-jikesrvm/repos/jikesrvm
-          RUSTUP_TOOLCHAIN=nightly-2020-07-08 python scripts/testMMTk.py -g RFastAdaptiveSemiSpace -j /usr/lib/jvm/java-1.8.0-openjdk-amd64 --build-only -- --answer-yes --quick --use-third-party-heap=../../ --use-third-party-build-configs=../../jikesrvm/build/configs --use-external-source=../../jikesrvm/rvm/src
+          python scripts/testMMTk.py -g RFastAdaptiveSemiSpace -j /usr/lib/jvm/java-1.8.0-openjdk-amd64 --build-only -- --answer-yes --quick --use-third-party-heap=../../ --use-third-party-build-configs=../../jikesrvm/build/configs --use-external-source=../../jikesrvm/rvm/src
       # Set parameters
       - name: Set stress test parameters
         id: stress_test
@@ -106,6 +108,8 @@ jobs:
       # setup
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
       - name: Setup
         run: |
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
@@ -116,7 +120,6 @@ jobs:
           cd mmtk-openjdk/repos/openjdk
           export DEBUG_LEVEL=release
           export MMTK_PLAN=semispace
-          export RUSTUP_TOOLCHAIN=nightly-2020-07-08
           sh configure --disable-warnings-as-errors --with-debug-level=$DEBUG_LEVEL
           make CONF=linux-x86_64-normal-server-$DEBUG_LEVEL THIRD_PARTY_HEAP=$PWD/../../openjdk
       # Set parameters

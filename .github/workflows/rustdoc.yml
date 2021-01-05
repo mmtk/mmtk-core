@@ -11,10 +11,9 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
-      - name: Install latest nightly
+      - name: Install nightly
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2020-07-08
           components: rustfmt, clippy
           target: i686-unknown-linux-gnu
           # This overwrites the default toolchain with the toolchain specified above.
