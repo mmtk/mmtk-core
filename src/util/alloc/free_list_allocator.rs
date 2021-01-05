@@ -1,5 +1,6 @@
 
 use atomic::Ordering;
+use libc::{c_void, size_t};
 
 use crate::util::Address;
 use crate::policy::malloc::*;
@@ -35,21 +36,19 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         trace!("alloc");
         assert!(offset==0);
         unsafe {
-            if malloc_memory_full() && PHASE == Phase::Allocation {
-                PHASE = Phase::Marking;
+            if malloc_memory_full() {
                 println!("\ntriggering collection");
                 self.plan.handle_user_collection_request(self.tls, true);
                 println!("collection done");
                 assert!(!malloc_memory_full(), "FreeListAllocator: Out of memory!");
-                PHASE = Phase::Allocation;
             }
 
             if USE_HASHSET {
                 //using hashset
-                let ptr = libc::calloc(1, size + 8);
+                let ptr = calloc(1, size + 8);
                 let address = Address::from_mut_ptr(ptr);
                 let object = address.to_object_reference();
-                let allocated_memory = libc::malloc_usable_size(ptr);
+                let allocated_memory = malloc_usable_size(ptr);
                 let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
                 *total_memory_allocated += allocated_memory;
                 // println!("Allocated {} bytes, total {} bytes.", allocated_memory, total_memory_allocated);
@@ -59,10 +58,10 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                 address.add(8)
             } else {
                 //using bitmap
-                let ptr = libc::calloc(1, size);
+                let ptr = calloc(1, size);
                 let address = Address::from_mut_ptr(ptr);
                 let object = address.to_object_reference();
-                let allocated_memory = libc::malloc_usable_size(ptr);
+                let allocated_memory = malloc_usable_size(ptr);
                 let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
                 *total_memory_allocated += allocated_memory;
                 // NODES.lock().unwrap().insert(object);

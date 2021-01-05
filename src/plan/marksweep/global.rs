@@ -1,6 +1,7 @@
 use super::gc_works::MSProcessEdges;
 use crate::{mmtk::MMTK, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
 use crate::policy::malloc::*;
+use crate::policy::msspace::MSSpace;
 use crate::plan::global::NoCopy;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -23,15 +24,15 @@ use crate::util::{Address, ObjectReference, OpaquePointer};
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::vm::VMBinding;
-use std::{ops::Sub, sync::{Arc, atomic::AtomicU8}};
+use std::{ops::Sub, sync::Arc};
 
-use atomic::Ordering;
 use enum_map::EnumMap;
 
 pub type SelectedPlan<VM> = MarkSweep<VM>;
 
 pub struct MarkSweep<VM: VMBinding> {
     pub common: CommonPlan<VM>,
+    pub space: MSSpace<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
@@ -50,6 +51,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         MarkSweep {
             common: CommonPlan::new(vm_map, mmapper, options, heap),
+            space: MSSpace::new(),
         }
     }
 
@@ -104,7 +106,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn release(&self, tls: OpaquePointer) {
-        unsafe { PHASE = Phase::Sweeping; }
         println!("global::release()");
         {
             let total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
@@ -142,9 +143,9 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                                 let address = bitmap_index_to_address(bitmap_index, chunk_start);
                                 let ptr = address.to_mut_ptr();
                                 let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
-                                let freed_memory = libc::malloc_usable_size(ptr);
+                                let freed_memory = malloc_usable_size(ptr);
                                 *total_memory_allocated -= freed_memory;
-                                libc::free(ptr);
+                                free(ptr);
                                 malloced[bitmap_index] = 0;
                                 marked[bitmap_index] = 0;
                             } else {
@@ -164,7 +165,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                 
                 let total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
                 println!("total memory allocated = {}", *total_memory_allocated);
-                PHASE = Phase::Allocation;
 
             }
 

@@ -17,12 +17,14 @@ crate-type = ["rlib"]
 doctest = false
 
 [package.metadata.docs.rs]
-features = ["mygencopy"]
+features = ["marksweep"]
 
 [dependencies]
 custom_derive = "0.1"
 enum_derive = "0.1"
 libc = "0.2"
+jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"] }
+mimalloc-sys = "0.1.6"
 lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
@@ -40,6 +42,7 @@ rand = "0.7.3"
 
 [features]
 default = []
+malloc_mimalloc = []
 
 # plans
 nogc = ["immortalspace", "largeobjectspace"]
