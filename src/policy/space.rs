@@ -263,6 +263,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 unsafe { Address::zero() }
             } else {
                 debug!("Space.acquire(), returned = {}", rtn);
+                if VM::VMObjectModel::HAS_GC_BYTE {
+                    crate::util::side_metadata::SideMetadata::add_space(
+                        rtn,
+                        conversions::pages_to_bytes(pages),
+                    );
+                }
                 rtn
             }
         }

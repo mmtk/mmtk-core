@@ -53,13 +53,13 @@ pub fn mprotect(start: Address, size: usize) -> Result<()> {
 /// Reserves a contiguous virtual address range with the specified size,
 /// without mapping it to physical memory.
 /// The dzmmap function can then be used to map specific portions of the address range to physical memory.
-/// 
-pub fn reserve_vm_address_range(size: usize) -> Result<Address> {
+///
+pub fn reserve_address_range(start: Address, size: usize) -> Result<Address> {
     let prot = libc::PROT_NONE;
-    let flags = libc::MAP_ANON | libc::MAP_PRIVATE;
-    let result: *mut c_void = unsafe { libc::mmap(std::ptr::null_mut(), size, prot, flags, -1, 0) };
+    let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
+    let result: *mut c_void = unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) };
     if result == libc::MAP_FAILED {
-        Err(Error::from_raw_os_error(result))
+        Err(Error::from_raw_os_error(result as _))
     } else {
         Ok(Address::from_mut_ptr(result))
     }
