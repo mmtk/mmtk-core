@@ -1,4 +1,4 @@
-use super::MarkSweep;
+use super::MallocMS;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
@@ -11,14 +11,14 @@ use enum_map::enum_map;
 use enum_map::EnumMap;
 
 pub fn ms_mutator_prepare<VM: VMBinding>(
-    _mutator: &mut Mutator<MarkSweep<VM>>,
+    _mutator: &mut Mutator<MallocMS<VM>>,
     _tls: OpaquePointer,
 ) {
     // Do nothing
 }
 
 pub fn ms_mutator_release<VM: VMBinding>(
-    _mutator: &mut Mutator<MarkSweep<VM>>,
+    _mutator: &mut Mutator<MallocMS<VM>>,
     _tls: OpaquePointer,
 ) {
     // Do nothing
@@ -35,8 +35,8 @@ lazy_static! {
 
 pub fn create_ms_mutator<VM: VMBinding>(
     mutator_tls: OpaquePointer,
-    plan: &'static MarkSweep<VM>,
-) -> Mutator<MarkSweep<VM>> {
+    plan: &'static MallocMS<VM>,
+) -> Mutator<MallocMS<VM>> {
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![

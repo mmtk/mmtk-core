@@ -1,5 +1,9 @@
-use std::sync::{Mutex, atomic::AtomicUsize};
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+// a collection of functions and data structures used by MallocMS
+// currently under policy so that is_malloced can be accessed by the OpenJDK binding
+// once the sparse SFT table is in use and is_malloced is replaced by is_mapped_address, this should be moved to plan::marksweep
+
+use std::sync::atomic::{Ordering, AtomicUsize};
+use std::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::collections::HashSet;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -20,7 +24,6 @@ pub static MEMORY_ALLOCATED: AtomicUsize = AtomicUsize::new(0);
 
 // Import calloc, free, and malloc_usable_size from the library specified in Cargo.toml:45
 
-use atomic::Ordering;
 #[cfg(feature = "malloc_jemalloc")]
 pub use jemalloc_sys::{free, malloc_usable_size, calloc};
 
@@ -81,40 +84,6 @@ pub fn write_malloc_bits() {
         // println!("written to table");
     }
 }
-
-// pub fn write_mark_bits() {
-//     let mut mark_buffer = MARK_BUFFER.lock().unwrap();
-//     let ref mut metadata_table = METADATA_TABLE.write().unwrap();
-//     loop {
-//         let address = mark_buffer.pop();
-//         let mut address = match address {
-//             Some(address) => address,
-//             None => {    
-//                 // println!("completed writing mark bits");
-//                 return
-//             },
-//         };
-//         let (address, bit) = address;
-//         let chunk_index = address_to_chunk_index_with_write(address, metadata_table);
-//         let chunk_index = match chunk_index {
-//             Some(i) => i,
-//             None => {
-//                 let table_length = metadata_table.len();
-//                 let malloced = vec![0; BYTES_IN_CHUNK/16];
-//                 let marked = vec![0; BYTES_IN_CHUNK/16];
-//                 let row = (conversions::chunk_align_down(address).as_usize(), malloced, marked);
-//                 metadata_table.push(row);
-//                 table_length
-//             }
-//         };
-//         let bitmap_index = address_to_bitmap_index(address);
-//         let mut row = &mut metadata_table[chunk_index];
-//         // if bit == 1 {
-//         //     println!("marking address {}", address);
-//         // }
-//         row.2[bitmap_index] = bit;
-//     }
-// }
 
 pub unsafe fn malloc_memory_full() -> bool {
     MEMORY_ALLOCATED.load(Ordering::SeqCst) >= MALLOC_MEMORY

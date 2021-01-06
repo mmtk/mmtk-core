@@ -1,6 +1,3 @@
-
-use atomic::Ordering;
-
 use crate::scheduler::gc_works::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
@@ -30,7 +27,6 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         // println!("trace");
-        // unreachable!();
         if object.is_null() {
             return object;
         }
@@ -46,7 +42,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
             }
             object
         } else {
-            //using bitmaps
+            //using metadata table
             if !is_marked(object) { 
                 let ref mut metadata_table = METADATA_TABLE.write().unwrap();
                 let chunk_index = address_to_chunk_index_with_write(object.to_address(), metadata_table).unwrap();
@@ -55,9 +51,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
                 let index = address_to_bitmap_index(object.to_address());
                 marked[index] = 1;
                 
-                // println!("adding obj at address {} to the hashset", object.to_address());
                 // MARKED.lock().unwrap().insert(object);
-                // println!("done adding {} to hashset", object.to_address());
                 self.process_node(object);
             }
             object

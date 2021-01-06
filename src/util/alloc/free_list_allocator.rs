@@ -1,7 +1,3 @@
-
-use atomic::Ordering;
-use libc::{c_void, size_t};
-
 use crate::util::Address;
 use crate::policy::malloc::*;
 use crate::util::alloc::Allocator;
@@ -10,6 +6,7 @@ use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::space::Space;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+use atomic::Ordering;
 
 #[repr(C)]
 pub struct FreeListAllocator<VM: VMBinding> {
@@ -37,9 +34,9 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         assert!(offset==0);
         unsafe {
             if malloc_memory_full() {
-                println!("\ntriggering collection");
+                // println!("\ntriggering collection");
                 self.plan.handle_user_collection_request(self.tls, true);
-                println!("collection done");
+                // println!("collection done");
                 assert!(!malloc_memory_full(), "FreeListAllocator: Out of memory!");
             }
 
@@ -47,29 +44,20 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                 //using hashset
                 let ptr = calloc(1, size + 8);
                 let address = Address::from_mut_ptr(ptr);
-                let object = address.to_object_reference();
                 let allocated_memory = malloc_usable_size(ptr);
                 MEMORY_ALLOCATED.fetch_add(allocated_memory, Ordering::SeqCst);
-                // let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
-                // *total_memory_allocated += allocated_memory;
-                // println!("Allocated {} bytes, total {} bytes.", allocated_memory, total_memory_allocated);
                 // println!("allocated object sized {} into block sized {} at {:b}, index of {:b}", size + 8, allocated_memory, address.as_usize(), object_reference_to_index(object));
                 NODES.lock().unwrap().insert(address.add(8).to_object_reference()); //NODES contains the reference to the object, not the mark word
                 
                 address.add(8)
             } else {
-                //using bitmap
+                //using metadata table
                 let ptr = calloc(1, size);
                 let address = Address::from_mut_ptr(ptr);
-                let object = address.to_object_reference();
                 let allocated_memory = malloc_usable_size(ptr);
                 MEMORY_ALLOCATED.fetch_add(allocated_memory, Ordering::SeqCst);
-                // let mut total_memory_allocated = MEMORY_ALLOCATED.lock().unwrap();
-                // *total_memory_allocated += allocated_memory;
                 // NODES.lock().unwrap().insert(object);
                 create_metadata(address);
-                // println!("alloced {}", total_memory_allocated);
-                // println!("allocing address {}, buffer = {:?}", address, MALLOC_BUFFER.lock().unwrap());
                 address
             }
         }

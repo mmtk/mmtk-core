@@ -1,7 +1,7 @@
 use super::gc_works::MSProcessEdges;
 use crate::{mmtk::MMTK, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
 use crate::policy::malloc::*;
-use crate::policy::msspace::MSSpace;
+use crate::policy::mallocspace::MallocSpace;
 use crate::plan::global::NoCopy;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -29,16 +29,16 @@ use std::{ops::Sub, sync::Arc};
 use atomic::Ordering;
 use enum_map::EnumMap;
 
-pub type SelectedPlan<VM> = MarkSweep<VM>;
+pub type SelectedPlan<VM> = MallocMS<VM>;
 
-pub struct MarkSweep<VM: VMBinding> {
+pub struct MallocMS<VM: VMBinding> {
     pub common: CommonPlan<VM>,
-    pub space: MSSpace<VM>,
+    pub space: MallocSpace<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
+unsafe impl<VM: VMBinding> Sync for MallocMS<VM> {}
 
-impl<VM: VMBinding> Plan for MarkSweep<VM> {
+impl<VM: VMBinding> Plan for MallocMS<VM> {
     type VM = VM;
     type Mutator = Mutator<Self>;
     type CopyContext = NoCopy<VM>;
@@ -50,9 +50,9 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         _scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        MarkSweep {
+        MallocMS {
             common: CommonPlan::new(vm_map, mmapper, options, heap),
-            space: MSSpace::new(),
+            space: MallocSpace::new(),
         }
     }
 
@@ -107,7 +107,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn release(&self, tls: OpaquePointer) {
-        println!("global::release()");
+        println!("\nglobal::release()");
         {
             let total_memory_allocated = MEMORY_ALLOCATED.load(Ordering::SeqCst);
             println!("total memory allocated = {}", total_memory_allocated);
@@ -116,7 +116,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
             if USE_HASHSET {
                 //using hashset
                 let mut NODES_mut = &mut *NODES.lock().unwrap();
-                NODES_mut.retain(|&o| MarkSweep::<VM>::marked(&o));
+                NODES_mut.retain(|&o| MallocMS::<VM>::marked(&o));
                 for object in NODES_mut.iter() {
                     let a: Address = object.to_address().sub(8);
                     let marking_word: usize = a.load();
@@ -177,8 +177,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        0
-        // MALLOC_MEMORY - MEMORY_ALLOCATED.load(Ordering::SeqCst)
+        self.common.get_pages_used()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -190,7 +189,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 }
 
-impl<VM: VMBinding> MarkSweep<VM> {
+impl<VM: VMBinding> MallocMS<VM> {
     fn marked(&object: &ObjectReference) -> bool {
         unsafe {
             let address: Address = object.to_address().sub(8);

@@ -26,5 +26,5 @@ pub mod largeobjectspace;
 #[cfg(feature = "lockfreeimmortalspace")]
 pub mod lockfreeimmortalspace;
 
-pub mod msspace;
+pub mod mallocspace;
 

@@ -4,13 +4,13 @@ use crate::{policy::space::{Space, SFT}, util::{Address, ObjectReference, heap::
 
 use super::space::CommonSpace;
 
-pub struct MSSpace<VM: VMBinding> {
+pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>
 }
 
-impl<VM: VMBinding> SFT for MSSpace<VM> {
+impl<VM: VMBinding> SFT for MallocSpace<VM> {
     fn name(&self) -> &str {
-        "MSSpace"
+        "MallocSpace"
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
@@ -26,7 +26,7 @@ impl<VM: VMBinding> SFT for MSSpace<VM> {
     fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
 }
 
-impl<VM: VMBinding> Space<VM> for MSSpace<VM> {
+impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn as_space(&self) -> &dyn Space<VM> {
         self
     }
@@ -52,9 +52,9 @@ impl<VM: VMBinding> Space<VM> for MSSpace<VM> {
     }
 }
 
-impl<VM: VMBinding> MSSpace<VM> {
+impl<VM: VMBinding> MallocSpace<VM> {
     pub fn new() -> Self {
-        MSSpace {
+        MallocSpace {
             phantom: PhantomData,
         }
     }
