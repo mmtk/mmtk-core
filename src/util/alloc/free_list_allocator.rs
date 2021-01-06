@@ -1,5 +1,8 @@
 use crate::util::Address;
-use crate::policy::malloc::*;
+use crate::policy::malloc::calloc;
+use crate::policy::malloc::malloc_usable_size;
+use crate::policy::malloc::HEAP_USED;
+use crate::policy::malloc::create_metadata;
 use crate::util::alloc::Allocator;
 use crate::plan::global::Plan;
 use crate::plan::selected_plan::SelectedPlan;
@@ -33,33 +36,16 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         trace!("alloc");
         assert!(offset==0);
         unsafe {
-            if malloc_memory_full() {
-                // println!("\ntriggering collection");
+            if self.plan.collection_required(false, self.space.unwrap()) {
                 self.plan.handle_user_collection_request(self.tls, true);
-                // println!("collection done");
-                assert!(!malloc_memory_full(), "FreeListAllocator: Out of memory!");
+                assert!(!self.plan.collection_required(false, self.space.unwrap()), "FreeListAllocator: Out of memory!");
             }
-
-            if USE_HASHSET {
-                //using hashset
-                let ptr = calloc(1, size + 8);
-                let address = Address::from_mut_ptr(ptr);
-                let allocated_memory = malloc_usable_size(ptr);
-                MEMORY_ALLOCATED.fetch_add(allocated_memory, Ordering::SeqCst);
-                // println!("allocated object sized {} into block sized {} at {:b}, index of {:b}", size + 8, allocated_memory, address.as_usize(), object_reference_to_index(object));
-                NODES.lock().unwrap().insert(address.add(8).to_object_reference()); //NODES contains the reference to the object, not the mark word
-                
-                address.add(8)
-            } else {
-                //using metadata table
-                let ptr = calloc(1, size);
-                let address = Address::from_mut_ptr(ptr);
-                let allocated_memory = malloc_usable_size(ptr);
-                MEMORY_ALLOCATED.fetch_add(allocated_memory, Ordering::SeqCst);
-                // NODES.lock().unwrap().insert(object);
-                create_metadata(address);
-                address
-            }
+            let ptr = calloc(1, size);
+            let address = Address::from_mut_ptr(ptr);
+            let allocated_memory = malloc_usable_size(ptr);
+            HEAP_USED.fetch_add(allocated_memory, Ordering::SeqCst);
+            create_metadata(address);
+            address
         }
     }
 

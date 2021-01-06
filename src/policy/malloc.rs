@@ -2,25 +2,20 @@
 // currently under policy so that is_malloced can be accessed by the OpenJDK binding
 // once the sparse SFT table is in use and is_malloced is replaced by is_mapped_address, this should be moved to plan::marksweep
 
-use std::sync::atomic::{Ordering, AtomicUsize};
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use std::collections::HashSet;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::conversions;
 
 lazy_static! {
-    pub static ref NODES: Mutex<HashSet<ObjectReference>> = Mutex::default();
-    // pub static ref MARKED: Mutex<HashSet<ObjectReference>> = Mutex::default();
     pub static ref METADATA_TABLE: RwLock<Vec<(usize, Vec<u8>, Vec<u8>)>> = RwLock::default();
-    pub static ref MALLOC_BUFFER: Mutex<Vec<Address>> = Mutex::default();
-    // pub static ref MARK_BUFFER: Mutex<Vec<Address>> = Mutex::default();
+    pub static ref METADATA_BUFFER: Mutex<Vec<Address>> = Mutex::default();
     
 }
-pub const MALLOC_MEMORY: usize = 90000000;
-pub const USE_HASHSET: bool = false;
-pub static MEMORY_ALLOCATED: AtomicUsize = AtomicUsize::new(0);
+pub static mut HEAP_SIZE: usize = 90000000;
+pub static HEAP_USED: AtomicUsize = AtomicUsize::new(0);
 
 // Import calloc, free, and malloc_usable_size from the library specified in Cargo.toml:45
 
@@ -50,66 +45,52 @@ pub unsafe fn calloc(count: size_t, size: size_t) -> *mut c_void {
 pub use libc::{free, malloc_usable_size, calloc};
 
 // Set the corresponding bit for each address in the buffer
-pub fn write_malloc_bits() {
-    let mut malloc_buffer = MALLOC_BUFFER.lock().unwrap();
+pub fn write_metadata_bits() {
+    let mut buffer = METADATA_BUFFER.lock().unwrap();
     let ref mut metadata_table = METADATA_TABLE.write().unwrap();
     loop {
-        // println!("begin loop");
-        let address = match malloc_buffer.pop() {
+        let address = match buffer.pop() {
             Some(addr) => addr,
             None => {    
                 // buffer exhausted
-                // println!("completed writing malloc bits");
                 return
             },
         };
-        // println!("write-locked table");
         let chunk_index = address_to_chunk_index_with_write(address, metadata_table);
         let chunk_index = match chunk_index {
             Some(i) => i,
             None => {
                 let table_length = metadata_table.len();
-                // println!("need new row for chunk start {}, currently {}", conversions::chunk_align_down(address).as_usize(),table_length);
                 let malloced = vec![0; BYTES_IN_CHUNK/16];
                 let marked = vec![0; BYTES_IN_CHUNK/16];
                 let row = (conversions::chunk_align_down(address).as_usize(), malloced, marked);
                 metadata_table.push(row);
-                // println!("created new row");
                 table_length
             }
         };
         let bitmap_index = address_to_bitmap_index(address);
         let mut row = &mut metadata_table[chunk_index];
         row.1[bitmap_index] = 1;
-        // println!("written to table");
     }
-}
-
-pub unsafe fn malloc_memory_full() -> bool {
-    MEMORY_ALLOCATED.load(Ordering::SeqCst) >= MALLOC_MEMORY
 }
 
 pub fn create_metadata(address: Address) {
-    // println!("on cree des metadonnes");
     let buffer_full = {
-        let mut malloc_buffer = MALLOC_BUFFER.lock().unwrap();
-        malloc_buffer.push(address);
-        malloc_buffer.len() >= 16
+        let mut buffer = METADATA_BUFFER.lock().unwrap();
+        buffer.push(address);
+        buffer.len() >= 16
     };
     if buffer_full {
-        write_malloc_bits();
+        write_metadata_bits();
     }
-    // println!("on a termine")
 
 }
 
 // Check the bit for a given object
 // Later, this should be updated to use the SFT table defined in policy::space
 pub fn is_malloced(object: ObjectReference) -> bool {
-    // let nodes_result = NODES.lock().unwrap().contains(&object);
-    // println!("checking address {}", object.to_address());
-    if !MALLOC_BUFFER.lock().unwrap().is_empty() {
-        write_malloc_bits();
+    if !METADATA_BUFFER.lock().unwrap().is_empty() {
+        write_metadata_bits();
     }
     let chunk_index = {
         let ref metadata_table = METADATA_TABLE.read().unwrap();
@@ -117,12 +98,10 @@ pub fn is_malloced(object: ObjectReference) -> bool {
     };
     match chunk_index {
         Some(index) => {
-            let r = METADATA_TABLE.read().unwrap()[index].1[address_to_bitmap_index(object.to_address())] == 1;
-            // assert!(r == nodes_result, "for address {}, testing hashset gives {}, testing metadata_table gives {}", object.to_address(), nodes_result, r);
-            r
+            METADATA_TABLE.read().unwrap()[index].1[address_to_bitmap_index(object.to_address())] == 1
+
         },
         None => {
-            // assert!(nodes_result == false);
             false
         },
     }
