@@ -1,4 +1,4 @@
-// a collection of functions and data structures used by MallocMS
+// a collection of functions and data structures used by MarkSweep
 // currently under policy so that is_malloced can be accessed by the OpenJDK binding
 // once the sparse SFT table is in use and is_malloced is replaced by is_mapped_address, this should be moved to plan::marksweep
 

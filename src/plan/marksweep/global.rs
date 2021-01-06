@@ -29,16 +29,16 @@ use std::{ops::Sub, sync::Arc};
 use atomic::Ordering;
 use enum_map::EnumMap;
 
-pub type SelectedPlan<VM> = MallocMS<VM>;
+pub type SelectedPlan<VM> = MarkSweep<VM>;
 
-pub struct MallocMS<VM: VMBinding> {
+pub struct MarkSweep<VM: VMBinding> {
     pub common: CommonPlan<VM>,
     pub space: MallocSpace<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for MallocMS<VM> {}
+unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
 
-impl<VM: VMBinding> Plan for MallocMS<VM> {
+impl<VM: VMBinding> Plan for MarkSweep<VM> {
     type VM = VM;
     type Mutator = Mutator<Self>;
     type CopyContext = NoCopy<VM>;
@@ -50,7 +50,7 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
         _scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        MallocMS {
+        MarkSweep {
             common: CommonPlan::new(vm_map, mmapper, options, heap),
             space: MallocSpace::new(),
         }
@@ -116,7 +116,7 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
             if USE_HASHSET {
                 //using hashset
                 let mut NODES_mut = &mut *NODES.lock().unwrap();
-                NODES_mut.retain(|&o| MallocMS::<VM>::marked(&o));
+                NODES_mut.retain(|&o| MarkSweep::<VM>::marked(&o));
                 for object in NODES_mut.iter() {
                     let a: Address = object.to_address().sub(8);
                     let marking_word: usize = a.load();
@@ -189,7 +189,7 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
     }
 }
 
-impl<VM: VMBinding> MallocMS<VM> {
+impl<VM: VMBinding> MarkSweep<VM> {
     fn marked(&object: &ObjectReference) -> bool {
         unsafe {
             let address: Address = object.to_address().sub(8);
