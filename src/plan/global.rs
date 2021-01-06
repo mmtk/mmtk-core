@@ -274,15 +274,15 @@ pub trait Plan: Sized + 'static + Sync + Send {
     fn stress_test_gc_required(&self) -> bool {
         let stress_factor = self.base().options.stress_factor;
         if self.is_initialized()
-            && (self.base().allocation_count.load(Ordering::Relaxed) > stress_factor)
+            && (self.base().allocation_bytes.load(Ordering::SeqCst) > stress_factor)
         {
             trace!(
-                "Stress GC: allocation_count = {}, stress_factor = {}",
-                self.base().allocation_count.load(Ordering::Relaxed),
+                "Stress GC: allocation_bytes = {}, stress_factor = {}",
+                self.base().allocation_bytes.load(Ordering::Relaxed),
                 stress_factor
             );
             trace!("Doing stress GC");
-            self.base().allocation_count.store(0, Ordering::Relaxed);
+            self.base().allocation_bytes.store(0, Ordering::SeqCst);
             true
         } else {
             false
@@ -355,7 +355,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub scanned_stacks: AtomicUsize,
     pub mutator_iterator_lock: Mutex<()>,
     // Allocation count
-    pub allocation_count: AtomicUsize,
+    pub allocation_bytes: AtomicUsize,
 }
 
 #[cfg(feature = "base_spaces")]
@@ -444,7 +444,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             inside_sanity: AtomicBool::new(false),
             scanned_stacks: AtomicUsize::new(0),
             mutator_iterator_lock: Mutex::new(()),
-            allocation_count: AtomicUsize::new(0),
+            allocation_bytes: AtomicUsize::new(0),
         }
     }
 

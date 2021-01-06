@@ -118,30 +118,26 @@ impl<VM: VMBinding> BumpAllocator<VM> {
                 unsafe { VM::VMActivePlan::is_mutator(self.tls) } && self.plan.is_initialized();
 
             if is_mutator
-                && (base.allocation_count.load(Ordering::Relaxed) > base.options.stress_factor)
+                && (base.allocation_bytes.load(Ordering::SeqCst) > base.options.stress_factor)
             {
                 trace!(
-                    "Stress GC: allocation_count = {} more than stress_factor = {}",
-                    base.allocation_count.load(Ordering::Relaxed),
+                    "Stress GC: allocation_bytes = {} more than stress_factor = {}",
+                    base.allocation_bytes.load(Ordering::Relaxed),
                     base.options.stress_factor
                 );
                 return self.acquire_block(size, align, offset, true);
             }
 
-            fill_alignment_gap::<VM>(self.cursor, result);
-            let alloc_size = new_cursor - self.cursor;
-
             if is_mutator {
-                let current_allocation_count = base.allocation_count.load(Ordering::Relaxed);
-                base.allocation_count
-                    .store(current_allocation_count + alloc_size, Ordering::Relaxed);
+                base.allocation_bytes.store(size, Ordering::SeqCst);
                 trace!(
-                    "Stress GC: allocation_count = {}",
-                    base.allocation_count.load(Ordering::Relaxed)
+                    "Stress GC: allocation_bytes = {}",
+                    base.allocation_bytes.load(Ordering::Relaxed)
                 );
             }
 
-            self.limit -= alloc_size;
+            fill_alignment_gap::<VM>(self.cursor, result);
+            self.limit -= new_cursor - self.cursor;
             self.cursor = new_cursor;
             trace!(
                 "alloc_slow: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
