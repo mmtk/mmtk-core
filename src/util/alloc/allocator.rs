@@ -1,3 +1,4 @@
+use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use crate::util::address::Address;
 
 use std::sync::atomic::Ordering;
@@ -120,6 +121,8 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     #[inline(always)]
     fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let tls = self.get_tls();
+        let plan = self.get_plan().base();
+        let stress_test = plan.options.stress_factor != DEFAULT_STRESS_FACTOR;
 
         // Information about the previous collection.
         let mut emergency_collection = false;
@@ -132,7 +135,6 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 return result;
             }
 
-            let plan = self.get_plan().base();
             if !result.is_zero() {
                 // TODO: Check if we need oom lock.
                 // It seems the lock only protects access to the atomic boolean. We could possibly do
@@ -147,6 +149,12 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     plan.allocation_success.store(true, Ordering::Relaxed);
                     drop(guard);
                 }
+
+                if stress_test && self.get_plan().is_initialized() {
+                    info!("size = {}, result = {}", size, result);
+                    plan.increase_allocation_bytes_by(size);
+                }
+
                 return result;
             }
 

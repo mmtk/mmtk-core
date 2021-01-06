@@ -639,6 +639,14 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     fn force_full_heap_collection(&self) {}
+
+    pub fn increase_allocation_bytes_by(&self, size: usize) {
+        self.allocation_bytes.fetch_add(size, Ordering::SeqCst);
+        info!(
+            "Stress GC: allocation_bytes = {}",
+            self.allocation_bytes.load(Ordering::Relaxed)
+        );
+    }
 }
 
 /**

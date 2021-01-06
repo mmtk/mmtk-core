@@ -120,7 +120,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
             if is_mutator
                 && (base.allocation_bytes.load(Ordering::SeqCst) > base.options.stress_factor)
             {
-                trace!(
+                info!(
                     "Stress GC: allocation_bytes = {} more than stress_factor = {}",
                     base.allocation_bytes.load(Ordering::Relaxed),
                     base.options.stress_factor
@@ -128,23 +128,21 @@ impl<VM: VMBinding> BumpAllocator<VM> {
                 return self.acquire_block(size, align, offset, true);
             }
 
-            if is_mutator {
-                base.allocation_bytes.store(size, Ordering::SeqCst);
-                trace!(
-                    "Stress GC: allocation_bytes = {}",
-                    base.allocation_bytes.load(Ordering::Relaxed)
-                );
-            }
+            // if is_mutator {
+            //     info!("size = {}, result = {}", size, result);
+            //     base.increase_allocation_bytes_by(size);
+            // }
 
             fill_alignment_gap::<VM>(self.cursor, result);
             self.limit -= new_cursor - self.cursor;
             self.cursor = new_cursor;
-            trace!(
-                "alloc_slow: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
+            info!(
+                "alloc_slow: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}, is_mutator: {}",
                 size,
                 result,
                 self.cursor,
-                self.limit
+                self.limit,
+                is_mutator
             );
             result
         }
