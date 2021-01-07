@@ -97,6 +97,18 @@ impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     }
 }
 
+pub trait PlanTypes {
+    type VM: VMBinding;
+    type Mutator: MutatorContext<Self::VM>;
+    type CopyContext: CopyContext;
+
+    fn bind_mutator(
+        &'static self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> Box<Self::Mutator>;
+}
+
 /// A plan describes the global core functionality for all memory management schemes.
 /// All global MMTk plans should implement this trait.
 ///
@@ -104,8 +116,6 @@ impl<VM: VMBinding> CopyContext for NoCopy<VM> {
 /// (such as memory and virtual memory resources).
 pub trait Plan: Sized + 'static + Sync + Send {
     type VM: VMBinding;
-    type Mutator: MutatorContext<Self::VM>;
-    type CopyContext: CopyContext;
 
     fn new(
         vm_map: &'static VMMap,
@@ -149,12 +159,6 @@ pub trait Plan: Sized + 'static + Sync + Send {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<Self::VM>>,
     );
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Self::Mutator>;
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 

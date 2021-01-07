@@ -32,6 +32,7 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+use crate::plan::global::PlanTypes;
 
 /// Run the main loop for the GC controller thread. This method does not return.
 ///
@@ -69,7 +70,7 @@ pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: OpaquePointer,
 ) -> Box<Mutator<SelectedPlan<VM>>> {
-    SelectedPlan::bind_mutator(&mmtk.plan, tls, mmtk)
+    <SelectedPlan<VM> as PlanTypes>::bind_mutator(&mmtk.plan, tls, mmtk)
 }
 
 /// Reclaim a mutator that is no longer needed.

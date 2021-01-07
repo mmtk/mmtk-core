@@ -46,7 +46,7 @@ pub struct Mutator<P: Plan> {
     pub config: MutatorConfig<P>,
 }
 
-impl<P: Plan<Mutator = Self>> MutatorContext<P::VM> for Mutator<P> {
+impl<P: Plan> MutatorContext<P::VM> for Mutator<P> {
     fn prepare(&mut self, tls: OpaquePointer) {
         (*self.config.prepare_func)(self, tls)
     }

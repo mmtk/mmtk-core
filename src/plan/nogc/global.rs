@@ -19,6 +19,7 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
+use crate::plan::global::PlanTypes;
 
 #[cfg(not(feature = "nogc_lock_free"))]
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
@@ -34,10 +35,22 @@ pub struct NoGC<VM: VMBinding> {
 
 unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
 
-impl<VM: VMBinding> Plan for NoGC<VM> {
+impl<VM: VMBinding> PlanTypes for NoGC<VM> {
     type VM = VM;
     type Mutator = Mutator<Self>;
     type CopyContext = NoCopy<VM>;
+
+    fn bind_mutator(
+        &'static self,
+        tls: OpaquePointer,
+        _mmtk: &'static MMTK<Self::VM>,
+    ) -> Box<Mutator<Self>> {
+        Box::new(create_nogc_mutator(tls, self))
+    }    
+}
+
+impl<VM: VMBinding> Plan for NoGC<VM> {
+    type VM = VM;
 
     fn new(
         vm_map: &'static VMMap,
@@ -83,14 +96,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn base(&self) -> &BasePlan<VM> {
         &self.base
-    }
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        _mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Mutator<Self>> {
-        Box::new(create_nogc_mutator(tls, self))
     }
 
     fn prepare(&self, _tls: OpaquePointer) {
