@@ -1,6 +1,6 @@
-// a collection of functions and data structures used by MarkSweep
+// a collection of functions and data structures used by MallocMS
 // currently under policy so that is_malloced can be accessed by the OpenJDK binding
-// once the sparse SFT table is in use and is_malloced is replaced by is_mapped_address, this should be moved to plan::marksweep
+// once the sparse SFT table is in use and is_malloced is replaced by is_mapped_address, this should be moved to plan::mallocms
 
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};

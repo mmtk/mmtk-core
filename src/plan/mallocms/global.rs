@@ -12,8 +12,8 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::mutator_context::Mutator;
-use crate::plan::marksweep::mutator::create_ms_mutator;
-use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
+use crate::plan::mallocms::mutator::create_ms_mutator;
+use crate::plan::mallocms::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::policy::space::Space;
@@ -34,16 +34,16 @@ use std::sync::Arc;
 use atomic::Ordering;
 use enum_map::EnumMap;
 
-pub type SelectedPlan<VM> = MarkSweep<VM>;
+pub type SelectedPlan<VM> = MallocMS<VM>;
 
-pub struct MarkSweep<VM: VMBinding> {
+pub struct MallocMS<VM: VMBinding> {
     pub common: CommonPlan<VM>,
     pub space: MallocSpace<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
+unsafe impl<VM: VMBinding> Sync for MallocMS<VM> {}
 
-impl<VM: VMBinding> Plan for MarkSweep<VM> {
+impl<VM: VMBinding> Plan for MallocMS<VM> {
     type VM = VM;
     type Mutator = Mutator<Self>;
     type CopyContext = NoCopy<VM>;
@@ -55,7 +55,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         _scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        MarkSweep {
+        MallocMS {
             common: CommonPlan::new(vm_map, mmapper, options, heap),
             space: MallocSpace::new(),
         }

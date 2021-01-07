@@ -234,7 +234,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
     where
         Self: Sized,
     {
-        #[cfg(feature="marksweep")]
+        #[cfg(feature="mallocms")]
         unreachable!("plan::global::collection_required");
         let stress_force_gc = self.stress_test_gc_required();
         debug!(

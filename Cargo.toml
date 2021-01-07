@@ -17,7 +17,7 @@ crate-type = ["rlib"]
 doctest = false
 
 [package.metadata.docs.rs]
-features = ["marksweep"]
+features = ["mallocms"]
 
 [dependencies]
 custom_derive = "0.1"
@@ -51,7 +51,7 @@ gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 mygc = ["immortalspace", "largeobjectspace", "copyspace"]
 mygencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 gencopycopy = ["immortalspace", "largeobjectspace", "copyspace"]
-marksweep =["immortalspace", "largeobjectspace"]
+mallocms =["immortalspace", "largeobjectspace"]
 
 # spaces
 base_spaces = []
