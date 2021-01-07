@@ -13,7 +13,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         "MallocSpace"
     }
 
-    fn is_live(&self, object: ObjectReference) -> bool {
+    fn is_live(&self, _object: ObjectReference) -> bool {
         unimplemented!();
     }
     fn is_movable(&self) -> bool {

@@ -9,19 +9,11 @@ use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::conversions;
 
-lazy_static! {
-    pub static ref METADATA_TABLE: RwLock<Vec<(usize, Vec<u8>, Vec<u8>)>> = RwLock::default();
-    pub static ref METADATA_BUFFER: Mutex<Vec<Address>> = Mutex::default();
-    
-}
-pub static mut HEAP_SIZE: usize = 90000000;
-pub static HEAP_USED: AtomicUsize = AtomicUsize::new(0);
-
 // Import calloc, free, and malloc_usable_size from the library specified in Cargo.toml:45
-
 #[cfg(feature = "malloc_jemalloc")]
 pub use jemalloc_sys::{free, malloc_usable_size, calloc};
 
+#[cfg(feature = "malloc_mimalloc")]
 use libc::{c_void, size_t};
 #[cfg(feature = "malloc_mimalloc")]
 use mimalloc_sys::{mi_free, mi_malloc_usable_size, mi_calloc};
@@ -43,6 +35,16 @@ pub unsafe fn calloc(count: size_t, size: size_t) -> *mut c_void {
 
 #[cfg(not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc")))]
 pub use libc::{free, malloc_usable_size, calloc};
+
+
+lazy_static! {
+    pub static ref METADATA_TABLE: RwLock<Vec<(usize, Vec<u8>, Vec<u8>)>> = RwLock::default();
+    pub static ref METADATA_BUFFER: Mutex<Vec<Address>> = Mutex::default();
+    
+}
+
+pub static mut HEAP_SIZE: usize = 90000000;
+pub static HEAP_USED: AtomicUsize = AtomicUsize::new(0);
 
 // Set the corresponding bit for each address in the buffer
 pub fn write_metadata_bits() {

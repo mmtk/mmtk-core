@@ -1,7 +1,6 @@
 use crate::util::conversions::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use std::collections::HashSet;
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
@@ -24,7 +23,7 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 
 use crate::vm::VMBinding;
-use std::{marker::PhantomData, sync::Mutex};
+use std::marker::PhantomData;
 
 use downcast_rs::Downcast;
 

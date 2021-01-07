@@ -24,7 +24,7 @@ use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use enum_map::EnumMap;
-use std::{cell::UnsafeCell, collections::HashSet};
+use std::cell::UnsafeCell;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};

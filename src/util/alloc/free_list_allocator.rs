@@ -32,7 +32,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     fn get_plan(&self) -> &'static SelectedPlan<VM> {
         self.plan
     }
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc(&mut self, size: usize, _align: usize, offset: isize) -> Address {
         trace!("alloc");
         assert!(offset==0);
         unsafe {
@@ -54,8 +54,8 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         self.tls
     }
 
-    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        unimplemented!();
+    fn alloc_slow_once(&mut self, _size: usize, _align: usize, _offset: isize) -> Address {
+        unimplemented!(); // No fast path so unnecessary
     }
 }
 
