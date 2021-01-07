@@ -1,4 +1,5 @@
 use crate::plan::selected_plan::SelectedPlan;
+#[cfg(feature = "largeobjectspace")]
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::{allocator, Allocator};

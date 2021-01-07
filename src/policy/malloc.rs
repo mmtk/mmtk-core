@@ -6,7 +6,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use crate::util::conversions;
 
 // Import calloc, free, and malloc_usable_size from the library specified in Cargo.toml:45
@@ -40,7 +40,6 @@ pub use libc::{free, malloc_usable_size, calloc};
 lazy_static! {
     pub static ref METADATA_TABLE: RwLock<Vec<(usize, Vec<u8>, Vec<u8>)>> = RwLock::default();
     pub static ref METADATA_BUFFER: Mutex<Vec<Address>> = Mutex::default();
-    
 }
 
 pub static mut HEAP_SIZE: usize = 90000000;
@@ -63,16 +62,16 @@ pub fn write_metadata_bits() {
             Some(i) => i,
             None => {
                 let table_length = metadata_table.len();
-                let malloced = vec![0; BYTES_IN_CHUNK/16];
-                let marked = vec![0; BYTES_IN_CHUNK/16];
+                let malloced = vec![0; 1 << LOG_BYTES_IN_CHUNK >> 4];
+                let marked = vec![0; 1 << LOG_BYTES_IN_CHUNK >> 4];
                 let row = (conversions::chunk_align_down(address).as_usize(), malloced, marked);
                 metadata_table.push(row);
                 table_length
             }
         };
-        let bitmap_index = address_to_bitmap_index(address);
-        let mut row = &mut metadata_table[chunk_index];
-        row.1[bitmap_index] = 1;
+        let word_index = address_to_word_index(address);
+        let row = &mut metadata_table[chunk_index];
+        row.1[word_index] = 1;
     }
 }
 
@@ -100,7 +99,7 @@ pub fn is_malloced(object: ObjectReference) -> bool {
     };
     match chunk_index {
         Some(index) => {
-            METADATA_TABLE.read().unwrap()[index].1[address_to_bitmap_index(object.to_address())] == 1
+            METADATA_TABLE.read().unwrap()[index].1[address_to_word_index(object.to_address())] == 1
 
         },
         None => {
@@ -111,11 +110,11 @@ pub fn is_malloced(object: ObjectReference) -> bool {
 }
 
 // There is an entry for each word
-pub fn address_to_bitmap_index(address: Address) -> usize {
+pub fn address_to_word_index(address: Address) -> usize {
     (address - conversions::chunk_align_down(address)) / 16
 }
 
-pub fn bitmap_index_to_address(index: usize, chunk_start: usize) -> Address {
+pub fn word_index_to_address(index: usize, chunk_start: usize) -> Address {
     unsafe { Address::from_usize(index * 16 + chunk_start) }
 }
 
@@ -136,7 +135,7 @@ pub fn address_to_chunk_index_with_read(address: Address, metadata_table: &RwLoc
 // check the corresponding bit in the metadata table
 pub fn is_marked(object: ObjectReference) -> bool {
     let address = object.to_address();
-    let bitmap_index = address_to_bitmap_index(address);
+    let word_index = address_to_word_index(address);
 
     let ref metadata_table = METADATA_TABLE.read().unwrap();
     let chunk_index = match address_to_chunk_index_with_read(address, metadata_table) {
@@ -144,6 +143,6 @@ pub fn is_marked(object: ObjectReference) -> bool {
         None => unreachable!(), // this function should only be called on an object that is known to have been allocated by malloc
     };
     let row = &metadata_table[chunk_index];
-    row.2[bitmap_index] == 1
+    row.2[word_index] == 1
     
 }

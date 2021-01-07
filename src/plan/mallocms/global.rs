@@ -1,10 +1,10 @@
 use super::gc_works::MSProcessEdges;
-use crate::{mmtk::MMTK, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
+use crate::{mmtk::MMTK, util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK};
 use crate::policy::malloc::HEAP_SIZE;
 use crate::policy::malloc::METADATA_TABLE;
 use crate::policy::malloc::malloc_usable_size;
 use crate::policy::malloc::free;
-use crate::policy::malloc::bitmap_index_to_address;
+use crate::policy::malloc::word_index_to_address;
 use crate::policy::malloc::HEAP_USED;
 use crate::policy::mallocspace::MallocSpace;
 use crate::plan::global::NoCopy;
@@ -37,7 +37,7 @@ use enum_map::EnumMap;
 pub type SelectedPlan<VM> = MallocMS<VM>;
 
 pub struct MallocMS<VM: VMBinding> {
-    pub common: CommonPlan<VM>,
+    pub base: BasePlan<VM>,
     pub space: MallocSpace<VM>,
 }
 
@@ -56,7 +56,7 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         MallocMS {
-            common: CommonPlan::new(vm_map, mmapper, options, heap),
+            base: BasePlan::new(vm_map, mmapper, options, heap),
             space: MallocSpace::new(),
         }
     }
@@ -76,7 +76,7 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
         unsafe { HEAP_SIZE = heap_size; }
-        self.common.gc_init(heap_size, vm_map, scheduler);
+        self.base.gc_init(heap_size, vm_map, scheduler);
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
@@ -114,40 +114,35 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
 
     fn release(&self, tls: OpaquePointer) {
         unsafe {
-                //using bitmaps
-                let chunks = METADATA_TABLE.read().unwrap().len();
-                {let ref mut metadata_table = METADATA_TABLE.write().unwrap();
-                let mut chunk_index = 0;
-                let mut malloc_count = 0;
-                let mut mark_count = 0;
-                while chunk_index < chunks {
-                    let mut row = &mut metadata_table[chunk_index];
-                    let ref mut malloced = row.1;
-                    let ref mut marked = row.2;
-                    let mut bitmap_index = 0;
-                    while bitmap_index < BYTES_IN_CHUNK/16 {
-                        if malloced[bitmap_index] == 1 {
-                            malloc_count += 1;
-                            if marked[bitmap_index] == 0 {
-                                let chunk_start = row.0;
-                                let address = bitmap_index_to_address(bitmap_index, chunk_start);
-                                let ptr = address.to_mut_ptr();
-                                let freed_memory = malloc_usable_size(ptr);
-                                HEAP_USED.fetch_sub(freed_memory, Ordering::SeqCst);
-                                free(ptr);
-                                malloced[bitmap_index] = 0;
-                                marked[bitmap_index] = 0;
-                            } else {
-                                marked[bitmap_index] = 0;
-                                let chunk_start = row.0;
-                                let address = bitmap_index_to_address(bitmap_index, chunk_start);
-                                mark_count += 1;
-                            }
+            let table_len = METADATA_TABLE.read().unwrap().len();
+            let ref mut metadata_table = METADATA_TABLE.write().unwrap();
+            // let table_len = metadata_table.len();
+            let mut chunk_index = 0;
+            while chunk_index < table_len {
+                let row = &mut metadata_table[chunk_index];
+                let malloced = &mut row.1;
+                let marked = &mut row.2;
+                let mut word_index = 0;
+                while word_index < 1 << LOG_BYTES_IN_CHUNK >> 4 {
+                    if malloced[word_index] == 1 {
+                        if marked[word_index] == 0 {
+                            let chunk_start = row.0;
+                            let address = word_index_to_address(word_index, chunk_start);
+                            let ptr = address.to_mut_ptr();
+                            let freed_memory = malloc_usable_size(ptr);
+                            HEAP_USED.fetch_sub(freed_memory, Ordering::SeqCst);
+                            free(ptr);
+                            malloced[word_index] = 0;
+                            marked[word_index] = 0;
+                        } else {
+                            marked[word_index] = 0;
+                            let chunk_start = row.0;
+                            let address = word_index_to_address(word_index, chunk_start);
                         }
-                        bitmap_index += 1;
                     }
-                    chunk_index += 1;
+                    word_index += 1;
                 }
+                chunk_index += 1;
             }
         }
     }
@@ -157,14 +152,14 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        self.common.get_pages_used()
+        self.base.get_pages_used()
     }
 
     fn base(&self) -> &BasePlan<VM> {
-        &self.common.base
+        &self.base
     }
 
     fn common(&self) -> &CommonPlan<VM> {
-        &self.common
+        unreachable!("MallocMS does not have a common plan.");
     }
 }

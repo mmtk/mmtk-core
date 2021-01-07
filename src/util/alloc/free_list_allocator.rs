@@ -55,7 +55,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, _size: usize, _align: usize, _offset: isize) -> Address {
-        unimplemented!(); // No fast path so unnecessary
+        unreachable!(); // No fast path so unnecessary
     }
 }
 

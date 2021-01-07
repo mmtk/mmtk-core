@@ -5,7 +5,7 @@ use std::{marker::PhantomData};
 use std::ops::{Deref, DerefMut};
 use crate::policy::malloc::is_marked;
 use crate::policy::malloc::METADATA_TABLE;
-use crate::policy::malloc::address_to_bitmap_index;
+use crate::policy::malloc::address_to_word_index;
 use crate::policy::malloc::address_to_chunk_index_with_write;
 
 
@@ -34,7 +34,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
             let chunk_index = address_to_chunk_index_with_write(object.to_address(), metadata_table).unwrap();
             let ref mut row = metadata_table[chunk_index];
             let ref mut marked = row.2;
-            let index = address_to_bitmap_index(object.to_address());
+            let index = address_to_word_index(object.to_address());
             marked[index] = 1;
             self.process_node(object);
         }

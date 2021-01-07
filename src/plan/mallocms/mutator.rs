@@ -4,7 +4,6 @@ use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::{ FreeListAllocator };
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::enum_map;
@@ -26,9 +25,7 @@ pub fn ms_mutator_release<VM: VMBinding>(
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default => AllocatorSelector::FreeList(0),
-        AllocationType:: Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::FreeList(1),
-        AllocationType::Los => AllocatorSelector::LargeObject(0),
+        AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::FreeList(0),
     };
 }
 
@@ -40,7 +37,7 @@ pub fn create_ms_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
-            (AllocatorSelector::FreeList(0), &plan.space), //we ignore space
+            (AllocatorSelector::FreeList(0), &plan.space),
         ],
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,

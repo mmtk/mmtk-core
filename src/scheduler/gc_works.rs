@@ -165,7 +165,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
             if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
                 // Prepare mutators if necessary
                 // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
-                if !mmtk.plan.common().stacks_prepared() {
+                if !mmtk.plan.base().stacks_prepared() {
                     for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
                         <E::VM as VMBinding>::VMCollection::prepare_mutator(
                             mutator.get_tls(),
@@ -201,7 +201,7 @@ pub struct EndOfGC;
 
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        mmtk.plan.common().base.set_gc_status(GcStatus::NotInGC);
+        mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
 }
@@ -222,7 +222,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
         trace!("ScanStackRoots");
         <E::VM as VMBinding>::VMScanning::scan_thread_roots::<E>();
         <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
-        mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
+        mmtk.plan.base().set_gc_status(GcStatus::GcProper);
     }
 }
 
@@ -248,7 +248,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
             <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
                 false, worker.tls,
             );
-            mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
+            mmtk.plan.base().set_gc_status(GcStatus::GcProper);
         }
     }
 }

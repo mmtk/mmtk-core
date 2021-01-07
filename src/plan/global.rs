@@ -2,7 +2,9 @@ use super::controller_collector_context::ControllerCollectorContext;
 use super::MutatorContext;
 use crate::mmtk::MMTK;
 use crate::plan::transitive_closure::TransitiveClosure;
+#[cfg(feature = "immortalspace")]
 use crate::policy::immortalspace::ImmortalSpace;
+#[cfg(feature = "largeobjectspace")]
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 #[cfg(feature = "sanity")]
@@ -133,6 +135,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
         // Release global/collectors/mutators
         scheduler.release_stage.add(SanityRelease::new(self));
     }
+    #[cfg(all(feature = "largeobjectspace", feature = "immortalspace"))]
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
@@ -644,16 +647,19 @@ impl<VM: VMBinding> BasePlan<VM> {
 /**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
 */
+#[cfg(all(feature = "largeobjectspace", feature = "immortalspace"))]
 pub struct CommonPlan<VM: VMBinding> {
     pub unsync: UnsafeCell<CommonUnsync<VM>>,
     pub base: BasePlan<VM>,
 }
 
+#[cfg(all(feature = "largeobjectspace", feature = "immortalspace"))]
 pub struct CommonUnsync<VM: VMBinding> {
     pub immortal: ImmortalSpace<VM>,
     pub los: LargeObjectSpace<VM>,
 }
 
+#[cfg(all(feature = "largeobjectspace", feature = "immortalspace"))]
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(
         vm_map: &'static VMMap,
@@ -737,11 +743,13 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.stacks_prepared()
     }
 
+    #[cfg(feature = "immortalspace")]
     pub fn get_immortal(&self) -> &'static ImmortalSpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };
         &unsync.immortal
     }
 
+    #[cfg(feature = "largeobjectspace")]
     pub fn get_los(&self) -> &'static LargeObjectSpace<VM> {
         let unsync = unsafe { &*self.unsync.get() };
         &unsync.los
