@@ -1,5 +1,5 @@
-use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use crate::util::address::Address;
+use crate::util::constants::DEFAULT_STRESS_FACTOR;
 
 use std::sync::atomic::Ordering;
 
@@ -158,9 +158,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 // (i) by the original alloc_slow_inline(); and (ii) by the alloc_slow_inline()
                 // called by acquire(). In order to not double count the allocation, we only
                 // update allocation bytes if the previous result wasn't 0x0.
-                if stress_test && self.get_plan().is_initialized()
-                    && !previous_result_zero
-                {
+                if stress_test && self.get_plan().is_initialized() && !previous_result_zero {
                     plan.increase_allocation_bytes_by(size);
                 }
 
