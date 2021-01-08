@@ -354,7 +354,7 @@ pub struct BasePlan<VM: VMBinding> {
     // A counter for per-mutator stack scanning
     pub scanned_stacks: AtomicUsize,
     pub mutator_iterator_lock: Mutex<()>,
-    // Allocation count
+    // A counter that keeps tracks of the number of bytes allocated since last stress test
     pub allocation_bytes: AtomicUsize,
 }
 
@@ -641,10 +641,12 @@ impl<VM: VMBinding> BasePlan<VM> {
     fn force_full_heap_collection(&self) {}
 
     pub fn increase_allocation_bytes_by(&self, size: usize) {
-        self.allocation_bytes.fetch_add(size, Ordering::SeqCst);
-        info!(
-            "Stress GC: allocation_bytes = {}",
-            self.allocation_bytes.load(Ordering::Relaxed)
+        let old_allocation_bytes = self.allocation_bytes.fetch_add(size, Ordering::SeqCst);
+        trace!(
+            "Stress GC: old_allocation_bytes = {}, size = {}, allocation_bytes = {}",
+            old_allocation_bytes,
+            size,
+            self.allocation_bytes.load(Ordering::Relaxed),
         );
     }
 }

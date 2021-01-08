@@ -126,6 +126,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
         // Information about the previous collection.
         let mut emergency_collection = false;
+        let mut previous_result_zero = false;
         loop {
             // Try to allocate using the slow path
             let result = self.alloc_slow_once(size, align, offset);
@@ -150,8 +151,16 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     drop(guard);
                 }
 
-                if stress_test && self.get_plan().is_initialized() {
-                    info!("size = {}, result = {}", size, result);
+                // When a GC occurs, the resultant address provided by `acquire()` is 0x0.
+                // Hence, another iteration of this loop occurs. In such a case, the second
+                // iteration tries to allocate again, and if is successful, then the allocation
+                // bytes are updated. However, this leads to double counting of the allocation:
+                // (i) by the original alloc_slow_inline(); and (ii) by the alloc_slow_inline()
+                // called by acquire(). In order to not double count the allocation, we only
+                // update allocation bytes if the previous result wasn't 0x0.
+                if stress_test && self.get_plan().is_initialized()
+                    && !previous_result_zero
+                {
                     plan.increase_allocation_bytes_by(size);
                 }
 
@@ -197,6 +206,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
              */
             emergency_collection = self.get_plan().is_emergency_collection();
             trace!("Got emergency collection as {}", emergency_collection);
+            previous_result_zero = true;
         }
     }
 
