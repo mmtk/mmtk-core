@@ -9,6 +9,7 @@ use crate::policy::malloc::HEAP_USED;
 use crate::policy::mallocspace::MallocSpace;
 use crate::plan::global::NoCopy;
 use crate::plan::global::BasePlan;
+#[cfg(all(feature = "largeobjectspace", feature = "immortalspace"))]
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::mutator_context::Mutator;
@@ -159,6 +160,7 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
         &self.base
     }
 
+    #[cfg(all(feature = "largeobjectspace", feature = "immortalspace"))]
     fn common(&self) -> &CommonPlan<VM> {
         unreachable!("MallocMS does not have a common plan.");
     }

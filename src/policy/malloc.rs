@@ -9,6 +9,7 @@ use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use crate::util::conversions;
 
+use atomic::Ordering;
 // Import calloc, free, and malloc_usable_size from the library specified in Cargo.toml:45
 #[cfg(feature = "malloc_jemalloc")]
 pub use jemalloc_sys::{free, malloc_usable_size, calloc};
@@ -85,6 +86,10 @@ pub fn create_metadata(address: Address) {
         write_metadata_bits();
     }
 
+}
+
+pub fn heap_full() -> bool {
+    unsafe { HEAP_USED.load(Ordering::SeqCst) >= HEAP_SIZE }
 }
 
 // Check the bit for a given object

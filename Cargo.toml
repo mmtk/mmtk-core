@@ -42,8 +42,7 @@ rand = "0.7.3"
 
 [features]
 default = []
-malloc_mimalloc = []
-malloc_jemalloc = []
+
 
 # plans
 nogc = ["immortalspace", "largeobjectspace"]
@@ -52,7 +51,7 @@ gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 mygc = ["immortalspace", "largeobjectspace", "copyspace"]
 mygencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 gencopycopy = ["immortalspace", "largeobjectspace", "copyspace"]
-mallocms = ["immortalspace", "largeobjectspace", "malloc_mimalloc"]
+mallocms = ["mallocspace", "malloc_mimalloc"]
 
 # spaces
 base_spaces = []
@@ -64,6 +63,7 @@ immortalspace = []
 copyspace = []
 largeobjectspace = []
 lockfreeimmortalspace = []
+mallocspace = []
 
 sanity = []
 force_32bit_heap_layout = []
@@ -71,3 +71,8 @@ nogc_lock_free = ["nogc", "lockfreeimmortalspace"]
 nogc_no_zeroing = ["nogc_lock_free"]
 
 single_worker = []
+
+# malloc versions
+malloc_libc = []
+malloc_mimalloc = []
+malloc_jemalloc = []

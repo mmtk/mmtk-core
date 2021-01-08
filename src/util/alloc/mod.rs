@@ -10,4 +10,5 @@ pub mod linear_scan;
 pub use self::allocator::Allocator;
 pub use self::bumpallocator::BumpAllocator;
 pub use self::free_list_allocator::FreeListAllocator;
+#[cfg(feature = "largeobjectspace")]
 pub use self::large_object_allocator::LargeObjectAllocator;

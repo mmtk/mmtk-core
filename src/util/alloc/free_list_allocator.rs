@@ -1,4 +1,4 @@
-use crate::util::Address;
+use crate::policy::malloc::heap_full;
 use crate::policy::malloc::calloc;
 use crate::policy::malloc::malloc_usable_size;
 use crate::policy::malloc::HEAP_USED;
@@ -8,6 +8,7 @@ use crate::plan::global::Plan;
 use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::space::Space;
 use crate::util::OpaquePointer;
+use crate::util::Address;
 use crate::vm::VMBinding;
 use atomic::Ordering;
 
@@ -36,9 +37,9 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         trace!("alloc");
         assert!(offset==0);
         unsafe {
-            if self.plan.collection_required(false, self.space.unwrap()) {
+            if heap_full() {
                 self.plan.handle_user_collection_request(self.tls, true);
-                assert!(!self.plan.collection_required(false, self.space.unwrap()), "FreeListAllocator: Out of memory!");
+                assert!(!heap_full(), "FreeListAllocator: Out of memory!");
             }
             let ptr = calloc(1, size);
             let address = Address::from_mut_ptr(ptr);
