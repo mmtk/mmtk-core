@@ -25,6 +25,7 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use crate::plan::global::PlanTypes;
 
 use enum_map::EnumMap;
 
@@ -41,10 +42,22 @@ pub struct SemiSpace<VM: VMBinding> {
 
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
 
-impl<VM: VMBinding> Plan for SemiSpace<VM> {
+impl<VM: VMBinding> PlanTypes for SemiSpace<VM> {
     type VM = VM;
     type Mutator = Mutator<Self>;
     type CopyContext = SSCopyContext<VM>;
+
+    fn bind_mutator(
+        &'static self,
+        tls: OpaquePointer,
+        _mmtk: &'static MMTK<Self::VM>,
+    ) -> Box<Mutator<Self>> {
+        Box::new(create_ss_mutator(tls, self))
+    }    
+}
+
+impl<VM: VMBinding> Plan for SemiSpace<VM> {
+    type VM = VM;
 
     fn new(
         vm_map: &'static VMMap,
@@ -105,14 +118,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         #[cfg(feature = "sanity")]
         scheduler.final_stage.add(ScheduleSanityGC);
         scheduler.set_finalizer(Some(EndOfGC));
-    }
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        _mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Mutator<Self>> {
-        Box::new(create_ss_mutator(tls, self))
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
