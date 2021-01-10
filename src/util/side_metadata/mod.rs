@@ -1,6 +1,7 @@
 //! A generic module to work with side metadata.
 //!
 
-mod side_metadata;
+mod global;
 
-pub use side_metadata::SideMetadata;
+pub use global::SideMetadata;
+pub use global::SideMetadataID;

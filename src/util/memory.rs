@@ -54,13 +54,16 @@ pub fn mprotect(start: Address, size: usize) -> Result<()> {
 /// without mapping it to physical memory.
 /// The dzmmap function can then be used to map specific portions of the address range to physical memory.
 ///
-pub fn reserve_address_range(start: Address, size: usize) -> Result<Address> {
+pub fn reserve_address_range(start: Address, size: usize) {
     let prot = libc::PROT_NONE;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
     let result: *mut c_void = unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) };
     if result == libc::MAP_FAILED {
-        Err(Error::from_raw_os_error(result as _))
-    } else {
-        Ok(Address::from_mut_ptr(result))
+        panic!(
+            "reserve_address_range({}, {}) FAILED with error {:#?}",
+            start,
+            size,
+            Error::from_raw_os_error(result as _)
+        );
     }
 }

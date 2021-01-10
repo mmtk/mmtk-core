@@ -22,7 +22,6 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::{MetadataID, SideMetadata};
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -39,7 +38,6 @@ pub struct SemiSpace<VM: VMBinding> {
     pub copyspace0: CopySpace<VM>,
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
-    pub metadata_id: MetadataID,
 }
 
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
@@ -78,7 +76,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
                 &mut heap,
             ),
             common: CommonPlan::new(vm_map, mmapper, options, heap),
-            metadata_id: MetadataID::new(),
         }
     }
 
@@ -92,10 +89,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
         self.copyspace0.init(&vm_map);
         self.copyspace1.init(&vm_map);
-
-        if !VM::VMObjectModel::HAS_GC_BYTE {
-            self.metadata_id = SideMetadata::add_meta_bits(2, constants::LOG_BITS_IN_WORD);
-        }
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
