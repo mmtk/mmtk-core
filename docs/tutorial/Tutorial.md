@@ -271,7 +271,12 @@ The first step of changing the MyGC plan into a Semispace plan is to add the two
 ### Collector: Implement garbage collection
 1. Implement work packet. Make new file gc_works. This file implements CopyContext and ProcessEdges. The former provides context for when the gc needs to collect, and ProcessEdges ?
 ### Adding another copyspace
-Less guided exercise: Add “young” copyspace which all new objects go to before moving to the fromspace. 
+Less guided exercise: Add “young” copyspace which all new objects go to before moving to the fromspace. No r/w barrier.
+Add youngspace (copyspace).
+Allocate to youngspace. 
+Youngspace gets collected at the same time as the other things.
+Live items from youngspace get moved to tospace.
+It's an incomplete implementation of a generational GC, in effect.
 
 [**Back to table of contents**](#contents)
 ***
