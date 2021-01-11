@@ -8,16 +8,17 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use crate::util::conversions;
+use crate::util::alloc::tcmalloc::{TCMallocInternalMalloc};
 
 use atomic::Ordering;
 // Import calloc, free, and malloc_usable_size from the library specified in Cargo.toml:45
 #[cfg(feature = "malloc_jemalloc")]
 pub use jemalloc_sys::{free, malloc_usable_size, calloc};
 
-#[cfg(feature = "malloc_mimalloc")]
 use libc::{c_void, size_t};
 #[cfg(feature = "malloc_mimalloc")]
 use mimalloc_sys::{mi_free, mi_malloc_usable_size, mi_calloc};
+
 
 #[cfg(feature = "malloc_mimalloc")]
 pub unsafe fn malloc_usable_size(p: *const c_void) -> size_t {
@@ -34,7 +35,14 @@ pub unsafe fn calloc(count: size_t, size: size_t) -> *mut c_void {
     mi_calloc(count, size)
 }
 
-#[cfg(not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc")))]
+#[cfg(feature = "malloc_tcmalloc")]
+pub unsafe fn calloc(count: size_t, size: size_t) -> *mut c_void {
+    TCMallocInternalMalloc(count, size)
+}
+pub use libc::{free, malloc_usable_size};
+
+
+#[cfg(not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc", feature = "malloc_tcmalloc")))]
 pub use libc::{free, malloc_usable_size, calloc};
 
 

@@ -40,6 +40,9 @@ env_logger = "0.8.2"
 crossbeam = "0.7.3"
 rand = "0.7.3"
 
+[build-dependencies]
+cc = "1.0"
+
 [features]
 default = []
 
@@ -51,7 +54,7 @@ gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 mygc = ["immortalspace", "largeobjectspace", "copyspace"]
 mygencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 gencopycopy = ["immortalspace", "largeobjectspace", "copyspace"]
-mallocms = ["mallocspace", "malloc_mimalloc"]
+mallocms = ["mallocspace", "malloc_tcmalloc"]
 
 # spaces
 base_spaces = []
@@ -76,3 +79,4 @@ single_worker = []
 malloc_libc = []
 malloc_mimalloc = []
 malloc_jemalloc = []
+malloc_tcmalloc = []
