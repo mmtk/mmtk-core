@@ -59,38 +59,6 @@ impl<VM: VMBinding> PlanTypes for SemiSpace<VM> {
 impl<VM: VMBinding> Plan for SemiSpace<VM> {
     type VM = VM;
 
-    fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<Self::VM>,
-    ) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-
-        SemiSpace {
-            hi: AtomicBool::new(false),
-            copyspace0: CopySpace::new(
-                "copyspace0",
-                false,
-                true,
-                VMRequest::discontiguous(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            copyspace1: CopySpace::new(
-                "copyspace1",
-                true,
-                true,
-                VMRequest::discontiguous(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap),
-        }
-    }
-
     fn gc_init(
         &mut self,
         heap_size: usize,
@@ -159,6 +127,38 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 }
 
 impl<VM: VMBinding> SemiSpace<VM> {
+    pub fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+        _scheduler: &'static MMTkScheduler<VM>,
+    ) -> Self {
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+
+        SemiSpace {
+            hi: AtomicBool::new(false),
+            copyspace0: CopySpace::new(
+                "copyspace0",
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            copyspace1: CopySpace::new(
+                "copyspace1",
+                true,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            common: CommonPlan::new(vm_map, mmapper, options, heap),
+        }
+    }
+
     pub fn tospace(&self) -> &CopySpace<VM> {
         if self.hi.load(Ordering::SeqCst) {
             &self.copyspace1

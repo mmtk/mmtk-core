@@ -28,6 +28,9 @@ use std::cell::UnsafeCell;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use crate::plan::Mutator;
+use crate::util::options::PlanSelector;
+use downcast_rs::Downcast;
 
 /// A GC worker's context for copying GCs.
 /// Each GC plan should provide their implementation of a CopyContext.
@@ -109,20 +112,32 @@ pub trait PlanTypes {
     ) -> Box<Self::Mutator>;
 }
 
+pub fn create_mutator<VM: VMBinding>(tls: OpaquePointer, mmtk: &'static MMTK<VM>) -> Box<Mutator<VM>> {
+    unimplemented!()
+}
+
+pub fn create_plan<VM: VMBinding>(
+    plan: PlanSelector,
+    vm_map: &'static VMMap,
+    mmapper: &'static Mmapper,
+    options: Arc<UnsafeOptionsWrapper>,
+    _scheduler: &'static MMTkScheduler<VM>) -> Box<dyn Plan<VM=VM>> {
+    use crate::plan::nogc::NoGC;
+    let plan = match plan {
+        PlanSelector::NoGC => NoGC::new(vm_map, mmapper, options, _scheduler),
+        _ => unimplemented!()
+    };
+    Box::new(plan)
+}
+
 /// A plan describes the global core functionality for all memory management schemes.
 /// All global MMTk plans should implement this trait.
 ///
 /// The global instance defines and manages static resources
 /// (such as memory and virtual memory resources).
-pub trait Plan: Sized + 'static + Sync + Send {
+pub trait Plan: 'static + Sync + Send + Downcast {
     type VM: VMBinding;
 
-    fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-        scheduler: &'static MMTkScheduler<Self::VM>,
-    ) -> Self;
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
     #[cfg(feature = "sanity")]
@@ -188,7 +203,10 @@ pub trait Plan: Sized + 'static + Sync + Send {
     fn prepare(&self, tls: OpaquePointer);
     fn release(&self, tls: OpaquePointer);
 
-    fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
+    fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool 
+    where
+        Self: Sized,
+    {
         if self.collection_required(space_full, space) {
             // FIXME
             /*if space == META_DATA_SPACE {
@@ -318,6 +336,8 @@ pub trait Plan: Sized + 'static + Sync + Send {
         }
     }
 }
+
+impl_downcast!(Plan assoc VM);
 
 #[derive(PartialEq)]
 pub enum GcStatus {

@@ -52,13 +52,13 @@ impl<P: Plan> GCWork<P::VM> for Prepare<P> {
 pub struct PrepareMutator<VM: VMBinding> {
     // The mutator reference has static lifetime.
     // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
-    pub mutator: &'static mut Mutator<SelectedPlan<VM>>,
+    pub mutator: &'static mut Mutator<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for PrepareMutator<VM> {}
 
 impl<VM: VMBinding> PrepareMutator<VM> {
-    pub fn new(mutator: &'static mut Mutator<SelectedPlan<VM>>) -> Self {
+    pub fn new(mutator: &'static mut Mutator<VM>) -> Self {
         Self { mutator }
     }
 }
@@ -112,13 +112,13 @@ impl<P: Plan> GCWork<P::VM> for Release<P> {
 pub struct ReleaseMutator<VM: VMBinding> {
     // The mutator reference has static lifetime.
     // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
-    pub mutator: &'static mut Mutator<SelectedPlan<VM>>,
+    pub mutator: &'static mut Mutator<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for ReleaseMutator<VM> {}
 
 impl<VM: VMBinding> ReleaseMutator<VM> {
-    pub fn new(mutator: &'static mut Mutator<SelectedPlan<VM>>) -> Self {
+    pub fn new(mutator: &'static mut Mutator<VM>) -> Self {
         Self { mutator }
     }
 }
@@ -227,7 +227,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
 }
 
 pub struct ScanStackRoot<Edges: ProcessEdgesWork>(
-    pub &'static mut Mutator<SelectedPlan<Edges::VM>>,
+    pub &'static mut Mutator<Edges::VM>,
 );
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
@@ -311,8 +311,10 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
         self.mmtk.unwrap()
     }
     #[inline]
-    pub fn plan(&self) -> &'static SelectedPlan<E::VM> {
-        &self.mmtk.unwrap().plan
+    pub fn plan(&self) -> &Box<dyn Plan<VM=E::VM>> {
+        let mmtk: &'static MMTK<E::VM> = self.mmtk.unwrap();
+        let plan: &Box<dyn Plan<VM=E::VM>> = &mmtk.plan;
+        plan
     }
 }
 

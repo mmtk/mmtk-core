@@ -69,15 +69,16 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
 pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: OpaquePointer,
-) -> Box<Mutator<SelectedPlan<VM>>> {
-    <SelectedPlan<VM> as PlanTypes>::bind_mutator(&mmtk.plan, tls, mmtk)
+) -> Box<Mutator<VM>> {
+    // <SelectedPlan<VM> as PlanTypes>::bind_mutator(&mmtk.plan, tls, mmtk)
+    crate::plan::global::create_mutator(tls, mmtk)
 }
 
 /// Reclaim a mutator that is no longer needed.
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator to be destroyed.
-pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<SelectedPlan<VM>>>) {
+pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<VM>>) {
     drop(mutator);
 }
 
@@ -85,7 +86,7 @@ pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<SelectedPlan<VM>>>) {
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator.
-pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<SelectedPlan<VM>>) {
+pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
     mutator.flush()
 }
 
@@ -99,7 +100,7 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<SelectedPlan<VM>>) {
 /// * `offset`: Offset associated with the alignment.
 /// * `semantics`: The allocation semantic required for the allocation.
 pub fn alloc<VM: VMBinding>(
-    mutator: &mut Mutator<SelectedPlan<VM>>,
+    mutator: &mut Mutator<VM>,
     size: usize,
     align: usize,
     offset: isize,
@@ -127,7 +128,7 @@ pub fn alloc<VM: VMBinding>(
 /// * `bytes`: The size of the space allocated for the object (in bytes).
 /// * `semantics`: The allocation semantics used for the allocation.
 pub fn post_alloc<VM: VMBinding>(
-    mutator: &mut Mutator<SelectedPlan<VM>>,
+    mutator: &mut Mutator<VM>,
     refer: ObjectReference,
     bytes: usize,
     semantics: AllocationSemantics,

@@ -37,50 +37,20 @@ unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
 
 impl<VM: VMBinding> PlanTypes for NoGC<VM> {
     type VM = VM;
-    type Mutator = Mutator<Self>;
+    type Mutator = Mutator<VM>;
     type CopyContext = NoCopy<VM>;
 
     fn bind_mutator(
         &'static self,
         tls: OpaquePointer,
-        _mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Mutator<Self>> {
+        _mmtk: &'static MMTK<VM>,
+    ) -> Box<Mutator<VM>> {
         Box::new(create_nogc_mutator(tls, self))
     }    
 }
 
 impl<VM: VMBinding> Plan for NoGC<VM> {
     type VM = VM;
-
-    fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<Self::VM>,
-    ) -> Self {
-        #[cfg(not(feature = "nogc_lock_free"))]
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        #[cfg(feature = "nogc_lock_free")]
-        let heap = HeapMeta::new(HEAP_START, HEAP_END);
-
-        #[cfg(feature = "nogc_lock_free")]
-        let nogc_space =
-            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")));
-        #[cfg(not(feature = "nogc_lock_free"))]
-        let nogc_space = NoGCImmortalSpace::new(
-            "nogc_space",
-            true,
-            VMRequest::discontiguous(),
-            vm_map,
-            mmapper,
-            &mut heap,
-        );
-
-        NoGC {
-            nogc_space,
-            base: BasePlan::new(vm_map, mmapper, options, heap),
-        }
-    }
 
     fn gc_init(
         &mut self,
@@ -120,5 +90,37 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn handle_user_collection_request(&self, _tls: OpaquePointer, _force: bool) {
         println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
+    }
+}
+
+impl<VM: VMBinding> NoGC<VM> {
+    pub fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+        _scheduler: &'static MMTkScheduler<VM>,
+    ) -> Self {
+        #[cfg(not(feature = "nogc_lock_free"))]
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        #[cfg(feature = "nogc_lock_free")]
+        let heap = HeapMeta::new(HEAP_START, HEAP_END);
+
+        #[cfg(feature = "nogc_lock_free")]
+        let nogc_space =
+            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")));
+        #[cfg(not(feature = "nogc_lock_free"))]
+        let nogc_space = NoGCImmortalSpace::new(
+            "nogc_space",
+            true,
+            VMRequest::discontiguous(),
+            vm_map,
+            mmapper,
+            &mut heap,
+        );
+
+        NoGC {
+            nogc_space,
+            base: BasePlan::new(vm_map, mmapper, options, heap),
+        }
     }
 }
