@@ -7,6 +7,7 @@ use crate::util::forwarding_word;
 use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::VMBinding;
 use crate::MMTK;
+use crate::plan::Plan;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
@@ -19,8 +20,8 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
     type VM = VM;
     fn new(mmtk: &'static MMTK<Self::VM>) -> Self {
         Self {
-            plan: &mmtk.plan,
-            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
+            plan: &mmtk.plan.downcast_ref::<SemiSpace<VM>>().unwrap(),
+            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
         }
     }
     fn init(&mut self, tls: OpaquePointer) {
@@ -55,18 +56,27 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
     }
 }
 
-#[derive(Default)]
+// #[derive(Default)]
 pub struct SSProcessEdges<VM: VMBinding> {
+    plan: &'static SemiSpace<VM>,
     base: ProcessEdgesBase<SSProcessEdges<VM>>,
-    phantom: PhantomData<VM>,
+    // phantom: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> SSProcessEdges<VM> {
+    fn ss(&self) -> &'static SemiSpace<VM> {
+        self.plan
+    }
 }
 
 impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
     type VM = VM;
     fn new(edges: Vec<Address>, _roots: bool) -> Self {
+        let base = ProcessEdgesBase::new(edges);
+        let plan = base.plan().downcast_ref::<SemiSpace<VM>>().unwrap();
         Self {
-            base: ProcessEdgesBase::new(edges),
-            ..Default::default()
+            base,
+            plan,
         }
     }
     #[inline]
@@ -74,22 +84,22 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
-        if self.plan().tospace().in_space(object) {
-            self.plan().tospace().trace_object(
+        if self.ss().tospace().in_space(object) {
+            self.ss().tospace().trace_object(
                 self,
                 object,
                 super::global::ALLOC_SS,
                 self.worker().local(),
             )
-        } else if self.plan().fromspace().in_space(object) {
-            self.plan().fromspace().trace_object(
+        } else if self.ss().fromspace().in_space(object) {
+            self.ss().fromspace().trace_object(
                 self,
                 object,
                 super::global::ALLOC_SS,
                 self.worker().local(),
             )
         } else {
-            self.plan().common.trace_object(self, object)
+            self.ss().common.trace_object(self, object)
         }
     }
 }

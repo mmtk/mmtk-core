@@ -21,7 +21,7 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
     fn new(mmtk: &'static MMTK<Self::VM>) -> Self {
         Self {
             plan: unsafe { &*(&mmtk.plan as *const _ as *const GenCopy<VM>) },
-            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
+            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
         }
     }
     fn init(&mut self, tls: OpaquePointer) {
@@ -57,18 +57,27 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
     }
 }
 
-#[derive(Default)]
+// #[derive(Default)]
 pub struct GenCopyNurseryProcessEdges<VM: VMBinding> {
+    plan: &'static GenCopy<VM>,
     base: ProcessEdgesBase<GenCopyNurseryProcessEdges<VM>>,
-    phantom: PhantomData<VM>,
+    // phantom: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> GenCopyNurseryProcessEdges<VM> {
+    fn gencopy(&self) -> &'static GenCopy<VM> {
+        self.plan
+    }
 }
 
 impl<VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
     type VM = VM;
     fn new(edges: Vec<Address>, _roots: bool) -> Self {
+        let base = ProcessEdgesBase::new(edges);
+        let plan = base.plan().downcast_ref::<GenCopy<VM>>().unwrap();
         Self {
-            base: ProcessEdgesBase::new(edges),
-            ..Default::default()
+            base,
+            plan,
         }
     }
     #[inline]
@@ -77,24 +86,24 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
             return object;
         }
         // Evacuate nursery objects
-        if self.plan().nursery.in_space(object) {
-            return self.plan().nursery.trace_object(
+        if self.gencopy().nursery.in_space(object) {
+            return self.gencopy().nursery.trace_object(
                 self,
                 object,
                 super::global::ALLOC_SS,
                 self.worker().local(),
             );
         }
-        debug_assert!(!self.plan().fromspace().in_space(object));
-        debug_assert!(self.plan().tospace().in_space(object));
+        debug_assert!(!self.gencopy().fromspace().in_space(object));
+        debug_assert!(self.gencopy().tospace().in_space(object));
         object
     }
     #[inline]
     fn process_edge(&mut self, slot: Address) {
-        debug_assert!(!self.plan().fromspace().address_in_space(slot));
+        debug_assert!(!self.gencopy().fromspace().address_in_space(slot));
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
-        debug_assert!(!self.plan().nursery.in_space(new_object));
+        debug_assert!(!self.gencopy().nursery.in_space(new_object));
         unsafe { slot.store(new_object) };
     }
 }
@@ -112,18 +121,27 @@ impl<VM: VMBinding> DerefMut for GenCopyNurseryProcessEdges<VM> {
     }
 }
 
-#[derive(Default)]
+// #[derive(Default)]
 pub struct GenCopyMatureProcessEdges<VM: VMBinding> {
+    plan: &'static GenCopy<VM>,
     base: ProcessEdgesBase<GenCopyMatureProcessEdges<VM>>,
-    phantom: PhantomData<VM>,
+    // phantom: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> GenCopyMatureProcessEdges<VM> {
+    fn gencopy(&self) -> &'static GenCopy<VM> {
+        self.plan
+    }
 }
 
 impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
     type VM = VM;
     fn new(edges: Vec<Address>, _roots: bool) -> Self {
+        let base = ProcessEdgesBase::new(edges);
+        let plan = base.plan().downcast_ref::<GenCopy<VM>>().unwrap();
         Self {
-            base: ProcessEdgesBase::new(edges),
-            ..Default::default()
+            base,
+            plan,
         }
     }
     #[inline]
@@ -132,8 +150,8 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
             return object;
         }
         // Evacuate nursery objects
-        if self.plan().nursery.in_space(object) {
-            return self.plan().nursery.trace_object(
+        if self.gencopy().nursery.in_space(object) {
+            return self.gencopy().nursery.trace_object(
                 self,
                 object,
                 super::global::ALLOC_SS,
@@ -141,23 +159,23 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
             );
         }
         // Evacuate mature objects
-        if self.plan().tospace().in_space(object) {
-            return self.plan().tospace().trace_object(
+        if self.gencopy().tospace().in_space(object) {
+            return self.gencopy().tospace().trace_object(
                 self,
                 object,
                 super::global::ALLOC_SS,
                 self.worker().local(),
             );
         }
-        if self.plan().fromspace().in_space(object) {
-            return self.plan().fromspace().trace_object(
+        if self.gencopy().fromspace().in_space(object) {
+            return self.gencopy().fromspace().trace_object(
                 self,
                 object,
                 super::global::ALLOC_SS,
                 self.worker().local(),
             );
         }
-        self.plan().common.trace_object(self, object)
+        self.gencopy().common.trace_object(self, object)
     }
 }
 

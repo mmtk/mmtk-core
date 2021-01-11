@@ -37,6 +37,6 @@ pub fn create_nogc_mutator<VM: VMBinding>(
         barrier: box NoBarrier,
         mutator_tls,
         config,
-        // plan,
+        plan,
     }
 }

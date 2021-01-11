@@ -44,14 +44,14 @@ unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
 
 impl<VM: VMBinding> PlanTypes for SemiSpace<VM> {
     type VM = VM;
-    type Mutator = Mutator<Self>;
+    type Mutator = Mutator<VM>;
     type CopyContext = SSCopyContext<VM>;
 
     fn bind_mutator(
         &'static self,
         tls: OpaquePointer,
         _mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Mutator<Self>> {
+    ) -> Box<Mutator<VM>> {
         Box::new(create_ss_mutator(tls, self))
     }    
 }

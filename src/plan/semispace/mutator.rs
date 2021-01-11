@@ -7,18 +7,19 @@ use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+use crate::plan::Plan;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
 pub fn ss_mutator_prepare<VM: VMBinding>(
-    _mutator: &mut Mutator<SemiSpace<VM>>,
+    _mutator: &mut Mutator<VM>,
     _tls: OpaquePointer,
 ) {
     // Do nothing
 }
 
 pub fn ss_mutator_release<VM: VMBinding>(
-    mutator: &mut Mutator<SemiSpace<VM>>,
+    mutator: &mut Mutator<VM>,
     _tls: OpaquePointer,
 ) {
     // rebind the allocation bump pointer to the appropriate semispace
@@ -29,7 +30,7 @@ pub fn ss_mutator_release<VM: VMBinding>(
     }
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
-    bump_allocator.rebind(Some(mutator.plan.tospace()));
+    bump_allocator.rebind(Some(mutator.plan.downcast_ref::<SemiSpace<VM>>().unwrap().tospace()));
 }
 
 lazy_static! {
@@ -42,17 +43,18 @@ lazy_static! {
 
 pub fn create_ss_mutator<VM: VMBinding>(
     mutator_tls: OpaquePointer,
-    plan: &'static SemiSpace<VM>,
-) -> Mutator<SemiSpace<VM>> {
+    plan: &'static dyn Plan<VM=VM>,
+) -> Mutator<VM> {
+    let ss = plan.downcast_ref::<SemiSpace<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), plan.tospace()),
+            (AllocatorSelector::BumpPointer(0), ss.tospace()),
             (
                 AllocatorSelector::BumpPointer(1),
-                plan.common.get_immortal(),
+                ss.common.get_immortal(),
             ),
-            (AllocatorSelector::LargeObject(0), plan.common.get_los()),
+            (AllocatorSelector::LargeObject(0), ss.common.get_los()),
         ],
         prepare_func: &ss_mutator_prepare,
         release_func: &ss_mutator_release,

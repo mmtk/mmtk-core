@@ -42,7 +42,7 @@ pub struct Mutator<VM: VMBinding> {
     pub allocators: Allocators<VM>,
     pub barrier: Box<dyn Barrier>,
     pub mutator_tls: OpaquePointer,
-    // pub plan: &'static dyn Plan<VM=VM>,
+    pub plan: &'static dyn Plan<VM=VM>,
     pub config: MutatorConfig<VM>,
 }
 

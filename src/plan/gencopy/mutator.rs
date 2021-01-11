@@ -14,14 +14,14 @@ use enum_map::enum_map;
 use enum_map::EnumMap;
 
 pub fn gencopy_mutator_prepare<VM: VMBinding>(
-    _mutator: &mut Mutator<GenCopy<VM>>,
+    _mutator: &mut Mutator<VM>,
     _tls: OpaquePointer,
 ) {
     // Do nothing
 }
 
 pub fn gencopy_mutator_release<VM: VMBinding>(
-    mutator: &mut Mutator<GenCopy<VM>>,
+    mutator: &mut Mutator<VM>,
     _tls: OpaquePointer,
 ) {
     // reset nursery allocator
@@ -46,18 +46,19 @@ lazy_static! {
 pub fn create_gencopy_mutator<VM: VMBinding>(
     mutator_tls: OpaquePointer,
     mmtk: &'static MMTK<VM>,
-) -> Mutator<GenCopy<VM>> {
+) -> Mutator<VM> {
+    let gencopy = mmtk.plan.downcast_ref::<GenCopy<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), &mmtk.plan.nursery),
+            (AllocatorSelector::BumpPointer(0), &gencopy.nursery),
             (
                 AllocatorSelector::BumpPointer(1),
-                mmtk.plan.common.get_immortal(),
+                gencopy.common.get_immortal(),
             ),
             (
                 AllocatorSelector::LargeObject(0),
-                mmtk.plan.common.get_los(),
+                gencopy.common.get_los(),
             ),
         ],
         prepare_func: &gencopy_mutator_prepare,
@@ -65,13 +66,13 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, &mmtk.plan, &config.space_mapping),
+        allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
         barrier: box FieldRememberingBarrier::<GenCopyNurseryProcessEdges<VM>, CopySpace<VM>>::new(
             mmtk,
-            &mmtk.plan.nursery,
+            &gencopy.nursery,
         ),
         mutator_tls,
         config,
-        plan: &mmtk.plan,
+        plan: gencopy,
     }
 }

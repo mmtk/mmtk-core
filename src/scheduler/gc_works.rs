@@ -311,10 +311,8 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
         self.mmtk.unwrap()
     }
     #[inline]
-    pub fn plan(&self) -> &Box<dyn Plan<VM=E::VM>> {
-        let mmtk: &'static MMTK<E::VM> = self.mmtk.unwrap();
-        let plan: &Box<dyn Plan<VM=E::VM>> = &mmtk.plan;
-        plan
+    pub fn plan(&self) -> &'static dyn Plan<VM=E::VM> {
+        &*self.mmtk.unwrap().plan
     }
 }
 

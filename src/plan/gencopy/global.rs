@@ -24,6 +24,7 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::*;
+use crate::plan::global::PlanTypes;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -45,10 +46,22 @@ pub struct GenCopy<VM: VMBinding> {
 
 unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
 
+impl<VM: VMBinding> PlanTypes for GenCopy<VM> {
+    type VM = VM;
+    type Mutator = Mutator<VM>;
+    type CopyContext = GenCopyCopyContext<VM>;
+
+    fn bind_mutator(
+        &'static self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> Box<Mutator<VM>> {
+        Box::new(create_gencopy_mutator(tls, mmtk))
+    }    
+}
+
 impl<VM: VMBinding> Plan for GenCopy<VM> {
     type VM = VM;
-    type Mutator = Mutator<Self>;
-    type CopyContext = GenCopyCopyContext<VM>;
 
     fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
     where
@@ -57,49 +70,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         let nursery_full = self.nursery.reserved_pages() >= (NURSERY_SIZE >> LOG_BYTES_IN_PAGE);
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
         space_full || nursery_full || heap_full
-    }
-
-    fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-        scheduler: &'static MMTkScheduler<Self::VM>,
-    ) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-
-        GenCopy {
-            nursery: CopySpace::new(
-                "nursery",
-                false,
-                true,
-                VMRequest::fixed_extent(NURSERY_SIZE, false),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            hi: AtomicBool::new(false),
-            copyspace0: CopySpace::new(
-                "copyspace0",
-                false,
-                true,
-                VMRequest::discontiguous(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            copyspace1: CopySpace::new(
-                "copyspace1",
-                true,
-                true,
-                VMRequest::discontiguous(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap),
-            in_nursery: AtomicBool::default(),
-            scheduler,
-        }
     }
 
     fn gc_init(
@@ -138,14 +108,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         #[cfg(feature = "sanity")]
         scheduler.final_stage.add(ScheduleSanityGC);
         scheduler.set_finalizer(Some(EndOfGC));
-    }
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Mutator<Self>> {
-        Box::new(create_gencopy_mutator(tls, mmtk))
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -196,6 +158,49 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 }
 
 impl<VM: VMBinding> GenCopy<VM> {
+    fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+        scheduler: &'static MMTkScheduler<VM>,
+    ) -> Self {
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+
+        GenCopy {
+            nursery: CopySpace::new(
+                "nursery",
+                false,
+                true,
+                VMRequest::fixed_extent(NURSERY_SIZE, false),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            hi: AtomicBool::new(false),
+            copyspace0: CopySpace::new(
+                "copyspace0",
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            copyspace1: CopySpace::new(
+                "copyspace1",
+                true,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            common: CommonPlan::new(vm_map, mmapper, options, heap),
+            in_nursery: AtomicBool::default(),
+            scheduler,
+        }
+    }
+
     fn request_full_heap_collection(&self) -> bool {
         self.get_total_pages() <= self.get_pages_reserved()
     }
