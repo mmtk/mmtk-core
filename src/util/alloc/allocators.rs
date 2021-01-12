@@ -1,6 +1,5 @@
 use std::mem::MaybeUninit;
 
-use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator};

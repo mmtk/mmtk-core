@@ -26,6 +26,7 @@ use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use crate::plan::global::PlanTypes;
+use crate::plan::global::PlanConstraints;
 
 use enum_map::EnumMap;
 
@@ -47,6 +48,11 @@ impl<VM: VMBinding> PlanTypes for SemiSpace<VM> {
     type Mutator = Mutator<VM>;
     type CopyContext = SSCopyContext<VM>;
 
+    const MOVES_OBJECTS: bool = true;
+    const GC_HEADER_BITS: usize = 2;
+    const GC_HEADER_WORDS: usize = 0;
+    const NUM_SPECIALIZED_SCANS: usize = 1;        
+
     fn bind_mutator(
         &'static self,
         tls: OpaquePointer,
@@ -56,8 +62,20 @@ impl<VM: VMBinding> PlanTypes for SemiSpace<VM> {
     }    
 }
 
+pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    moves_objects: true,
+    gc_header_bits: 2,
+    gc_header_words: 0,
+    num_specialized_scans: 1,
+    ..PlanConstraints::default()
+};
+
 impl<VM: VMBinding> Plan for SemiSpace<VM> {
     type VM = VM;
+
+    fn constraints(&self) -> &'static PlanConstraints {
+        &SS_CONSTRAINTS
+    }
 
     fn gc_init(
         &mut self,
@@ -155,7 +173,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS),
         }
     }
 

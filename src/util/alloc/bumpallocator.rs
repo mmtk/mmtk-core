@@ -3,7 +3,6 @@ use crate::util::Address;
 
 use crate::util::alloc::Allocator;
 
-use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::OpaquePointer;

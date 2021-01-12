@@ -21,8 +21,8 @@ use crate::vm::Collection;
 
 use crate::util::{Address, ObjectReference};
 
-use self::selected_plan::SelectedPlan;
-use crate::plan::selected_plan;
+// use self::selected_plan::SelectedPlan;
+// use crate::plan::selected_plan;
 use crate::util::alloc::allocators::AllocatorSelector;
 
 use crate::mmtk::MMTK;

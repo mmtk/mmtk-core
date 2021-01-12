@@ -25,6 +25,7 @@ use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::*;
 use crate::plan::global::PlanTypes;
+use crate::plan::global::PlanConstraints;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -51,6 +52,11 @@ impl<VM: VMBinding> PlanTypes for GenCopy<VM> {
     type Mutator = Mutator<VM>;
     type CopyContext = GenCopyCopyContext<VM>;
 
+    const MOVES_OBJECTS: bool = true;
+    const GC_HEADER_BITS: usize = 2;
+    const GC_HEADER_WORDS: usize = 0;
+    const NUM_SPECIALIZED_SCANS: usize = 1;
+    
     fn bind_mutator(
         &'static self,
         tls: OpaquePointer,
@@ -60,8 +66,20 @@ impl<VM: VMBinding> PlanTypes for GenCopy<VM> {
     }    
 }
 
+pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    moves_objects: true,
+    gc_header_bits: 2,
+    gc_header_words: 0,
+    num_specialized_scans: 1,
+    ..PlanConstraints::default()
+};
+
 impl<VM: VMBinding> Plan for GenCopy<VM> {
     type VM = VM;
+
+    fn constraints(&self) -> &'static PlanConstraints {
+        &GENCOPY_CONSTRAINTS
+    }
 
     fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
     where
@@ -195,7 +213,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &GENCOPY_CONSTRAINTS),
             in_nursery: AtomicBool::default(),
             scheduler,
         }

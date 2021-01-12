@@ -35,7 +35,7 @@ use downcast_rs::Downcast;
 /// A GC worker's context for copying GCs.
 /// Each GC plan should provide their implementation of a CopyContext.
 /// For non-copying GC, NoCopy can be used.
-pub trait CopyContext: Sized + 'static + Sync + Send {
+pub trait CopyContext: 'static + Sync + Send {
     type VM: VMBinding;
     const MAX_NON_LOS_COPY_BYTES: usize = MAX_INT;
     fn new(mmtk: &'static MMTK<Self::VM>) -> Self;
@@ -100,16 +100,56 @@ impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     }
 }
 
+impl<VM: VMBinding> WorkerLocal<MMTK<VM>> for NoCopy<VM> {
+    fn new(mmtk: &'static MMTK<VM>) -> Self {
+        CopyContext::new(mmtk)
+    }
+    fn init(&mut self, tls: OpaquePointer) {
+        CopyContext::init(self, tls);
+    }
+}
+
 pub trait PlanTypes {
     type VM: VMBinding;
     type Mutator: MutatorContext<Self::VM>;
     type CopyContext: CopyContext;
+
+    const MOVES_OBJECTS: bool;
+    const GC_HEADER_BITS: usize;
+    const GC_HEADER_WORDS: usize;
+    const NUM_SPECIALIZED_SCANS: usize;
+    // unused for now
+    const NEEDS_LOG_BIT_IN_HEADER: bool = false;
+    const NEEDS_LOG_BIT_IN_HEADER_NUM: usize = 0;
 
     fn bind_mutator(
         &'static self,
         tls: OpaquePointer,
         mmtk: &'static MMTK<Self::VM>,
     ) -> Box<Self::Mutator>;
+}
+
+pub struct PlanConstraints {
+    pub moves_objects: bool,
+    pub gc_header_bits: usize,
+    pub gc_header_words: usize,
+    pub num_specialized_scans: usize,
+    // unused for now
+    pub needs_log_bit_in_header: bool,
+    pub needs_log_bit_in_header_num: usize,
+}
+
+impl PlanConstraints {
+    pub const fn default() -> Self {
+        PlanConstraints {
+            moves_objects: false,
+            gc_header_bits: 0,
+            gc_header_words: 0,
+            num_specialized_scans: 0,
+            needs_log_bit_in_header: false,
+            needs_log_bit_in_header_num: 0,
+        }
+    }
 }
 
 pub fn create_mutator<VM: VMBinding>(tls: OpaquePointer, mmtk: &'static MMTK<VM>) -> Box<Mutator<VM>> {
@@ -138,6 +178,7 @@ pub fn create_plan<VM: VMBinding>(
 pub trait Plan: 'static + Sync + Send + Downcast {
     type VM: VMBinding;
 
+    fn constraints(&self) -> &'static PlanConstraints;
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
     #[cfg(feature = "sanity")]
@@ -528,7 +569,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         0
     }
 
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
         &self,
         _trace: &mut T,
         _object: ObjectReference,
@@ -541,7 +582,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             {
                 if unsync.code_space.in_space(_object) {
                     trace!("trace_object: object in code space");
-                    return unsync.code_space.trace_object(_trace, _object);
+                    return unsync.code_space.trace_object::<T, C>(_trace, _object);
                 }
             }
 
@@ -681,6 +722,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
+        constraints: &'static PlanConstraints,
     ) -> CommonPlan<VM> {
         CommonPlan {
             unsync: UnsafeCell::new(CommonUnsync {
@@ -691,6 +733,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     vm_map,
                     mmapper,
                     &mut heap,
+                    constraints,
                 ),
                 los: LargeObjectSpace::new(
                     "los",
@@ -699,6 +742,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     vm_map,
                     mmapper,
                     &mut heap,
+                    constraints,
                 ),
             }),
             base: BasePlan::new(vm_map, mmapper, options, heap),
@@ -722,7 +766,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         unsync.immortal.reserved_pages() + unsync.los.reserved_pages() + self.base.get_pages_used()
     }
 
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -737,7 +781,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             trace!("trace_object: object in los");
             return unsync.los.trace_object(trace, object);
         }
-        self.base.trace_object(trace, object)
+        self.base.trace_object::<T, C>(trace, object)
     }
 
     pub fn prepare(&self, tls: OpaquePointer, primary: bool) {

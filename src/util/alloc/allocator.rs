@@ -2,7 +2,6 @@ use crate::util::address::Address;
 
 use std::sync::atomic::Ordering;
 
-use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::constants::*;

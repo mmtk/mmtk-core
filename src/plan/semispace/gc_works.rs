@@ -8,6 +8,7 @@ use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::plan::Plan;
+use crate::scheduler::WorkerLocal;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
@@ -53,6 +54,15 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
         _semantics: crate::AllocationSemantics,
     ) {
         forwarding_word::clear_forwarding_bits::<VM>(obj);
+    }
+}
+
+impl<VM: VMBinding> WorkerLocal<MMTK<VM>> for SSCopyContext<VM> {
+    fn new(mmtk: &'static MMTK<VM>) -> Self {
+        CopyContext::new(mmtk)
+    }
+    fn init(&mut self, tls: OpaquePointer) {
+        CopyContext::init(self, tls);
     }
 }
 

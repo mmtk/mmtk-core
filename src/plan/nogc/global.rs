@@ -20,6 +20,7 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
 use crate::plan::global::PlanTypes;
+use crate::plan::global::PlanConstraints;
 
 #[cfg(not(feature = "nogc_lock_free"))]
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
@@ -40,6 +41,11 @@ impl<VM: VMBinding> PlanTypes for NoGC<VM> {
     type Mutator = Mutator<VM>;
     type CopyContext = NoCopy<VM>;
 
+    const MOVES_OBJECTS: bool = false;
+    const GC_HEADER_BITS: usize = 0;
+    const GC_HEADER_WORDS: usize = 0;
+    const NUM_SPECIALIZED_SCANS: usize = 1;
+
     fn bind_mutator(
         &'static self,
         tls: OpaquePointer,
@@ -49,8 +55,14 @@ impl<VM: VMBinding> PlanTypes for NoGC<VM> {
     }    
 }
 
+pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
+
 impl<VM: VMBinding> Plan for NoGC<VM> {
     type VM = VM;
+
+    fn constraints(&self) -> &'static PlanConstraints {
+        &NOGC_CONSTRAINTS
+    }
 
     fn gc_init(
         &mut self,
@@ -116,6 +128,7 @@ impl<VM: VMBinding> NoGC<VM> {
             vm_map,
             mmapper,
             &mut heap,
+            &NOGC_CONSTRAINTS,
         );
 
         NoGC {

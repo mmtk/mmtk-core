@@ -1,4 +1,4 @@
-use crate::plan::{Mutator, SelectedPlan, TransitiveClosure};
+use crate::plan::{Mutator, TransitiveClosure};
 use crate::scheduler::gc_works::ProcessEdgesWork;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
