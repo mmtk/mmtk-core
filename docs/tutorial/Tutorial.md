@@ -277,10 +277,10 @@ Now that you have a working Semispace collector, you should be familiar enough w
 Create a copy of your Semispace collector, called `triplespace`. Then, add a new copyspace to the collector, called the `youngspace`. Make sure any new objects are allocated to this space rather than the fromspace. Garbage will be continue to be collected at the same time for all the spaces, and any live items remaining from the youngspace should move to the tospace.
 
 If you get particularly stuck, instructions for how to complete this exersize are available [here](#triplespace-backup-instructions).
+0
+This, in effect, will be a sort of generational garbage collector. The *weak generational hypothesis* states that most of the objects allocated to a heap after one collection will die before the next collection. Therefore, it is worth separating out 'young' and 'old' objects and only scanning each as needed, to minimise the number of times old live objects are scanned. New objects are allocated to a 'nursery', and after one collection they move to the 'mature' space - in `triplespace`, `youngspace` is the nursery and the tospace and fromspace are the mature space.
 
-This, in effect, will be a sort of generational garbage collector. One of the major theories in garbage collection is the *weak generational hypothesis* - most of the objects allocated to a heap after one collection will die before the next collection. Therefore, it is worth separating out 'young' and 'old' objects to minimise the number of times old live objects are scanned. New objects are allocated to a 'nursery', and after one collection they move to the 'mature' space - in `triplespace`, `youngspace` is the nursery and the tospace and fromspace are the mature space.
-
-Of course, the `triplespace` collector is incredibly inefficient for a generational collector, because it does not do separate collections for its nursery and mature space. Since every space is collected at the same time, the objects in the mature space are being scanned as much as the objects in the nursery are. **TODO: segue into generational collector talk** 
+Of course, the `triplespace` collector is incredibly inefficient for a generational collector, becaue it does not do separate collections for its nursery and mature space. Since every space is collected at the same time, the objects in the mature space are being scanned as much as the objects in the nursery are. **TODO: segue into generational collector talk** 
 
 
 #### Triplespace backup instructions
