@@ -190,11 +190,11 @@ At this point, you should familiarise yourself with the MyGC plan if you haven't
 ## Building a Semispace Collector
 ### What is a Semispace collector?
 **TODO: Add section intro**
+In a Semispace collector, the heap is divided into two equally-sized spaces, called 'semispaces'. One of these is defined as a 'tospace', where new objects are allocated, and the other a 'fromspace'. The allocator allocates to the tospace until it is full. After this, the definitions of the spaces are flipped (the 'tospace' becomes a 'fromspace' and vise versa), and live objects in the fromspace are copied to the tospace. Then, the fromspace is cleared, and the process begins again.
 
 ### Allocation: Add copyspaces
 The first step of changing the MyGC plan into a Semispace plan is to add the two copyspaces that the collector will allocate memory into. This requires adding two copyspaces, code to properly initialise and prepare the new spaces, and a copy context.
-**I don't like the formatting here. It's cluttered and hard to read.**
-
+**TODO: explain the stuff about the common plan spaces**
 First, in `global.rs`, replace the old immortal space with two copyspaces.
  1. change as few imports as possible for this step. Need CommonPlan, AtomicBool, CopySpace. Remove line for allow unused imports. Maybe do these as needed.
  2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
@@ -228,7 +228,6 @@ First, in `global.rs`, replace the old immortal space with two copyspaces.
     }
    ```
    
-
   5. The plan now has the components it needs for allocation, but not the instructions for how to make use of them.
      1. Add a method to Plan for MyGC called `common` that returns a reference to the common plan.
        ```rust
@@ -243,9 +242,23 @@ First, in `global.rs`, replace the old immortal space with two copyspaces.
        }
        ```
       3. Find the method `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
-      4. Find the method `prepare`. TODO
-      5. Find the method `release`. TODO
-      6. *is this needed here?* Add the following method to Plan for MyGC. **TODO: Find a better way to word this.**
+      4. Find the method `prepare`. Delete the `unreachable!()` call, and add the following code:
+         ```rust
+         self.common.prepare(tls, true);
+         self.hi
+            .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
+         let hi = self.hi.load(Ordering::SeqCst); 
+         self.copyspace0.prepare(hi);
+         self.copyspace1.prepare(!hi);
+         ```
+         This prepares the common plan, flips the definitions for which space is 'to' and which is 'from', then prepares the copyspaces with the new definition.
+      5. Find the method `release`. Delete the `unreachable!()` call, and add the following code:
+         ```rust
+         self.common.release(tls, true);
+         self.fromspace().release();
+         ```
+         This releases the spaces after the collection.
+      6. **is this needed here?** Add the following method to Plan for MyGC. **TODO: Find a better way to word this.**
         ```rust
         fn get_collection_reserve(&self) -> usize {
          self.tospace().reserved_pages()
@@ -266,6 +279,12 @@ First, in `global.rs`, replace the old immortal space with two copyspaces.
           }
         }
         ```
+      9. Also add the following helper function:
+      ```rust
+      fn get_collection_reserve(&self) -> usize {
+        self.tospace().reserved_pages()
+      }
+      ``` 
    
 mutator.rs
    * change value maps in lazy_static - going to need different space types for SemiSpace. 
@@ -283,15 +302,28 @@ Now that you have a working Semispace collector, you should be familiar enough w
 Create a copy of your Semispace collector, called `triplespace`. Then, add a new copyspace to the collector, called the `youngspace`. Make sure any new objects are allocated to this space rather than the fromspace. Garbage will be continue to be collected at the same time for all the spaces, and any live items remaining from the youngspace should move to the tospace.
 
 If you get particularly stuck, instructions for how to complete this exersize are available [here](#triplespace-backup-instructions).
-0
-This, in effect, will be a sort of generational garbage collector. The *weak generational hypothesis* states that most of the objects allocated to a heap after one collection will die before the next collection. Therefore, it is worth separating out 'young' and 'old' objects and only scanning each as needed, to minimise the number of times old live objects are scanned. New objects are allocated to a 'nursery', and after one collection they move to the 'mature' space - in `triplespace`, `youngspace` is the nursery and the tospace and fromspace are the mature space.
 
-Of course, the `triplespace` collector is incredibly inefficient for a generational collector, becaue it does not do separate collections for its nursery and mature space. Since every space is collected at the same time, the objects in the mature space are being scanned as much as the objects in the nursery are. **TODO: segue into generational collector talk** 
+***
+Triplespace is a sort of generational garbage collector. These collectors separate out old objects and new objects into separate spaces. Newly allocated objects should be scanned far more often than old objects, which minimises the time spent repeatedly re-scanning long-lived objects. 
+
+Of course, this means that the Triplespace is incredibly inefficient for a generational collector, because the older objects are still being scanned every collection. It wouldn't be very useful in a real-life scenario. The next thing to do is to make this collector into a more efficient proper generational collector.
+
+[**Back to table of contents**](#contents)
+***
+## Building a copying generational collector
+
+### What is a generational collector?
+The *weak generational hypothesis* states that most of the objects allocated to a heap after one collection will die before the next collection. Therefore, it is worth separating out 'young' and 'old' objects and only scanning each as needed, to minimise the number of times old live objects are scanned. New objects are allocated to a 'nursery', and after one collection they move to the 'mature' space - in `triplespace`, `youngspace` is a proto-nursery, and the tospace and fromspace are the mature space.
+
+This collector fixes one of the major problems with Semispace - namely, that any old objects are repeatedly copied back and forth. By separating these old objects into a separate 'mature' space, the number of collections needed is greatly reduced.
+
+**TODO: finish this section**
+
+**Idea: Add 2nd older generation exercise**
 
 
 #### Triplespace backup instructions
 
-**TODO: Should move this somewhere away a little, to encourage actually doing the exercise without looking at the instructions**
 **TODO: Clean up and check accuracy**
 
 global.rs:
