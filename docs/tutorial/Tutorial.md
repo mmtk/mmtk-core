@@ -272,26 +272,35 @@ The first step of changing the MyGC plan into a Semispace plan is to add the two
 1. Implement work packet. Make new file gc_works. 
 
 ### Adding another copyspace
-Less guided exercise: Add “young” copyspace which all new objects are allocated to. No r/w barrier.
-Youngspace gets collected at the same time as the other things.
-Live items from youngspace get moved to tospace.
-It's an incomplete implementation of a generational GC, in effect.
+Now that you have a working Semispace collector, you should be familiar enough with the code to start writing some yourself.
+
+Create a copy of your Semispace collector, called `triplespace`. Then, add a new copyspace to the collector, called the `youngspace`. Make sure any new objects are allocated to this space rather than the fromspace. Garbage will be continue to be collected at the same time for all the spaces, and any live items remaining from the youngspace should move to the tospace.
+
+If you get particularly stuck, instructions for how to complete this exersize are available [here](#triplespace-backup-instructions).
+
+This, in effect, will be a sort of generational garbage collector. One of the major theories in garbage collection is the *weak generational hypothesis* - most of the objects allocated to a heap after one collection will die before the next collection. Therefore, it is worth separating out 'young' and 'old' objects to minimise the number of times old live objects are scanned. New objects are allocated to a 'nursery', and after one collection they move to the 'mature' space - in `triplespace`, `youngspace` is the nursery and the tospace and fromspace are the mature space.
+
+Of course, the `triplespace` collector is incredibly inefficient for a generational collector, because it does not do separate collections for its nursery and mature space. Since every space is collected at the same time, the objects in the mature space are being scanned as much as the objects in the nursery are. **TODO: segue into generational collector talk** 
+
+
+#### Triplespace backup instructions
 
 **TODO: Should move this somewhere away a little, to encourage actually doing the exercise without looking at the instructions**
-**TODO: Check accuracy**
-Backup instructions:
+**TODO: Clean up and check accuracy**
+
 global.rs:
  - add youngspace to Plan for TripleSpace new()
  - init in gc_init
  - prepare (as fromspace) in prepare()
  - release in release()
  - add reference function fromspace()
+ 
 mutator.rs:
  - add bumppointer to youngspace in space_mapping in create_triplespace_mutator
  - in triplespace_mutator_release: rebind bumpallocator to youngspace
+ 
 gc_works.rs
  - add youngspace to trace_object, following format of to/fromspace
- 
 
 
 [**Back to table of contents**](#contents)
