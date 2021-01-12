@@ -216,10 +216,8 @@
 <span id="213">213</span>
 <span id="214">214</span>
 <span id="215">215</span>
-<span id="216">216</span>
-<span id="217">217</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_PAGE</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">UnsafeCell</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">default</span>::<span class="ident">Default</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::<span class="ident">Deref</span>;
@@ -318,7 +316,7 @@
     <span class="comment">// Note: This gets ignored. Use RUST_LOG to specify log level.</span>
     <span class="comment">// TODO: Delete this option.</span>
     <span class="ident">verbose</span>:               <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="number">0</span>,
-    <span class="ident">stress_factor</span>:         <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">usize</span>::<span class="ident">max_value</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>,
+    <span class="ident">stress_factor</span>:         <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>,
     <span class="comment">// vmspace</span>
     <span class="comment">// FIXME: These options are set for JikesRVM. We need a proper way to set options.</span>
     <span class="comment">//   We need to set these values programmatically in VM specific code.</span>
@@ -357,11 +355,9 @@
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_PAGE</span>;
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">DEFAULT_STRESS_FACTOR</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">options</span>::<span class="ident">Options</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">test_util</span>::<span class="ident">serial_test</span>;
-
-    <span class="kw">const</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">usize</span>::<span class="ident">max_value</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>;
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">no_env_var</span>() {

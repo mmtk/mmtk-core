@@ -103,6 +103,13 @@
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">embedded_meta_data</span>::<span class="ident">LOG_BYTES_IN_REGION</span>;
 
@@ -206,5 +213,12 @@
 
 <span class="comment">/* Assume byte-addressability */</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_ADDRESS_SPACE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">BITS_IN_ADDRESS</span> <span class="kw">as</span> <span class="ident">u8</span>;
+
+<span class="comment">/****************************************************************************
+ *
+ * Default options
+ */</span>
+
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">usize</span>::<span class="ident">max_value</span>();
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "mmtk";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

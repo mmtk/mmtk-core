@@ -199,8 +199,25 @@
 <span id="196">196</span>
 <span id="197">197</span>
 <span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">address</span>::<span class="ident">Address</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">DEFAULT_STRESS_FACTOR</span>;
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">Ordering</span>;
 
@@ -322,9 +339,12 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">alloc_slow_inline</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
         <span class="kw">let</span> <span class="ident">tls</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_tls</span>();
+        <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">base</span>();
+        <span class="kw">let</span> <span class="ident">stress_test</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span> <span class="op">!</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>;
 
         <span class="comment">// Information about the previous collection.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">emergency_collection</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">previous_result_zero</span> <span class="op">=</span> <span class="bool-val">false</span>;
         <span class="kw">loop</span> {
             <span class="comment">// Try to allocate using the slow path</span>
             <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">alloc_slow_once</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
@@ -334,7 +354,6 @@
                 <span class="kw">return</span> <span class="ident">result</span>;
             }
 
-            <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">base</span>();
             <span class="kw">if</span> <span class="op">!</span><span class="ident">result</span>.<span class="ident">is_zero</span>() {
                 <span class="comment">// TODO: Check if we need oom lock.</span>
                 <span class="comment">// It seems the lock only protects access to the atomic boolean. We could possibly do</span>
@@ -349,6 +368,18 @@
                     <span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
                     <span class="ident">drop</span>(<span class="ident">guard</span>);
                 }
+
+                <span class="comment">// When a GC occurs, the resultant address provided by `acquire()` is 0x0.</span>
+                <span class="comment">// Hence, another iteration of this loop occurs. In such a case, the second</span>
+                <span class="comment">// iteration tries to allocate again, and if is successful, then the allocation</span>
+                <span class="comment">// bytes are updated. However, this leads to double counting of the allocation:</span>
+                <span class="comment">// (i) by the original alloc_slow_inline(); and (ii) by the alloc_slow_inline()</span>
+                <span class="comment">// called by acquire(). In order to not double count the allocation, we only</span>
+                <span class="comment">// update allocation bytes if the previous result wasn&#39;t 0x0.</span>
+                <span class="kw">if</span> <span class="ident">stress_test</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">is_initialized</span>() <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">previous_result_zero</span> {
+                    <span class="ident">plan</span>.<span class="ident">increase_allocation_bytes_by</span>(<span class="ident">size</span>);
+                }
+
                 <span class="kw">return</span> <span class="ident">result</span>;
             }
 
@@ -357,7 +388,7 @@
             <span class="comment">// leave this loop between the two GCs. The local var &#39;emergency_collection&#39; was set to true</span>
             <span class="comment">// after the first GC. But when we execute this check below, we just finished the second GC,</span>
             <span class="comment">// which is not emergency. In such case, we will give a false OOM.</span>
-            <span class="comment">// We cannot just rely on the local var. Instead, we get the emergency colleciton value again,</span>
+            <span class="comment">// We cannot just rely on the local var. Instead, we get the emergency collection value again,</span>
             <span class="comment">// and check both.</span>
             <span class="kw">if</span> <span class="ident">emergency_collection</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">is_emergency_collection</span>() {
                 <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Emergency collection&quot;</span>);
@@ -391,6 +422,7 @@
              */</span>
             <span class="ident">emergency_collection</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">is_emergency_collection</span>();
             <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Got emergency collection as {}&quot;</span>, <span class="ident">emergency_collection</span>);
+            <span class="ident">previous_result_zero</span> <span class="op">=</span> <span class="bool-val">true</span>;
         }
     }
 
