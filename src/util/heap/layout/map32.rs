@@ -230,10 +230,6 @@ impl Map for Map32 {
         self.cumulative_committed_pages
             .fetch_add(pages, Ordering::Relaxed);
     }
-
-    fn get_cumulative_committed_pages(&self) -> usize {
-        self.cumulative_committed_pages.load(Ordering::Relaxed)
-    }
 }
 
 impl Map32 {
