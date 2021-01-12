@@ -55,7 +55,7 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         _scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let heap = HeapMeta::new(HEAP_START, HEAP_END);
         MallocMS {
             base: BasePlan::new(vm_map, mmapper, options, heap),
             space: MallocSpace::new(),
@@ -109,11 +109,11 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&self, _tls: OpaquePointer) {
         // Do nothing  
     }
 
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&self, _tls: OpaquePointer) {
         unsafe {
             let table_len = METADATA_TABLE.read().unwrap().len();
             let ref mut metadata_table = METADATA_TABLE.write().unwrap();
@@ -137,8 +137,6 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
                             marked[word_index] = 0;
                         } else {
                             marked[word_index] = 0;
-                            let chunk_start = row.0;
-                            let address = word_index_to_address(word_index, chunk_start);
                         }
                     }
                     word_index += 1;

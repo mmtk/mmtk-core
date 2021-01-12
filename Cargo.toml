@@ -54,7 +54,7 @@ gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 mygc = ["immortalspace", "largeobjectspace", "copyspace"]
 mygencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 gencopycopy = ["immortalspace", "largeobjectspace", "copyspace"]
-mallocms = ["mallocspace", "malloc_tcmalloc"]
+mallocms = ["mallocspace", "malloc_hoard"]
 
 # spaces
 base_spaces = []
@@ -80,3 +80,4 @@ malloc_libc = []
 malloc_mimalloc = []
 malloc_jemalloc = []
 malloc_tcmalloc = []
+malloc_hoard = []

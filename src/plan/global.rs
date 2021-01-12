@@ -237,8 +237,6 @@ pub trait Plan: Sized + 'static + Sync + Send {
     where
         Self: Sized,
     {
-        #[cfg(feature="mallocms")]
-        unreachable!("plan::global::collection_required");
         let stress_force_gc = self.stress_test_gc_required();
         debug!(
             "self.get_pages_reserved()={}, self.get_total_pages()={}",
