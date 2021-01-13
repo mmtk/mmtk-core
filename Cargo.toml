@@ -42,9 +42,9 @@ rand = "0.7.3"
 default = []
 
 # plans
-nogc = ["immortalspace", "largeobjectspace"]
-semispace = ["immortalspace", "largeobjectspace", "copyspace"]
-gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
+# nogc = ["immortalspace", "largeobjectspace"]
+# semispace = ["immortalspace", "largeobjectspace", "copyspace"]
+# gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 
 # spaces
 base_spaces = []
@@ -52,13 +52,13 @@ vm_space = ["base_spaces"]
 ro_space = ["base_spaces"]
 code_space  = ["base_spaces"]
 
-immortalspace = []
-copyspace = []
-largeobjectspace = []
-lockfreeimmortalspace = []
+# immortalspace = []
+# copyspace = []
+# largeobjectspace = []
+# lockfreeimmortalspace = []
 
 sanity = []
-nogc_lock_free = ["nogc", "lockfreeimmortalspace"]
+nogc_lock_free = []
 nogc_no_zeroing = ["nogc_lock_free"]
 
 single_worker = []
