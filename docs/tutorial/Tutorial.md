@@ -189,23 +189,23 @@ At this point, you should familiarise yourself with the MyGC plan if you haven't
 ***
 ## Building a Semispace Collector
 ### What is a Semispace collector?
-**TODO: Add section intro**
-In a Semispace collector, the heap is divided into two equally-sized spaces, called 'semispaces'. One of these is defined as a 'tospace', where new objects are allocated, and the other a 'fromspace'. The allocator allocates to the tospace until it is full. After this, the definitions of the spaces are flipped (the 'tospace' becomes a 'fromspace' and vise versa), and live objects in the fromspace are copied to the tospace. Then, the fromspace is cleared, and the process begins again.
+In a Semispace collector, the heap is divided into two equally-sized spaces, called 'semispaces'. One of these is defined as a 'fromspace', and the other a 'tospace'. The allocator allocates to the tospace until it is full. 
+
+When the tospace is full, the definitions of the spaces are flipped (the 'tospace' becomes a 'fromspace' and vise versa). Then, the collector scans each object in what is now the fromspace. Then, if a live object is found, a copy of it is made in the tospace. That is to say, live objects are copied *from* the fromspace *to* the tospace. After every object is scanned, the fromspace is cleared, and the process begins again. 
 
 ### Allocation: Add copyspaces
 The first step of changing the MyGC plan into a Semispace plan is to add the two copyspaces that the collector will allocate memory into. This requires adding two copyspaces, code to properly initialise and prepare the new spaces, and a copy context.
-**TODO: explain the stuff about the common plan spaces**
 First, in `global.rs`, replace the old immortal space with two copyspaces.
- 1. change as few imports as possible for this step. Need CommonPlan, AtomicBool, CopySpace. Remove line for allow unused imports. Maybe do these as needed.
- 2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
-    1. Delete the two lines in the thing.
+1. change as few imports as possible for this step. Need CommonPlan, AtomicBool, CopySpace. Remove line for allow unused imports. Maybe do these as needed.
+2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
+    1. Delete the existing fields in the constructor.
     2. Add `pub hi: AtomicBool,`. This is a thread-safe bool indicating which copyspace is the to-space.
     3. Add `pub copyspace0: CopySpace<VM>,` and `pub copyspace1: CopySpace<VM>,`. These are the two copyspaces.
     4. Add `pub common: CommonPlan<VM>,`. Semispace uses the common plan rather than the base plan. 
-  3. Change `impl<VM: VMBinding> Plan for MyGC<VM> {`. This section initialises and prepares the objects in MyGC that you just defined.
+3. Change `impl<VM: VMBinding> Plan for MyGC<VM> {`. This section initialises and prepares the objects in MyGC that you just defined.
      1. Delete the definition of `mygc_space`. Instead, we will define the two copyspaces here.
      2. Define one of the copyspaces by adding the following code: **TODO: Make sure this works. Semispace doesn't use variables here, and I'm not confident enough in my rust to say this'll work for sure. But doing it this way makes it easier to write the little excersize below.**
-       ```rust
+      ```rust
        let copyspace0 = CopySpace::new(
             "copyspace0",
             false,
@@ -215,32 +215,30 @@ First, in `global.rs`, replace the old immortal space with two copyspaces.
             mmapper,
             &mut heap,
          );
-        ```
-     3. You may have noticed that the CopySpace initialisation requires one more bool compared to ImmortalSpace. 
-       The definitions for these spaces are stored in `mmtk-core/policy`. By looking in these files, add a comment to the above code noting which bool has what function. Then, copy the code again, renaming the variable `copyspace1`, and setting it so that it is a fromspace rather than a tospace.
-   4. Finally, replace the old MyGC initializer with the following:
-   ```rust
-    MyGC {
-        hi: AtomicBool::new(false),
-        copyspace0,
-        copyspace1,
-        common: CommonPlan::new(vm_map, mmapper, options, heap),
-    }
-   ```
-   
-  5. The plan now has the components it needs for allocation, but not the instructions for how to make use of them.
-     1. Add a method to Plan for MyGC called `common` that returns a reference to the common plan.
+    ```
+    3. Create another copyspace, called `copyspace1`, defining it as a fromspace instead of a tospace. (Hint: the definitions for copyspaces are in `mmtk-core/policy/copyspace.rs`) 
+    4. Finally, replace the old MyGC initializer with the following:
+       ```rust
+        MyGC {
+            hi: AtomicBool::new(false),
+            copyspace0,
+            copyspace1,
+            common: CommonPlan::new(vm_map, mmapper, options, heap),
+        }
+       ```
+4. The plan now has the components it needs for allocation, but not the instructions for how to make use of them.
+     1. Add a helper method to Plan for MyGC called `common` that returns a reference to the common plan.
        ```rust
        fn common(&self) -> &CommonPlan<VM> {
          &self.common
        }
-       ```
-      2. Find the method `base` and change it so that it calls the base plan *through* the common plan.
+   ```
+      2. Find the helper method `base` and change it so that it calls the base plan *through* the common plan.
        ```rust
        fn base(&self) -> &BasePlan<VM> {
          &self.common.base
        }
-       ```
+   ```
       3. Find the method `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
       4. Find the method `prepare`. Delete the `unreachable!()` call, and add the following code:
          ```rust
@@ -257,19 +255,18 @@ First, in `global.rs`, replace the old immortal space with two copyspaces.
          self.common.release(tls, true);
          self.fromspace().release();
          ```
-         This releases the spaces after the collection.
-      6. **is this needed here?** Add the following method to Plan for MyGC. **TODO: Find a better way to word this.**
+      6. **is this needed here?** Add the following helper method to Plan for MyGC. **TODO: Find a better way to word this.**
         ```rust
         fn get_collection_reserve(&self) -> usize {
          self.tospace().reserved_pages()
         }
-        ```
+     ```
       7. Add a new section of methods for MyGC (outside of the methods for Plan for MyGC).
         ```rust
         impl<VM: VMBinding> MyGC<VM> {
         }
-        ```
-      8. To this, add two methods, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. Try writing tospace on your own before looking at the code below, and then write fromspace.
+     ```
+      8. To this, add two helper methods, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. `tospace()` (see below) returns a reference to the tospace, and `fromspace()` returns a reference to the fromspace.
         ```rust
         pub fn tospace(&self) -> &CopySpace<VM> {
           if self.hi.load(Ordering::SeqCst) {
@@ -278,20 +275,28 @@ First, in `global.rs`, replace the old immortal space with two copyspaces.
               &self.copyspace0
           }
         }
-        ```
+     ```
       9. Also add the following helper function:
       ```rust
       fn get_collection_reserve(&self) -> usize {
         self.tospace().reserved_pages()
       }
       ``` 
-   
-mutator.rs
-   * change value maps in lazy_static - going to need different space types for SemiSpace. 
-   * create_mygc_mutator: Change space_mapping. tospace gets an immortal space, fromspace gets a large-object space (los). Only from is going to have a collection in it. To and from are swapped each collection, and are of equal size. This means that there’s no chance for tospace to run out of memory, but it isn’t the most efficient system.
+Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace.
+  1. First, in `lazy_static!`, make the following changes:
+     1. Map `Default` to `BumpPointer(0)`.
+     2. Map `ReadOnly` to `BumpPointer(1)`.
+     3. Map `Los` to `LargeObject(0)`. 
+  2. Next, in `create_mygc_mutator`, change which allocator is allocated to what space in `space_mapping`.
+     1. `BumpPointer(0)` should map to the tospace.
+     2. `BumpPointer(1)` should map to `plan.common.get_immortal()`.
+     3. `LargeObject(0)` should map to `plan.common.get_los()`.
+There may seem to be 2 extraneous spaces and pointers that have appeared all of a sudden in these past 2 steps. These are parts of the MMTk common plan itself.
+1. The immortal space is used for objects that the virtual machine or a library never expects to move - **TODO: such as?**.
+2. The large object space is needed because MMTk handles particularly large objects differently to normal objects, as the space overhead of copying large objects is very high. Instead, this space is used by a separate GC algorithm in the common plan to avoid having to copy them. 
+**TODO: Above was paraphrased from Angus' notes, may need to get more detail or clarification**
 3. add mut prep/release functions
-4. Test allocation is working
-   * How?
+4. Test allocation is working (helloworld/fannkunchredux pass, decapo fail, add print after allocating?)
    
 ### Collector: Implement garbage collection
 1. Implement work packet. Make new file gc_works. 
