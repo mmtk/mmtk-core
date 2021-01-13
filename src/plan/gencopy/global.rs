@@ -24,7 +24,6 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::*;
-use crate::plan::global::PlanTypes;
 use crate::plan::global::PlanConstraints;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -46,25 +45,6 @@ pub struct GenCopy<VM: VMBinding> {
 }
 
 unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
-
-impl<VM: VMBinding> PlanTypes for GenCopy<VM> {
-    type VM = VM;
-    type Mutator = Mutator<VM>;
-    type CopyContext = GenCopyCopyContext<VM>;
-
-    const MOVES_OBJECTS: bool = true;
-    const GC_HEADER_BITS: usize = 2;
-    const GC_HEADER_WORDS: usize = 0;
-    const NUM_SPECIALIZED_SCANS: usize = 1;
-    
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Mutator<VM>> {
-        Box::new(create_gencopy_mutator(tls, mmtk))
-    }    
-}
 
 pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,

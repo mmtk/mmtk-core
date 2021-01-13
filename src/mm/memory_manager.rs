@@ -32,7 +32,6 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::plan::global::PlanTypes;
 
 /// Run the main loop for the GC controller thread. This method does not return.
 ///

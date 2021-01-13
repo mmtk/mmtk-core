@@ -110,26 +110,6 @@ impl<VM: VMBinding> WorkerLocal for NoCopy<VM> {
     }
 }
 
-pub trait PlanTypes {
-    type VM: VMBinding;
-    type Mutator: MutatorContext<Self::VM>;
-    type CopyContext: CopyContext;
-
-    const MOVES_OBJECTS: bool;
-    const GC_HEADER_BITS: usize;
-    const GC_HEADER_WORDS: usize;
-    const NUM_SPECIALIZED_SCANS: usize;
-    // unused for now
-    const NEEDS_LOG_BIT_IN_HEADER: bool = false;
-    const NEEDS_LOG_BIT_IN_HEADER_NUM: usize = 0;
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Self::Mutator>;
-}
-
 pub struct PlanConstraints {
     pub moves_objects: bool,
     pub gc_header_bits: usize,

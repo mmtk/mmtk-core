@@ -25,7 +25,6 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use crate::plan::global::PlanTypes;
 use crate::plan::global::PlanConstraints;
 
 use enum_map::EnumMap;
@@ -42,25 +41,6 @@ pub struct SemiSpace<VM: VMBinding> {
 }
 
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
-
-impl<VM: VMBinding> PlanTypes for SemiSpace<VM> {
-    type VM = VM;
-    type Mutator = Mutator<VM>;
-    type CopyContext = SSCopyContext<VM>;
-
-    const MOVES_OBJECTS: bool = true;
-    const GC_HEADER_BITS: usize = 2;
-    const GC_HEADER_WORDS: usize = 0;
-    const NUM_SPECIALIZED_SCANS: usize = 1;        
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        _mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Mutator<VM>> {
-        Box::new(create_ss_mutator(tls, self))
-    }    
-}
 
 pub(super) const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,

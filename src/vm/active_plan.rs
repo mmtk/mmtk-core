@@ -4,7 +4,6 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 use std::sync::MutexGuard;
-use crate::plan::global::PlanTypes;
 use crate::plan::Mutator;
 
 pub struct SynchronizedMutatorIterator<'a, VM: VMBinding> {

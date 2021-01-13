@@ -19,7 +19,6 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
-use crate::plan::global::PlanTypes;
 use crate::plan::global::PlanConstraints;
 use crate::scheduler::GCWorkerLocalPtr;
 use crate::scheduler::GCWorkerLocal;
@@ -37,25 +36,6 @@ pub struct NoGC<VM: VMBinding> {
 }
 
 unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
-
-impl<VM: VMBinding> PlanTypes for NoGC<VM> {
-    type VM = VM;
-    type Mutator = Mutator<VM>;
-    type CopyContext = NoCopy<VM>;
-
-    const MOVES_OBJECTS: bool = false;
-    const GC_HEADER_BITS: usize = 0;
-    const GC_HEADER_WORDS: usize = 0;
-    const NUM_SPECIALIZED_SCANS: usize = 1;
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        _mmtk: &'static MMTK<VM>,
-    ) -> Box<Mutator<VM>> {
-        Box::new(create_nogc_mutator(tls, self))
-    }    
-}
 
 pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
 

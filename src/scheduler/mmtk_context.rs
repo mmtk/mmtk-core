@@ -2,7 +2,6 @@ use super::*;
 use crate::util::OpaquePointer;
 use crate::vm::{Collection, VMBinding};
 use crate::{CopyContext, Plan, MMTK};
-use crate::plan::global::PlanTypes;
 
 pub type GCWorkerLocalPtr = WorkerLocalPtr;
 pub trait GCWorkerLocal = WorkerLocal;
