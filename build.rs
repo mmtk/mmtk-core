@@ -3,8 +3,8 @@ use std::process::Command;
 fn main() {
     #[cfg(feature = "malloc_tcmalloc")]
     build_tcmalloc();
-    #[cfg(feature = "malloc_hoard")]
-    build_hoard();
+    #[cfg(feature = "malloc_scalloc")]
+    build_scalloc();
 }
 
 fn build_tcmalloc() {
@@ -23,15 +23,22 @@ fn build_tcmalloc() {
     // println!("cargo:rustc-link-lib=dylib=tcmalloc");
     // println!("cargo:rustc-link-lib=static=absl");
     println!("cargo:rustc-link-search=native=/home/paiger/mmtk-core/src/tcmalloc/bazel-bin/tcmalloc");
+    // println!("cargo:rustc-link-search=dependency=/home/paiger/mmtk-core/src/tcmalloc/bazel-bin/tcmalloc");
 }
 
-fn build_hoard() {
+fn build_scalloc() {
+    let mut gyp = Command::new("gyp");
+    gyp
+        .current_dir("scalloc")
+        .args(&["build/gyp/gyp", "--depth=.", "scalloc.gyp"])
+        .status().expect("Failed to generate scalloc build environment.");
+    println!("cargo:rustc-env=BUILDTYPE=Release");
     let args: &[&str; 0] = &[];
     let mut make = Command::new("make");
     make
-        .current_dir("Hoard-3.13/src")
-        .args(args)
-        .status().expect("Failed to make Hoard");
-    println!("cargo:rustc-link-lib=dylib=hoard");
-    println!("cargo:rustc-link-search=native=/home/paiger/mmtk-core/Hoard-3.13/src")
+    .current_dir("scalloc")
+    .args(args)
+    .status().expect("Failed to build scalloc.");
+    println!("cargo:rustc-link-lib=dylib=scalloc");
+    println!("cargo:rustc-link-search=native=/home/paiger/mmtk-core/scalloc/out/Release/lib.target")
 }

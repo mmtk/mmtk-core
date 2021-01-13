@@ -9,52 +9,28 @@ use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use crate::util::conversions;
 use crate::util::alloc::tcmalloc;
-use crate::util::alloc::hoard;
+use crate::util::alloc::scalloc;
 
 use atomic::Ordering;
 // Import calloc, free, and malloc_usable_size from the library specified in Cargo.toml:45
 #[cfg(feature = "malloc_jemalloc")]
 pub use jemalloc_sys::{free, malloc_usable_size, calloc};
 
-#[cfg(any(feature = "malloc_mimalloc", feature = "malloc_tcmalloc"))]
-use libc::{c_void, size_t};
 #[cfg(feature = "malloc_mimalloc")]
-use mimalloc_sys::{mi_free, mi_malloc_usable_size, mi_calloc};
-
-
-#[cfg(feature = "malloc_mimalloc")]
-pub unsafe fn malloc_usable_size(p: *const c_void) -> size_t {
-    mi_malloc_usable_size(p)
-}
-
-#[cfg(feature = "malloc_mimalloc")]
-pub unsafe fn free(p: *mut c_void) {
-    mi_free(p);
-}
-
-#[cfg(feature = "malloc_mimalloc")]
-pub unsafe fn calloc(count: size_t, size: size_t) -> *mut c_void {
-    mi_calloc(count, size)
-}
+pub use mimalloc_sys::{mi_free as free, mi_malloc_usable_size as malloc_usable_size, mi_calloc as calloc};
 
 #[cfg(feature = "malloc_tcmalloc")]
-pub unsafe fn calloc(count: size_t, size: size_t) -> *mut c_void {
-    tcmalloc::TCMallocInternalMalloc(count, size)
-}
-#[cfg(feature = "malloc_tcmalloc")]
-pub unsafe fn free(p: *mut c_void) -> *mut c_void {
-    tcmalloc::TCMallocInternalFree(p)
-}
+pub use tcmalloc::{TCMallocInternalCalloc as calloc, TCMallocInternalMallocSize as malloc_usable_size, TCMallocInternalFree as free};
 
-#[cfg(feature = "malloc_tcmalloc")]
-pub unsafe fn malloc_usable_size(p: *mut c_void) -> *mut c_void {
-    tcmalloc::TCMallocInternalMallocUsableSize(p)
-}
-
+//To use hoard, export LD_LIBRARY_PATH=/home/paiger/hoard-sys/Hoard-3.13/src
+//Not sure how to do this otherwise
 #[cfg(feature = "malloc_hoard")]
-pub use hoard::{free, malloc_usable_size, calloc};
+pub use hoard_sys::{free, malloc_usable_size, calloc};
 
-#[cfg(not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc", feature = "malloc_tcmalloc", feature = "malloc_hoard")))]
+#[cfg(feature = "malloc_scalloc")]
+pub use scalloc::{free, malloc_usable_size, calloc};
+
+#[cfg(not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc", feature = "malloc_tcmalloc", feature = "malloc_hoard", feature = "malloc_scalloc")))]
 pub use libc::{free, malloc_usable_size, calloc};
 
 

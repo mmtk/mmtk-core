@@ -25,6 +25,7 @@ enum_derive = "0.1"
 libc = "0.2"
 jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"] }
 mimalloc-sys = "0.1.6"
+hoard-sys = { path = "../hoard-sys" }
 lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
@@ -81,3 +82,4 @@ malloc_mimalloc = []
 malloc_jemalloc = []
 malloc_tcmalloc = []
 malloc_hoard = []
+malloc_scalloc = []
