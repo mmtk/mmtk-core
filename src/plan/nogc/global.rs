@@ -21,6 +21,8 @@ use enum_map::EnumMap;
 use std::sync::Arc;
 use crate::plan::global::PlanTypes;
 use crate::plan::global::PlanConstraints;
+use crate::scheduler::GCWorkerLocalPtr;
+use crate::scheduler::GCWorkerLocal;
 
 #[cfg(not(feature = "nogc_lock_free"))]
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
@@ -62,6 +64,12 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &NOGC_CONSTRAINTS
+    }
+
+    fn create_worker_local(&self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> GCWorkerLocalPtr {
+        let mut c = NoCopy::new(mmtk);
+        c.init(tls);
+        GCWorkerLocalPtr::new(c)
     }
 
     fn gc_init(

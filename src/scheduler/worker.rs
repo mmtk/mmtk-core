@@ -6,13 +6,31 @@ use crate::util::OpaquePointer;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Weak};
+use std::ffi::c_void;
+
+/// This struct will be accessed during trace_object(), which is performance critical.
+/// However, we do not know its concrete type as the plan and its copy context is dynamically selected.
+/// Instead use a void* type to store it, and during trace_object() we cast it to the correct copy context type.
+#[derive(Copy, Clone)]
+pub struct WorkerLocalPtr(*mut c_void);
+impl WorkerLocalPtr {
+    pub const UNINITIALIZED: Self = WorkerLocalPtr(std::ptr::null_mut());
+
+    pub fn new(worker_local: impl WorkerLocal) -> Self {
+        WorkerLocalPtr(Box::into_raw(Box::new(worker_local)) as *mut c_void)
+    }
+
+    pub unsafe fn as_type<W: WorkerLocal>(&self) -> &mut W {
+        &mut *(self.0 as *mut W)
+    }
+}
 
 pub struct Worker<C: Context> {
     pub tls: OpaquePointer,
     pub ordinal: usize,
     pub parked: AtomicBool,
     scheduler: Arc<Scheduler<C>>,
-    local: Option<C::WorkerLocal>,
+    local: WorkerLocalPtr,
     pub local_works: WorkBucket<C>,
     pub sender: Sender<CoordinatorMessage<C>>,
     pub stat: WorkerLocalStat,
@@ -32,7 +50,7 @@ impl<C: Context> Worker<C> {
             tls: OpaquePointer::UNINITIALIZED,
             ordinal,
             parked: AtomicBool::new(true),
-            local: None,
+            local: WorkerLocalPtr::UNINITIALIZED,
             local_works: WorkBucket::new(true, scheduler.worker_monitor.clone()),
             sender: scheduler.channel.0.clone(),
             scheduler,
@@ -55,8 +73,12 @@ impl<C: Context> Worker<C> {
     }
 
     #[inline]
-    pub fn local(&mut self) -> &mut C::WorkerLocal {
-        self.local.as_mut().unwrap()
+    pub unsafe fn local<W: WorkerLocal>(&mut self) -> &mut W {
+        self.local.as_type::<W>()
+    }
+
+    pub fn set_local(&mut self, local: WorkerLocalPtr) {
+        self.local = local;
     }
 
     pub fn init(&mut self, tls: OpaquePointer) {
@@ -69,9 +91,8 @@ impl<C: Context> Worker<C> {
 
     pub fn run(&mut self, context: &'static C) {
         self.context = Some(context);
-        self.local = Some(C::WorkerLocal::new(context));
-        let tls = self.tls;
-        self.local().init(tls);
+        // let tls = self.tls;
+        // self.local().init(tls);
         self.parked.store(false, Ordering::SeqCst);
         loop {
             let mut work = self.scheduler().poll(self);

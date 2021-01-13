@@ -21,19 +21,20 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
 impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for ScheduleCollection {}
 
 /// GC Preparation Work (include updating global states)
-pub struct Prepare<P: Plan> {
+pub struct Prepare<P: Plan, W: CopyContext + WorkerLocal> {
     pub plan: &'static P,
+    _p: PhantomData<W>,
 }
 
-unsafe impl<P: Plan> Sync for Prepare<P> {}
+unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for Prepare<P, W> {}
 
-impl<P: Plan> Prepare<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> Prepare<P, W> {
     pub fn new(plan: &'static P) -> Self {
-        Self { plan }
+        Self { plan, _p: PhantomData }
     }
 }
 
-impl<P: Plan> GCWork<P::VM> for Prepare<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Prepare<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Prepare Global");
         self.plan.prepare(worker.tls);
@@ -43,7 +44,7 @@ impl<P: Plan> GCWork<P::VM> for Prepare<P> {
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_works.add(PrepareCollector::default());
+            w.local_works.add(PrepareCollector::<W>(PhantomData));
         }
     }
 }
@@ -70,29 +71,30 @@ impl<VM: VMBinding> GCWork<VM> for PrepareMutator<VM> {
     }
 }
 
-#[derive(Default)]
-pub struct PrepareCollector;
+// #[derive(Default)]
+pub struct PrepareCollector<W: CopyContext + WorkerLocal>(PhantomData<W>);
 
-impl<VM: VMBinding> GCWork<VM> for PrepareCollector {
+impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for PrepareCollector<W> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Prepare Collector");
-        worker.local().prepare();
+        unsafe { worker.local::<W>() }.prepare();
     }
 }
 
-pub struct Release<P: Plan> {
+pub struct Release<P: Plan, W: CopyContext + WorkerLocal> {
     pub plan: &'static P,
+    _p: PhantomData<W>,
 }
 
-unsafe impl<P: Plan> Sync for Release<P> {}
+unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for Release<P, W> {}
 
-impl<P: Plan> Release<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> Release<P, W> {
     pub fn new(plan: &'static P) -> Self {
-        Self { plan }
+        Self { plan, _p: PhantomData }
     }
 }
 
-impl<P: Plan> GCWork<P::VM> for Release<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Release Global");
         self.plan.release(worker.tls);
@@ -102,7 +104,7 @@ impl<P: Plan> GCWork<P::VM> for Release<P> {
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_works.add(ReleaseCollector::default());
+            w.local_works.add(ReleaseCollector::<W>(PhantomData));
         }
         // TODO: Process weak references properly
         mmtk.reference_processors.clear();
@@ -130,13 +132,13 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseMutator<VM> {
     }
 }
 
-#[derive(Default)]
-pub struct ReleaseCollector;
+// #[derive(Default)]
+pub struct ReleaseCollector<W: CopyContext + WorkerLocal>(PhantomData<W>);
 
-impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
+impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for ReleaseCollector<W> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Release Collector");
-        worker.local().release();
+        unsafe { worker.local::<W>() }.release();
     }
 }
 

@@ -62,7 +62,7 @@ impl<VM: VMBinding> PlanTypes for SemiSpace<VM> {
     }    
 }
 
-pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
+pub(super) const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     gc_header_bits: 2,
     gc_header_words: 0,
@@ -75,6 +75,12 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &SS_CONSTRAINTS
+    }
+
+    fn create_worker_local(&self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> GCWorkerLocalPtr {
+        let mut c = SSCopyContext::new(mmtk);
+        c.init(tls);
+        GCWorkerLocalPtr::new(c)
     }
 
     fn gc_init(
@@ -97,9 +103,9 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
             .unconstrained_works
             .add(StopMutators::<SSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
-        scheduler.prepare_stage.add(Prepare::new(self));
+        scheduler.prepare_stage.add(Prepare::<Self, SSCopyContext<VM>>::new(self));
         // Release global/collectors/mutators
-        scheduler.release_stage.add(Release::new(self));
+        scheduler.release_stage.add(Release::<Self, SSCopyContext<VM>>::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.final_stage.add(ScheduleSanityGC);

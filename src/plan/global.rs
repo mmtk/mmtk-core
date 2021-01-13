@@ -37,8 +37,7 @@ use downcast_rs::Downcast;
 /// For non-copying GC, NoCopy can be used.
 pub trait CopyContext: 'static + Sync + Send {
     type VM: VMBinding;
-    const MAX_NON_LOS_COPY_BYTES: usize = MAX_INT;
-    fn new(mmtk: &'static MMTK<Self::VM>) -> Self;
+    fn constraints(&self) -> &'static PlanConstraints;
     fn init(&mut self, tls: OpaquePointer);
     fn prepare(&mut self);
     fn release(&mut self);
@@ -69,7 +68,7 @@ pub trait CopyContext: 'static + Sync + Send {
             bytes,
             align,
             Self::VM::MIN_ALIGNMENT,
-        ) > Self::MAX_NON_LOS_COPY_BYTES;
+        ) > self.constraints().max_non_los_copy_bytes;
         if large {
             AllocationSemantics::Los
         } else {
@@ -82,10 +81,9 @@ pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
 
 impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     type VM = VM;
-    fn new(_mmtk: &'static MMTK<Self::VM>) -> Self {
-        Self(PhantomData)
-    }
+    
     fn init(&mut self, _tls: OpaquePointer) {}
+    fn constraints(&self) -> &'static PlanConstraints { unreachable!() }
     fn prepare(&mut self) {}
     fn release(&mut self) {}
     fn alloc_copy(
@@ -100,10 +98,13 @@ impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     }
 }
 
-impl<VM: VMBinding> WorkerLocal<MMTK<VM>> for NoCopy<VM> {
-    fn new(mmtk: &'static MMTK<VM>) -> Self {
-        CopyContext::new(mmtk)
+impl<VM: VMBinding> NoCopy<VM> {
+    pub fn new(_mmtk: &'static MMTK<VM>) -> Self {
+        Self(PhantomData)
     }
+}
+
+impl<VM: VMBinding> WorkerLocal for NoCopy<VM> {
     fn init(&mut self, tls: OpaquePointer) {
         CopyContext::init(self, tls);
     }
@@ -134,6 +135,7 @@ pub struct PlanConstraints {
     pub gc_header_bits: usize,
     pub gc_header_words: usize,
     pub num_specialized_scans: usize,
+    pub max_non_los_copy_bytes: usize,
     // unused for now
     pub needs_log_bit_in_header: bool,
     pub needs_log_bit_in_header_num: usize,
@@ -146,6 +148,7 @@ impl PlanConstraints {
             gc_header_bits: 0,
             gc_header_words: 0,
             num_specialized_scans: 0,
+            max_non_los_copy_bytes: usize::MAX,
             needs_log_bit_in_header: false,
             needs_log_bit_in_header_num: 0,
         }
@@ -179,6 +182,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
     type VM: VMBinding;
 
     fn constraints(&self) -> &'static PlanConstraints;
+    fn create_worker_local(&self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> GCWorkerLocalPtr;
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
     #[cfg(feature = "sanity")]
@@ -244,10 +248,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
     fn prepare(&self, tls: OpaquePointer);
     fn release(&self, tls: OpaquePointer);
 
-    fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool 
-    where
-        Self: Sized,
-    {
+    fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
         if self.collection_required(space_full, space) {
             // FIXME
             /*if space == META_DATA_SPACE {
@@ -292,10 +293,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
-    where
-        Self: Sized,
-    {
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool {
         let stress_force_gc = self.stress_test_gc_required();
         debug!(
             "self.get_pages_reserved()={}, self.get_total_pages()={}",

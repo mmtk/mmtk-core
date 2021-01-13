@@ -8,6 +8,7 @@ use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::plan::Plan;
+use crate::plan::global::PlanConstraints;
 use crate::scheduler::WorkerLocal;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
@@ -19,11 +20,9 @@ pub struct SSCopyContext<VM: VMBinding> {
 
 impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
     type VM = VM;
-    fn new(mmtk: &'static MMTK<Self::VM>) -> Self {
-        Self {
-            plan: &mmtk.plan.downcast_ref::<SemiSpace<VM>>().unwrap(),
-            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
-        }
+
+    fn constraints(&self) -> &'static PlanConstraints {
+        &super::global::SS_CONSTRAINTS
     }
     fn init(&mut self, tls: OpaquePointer) {
         self.ss.tls = tls;
@@ -57,10 +56,16 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
     }
 }
 
-impl<VM: VMBinding> WorkerLocal<MMTK<VM>> for SSCopyContext<VM> {
-    fn new(mmtk: &'static MMTK<VM>) -> Self {
-        CopyContext::new(mmtk)
+impl<VM: VMBinding> SSCopyContext<VM> {
+    pub fn new(mmtk: &'static MMTK<VM>) -> Self {
+        Self {
+            plan: &mmtk.plan.downcast_ref::<SemiSpace<VM>>().unwrap(),
+            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
+        }
     }
+}
+
+impl<VM: VMBinding> WorkerLocal for SSCopyContext<VM> {
     fn init(&mut self, tls: OpaquePointer) {
         CopyContext::init(self, tls);
     }
@@ -95,21 +100,21 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
             return object;
         }
         if self.ss().tospace().in_space(object) {
-            self.ss().tospace().trace_object(
+            self.ss().tospace().trace_object::<Self, SSCopyContext<VM>>(
                 self,
                 object,
                 super::global::ALLOC_SS,
-                self.worker().local(),
+                unsafe { self.worker().local::<SSCopyContext<VM>>() },
             )
         } else if self.ss().fromspace().in_space(object) {
-            self.ss().fromspace().trace_object(
+            self.ss().fromspace().trace_object::<Self, SSCopyContext<VM>>(
                 self,
                 object,
                 super::global::ALLOC_SS,
-                self.worker().local(),
+                unsafe { self.worker().local::<SSCopyContext<VM>>() },
             )
         } else {
-            self.ss().common.trace_object(self, object)
+            self.ss().common.trace_object::<Self, SSCopyContext<VM>>(self, object)
         }
     }
 }

@@ -9,6 +9,7 @@ use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::*;
 use crate::MMTK;
 use crate::scheduler::WorkerLocal;
+use crate::plan::global::PlanConstraints;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
@@ -19,11 +20,9 @@ pub struct GenCopyCopyContext<VM: VMBinding> {
 
 impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
     type VM = VM;
-    fn new(mmtk: &'static MMTK<Self::VM>) -> Self {
-        Self {
-            plan: unsafe { &*(&mmtk.plan as *const _ as *const GenCopy<VM>) },
-            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
-        }
+
+    fn constraints(&self) -> &'static PlanConstraints {
+        &super::global::GENCOPY_CONSTRAINTS
     }
     fn init(&mut self, tls: OpaquePointer) {
         self.ss.tls = tls;
@@ -58,10 +57,16 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
     }
 }
 
-impl<VM: VMBinding> WorkerLocal<MMTK<VM>> for GenCopyCopyContext<VM> {
-    fn new(mmtk: &'static MMTK<VM>) -> Self {
-        CopyContext::new(mmtk)
+impl<VM: VMBinding> GenCopyCopyContext<VM> {
+    pub fn new(mmtk: &'static MMTK<VM>) -> Self {
+        Self {
+            plan: unsafe { &*(&mmtk.plan as *const _ as *const GenCopy<VM>) },
+            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
+        }
     }
+}
+
+impl<VM: VMBinding> WorkerLocal for GenCopyCopyContext<VM> {
     fn init(&mut self, tls: OpaquePointer) {
         CopyContext::init(self, tls);
     }
@@ -97,11 +102,11 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
         }
         // Evacuate nursery objects
         if self.gencopy().nursery.in_space(object) {
-            return self.gencopy().nursery.trace_object(
+            return self.gencopy().nursery.trace_object::<Self, GenCopyCopyContext<VM>>(
                 self,
                 object,
                 super::global::ALLOC_SS,
-                self.worker().local(),
+                unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
             );
         }
         debug_assert!(!self.gencopy().fromspace().in_space(object));
@@ -161,31 +166,31 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
         }
         // Evacuate nursery objects
         if self.gencopy().nursery.in_space(object) {
-            return self.gencopy().nursery.trace_object(
+            return self.gencopy().nursery.trace_object::<Self, GenCopyCopyContext<VM>>(
                 self,
                 object,
                 super::global::ALLOC_SS,
-                self.worker().local(),
+                unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
             );
         }
         // Evacuate mature objects
         if self.gencopy().tospace().in_space(object) {
-            return self.gencopy().tospace().trace_object(
+            return self.gencopy().tospace().trace_object::<Self, GenCopyCopyContext<VM>>(
                 self,
                 object,
                 super::global::ALLOC_SS,
-                self.worker().local(),
+                unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
             );
         }
         if self.gencopy().fromspace().in_space(object) {
-            return self.gencopy().fromspace().trace_object(
+            return self.gencopy().fromspace().trace_object::<Self, GenCopyCopyContext<VM>>(
                 self,
                 object,
                 super::global::ALLOC_SS,
-                self.worker().local(),
+                unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
             );
         }
-        self.gencopy().common.trace_object(self, object)
+        self.gencopy().common.trace_object::<Self, GenCopyCopyContext<VM>>(self, object)
     }
 }
 

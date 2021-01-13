@@ -161,6 +161,7 @@ pub fn start_worker<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
 ) {
     worker.init(tls);
+    worker.set_local(mmtk.plan.create_worker_local(tls, mmtk));
     worker.run(mmtk);
 }
 
