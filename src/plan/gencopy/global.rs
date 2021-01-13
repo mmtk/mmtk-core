@@ -162,7 +162,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 }
 
 impl<VM: VMBinding> GenCopy<VM> {
-    fn new(
+    pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,

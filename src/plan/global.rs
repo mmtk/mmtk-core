@@ -136,7 +136,11 @@ impl PlanConstraints {
 }
 
 pub fn create_mutator<VM: VMBinding>(tls: OpaquePointer, mmtk: &'static MMTK<VM>) -> Box<Mutator<VM>> {
-    unimplemented!()
+    Box::new(match mmtk.options.plan {
+        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, &*mmtk.plan),
+        PlanSelector::SemiSpace => crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan),
+        PlanSelector::GenCopy => crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
+    })
 }
 
 pub fn create_plan<VM: VMBinding>(
@@ -144,13 +148,12 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
-    _scheduler: &'static MMTkScheduler<VM>) -> Box<dyn Plan<VM=VM>> {
-    use crate::plan::nogc::NoGC;
-    let plan = match plan {
-        PlanSelector::NoGC => NoGC::new(vm_map, mmapper, options, _scheduler),
-        _ => unimplemented!()
-    };
-    Box::new(plan)
+    scheduler: &'static MMTkScheduler<VM>) -> Box<dyn Plan<VM=VM>> {
+    match plan {
+        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options, scheduler)),
+        PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(vm_map, mmapper, options, scheduler)),
+        PlanSelector::GenCopy => Box::new(crate::plan::gencopy::GenCopy::new(vm_map, mmapper, options, scheduler)),
+    }
 }
 
 /// A plan describes the global core functionality for all memory management schemes.
