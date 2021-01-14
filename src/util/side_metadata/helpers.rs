@@ -32,7 +32,6 @@ pub(super) fn address_to_meta_address(addr: Address, metadata_id: SideMetadataID
     let offset = (addr.as_usize() >> METADATA_SINGLETON.align[metadata_id.as_usize()])
         >> ((constants::LOG_BITS_IN_BYTE as usize) - bits_num_log);
 
-    // info!("address_to_meta_address({}, {}).offset => 0x{:x}", addr, metadata_id.as_usize(), offset);
     METADATA_SINGLETON.meta_base_addr_vec[metadata_id.as_usize()] + offset
 }
 
@@ -174,4 +173,17 @@ pub(super) fn meta_byte_lshift(addr: Address, metadata_id: SideMetadataID) -> us
     let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.as_usize()];
     ((addr.as_usize() >> constants::LOG_BYTES_IN_WORD) % (constants::BITS_IN_BYTE >> bits_num_log))
         << bits_num_log
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::util::side_metadata::helpers::*;
+
+    #[test]
+    fn test_side_metadata_helpers_round_up_to_page_size() {
+        assert_eq!(round_up_to_page_size(1), META_SPACE_PAGE_SIZE);
+        assert_eq!(round_up_to_page_size(META_SPACE_PAGE_SIZE - 1), META_SPACE_PAGE_SIZE);
+        assert_eq!(round_up_to_page_size(META_SPACE_PAGE_SIZE), META_SPACE_PAGE_SIZE);
+        assert_eq!(round_up_to_page_size(META_SPACE_PAGE_SIZE + 1), META_SPACE_PAGE_SIZE << 1);
+    }
 }
