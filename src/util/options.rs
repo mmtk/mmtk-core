@@ -14,7 +14,7 @@ custom_derive! {
 }
 
 custom_derive! {
-    #[derive(Copy, Clone, EnumFromStr)]
+    #[derive(Copy, Clone, EnumFromStr, Debug)]
     pub enum PlanSelector {
         NoGC,
         SemiSpace,

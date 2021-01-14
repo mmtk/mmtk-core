@@ -96,7 +96,7 @@ impl<VM: VMBinding> Allocators<VM> {
 //   LargeObject,
 // }
 #[repr(C, u8)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum AllocatorSelector {
     BumpPointer(u8),
     LargeObject(u8),
