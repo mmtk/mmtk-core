@@ -87,8 +87,8 @@ impl<VM: VMBinding> GenCopyNurseryProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
     type VM = VM;
-    fn new(edges: Vec<Address>, _roots: bool) -> Self {
-        let base = ProcessEdgesBase::new(edges);
+    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<GenCopy<VM>>().unwrap();
         Self {
             base,
@@ -151,8 +151,8 @@ impl<VM: VMBinding> GenCopyMatureProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
     type VM = VM;
-    fn new(edges: Vec<Address>, _roots: bool) -> Self {
-        let base = ProcessEdgesBase::new(edges);
+    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<GenCopy<VM>>().unwrap();
         Self {
             base,
@@ -228,7 +228,7 @@ impl<VM: VMBinding> GCWork<VM> for GenCopyProcessModBuf {
             worker
                 .scheduler()
                 .closure_stage
-                .add(GenCopyNurseryProcessEdges::<VM>::new(modified_edges, true));
+                .add(GenCopyNurseryProcessEdges::<VM>::new(modified_edges, true, mmtk));
         } else {
             // Do nothing
         }

@@ -274,7 +274,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
 pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
     pub edges: Vec<Address>,
     pub nodes: Vec<ObjectReference>,
-    pub mmtk: Option<&'static MMTK<E::VM>>,
+    mmtk: &'static MMTK<E::VM>,
     // Use raw pointer for fast pointer dereferencing, instead of using `Option<&'static mut GCWorker<E::VM>>`.
     // Because a copying gc will dereference this pointer at least once for every object copy.
     worker: *mut GCWorker<E::VM>,
@@ -283,22 +283,26 @@ pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
 unsafe impl<E: ProcessEdgesWork> Sync for ProcessEdgesBase<E> {}
 unsafe impl<E: ProcessEdgesWork> Send for ProcessEdgesBase<E> {}
 
-impl<E: ProcessEdgesWork> Default for ProcessEdgesBase<E> {
-    fn default() -> Self {
-        Self {
-            edges: vec![],
-            nodes: vec![],
-            mmtk: None,
-            worker: 0 as _,
-        }
-    }
-}
+// impl<E: ProcessEdgesWork> Default for ProcessEdgesBase<E> {
+//     fn default() -> Self {
+//         Self {
+//             edges: vec![],
+//             nodes: vec![],
+//             mmtk: None,
+//             worker: 0 as _,
+//         }
+//     }
+// }
 
 impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
-    pub fn new(edges: Vec<Address>) -> Self {
+    // Requires an MMTk reference. Each plan-specific type that uses ProcessEdgesBase can get a static plan reference
+    // at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.
+    pub fn new(edges: Vec<Address>, mmtk: &'static MMTK<E::VM>) -> Self {
         Self {
             edges,
-            ..Self::default()
+            nodes: vec![],
+            mmtk,
+            worker: std::ptr::null_mut(),
         }
     }
     pub fn set_worker(&mut self, worker: &mut GCWorker<E::VM>) {
@@ -310,11 +314,11 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
     }
     #[inline]
     pub fn mmtk(&self) -> &'static MMTK<E::VM> {
-        self.mmtk.unwrap()
+        self.mmtk
     }
     #[inline]
     pub fn plan(&self) -> &'static dyn Plan<VM=E::VM> {
-        &*self.mmtk.unwrap().plan
+        &*self.mmtk.plan
     }
 }
 
@@ -326,7 +330,7 @@ pub trait ProcessEdgesWork:
     const CAPACITY: usize = 4096;
     const OVERWRITE_REFERENCE: bool = true;
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
-    fn new(edges: Vec<Address>, roots: bool) -> Self;
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<Self::VM>) -> Self;
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 
     #[inline]
@@ -355,7 +359,6 @@ pub trait ProcessEdgesWork:
             self.worker().do_work(scan_objects_work);
         } else {
             self.mmtk
-                .unwrap()
                 .scheduler
                 .closure_stage
                 .add(scan_objects_work);
@@ -383,7 +386,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     #[inline]
     default fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessEdgesWork");
-        self.mmtk = Some(mmtk);
         self.set_worker(worker);
         self.process_edges();
         if !self.nodes.is_empty() {
@@ -452,7 +454,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             worker
                 .scheduler()
                 .closure_stage
-                .add(E::new(modified_edges, true));
+                .add(E::new(modified_edges, true, mmtk));
         } else {
             // Do nothing
         }
