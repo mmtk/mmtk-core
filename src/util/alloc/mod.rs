@@ -7,7 +7,6 @@ pub mod embedded_meta_data;
 pub mod large_object_allocator;
 pub mod linear_scan;
 pub mod tcmalloc;
-pub mod scalloc;
 
 pub use self::allocator::Allocator;
 pub use self::bumpallocator::BumpAllocator;

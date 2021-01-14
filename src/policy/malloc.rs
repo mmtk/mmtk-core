@@ -9,7 +9,6 @@ use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use crate::util::conversions;
 use crate::util::alloc::tcmalloc;
-use crate::util::alloc::scalloc;
 
 use atomic::Ordering;
 // Import calloc, free, and malloc_usable_size from the library specified in Cargo.toml:45
@@ -22,13 +21,13 @@ pub use mimalloc_sys::{mi_free as free, mi_malloc_usable_size as malloc_usable_s
 #[cfg(feature = "malloc_tcmalloc")]
 pub use tcmalloc::{TCMallocInternalCalloc as calloc, TCMallocInternalMallocSize as malloc_usable_size, TCMallocInternalFree as free};
 
-//To use hoard, export LD_LIBRARY_PATH=/home/paiger/hoard-sys/Hoard-3.13/src
-//Not sure how to do this otherwise
+// export LD_LIBRARY_PATH=/home/paiger/hoard-sys/target/debug/build/hoard-sys-eb210b0bc9a5ccf1/out/Hoard/src
 #[cfg(feature = "malloc_hoard")]
 pub use hoard_sys::{free, malloc_usable_size, calloc};
 
+// export LD_LIBRARY_PATH=/home/paiger/scalloc-sys/scalloc/out/Release/lib.target
 #[cfg(feature = "malloc_scalloc")]
-pub use scalloc::{free, malloc_usable_size, calloc};
+pub use scalloc_sys::{free, malloc_usable_size, calloc};
 
 #[cfg(not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc", feature = "malloc_tcmalloc", feature = "malloc_hoard", feature = "malloc_scalloc")))]
 pub use libc::{free, malloc_usable_size, calloc};
