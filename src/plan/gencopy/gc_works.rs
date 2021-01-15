@@ -60,7 +60,7 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
 impl<VM: VMBinding> GenCopyCopyContext<VM> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
-            plan: unsafe { &*(&mmtk.plan as *const _ as *const GenCopy<VM>) },
+            plan: &mmtk.plan.downcast_ref::<GenCopy<VM>>().unwrap(),
             ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
         }
     }
