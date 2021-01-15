@@ -88,7 +88,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         scheduler.release_stage.add(Release::<Self, SSCopyContext<VM>>::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.final_stage.add(ScheduleSanityGC);
+        scheduler.final_stage.add(ScheduleSanityGC::<SemiSpace<VM>, SSCopyContext<VM>>::new());
         scheduler.set_finalizer(Some(EndOfGC));
     }
 

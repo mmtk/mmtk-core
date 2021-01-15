@@ -110,7 +110,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         scheduler.release_stage.add(Release::<Self, GenCopyCopyContext<VM>>::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.final_stage.add(ScheduleSanityGC);
+        scheduler.final_stage.add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new());
         scheduler.set_finalizer(Some(EndOfGC));
     }
 

@@ -44,7 +44,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Prepare<P, W> {
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_works.add(PrepareCollector::<W>(PhantomData));
+            w.local_works.add(PrepareCollector::<W>::new());
         }
     }
 }
@@ -73,6 +73,12 @@ impl<VM: VMBinding> GCWork<VM> for PrepareMutator<VM> {
 
 // #[derive(Default)]
 pub struct PrepareCollector<W: CopyContext + WorkerLocal>(PhantomData<W>);
+
+impl<W: CopyContext + WorkerLocal> PrepareCollector<W> {
+    pub fn new() -> Self {
+        PrepareCollector(PhantomData)
+    }
+}
 
 impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for PrepareCollector<W> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
@@ -134,6 +140,12 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseMutator<VM> {
 
 // #[derive(Default)]
 pub struct ReleaseCollector<W: CopyContext + WorkerLocal>(PhantomData<W>);
+
+impl<W: CopyContext + WorkerLocal> ReleaseCollector<W> {
+    pub fn new() -> Self {
+        ReleaseCollector(PhantomData)
+    }
+}
 
 impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for ReleaseCollector<W> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {

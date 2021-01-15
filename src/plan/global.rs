@@ -168,23 +168,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
     fn create_worker_local(&self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> GCWorkerLocalPtr;
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
-    #[cfg(feature = "sanity")]
-    fn schedule_sanity_collection(&'static self, scheduler: &MMTkScheduler<Self::VM>) {
-        self.base().inside_sanity.store(true, Ordering::SeqCst);
-        // Stop & scan mutators (mutator scanning can happen before STW)
-        for mutator in <Self::VM as VMBinding>::VMActivePlan::mutators() {
-            scheduler
-                .prepare_stage
-                .add(ScanStackRoot::<SanityGCProcessEdges<Self::VM>>(mutator));
-        }
-        scheduler
-            .prepare_stage
-            .add(ScanVMSpecificRoots::<SanityGCProcessEdges<Self::VM>>::new());
-        // Prepare global/collectors/mutators
-        scheduler.prepare_stage.add(SanityPrepare::new(self));
-        // Release global/collectors/mutators
-        scheduler.release_stage.add(SanityRelease::new(self));
-    }
+
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
@@ -418,6 +402,7 @@ pub fn create_vm_space<VM: VMBinding>(
     mmapper: &'static Mmapper,
     heap: &mut HeapMeta,
     boot_segment_bytes: usize,
+    constraints: &'static PlanConstraints,
 ) -> ImmortalSpace<VM> {
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
@@ -433,6 +418,7 @@ pub fn create_vm_space<VM: VMBinding>(
         vm_map,
         mmapper,
         heap,
+        constraints,
     )
 }
 
@@ -443,6 +429,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
+        constraints: &'static PlanConstraints,
     ) -> BasePlan<VM> {
         BasePlan {
             #[cfg(feature = "base_spaces")]
@@ -455,6 +442,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     vm_map,
                     mmapper,
                     &mut heap,
+                    constraints,
                 ),
                 #[cfg(feature = "ro_space")]
                 ro_space: ImmortalSpace::new(
@@ -464,9 +452,10 @@ impl<VM: VMBinding> BasePlan<VM> {
                     vm_map,
                     mmapper,
                     &mut heap,
+                    constraints,
                 ),
                 #[cfg(feature = "vm_space")]
-                vm_space: create_vm_space(vm_map, mmapper, &mut heap, options.vm_space_size),
+                vm_space: create_vm_space(vm_map, mmapper, &mut heap, options.vm_space_size, constraints),
             }),
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),
@@ -563,7 +552,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             {
                 if unsync.code_space.in_space(_object) {
                     trace!("trace_object: object in code space");
-                    return unsync.code_space.trace_object::<T, C>(_trace, _object);
+                    return unsync.code_space.trace_object::<T>(_trace, _object);
                 }
             }
 
@@ -726,7 +715,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     constraints,
                 ),
             }),
-            base: BasePlan::new(vm_map, mmapper, options, heap),
+            base: BasePlan::new(vm_map, mmapper, options, heap, constraints),
         }
     }
 
