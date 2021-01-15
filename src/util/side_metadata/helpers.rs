@@ -163,7 +163,7 @@ pub(super) fn round_up_to_page_size(size: usize) -> usize {
         size
     } else {
         // round-up the size to page size
-        ((size >> constants::LOG_BYTES_IN_PAGE) + 1) << constants::LOG_BITS_IN_PAGE
+        ((size >> constants::LOG_BYTES_IN_PAGE) + 1) << constants::LOG_BYTES_IN_PAGE
     }
 }
 
