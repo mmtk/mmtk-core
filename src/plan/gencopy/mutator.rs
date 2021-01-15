@@ -13,17 +13,11 @@ use crate::MMTK;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn gencopy_mutator_prepare<VM: VMBinding>(
-    _mutator: &mut Mutator<VM>,
-    _tls: OpaquePointer,
-) {
+pub fn gencopy_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
     // Do nothing
 }
 
-pub fn gencopy_mutator_release<VM: VMBinding>(
-    mutator: &mut Mutator<VM>,
-    _tls: OpaquePointer,
-) {
+pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
     // reset nursery allocator
     let bump_allocator = unsafe {
         mutator
@@ -56,10 +50,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
                 AllocatorSelector::BumpPointer(1),
                 gencopy.common.get_immortal(),
             ),
-            (
-                AllocatorSelector::LargeObject(0),
-                gencopy.common.get_los(),
-            ),
+            (AllocatorSelector::LargeObject(0), gencopy.common.get_los()),
         ],
         prepare_func: &gencopy_mutator_prepare,
         release_func: &gencopy_mutator_release,

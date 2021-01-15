@@ -8,12 +8,12 @@ use crate::util::ObjectReference;
 use crate::plan::TransitiveClosure;
 use crate::util::header_byte::HeaderByte;
 
+use crate::plan::global::PlanConstraints;
 use crate::policy::space::SpaceOptions;
 use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
-use crate::plan::global::PlanConstraints;
 use std::cell::UnsafeCell;
 
 pub struct ImmortalSpace<VM: VMBinding> {
@@ -89,7 +89,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        constraints: &'static PlanConstraints
+        constraints: &'static PlanConstraints,
     ) -> Self {
         let common = CommonSpace::new(
             SpaceOptions {

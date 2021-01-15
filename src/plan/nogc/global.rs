@@ -1,9 +1,12 @@
 use crate::mmtk::MMTK;
+use crate::plan::global::PlanConstraints;
 use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::policy::space::Space;
+use crate::scheduler::GCWorkerLocal;
+use crate::scheduler::GCWorkerLocalPtr;
 use crate::scheduler::MMTkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -17,9 +20,6 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
-use crate::plan::global::PlanConstraints;
-use crate::scheduler::GCWorkerLocalPtr;
-use crate::scheduler::GCWorkerLocal;
 
 #[cfg(not(feature = "nogc_lock_free"))]
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
@@ -42,7 +42,11 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &NOGC_CONSTRAINTS
     }
 
-    fn create_worker_local(&self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> GCWorkerLocalPtr {
+    fn create_worker_local(
+        &self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> GCWorkerLocalPtr {
         let mut c = NoCopy::new(mmtk);
         c.init(tls);
         GCWorkerLocalPtr::new(c)

@@ -1,6 +1,7 @@
 use super::controller_collector_context::ControllerCollectorContext;
 use crate::mmtk::MMTK;
 use crate::plan::transitive_closure::TransitiveClosure;
+use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
@@ -12,19 +13,18 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
+use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use crate::plan::Mutator;
-use crate::util::options::PlanSelector;
-use downcast_rs::Downcast;
 
 /// A GC worker's context for copying GCs.
 /// Each GC plan should provide their implementation of a CopyContext.
@@ -75,9 +75,11 @@ pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
 
 impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     type VM = VM;
-    
+
     fn init(&mut self, _tls: OpaquePointer) {}
-    fn constraints(&self) -> &'static PlanConstraints { unreachable!() }
+    fn constraints(&self) -> &'static PlanConstraints {
+        unreachable!()
+    }
     fn prepare(&mut self) {}
     fn release(&mut self) {}
     fn alloc_copy(
@@ -129,10 +131,15 @@ impl PlanConstraints {
     }
 }
 
-pub fn create_mutator<VM: VMBinding>(tls: OpaquePointer, mmtk: &'static MMTK<VM>) -> Box<Mutator<VM>> {
+pub fn create_mutator<VM: VMBinding>(
+    tls: OpaquePointer,
+    mmtk: &'static MMTK<VM>,
+) -> Box<Mutator<VM>> {
     Box::new(match mmtk.options.plan {
         PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, &*mmtk.plan),
-        PlanSelector::SemiSpace => crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan),
+        PlanSelector::SemiSpace => {
+            crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
+        }
         PlanSelector::GenCopy => crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
     })
 }
@@ -142,11 +149,18 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
-    scheduler: &'static MMTkScheduler<VM>) -> Box<dyn Plan<VM=VM>> {
+    scheduler: &'static MMTkScheduler<VM>,
+) -> Box<dyn Plan<VM = VM>> {
     match plan {
-        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options, scheduler)),
-        PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(vm_map, mmapper, options, scheduler)),
-        PlanSelector::GenCopy => Box::new(crate::plan::gencopy::GenCopy::new(vm_map, mmapper, options, scheduler)),
+        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(
+            vm_map, mmapper, options, scheduler,
+        )),
+        PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
+            vm_map, mmapper, options, scheduler,
+        )),
+        PlanSelector::GenCopy => Box::new(crate::plan::gencopy::GenCopy::new(
+            vm_map, mmapper, options, scheduler,
+        )),
     }
 }
 
@@ -159,7 +173,11 @@ pub trait Plan: 'static + Sync + Send + Downcast {
     type VM: VMBinding;
 
     fn constraints(&self) -> &'static PlanConstraints;
-    fn create_worker_local(&self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> GCWorkerLocalPtr;
+    fn create_worker_local(
+        &self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> GCWorkerLocalPtr;
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
 
@@ -451,7 +469,13 @@ impl<VM: VMBinding> BasePlan<VM> {
                     constraints,
                 ),
                 #[cfg(feature = "vm_space")]
-                vm_space: create_vm_space(vm_map, mmapper, &mut heap, options.vm_space_size, constraints),
+                vm_space: create_vm_space(
+                    vm_map,
+                    mmapper,
+                    &mut heap,
+                    options.vm_space_size,
+                    constraints,
+                ),
             }),
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),

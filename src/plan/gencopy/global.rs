@@ -4,6 +4,7 @@ use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
+use crate::plan::global::PlanConstraints;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
@@ -22,7 +23,6 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::*;
-use crate::plan::global::PlanConstraints;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -57,11 +57,15 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &GENCOPY_CONSTRAINTS
     }
 
-    fn create_worker_local(&self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> GCWorkerLocalPtr {
+    fn create_worker_local(
+        &self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> GCWorkerLocalPtr {
         let mut c = GenCopyCopyContext::new(mmtk);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
-    }  
+    }
 
     fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
     where
@@ -101,12 +105,18 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                 .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
         }
         // Prepare global/collectors/mutators
-        scheduler.prepare_stage.add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
+        scheduler
+            .prepare_stage
+            .add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
         // Release global/collectors/mutators
-        scheduler.release_stage.add(Release::<Self, GenCopyCopyContext<VM>>::new(self));
+        scheduler
+            .release_stage
+            .add(Release::<Self, GenCopyCopyContext<VM>>::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.final_stage.add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new());
+        scheduler
+            .final_stage
+            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new());
         scheduler.set_finalizer(Some(EndOfGC));
     }
 

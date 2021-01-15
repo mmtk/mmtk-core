@@ -3,6 +3,7 @@ use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
+use crate::plan::global::PlanConstraints;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -23,7 +24,6 @@ use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use crate::plan::global::PlanConstraints;
 
 use enum_map::EnumMap;
 
@@ -53,7 +53,11 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &SS_CONSTRAINTS
     }
 
-    fn create_worker_local(&self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>) -> GCWorkerLocalPtr {
+    fn create_worker_local(
+        &self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> GCWorkerLocalPtr {
         let mut c = SSCopyContext::new(mmtk);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
@@ -79,12 +83,18 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
             .unconstrained_works
             .add(StopMutators::<SSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
-        scheduler.prepare_stage.add(Prepare::<Self, SSCopyContext<VM>>::new(self));
+        scheduler
+            .prepare_stage
+            .add(Prepare::<Self, SSCopyContext<VM>>::new(self));
         // Release global/collectors/mutators
-        scheduler.release_stage.add(Release::<Self, SSCopyContext<VM>>::new(self));
+        scheduler
+            .release_stage
+            .add(Release::<Self, SSCopyContext<VM>>::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.final_stage.add(ScheduleSanityGC::<SemiSpace<VM>, SSCopyContext<VM>>::new());
+        scheduler
+            .final_stage
+            .add(ScheduleSanityGC::<SemiSpace<VM>, SSCopyContext<VM>>::new());
         scheduler.set_finalizer(Some(EndOfGC));
     }
 

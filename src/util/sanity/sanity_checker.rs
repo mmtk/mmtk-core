@@ -1,3 +1,4 @@
+use crate::plan::global::CopyContext;
 use crate::plan::Plan;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
@@ -7,7 +8,6 @@ use crate::MMTK;
 use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-use crate::plan::global::CopyContext;
 use std::sync::atomic::Ordering;
 
 #[allow(dead_code)]
@@ -38,11 +38,13 @@ impl<P: Plan, W: CopyContext + WorkerLocal> ScheduleSanityGC<P, W> {
     }
 }
 
-impl<VM: VMBinding, P: Plan<VM=VM>, W: CopyContext + WorkerLocal> GCWork<VM> for ScheduleSanityGC<P, W> {
+impl<VM: VMBinding, P: Plan<VM = VM>, W: CopyContext + WorkerLocal> GCWork<VM>
+    for ScheduleSanityGC<P, W>
+{
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let scheduler = worker.scheduler();
         let plan = &mmtk.plan;
-        
+
         scheduler.reset_state();
 
         plan.base().inside_sanity.store(true, Ordering::SeqCst);
@@ -56,9 +58,19 @@ impl<VM: VMBinding, P: Plan<VM=VM>, W: CopyContext + WorkerLocal> GCWork<VM> for
             .prepare_stage
             .add(ScanVMSpecificRoots::<SanityGCProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
-        worker.scheduler().prepare_stage.add(SanityPrepare::<P, W>::new(plan.downcast_ref::<P>().unwrap()));
+        worker
+            .scheduler()
+            .prepare_stage
+            .add(SanityPrepare::<P, W>::new(
+                plan.downcast_ref::<P>().unwrap(),
+            ));
         // Release global/collectors/mutators
-        worker.scheduler().release_stage.add(SanityRelease::<P, W>::new(plan.downcast_ref::<P>().unwrap()));
+        worker
+            .scheduler()
+            .release_stage
+            .add(SanityRelease::<P, W>::new(
+                plan.downcast_ref::<P>().unwrap(),
+            ));
     }
 }
 
@@ -71,7 +83,10 @@ unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for SanityPrepare<P, W> 
 
 impl<P: Plan, W: CopyContext + WorkerLocal> SanityPrepare<P, W> {
     pub fn new(plan: &'static P) -> Self {
-        Self { plan, _p: PhantomData }
+        Self {
+            plan,
+            _p: PhantomData,
+        }
     }
 }
 
@@ -102,7 +117,10 @@ unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for SanityRelease<P, W> 
 
 impl<P: Plan, W: CopyContext + WorkerLocal> SanityRelease<P, W> {
     pub fn new(plan: &'static P) -> Self {
-        Self { plan, _p: PhantomData }
+        Self {
+            plan,
+            _p: PhantomData,
+        }
     }
 }
 

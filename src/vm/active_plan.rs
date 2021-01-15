@@ -1,10 +1,10 @@
+use crate::plan::Mutator;
 use crate::plan::Plan;
 use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 use std::sync::MutexGuard;
-use crate::plan::Mutator;
 
 pub struct SynchronizedMutatorIterator<'a, VM: VMBinding> {
     _guard: MutexGuard<'a, ()>,
@@ -30,7 +30,7 @@ pub trait ActivePlan<VM: VMBinding> {
     // TODO: I don't know how this can be implemented when we have multiple MMTk instances.
     // This function is used by space and phase to refer to the current plan.
     // Possibly we should remove the use of this function, and remove this function?
-    fn global() -> &'static dyn Plan<VM=VM>;
+    fn global() -> &'static dyn Plan<VM = VM>;
 
     /// Return a `GCWorker` reference for the thread.
     ///

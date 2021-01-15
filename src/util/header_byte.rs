@@ -1,8 +1,8 @@
 // use crate::plan::SelectedConstraints;
+use crate::plan::global::PlanConstraints;
 use crate::util::gc_byte;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
-use crate::plan::global::PlanConstraints;
 
 pub const TOTAL_BITS: usize = 8;
 // pub const NEEDS_UNLOGGED_BIT: bool = SelectedConstraints::NEEDS_LOG_BIT_IN_HEADER;
@@ -29,11 +29,17 @@ impl HeaderByte {
     }
 
     pub fn mark_as_unlogged<VM: VMBinding>(&self, object: ObjectReference) {
-        gc_byte::write_gc_byte::<VM>(object, gc_byte::read_gc_byte::<VM>(object) | self.unlogged_bit);
+        gc_byte::write_gc_byte::<VM>(
+            object,
+            gc_byte::read_gc_byte::<VM>(object) | self.unlogged_bit,
+        );
     }
 
     pub fn mark_as_logged<VM: VMBinding>(&self, object: ObjectReference) {
-        gc_byte::write_gc_byte::<VM>(object, gc_byte::read_gc_byte::<VM>(object) & !self.unlogged_bit);
+        gc_byte::write_gc_byte::<VM>(
+            object,
+            gc_byte::read_gc_byte::<VM>(object) & !self.unlogged_bit,
+        );
     }
 
     pub fn is_unlogged<VM: VMBinding>(&self, object: ObjectReference) -> bool {

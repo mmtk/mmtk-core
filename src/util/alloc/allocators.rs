@@ -1,11 +1,11 @@
 use std::mem::MaybeUninit;
 
+use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator};
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::plan::Plan;
 
 const MAX_BUMP_ALLOCATORS: usize = 5;
 const MAX_LARGE_OBJECT_ALLOCATORS: usize = 1;
@@ -52,7 +52,7 @@ impl<VM: VMBinding> Allocators<VM> {
 
     pub fn new(
         mutator_tls: OpaquePointer,
-        plan: &'static dyn Plan<VM=VM>,
+        plan: &'static dyn Plan<VM = VM>,
         space_mapping: &[(AllocatorSelector, &'static dyn Space<VM>)],
     ) -> Self {
         let mut ret = Allocators {

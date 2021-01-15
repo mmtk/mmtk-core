@@ -30,7 +30,10 @@ unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for Prepare<P, W> {}
 
 impl<P: Plan, W: CopyContext + WorkerLocal> Prepare<P, W> {
     pub fn new(plan: &'static P) -> Self {
-        Self { plan, _p: PhantomData }
+        Self {
+            plan,
+            _p: PhantomData,
+        }
     }
 }
 
@@ -96,7 +99,10 @@ unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for Release<P, W> {}
 
 impl<P: Plan, W: CopyContext + WorkerLocal> Release<P, W> {
     pub fn new(plan: &'static P) -> Self {
-        Self { plan, _p: PhantomData }
+        Self {
+            plan,
+            _p: PhantomData,
+        }
     }
 }
 
@@ -240,9 +246,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     }
 }
 
-pub struct ScanStackRoot<Edges: ProcessEdgesWork>(
-    pub &'static mut Mutator<Edges::VM>,
-);
+pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Edges::VM>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
@@ -329,7 +333,7 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
         self.mmtk
     }
     #[inline]
-    pub fn plan(&self) -> &'static dyn Plan<VM=E::VM> {
+    pub fn plan(&self) -> &'static dyn Plan<VM = E::VM> {
         &*self.mmtk.plan
     }
 }
@@ -370,10 +374,7 @@ pub trait ProcessEdgesWork:
             // Executing these works now can remarkably reduce the global synchronization time.
             self.worker().do_work(scan_objects_work);
         } else {
-            self.mmtk
-                .scheduler
-                .closure_stage
-                .add(scan_objects_work);
+            self.mmtk.scheduler.closure_stage.add(scan_objects_work);
         }
     }
 

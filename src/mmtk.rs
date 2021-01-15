@@ -33,7 +33,7 @@ lazy_static! {
 /// An MMTk instance. MMTk allows mutiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
-    pub plan: Box<dyn Plan<VM=VM>>,
+    pub plan: Box<dyn Plan<VM = VM>>,
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
     pub sftmap: &'static SFTMap,
@@ -52,9 +52,13 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
         let scheduler = Scheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = crate::plan::global::create_plan(options.plan, &VM_MAP, &MMAPPER, options.clone(), unsafe {
-            &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>)
-        });
+        let plan = crate::plan::global::create_plan(
+            options.plan,
+            &VM_MAP,
+            &MMAPPER,
+            options.clone(),
+            unsafe { &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>) },
+        );
         MMTK {
             plan,
             vm_map: &VM_MAP,

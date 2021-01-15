@@ -3,10 +3,10 @@ use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::OpaquePointer;
+use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Weak};
-use std::ffi::c_void;
 
 /// This struct will be accessed during trace_object(), which is performance critical.
 /// However, we do not know its concrete type as the plan and its copy context is dynamically selected.

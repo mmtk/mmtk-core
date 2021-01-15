@@ -1,14 +1,14 @@
 use super::global::SemiSpace;
+use crate::plan::global::PlanConstraints;
 use crate::plan::CopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
+use crate::scheduler::WorkerLocal;
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::forwarding_word;
 use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::VMBinding;
 use crate::MMTK;
-use crate::plan::global::PlanConstraints;
-use crate::scheduler::WorkerLocal;
 use std::ops::{Deref, DerefMut};
 
 pub struct SSCopyContext<VM: VMBinding> {
@@ -87,10 +87,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<SemiSpace<VM>>().unwrap();
-        Self {
-            base,
-            plan,
-        }
+        Self { base, plan }
     }
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
@@ -105,14 +102,18 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
                 unsafe { self.worker().local::<SSCopyContext<VM>>() },
             )
         } else if self.ss().fromspace().in_space(object) {
-            self.ss().fromspace().trace_object::<Self, SSCopyContext<VM>>(
-                self,
-                object,
-                super::global::ALLOC_SS,
-                unsafe { self.worker().local::<SSCopyContext<VM>>() },
-            )
+            self.ss()
+                .fromspace()
+                .trace_object::<Self, SSCopyContext<VM>>(
+                    self,
+                    object,
+                    super::global::ALLOC_SS,
+                    unsafe { self.worker().local::<SSCopyContext<VM>>() },
+                )
         } else {
-            self.ss().common.trace_object::<Self, SSCopyContext<VM>>(self, object)
+            self.ss()
+                .common
+                .trace_object::<Self, SSCopyContext<VM>>(self, object)
         }
     }
 }
