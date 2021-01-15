@@ -2,17 +2,8 @@ use super::helpers::{self, *};
 use crate::util::{constants, memory, Address};
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, Ordering};
 
-// The following information about the target data is required:
-//     1. minimum data alignment (in #Bytes),
-//     2. global metadata size per data unit (in #bits),
-//     3. policy specific metadata size per data unit (in #bits)
-//
-// FACTS:
-// - Regardless of the number of bits in a metadata unit,
-// we always represent its content as a word.
-// - Policy-specific bits are required for all data units, so when a space
-// grows, all bits are grown as well.
-//
+// ** NOTE: **
+//  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
 
 pub(super) const INVALID_SIDEMETADATA_ID: SideMetadataID = SideMetadataID(MAX_METADATA_BITS + 1);
 
@@ -57,17 +48,17 @@ impl SideMetadata {
         &mut *(self as *const _ as *mut _)
     }
 
-    // Adds the requested number of bits to the side metadata and returns an ID.
-    // This ID is used for the future references to these bits
-    // and allows choosing between bit sets (e.g. global and policy-specific bits, each have an ID).
-    //
-    // Arguments:
-    //
-    // `number_of_bits`: is the number of bits per source data unit (e.g. per object).
-    //   Currently, the maximum metadata size per data unit is a word (usize).
-    //
-    // `align`: is the minimum alignment of the source data.
-    //   The minimum data granularity is a word, which means the minimum value of this argument is 2 in 32-bits, and 3 in 64 bits systems.
+    /// Requests a number of metadata bits and returns a `SideMetadataID`.
+    /// This ID is used for the future references to these bits and allows choosing between bit sets (e.g. global and policy-specific bits, each have an ID).
+    ///
+    /// # Arguments
+    ///
+    /// * `number_of_bits` - The number of bits per source data unit (e.g. per object).
+    ///     Currently, the maximum metadata size per data unit is a word (usize).
+    ///
+    /// * `align` - The minimum alignment of the source data.
+    ///     The minimum data granularity is a word, which means the minimum value of this argument is 2 in 32-bits, and 3 in 64 bits systems.
+    ///
     pub fn request_meta_bits(number_of_bits: usize, align: usize) -> SideMetadataID {
         assert!(
             [1, 2, 4, 8, 16, 32].contains(&number_of_bits),
@@ -120,11 +111,17 @@ impl SideMetadata {
         next_id
     }
 
-    pub fn ensure_meta_space_is_mapped(
-        start: Address,
-        size: usize,
-        metadata_id: SideMetadataID,
-    ) -> bool {
+    /// Tries to map the required metadata space and returns `true` is successful.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - The starting address of the source data.
+    ///
+    /// * `size` - The size of the source data (in bytes).
+    ///
+    /// * `metadata_id` - The ID of the side metadata to map the space for.
+    ///
+    pub fn map_meta_space(start: Address, size: usize, metadata_id: SideMetadataID) -> bool {
         ensure_meta_is_mapped(start, size, metadata_id)
     }
 
@@ -310,10 +307,14 @@ impl SideMetadata {
 
     /// Bulk-zero a metadata space.
     ///
-    /// Arguments:
+    /// # Arguments
     ///
-    /// `start` is the starting address of the data whose metadata is being zeroed.
-    /// `size` is the size (in bytes) of the source data.
+    /// * `start` - The starting address of the data whose metadata is being zeroed.
+    ///
+    /// * `size` - The size (in bytes) of the source data.
+    ///
+    /// * `metadata_id` - The ID of the target side metadata.
+    ///
     pub fn bzero_meta_space(start: Address, size: usize, metadata_id: SideMetadataID) {
         let meta_start = helpers::address_to_meta_address(start, metadata_id);
         let meta_end = helpers::address_to_meta_address(start + size, metadata_id);
@@ -336,14 +337,14 @@ mod tests {
     }
 
     #[test]
-    fn test_ensure_meta_space_is_mapped_lt4kb() {
+    fn test_map_meta_space_lt4kb() {
         let number_of_bits = 1;
         let number_of_bits_log = 0;
         let align = constants::LOG_BYTES_IN_WORD as usize;
         let space_size = 1;
 
         let metadata_id = SideMetadata::request_meta_bits(number_of_bits, align);
-        assert!(SideMetadata::ensure_meta_space_is_mapped(
+        assert!(SideMetadata::map_meta_space(
             vm_layout_constants::HEAP_START,
             space_size,
             metadata_id
@@ -374,13 +375,13 @@ mod tests {
     }
 
     #[test]
-    fn test_ensure_meta_space_is_mapped_gt4kb() {
+    fn test_map_meta_space_gt4kb() {
         let number_of_bits = 8;
         let align = constants::LOG_BYTES_IN_WORD as usize;
         let space_size = helpers::META_SPACE_PAGE_SIZE * 64 + 1;
 
         let metadata_id = SideMetadata::request_meta_bits(number_of_bits, align);
-        assert!(SideMetadata::ensure_meta_space_is_mapped(
+        assert!(SideMetadata::map_meta_space(
             vm_layout_constants::HEAP_START,
             space_size,
             metadata_id

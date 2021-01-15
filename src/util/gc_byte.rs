@@ -27,7 +27,7 @@ pub(crate) unsafe fn init_side_gcbyte() {
 }
 
 pub fn ensure_gcbyte_space_is_mapped(start: Address, size: usize) -> bool {
-    unsafe { SideMetadata::ensure_meta_space_is_mapped(start, size, SIDE_GCBYTE_ID) }
+    unsafe { SideMetadata::map_meta_space(start, size, SIDE_GCBYTE_ID) }
 }
 
 // TODO: we probably need to add non-atomic versions of the read and write methods
