@@ -71,11 +71,9 @@ impl<VM: VMBinding> WorkerLocal for GenCopyCopyContext<VM> {
     }
 }
 
-// #[derive(Default)]
 pub struct GenCopyNurseryProcessEdges<VM: VMBinding> {
     plan: &'static GenCopy<VM>,
     base: ProcessEdgesBase<GenCopyNurseryProcessEdges<VM>>,
-    // phantom: PhantomData<VM>,
 }
 
 impl<VM: VMBinding> GenCopyNurseryProcessEdges<VM> {
@@ -135,11 +133,9 @@ impl<VM: VMBinding> DerefMut for GenCopyNurseryProcessEdges<VM> {
     }
 }
 
-// #[derive(Default)]
 pub struct GenCopyMatureProcessEdges<VM: VMBinding> {
     plan: &'static GenCopy<VM>,
     base: ProcessEdgesBase<GenCopyMatureProcessEdges<VM>>,
-    // phantom: PhantomData<VM>,
 }
 
 impl<VM: VMBinding> GenCopyMatureProcessEdges<VM> {

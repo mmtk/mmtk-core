@@ -41,24 +41,18 @@ rand = "0.7.3"
 [features]
 default = []
 
-# plans
-# nogc = ["immortalspace", "largeobjectspace"]
-# semispace = ["immortalspace", "largeobjectspace", "copyspace"]
-# gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
-
 # spaces
 base_spaces = []
 vm_space = ["base_spaces"]
 ro_space = ["base_spaces"]
 code_space  = ["base_spaces"]
 
-# immortalspace = []
-# copyspace = []
-# largeobjectspace = []
-# lockfreeimmortalspace = []
-
+# Run sanity GC
 sanity = []
+# Use lock free variant of NoGC
 nogc_lock_free = []
+# Use lock free with no zeroing NoGC
 nogc_no_zeroing = ["nogc_lock_free"]
-
+# For using a single GC thread
+# Q: Why do we need this as a compile time flat? We can always set the number of GC threads through options.
 single_worker = []

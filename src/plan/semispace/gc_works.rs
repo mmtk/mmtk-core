@@ -69,11 +69,11 @@ impl<VM: VMBinding> WorkerLocal for SSCopyContext<VM> {
     }
 }
 
-// #[derive(Default)]
 pub struct SSProcessEdges<VM: VMBinding> {
+    // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
+    // downcast for each traced object.
     plan: &'static SemiSpace<VM>,
     base: ProcessEdgesBase<SSProcessEdges<VM>>,
-    // phantom: PhantomData<VM>,
 }
 
 impl<VM: VMBinding> SSProcessEdges<VM> {

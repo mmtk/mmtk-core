@@ -13,20 +13,6 @@ pub use self::mutator_context::MutatorContext;
 pub use self::tracelocal::TraceLocal;
 pub use self::transitive_closure::TransitiveClosure;
 
-// #[cfg(feature = "nogc")]
-pub mod nogc;
-// #[cfg(feature = "nogc")]
-// pub use self::nogc as selected_plan;
-
-// #[cfg(feature = "semispace")]
-pub mod semispace;
-// #[cfg(feature = "semispace")]
-// pub use self::semispace as selected_plan;
-
-// #[cfg(feature = "gencopy")]
 pub mod gencopy;
-// #[cfg(feature = "gencopy")]
-// pub use self::gencopy as selected_plan;
-
-// pub use self::selected_plan::SelectedConstraints;
-// pub use self::selected_plan::SelectedPlan;
+pub mod nogc;
+pub mod semispace;

@@ -11,26 +11,19 @@
 //! it can turn the `Box` pointer to a native pointer (`*mut Mutator`), and forge a mut reference from the native
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
-use std::sync::atomic::Ordering;
-
-use crate::plan::mutator_context::{Mutator, MutatorContext};
-use crate::scheduler::GCWorker;
-
-use crate::vm::Collection;
-
-use crate::util::{Address, ObjectReference};
-
-// use self::selected_plan::SelectedPlan;
-// use crate::plan::selected_plan;
-use crate::util::alloc::allocators::AllocatorSelector;
-
 use crate::mmtk::MMTK;
+use crate::plan::mutator_context::{Mutator, MutatorContext};
 use crate::plan::AllocationSemantics;
+use crate::scheduler::GCWorker;
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::OpaquePointer;
+use crate::util::{Address, ObjectReference};
+use crate::vm::Collection;
 use crate::vm::VMBinding;
+use std::sync::atomic::Ordering;
 
 /// Run the main loop for the GC controller thread. This method does not return.
 ///
@@ -68,7 +61,6 @@ pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: OpaquePointer,
 ) -> Box<Mutator<VM>> {
-    // <SelectedPlan<VM> as PlanTypes>::bind_mutator(&mmtk.plan, tls, mmtk)
     crate::plan::global::create_mutator(tls, mmtk)
 }
 

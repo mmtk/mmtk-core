@@ -1,14 +1,9 @@
-// use crate::plan::SelectedConstraints;
 use crate::plan::global::PlanConstraints;
 use crate::util::gc_byte;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 
 pub const TOTAL_BITS: usize = 8;
-// pub const NEEDS_UNLOGGED_BIT: bool = SelectedConstraints::NEEDS_LOG_BIT_IN_HEADER;
-// pub const UNLOGGED_BIT_NUMBER: usize = SelectedConstraints::NEEDS_LOG_BIT_IN_HEADER_NUM;
-// pub const UNLOGGED_BIT: u8 = 1 << UNLOGGED_BIT_NUMBER;
-// pub const USED_GLOBAL_BITS: usize = TOTAL_BITS - UNLOGGED_BIT_NUMBER;
 
 pub struct HeaderByte {
     pub needs_unlogged_bit: bool,

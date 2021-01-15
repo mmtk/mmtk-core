@@ -106,13 +106,16 @@ impl<VM: VMBinding> WorkerLocal for NoCopy<VM> {
     }
 }
 
+/// This struct defines plan-specific constraints.
+/// Most of the constraints are constants. Each plan should declare a constant of this struct,
+/// and use the constant wherever possible. However, for plan-neutral implementations,
+/// these constraints are not constant.
 pub struct PlanConstraints {
     pub moves_objects: bool,
     pub gc_header_bits: usize,
     pub gc_header_words: usize,
     pub num_specialized_scans: usize,
     pub max_non_los_copy_bytes: usize,
-    // unused for now
     pub needs_log_bit_in_header: bool,
     pub needs_log_bit_in_header_num: usize,
 }

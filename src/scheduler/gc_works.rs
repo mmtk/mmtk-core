@@ -299,17 +299,6 @@ pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
 unsafe impl<E: ProcessEdgesWork> Sync for ProcessEdgesBase<E> {}
 unsafe impl<E: ProcessEdgesWork> Send for ProcessEdgesBase<E> {}
 
-// impl<E: ProcessEdgesWork> Default for ProcessEdgesBase<E> {
-//     fn default() -> Self {
-//         Self {
-//             edges: vec![],
-//             nodes: vec![],
-//             mmtk: None,
-//             worker: 0 as _,
-//         }
-//     }
-// }
-
 impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
     // Requires an MMTk reference. Each plan-specific type that uses ProcessEdgesBase can get a static plan reference
     // at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.
