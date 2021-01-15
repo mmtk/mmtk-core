@@ -182,8 +182,17 @@ mod tests {
     #[test]
     fn test_side_metadata_helpers_round_up_to_page_size() {
         assert_eq!(round_up_to_page_size(1), META_SPACE_PAGE_SIZE);
-        assert_eq!(round_up_to_page_size(META_SPACE_PAGE_SIZE - 1), META_SPACE_PAGE_SIZE);
-        assert_eq!(round_up_to_page_size(META_SPACE_PAGE_SIZE), META_SPACE_PAGE_SIZE);
-        assert_eq!(round_up_to_page_size(META_SPACE_PAGE_SIZE + 1), META_SPACE_PAGE_SIZE << 1);
+        assert_eq!(
+            round_up_to_page_size(META_SPACE_PAGE_SIZE - 1),
+            META_SPACE_PAGE_SIZE
+        );
+        assert_eq!(
+            round_up_to_page_size(META_SPACE_PAGE_SIZE),
+            META_SPACE_PAGE_SIZE
+        );
+        assert_eq!(
+            round_up_to_page_size(META_SPACE_PAGE_SIZE + 1),
+            META_SPACE_PAGE_SIZE << 1
+        );
     }
 }

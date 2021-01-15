@@ -1,4 +1,4 @@
-use super::helpers::{*, self};
+use super::helpers::{self, *};
 use crate::util::{constants, memory, Address};
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, Ordering};
 
@@ -309,16 +309,12 @@ impl SideMetadata {
     }
 
     /// Bulk-zero a metadata space.
-    /// 
+    ///
     /// Arguments:
     ///
     /// `start` is the starting address of the data whose metadata is being zeroed.
     /// `size` is the size (in bytes) of the source data.
-    pub fn bzero_meta_space(
-        start: Address,
-        size: usize,
-        metadata_id: SideMetadataID,
-    ) {
+    pub fn bzero_meta_space(start: Address, size: usize, metadata_id: SideMetadataID) {
         let meta_start = helpers::address_to_meta_address(start, metadata_id);
         let meta_end = helpers::address_to_meta_address(start + size, metadata_id);
         memory::zero(meta_start, meta_end.as_usize() - meta_start.as_usize());
@@ -403,12 +399,12 @@ mod tests {
             ))
             .unwrap()
         );
-        assert!(
-            !helpers::meta_page_is_mapped(helpers::address_to_meta_page_address(
+        assert!(!helpers::meta_page_is_mapped(
+            helpers::address_to_meta_page_address(
                 vm_layout_constants::HEAP_START + space_size,
                 metadata_id
-            ) + helpers::META_SPACE_PAGE_SIZE)
-            .unwrap()
-        );
+            ) + helpers::META_SPACE_PAGE_SIZE
+        )
+        .unwrap());
     }
 }
