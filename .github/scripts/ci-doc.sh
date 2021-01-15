@@ -1,3 +1,3 @@
 set -xe
 
-cargo doc --features semispace --no-deps
+cargo doc --all-features --no-deps
