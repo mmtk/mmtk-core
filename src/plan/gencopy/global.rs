@@ -1,11 +1,9 @@
 use super::gc_works::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
-use super::mutator::create_gencopy_mutator;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::mutator_context::Mutator;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
@@ -28,8 +26,6 @@ use crate::plan::global::PlanConstraints;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-
-pub type SelectedPlan<VM> = GenCopy<VM>;
 
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 pub const NURSERY_SIZE: usize = 16 * 1024 * 1024;

@@ -71,7 +71,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareMutator<VM> {
     }
 }
 
-// #[derive(Default)]
+#[derive(Default)]
 pub struct PrepareCollector<W: CopyContext + WorkerLocal>(PhantomData<W>);
 
 impl<W: CopyContext + WorkerLocal> PrepareCollector<W> {
@@ -138,7 +138,7 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseMutator<VM> {
     }
 }
 
-// #[derive(Default)]
+#[derive(Default)]
 pub struct ReleaseCollector<W: CopyContext + WorkerLocal>(PhantomData<W>);
 
 impl<W: CopyContext + WorkerLocal> ReleaseCollector<W> {
@@ -396,7 +396,7 @@ pub trait ProcessEdgesWork:
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     #[inline]
-    default fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    default fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessEdgesWork");
         self.set_worker(worker);
         self.process_edges();

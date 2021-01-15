@@ -14,7 +14,6 @@
 use std::sync::atomic::Ordering;
 
 use crate::plan::mutator_context::{Mutator, MutatorContext};
-use crate::plan::Plan;
 use crate::scheduler::GCWorker;
 
 use crate::vm::Collection;

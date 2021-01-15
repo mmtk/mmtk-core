@@ -1,7 +1,5 @@
 use crate::mmtk::MMTK;
 use crate::plan::global::{BasePlan, NoCopy};
-use crate::plan::mutator_context::Mutator;
-use crate::plan::nogc::mutator::create_nogc_mutator;
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -27,8 +25,6 @@ use crate::scheduler::GCWorkerLocal;
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
 #[cfg(feature = "nogc_lock_free")]
 use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
-
-pub type SelectedPlan<VM> = NoGC<VM>;
 
 pub struct NoGC<VM: VMBinding> {
     pub base: BasePlan<VM>,

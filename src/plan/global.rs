@@ -1,15 +1,11 @@
 use super::controller_collector_context::ControllerCollectorContext;
-use super::MutatorContext;
 use crate::mmtk::MMTK;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-#[cfg(feature = "sanity")]
-use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::constants::*;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -17,8 +13,6 @@ use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::*;
 use crate::util::statistics::stats::Stats;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
@@ -404,6 +398,7 @@ pub fn create_vm_space<VM: VMBinding>(
     boot_segment_bytes: usize,
     constraints: &'static PlanConstraints,
 ) -> ImmortalSpace<VM> {
+    use crate::util::constants::LOG_BYTES_IN_MBYTE;
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
 
@@ -424,6 +419,7 @@ pub fn create_vm_space<VM: VMBinding>(
 
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'heap' only needs to be mutable for certain features
+    #[allow(unused_variables)] // 'constraints' is only needed for certain features
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,

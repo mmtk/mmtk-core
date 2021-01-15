@@ -20,7 +20,9 @@ impl WorkerLocalPtr {
         WorkerLocalPtr(Box::into_raw(Box::new(worker_local)) as *mut c_void)
     }
 
-    pub unsafe fn as_type<W: WorkerLocal>(&self) -> &mut W {
+    /// # Safety
+    /// The user needs to guarantee that the type supplied here is the same type used to create this pointer.
+    pub unsafe fn as_type<W: WorkerLocal>(&mut self) -> &mut W {
         &mut *(self.0 as *mut W)
     }
 }
@@ -72,6 +74,8 @@ impl<C: Context> Worker<C> {
         &self.scheduler
     }
 
+    /// # Safety
+    /// The user needs to guarantee that the type supplied here is the same type used to create this pointer.
     #[inline]
     pub unsafe fn local<W: WorkerLocal>(&mut self) -> &mut W {
         self.local.as_type::<W>()

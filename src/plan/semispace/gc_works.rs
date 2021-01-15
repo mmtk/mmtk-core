@@ -7,10 +7,8 @@ use crate::util::forwarding_word;
 use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::VMBinding;
 use crate::MMTK;
-use crate::plan::Plan;
 use crate::plan::global::PlanConstraints;
 use crate::scheduler::WorkerLocal;
-use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
 pub struct SSCopyContext<VM: VMBinding> {

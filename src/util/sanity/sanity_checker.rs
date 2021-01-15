@@ -29,7 +29,7 @@ impl SanityChecker {
     }
 }
 
-// #[derive(Default)]
+#[derive(Default)]
 pub struct ScheduleSanityGC<P: Plan, W: CopyContext + WorkerLocal>(PhantomData<(P, W)>);
 
 impl<P: Plan, W: CopyContext + WorkerLocal> ScheduleSanityGC<P, W> {

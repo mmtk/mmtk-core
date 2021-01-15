@@ -3,8 +3,6 @@ use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::mutator_context::Mutator;
-use crate::plan::semispace::mutator::create_ss_mutator;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -28,8 +26,6 @@ use std::sync::Arc;
 use crate::plan::global::PlanConstraints;
 
 use enum_map::EnumMap;
-
-pub type SelectedPlan<VM> = SemiSpace<VM>;
 
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 

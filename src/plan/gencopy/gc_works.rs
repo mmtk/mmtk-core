@@ -1,5 +1,5 @@
 use super::global::GenCopy;
-use crate::plan::{CopyContext, Plan};
+use crate::plan::CopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::{GCWork, GCWorker};
@@ -10,7 +10,6 @@ use crate::vm::*;
 use crate::MMTK;
 use crate::scheduler::WorkerLocal;
 use crate::plan::global::PlanConstraints;
-use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
 pub struct GenCopyCopyContext<VM: VMBinding> {
