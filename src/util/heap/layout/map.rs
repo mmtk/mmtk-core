@@ -56,6 +56,4 @@ pub trait Map: Sized {
     }
 
     fn add_to_cumulative_committed_pages(&self, pages: usize);
-
-    fn get_cumulative_committed_pages(&self) -> usize;
 }
