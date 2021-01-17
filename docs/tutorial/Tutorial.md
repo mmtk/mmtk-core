@@ -274,6 +274,7 @@ Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace
      1. `BumpPointer(0)` should map to the tospace.
      2. `BumpPointer(1)` should map to `plan.common.get_immortal()`.
      3. `LargeObject(0)` should map to `plan.common.get_los()`.
+     4. None of the above should be dereferenced (ie, they should not have the `&` prefix). **TODO: Why?**
 There may seem to be 2 extraneous spaces and pointers that have appeared all of a sudden in these past 2 steps. These are parts of the MMTk common plan itself.
  1. The immortal space is used for objects that the virtual machine or a library never expects to move - **TODO: such as?**.
  2. The large object space is needed because MMTk handles particularly large objects differently to normal objects, as the space overhead of copying large objects is very high. Instead, this space is used by a separate GC algorithm in the common plan to avoid having to copy them. 
@@ -284,8 +285,25 @@ There may seem to be 2 extraneous spaces and pointers that have appeared all of 
 With this, you should have the allocation working, but not garbage collection. Try building MyGC now. If you run HelloWorld or Fannkunchredux, they should work. DaCapo's lusearch should fail, as it requires garbage to be collected. 
    
 ### Collector: Implement garbage collection
-1. Make a new file, called `gc_works`. 
-Delete `handle_user_collection_request`.
+
+  1. Make a new file, called `gc_works`. 
+  2. Add the following import statements:
+    ```rust
+    use super::global::MyGC;
+  use crate::plan::CopyContext;
+  use crate::policy::space::Space;
+  use crate::scheduler::gc_works::*;
+  use crate::util::alloc::{Allocator, BumpAllocator}; //ALLOC
+  use crate::util::forwarding_word;
+  use crate::util::{Address, ObjectReference, OpaquePointer};
+  use crate::vm::VMBinding;
+  use crate::MMTK;
+  use std::marker::PhantomData;
+  use std::ops::{Deref, DerefMut};
+  ```
+  3. Add a new structure, `MyGCCopyContext`, with the type parameter `VM: VMBinding`. It should have the fields `plan:&'static MyGC<VM>` and `mygc: BumpAllocator`.
+  4. Create an implementation block. (`impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> `) plan/global has copycontext base **TODO: Reword.**
+     1. 
 
 from mutator.rs
   3. Going back to the mutator, create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. Its body can stay empty, as there aren't any preparation steps for this GC. This will run *before* any allocation. **TODO: ..I think.**
@@ -307,7 +325,7 @@ from mutator.rs
   6. Delete `mygc_mutator_noop`.
 
 
-(back in mutator)
+(back in global)
       3. Find the method `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
       4. Find the method `prepare`. Delete the `unreachable!()` call, and add the following code:
          ```rust
@@ -324,12 +342,13 @@ from mutator.rs
          self.common.release(tls, true);
          self.fromspace().release();
          ```
-      6. **is this needed here?** Add the following helper method to Plan for MyGC. **TODO: Find a better way to word this.**
+      6. Add the following helper method to Plan for MyGC. **TODO: Find a better way to word this.**
         ```rust
         fn get_collection_reserve(&self) -> usize {
          self.tospace().reserved_pages()
         }
      ```
+     7. Delete `handle_user_collection_request`. This function was an override of a Common plan function, which can run correctly when collection is handled.
  
 
 ### Adding another copyspace
