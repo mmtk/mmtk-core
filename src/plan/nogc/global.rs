@@ -1,4 +1,4 @@
-use crate::mmtk::MMTK;
+use crate::{mmtk::MMTK, util::{alloc::embedded_meta_data::{BYTES_IN_REGION, PAGES_IN_REGION}, constants::BYTES_IN_PAGE}};
 use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::mutator_context::Mutator;
 use crate::plan::nogc::mutator::create_nogc_mutator;
@@ -75,6 +75,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
+        crate::util::memory::dzmmap(HEAP_END, BYTES_IN_REGION);
         self.base.gc_init(heap_size, vm_map, scheduler);
 
         // FIXME correctly initialize spaces based on options
