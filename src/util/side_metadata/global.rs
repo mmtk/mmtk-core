@@ -263,6 +263,118 @@ impl SideMetadata {
         }
     }
 
+    // same as Rust atomics, this wraps around on overflow
+    pub fn fetch_add_atomic(metadata_id: SideMetadataID, data_addr: Address, val: usize) -> usize {
+        let meta_addr = address_to_meta_address(data_addr, metadata_id);
+        debug_assert!(
+            meta_page_is_mapped(address_to_meta_page_address(data_addr, metadata_id)).unwrap(),
+            "fetch_add_atomic.metadata_addr({}) for data_addr({}) is not mapped",
+            meta_addr,
+            data_addr
+        );
+
+        let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.0];
+        if bits_num_log < 3 {
+            let lshift = meta_byte_lshift(data_addr, metadata_id);
+            let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
+            println!(
+                "mask: 0x{:x}, not_mask: 0x{:x}, lshift: {}",
+                mask, !mask, lshift
+            );
+
+            let mut old_val = unsafe { meta_addr.load::<u8>() };
+            let mut new_sub_val = (((old_val & mask) >> lshift) + (val as u8)) & (mask >> lshift);
+            println!("new_sub_val: {}", new_sub_val);
+            let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
+            println!("new_val: {}", new_val);
+
+            while unsafe {
+                meta_addr
+                    .compare_exchange::<AtomicU8>(
+                        old_val,
+                        new_val,
+                        Ordering::SeqCst,
+                        Ordering::SeqCst,
+                    )
+                    .is_err()
+            } {
+                old_val = unsafe { meta_addr.load::<u8>() };
+                new_sub_val = (((old_val & mask) >> lshift) + (val as u8)) & (mask >> lshift);
+                println!("new_sub_val: {}", new_sub_val);
+                new_val = (old_val & !mask) | (new_sub_val << lshift);
+                println!("new_val: {}", new_val);
+            }
+
+            (old_val & mask) as usize
+        } else if bits_num_log == 3 {
+            unsafe {
+                (&*meta_addr.to_ptr::<AtomicU8>()).fetch_add(val as u8, Ordering::SeqCst) as usize
+            }
+        } else if bits_num_log == 4 {
+            unsafe {
+                (&*meta_addr.to_ptr::<AtomicU16>()).fetch_add(val as u16, Ordering::SeqCst) as usize
+            }
+        } else if bits_num_log == 5 {
+            unsafe {
+                (&*meta_addr.to_ptr::<AtomicU32>()).fetch_add(val as u32, Ordering::SeqCst) as usize
+            }
+        } else {
+            todo!("side metadata > 32-bits is not supported yet!");
+        }
+    }
+
+    // same as Rust atomics, this wraps around on overflow
+    pub fn fetch_sub_atomic(metadata_id: SideMetadataID, data_addr: Address, val: usize) -> usize {
+        let meta_addr = address_to_meta_address(data_addr, metadata_id);
+        debug_assert!(
+            meta_page_is_mapped(address_to_meta_page_address(data_addr, metadata_id)).unwrap(),
+            "fetch_sub_atomic.metadata_addr({}) for data_addr({}) is not mapped",
+            meta_addr,
+            data_addr
+        );
+
+        let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.0];
+        if bits_num_log < 3 {
+            let lshift = meta_byte_lshift(data_addr, metadata_id);
+            let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
+
+            let mut old_val = unsafe { meta_addr.load::<u8>() };
+            let mut new_sub_val = (((old_val & mask) >> lshift) - (val as u8)) & (mask >> lshift);
+            let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
+
+            while unsafe {
+                meta_addr
+                    .compare_exchange::<AtomicU8>(
+                        old_val,
+                        new_val,
+                        Ordering::SeqCst,
+                        Ordering::SeqCst,
+                    )
+                    .is_err()
+            } {
+                old_val = unsafe { meta_addr.load::<u8>() };
+                new_sub_val = (((old_val & mask) >> lshift) - (val as u8)) & (mask >> lshift);
+                new_val = (old_val & !mask) | (new_sub_val << lshift);
+            }
+
+            (old_val & mask) as usize
+        } else if bits_num_log == 3 {
+            unsafe {
+                (&*meta_addr.to_ptr::<AtomicU8>()).fetch_sub(val as u8, Ordering::SeqCst) as usize
+            }
+        } else if bits_num_log == 4 {
+            unsafe {
+                (&*meta_addr.to_ptr::<AtomicU16>()).fetch_sub(val as u16, Ordering::SeqCst) as usize
+            }
+        } else if bits_num_log == 5 {
+            unsafe {
+                (&*meta_addr.to_ptr::<AtomicU32>()).fetch_sub(val as u32, Ordering::SeqCst) as usize
+            }
+        } else {
+            todo!("side metadata > 32-bits is not supported yet!");
+        }
+    }
+
     pub fn load(metadata_id: SideMetadataID, data_addr: Address) -> usize {
         let meta_addr = address_to_meta_address(data_addr, metadata_id);
         let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.0];
@@ -407,5 +519,63 @@ mod tests {
             ) + helpers::META_SPACE_PAGE_SIZE
         )
         .unwrap());
+    }
+
+    #[test]
+    fn test_side_metadata_atomic_fetch_add_sub_ge8bits() {
+        let data_addr = vm_layout_constants::HEAP_START;
+        let metadata_id =
+            SideMetadata::request_meta_bits(16, constants::LOG_BYTES_IN_WORD as usize);
+        SideMetadata::map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
+
+        let zero = SideMetadata::fetch_add_atomic(metadata_id, data_addr, 5);
+        assert_eq!(zero, 0);
+
+        let five = SideMetadata::load_atomic(metadata_id, data_addr);
+        assert_eq!(five, 5);
+
+        let another_five = SideMetadata::fetch_sub_atomic(metadata_id, data_addr, 2);
+        assert_eq!(another_five, 5);
+
+        let three = SideMetadata::load_atomic(metadata_id, data_addr);
+        assert_eq!(three, 3);
+    }
+
+    #[test]
+    fn test_side_metadata_atomic_fetch_add_sub_4bits() {
+        let data_addr = vm_layout_constants::HEAP_START;
+        let metadata_id = SideMetadata::request_meta_bits(4, constants::LOG_BYTES_IN_WORD as usize);
+        SideMetadata::map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
+
+        let zero = SideMetadata::fetch_add_atomic(metadata_id, data_addr, 5);
+        assert_eq!(zero, 0);
+
+        let five = SideMetadata::load_atomic(metadata_id, data_addr);
+        assert_eq!(five, 5);
+
+        let another_five = SideMetadata::fetch_sub_atomic(metadata_id, data_addr, 2);
+        assert_eq!(another_five, 5);
+
+        let three = SideMetadata::load_atomic(metadata_id, data_addr);
+        assert_eq!(three, 3);
+    }
+
+    #[test]
+    fn test_side_metadata_atomic_fetch_add_sub_2bits() {
+        let data_addr = vm_layout_constants::HEAP_START;
+        let metadata_id = SideMetadata::request_meta_bits(2, constants::LOG_BYTES_IN_WORD as usize);
+        SideMetadata::map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
+
+        let zero = SideMetadata::fetch_add_atomic(metadata_id, data_addr, 2);
+        assert_eq!(zero, 0);
+
+        let two = SideMetadata::load_atomic(metadata_id, data_addr);
+        assert_eq!(two, 2);
+
+        let another_two = SideMetadata::fetch_sub_atomic(metadata_id, data_addr, 1);
+        assert_eq!(another_two, 2);
+
+        let one = SideMetadata::load_atomic(metadata_id, data_addr);
+        assert_eq!(one, 1);
     }
 }

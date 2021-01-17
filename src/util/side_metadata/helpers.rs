@@ -24,13 +24,25 @@ pub(super) const META_SPACE_PAGE_SIZE_LOG: usize = constants::LOG_BYTES_IN_PAGE 
 
 #[inline(always)]
 pub(super) fn address_to_meta_address(addr: Address, metadata_id: SideMetadataID) -> Address {
-    let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.as_usize()];
+    let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.as_usize()] as i32;
     // right shifts for `align` times, then
     // if bits_num_log < 3, right shift a few more times to cover multi objects per metadata byte
     // if bits_num_log = 3, metadata byte per object is 1
     // for > 3, left shift, because more than 1 byte per object is required
-    let offset = (addr.as_usize() >> METADATA_SINGLETON.align[metadata_id.as_usize()])
-        >> ((constants::LOG_BITS_IN_BYTE as usize) - bits_num_log);
+    let rshift = (constants::LOG_BITS_IN_BYTE as i32) - bits_num_log;
+    let offset = if rshift >= 0 {
+        addr.as_usize()
+            .checked_shr(METADATA_SINGLETON.align[metadata_id.as_usize()] as u32)
+            .unwrap()
+            .checked_shr(rshift as u32)
+            .unwrap()
+    } else {
+        addr.as_usize()
+            .checked_shr(METADATA_SINGLETON.align[metadata_id.as_usize()] as u32)
+            .unwrap()
+            .checked_shl(-rshift as u32)
+            .unwrap()
+    };
 
     METADATA_SINGLETON.meta_base_addr_vec[metadata_id.as_usize()] + offset
 }
