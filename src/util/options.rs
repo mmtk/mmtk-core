@@ -62,6 +62,7 @@ macro_rules! options {
                         let validate_fn = $validator;
                         validate_fn(val)
                     } else {
+                        eprintln!("Warn: unable to set {}={}. Default value will be used.", s, val);
                         false
                     })*
                     _ => panic!("Invalid Options key")

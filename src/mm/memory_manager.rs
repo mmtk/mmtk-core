@@ -49,6 +49,7 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
         ),
     }
     mmtk.plan.gc_init(heap_size, &mmtk.vm_map, &mmtk.scheduler);
+    info!("Initialized MMTk with {:?}", mmtk.options.plan);
 }
 
 /// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should

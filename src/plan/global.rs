@@ -116,6 +116,7 @@ pub struct PlanConstraints {
     pub gc_header_words: usize,
     pub num_specialized_scans: usize,
     pub max_non_los_copy_bytes: usize,
+    pub needs_write_barrier: bool,
     pub needs_log_bit_in_header: bool,
     pub needs_log_bit_in_header_num: usize,
 }
@@ -128,6 +129,7 @@ impl PlanConstraints {
             gc_header_words: 0,
             num_specialized_scans: 0,
             max_non_los_copy_bytes: usize::MAX,
+            needs_write_barrier: false,
             needs_log_bit_in_header: false,
             needs_log_bit_in_header_num: 0,
         }
