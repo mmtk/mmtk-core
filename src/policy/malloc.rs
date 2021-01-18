@@ -8,7 +8,6 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use crate::util::conversions;
-use crate::util::alloc::tcmalloc;
 
 use atomic::Ordering;
 // Import calloc, free, and malloc_usable_size from the library specified in Cargo.toml:45
@@ -19,26 +18,26 @@ pub use jemalloc_sys::{free, malloc_usable_size, calloc};
 pub use mimalloc_sys::{mi_free as free, mi_malloc_usable_size as malloc_usable_size, mi_calloc as calloc};
 
 #[cfg(feature = "malloc_tcmalloc")]
-pub use tcmalloc::{TCMallocInternalCalloc as calloc, TCMallocInternalMallocSize as malloc_usable_size, TCMallocInternalFree as free};
+pub use tcmalloc_sys::{TCMallocInternalCalloc as calloc, TCMallocInternalMallocSize as malloc_usable_size, TCMallocInternalFree as free};
 
-// export LD_LIBRARY_PATH=/home/paiger/hoard-sys/target/debug/build/hoard-sys-eb210b0bc9a5ccf1/out/Hoard/src
+
+// export LD_LIBRARY_PATH=/home/paiger/mmtk-openjdk/mmtk/target/release/build/hoard-sys-bcc6c3e0a7e92343/out/Hoard/src
 #[cfg(feature = "malloc_hoard")]
 pub use hoard_sys::{free, malloc_usable_size, calloc};
 
-// export LD_LIBRARY_PATH=/home/paiger/scalloc-sys/scalloc/out/Release/lib.target
+// export LD_LIBRARY_PATH=/home/paiger/mmtk-openjdk/mmtk/target/release/build/scalloc-sys-56cc58b9b944d8e4/out/scalloc/out/Release/lib.target
 #[cfg(feature = "malloc_scalloc")]
 pub use scalloc_sys::{free, malloc_usable_size, calloc};
 
 #[cfg(not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc", feature = "malloc_tcmalloc", feature = "malloc_hoard", feature = "malloc_scalloc")))]
 pub use libc::{free, malloc_usable_size, calloc};
 
-
 lazy_static! {
     pub static ref METADATA_TABLE: RwLock<Vec<(usize, Vec<u8>, Vec<u8>)>> = RwLock::default();
     pub static ref METADATA_BUFFER: Mutex<Vec<Address>> = Mutex::default();
 }
 
-pub static mut HEAP_SIZE: usize = 90000000;
+pub static mut HEAP_SIZE: usize = 0;
 pub static HEAP_USED: AtomicUsize = AtomicUsize::new(0);
 
 // Set the corresponding bit for each address in the buffer

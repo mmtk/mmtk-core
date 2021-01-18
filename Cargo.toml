@@ -27,6 +27,7 @@ jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"] }
 mimalloc-sys = "0.1.6"
 hoard-sys = { path = "../hoard-sys" }
 scalloc-sys = { path = "../scalloc-sys" }
+tcmalloc-sys = { path = "../tcmalloc-sys" }
 lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
@@ -56,7 +57,7 @@ gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 mygc = ["immortalspace", "largeobjectspace", "copyspace"]
 mygencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 gencopycopy = ["immortalspace", "largeobjectspace", "copyspace"]
-mallocms = ["mallocspace", "malloc_scalloc"]
+mallocms = ["mallocspace", "malloc_tcmalloc"]
 
 # spaces
 base_spaces = []
@@ -81,6 +82,6 @@ single_worker = []
 malloc_libc = []
 malloc_mimalloc = []
 malloc_jemalloc = []
-malloc_tcmalloc = []
+malloc_tcmalloc = [] #Does not work
 malloc_hoard = []
-malloc_scalloc = []
+malloc_scalloc = [] #Build script does not work
