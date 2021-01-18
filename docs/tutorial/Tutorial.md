@@ -286,6 +286,8 @@ With this, you should have the allocation working, but not garbage collection. T
    
 ### Collector: Implement garbage collection
 
+**TODO: I don't like how directed this section is, but due to the number of specifics and new concepts here it's a bit difficult.. How much searching should the reader have to do? At the very least, this section should have some better explanations a la the previous section**
+
   1. Make a new file, called `gc_works`. 
   2. Add the following import statements:
     ```rust
@@ -303,10 +305,99 @@ With this, you should have the allocation working, but not garbage collection. T
   ```
   3. Add a new structure, `MyGCCopyContext`, with the type parameter `VM: VMBinding`. It should have the fields `plan:&'static MyGC<VM>` and `mygc: BumpAllocator`.
   4. Create an implementation block. (`impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> `) plan/global has copycontext base **TODO: Reword.**
-     1. 
+     1. Add a type alias for VMBinding (given to the class as `VM`): `type VM: VM`. 
+     2. Add the following skeleton functions (taken from `plan/global.rs`):
+        ```rust
+        fn new(mmtk: &'static MMTK<Self::VM>) -> Self { };
+        fn init(&mut self, tls: OpaquePointer) { };
+        fn prepare(&mut self) { };
+        fn release(&mut self) { };
+        fn alloc_copy(`init
+            &mut self,
+            original: ObjectReference,
+            bytes: usize,
+            align: usize,
+            offset: isize,
+            semantics: AllocationSemantics,
+        ) -> Address {
+        };
+        fn post_copy(
+            &mut self,
+            _obj: ObjectReference,
+            _tib: Address,
+            _bytes: usize,
+            _semantics: AllocationSemantics,
+        ) {
+        }
+        ```
+     3. To `new`, add an initialiser for the class:
+      ```rust
+      Self {
+            plan: &mmtk.plan,
+            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
+        }
+        ```
+     4. In `init`, set the `tls` variable in the held instance of `mygc` to the one passed to the function. **TODO: Reword.**
+     5. In `prepare`, rebind the allocator to the tospace.
+     6. Leave `release` with an empty body.
+     7. In `alloc`, call the allocator's `alloc` function. Above the function, use an inline attribute (`#[inline(always)]`) to tell the Rust compiler to always inline the function.
+     8. In `post_copy` add **TODO: add description**. Also, add an inline (always) attribute. **TODO: Why inline here?**
+      ```rust
+      forwarding_word::clear_forwarding_bits::<VM>(obj);
+      ```
+  5. Add a new public structure, `MyGCProcessEdges`, with the type parameter `<VM:VMBinding>`. It will hold an instance of `ProcessEdgesBase` and `PhantomData`, and implement the Default trait:
+     ```rust
+     #[derive(Default)]
+     pub struct MyGCProcessEdges<VM: VMBinding> {
+         base: ProcessEdgesBase<MyGCProcessEdges<VM>>,
+         phantom: PhantomData<VM>,
+     }
+     ```
+  6. Add a new implementations block `impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM>`.
+     1. Add a VM type alias (`type VM = VM`).
+     2. Add a new method, `new`.
+       ```rust
+       fn new(edges: Vec<Address>, _roots: bool) -> Self {
+           Self {
+               base: ProcessEdgesBase::new(edges),
+               ..Default::default()
+           }
+       }
+      ```
+     3. Add a new method, `trace_object(&mut self, object: ObjectReference)`.
+       1. This method should return an ObjectReference, and use the inline (*not* always) attribute.
+       2. Check if the object passed into the function is null (`object.is_null()`). If it is, return the object.
+       3. Check if the object is in the tospace (`self.plan().tospace().in_space(object)`). If it is, call `trace_object` through the tospace to check if the object is alive, and return the result:
+          ```rust
+          self.plan().tospace().trace_object(
+                self,
+                object,
+                super::global::ALLOC_MyGC,
+                self.worker().local(),
+            )
+          ```
+       4. If it is not in the tospace, check if the object is in the fromspace and return the result of the fromspace's `trace_object` if it is.
+       5. If it is in neither space, it must be in the immortal space, or large object space. Trace the object with `self.plan().common.trace_object(self, object)`.
+  7. Add two new implementation blocks, `Deref` and `DerefMut` for `MyGCProcessEdges`. **TODO: Finish**
+     ```rust
+     impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
+         type Target = ProcessEdgesBase<Self>;
+         #[inline]
+         fn deref(&self) -> &Self::Target {
+             &self.base
+         }
+     }
 
+     impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
+         #[inline]
+         fn deref_mut(&mut self) -> &mut Self::Target {
+             &mut self.base
+         }
+     }
+     ```
+     
 from mutator.rs
-  3. Going back to the mutator, create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. Its body can stay empty, as there aren't any preparation steps for this GC. This will run *before* any allocation. **TODO: ..I think.**
+  3. Going back to the mutator, create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. Its body can stay empty, as there aren't any preparation steps for this GC. This will run *before* any allocation. **TODO: Check accuracy.**
   4. Create a new function called `mygc_mutator_release` that takes the same inputs as the `prepare` function above, and has the following body:
      ```rust
      let bump_allocator = unsafe {
@@ -320,7 +411,7 @@ from mutator.rs
         .unwrap();
         bump_allocator.rebind(Some(mutator.plan.tospace()));
      ```
-     This will run *after* any mutator action.
+     This will run *after* any mutator action. **TODO: Check accuracy**
   5. In `create_mygc_mutator`, replace `mygc_mutator_noop` in the `prep_func` and `release_func` fields with `mygc_mutator_prepare` and `mygc_mutator_release` respectively.
   6. Delete `mygc_mutator_noop`.
 
