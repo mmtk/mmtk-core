@@ -267,6 +267,10 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
                         base.scanned_stacks.load(Ordering::Relaxed),
                         mutators
                     );
+                    <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
+                        false, worker.tls,
+                    );
+                    base.set_gc_status(GcStatus::GcProper);
                     break;
                 }
             }
