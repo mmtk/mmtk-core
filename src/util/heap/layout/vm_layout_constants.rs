@@ -2,13 +2,13 @@ use super::heap_parameters::*;
 use crate::util::constants::*;
 use crate::util::Address;
 
-///////// FIXME ////////////
-use super::super::vmrequest::{HEAP_LAYOUT_32BIT, HEAP_LAYOUT_64BIT};
 use crate::util::conversions::{chunk_align_down, chunk_align_up};
 
 /** log_2 of the addressable virtual space */
-pub const LOG_ADDRESS_SPACE: usize =
-    if_then_else_usize!(HEAP_LAYOUT_32BIT, 32, LOG_SPACE_SIZE_64 + LOG_MAX_SPACES);
+#[cfg(target_pointer_width = "64")]
+pub const LOG_ADDRESS_SPACE: usize = LOG_SPACE_SIZE_64 + LOG_MAX_SPACES;
+#[cfg(target_pointer_width = "32")]
+pub const LOG_ADDRESS_SPACE: usize = 32;
 /**
  * log_2 of the coarsest unit of address space allocation.
  * <p>
@@ -35,7 +35,10 @@ pub const MAX_CHUNKS: usize = 1 << LOG_MAX_CHUNKS;
  * An upper bound on the extent of any space in the
  * current memory layout
  */
-pub const LOG_SPACE_EXTENT: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT, LOG_SPACE_SIZE_64, 31);
+#[cfg(target_pointer_width = "64")]
+pub const LOG_SPACE_EXTENT: usize = LOG_SPACE_SIZE_64;
+#[cfg(target_pointer_width = "32")]
+pub const LOG_SPACE_EXTENT: usize = 31;
 
 /**
  * An upper bound on the extent of any space in the
@@ -45,24 +48,24 @@ pub const MAX_SPACE_EXTENT: usize = 1 << LOG_SPACE_EXTENT;
 
 // FIXME: HEAP_START, HEAP_END are VM-dependent
 /** Lowest virtual address used by the virtual machine */
-#[cfg(any(target_pointer_width = "32", feature = "force_32bit_heap_layout"))]
+#[cfg(target_pointer_width = "32")]
 pub const HEAP_START: Address = chunk_align_down(unsafe { Address::from_usize(0x6000_0000) });
-#[cfg(all(target_pointer_width = "64", not(feature = "force_32bit_heap_layout")))]
+#[cfg(target_pointer_width = "64")]
 pub const HEAP_START: Address =
     chunk_align_down(unsafe { Address::from_usize(0x0000_0200_0000_0000usize) });
 
 /** Highest virtual address used by the virtual machine */
-#[cfg(any(target_pointer_width = "32", feature = "force_32bit_heap_layout"))]
+#[cfg(target_pointer_width = "32")]
 pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0xb000_0000) });
-#[cfg(all(target_pointer_width = "64", not(feature = "force_32bit_heap_layout")))]
+#[cfg(target_pointer_width = "64")]
 pub const HEAP_END: Address =
     chunk_align_up(unsafe { Address::from_usize(0x0000_2000_0000_0000usize) });
 
 /// vm-sapce size (currently only used by jikesrvm)
-#[cfg(any(target_pointer_width = "32", feature = "force_32bit_heap_layout"))]
+#[cfg(target_pointer_width = "32")]
 pub const VM_SPACE_SIZE: usize =
     chunk_align_up(unsafe { Address::from_usize(0x800_0000) }).as_usize();
-#[cfg(all(target_pointer_width = "64", not(feature = "force_32bit_heap_layout")))]
+#[cfg(target_pointer_width = "64")]
 pub const VM_SPACE_SIZE: usize =
     chunk_align_up(unsafe { Address::from_usize(0xdc0_0000) }).as_usize();
 
@@ -109,7 +112,10 @@ pub const PAGES_IN_SPACE64: usize = 1 << LOG_PAGES_IN_SPACE64;
  * Number of bits to shift a space index into/out of a virtual address.
  */
 /* In a 32-bit model, use a dummy value so that the compiler doesn't barf. */
-pub const SPACE_SHIFT_64: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT, LOG_SPACE_SIZE_64, 0);
+#[cfg(target_pointer_width = "32")]
+pub const SPACE_SHIFT_64: usize = 0;
+#[cfg(target_pointer_width = "64")]
+pub const SPACE_SHIFT_64: usize = LOG_SPACE_SIZE_64;
 
 /**
  * Bitwise mask to isolate a space index in a virtual address.
@@ -117,10 +123,10 @@ pub const SPACE_SHIFT_64: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT, LOG_SPA
  * We can't express this constant in a 32-bit environment, hence the
  * conditional definition.
  */
-pub const SPACE_MASK_64: usize = if_then_else_zero_usize!(
-    HEAP_LAYOUT_64BIT,
-    ((1 << LOG_MAX_SPACES) - 1) << SPACE_SHIFT_64
-);
+#[cfg(target_pointer_width = "32")]
+pub const SPACE_MASK_64: usize = 0;
+#[cfg(target_pointer_width = "64")]
+pub const SPACE_MASK_64: usize = ((1 << LOG_MAX_SPACES) - 1) << SPACE_SHIFT_64;
 
 /*
  * Size of each space in the 64-bit memory layout

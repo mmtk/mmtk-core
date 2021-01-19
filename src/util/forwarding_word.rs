@@ -120,10 +120,10 @@ pub fn state_is_being_forwarded(gc_byte: u8) -> bool {
 }
 
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
-    gc_byte::write_gc_byte::<VM>(
-        object,
-        gc_byte::read_gc_byte::<VM>(object) & !FORWARDING_MASK,
-    );
+    let mut old_val = gc_byte::read_gc_byte::<VM>(object);
+    while !gc_byte::compare_exchange_gc_byte::<VM>(object, old_val, old_val & !FORWARDING_MASK) {
+        old_val = gc_byte::read_gc_byte::<VM>(object);
+    }
 }
 
 /// Returns the address of the forwarding word of an object.
@@ -222,4 +222,21 @@ pub(super) fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize
 #[cfg(target_endian = "big")]
 pub(super) fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize> {
     unimplemented!()
+}
+
+#[cfg(debug_assertions)]
+pub(crate) fn check_alloc_size<VM: VMBinding>(size: usize) {
+    debug_assert!(
+        if !VM::VMObjectModel::HAS_GC_BYTE || gc_byte_offset_in_forwarding_word::<VM>().is_some() {
+            // If there is no gc byte, the min object size is 1 word. We save forwarding pointer in the word.
+            // If the gc byte is low/high order byte, the min object size is 1 word. We save forwarding pointer
+            // in the word that contains the gc byte.
+            size >= constants::BYTES_IN_WORD
+        } else {
+            // For none of the above cases, the min object size is 2 word. We save forwarding pointer in the next word that does not contain the gc byte.
+            size >= 2 * constants::BYTES_IN_WORD
+        },
+        "allocation size (0x{:x}) is too small!",
+        size
+    );
 }

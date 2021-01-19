@@ -33,10 +33,12 @@ impl<VM: VMBinding> Allocators<VM> {
     /// The selector needs to be valid, and points to an allocator that has been initialized.
     pub unsafe fn get_allocator(&self, selector: AllocatorSelector) -> &dyn Allocator<VM> {
         match selector {
-            AllocatorSelector::BumpPointer(index) => self.bump_pointer[index as usize].get_ref(),
-            #[cfg(feature = "largeobjectspace")]
-            AllocatorSelector::LargeObject(index) => self.large_object[index as usize].get_ref(),
-            AllocatorSelector::FreeList(index) => self.free_list[index as usize].get_ref(),
+            AllocatorSelector::BumpPointer(index) => {
+                self.bump_pointer[index as usize].assume_init_ref()
+            }
+            AllocatorSelector::LargeObject(index) => {
+                self.large_object[index as usize].assume_init_ref()
+            }
         }
     }
 
@@ -47,10 +49,12 @@ impl<VM: VMBinding> Allocators<VM> {
         selector: AllocatorSelector,
     ) -> &mut dyn Allocator<VM> {
         match selector {
-            AllocatorSelector::BumpPointer(index) => self.bump_pointer[index as usize].get_mut(),
-            #[cfg(feature = "largeobjectspace")]
-            AllocatorSelector::LargeObject(index) => self.large_object[index as usize].get_mut(),
-            AllocatorSelector::FreeList(index) => self.free_list[index as usize].get_mut(),
+            AllocatorSelector::BumpPointer(index) => {
+                self.bump_pointer[index as usize].assume_init_mut()
+            }
+            AllocatorSelector::LargeObject(index) => {
+                self.large_object[index as usize].assume_init_mut()
+            }
         }
     }
 

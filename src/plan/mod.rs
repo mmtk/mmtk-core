@@ -3,7 +3,6 @@ pub mod controller_collector_context;
 pub mod global;
 pub mod mutator_context;
 pub mod plan_constraints;
-mod trace;
 pub mod tracelocal;
 pub mod transitive_closure;
 pub use self::global::AllocationSemantics;

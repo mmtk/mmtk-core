@@ -44,9 +44,9 @@ pub extern "C" fn alloc(mutator: *mut Mutator<SelectedPlan<DummyVM>>, size: usiz
 }
 
 #[no_mangle]
-pub extern "C" fn post_alloc(mutator: *mut Mutator<SelectedPlan<DummyVM>>, refer: ObjectReference, type_refer: ObjectReference,
+pub extern "C" fn post_alloc(mutator: *mut Mutator<SelectedPlan<DummyVM>>, refer: ObjectReference,
                                         bytes: usize, semantics: AllocationSemantics) {
-    memory_manager::post_alloc::<DummyVM>(unsafe { &mut *mutator }, refer, type_refer, bytes, semantics)
+    memory_manager::post_alloc::<DummyVM>(unsafe { &mut *mutator }, refer, bytes, semantics)
 }
 
 #[no_mangle]
@@ -77,12 +77,6 @@ pub extern "C" fn free_bytes() -> usize {
 #[no_mangle]
 pub extern "C" fn total_bytes() -> usize {
     memory_manager::total_bytes(&SINGLETON)
-}
-
-#[no_mangle]
-#[cfg(feature = "sanity")]
-pub extern "C" fn scan_region() {
-    memory_manager::scan_region(&SINGLETON)
 }
 
 #[no_mangle]

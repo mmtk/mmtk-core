@@ -6,12 +6,6 @@ import shutil
 import os
 import sys
 
-# check RUSTUP_TOOLCHAIN
-if "RUSTUP_TOOLCHAIN" in os.environ:
-    toolchain = "+" + os.environ["RUSTUP_TOOLCHAIN"]
-else:
-    toolchain = "+nightly"
-
 MMTk_ROOT = os.path.join(__file__, "..", "..")
 
 plan_dir = os.path.abspath(os.path.join(MMTk_ROOT, "src", "plan"))
@@ -53,8 +47,6 @@ vmbinding = "vmbindings/dummyvm"
 for plan in PLANS:
     cmd = []
     cmd.append("cargo")
-    if toolchain:
-        cmd.append(toolchain)
     cmd.extend([
         "build",
         "--manifest-path",
