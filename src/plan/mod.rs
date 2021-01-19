@@ -12,6 +12,7 @@ pub use self::mutator_context::Mutator;
 pub use self::mutator_context::MutatorContext;
 pub use self::tracelocal::TraceLocal;
 pub use self::transitive_closure::TransitiveClosure;
+pub use self::plan_constraints::PlanConstraints;
 
 pub mod gencopy;
 pub mod nogc;

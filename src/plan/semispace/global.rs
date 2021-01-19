@@ -3,7 +3,7 @@ use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::global::PlanConstraints;
+use crate::plan::PlanConstraints;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -38,7 +38,7 @@ pub struct SemiSpace<VM: VMBinding> {
 
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
 
-pub(super) const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
+pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     gc_header_bits: 2,
     gc_header_words: 0,

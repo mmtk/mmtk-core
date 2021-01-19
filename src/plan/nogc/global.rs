@@ -1,5 +1,5 @@
 use crate::mmtk::MMTK;
-use crate::plan::global::PlanConstraints;
+use crate::plan::PlanConstraints;
 use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;

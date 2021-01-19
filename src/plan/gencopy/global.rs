@@ -4,7 +4,7 @@ use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::global::PlanConstraints;
+use crate::plan::PlanConstraints;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;

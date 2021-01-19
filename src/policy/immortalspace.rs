@@ -8,7 +8,7 @@ use crate::util::ObjectReference;
 use crate::plan::TransitiveClosure;
 use crate::util::header_byte::HeaderByte;
 
-use crate::plan::global::PlanConstraints;
+use crate::plan::PlanConstraints;
 use crate::policy::space::SpaceOptions;
 use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};

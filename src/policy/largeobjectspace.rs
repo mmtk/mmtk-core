@@ -1,6 +1,6 @@
 use std::cell::UnsafeCell;
 
-use crate::plan::global::PlanConstraints;
+use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};

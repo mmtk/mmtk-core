@@ -56,7 +56,7 @@ extern crate downcast_rs;
 pub mod util;
 mod mm;
 mod mmtk;
-mod plan;
+pub mod plan;
 pub mod policy;
 pub mod scheduler;
 pub mod vm;

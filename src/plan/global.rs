@@ -1,5 +1,6 @@
 use super::controller_collector_context::ControllerCollectorContext;
 use crate::mmtk::MMTK;
+use super::PlanConstraints;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -103,36 +104,6 @@ impl<VM: VMBinding> NoCopy<VM> {
 impl<VM: VMBinding> WorkerLocal for NoCopy<VM> {
     fn init(&mut self, tls: OpaquePointer) {
         CopyContext::init(self, tls);
-    }
-}
-
-/// This struct defines plan-specific constraints.
-/// Most of the constraints are constants. Each plan should declare a constant of this struct,
-/// and use the constant wherever possible. However, for plan-neutral implementations,
-/// these constraints are not constant.
-pub struct PlanConstraints {
-    pub moves_objects: bool,
-    pub gc_header_bits: usize,
-    pub gc_header_words: usize,
-    pub num_specialized_scans: usize,
-    pub max_non_los_copy_bytes: usize,
-    pub needs_write_barrier: bool,
-    pub needs_log_bit_in_header: bool,
-    pub needs_log_bit_in_header_num: usize,
-}
-
-impl PlanConstraints {
-    pub const fn default() -> Self {
-        PlanConstraints {
-            moves_objects: false,
-            gc_header_bits: 0,
-            gc_header_words: 0,
-            num_specialized_scans: 0,
-            max_non_los_copy_bytes: usize::MAX,
-            needs_write_barrier: false,
-            needs_log_bit_in_header: false,
-            needs_log_bit_in_header_num: 0,
-        }
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::plan::global::PlanConstraints;
+use crate::plan::PlanConstraints;
 use crate::util::gc_byte;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
