@@ -1,6 +1,6 @@
 use super::controller_collector_context::ControllerCollectorContext;
-use crate::mmtk::MMTK;
 use super::PlanConstraints;
+use crate::mmtk::MMTK;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;

@@ -1,6 +1,6 @@
 use super::global::SemiSpace;
-use crate::plan::PlanConstraints;
 use crate::plan::CopyContext;
+use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::WorkerLocal;
