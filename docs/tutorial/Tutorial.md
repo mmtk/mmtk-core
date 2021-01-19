@@ -290,19 +290,19 @@ With this, you should have the allocation working, but not garbage collection. T
 
   1. Make a new file, called `gc_works`. 
   2. Add the following import statements:
-    ```rust
-    use super::global::MyGC;
-  use crate::plan::CopyContext;
-  use crate::policy::space::Space;
-  use crate::scheduler::gc_works::*;
-  use crate::util::alloc::{Allocator, BumpAllocator}; //ALLOC
-  use crate::util::forwarding_word;
-  use crate::util::{Address, ObjectReference, OpaquePointer};
-  use crate::vm::VMBinding;
-  use crate::MMTK;
-  use std::marker::PhantomData;
-  use std::ops::{Deref, DerefMut};
-  ```
+   ```rust
+   use super::global::MyGC;
+   use crate::plan::CopyContext;
+   use crate::policy::space::Space;
+   use crate::scheduler::gc_works::*;
+   use crate::util::alloc::{Allocator, BumpAllocator}; //ALLOC
+   use crate::util::forwarding_word;
+   use crate::util::{Address, ObjectReference, OpaquePointer};
+   use crate::vm::VMBinding;
+   use crate::MMTK;
+   use std::marker::PhantomData;
+   use std::ops::{Deref, DerefMut};
+   ```
   3. Add a new structure, `MyGCCopyContext`, with the type parameter `VM: VMBinding`. It should have the fields `plan:&'static MyGC<VM>` and `mygc: BumpAllocator`.
   4. Create an implementation block. (`impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> `) plan/global has copycontext base **TODO: Reword.**
      1. Add a type alias for VMBinding (given to the class as `VM`): `type VM: VM`. 
