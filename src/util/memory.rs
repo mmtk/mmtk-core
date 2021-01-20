@@ -23,11 +23,13 @@ pub fn dzmmap(start: Address, size: usize) -> Result<Address> {
         }
         Ok(addr)
     } else {
-        assert!(result as usize <= 127,
-                "mmap with MAP_FIXED has unexpected behavior: demand zero mmap with MAP_FIXED on {:?} returned some other address {:?}",
-                start, result
-        );
-        Err(Error::from_raw_os_error(result as _))
+        // assert!(result as usize <= 127,
+        //         "mmap with MAP_FIXED has unexpected behavior: demand zero mmap with MAP_FIXED on {:?} returned some other address {:?}",
+        //         start, result
+        // );
+        Err(Error::from_raw_os_error(
+            unsafe { *libc::__errno_location() } as _,
+        ))
     }
 }
 
