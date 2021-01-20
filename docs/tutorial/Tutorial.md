@@ -101,40 +101,40 @@ You will need to build multiple versions of the VM in this tutorial. You should 
    3. A renamed build folder can be tested by changing the file path in commands as appropriate.
    4. If you plan to completely overwrite a build, deleting the folder you are writing over will help prevent errors.
 3. Try building using NoGC. Both HelloWorld and the fannkuchredux benchmark should run without issue. If you then run lusearch, it should fail when a collection is triggered. The messages and errors produced should look identical or nearly identical to the log below.
-```
-$ ./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch
-Using scaled threading model. 24 processors detected, 24 threads used to drive the workload, in a possible range of [1,64]
-Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.
-===== DaCapo 9.12-MR1 lusearch starting =====
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-thread '<unnamed>' panicked at 'internal error: entered unreachable code: GC triggered in nogc', /opt/rust/toolchains/nightly-2020-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/src/libstd/macros.rs:16:9
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-[2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
-fatal runtime error: failed to initiate panic, error 5
-Aborted (core dumped)
-```
+    ```
+    $ ./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch
+    Using scaled threading model. 24 processors detected, 24 threads used to drive the workload, in a possible range of [1,64]
+    Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.
+    ===== DaCapo 9.12-MR1 lusearch starting =====
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    thread '<unnamed>' panicked at 'internal error: entered unreachable code: GC triggered in nogc', /opt/rust/toolchains/nightly-2020-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/src/libstd/macros.rs:16:9
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    [2020-12-18T00:27:49Z INFO  mmtk::plan::global]   [POLL] nogc_space: Triggering collection
+    fatal runtime error: failed to initiate panic, error 5
+    Aborted (core dumped)
+    ```
 4. If you haven't already, try building using Semispace. lusearch should now pass, as garbage will be collected, and the smaller benchmarks should run the same as they did while using NoGC.
 
 
@@ -155,20 +155,20 @@ NoGC is a GC plan that only allocates memory, and does not have a collector. We'
    - For example, in Visual Studio Code, you can (making sure case sensitivity is selected in the search function) select one instance of `nogc` and either right click and select "Change all instances" or use the CTRL-F2 shortcut, and then type `mygc`, and repeat for `NoGC`.
 4. In order to use MyGC, you will need to make some changes to the following files:
     1. `mmtk-core/src/plan/mod.rs`, under the import statements, add:
-    ```rust
-    #[cfg(feature = "mygc")]
-    pub mod mygc;
-    #[cfg(feature = "mygc")]
-    pub use self::mygc as selected_plan;
-    ```
+        ```rust
+        #[cfg(feature = "mygc")]
+        pub mod mygc;
+        #[cfg(feature = "mygc")]
+        pub use self::mygc as selected_plan;
+        ```
     2. `mmtk-core/Cargo.toml`, under `#plans`, add: 
-    ```rust
-    mygc = ["immortalspace", "largeobjectspace"]
-    ```
+        ```rust
+        mygc = ["immortalspace", "largeobjectspace"]
+        ```
     3. `mmtk-openjdk/mmtk/Cargo.toml`, under `[features]`, add: 
-    ```rust 
-    mygc = ["mmtk/mygc"] 
-    ```
+        ```rust 
+        mygc = ["mmtk/mygc"] 
+        ```
     
 Note that all of the above changes almost exactly copy the NoGC entries in each of these files. However, NoGC has some features that are not needed for this tutorial. Remove references to them in the MyGC plan now. 
 1. Within `mygc/global.rs`, find any use of `#[cfg(feature = "mygc_lock_free")]` and delete both it *and the line below it*.
@@ -208,63 +208,63 @@ First, in `global.rs`, replace the old immortal space with two copyspaces.
 3. Change `impl<VM: VMBinding> Plan for MyGC<VM> {`. This section initialises and prepares the objects in MyGC that you just defined.
   1. Delete the definition of `mygc_space`. Instead, we will define the two copyspaces here.
   2. Define one of the copyspaces by adding the following code: 
-```rust
- let copyspace0 = CopySpace::new(
-      "copyspace0",
-      false,
-      true,
-      VMRequest::discontiguous(),
-      vm_map,
-      mmapper,
-      &mut heap,
-  );
-```
+      ```rust
+       let copyspace0 = CopySpace::new(
+            "copyspace0",
+            false,
+            true,
+            VMRequest::discontiguous(),
+            vm_map,
+            mmapper,
+            &mut heap,
+        );
+      ```
   3. Create another copyspace, called `copyspace1`, defining it as a fromspace instead of a tospace. (Hint: the definitions for copyspaces are in `mmtk-core/policy/copyspace.rs`.) 
   4. Finally, replace the old MyGC initializer with the following:
-     ```rust
-      MyGC {
-          hi: AtomicBool::new(false),
-          copyspace0,
-          copyspace1,
-          common: CommonPlan::new(vm_map, mmapper, options, heap),
-      }
-     ```
+      ```rust
+       MyGC {
+           hi: AtomicBool::new(false),
+           copyspace0,
+           copyspace1,
+           common: CommonPlan::new(vm_map, mmapper, options, heap),
+       }
+      ```
 4. The plan now has the components it needs for allocation, but not the instructions for how to make use of them.
      1. Add a helper method to Plan for MyGC called `common` that returns a reference to the common plan.
-       ```rust
-       fn common(&self) -> &CommonPlan<VM> {
-         &self.common
-       }
-       ```
+         ```rust
+         fn common(&self) -> &CommonPlan<VM> {
+           &self.common
+         }
+         ```
       2. Find the helper method `base` and change it so that it calls the base plan *through* the common plan.
-       ```rust
-       fn base(&self) -> &BasePlan<VM> {
-         &self.common.base
-       }
-   ```
+          ```rust
+          fn base(&self) -> &BasePlan<VM> {
+            &self.common.base
+          }
+         ```
       3. Find the method `get_pages_used`. Replace the current body with `self.tospace().reserved_pages() + self.common.get_pages_used()`, to correctly count the pages contained in the tospace and the common spaces (which will be explained later).
 
       4. Add a new section of methods for MyGC (outside of the methods for Plan for MyGC).
-        ```rust
-        impl<VM: VMBinding> MyGC<VM> {
-        }
-     ```
-      5. To this, add two helper methods, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. `tospace()` (see below) returns a reference to the tospace, and `fromspace()` returns a reference to the fromspace.
-        ```rust
-        pub fn tospace(&self) -> &CopySpace<VM> {
-          if self.hi.load(Ordering::SeqCst) {
-              &self.copyspace1
-          } else {
-              &self.copyspace0
+          ```rust
+          impl<VM: VMBinding> MyGC<VM> {
           }
-        }
-     ```
+         ```
+      5. To this, add two helper methods, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. `tospace()` (see below) returns a reference to the tospace, and `fromspace()` returns a reference to the fromspace.
+          ```rust
+          pub fn tospace(&self) -> &CopySpace<VM> {
+            if self.hi.load(Ordering::SeqCst) {
+                &self.copyspace1
+            } else {
+                &self.copyspace0
+            }
+          }
+         ```
       6. Also add the following helper function:
-      ```rust
-      fn get_collection_reserve(&self) -> usize {
-        self.tospace().reserved_pages()
-      }
-      ``` 
+          ```rust
+          fn get_collection_reserve(&self) -> usize {
+            self.tospace().reserved_pages()
+          }
+          ``` 
 Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace, and to the two spaces controlled by the common plan. **TODO: import statements**
   1. First, in `lazy_static!`, make the following changes:
      1. Map `Default` to `BumpPointer(0)`.
@@ -290,153 +290,153 @@ With this, you should have the allocation working, but not garbage collection. T
 
 1. Make a new file, called `gc_works`. 
 2. Add the following import statements:
- ```rust
- use super::global::MyGC;
- use crate::plan::CopyContext;
- use crate::policy::space::Space;
- use crate::scheduler::gc_works::*;
- use crate::util::alloc::{Allocator, BumpAllocator};
- use crate::util::forwarding_word;
- use crate::util::{Address, ObjectReference, OpaquePointer};
- use crate::vm::VMBinding;
- use crate::MMTK;
- use std::marker::PhantomData;
- use std::ops::{Deref, DerefMut};
- ```
+    ```rust
+    use super::global::MyGC;
+    use crate::plan::CopyContext;
+    use crate::policy::space::Space;
+    use crate::scheduler::gc_works::*;
+    use crate::util::alloc::{Allocator, BumpAllocator};
+    use crate::util::forwarding_word;
+    use crate::util::{Address, ObjectReference, OpaquePointer};
+    use crate::vm::VMBinding;
+    use crate::MMTK;
+    use std::marker::PhantomData;
+    use std::ops::{Deref, DerefMut};
+    ```
 3. Add a new structure, `MyGCCopyContext`, with the type parameter `VM: VMBinding`. It should have the fields `plan:&'static MyGC<VM>` and `mygc: BumpAllocator`.
 4. Create an implementation block - `impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM>`.
    1. Add a type alias for VMBinding (given to the class as `VM`): `type VM: VM`. 
    2. Add the following skeleton functions (taken from `plan/global.rs`):
-      ```rust
-      fn new(mmtk: &'static MMTK<Self::VM>) -> Self { };
-      fn init(&mut self, tls: OpaquePointer) { };
-      fn prepare(&mut self) { };
-      fn release(&mut self) { };
-      fn alloc_copy(`init
-          &mut self,
-          original: ObjectReference,
-          bytes: usize,
-          align: usize,
-          offset: isize,
-          semantics: AllocationSemantics,
-      ) -> Address {
-      };
-      fn post_copy(
-          &mut self,
-          _obj: ObjectReference,
-          _tib: Address,
-          _bytes: usize,
-          _semantics: AllocationSemantics,
-      ) {
-      }
-      ```
+       ```rust
+       fn new(mmtk: &'static MMTK<Self::VM>) -> Self { };
+       fn init(&mut self, tls: OpaquePointer) { };
+       fn prepare(&mut self) { };
+       fn release(&mut self) { };
+       fn alloc_copy(`init
+           &mut self,
+           original: ObjectReference,
+           bytes: usize,
+           align: usize,
+           offset: isize,
+           semantics: AllocationSemantics,
+       ) -> Address {
+       };
+       fn post_copy(
+           &mut self,
+           _obj: ObjectReference,
+           _tib: Address,
+           _bytes: usize,
+           _semantics: AllocationSemantics,
+       ) {
+       }
+       ```
    3. To `new`, add an initialiser for the class:
-      ```rust
-      Self {
-            plan: &mmtk.plan,
-            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
-        }
-        ```
+       ```rust
+       Self {
+             plan: &mmtk.plan,
+             mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
+         }
+       ```
    4. In `init`, set the `tls` variable in the held instance of `mygc` to the one passed to the function. **TODO: Reword.**
    5. In `prepare`, rebind the allocator to the tospace.
    6. Leave `release` with an empty body.
    7. In `alloc`, call the allocator's `alloc` function. Above the function, use an inline attribute (`#[inline(always)]`) to tell the Rust compiler to always inline the function.
    8. In `post_copy` add **TODO: add description**. Also, add an inline (always) attribute. **TODO: Why inline here?**
-    ```rust
-    forwarding_word::clear_forwarding_bits::<VM>(obj);
-    ```
+       ```rust
+       forwarding_word::clear_forwarding_bits::<VM>(obj);
+       ```
 5. Add a new public structure, `MyGCProcessEdges`, with the type parameter `<VM:VMBinding>`. It will hold an instance of `ProcessEdgesBase` and `PhantomData`, and implement the Default trait:
-   ```rust
-   #[derive(Default)]
-   pub struct MyGCProcessEdges<VM: VMBinding> {
-       base: ProcessEdgesBase<MyGCProcessEdges<VM>>,
-       phantom: PhantomData<VM>,
-   }
-   ```
+    ```rust
+    #[derive(Default)]
+    pub struct MyGCProcessEdges<VM: VMBinding> {
+        base: ProcessEdgesBase<MyGCProcessEdges<VM>>,
+        phantom: PhantomData<VM>,
+    }
+    ```
 6. Add a new implementations block `impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM>`.
    1. Add a VM type alias (`type VM = VM`).
    2. Add a new method, `new`.
-     ```rust
-     fn new(edges: Vec<Address>, _roots: bool) -> Self {
-         Self {
-             base: ProcessEdgesBase::new(edges),
-             ..Default::default()
-         }
-     }
-    ```
+       ```rust
+       fn new(edges: Vec<Address>, _roots: bool) -> Self {
+           Self {
+               base: ProcessEdgesBase::new(edges),
+               ..Default::default()
+           }
+       }
+      ```
    3. Add a new method, `trace_object(&mut self, object: ObjectReference)`.
      1. This method should return an ObjectReference, and use the inline (*not* always) attribute.
      2. Check if the object passed into the function is null (`object.is_null()`). If it is, return the object.
      3. Check if the object is in the tospace (`self.plan().tospace().in_space(object)`). If it is, call `trace_object` through the tospace to check if the object is alive, and return the result:
-        ```rust
-        self.plan().tospace().trace_object(
-              self,
-              object,
-              super::global::ALLOC_MyGC,
-              self.worker().local(),
-          )
-        ```
+         ```rust
+         self.plan().tospace().trace_object(
+               self,
+               object,
+               super::global::ALLOC_MyGC,
+               self.worker().local(),
+           )
+         ```
      4. If it is not in the tospace, check if the object is in the fromspace and return the result of the fromspace's `trace_object` if it is.
      5. If it is in neither space, it must be in the immortal space, or large object space. Trace the object with `self.plan().common.trace_object(self, object)`.
 7. Add two new implementation blocks, `Deref` and `DerefMut` for `MyGCProcessEdges`. **TODO: Finish**
-   ```rust
-   impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
-       type Target = ProcessEdgesBase<Self>;
-       #[inline]
-       fn deref(&self) -> &Self::Target {
-           &self.base
-       }
-   }
+    ```rust
+    impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
+        type Target = ProcessEdgesBase<Self>;
+        #[inline]
+        fn deref(&self) -> &Self::Target {
+            &self.base
+        }
+    }
 
-   impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
-       #[inline]
-       fn deref_mut(&mut self) -> &mut Self::Target {
-           &mut self.base
-       }
-   }
-   ```
+    impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
+        #[inline]
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.base
+        }
+    }
+    ```
      
 Next, go back to `mutator.rs`. **TODO: Should this be here? The allocation seems to work without it, but I don't really understand why.**
 1. Create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. Its body can stay empty, as there aren't any preparation steps for this GC.
 2. Create a new function called `mygc_mutator_release` that takes the same inputs as the `prepare` function above, and has the following body:
-   ```rust
-   let bump_allocator = unsafe {
-      mutator
-          .allocators
-          . get_allocator_mut(
-              mutator.config.allocator_mapping[AllocationType::Default]
-          )
-      }
-      .downcast_mut::<BumpAllocator<VM>>()
-      .unwrap();
-      bump_allocator.rebind(Some(mutator.plan.tospace()));
-   ```
+    ```rust
+    let bump_allocator = unsafe {
+       mutator
+           .allocators
+           . get_allocator_mut(
+               mutator.config.allocator_mapping[AllocationType::Default]
+           )
+       }
+       .downcast_mut::<BumpAllocator<VM>>()
+       .unwrap();
+       bump_allocator.rebind(Some(mutator.plan.tospace()));
+    ```
 3. In `create_mygc_mutator`, replace `mygc_mutator_noop` in the `prep_func` and `release_func` fields with `mygc_mutator_prepare` and `mygc_mutator_release` respectively.
 4. Delete `mygc_mutator_noop`.
 
 Go to `global.rs`.
 1. Find the method `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
 2. Find the method `prepare`. Delete the `unreachable!()` call, and add the following code:
-   ```rust
-   self.common.prepare(tls, true);
-   self.hi
-      .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
-   let hi = self.hi.load(Ordering::SeqCst); 
-   self.copyspace0.prepare(hi);
-   self.copyspace1.prepare(!hi);
-   ```
-   This prepares the common plan, flips the definitions for which space is 'to' and which is 'from', then prepares the copyspaces with the new definition.
+    ```rust
+    self.common.prepare(tls, true);
+    self.hi
+       .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
+    let hi = self.hi.load(Ordering::SeqCst); 
+    self.copyspace0.prepare(hi);
+    self.copyspace1.prepare(!hi);
+    ```
+   This prepares the two spaces in the common plan, flips the definitions for which space is 'to' and which is 'from', then prepares the copyspaces with the new definition.
 3. Find the method `release`. Delete the `unreachable!()` call, and add the following code:
-   ```rust
-   self.common.release(tls, true);
-   self.fromspace().release();
-   ```
+    ```rust
+    self.common.release(tls, true);
+    self.fromspace().release();
+    ```
 4. Add the following helper method to Plan for MyGC. **TODO: Reword for clarity?**
- ```rust
-  fn get_collection_reserve(&self) -> usize {
-   self.tospace().reserved_pages()
-  }
-```
+    ```rust
+     fn get_collection_reserve(&self) -> usize {
+      self.tospace().reserved_pages()
+     }
+    ```
 5. Delete `handle_user_collection_request`. This function was an override of a Common plan function, which can run correctly when collection is handled.
 
 
