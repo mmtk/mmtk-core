@@ -244,12 +244,12 @@ First, in `global.rs`, replace the old immortal space with two copyspaces.
    ```
       3. Find the method `get_pages_used`. Replace the current body with `self.tospace().reserved_pages() + self.common.get_pages_used()`, to correctly count the pages contained in the tospace and the common spaces (which will be explained later).
    
-      7. Add a new section of methods for MyGC (outside of the methods for Plan for MyGC).
+      4. Add a new section of methods for MyGC (outside of the methods for Plan for MyGC).
         ```rust
         impl<VM: VMBinding> MyGC<VM> {
         }
      ```
-      8. To this, add two helper methods, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. `tospace()` (see below)7 returns a reference to the tospace, and `fromspace()` returns a reference to the fromspace.
+      5. To this, add two helper methods, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. `tospace()` (see below) returns a reference to the tospace, and `fromspace()` returns a reference to the fromspace.
         ```rust
         pub fn tospace(&self) -> &CopySpace<VM> {
           if self.hi.load(Ordering::SeqCst) {
@@ -259,13 +259,13 @@ First, in `global.rs`, replace the old immortal space with two copyspaces.
           }
         }
      ```
-      9. Also add the following helper function:
+      6. Also add the following helper function:
       ```rust
       fn get_collection_reserve(&self) -> usize {
         self.tospace().reserved_pages()
       }
       ``` 
-Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace.
+Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace, and to the two spaces controlled by the common plan.
   1. First, in `lazy_static!`, make the following changes:
      1. Map `Default` to `BumpPointer(0)`.
      2. Map `ReadOnly` to `BumpPointer(1)`.
@@ -275,7 +275,7 @@ Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace
      2. `BumpPointer(1)` should map to `plan.common.get_immortal()`.
      3. `LargeObject(0)` should map to `plan.common.get_los()`.
      4. None of the above should be dereferenced (ie, they should not have the `&` prefix). **TODO: Why?**
-There may seem to be 2 extraneous spaces and pointers that have appeared all of a sudden in these past 2 steps. These are parts of the MMTk common plan itself.
+There may seem to be 2 extraneous spaces and allocators that have appeared all of a sudden in these past 2 steps. These are parts of the MMTk common plan itself.
  1. The immortal space is used for objects that the virtual machine or a library never expects to move - **TODO: such as?**.
  2. The large object space is needed because MMTk handles particularly large objects differently to normal objects, as the space overhead of copying large objects is very high. Instead, this space is used by a separate GC algorithm in the common plan to avoid having to copy them. 
 **TODO: Above was paraphrased from Angus' notes, may need to get more detail or clarification**
@@ -304,7 +304,7 @@ With this, you should have the allocation working, but not garbage collection. T
    use std::ops::{Deref, DerefMut};
    ```
   3. Add a new structure, `MyGCCopyContext`, with the type parameter `VM: VMBinding`. It should have the fields `plan:&'static MyGC<VM>` and `mygc: BumpAllocator`.
-  4. Create an implementation block. (`impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> `) plan/global has copycontext base **TODO: Reword.**
+  4. Create an implementation block - `impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM>`.
      1. Add a type alias for VMBinding (given to the class as `VM`): `type VM: VM`. 
      2. Add the following skeleton functions (taken from `plan/global.rs`):
         ```rust
@@ -331,12 +331,12 @@ With this, you should have the allocation working, but not garbage collection. T
         }
         ```
      3. To `new`, add an initialiser for the class:
-      ```rust
-      Self {
-            plan: &mmtk.plan,
-            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
-        }
-        ```
+        ```rust
+        Self {
+              plan: &mmtk.plan,
+              mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
+          }
+          ```
      4. In `init`, set the `tls` variable in the held instance of `mygc` to the one passed to the function. **TODO: Reword.**
      5. In `prepare`, rebind the allocator to the tospace.
      6. Leave `release` with an empty body.
@@ -396,9 +396,9 @@ With this, you should have the allocation working, but not garbage collection. T
      }
      ```
      
-from mutator.rs
-  3. Going back to the mutator, create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. Its body can stay empty, as there aren't any preparation steps for this GC. This will run *before* any allocation. **TODO: Check accuracy.**
-  4. Create a new function called `mygc_mutator_release` that takes the same inputs as the `prepare` function above, and has the following body:
+Next, go back to `mutator.rs`. **TODO: Should this be here? The allocation seems to work without it, but I don't really understand why.**
+  1. Create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. Its body can stay empty, as there aren't any preparation steps for this GC.
+  2. Create a new function called `mygc_mutator_release` that takes the same inputs as the `prepare` function above, and has the following body:
      ```rust
      let bump_allocator = unsafe {
         mutator
@@ -411,42 +411,43 @@ from mutator.rs
         .unwrap();
         bump_allocator.rebind(Some(mutator.plan.tospace()));
      ```
-     This will run *after* any mutator action. **TODO: Check accuracy**
-  5. In `create_mygc_mutator`, replace `mygc_mutator_noop` in the `prep_func` and `release_func` fields with `mygc_mutator_prepare` and `mygc_mutator_release` respectively.
-  6. Delete `mygc_mutator_noop`.
+  3. In `create_mygc_mutator`, replace `mygc_mutator_noop` in the `prep_func` and `release_func` fields with `mygc_mutator_prepare` and `mygc_mutator_release` respectively.
+  4. Delete `mygc_mutator_noop`.
 
-
-(back in global)
-      3. Find the method `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
-      4. Find the method `prepare`. Delete the `unreachable!()` call, and add the following code:
-         ```rust
-         self.common.prepare(tls, true);
-         self.hi
-            .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
-         let hi = self.hi.load(Ordering::SeqCst); 
-         self.copyspace0.prepare(hi);
-         self.copyspace1.prepare(!hi);
-         ```
-         This prepares the common plan, flips the definitions for which space is 'to' and which is 'from', then prepares the copyspaces with the new definition.
-      5. Find the method `release`. Delete the `unreachable!()` call, and add the following code:
-         ```rust
-         self.common.release(tls, true);
-         self.fromspace().release();
-         ```
-      6. Add the following helper method to Plan for MyGC. **TODO: Find a better way to word this.**
-        ```rust
-        fn get_collection_reserve(&self) -> usize {
-         self.tospace().reserved_pages()
-        }
+Go to `global.rs`.
+  1. Find the method `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
+  2. Find the method `prepare`. Delete the `unreachable!()` call, and add the following code:
+     ```rust
+     self.common.prepare(tls, true);
+     self.hi
+        .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
+     let hi = self.hi.load(Ordering::SeqCst); 
+     self.copyspace0.prepare(hi);
+     self.copyspace1.prepare(!hi);
      ```
-     7. Delete `handle_user_collection_request`. This function was an override of a Common plan function, which can run correctly when collection is handled.
- 
+     This prepares the common plan, flips the definitions for which space is 'to' and which is 'from', then prepares the copyspaces with the new definition.
+  3. Find the method `release`. Delete the `unreachable!()` call, and add the following code:
+     ```rust
+     self.common.release(tls, true);
+     self.fromspace().release();
+     ```
+  4. Add the following helper method to Plan for MyGC. **TODO: Reword for clarity?**
+   ```rust
+    fn get_collection_reserve(&self) -> usize {
+     self.tospace().reserved_pages()
+    }
+  ```
+  5. Delete `handle_user_collection_request`. This function was an override of a Common plan function, which can run correctly when collection is handled.
+
 
 ### Adding another copyspace
 Now that you have a working Semispace collector, you should be familiar enough with the code to start writing some yourself.
-
-Create a copy of your Semispace collector, called `triplespace`. Then, add a new copyspace to the collector, called the `youngspace`. Make sure any new objects are allocated to this space rather than the fromspace. Garbage will be continue to be collected at the same time for all the spaces, and any live items remaining from the youngspace should move to the tospace.
-
+  1. Create a copy of your Semispace collector, called `triplespace`. 
+  2. Add a new copyspace to the collector, called the `youngspace`, with the following traits:
+      * New objects are allocated to the youngspace (rather than the fromspace).
+      * During a collection, live objects in the youngspace are moved to the tospace.
+      * Garbage is still collected at the same time for all spaces.
+      
 If you get particularly stuck, instructions for how to complete this exersize are available [here](#triplespace-backup-instructions).
 
 ***
