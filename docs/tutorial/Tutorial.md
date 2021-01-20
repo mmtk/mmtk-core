@@ -199,27 +199,27 @@ When the tospace is full, the definitions of the spaces are flipped (the 'tospac
 
 The first step of changing the MyGC plan into a Semispace plan is to add the two copyspaces that the collector will allocate memory into. This requires adding two copyspaces, code to properly initialise and prepare the new spaces, and a copy context.
 First, in `global.rs`, replace the old immortal space with two copyspaces.
-1. **TODO** change as few imports as possible for this step. Need CommonPlan, AtomicBool, CopySpace. Remove line for allow unused imports. Maybe do these as needed.
-2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
+  1. **TODO** change as few imports as possible for this step. Need CommonPlan, AtomicBool, CopySpace. Remove line for allow unused imports. Maybe do these as needed.
+  2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
     1. Delete the existing fields in the constructor.
     2. Add `pub hi: AtomicBool,`. This is a thread-safe bool indicating which copyspace is the to-space.
     3. Add `pub copyspace0: CopySpace<VM>,` and `pub copyspace1: CopySpace<VM>,`. These are the two copyspaces.
     4. Add `pub common: CommonPlan<VM>,`. Semispace uses the common plan rather than the base plan. 
-3. Change `impl<VM: VMBinding> Plan for MyGC<VM> {`. This section initialises and prepares the objects in MyGC that you just defined.
-     1. Delete the definition of `mygc_space`. Instead, we will define the two copyspaces here.
-     2. Define one of the copyspaces by adding the following code: 
-      ```rust
-       let copyspace0 = CopySpace::new(
-            "copyspace0",
-            false,
-            true,
-            VMRequest::discontiguous(),
-            vm_map,
-            mmapper,
-            &mut heap,
-         );
-    ```
-    3. Create another copyspace, called `copyspace1`, defining it as a fromspace instead of a tospace. (Hint: the definitions for copyspaces are in `mmtk-core/policy/copyspace.rs`) 
+  3. Change `impl<VM: VMBinding> Plan for MyGC<VM> {`. This section initialises and prepares the objects in MyGC that you just defined.
+    1. Delete the definition of `mygc_space`. Instead, we will define the two copyspaces here.
+    2. Define one of the copyspaces by adding the following code: 
+ ```rust
+   let copyspace0 = CopySpace::new(
+        "copyspace0",
+        false,
+        true,
+        VMRequest::discontiguous(),
+        vm_map,
+        mmapper,
+        &mut heap,
+    );
+ ```
+    3. Create another copyspace, called `copyspace1`, defining it as a fromspace instead of a tospace. (Hint: the definitions for copyspaces are in `mmtk-core/policy/copyspace.rs`.) 
     4. Finally, replace the old MyGC initializer with the following:
        ```rust
         MyGC {
@@ -229,43 +229,43 @@ First, in `global.rs`, replace the old immortal space with two copyspaces.
             common: CommonPlan::new(vm_map, mmapper, options, heap),
         }
        ```
-4. The plan now has the components it needs for allocation, but not the instructions for how to make use of them.
-     1. Add a helper method to Plan for MyGC called `common` that returns a reference to the common plan.
-       ```rust
-       fn common(&self) -> &CommonPlan<VM> {
-         &self.common
-       }
-   ```
-      2. Find the helper method `base` and change it so that it calls the base plan *through* the common plan.
-       ```rust
-       fn base(&self) -> &BasePlan<VM> {
-         &self.common.base
-       }
-   ```
-      3. Find the method `get_pages_used`. Replace the current body with `self.tospace().reserved_pages() + self.common.get_pages_used()`, to correctly count the pages contained in the tospace and the common spaces (which will be explained later).
-   
-      4. Add a new section of methods for MyGC (outside of the methods for Plan for MyGC).
-        ```rust
-        impl<VM: VMBinding> MyGC<VM> {
-        }
+  4. The plan now has the components it needs for allocation, but not the instructions for how to make use of them.
+       1. Add a helper method to Plan for MyGC called `common` that returns a reference to the common plan.
+         ```rust
+         fn common(&self) -> &CommonPlan<VM> {
+           &self.common
+         }
+         ```
+        2. Find the helper method `base` and change it so that it calls the base plan *through* the common plan.
+         ```rust
+         fn base(&self) -> &BasePlan<VM> {
+           &self.common.base
+         }
      ```
-      5. To this, add two helper methods, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. `tospace()` (see below) returns a reference to the tospace, and `fromspace()` returns a reference to the fromspace.
-        ```rust
-        pub fn tospace(&self) -> &CopySpace<VM> {
-          if self.hi.load(Ordering::SeqCst) {
-              &self.copyspace1
-          } else {
-              &self.copyspace0
+        3. Find the method `get_pages_used`. Replace the current body with `self.tospace().reserved_pages() + self.common.get_pages_used()`, to correctly count the pages contained in the tospace and the common spaces (which will be explained later).
+
+        4. Add a new section of methods for MyGC (outside of the methods for Plan for MyGC).
+          ```rust
+          impl<VM: VMBinding> MyGC<VM> {
           }
+       ```
+        5. To this, add two helper methods, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. `tospace()` (see below) returns a reference to the tospace, and `fromspace()` returns a reference to the fromspace.
+          ```rust
+          pub fn tospace(&self) -> &CopySpace<VM> {
+            if self.hi.load(Ordering::SeqCst) {
+                &self.copyspace1
+            } else {
+                &self.copyspace0
+            }
+          }
+       ```
+        6. Also add the following helper function:
+        ```rust
+        fn get_collection_reserve(&self) -> usize {
+          self.tospace().reserved_pages()
         }
-     ```
-      6. Also add the following helper function:
-      ```rust
-      fn get_collection_reserve(&self) -> usize {
-        self.tospace().reserved_pages()
-      }
-      ``` 
-Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace, and to the two spaces controlled by the common plan.
+        ``` 
+Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace, and to the two spaces controlled by the common plan. **TODO: import statements**
   1. First, in `lazy_static!`, make the following changes:
      1. Map `Default` to `BumpPointer(0)`.
      2. Map `ReadOnly` to `BumpPointer(1)`.
@@ -295,7 +295,7 @@ With this, you should have the allocation working, but not garbage collection. T
    use crate::plan::CopyContext;
    use crate::policy::space::Space;
    use crate::scheduler::gc_works::*;
-   use crate::util::alloc::{Allocator, BumpAllocator}; //ALLOC
+   use crate::util::alloc::{Allocator, BumpAllocator};
    use crate::util::forwarding_word;
    use crate::util::{Address, ObjectReference, OpaquePointer};
    use crate::vm::VMBinding;
@@ -460,16 +460,16 @@ Of course, this means that the Triplespace is incredibly inefficient for a gener
 ## Building a copying generational collector
 
 ### What is a generational collector?
-The *weak generational hypothesis* states that most of the objects allocated to a heap after one collection will die before the next collection. Therefore, it is worth separating out 'young' and 'old' objects and only scanning each as needed, to minimise the number of times old live objects are scanned. New objects are allocated to a 'nursery', and after one collection they move to the 'mature' space - in `triplespace`, `youngspace` is a proto-nursery, and the tospace and fromspace are the mature space.
+The *weak generational hypothesis* states that most of the objects allocated to a heap after one collection will die before the next collection. Therefore, it is worth separating out 'young' and 'old' objects and only scanning each as needed, to minimise the number of times old live objects are scanned. New objects are allocated to a 'nursery', and after one collection they move to the 'mature' space. In `triplespace`, `youngspace` is a proto-nursery, and the tospace and fromspace are the mature space.
 
-This collector fixes one of the major problems with Semispace - namely, that any old objects are repeatedly copied back and forth. By separating these old objects into a separate 'mature' space, the number of collections needed is greatly reduced.
+This collector fixes one of the major problems with Semispace - namely, that any long-lived objects are repeatedly copied back and forth. By separating these objects into a separate 'mature' space, the number of full heap collections needed is greatly reduced.
 
 **TODO: finish this section**
 
 **Idea: Add 2nd older generation exercise**
 
 
-#### Triplespace backup instructions
+### Triplespace backup instructions
 
 **TODO: Clean up and check accuracy**
 
