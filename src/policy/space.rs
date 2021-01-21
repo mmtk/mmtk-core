@@ -243,7 +243,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         trace!("Polling ..");
 
-        if unsafe { VM::VMActivePlan::is_mutator(tls) } && VM::VMActivePlan::global().poll(false, self.as_space()) {
+        if unsafe { VM::VMActivePlan::is_mutator(tls) }
+            && VM::VMActivePlan::global().poll(false, self.as_space())
+        {
             debug!("Collection required");
             if !VM::VMActivePlan::global().is_initialized() {
                 panic!("Collection is not enabled.");
