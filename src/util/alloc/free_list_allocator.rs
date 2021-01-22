@@ -1,8 +1,7 @@
-use crate::policy::malloc::heap_full;
+use crate::{policy::malloc::{HEAP_SIZE, heap_full, map_meta_space_for_chunk, meta_space_mapped, set_alloc_bit}, util::{conversions}};
 use crate::policy::malloc::calloc;
 use crate::policy::malloc::malloc_usable_size;
 use crate::policy::malloc::HEAP_USED;
-use crate::policy::malloc::create_metadata;
 use crate::util::alloc::Allocator;
 use crate::plan::global::Plan;
 use crate::plan::selected_plan::SelectedPlan;
@@ -36,16 +35,24 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     fn alloc(&mut self, size: usize, _align: usize, offset: isize) -> Address {
         trace!("alloc");
         assert!(offset==0);
+        // println!("{} {}",_align, size);
         unsafe {
             if heap_full() {
+                println!("Heap full, begin marking");
                 self.plan.handle_user_collection_request(self.tls, true);
                 assert!(!heap_full(), "FreeListAllocator: Out of memory!");
             }
             let ptr = calloc(1, size);
             let address = Address::from_mut_ptr(ptr);
+            if !meta_space_mapped(address) {
+                let chunk_start = conversions::chunk_align_down(address);
+                println!("found a chunk {} for which meta space is not mapped", chunk_start);
+                map_meta_space_for_chunk(chunk_start);
+                println!("mapped the meta space");
+            }
             let allocated_memory = malloc_usable_size(ptr);
+            set_alloc_bit(address);
             HEAP_USED.fetch_add(allocated_memory, Ordering::SeqCst);
-            create_metadata(address);
             address
         }
     }

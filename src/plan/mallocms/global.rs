@@ -1,11 +1,12 @@
 use super::gc_works::MSProcessEdges;
-use crate::{mmtk::MMTK, util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK};
+use crate::{mmtk::MMTK, policy::malloc::{self, ALIGN, is_malloced}, util::{Address, constants, heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK}, side_metadata}};
 use crate::policy::malloc::HEAP_SIZE;
-use crate::policy::malloc::METADATA_TABLE;
+use crate::policy::malloc::ALLOCATION_METADATA_ID;
+use crate::policy::malloc::MARKING_METADATA_ID;
 use crate::policy::malloc::malloc_usable_size;
 use crate::policy::malloc::free;
-use crate::policy::malloc::word_index_to_address;
 use crate::policy::malloc::HEAP_USED;
+use crate::policy::malloc::MAPPED_CHUNKS;
 use crate::policy::mallocspace::MallocSpace;
 use crate::plan::global::NoCopy;
 use crate::plan::global::BasePlan;
@@ -27,13 +28,15 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::OpaquePointer;
+use crate::util::side_metadata::SideMetadata;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::vm::VMBinding;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use atomic::Ordering;
 use enum_map::EnumMap;
+use malloc::{MIN_OBJECT_SIZE, unset_alloc_bit, unset_mark_bit};
 
 pub type SelectedPlan<VM> = MallocMS<VM>;
 
@@ -67,7 +70,8 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
     fn collection_required(&self, _space_full: bool, _space: &dyn Space<Self::VM>) -> bool
     where
             Self: Sized, {
-        unsafe { HEAP_USED.load(Ordering::SeqCst) >= HEAP_SIZE }
+            unimplemented!();
+        // unsafe { HEAP_USED.load(Ordering::SeqCst) >= HEAP_SIZE }
     }
 
     fn gc_init(
@@ -76,7 +80,12 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
-        unsafe { HEAP_SIZE = heap_size; }
+        unsafe {
+            let align = constants::LOG_BYTES_IN_WORD as usize;
+            HEAP_SIZE = heap_size;
+            ALLOCATION_METADATA_ID = SideMetadata::request_meta_bits(1, align);
+            MARKING_METADATA_ID = SideMetadata::request_meta_bits(1, align);
+        }
         self.base.gc_init(heap_size, vm_map, scheduler);
     }
 
@@ -114,36 +123,30 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
     }
 
     fn release(&self, _tls: OpaquePointer) {
+        println!("Begin release: HEAP_USED = {}", HEAP_USED.load(Ordering::SeqCst));
         unsafe {
-            let table_len = METADATA_TABLE.read().unwrap().len();
-            let ref mut metadata_table = METADATA_TABLE.write().unwrap();
-            // let table_len = metadata_table.len();
-            let mut chunk_index = 0;
-            while chunk_index < table_len {
-                let row = &mut metadata_table[chunk_index];
-                let malloced = &mut row.1;
-                let marked = &mut row.2;
-                let mut word_index = 0;
-                while word_index < 1 << LOG_BYTES_IN_CHUNK >> 4 {
-                    if malloced[word_index] == 1 {
-                        if marked[word_index] == 0 {
-                            let chunk_start = row.0;
-                            let address = word_index_to_address(word_index, chunk_start);
+            let chunks = &*MAPPED_CHUNKS.read().unwrap();
+            // println!("num chunks mapped = {}", chunks.len());
+            for chunk_start in chunks {
+                let mut address = *chunk_start;
+                let end_of_chunk = chunk_start.add(BYTES_IN_CHUNK);
+                while address.as_usize() < end_of_chunk.as_usize() {
+                    if SideMetadata::load_atomic(ALLOCATION_METADATA_ID, address) == 1 {
+                        if SideMetadata::load_atomic(MARKING_METADATA_ID, address) == 0 {
                             let ptr = address.to_mut_ptr();
                             let freed_memory = malloc_usable_size(ptr);
                             HEAP_USED.fetch_sub(freed_memory, Ordering::SeqCst);
                             free(ptr);
-                            malloced[word_index] = 0;
-                            marked[word_index] = 0;
+                            unset_alloc_bit(address);
                         } else {
-                            marked[word_index] = 0;
+                            unset_mark_bit(address);
                         }
                     }
-                    word_index += 1;
+                    address = address.add(ALIGN);
                 }
-                chunk_index += 1;
             }
         }
+        println!("Done release: HEAP_USED = {}", HEAP_USED.load(Ordering::SeqCst));
     }
 
     fn get_collection_reserve(&self) -> usize {

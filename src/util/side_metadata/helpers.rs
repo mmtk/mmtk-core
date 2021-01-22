@@ -48,7 +48,7 @@ pub(super) fn address_to_meta_address(addr: Address, metadata_id: SideMetadataID
 }
 
 // Gets the related meta address and clears the low order bits
-pub(super) fn address_to_meta_page_address(
+pub fn address_to_meta_page_address(
     data_addr: Address,
     metadata_id: SideMetadataID,
 ) -> Address {
@@ -64,7 +64,7 @@ pub(super) fn address_to_meta_page_address(
 // and Ok(is_mapped?) otherwise.
 //
 // NOTE: using incorrect (e.g. not properly aligned) page_addr is undefined behavior.
-pub(super) fn meta_page_is_mapped(page_addr: Address) -> Result<bool> {
+pub fn meta_page_is_mapped(page_addr: Address) -> Result<bool> {
     let prot = libc::PROT_NONE;
     // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
