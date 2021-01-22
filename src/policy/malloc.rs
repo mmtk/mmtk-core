@@ -2,7 +2,7 @@
 // currently under policy so that is_malloced can be accessed by the OpenJDK binding
 // once the sparse SFT table is in use and is_malloced is replaced by is_mapped_address, this should be moved to plan::mallocms
 
-use std::{cmp::max, collections::HashSet, sync::atomic::AtomicUsize};
+use std::{cmp::max, collections::HashSet, sync::atomic::AtomicUsize, time::SystemTime};
 use std::sync::RwLock;
 use crate::util::{Address, heap::layout::vm_layout_constants::BYTES_IN_CHUNK, side_metadata::{SideMetadata, SideMetadataID}};
 use crate::util::ObjectReference;
@@ -47,23 +47,17 @@ pub fn heap_full() -> bool {
     unsafe { HEAP_USED.load(Ordering::SeqCst) >= HEAP_SIZE }
 }
 
+
+
 pub fn meta_space_mapped(address: Address) -> bool {
     let chunk_start = chunk_align_down(address);
     MAPPED_CHUNKS.read().unwrap().contains(&chunk_start)
 }
 
 pub unsafe fn map_meta_space_for_chunk(chunk_start: Address) {
-    // println!("mapping metadata space for chunk_start = {}", chunk_start);
-    let chunk_end = chunk_start + BYTES_IN_CHUNK;
-    let mut address = chunk_start;
-    assert!(address < chunk_end);
-    let align = max(ALIGN, MIN_OBJECT_SIZE);
-    while address <= chunk_end {
-        SideMetadata::map_meta_space(address, align, ALLOCATION_METADATA_ID);
-        SideMetadata::map_meta_space(address, align, MARKING_METADATA_ID);
-        address = address.add(align);
-    }
     MAPPED_CHUNKS.write().unwrap().insert(chunk_start);
+    SideMetadata::map_meta_space(chunk_start, BYTES_IN_CHUNK, ALLOCATION_METADATA_ID);
+    SideMetadata::map_meta_space(chunk_start, BYTES_IN_CHUNK, MARKING_METADATA_ID);
 }
 
 // Check if a given object was allocated by malloc

@@ -123,7 +123,6 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
     }
 
     fn release(&self, _tls: OpaquePointer) {
-        println!("Begin release: HEAP_USED = {}", HEAP_USED.load(Ordering::SeqCst));
         unsafe {
             let chunks = &*MAPPED_CHUNKS.read().unwrap();
             // println!("num chunks mapped = {}", chunks.len());
@@ -146,7 +145,6 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
                 }
             }
         }
-        println!("Done release: HEAP_USED = {}", HEAP_USED.load(Ordering::SeqCst));
     }
 
     fn get_collection_reserve(&self) -> usize {

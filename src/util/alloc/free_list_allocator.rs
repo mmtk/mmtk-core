@@ -38,7 +38,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         // println!("{} {}",_align, size);
         unsafe {
             if heap_full() {
-                println!("Heap full, begin marking");
                 self.plan.handle_user_collection_request(self.tls, true);
                 assert!(!heap_full(), "FreeListAllocator: Out of memory!");
             }
@@ -46,9 +45,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             let address = Address::from_mut_ptr(ptr);
             if !meta_space_mapped(address) {
                 let chunk_start = conversions::chunk_align_down(address);
-                println!("found a chunk {} for which meta space is not mapped", chunk_start);
                 map_meta_space_for_chunk(chunk_start);
-                println!("mapped the meta space");
             }
             let allocated_memory = malloc_usable_size(ptr);
             set_alloc_bit(address);
