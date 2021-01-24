@@ -198,7 +198,16 @@ When the tospace is full, the definitions of the spaces are flipped (the 'tospac
 **TODO: Fix formatting**
 
 The first step of changing the MyGC plan into a Semispace plan is to add the two copyspaces that the collector will allocate memory into. This requires adding two copyspaces, code to properly initialise and prepare the new spaces, and a copy context.
-First, in `global.rs`, replace the old immortal space with two copyspaces.
+
+
+Firstly, we need to change the plan constraints.
+1. Look in `plan/plan_constraints.rs`. This file contains all the possible options for constraints. At the moment, `mygc/constraints.rs` contains 2 variables: `GC_HEADER_BITS` and `GC_HEADER_WORDS`. Both are set to 0. **TODO: What do these do?**
+2. You will need to change two more options: `MOVES_OBJECTS` and `NUM_SPECIALIZED_SCANS`. Copy the lines containing both to `mygc/constraints.rs`.
+3. Set `MOVES_OBJECTS` to `true`. 
+4. Set `NUM_SPECIALIZED_SCANS` to 1.
+
+
+Next, in `global.rs`, replace the old immortal space with two copyspaces.
 1. **TODO** change as few imports as possible for this step. Need CommonPlan, AtomicBool, CopySpace. Remove line for allow unused imports. Maybe do these as needed.
 2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
   1. Delete the existing fields in the constructor.
@@ -395,6 +404,9 @@ With this, you should have the allocation working, but not garbage collection. T
         }
     }
     ```
+8. A few import statements need to be added to the other files so that they can use the functions in `gc_works`.
+   1. `global.rs`: Import `MyGCCopyContext` and `MyGCProcessEdges`.
+   2. `mod.rs`: Import `gc_works` as a module (`mod gc_works;`).
      
 Next, go back to `mutator.rs`. **TODO: Should this be here? The allocation seems to work without it, but I don't really understand why.**
 1. Create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. Its body can stay empty, as there aren't any preparation steps for this GC.
