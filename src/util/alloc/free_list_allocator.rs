@@ -1,14 +1,18 @@
-use crate::{policy::malloc::{HEAP_SIZE, heap_full, map_meta_space_for_chunk, meta_space_mapped, set_alloc_bit}, util::{conversions}};
+use crate::plan::global::Plan;
+use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::malloc::calloc;
 use crate::policy::malloc::malloc_usable_size;
 use crate::policy::malloc::HEAP_USED;
-use crate::util::alloc::Allocator;
-use crate::plan::global::Plan;
-use crate::plan::selected_plan::SelectedPlan;
+use crate::policy::malloc::heap_full;
+use crate::policy::malloc::map_meta_space_for_chunk;
+use crate::policy::malloc::meta_space_mapped;
+use crate::policy::malloc::set_alloc_bit;
 use crate::policy::space::Space;
-use crate::util::OpaquePointer;
+use crate::util::alloc::Allocator;
 use crate::util::Address;
+use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+use crate::util::conversions;
 use atomic::Ordering;
 
 #[repr(C)]
@@ -24,7 +28,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 }
 
-
 impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     fn get_space(&self) -> Option<&'static dyn Space<VM>> {
         self.space
@@ -34,26 +37,23 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
     fn alloc(&mut self, size: usize, _align: usize, offset: isize) -> Address {
         trace!("alloc");
-        assert!(offset==0);
-        // println!("{} {}",_align, size);
+        assert!(offset == 0);
+        if heap_full() {
+            self.plan.handle_user_collection_request(self.tls, true);
+            assert!(!heap_full(), "FreeListAllocator: Out of memory!");
+        }
         unsafe {
-            if heap_full() {
-                self.plan.handle_user_collection_request(self.tls, true);
-                assert!(!heap_full(), "FreeListAllocator: Out of memory!");
-            }
             let ptr = calloc(1, size);
             let address = Address::from_mut_ptr(ptr);
             if !meta_space_mapped(address) {
                 let chunk_start = conversions::chunk_align_down(address);
                 map_meta_space_for_chunk(chunk_start);
             }
-            let allocated_memory = malloc_usable_size(ptr);
             set_alloc_bit(address);
-            HEAP_USED.fetch_add(allocated_memory, Ordering::SeqCst);
+            HEAP_USED.fetch_add(malloc_usable_size(ptr), Ordering::SeqCst);
             address
         }
     }
-
 
     fn get_tls(&self) -> OpaquePointer {
         self.tls
@@ -70,10 +70,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         space: Option<&'static dyn Space<VM>>,
         plan: &'static SelectedPlan<VM>,
     ) -> Self {
-        FreeListAllocator {
-            tls,
-            space,
-            plan,
-        }
+        FreeListAllocator { tls, space, plan }
     }
 }

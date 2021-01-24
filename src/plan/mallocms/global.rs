@@ -1,42 +1,45 @@
 use super::gc_works::MSProcessEdges;
-use crate::{mmtk::MMTK, policy::malloc::{self, ALIGN, is_malloced}, util::{Address, constants, heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK}, side_metadata}};
-use crate::policy::malloc::HEAP_SIZE;
-use crate::policy::malloc::ALLOCATION_METADATA_ID;
-use crate::policy::malloc::MARKING_METADATA_ID;
-use crate::policy::malloc::malloc_usable_size;
-use crate::policy::malloc::free;
-use crate::policy::malloc::HEAP_USED;
-use crate::policy::malloc::MAPPED_CHUNKS;
-use crate::policy::mallocspace::MallocSpace;
-use crate::plan::global::NoCopy;
+use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 #[cfg(all(feature = "largeobjectspace", feature = "immortalspace"))]
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::mutator_context::Mutator;
+use crate::plan::global::NoCopy;
 use crate::plan::mallocms::mutator::create_ms_mutator;
 use crate::plan::mallocms::mutator::ALLOCATOR_MAPPING;
+use crate::plan::mutator_context::Mutator;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
+use crate::policy::malloc::free;
+use crate::policy::malloc::malloc_usable_size;
+use crate::policy::malloc::unset_alloc_bit;
+use crate::policy::malloc::unset_mark_bit;
+use crate::policy::malloc::ALLOCATION_METADATA_ID;
+use crate::policy::malloc::HEAP_SIZE;
+use crate::policy::malloc::HEAP_USED;
+use crate::policy::malloc::MAPPED_CHUNKS;
+use crate::policy::malloc::MARKING_METADATA_ID;
+use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::constants;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::util::OpaquePointer;
-use crate::util::side_metadata::SideMetadata;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
+use crate::util::side_metadata::SideMetadata;
+use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use atomic::Ordering;
 use enum_map::EnumMap;
-use malloc::{MIN_OBJECT_SIZE, unset_alloc_bit, unset_mark_bit};
 
 pub type SelectedPlan<VM> = MallocMS<VM>;
 
@@ -65,12 +68,11 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
         }
     }
 
-
-
     fn collection_required(&self, _space_full: bool, _space: &dyn Space<Self::VM>) -> bool
     where
-            Self: Sized, {
-            unimplemented!();
+        Self: Sized,
+    {
+        unimplemented!();
         // unsafe { HEAP_USED.load(Ordering::SeqCst) >= HEAP_SIZE }
     }
 
@@ -113,35 +115,32 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
     ) -> Box<Mutator<Self>> {
         Box::new(create_ms_mutator(tls, self))
     }
-    
+
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
         &*ALLOCATOR_MAPPING
     }
 
     fn prepare(&self, _tls: OpaquePointer) {
-        // Do nothing  
+        // Do nothing
     }
 
     fn release(&self, _tls: OpaquePointer) {
         unsafe {
-            let chunks = &*MAPPED_CHUNKS.read().unwrap();
-            // println!("num chunks mapped = {}", chunks.len());
-            for chunk_start in chunks {
+            for chunk_start in &*MAPPED_CHUNKS.read().unwrap() {
                 let mut address = *chunk_start;
-                let end_of_chunk = chunk_start.add(BYTES_IN_CHUNK);
-                while address.as_usize() < end_of_chunk.as_usize() {
+                let chunk_end = chunk_start.add(BYTES_IN_CHUNK);
+                while address.as_usize() < chunk_end.as_usize() {
                     if SideMetadata::load_atomic(ALLOCATION_METADATA_ID, address) == 1 {
                         if SideMetadata::load_atomic(MARKING_METADATA_ID, address) == 0 {
                             let ptr = address.to_mut_ptr();
-                            let freed_memory = malloc_usable_size(ptr);
-                            HEAP_USED.fetch_sub(freed_memory, Ordering::SeqCst);
+                            HEAP_USED.fetch_sub(malloc_usable_size(ptr), Ordering::SeqCst);
                             free(ptr);
                             unset_alloc_bit(address);
                         } else {
                             unset_mark_bit(address);
                         }
                     }
-                    address = address.add(ALIGN);
+                    address = address.add(VM::MAX_ALIGNMENT);
                 }
             }
         }

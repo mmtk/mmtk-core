@@ -1,9 +1,11 @@
-use crate::{policy::malloc::{MARKING_METADATA_ID, is_marked, set_mark_bit}, scheduler::gc_works::*, util::side_metadata::SideMetadata};
-use crate::util::{Address, ObjectReference};
+use crate::policy::malloc::is_marked;
+use crate::policy::malloc::set_mark_bit;
+use crate::scheduler::gc_works::*;
+use crate::util::Address;
+use crate::util::ObjectReference;
 use crate::vm::VMBinding;
-use std::{marker::PhantomData};
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-
 
 #[derive(Default)]
 pub struct MSProcessEdges<VM: VMBinding> {
@@ -30,7 +32,6 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
             self.process_node(object);
         }
         object
-        
     }
 }
 
