@@ -48,9 +48,9 @@ impl<C: Context> Worker<C> {
 
     #[inline]
     pub fn add_work(&mut self, bucket: WorkBucketId, work: impl Work<C>) {
-        if (!self.scheduler().work_buckets[bucket].is_activated()) {
+        if !self.scheduler().work_buckets[bucket].is_activated() {
             self.scheduler.work_buckets[bucket].add_with_priority(1000, box work);
-            return
+            return;
         }
         self.local_work_buffer.push((bucket, box work));
         if self.local_work_buffer.len() > LOCALLY_CACHED_WORKS {
