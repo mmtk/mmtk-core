@@ -35,7 +35,10 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `tls`: The thread to query.
-    fn worker(tls: OpaquePointer) -> &'static mut GCWorker<VM>;
+    ///
+    /// # Safety
+    /// The caller needs to make sure that the thread is a GC worker thread.
+    unsafe fn worker(tls: OpaquePointer) -> &'static mut GCWorker<VM>;
 
     /// Return whether there is a mutator created and associated with the thread.
     ///
@@ -43,7 +46,7 @@ pub trait ActivePlan<VM: VMBinding> {
     /// * `tls`: The thread to query.
     ///
     /// # Safety
-    /// TODO: I am not sure why this is unsafe.
+    /// The caller needs to make sure that the thread is valid (a value passed in by the VM binding through API).
     unsafe fn is_mutator(tls: OpaquePointer) -> bool;
 
     /// Return a `Mutator` reference for the thread.
@@ -52,12 +55,8 @@ pub trait ActivePlan<VM: VMBinding> {
     /// * `tls`: The thread to query.
     ///
     /// # Safety
-    /// TODO: I am not sure why this is unsafe.
+    /// The caller needs to make sure that the thread is a mutator thread.
     unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan<VM> as Plan>::Mutator;
-
-    /// Return the number of GC collectors. This is unused by MMTk now, and will be removed.
-    #[deprecated]
-    fn collector_count() -> usize;
 
     /// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.
     fn reset_mutator_iterator();

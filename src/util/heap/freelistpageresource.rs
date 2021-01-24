@@ -3,7 +3,6 @@ use std::sync::{Mutex, MutexGuard};
 
 use super::layout::map::Map;
 use super::layout::Mmapper;
-use super::vmrequest::HEAP_LAYOUT_64BIT;
 use super::PageResource;
 use crate::policy::space::Space;
 use crate::util::address::Address;
@@ -30,9 +29,7 @@ impl CommonFreeListPageResource {
     }
 
     pub fn resize_freelist(&mut self, start_address: Address) {
-        // debug_assert!((HEAP_LAYOUT_64BIT || !contiguous) && !Plan.isInitialized());
         self.start = start_address.align_up(BYTES_IN_REGION);
-        // self.free_list.resize_freelist();
     }
 }
 
@@ -157,7 +154,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             );
             common_flpr
         };
-        let growable = HEAP_LAYOUT_64BIT;
+        let growable = cfg!(target_pointer_width = "64");
         let mut flpr = FreeListPageResource {
             common: CommonPageResource::new(true, growable),
             common_flpr,

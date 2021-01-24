@@ -70,14 +70,7 @@ impl<P: Plan<Mutator = Self>> MutatorContext<P::VM> for Mutator<P> {
     }
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
-    // Q: Can we remove type_refer?
-    fn post_alloc(
-        &mut self,
-        refer: ObjectReference,
-        _type_refer: ObjectReference,
-        _bytes: usize,
-        allocator: AllocationType,
-    ) {
+    fn post_alloc(&mut self, refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
         unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
@@ -111,13 +104,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
         offset: isize,
         allocator: AllocationType,
     ) -> Address;
-    fn post_alloc(
-        &mut self,
-        refer: ObjectReference,
-        type_refer: ObjectReference,
-        bytes: usize,
-        allocator: AllocationType,
-    );
+    fn post_alloc(&mut self, refer: ObjectReference, bytes: usize, allocator: AllocationType);
     fn flush_remembered_sets(&mut self) {
         self.barrier().flush();
     }

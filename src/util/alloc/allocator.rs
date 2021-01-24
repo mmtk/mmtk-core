@@ -1,4 +1,5 @@
 use crate::util::address::Address;
+use crate::util::constants::DEFAULT_STRESS_FACTOR;
 
 use std::sync::atomic::Ordering;
 
@@ -120,19 +121,21 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     #[inline(always)]
     fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let tls = self.get_tls();
+        let plan = self.get_plan().base();
+        let stress_test = plan.options.stress_factor != DEFAULT_STRESS_FACTOR;
 
         // Information about the previous collection.
         let mut emergency_collection = false;
+        let mut previous_result_zero = false;
         loop {
             // Try to allocate using the slow path
             let result = self.alloc_slow_once(size, align, offset);
 
-            if unsafe { !VM::VMActivePlan::is_mutator(tls) } {
+            if !unsafe { VM::VMActivePlan::is_mutator(tls) } {
                 debug_assert!(!result.is_zero());
                 return result;
             }
 
-            let plan = self.get_plan().base();
             if !result.is_zero() {
                 // TODO: Check if we need oom lock.
                 // It seems the lock only protects access to the atomic boolean. We could possibly do
@@ -147,10 +150,29 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     plan.allocation_success.store(true, Ordering::Relaxed);
                     drop(guard);
                 }
+
+                // When a GC occurs, the resultant address provided by `acquire()` is 0x0.
+                // Hence, another iteration of this loop occurs. In such a case, the second
+                // iteration tries to allocate again, and if is successful, then the allocation
+                // bytes are updated. However, this leads to double counting of the allocation:
+                // (i) by the original alloc_slow_inline(); and (ii) by the alloc_slow_inline()
+                // called by acquire(). In order to not double count the allocation, we only
+                // update allocation bytes if the previous result wasn't 0x0.
+                if stress_test && self.get_plan().is_initialized() && !previous_result_zero {
+                    plan.increase_allocation_bytes_by(size);
+                }
+
                 return result;
             }
 
-            if emergency_collection {
+            // It is possible to have cases where a thread is blocked for another GC (non emergency)
+            // immediately after being blocked for a GC (emergency) (e.g. in stress test), that is saying the thread does not
+            // leave this loop between the two GCs. The local var 'emergency_collection' was set to true
+            // after the first GC. But when we execute this check below, we just finished the second GC,
+            // which is not emergency. In such case, we will give a false OOM.
+            // We cannot just rely on the local var. Instead, we get the emergency collection value again,
+            // and check both.
+            if emergency_collection && self.get_plan().is_emergency_collection() {
                 trace!("Emergency collection");
                 // Report allocation success to assist OutOfMemory handling.
                 let guard = plan.oom_lock.lock().unwrap();
@@ -182,6 +204,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
              */
             emergency_collection = self.get_plan().is_emergency_collection();
             trace!("Got emergency collection as {}", emergency_collection);
+            previous_result_zero = true;
         }
     }
 

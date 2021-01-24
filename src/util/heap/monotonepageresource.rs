@@ -1,5 +1,4 @@
 use super::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use super::vmrequest::HEAP_LAYOUT_64BIT;
 use crate::policy::space::required_chunks;
 use crate::util::address::Address;
 use crate::util::conversions::*;
@@ -202,7 +201,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         let sentinel = start + bytes;
 
         MonotonePageResource {
-            common: CommonPageResource::new(true, HEAP_LAYOUT_64BIT),
+            common: CommonPageResource::new(true, cfg!(target_pointer_width = "64")),
 
             meta_data_pages_per_region,
             sync: Mutex::new(MonotonePageResourceSync {

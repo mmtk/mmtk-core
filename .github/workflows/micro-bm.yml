@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mmtk/mmtk-openjdk
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           path: mmtk-openjdk-trunk
           submodules: true
           ref: ${{ env.OPENJDK_BINDING_TRUNK_REF }}
@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mmtk/mmtk-openjdk
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           path: mmtk-openjdk-branch
           submodules: true
           ref: ${{ env.OPENJDK_BINDING_BRANCH_REF }}
@@ -53,15 +53,18 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mmtk/ci-perf-kit
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           ref: "0.4.3"
           path: ci-perf-kit
           submodules: true
+      # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV          
       # run compare
       - name: Compare Performance
         id: run
         run: |
-          RUSTUP_TOOLCHAIN=nightly-2020-07-08 ./ci-perf-kit/scripts/openjdk-micro-bm.sh mmtk-openjdk-trunk/ mmtk-core-trunk/ mmtk-openjdk-branch/ mmtk-core-branch/ openjdk-rebench-report.md
+          ./ci-perf-kit/scripts/openjdk-micro-bm.sh mmtk-openjdk-trunk/ mmtk-core-trunk/ mmtk-openjdk-branch/ mmtk-core-branch/ openjdk-rebench-report.md
       # set report.md to output
       - uses: pCYSl5EDgo/cat@master
         id: cat
