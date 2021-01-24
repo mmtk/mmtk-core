@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Weak};
 
-const LOCALLY_CACHED_WORKS: usize = 10;
+const LOCALLY_CACHED_WORKS: usize = 1;
 
 pub struct Worker<C: Context> {
     pub tls: OpaquePointer,
@@ -48,6 +48,10 @@ impl<C: Context> Worker<C> {
 
     #[inline]
     pub fn add_work(&mut self, bucket: WorkBucketId, work: impl Work<C>) {
+        if (!self.scheduler().work_buckets[bucket].is_activated()) {
+            self.scheduler.work_buckets[bucket].add_with_priority(1000, box work);
+            return
+        }
         self.local_work_buffer.push((bucket, box work));
         if self.local_work_buffer.len() > LOCALLY_CACHED_WORKS {
             self.flush();
