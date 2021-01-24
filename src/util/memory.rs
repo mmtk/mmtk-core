@@ -51,3 +51,39 @@ pub fn mprotect(start: Address, size: usize) -> Result<()> {
         Err(Error::from_raw_os_error(result))
     }
 }
+
+/// mmap with no swap space reserve:
+/// This function only maps the address range, but doesn't occupy any physical memory.
+///
+/// Before using any part of the address range, dzmmap must be called.
+///
+pub fn mmap_noreserve(start: Address, size: usize) -> Result<bool> {
+    let prot = libc::PROT_NONE;
+    let flags =
+        libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE | libc::MAP_NORESERVE;
+
+    let page_addr = start;
+    let result: *mut libc::c_void =
+        unsafe { libc::mmap(page_addr.to_mut_ptr(), size, prot, flags, -1, 0) };
+    if result == libc::MAP_FAILED {
+        let err = unsafe { *libc::__errno_location() };
+        if err == libc::EEXIST {
+            // mmtk already mapped it
+            return Ok(true);
+        } else {
+            // mmtk can't map it
+            println!(
+                "ERR mapping({}): {}",
+                page_addr,
+                Error::from_raw_os_error(err as _)
+            );
+            return Err(Error::from_raw_os_error(err as _));
+        }
+    }
+
+    println!(
+        "mmap_noreserve({}, 0x{:x}) -> result(0x{:x})",
+        start, size, result as usize
+    );
+    Ok(true)
+}

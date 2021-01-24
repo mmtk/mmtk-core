@@ -688,11 +688,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
-        if !VM::VMObjectModel::HAS_GC_BYTE {
-            unsafe {
-                gc_byte::init_side_gcbyte();
-            }
-        }
+        gc_byte::init_gcbyte::<VM>();
         self.base.gc_init(heap_size, vm_map, scheduler);
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.immortal.init(vm_map);

@@ -1,3 +1,4 @@
+use crate::plan::SelectedConstraints;
 use crate::util::side_metadata::{SideMetadata, SideMetadataID};
 use crate::util::{constants, ObjectReference};
 use crate::vm::ObjectModel;
@@ -17,17 +18,24 @@ static mut SIDE_GCBYTE_ID: SideMetadataID = SideMetadataID::new();
 
 #[allow(clippy::cast_ref_to_mut)]
 #[allow(clippy::mut_from_ref)]
-pub(crate) unsafe fn init_side_gcbyte() {
-    let res = SideMetadata::request_meta_bits(
-        // constants::BITS_IN_BYTE,
-        2,
-        constants::LOG_BYTES_IN_WORD as usize,
-    );
-    SIDE_GCBYTE_ID = res;
+pub(crate) fn init_gcbyte<VM: VMBinding>() {
+    if !VM::VMObjectModel::HAS_GC_BYTE {
+        let res = SideMetadata::request_meta_bits(
+            SelectedConstraints::GC_HEADER_BITS,
+            constants::LOG_BYTES_IN_WORD as usize,
+        );
+        unsafe {
+            SIDE_GCBYTE_ID = res;
+        }
+    }
 }
 
-pub fn ensure_gcbyte_space_is_mapped(start: Address, size: usize) -> bool {
-    unsafe { SideMetadata::map_meta_space(start, size, SIDE_GCBYTE_ID) }
+pub fn try_map_gcbyte<VM: VMBinding>(start: Address, size: usize) -> bool {
+    if !VM::VMObjectModel::HAS_GC_BYTE {
+        unsafe { SideMetadata::try_map_meta_space(start, size, SIDE_GCBYTE_ID) }
+    } else {
+        true
+    }
 }
 
 // TODO: we probably need to add non-atomic versions of the read and write methods
@@ -41,11 +49,8 @@ pub fn ensure_gcbyte_space_is_mapped(start: Address, size: usize) -> bool {
 /// Otherwise, MMTk provides the metadata on its side.
 ///
 fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 {
-    if VM::VMObjectModel::HAS_GC_BYTE {
-        unsafe { &*(object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET).to_ptr::<AtomicU8>() }
-    } else {
-        unreachable!()
-    }
+    debug_assert!(VM::VMObjectModel::HAS_GC_BYTE);
+    unsafe { &*(object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET).to_ptr::<AtomicU8>() }
 }
 
 /// Atomically reads the current value of an object's GC byte.

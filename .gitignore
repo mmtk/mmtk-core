@@ -27,4 +27,3 @@ Cargo.lock
 /bench-exe
 /test_mmtk
 /test_mmtk_32
-**/.ccls-cache/**

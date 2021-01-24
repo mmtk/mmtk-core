@@ -1,6 +1,7 @@
 use super::helpers::{self, *};
 use crate::util::{constants, memory, Address};
-use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 // ** NOTE: **
 //  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
@@ -25,6 +26,7 @@ impl SideMetadataID {
 // `meta_bits_num_vec[metadata_id]` stores the number of bits requested for `metadata_id`
 // `meta_base_addr_vec[metadata_id]` stores the starting address of the memory to be mapped for the bits of `metadata_id`
 pub struct SideMetadata {
+    pub(super) internal_mutex: Arc<Mutex<()>>,
     pub(super) align: Vec<usize>,
     pub(super) meta_bits_num_log_vec: Vec<usize>,
     pub(super) meta_base_addr_vec: Vec<Address>,
@@ -34,9 +36,10 @@ unsafe impl Sync for SideMetadata {}
 
 lazy_static! {
     pub(super) static ref METADATA_SINGLETON: SideMetadata = SideMetadata {
-        align: Vec::with_capacity(MAX_METADATA_BITS),
-        meta_bits_num_log_vec: Vec::with_capacity(MAX_METADATA_BITS),
-        meta_base_addr_vec: Vec::with_capacity(MAX_METADATA_BITS),
+        internal_mutex: Arc::new(Mutex::new(())),
+        align: Vec::with_capacity(MAX_METADATA_ID),
+        meta_bits_num_log_vec: Vec::with_capacity(MAX_METADATA_ID),
+        meta_base_addr_vec: Vec::with_capacity(MAX_METADATA_ID),
     };
 }
 
@@ -56,49 +59,52 @@ impl SideMetadata {
     /// * `number_of_bits` - The number of bits per source data unit (e.g. per object).
     ///     Currently, the maximum metadata size per data unit is a word (usize).
     ///
-    /// * `align` - The minimum alignment of the source data.
+    /// * `log_min_data_size` - The log of minimum source data (e.g. object) size.
     ///     The minimum data granularity is a word, which means the minimum value of this argument is 2 in 32-bits, and 3 in 64 bits systems.
     ///
-    pub fn request_meta_bits(number_of_bits: usize, align: usize) -> SideMetadataID {
-        assert!(
-            [1, 2, 4, 8, 16, 32].contains(&number_of_bits),
-            "number of metadata bits ({}) must be a power of two",
-            number_of_bits
+    pub fn request_meta_bits(number_of_bits: usize, log_min_data_size: usize) -> SideMetadataID {
+        trace!(
+            "request_meta_bits({}, {})",
+            number_of_bits,
+            log_min_data_size
         );
         assert!(
-            number_of_bits <= MAX_METADATA_BITS,
-            "Too many (>{}) metadata bits requested",
+            number_of_bits.is_power_of_two() && number_of_bits <= MAX_METADATA_BITS,
+            "number of metadata bits ({}) must be a power of two and <= {}.",
+            number_of_bits,
             MAX_METADATA_BITS
         );
         assert!(
-            align >= (constants::LOG_BYTES_IN_WORD as usize),
+            METADATA_SINGLETON.meta_bits_num_log_vec.len() < MAX_METADATA_ID,
+            "Too many (>{}) metadata bit-sets requested",
+            MAX_METADATA_ID
+        );
+        assert!(
+            log_min_data_size >= (constants::LOG_BYTES_IN_WORD as usize),
             "Alignment ({}) is less than minimum ({})",
-            align,
+            log_min_data_size,
             constants::LOG_BYTES_IN_WORD
         );
 
-        let number_of_bits_log: usize = match number_of_bits {
-            1 => 0,
-            2 => 1,
-            4 => 2,
-            8 => 3,
-            16 => 4,
-            32 => 5,
-            _ => unreachable!(),
-        };
+        let number_of_bits_log: usize = number_of_bits.trailing_zeros() as usize;
+
+        // This lock protects the only critical section where write access to SideMetadata's
+        // internal data occurs. All other functions only access Rust's thread-safe data structures
+        let _guard = METADATA_SINGLETON.internal_mutex.lock().unwrap();
+
         let next_id = SideMetadataID(METADATA_SINGLETON.meta_bits_num_log_vec.len());
         unsafe {
-            METADATA_SINGLETON.mut_self().align.push(align);
+            METADATA_SINGLETON.mut_self().align.push(log_min_data_size);
             METADATA_SINGLETON
                 .mut_self()
                 .meta_bits_num_log_vec
                 .push(number_of_bits_log);
         }
-        let next_base_addr = if next_id.0 == 0 {
+        let next_base_addr = if next_id.as_usize() == 0 {
             METADATA_BASE_ADDRESS
         } else {
-            METADATA_SINGLETON.meta_base_addr_vec[next_id.0 - 1]
-                + meta_space_size(SideMetadataID(next_id.0 - 1))
+            METADATA_SINGLETON.meta_base_addr_vec[next_id.as_usize() - 1]
+                + meta_space_size(SideMetadataID(next_id.as_usize() - 1))
         };
 
         unsafe {
@@ -121,8 +127,8 @@ impl SideMetadata {
     ///
     /// * `metadata_id` - The ID of the side metadata to map the space for.
     ///
-    pub fn map_meta_space(start: Address, size: usize, metadata_id: SideMetadataID) -> bool {
-        ensure_meta_is_mapped(start, size, metadata_id)
+    pub fn try_map_meta_space(start: Address, size: usize, metadata_id: SideMetadataID) -> bool {
+        try_map_meta(start, size, metadata_id)
     }
 
     pub fn load_atomic(metadata_id: SideMetadataID, data_addr: Address) -> usize {
@@ -134,7 +140,17 @@ impl SideMetadata {
             data_addr
         );
 
-        let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.0];
+        debug_assert!(
+            metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
+            "metadata_id ({}) out of range",
+            metadata_id.as_usize()
+        );
+        let bits_num_log = *unsafe {
+            METADATA_SINGLETON
+                .meta_bits_num_log_vec
+                .get_unchecked(metadata_id.as_usize())
+        };
+
         if bits_num_log <= 3 {
             let lshift = meta_byte_lshift(data_addr, metadata_id) as u8;
             let mask = (((1usize << (1usize << bits_num_log)) - 1) << lshift) as u8;
@@ -145,8 +161,13 @@ impl SideMetadata {
             unsafe { meta_addr.atomic_load::<AtomicU16>(Ordering::SeqCst) as usize }
         } else if bits_num_log == 5 {
             unsafe { meta_addr.atomic_load::<AtomicU32>(Ordering::SeqCst) as usize }
+        } else if bits_num_log == 6 {
+            unsafe { meta_addr.atomic_load::<AtomicUsize>(Ordering::SeqCst) }
         } else {
-            todo!("side metadata > 32-bits is not supported yet!")
+            unreachable!(
+                "side metadata > {}-bits is not supported!",
+                MAX_METADATA_BITS
+            );
         }
     }
 
@@ -159,7 +180,17 @@ impl SideMetadata {
             data_addr
         );
 
-        let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.0];
+        debug_assert!(
+            metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
+            "metadata_id ({}) out of range",
+            metadata_id.as_usize()
+        );
+        let bits_num_log = *unsafe {
+            METADATA_SINGLETON
+                .meta_bits_num_log_vec
+                .get_unchecked(metadata_id.as_usize())
+        };
+
         if bits_num_log < 3 {
             let lshift = meta_byte_lshift(data_addr, metadata_id);
             let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
@@ -186,8 +217,13 @@ impl SideMetadata {
             unsafe { meta_addr.atomic_store::<AtomicU16>(metadata as u16, Ordering::SeqCst) };
         } else if bits_num_log == 5 {
             unsafe { meta_addr.atomic_store::<AtomicU32>(metadata as u32, Ordering::SeqCst) };
+        } else if bits_num_log == 6 {
+            unsafe { meta_addr.atomic_store::<AtomicUsize>(metadata as usize, Ordering::SeqCst) }
         } else {
-            todo!("side metadata > 32-bits is not supported yet!");
+            unreachable!(
+                "side metadata > {}-bits is not supported!",
+                MAX_METADATA_BITS
+            );
         }
     }
 
@@ -205,7 +241,16 @@ impl SideMetadata {
             data_addr
         );
 
-        let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.0];
+        debug_assert!(
+            metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
+            "metadata_id ({}) out of range",
+            metadata_id.as_usize()
+        );
+        let bits_num_log = *unsafe {
+            METADATA_SINGLETON
+                .meta_bits_num_log_vec
+                .get_unchecked(metadata_id.as_usize())
+        };
 
         if bits_num_log < 3 {
             let lshift = meta_byte_lshift(data_addr, metadata_id);
@@ -258,8 +303,22 @@ impl SideMetadata {
                     )
                     .is_ok()
             }
+        } else if bits_num_log == 6 {
+            unsafe {
+                meta_addr
+                    .compare_exchange::<AtomicUsize>(
+                        old_metadata,
+                        new_metadata,
+                        Ordering::SeqCst,
+                        Ordering::SeqCst,
+                    )
+                    .is_ok()
+            }
         } else {
-            todo!("side metadata > 32-bits is not supported yet!")
+            unreachable!(
+                "side metadata > {}-bits is not supported!",
+                MAX_METADATA_BITS
+            );
         }
     }
 
@@ -273,20 +332,24 @@ impl SideMetadata {
             data_addr
         );
 
-        let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.0];
+        debug_assert!(
+            metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
+            "metadata_id ({}) out of range",
+            metadata_id.as_usize()
+        );
+        let bits_num_log = *unsafe {
+            METADATA_SINGLETON
+                .meta_bits_num_log_vec
+                .get_unchecked(metadata_id.as_usize())
+        };
+
         if bits_num_log < 3 {
             let lshift = meta_byte_lshift(data_addr, metadata_id);
             let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
-            println!(
-                "mask: 0x{:x}, not_mask: 0x{:x}, lshift: {}",
-                mask, !mask, lshift
-            );
 
             let mut old_val = unsafe { meta_addr.load::<u8>() };
             let mut new_sub_val = (((old_val & mask) >> lshift) + (val as u8)) & (mask >> lshift);
-            println!("new_sub_val: {}", new_sub_val);
             let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
-            println!("new_val: {}", new_val);
 
             while unsafe {
                 meta_addr
@@ -300,9 +363,7 @@ impl SideMetadata {
             } {
                 old_val = unsafe { meta_addr.load::<u8>() };
                 new_sub_val = (((old_val & mask) >> lshift) + (val as u8)) & (mask >> lshift);
-                println!("new_sub_val: {}", new_sub_val);
                 new_val = (old_val & !mask) | (new_sub_val << lshift);
-                println!("new_val: {}", new_val);
             }
 
             (old_val & mask) as usize
@@ -318,8 +379,13 @@ impl SideMetadata {
             unsafe {
                 (&*meta_addr.to_ptr::<AtomicU32>()).fetch_add(val as u32, Ordering::SeqCst) as usize
             }
+        } else if bits_num_log == 6 {
+            unsafe { (&*meta_addr.to_ptr::<AtomicUsize>()).fetch_add(val, Ordering::SeqCst) }
         } else {
-            todo!("side metadata > 32-bits is not supported yet!");
+            unreachable!(
+                "side metadata > {}-bits is not supported!",
+                MAX_METADATA_BITS
+            );
         }
     }
 
@@ -333,7 +399,17 @@ impl SideMetadata {
             data_addr
         );
 
-        let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.0];
+        debug_assert!(
+            metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
+            "metadata_id ({}) out of range",
+            metadata_id.as_usize()
+        );
+        let bits_num_log = *unsafe {
+            METADATA_SINGLETON
+                .meta_bits_num_log_vec
+                .get_unchecked(metadata_id.as_usize())
+        };
+
         if bits_num_log < 3 {
             let lshift = meta_byte_lshift(data_addr, metadata_id);
             let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
@@ -370,50 +446,97 @@ impl SideMetadata {
             unsafe {
                 (&*meta_addr.to_ptr::<AtomicU32>()).fetch_sub(val as u32, Ordering::SeqCst) as usize
             }
+        } else if bits_num_log == 6 {
+            unsafe { (&*meta_addr.to_ptr::<AtomicUsize>()).fetch_sub(val, Ordering::SeqCst) }
         } else {
-            todo!("side metadata > 32-bits is not supported yet!");
+            unreachable!(
+                "side metadata > {}-bits is not supported!",
+                MAX_METADATA_BITS
+            );
         }
     }
 
-    pub fn load(metadata_id: SideMetadataID, data_addr: Address) -> usize {
+    /// Non-atomic load of metadata.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because:
+    ///
+    /// 1. Concurrent access to this operation is undefined behavior.
+    /// 2. Interleaving Non-atomic and atomic operations is undefined behavior.
+    ///
+    pub unsafe fn load(metadata_id: SideMetadataID, data_addr: Address) -> usize {
         let meta_addr = address_to_meta_address(data_addr, metadata_id);
-        let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.0];
+        debug_assert!(
+            metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
+            "metadata_id ({}) out of range",
+            metadata_id.as_usize()
+        );
+        let bits_num_log = *METADATA_SINGLETON
+            .meta_bits_num_log_vec
+            .get_unchecked(metadata_id.as_usize());
 
         if bits_num_log <= 3 {
             let lshift = meta_byte_lshift(data_addr, metadata_id);
             let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
-            let byte_val = unsafe { meta_addr.load::<u8>() };
+            let byte_val = meta_addr.load::<u8>();
 
             ((byte_val & mask) as usize) >> lshift
         } else if bits_num_log == 4 {
-            unsafe { meta_addr.load::<u16>() as usize }
+            meta_addr.load::<u16>() as usize
         } else if bits_num_log == 5 {
-            unsafe { meta_addr.load::<u32>() as usize }
+            meta_addr.load::<u32>() as usize
+        } else if bits_num_log == 6 {
+            meta_addr.load::<usize>() as usize
         } else {
-            todo!("side metadata > 32-bits is not supported yet!")
+            unreachable!(
+                "side metadata > {}-bits is not supported!",
+                MAX_METADATA_BITS
+            );
         }
     }
 
-    pub fn store(metadata_id: SideMetadataID, data_addr: Address, metadata: usize) {
+    /// Non-atomic store of metadata.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because:
+    ///
+    /// 1. Concurrent access to this operation is undefined behaviour.
+    /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
+    ///
+    pub unsafe fn store(metadata_id: SideMetadataID, data_addr: Address, metadata: usize) {
         let meta_addr = address_to_meta_address(data_addr, metadata_id);
-        let bits_num_log = METADATA_SINGLETON.meta_bits_num_log_vec[metadata_id.0];
+        debug_assert!(
+            metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
+            "metadata_id ({}) out of range",
+            metadata_id.as_usize()
+        );
+        let bits_num_log = *METADATA_SINGLETON
+            .meta_bits_num_log_vec
+            .get_unchecked(metadata_id.as_usize());
 
         if bits_num_log < 3 {
             let lshift = meta_byte_lshift(data_addr, metadata_id);
             let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
 
-            let old_val = unsafe { meta_addr.load::<u8>() };
+            let old_val = meta_addr.load::<u8>();
             let new_val = (old_val & !mask) | ((metadata as u8) << lshift);
 
-            unsafe { meta_addr.store::<u8>(new_val) };
+            meta_addr.store::<u8>(new_val);
         } else if bits_num_log == 3 {
-            unsafe { meta_addr.store::<u8>(metadata as u8) };
+            meta_addr.store::<u8>(metadata as u8);
         } else if bits_num_log == 4 {
-            unsafe { meta_addr.store::<u16>(metadata as u16) };
+            meta_addr.store::<u16>(metadata as u16);
         } else if bits_num_log == 5 {
-            unsafe { meta_addr.store::<u32>(metadata as u32) };
+            meta_addr.store::<u32>(metadata as u32);
+        } else if bits_num_log == 6 {
+            meta_addr.store::<usize>(metadata as usize);
         } else {
-            todo!("side metadata > 32-bits is not supported yet!");
+            unreachable!(
+                "side metadata > {}-bits is not supported!",
+                MAX_METADATA_BITS
+            );
         }
     }
 
@@ -440,23 +563,26 @@ mod tests {
     use crate::util::heap::layout::vm_layout_constants;
     use crate::util::side_metadata::helpers;
     use crate::util::side_metadata::SideMetadata;
+    use crate::util::test_util::serial_test;
 
     #[test]
     fn test_side_metadata_request_meta_bits() {
-        for i in 0..5 {
-            SideMetadata::request_meta_bits(1 << i, constants::LOG_BYTES_IN_WORD as usize);
-        }
+        serial_test(|| {
+            for i in 0..5 {
+                SideMetadata::request_meta_bits(1 << i, constants::LOG_BYTES_IN_WORD as usize);
+            }
+        });
     }
 
     #[test]
-    fn test_map_meta_space_lt4kb() {
+    fn test_side_metadata_try_map_meta_space_lt4kb() {
         let number_of_bits = 1;
         let number_of_bits_log = 0;
         let align = constants::LOG_BYTES_IN_WORD as usize;
         let space_size = 1;
 
         let metadata_id = SideMetadata::request_meta_bits(number_of_bits, align);
-        assert!(SideMetadata::map_meta_space(
+        assert!(SideMetadata::try_map_meta_space(
             vm_layout_constants::HEAP_START,
             space_size,
             metadata_id
@@ -487,13 +613,13 @@ mod tests {
     }
 
     #[test]
-    fn test_map_meta_space_gt4kb() {
+    fn test_side_metadata_try_map_meta_space_gt4kb() {
         let number_of_bits = 8;
         let align = constants::LOG_BYTES_IN_WORD as usize;
         let space_size = helpers::META_SPACE_PAGE_SIZE * 64 + 1;
 
         let metadata_id = SideMetadata::request_meta_bits(number_of_bits, align);
-        assert!(SideMetadata::map_meta_space(
+        assert!(SideMetadata::try_map_meta_space(
             vm_layout_constants::HEAP_START,
             space_size,
             metadata_id
@@ -526,7 +652,7 @@ mod tests {
         let data_addr = vm_layout_constants::HEAP_START;
         let metadata_id =
             SideMetadata::request_meta_bits(16, constants::LOG_BYTES_IN_WORD as usize);
-        SideMetadata::map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
+        SideMetadata::try_map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
 
         let zero = SideMetadata::fetch_add_atomic(metadata_id, data_addr, 5);
         assert_eq!(zero, 0);
@@ -545,7 +671,7 @@ mod tests {
     fn test_side_metadata_atomic_fetch_add_sub_4bits() {
         let data_addr = vm_layout_constants::HEAP_START;
         let metadata_id = SideMetadata::request_meta_bits(4, constants::LOG_BYTES_IN_WORD as usize);
-        SideMetadata::map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
+        SideMetadata::try_map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
 
         let zero = SideMetadata::fetch_add_atomic(metadata_id, data_addr, 5);
         assert_eq!(zero, 0);
@@ -564,7 +690,7 @@ mod tests {
     fn test_side_metadata_atomic_fetch_add_sub_2bits() {
         let data_addr = vm_layout_constants::HEAP_START;
         let metadata_id = SideMetadata::request_meta_bits(2, constants::LOG_BYTES_IN_WORD as usize);
-        SideMetadata::map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
+        SideMetadata::try_map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
 
         let zero = SideMetadata::fetch_add_atomic(metadata_id, data_addr, 2);
         assert_eq!(zero, 0);
