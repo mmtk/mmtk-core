@@ -54,6 +54,8 @@ impl Map for Map64 {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         debug_assert!(Self::is_space_start(start));
         debug_assert!(extent <= SPACE_SIZE_64);
+        // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
+        // as each space will update different indices.
         let self_mut = unsafe { self.mut_self() };
         let index = Self::space_index(start).unwrap();
         self_mut.descriptor_map[index] = descriptor;
@@ -70,6 +72,7 @@ impl Map for Map64 {
         mut units: usize,
         grain: i32,
     ) -> Box<Self::FreeList> {
+        // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
         let self_mut = unsafe { self.mut_self() };
         let start = pr.get_start();
         let index = Self::space_index(start).unwrap();
@@ -112,6 +115,8 @@ impl Map for Map64 {
         _head: Address,
     ) -> Address {
         debug_assert!(Self::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
+        // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
+        // as each space will update different indices.
         let self_mut = unsafe { self.mut_self() };
 
         let index = descriptor.get_index();
@@ -156,6 +161,8 @@ impl Map for Map64 {
     }
 
     fn boot(&self) {
+        // This is only called during boot process by a single thread calling gc_init().
+        // It is fine to get a mutable reference.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         for pr in 0..MAX_SPACES {
             if let Some(fl) = self_mut.fl_map[pr] {
@@ -167,6 +174,8 @@ impl Map for Map64 {
     }
 
     fn finalize_static_space_map(&self, _from: Address, _to: Address) {
+        // This is only called during boot process by a single thread calling gc_init().
+        // It is fine to get a mutable reference.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         for pr in 0..MAX_SPACES {
             if let Some(fl) = self_mut.fl_page_resources[pr] {
@@ -199,16 +208,14 @@ impl Map for Map64 {
         self.cumulative_committed_pages
             .fetch_add(pages, Ordering::Relaxed);
     }
-
-    fn get_cumulative_committed_pages(&self) -> usize {
-        self.cumulative_committed_pages.load(Ordering::Relaxed)
-    }
 }
 
 impl Map64 {
-    // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
-    // of the same unsafe code.
-    // FIXME: We need a safe implementation.
+    /// # Safety
+    ///
+    /// The caller needs to guarantee there is no race condition. Either only one single thread
+    /// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).
+    /// In other cases, use mut_self_with_sync().
     #[allow(clippy::cast_ref_to_mut)]
     #[allow(clippy::mut_from_ref)]
     unsafe fn mut_self(&self) -> &mut Self {

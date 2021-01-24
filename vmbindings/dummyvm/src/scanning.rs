@@ -1,12 +1,10 @@
 use mmtk::vm::Scanning;
 use mmtk::{TransitiveClosure, SelectedPlan, Mutator};
-use mmtk::util::{ObjectReference, SynchronizedCounter};
+use mmtk::util::ObjectReference;
 use mmtk::util::OpaquePointer;
 use mmtk::scheduler::gc_works::*;
 use mmtk::scheduler::GCWorker;
 use crate::DummyVM;
-
-static COUNTER: SynchronizedCounter = SynchronizedCounter::new(0);
 
 pub struct VMScanning {}
 
@@ -26,15 +24,9 @@ impl Scanning<DummyVM> for VMScanning {
     fn scan_object<T: TransitiveClosure>(_trace: &mut T, _object: ObjectReference, _tls: OpaquePointer) {
         unimplemented!()
     }
-
-    fn reset_thread_counter() {
-        COUNTER.reset();
-    }
-
     fn notify_initial_thread_scan_complete(_partial_scan: bool, _tls: OpaquePointer) {
         unimplemented!()
     }
-
     fn supports_return_barrier() -> bool {
         unimplemented!()
     }

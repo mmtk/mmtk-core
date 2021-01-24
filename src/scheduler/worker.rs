@@ -88,7 +88,7 @@ impl<C: Context> Worker<C> {
         work.do_work(self, self.context.unwrap());
     }
 
-    pub fn run(&'static mut self, context: &'static C) {
+    pub fn run(&mut self, context: &'static C) {
         self.context = Some(context);
         self.local = Some(C::WorkerLocal::new(context));
         let tls = self.tls;

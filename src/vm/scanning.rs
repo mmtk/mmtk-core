@@ -29,9 +29,6 @@ pub trait Scanning<VM: VMBinding> {
         tls: OpaquePointer,
     );
 
-    #[deprecated]
-    fn reset_thread_counter();
-
     /// MMTk calls this method at the first time during a collection that thread's stacks
     /// have been scanned. This can be used (for example) to clean up
     /// obsolete compiled methods that are no longer being executed.
@@ -62,8 +59,6 @@ pub trait Scanning<VM: VMBinding> {
         mutator: &'static mut Mutator<SelectedPlan<VM>>,
         tls: OpaquePointer,
     );
-
-    // TODO: compute_new_thread_roots
 
     /// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)
     /// goes here.
