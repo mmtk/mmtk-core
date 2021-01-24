@@ -9,7 +9,7 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
 use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 pub struct Map32 {
     prev_link: Vec<i32>,
@@ -50,6 +50,8 @@ impl Map for Map32 {
     }
 
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
+        // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
+        // as each space will update different indices.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         let mut e = 0;
         while e < extent {
@@ -86,8 +88,7 @@ impl Map for Map32 {
         chunks: usize,
         head: Address,
     ) -> Address {
-        let self_mut: &mut Self = unsafe { self.mut_self() };
-        let _sync = self.sync.lock().unwrap();
+        let (_sync, self_mut) = self.mut_self_with_sync();
         let chunk = self_mut.region_map.alloc(chunks as _);
         debug_assert!(chunk != 0);
         if chunk == -1 {
@@ -127,36 +128,33 @@ impl Map for Map32 {
         self.get_contiguous_region_chunks(start) << LOG_BYTES_IN_CHUNK
     }
 
-    // The two while loops appear to not mutate the loop condition. However,
-    // free_contiguous_chunks_no_lock() in the loop actually unsafely mutates the while loop condition.
-    // The two while loops can end.
-    // TODO: We need to check the correctness, especially check thread safety.
-    #[allow(clippy::while_immutable_condition)]
     fn free_all_chunks(&self, any_chunk: Address) {
-        let _sync = self.sync.lock().unwrap();
+        let (_sync, self_mut) = self.mut_self_with_sync();
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
         if !any_chunk.is_zero() {
             let chunk = self.get_chunk_index(any_chunk);
-            while self.next_link[chunk] != 0 {
-                let x = self.next_link[chunk];
-                self.free_contiguous_chunks_no_lock(x);
+            while self_mut.next_link[chunk] != 0 {
+                let x = self_mut.next_link[chunk];
+                self_mut.free_contiguous_chunks_no_lock(x);
             }
-            while self.prev_link[chunk] != 0 {
-                let x = self.prev_link[chunk];
-                self.free_contiguous_chunks_no_lock(x);
+            while self_mut.prev_link[chunk] != 0 {
+                let x = self_mut.prev_link[chunk];
+                self_mut.free_contiguous_chunks_no_lock(x);
             }
-            self.free_contiguous_chunks_no_lock(chunk as _);
+            self_mut.free_contiguous_chunks_no_lock(chunk as _);
         }
     }
 
     fn free_contiguous_chunks(&self, start: Address) -> usize {
-        let _sync = self.sync.lock().unwrap();
+        let (_sync, self_mut) = self.mut_self_with_sync();
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = self.get_chunk_index(start);
-        self.free_contiguous_chunks_no_lock(chunk as _)
+        self_mut.free_contiguous_chunks_no_lock(chunk as _)
     }
 
     fn finalize_static_space_map(&self, from: Address, to: Address) {
+        // This is only called during boot process by a single thread calling gc_init().
+        // It is fine to get a mutable reference.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         /* establish bounds of discontiguous space */
         let start_address = from;
@@ -215,6 +213,7 @@ impl Map for Map32 {
     }
 
     fn get_discontig_freelist_pr_ordinal(&self, pr: &CommonFreeListPageResource) -> usize {
+        // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         self_mut.shared_fl_map[self.shared_discontig_fl_count] =
             Some(unsafe { &*(pr as *const CommonFreeListPageResource) });
@@ -231,38 +230,40 @@ impl Map for Map32 {
         self.cumulative_committed_pages
             .fetch_add(pages, Ordering::Relaxed);
     }
-
-    fn get_cumulative_committed_pages(&self) -> usize {
-        self.cumulative_committed_pages.load(Ordering::Relaxed)
-    }
 }
 
 impl Map32 {
-    // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
-    // of the same unsafe code.
-    // FIXME: We need a safe implementation.
+    /// # Safety
+    ///
+    /// The caller needs to guarantee there is no race condition. Either only one single thread
+    /// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).
+    /// In other cases, use mut_self_with_sync().
     #[allow(clippy::cast_ref_to_mut)]
     #[allow(clippy::mut_from_ref)]
     unsafe fn mut_self(&self) -> &mut Self {
         &mut *(self as *const _ as *mut _)
     }
 
-    fn free_contiguous_chunks_no_lock(&self, chunk: i32) -> usize {
-        let self_mut: &mut Self = unsafe { self.mut_self() };
-        let chunks = self_mut.region_map.free(chunk, false);
-        self_mut.total_available_discontiguous_chunks += chunks as usize;
+    fn mut_self_with_sync(&self) -> (MutexGuard<()>, &mut Self) {
+        let guard = self.sync.lock().unwrap();
+        (guard, unsafe { self.mut_self() })
+    }
+
+    fn free_contiguous_chunks_no_lock(&mut self, chunk: i32) -> usize {
+        let chunks = self.region_map.free(chunk, false);
+        self.total_available_discontiguous_chunks += chunks as usize;
         let next = self.next_link[chunk as usize];
         let prev = self.prev_link[chunk as usize];
         if next != 0 {
-            self_mut.prev_link[next as usize] = prev
+            self.prev_link[next as usize] = prev
         };
         if prev != 0 {
-            self_mut.next_link[prev as usize] = next
+            self.next_link[prev as usize] = next
         };
-        self_mut.prev_link[chunk as usize] = 0;
-        self_mut.next_link[chunk as usize] = 0;
+        self.prev_link[chunk as usize] = 0;
+        self.next_link[chunk as usize] = 0;
         for offset in 0..chunks {
-            self_mut.descriptor_map[(chunk + offset) as usize] = SpaceDescriptor::UNINITIALIZED;
+            self.descriptor_map[(chunk + offset) as usize] = SpaceDescriptor::UNINITIALIZED;
             SFT_MAP.clear((chunk + offset) as usize);
             // VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, chunk + offset, null);
         }

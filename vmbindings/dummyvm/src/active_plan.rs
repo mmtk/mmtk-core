@@ -12,7 +12,7 @@ impl ActivePlan<DummyVM> for VMActivePlan {
         &SINGLETON.plan
     }
 
-    fn worker(_tls: OpaquePointer) -> &'static mut GCWorker<DummyVM> {
+    unsafe fn worker(_tls: OpaquePointer) -> &'static mut GCWorker<DummyVM> {
         unimplemented!()
     }
 
@@ -26,10 +26,6 @@ impl ActivePlan<DummyVM> for VMActivePlan {
     }
 
     unsafe fn mutator(_tls: OpaquePointer) -> &'static mut <SelectedPlan<DummyVM> as Plan>::Mutator {
-        unimplemented!()
-    }
-
-    fn collector_count() -> usize {
         unimplemented!()
     }
 
