@@ -529,10 +529,9 @@ This collector fixes one of the major problems with Semispace - namely, that any
 
 `mutator.rs`:
 1. add `use super::gc_works::*;`, `use crate::policy::copyspace::CopySpace;`, `use crate::MMTK;`; `use crate::plan::barriers::NoBarrier;` -> `use crate::plan::barriers::*;`
-2. in `mutator_release` rebind bump pointer to nursery
-3. Number of changes to space mapping?
-4. add barrier
-5. push dereferenced mmtk.plan through plan bit in Mutator initializer
+2. in `mutator_release`, reset bump pointer rather than rebinding to the tospace
+3. Space mapping: BumpPointer(0) maps to nursery rather than tospace
+4. in Mutator initialiser: Change allocator, add barrier, add dereferenced mmtk.plan to plan field
 
 
 **Idea: Add 2nd older generation exercise**
