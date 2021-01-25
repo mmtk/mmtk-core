@@ -476,7 +476,64 @@ The *weak generational hypothesis* states that most of the objects allocated to 
 
 This collector fixes one of the major problems with Semispace - namely, that any long-lived objects are repeatedly copied back and forth. By separating these objects into a separate 'mature' space, the number of full heap collections needed is greatly reduced.
 
-**TODO: finish this section**
+**Notes: all diffs btn semispace and gencopy**
+`constraints.rs`: no changes
+`gc_works.rs`: 
+1. + `use crate::scheduler::{GCWork, GCWorker};`, `use crate::vm::VMBinding;` -> `use crate::vm::*;`
+2. + nursery-specific ProcessEdges and CopyContext
+3. Old ProcessEdges and CopyContext become mature-space specific. Mature space collections collect the whole heap.
+4. Add following block - scheduling things?
+    ```rust
+    #[derive(Default)]
+    pub struct GenCopyProcessModBuf {
+        pub modified_nodes: Vec<ObjectReference>,
+        pub modified_edges: Vec<Address>,
+    }
+
+
+    //add
+    impl<VM: VMBinding> GCWork<VM> for GenCopyProcessModBuf {
+        #[inline]
+        fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+            if mmtk.plan.in_nursery() {
+                let mut modified_nodes = vec![];
+                ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
+                worker.scheduler().closure_stage.add(
+                    ScanObjects::<GenCopyNurseryProcessEdges<VM>>::new(modified_nodes, false),
+                );
+
+                let mut modified_edges = vec![];
+                ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
+                worker
+                    .scheduler()
+                    .closure_stage
+                    .add(GenCopyNurseryProcessEdges::<VM>::new(modified_edges, true));
+            } else {
+                // Do nothing
+            }
+        }
+    }
+    ````
+`global.rs`:
+1. + `use crate::util::constants::LOG_BYTES_IN_PAGE;`,`use crate::vm::VMBinding;` -> `use crate::vm::*;`, `use super::gc_works::{SSCopyContext, SSProcessEdges};` -> `use super::gc_works::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};`
+2. + `pub const NURSERY_SIZE: usize = 16 * 1024 * 1024;`
+3. To GenCopy definition, add nursery, in_nursery, scheduler
+4. To Plan for GenCopy: 
+   1. add `collection_required`: returns true if if space is full, nursery is full, or heap is full
+   2. add definitions to initialiser
+   3. `gc_init`: init nursery
+   4. `schedule_collection`, `prepare`, `release` add nursery checks
+   5. `get_collection_reserve` and `get_pages_used` add nursery to count
+   6. add `in_nursery` helper function
+5. to `impl<VM: VMBinding> GenCopy<VM>` add `request_full_heap_collection`
+
+`mutator.rs`:
+1. add `use super::gc_works::*;`, `use crate::policy::copyspace::CopySpace;`, `use crate::MMTK;`; `use crate::plan::barriers::NoBarrier;` -> `use crate::plan::barriers::*;`
+2. in `mutator_release` rebind bump pointer to nursery
+3. Number of changes to space mapping?
+4. add barrier
+5. push dereferenced mmtk.plan through plan bit in Mutator initializer
+
 
 **Idea: Add 2nd older generation exercise**
 
