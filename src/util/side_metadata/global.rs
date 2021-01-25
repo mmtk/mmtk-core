@@ -134,7 +134,8 @@ impl SideMetadata {
     pub fn load_atomic(metadata_id: SideMetadataID, data_addr: Address) -> usize {
         let meta_addr = address_to_meta_address(data_addr, metadata_id);
         debug_assert!(
-            meta_page_is_mapped(address_to_meta_page_address(data_addr, metadata_id)).unwrap(),
+            check_and_map_meta_page(address_to_meta_page_address(data_addr, metadata_id))
+                .is_mapped(),
             "load_atomic.metadata_addr({}) for data_addr({}) is not mapped",
             meta_addr,
             data_addr
@@ -174,7 +175,8 @@ impl SideMetadata {
     pub fn store_atomic(metadata_id: SideMetadataID, data_addr: Address, metadata: usize) {
         let meta_addr = address_to_meta_address(data_addr, metadata_id);
         debug_assert!(
-            meta_page_is_mapped(address_to_meta_page_address(data_addr, metadata_id)).unwrap(),
+            check_and_map_meta_page(address_to_meta_page_address(data_addr, metadata_id))
+                .is_mapped(),
             "store_atomic.metadata_addr({}) for data_addr({}) is not mapped",
             meta_addr,
             data_addr
@@ -235,7 +237,8 @@ impl SideMetadata {
     ) -> bool {
         let meta_addr = address_to_meta_address(data_addr, metadata_id);
         debug_assert!(
-            meta_page_is_mapped(address_to_meta_page_address(data_addr, metadata_id)).unwrap(),
+            check_and_map_meta_page(address_to_meta_page_address(data_addr, metadata_id))
+                .is_mapped(),
             "cmpxng_atomic.metadata_addr({}) for data_addr({}) is not mapped",
             meta_addr,
             data_addr
@@ -326,7 +329,8 @@ impl SideMetadata {
     pub fn fetch_add_atomic(metadata_id: SideMetadataID, data_addr: Address, val: usize) -> usize {
         let meta_addr = address_to_meta_address(data_addr, metadata_id);
         debug_assert!(
-            meta_page_is_mapped(address_to_meta_page_address(data_addr, metadata_id)).unwrap(),
+            check_and_map_meta_page(address_to_meta_page_address(data_addr, metadata_id))
+                .is_mapped(),
             "fetch_add_atomic.metadata_addr({}) for data_addr({}) is not mapped",
             meta_addr,
             data_addr
@@ -393,7 +397,8 @@ impl SideMetadata {
     pub fn fetch_sub_atomic(metadata_id: SideMetadataID, data_addr: Address, val: usize) -> usize {
         let meta_addr = address_to_meta_address(data_addr, metadata_id);
         debug_assert!(
-            meta_page_is_mapped(address_to_meta_page_address(data_addr, metadata_id)).unwrap(),
+            check_and_map_meta_page(address_to_meta_page_address(data_addr, metadata_id))
+                .is_mapped(),
             "fetch_sub_atomic.metadata_addr({}) for data_addr({}) is not mapped",
             meta_addr,
             data_addr
@@ -588,27 +593,27 @@ mod tests {
             metadata_id
         ));
         assert!(
-            helpers::meta_page_is_mapped(helpers::address_to_meta_page_address(
+            helpers::check_and_map_meta_page(helpers::address_to_meta_page_address(
                 vm_layout_constants::HEAP_START,
                 metadata_id
             ))
-            .unwrap()
+            .is_mapped()
         );
         assert!(
-            helpers::meta_page_is_mapped(helpers::address_to_meta_page_address(
+            helpers::check_and_map_meta_page(helpers::address_to_meta_page_address(
                 vm_layout_constants::HEAP_START + space_size,
                 metadata_id
             ))
-            .unwrap()
+            .is_mapped()
         );
         assert!(
-            !helpers::meta_page_is_mapped(helpers::address_to_meta_page_address(
+            !helpers::check_and_map_meta_page(helpers::address_to_meta_page_address(
                 vm_layout_constants::HEAP_START
                     + (helpers::META_SPACE_PAGE_SIZE
                         << (align + constants::LOG_BITS_IN_WORD - number_of_bits_log)),
                 metadata_id
             ))
-            .unwrap()
+            .is_mapped()
         );
     }
 
@@ -625,26 +630,26 @@ mod tests {
             metadata_id
         ));
         assert!(
-            helpers::meta_page_is_mapped(helpers::address_to_meta_page_address(
+            helpers::check_and_map_meta_page(helpers::address_to_meta_page_address(
                 vm_layout_constants::HEAP_START,
                 metadata_id
             ))
-            .unwrap()
+            .is_mapped()
         );
         assert!(
-            helpers::meta_page_is_mapped(helpers::address_to_meta_page_address(
+            helpers::check_and_map_meta_page(helpers::address_to_meta_page_address(
                 vm_layout_constants::HEAP_START + space_size,
                 metadata_id
             ))
-            .unwrap()
+            .is_mapped()
         );
-        assert!(!helpers::meta_page_is_mapped(
+        assert!(!helpers::check_and_map_meta_page(
             helpers::address_to_meta_page_address(
                 vm_layout_constants::HEAP_START + space_size,
                 metadata_id
             ) + helpers::META_SPACE_PAGE_SIZE
         )
-        .unwrap());
+        .is_mapped());
     }
 
     #[test]

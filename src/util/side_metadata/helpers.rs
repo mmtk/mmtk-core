@@ -1,6 +1,6 @@
 use crate::util::{constants, conversions, memory, Address};
 use memory::dzmmap;
-use std::io::{Error, Result};
+use std::io::Error;
 
 use super::global::METADATA_SINGLETON;
 use super::SideMetadataID;
@@ -24,6 +24,22 @@ pub(super) const MAX_METADATA_ID: usize = constants::BITS_IN_WORD;
 
 // const SPACE_PER_META_BIT: usize = 2 << (MAX_HEAP_SIZE_LOG - constants::LOG_BITS_IN_WORD);
 pub(super) const META_SPACE_PAGE_SIZE: usize = constants::BYTES_IN_PAGE;
+
+/// Represents the mapping state of a metadata page.
+///
+/// `NotMappable(Error)` and `Mappable` indicate whether the page is mappable by MMTK.
+/// `Mapped` indicates that the page is already mapped by MMTK.
+pub(super) enum MappingState {
+    NotMappable(Error),
+    Mappable,
+    Mapped,
+}
+
+impl MappingState {
+    pub fn is_mapped(&self) -> bool {
+        matches!(self, MappingState::Mapped)
+    }
+}
 
 #[inline(always)]
 pub(super) fn address_to_meta_address(addr: Address, metadata_id: SideMetadataID) -> Address {
@@ -76,12 +92,14 @@ pub(super) fn address_to_meta_page_address(
 }
 
 // Checks whether the meta page containing this address is already mapped.
+// Maps the page, if it is mappable by MMTK.
 //
-// Returns Err if the address is not mappable by mmtk,
-// and Ok(is_mapped?) otherwise.
+// Returns `MappingState::NotMappable` if the address is not mappable by mmtk,
+// `MappingState::Mapped` if the page is already mapped by MMTK, and
+// `MappingState::Mappable` if the page is mappable but not already mapped.
 //
-// NOTE: using incorrect (e.g. not properly aligned) page_addr is undefined behavior.
-pub(super) fn meta_page_is_mapped(page_addr: Address) -> Result<bool> {
+// NOTE: using incorrect (e.g. not properly aligned) page_addr is undefined behaviour.
+pub(super) fn check_and_map_meta_page(page_addr: Address) -> MappingState {
     let prot = libc::PROT_NONE;
     // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
@@ -99,83 +117,57 @@ pub(super) fn meta_page_is_mapped(page_addr: Address) -> Result<bool> {
         let err = unsafe { *libc::__errno_location() };
         if err == libc::EEXIST {
             // mmtk already mapped it
-            Ok(true)
+            MappingState::Mapped
         } else {
             // mmtk can't map it
-            Err(Error::from_raw_os_error(err as _))
+            MappingState::NotMappable(Error::from_raw_os_error(err as _))
         }
     } else {
         // mmtk can map it
         // first, unmap the mapped memory
         let result2 = unsafe { libc::munmap(page_addr.to_mut_ptr(), META_SPACE_PAGE_SIZE) };
         assert_ne!(result2, libc::MAP_FAILED as _);
-        Ok(false)
+        MappingState::Mappable
     }
 }
 
 pub(super) fn try_map_meta(start: Address, size: usize, metadata_id: SideMetadataID) -> bool {
     let last_meta_page = address_to_meta_page_address(start + size - 1, metadata_id);
-    match meta_page_is_mapped(last_meta_page) {
-        Ok(is_mapped) => {
-            if is_mapped {
-                // all required pages are already mapped -> success
-                return true;
-            }
+    match check_and_map_meta_page(last_meta_page) {
+        MappingState::Mapped => {
+            // all required pages are already mapped -> success
+            return true;
         }
-        Err(_) => {
+        MappingState::NotMappable(_) => {
             // (at least) the last page is not mappable -> failure
             return false;
         }
+        MappingState::Mappable => {}
     }
     let first_meta_page = address_to_meta_page_address(start, metadata_id);
-    match meta_page_is_mapped(first_meta_page) {
-        Ok(is_mapped) => {
+    match check_and_map_meta_page(first_meta_page) {
+        MappingState::Mappable => {
             // first page is not mapped yet -> try mapping the whole area
-            if !is_mapped {
-                // map the whole area
-                if let Err(e) = dzmmap(
-                    first_meta_page,
-                    last_meta_page.as_usize() - first_meta_page.as_usize() + META_SPACE_PAGE_SIZE,
-                ) {
-                    debug!(
-                        "try_map_meta failed to map the required meta space with error: {}",
-                        e
-                    );
-                    return false;
-                }
-                return true;
+            // map the whole area
+            if let Err(e) = dzmmap(
+                first_meta_page,
+                last_meta_page.as_usize() - first_meta_page.as_usize() + META_SPACE_PAGE_SIZE,
+            ) {
+                debug!(
+                    "try_map_meta failed to map the required meta space with error: {}",
+                    e
+                );
+                return false;
             }
+            return true;
             // first page is already mapped and last page is not
         }
-        Err(_) => {
+        MappingState::NotMappable(_) => {
             // (at least) the first page is not mappable -> failure
             return false;
         }
+        MappingState::Mapped => {}
     }
-    // // find the first to be mapped page, and map from there onwards
-    // //
-    // // Here, we know the first_meta_page is mapped and the last is not.
-    // // The following loop performs a binary search.
-    // // At the end of the loop, both middle_page and last_page contain the result
-    // let mut first_page = first_meta_page;
-    // let mut last_page = last_meta_page;
-    // let mut middle_page = find_middle_page(first_page, last_page);
-    // while middle_page != last_page {
-    //     match meta_page_is_mapped(middle_page) {
-    //         Ok(is_mapped) => {
-    //             if is_mapped {
-    //                 first_page = middle_page;
-    //             } else {
-    //                 last_page = middle_page;
-    //             }
-    //         }
-    //         Err(_) => {
-    //             // non-mappable page detected -> failure
-    //             return false;
-    //         }
-    //     }
-    //     middle_page = find_middle_page(first_page, last_page);
-    // }
 
     // Considering that this function is only called on space growth,
     // there is zero or one mapped meta page in the range.
