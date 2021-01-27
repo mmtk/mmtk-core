@@ -1,5 +1,5 @@
-use crate::policy::malloc::is_marked;
-use crate::policy::malloc::set_mark_bit;
+use crate::plan::mallocms::metadata::is_marked;
+use crate::plan::mallocms::metadata::set_mark_bit;
 use crate::scheduler::gc_works::*;
 use crate::util::Address;
 use crate::util::ObjectReference;

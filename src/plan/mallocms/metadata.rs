@@ -1,7 +1,3 @@
-// a collection of functions and data structures used by MallocMS
-// currently under policy so that is_malloced can be accessed by the OpenJDK binding
-// once the sparse SFT table is in use and is_malloced is replaced by is_mapped_address, this should be moved to plan::mallocms
-
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::side_metadata::SideMetadata;
@@ -14,41 +10,6 @@ use std::sync::RwLock;
 use atomic::Ordering;
 use conversions::chunk_align_down;
 
-// Import calloc, free, and malloc_usable_size from the library specified in Cargo.toml:45
-#[cfg(feature = "malloc_jemalloc")]
-pub use jemalloc_sys::{calloc, free, malloc_usable_size};
-
-#[cfg(feature = "malloc_mimalloc")]
-pub use mimalloc_sys::{
-    mi_calloc as calloc,
-    mi_free as free,
-    mi_malloc_usable_size as malloc_usable_size,
-};
-
-#[cfg(feature = "malloc_tcmalloc")]
-pub use tcmalloc_sys::{
-    TCMallocInternalCalloc as calloc,
-    TCMallocInternalFree as free,
-    TCMallocInternalMallocSize as malloc_usable_size,
-};
-
-// export LD_LIBRARY_PATH=/home/paiger/mmtk-openjdk/mmtk/target/release/build/hoard-sys-bcc6c3e0a7e92343/out/Hoard/src
-#[cfg(feature = "malloc_hoard")]
-pub use hoard_sys::{calloc, free, malloc_usable_size};
-
-// export LD_LIBRARY_PATH=/home/paiger/scalloc-sys/scalloc/out/Release/lib.target
-#[cfg(feature = "malloc_scalloc")]
-pub use scalloc_sys::{calloc, free, malloc_usable_size};
-
-#[cfg(not(any(
-    feature = "malloc_jemalloc",
-    feature = "malloc_mimalloc",
-    feature = "malloc_tcmalloc",
-    feature = "malloc_hoard",
-    feature = "malloc_scalloc"
-)))]
-pub use libc::{calloc, free, malloc_usable_size};
-
 lazy_static! {
     pub static ref MAPPED_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
 }
@@ -57,6 +18,20 @@ pub static mut HEAP_SIZE: usize = 0;
 pub static HEAP_USED: AtomicUsize = AtomicUsize::new(0);
 pub static mut ALLOCATION_METADATA_ID: SideMetadataID = SideMetadataID::new();
 pub static mut MARKING_METADATA_ID: SideMetadataID = SideMetadataID::new();
+
+// pub struct Malloc;
+
+// unsafe impl GlobalAlloc for Malloc {
+//     unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
+//         calloc(layout.align(), layout.size()) as *mut u8
+//     }
+
+//     unsafe fn dealloc(&self, ptr: *mut u8, _layout: std::alloc::Layout) {
+//         free(ptr as *mut c_void)
+//     }
+// }
+// #[global_allocator]
+// static GLOBAL: Malloc = Malloc;
 
 pub fn heap_full() -> bool {
     unsafe { HEAP_USED.load(Ordering::SeqCst) >= HEAP_SIZE }

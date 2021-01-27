@@ -12,7 +12,6 @@
 /// policy, spaces also manage memory consumption (<i>used</i> virtual
 /// memory).
 pub mod space;
-pub mod malloc;
 
 #[cfg(feature = "immortalspace")]
 pub mod immortalspace;
