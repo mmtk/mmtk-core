@@ -1,0 +1,65 @@
+Performing C++ SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /home/paiger/mmtk-core/abseil-cpp-20200923.2/build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_a85af/fast && /usr/bin/make  -f CMakeFiles/cmTC_a85af.dir/build.make CMakeFiles/cmTC_a85af.dir/build
+make[1]: Entering directory '/home/paiger/mmtk-core/abseil-cpp-20200923.2/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_a85af.dir/src.cxx.o
+/usr/bin/c++ -DCMAKE_HAVE_LIBC_PTHREAD   -o CMakeFiles/cmTC_a85af.dir/src.cxx.o -c /home/paiger/mmtk-core/abseil-cpp-20200923.2/build/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_a85af
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a85af.dir/link.txt --verbose=1
+/usr/bin/c++ CMakeFiles/cmTC_a85af.dir/src.cxx.o -o cmTC_a85af 
+CMakeFiles/cmTC_a85af.dir/src.cxx.o: In function `main':
+src.cxx:(.text+0x25): undefined reference to `pthread_create'
+src.cxx:(.text+0x31): undefined reference to `pthread_detach'
+src.cxx:(.text+0x3d): undefined reference to `pthread_cancel'
+src.cxx:(.text+0x4f): undefined reference to `pthread_join'
+src.cxx:(.text+0x66): undefined reference to `pthread_atfork'
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+CMakeFiles/cmTC_a85af.dir/build.make:105: recipe for target 'cmTC_a85af' failed
+make[1]: *** [cmTC_a85af] Error 1
+make[1]: Leaving directory '/home/paiger/mmtk-core/abseil-cpp-20200923.2/build/CMakeFiles/CMakeTmp'
+Makefile:140: recipe for target 'cmTC_a85af/fast' failed
+make: *** [cmTC_a85af/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+static void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/paiger/mmtk-core/abseil-cpp-20200923.2/build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_cd180/fast && /usr/bin/make  -f CMakeFiles/cmTC_cd180.dir/build.make CMakeFiles/cmTC_cd180.dir/build
+make[1]: Entering directory '/home/paiger/mmtk-core/abseil-cpp-20200923.2/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_cd180.dir/CheckFunctionExists.cxx.o
+/usr/bin/c++   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_cd180.dir/CheckFunctionExists.cxx.o -c /home/paiger/mmtk-core/abseil-cpp-20200923.2/build/CMakeFiles/CheckLibraryExists/CheckFunctionExists.cxx
+Linking CXX executable cmTC_cd180
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_cd180.dir/link.txt --verbose=1
+/usr/bin/c++  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_cd180.dir/CheckFunctionExists.cxx.o -o cmTC_cd180  -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+CMakeFiles/cmTC_cd180.dir/build.make:105: recipe for target 'cmTC_cd180' failed
+make[1]: *** [cmTC_cd180] Error 1
+make[1]: Leaving directory '/home/paiger/mmtk-core/abseil-cpp-20200923.2/build/CMakeFiles/CMakeTmp'
+Makefile:140: recipe for target 'cmTC_cd180/fast' failed
+make: *** [cmTC_cd180/fast] Error 2
+
+
+
