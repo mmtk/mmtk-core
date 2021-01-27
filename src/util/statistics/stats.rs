@@ -115,12 +115,12 @@ impl Stats {
         }
     }
 
-    pub fn print_stats<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
+    pub fn print_stats<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>, perf_events: &HashMap<String, u64>) {
         println!(
             "============================ MMTk Statistics Totals ============================"
         );
         let scheduler_stat = mmtk.scheduler.statistics();
-        self.print_column_names(&scheduler_stat);
+        self.print_column_names(&scheduler_stat, perf_events);
         print!("{}\t", self.get_phase() / 2);
         let counter = self.counters.lock().unwrap();
         for iter in &(*counter) {
@@ -138,6 +138,12 @@ impl Stats {
         for value in scheduler_stat.values() {
             print!("{}\t", value);
         }
+        for value in perf_events.values() {
+            print!("{}\t", value);
+        }
+        if crate::plan::mutator_context::BARRIER_COUNTER {
+            print!("{:.2}\t", crate::plan::mutator_context::barrier_slow_path_take_rate());
+        }
         println!();
         print!("Total time: ");
         self.total_time.lock().unwrap().print_total(None);
@@ -145,7 +151,7 @@ impl Stats {
         println!("------------------------------ End MMTk Statistics -----------------------------")
     }
 
-    pub fn print_column_names(&self, scheduler_stat: &HashMap<String, String>) {
+    pub fn print_column_names(&self, scheduler_stat: &HashMap<String, String>, perf_events: &HashMap<String, u64>) {
         print!("GC\t");
         let counter = self.counters.lock().unwrap();
         for iter in &(*counter) {
@@ -158,6 +164,12 @@ impl Stats {
         }
         for name in scheduler_stat.keys() {
             print!("{}\t", name);
+        }
+        for name in perf_events.keys() {
+            print!("{}\t", name);
+        }
+        if crate::plan::mutator_context::BARRIER_COUNTER {
+            print!("takerate\t");
         }
         println!();
     }
@@ -177,9 +189,9 @@ impl Stats {
         }
     }
 
-    pub fn stop_all<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
+    pub fn stop_all<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>, perf_events: &HashMap<String, u64>) {
         self.stop_all_counters();
-        self.print_stats(mmtk);
+        self.print_stats(mmtk, perf_events);
     }
 
     fn stop_all_counters(&self) {

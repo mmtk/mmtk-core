@@ -6,7 +6,7 @@ use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
-
+use std::sync::atomic::{AtomicUsize, Ordering};
 use enum_map::EnumMap;
 
 type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
@@ -115,11 +115,34 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
     fn barrier(&mut self) -> &mut dyn Barrier;
 
     fn record_modified_node(&mut self, obj: ObjectReference) {
-        use crate::util::metadata::BitsReference;
-        BitsReference::of(obj.to_address(), 3, 0).attempt(0b0, 0b1);
+        if BARRIER_COUNTER {
+            BARRIER_FAST_COUNT.fetch_add(1, Ordering::SeqCst);
+            use crate::util::metadata::BitsReference;
+            if BitsReference::of(obj.to_address(), 3, 0).attempt(0b0, 0b1) {
+                BARRIER_SLOW_COUNT.fetch_add(1, Ordering::SeqCst);
+                // assert!(!BitsReference::of(obj.to_address(), 3, 0).attempt(0b0, 0b1));
+            }
+        } else {
+            use crate::util::metadata::BitsReference;
+            BitsReference::of(obj.to_address(), 3, 0).attempt(0b0, 0b1);
+        }
     }
     // TODO(wenyuzhao): Remove this. Looks like OpenJDK will never call this method.
     fn record_modified_edge(&mut self, _slot: Address) {
         unreachable!()
     }
+}
+
+pub const BARRIER_COUNTER: bool = false;
+pub static BARRIER_FAST_COUNT: AtomicUsize = AtomicUsize::new(0);
+pub static BARRIER_SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+pub fn clear_barrier_counter() {
+    BARRIER_FAST_COUNT.store(0, Ordering::SeqCst);
+    BARRIER_SLOW_COUNT.store(0, Ordering::SeqCst);
+}
+pub fn barrier_slow_path_take_rate() -> f64 {
+    let fast = BARRIER_FAST_COUNT.load(Ordering::SeqCst) as f64;
+    let slow = BARRIER_SLOW_COUNT.load(Ordering::SeqCst) as f64;
+    slow / fast
 }
