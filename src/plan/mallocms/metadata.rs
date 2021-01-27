@@ -5,17 +5,14 @@ use crate::util::side_metadata::SideMetadataID;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use std::collections::HashSet;
-use std::sync::atomic::AtomicUsize;
 use std::sync::RwLock;
-use atomic::Ordering;
 use conversions::chunk_align_down;
 
 lazy_static! {
     pub static ref MAPPED_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
 }
 
-pub static mut HEAP_SIZE: usize = 0;
-pub static HEAP_USED: AtomicUsize = AtomicUsize::new(0);
+
 pub static mut ALLOCATION_METADATA_ID: SideMetadataID = SideMetadataID::new();
 pub static mut MARKING_METADATA_ID: SideMetadataID = SideMetadataID::new();
 
@@ -33,9 +30,7 @@ pub static mut MARKING_METADATA_ID: SideMetadataID = SideMetadataID::new();
 // #[global_allocator]
 // static GLOBAL: Malloc = Malloc;
 
-pub fn heap_full() -> bool {
-    unsafe { HEAP_USED.load(Ordering::SeqCst) >= HEAP_SIZE }
-}
+
 
 pub fn meta_space_mapped(address: Address) -> bool {
     let chunk_start = chunk_align_down(address);

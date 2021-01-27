@@ -17,7 +17,7 @@ pub use tcmalloc_sys::{
     TCMallocInternalMallocSize as malloc_usable_size,
 };
 
-// export LD_LIBRARY_PATH=./../../mmtk/target/release/build/hoard-sys-f2b4a059118f1d26/out/Hoard/src
+// export LD_LIBRARY_PATH=./../../mmtk/target/release/build/hoard-sys-982b9ad0d5b55f98/out/Hoard/src
 #[cfg(feature = "malloc_hoard")]
 pub use hoard_sys::{calloc, free, malloc_usable_size};
 

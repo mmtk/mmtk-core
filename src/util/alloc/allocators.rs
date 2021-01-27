@@ -6,7 +6,9 @@ use crate::policy::largeobjectspace::LargeObjectSpace;
 #[cfg(feature = "largeobjectspace")]
 use crate::util::alloc::LargeObjectAllocator;
 use crate::policy::space::Space;
-use crate::util::alloc::{Allocator, BumpAllocator, FreeListAllocator};
+use crate::util::alloc::{Allocator, BumpAllocator};
+#[cfg(feature = "mallocms")]
+use crate::util::alloc::MallocAllocator;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 
@@ -25,7 +27,8 @@ pub struct Allocators<VM: VMBinding> {
     #[cfg(feature = "largeobjectspace")]
     pub large_object: [MaybeUninit<LargeObjectAllocator<VM>>; MAX_LARGE_OBJECT_ALLOCATORS],
     
-    pub free_list: [MaybeUninit<FreeListAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
+    #[cfg(feature = "mallocms")]
+    pub free_list: [MaybeUninit<MallocAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
 }
 
 impl<VM: VMBinding> Allocators<VM> {
@@ -40,7 +43,8 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::LargeObject(index) => {
                 self.large_object[index as usize].assume_init_ref()
             }
-            AllocatorSelector::FreeList(index) => {
+            #[cfg(feature = "mallocms")]
+            AllocatorSelector::Malloc(index) => {
                 self.free_list[index as usize].assume_init_ref()
             }
         }
@@ -60,7 +64,8 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::LargeObject(index) => {
                 self.large_object[index as usize].assume_init_mut()
             }
-            AllocatorSelector::FreeList(index) => {
+            #[cfg(feature = "mallocms")]
+            AllocatorSelector::Malloc(index) => {
                 self.free_list[index as usize].assume_init_mut()
             }
         }
@@ -75,6 +80,7 @@ impl<VM: VMBinding> Allocators<VM> {
             bump_pointer: unsafe { MaybeUninit::uninit().assume_init() },
             #[cfg(feature = "largeobjectspace")]
             large_object: unsafe { MaybeUninit::uninit().assume_init() },
+            #[cfg(feature = "mallocms")]
             free_list: unsafe { MaybeUninit::uninit().assume_init() },
         };
 
@@ -95,8 +101,9 @@ impl<VM: VMBinding> Allocators<VM> {
                         plan,
                     ));
                 }
-                AllocatorSelector::FreeList(index) => {
-                    ret.free_list[index as usize].write(FreeListAllocator::new(
+                #[cfg(feature = "mallocms")]
+                AllocatorSelector::Malloc(index) => {
+                    ret.free_list[index as usize].write(MallocAllocator::new(
                         mutator_tls,
                         Some(space),
                         plan,
@@ -128,5 +135,6 @@ pub enum AllocatorSelector {
     BumpPointer(u8),
     #[cfg(feature = "largeobjectspace")]
     LargeObject(u8),
-    FreeList(u8),
+    #[cfg(feature = "mallocms")]
+    Malloc(u8),
 }

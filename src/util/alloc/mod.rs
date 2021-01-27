@@ -1,7 +1,8 @@
 pub mod allocator;
 pub mod allocators;
 mod bumpallocator;
-mod free_list_allocator;
+#[cfg(feature = "mallocms")]
+pub mod malloc_allocator;
 pub mod dump_linear_scan;
 pub mod embedded_meta_data;
 pub mod large_object_allocator;
@@ -10,8 +11,10 @@ pub mod malloc;
 
 pub use self::allocator::Allocator;
 pub use self::bumpallocator::BumpAllocator;
-pub use self::free_list_allocator::FreeListAllocator;
+#[cfg(feature = "mallocms")]
+pub use self::malloc_allocator::MallocAllocator;
 #[cfg(feature = "largeobjectspace")]
 pub use self::large_object_allocator::LargeObjectAllocator;
 
+#[cfg(feature = "mallocms")]
 pub use crate::plan::mallocms::metadata::is_malloced;

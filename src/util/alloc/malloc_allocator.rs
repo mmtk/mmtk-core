@@ -1,7 +1,6 @@
-use crate::{plan::global::Plan};
+use std::sync::atomic::AtomicUsize;
+use crate::plan::global::Plan;
 use crate::plan::selected_plan::SelectedPlan;
-use crate::plan::mallocms::metadata::HEAP_USED;
-use crate::plan::mallocms::metadata::heap_full;
 use crate::plan::mallocms::metadata::map_meta_space_for_chunk;
 use crate::plan::mallocms::metadata::meta_space_mapped;
 use crate::plan::mallocms::metadata::set_alloc_bit;
@@ -15,20 +14,23 @@ use crate::vm::VMBinding;
 use crate::util::conversions;
 use atomic::Ordering;
 
+pub static mut HEAP_SIZE: usize = 0;
+pub static HEAP_USED: AtomicUsize = AtomicUsize::new(0);
+
 #[repr(C)]
-pub struct FreeListAllocator<VM: VMBinding> {
+pub struct MallocAllocator<VM: VMBinding> {
     pub tls: OpaquePointer,
     space: Option<&'static dyn Space<VM>>,
     plan: &'static SelectedPlan<VM>,
 }
 
-impl<VM: VMBinding> FreeListAllocator<VM> {
+impl<VM: VMBinding> MallocAllocator<VM> {
     pub fn rebind(&mut self, space: Option<&'static dyn Space<VM>>) {
         self.space = space;
     }
 }
 
-impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
+impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     fn get_space(&self) -> Option<&'static dyn Space<VM>> {
         self.space
     }
@@ -40,7 +42,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         assert!(offset == 0);
         if heap_full() {
             self.plan.handle_user_collection_request(self.tls, true);
-            assert!(!heap_full(), "FreeListAllocator: Out of memory!");
+            assert!(!heap_full(), "MallocAllocator: Out of memory!");
         }
         unsafe {
             let ptr = calloc(1, size);
@@ -64,12 +66,16 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 }
 
-impl<VM: VMBinding> FreeListAllocator<VM> {
+impl<VM: VMBinding> MallocAllocator<VM> {
     pub fn new(
         tls: OpaquePointer,
         space: Option<&'static dyn Space<VM>>,
         plan: &'static SelectedPlan<VM>,
     ) -> Self {
-        FreeListAllocator { tls, space, plan }
+        MallocAllocator { tls, space, plan }
     }
+}
+
+pub fn heap_full() -> bool {
+    unsafe { HEAP_USED.load(Ordering::SeqCst) >= HEAP_SIZE }
 }

@@ -25,7 +25,7 @@ pub fn ms_mutator_release<VM: VMBinding>(
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::FreeList(0),
+        AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::Malloc(0),
     };
 }
 
@@ -37,7 +37,7 @@ pub fn create_ms_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
-            (AllocatorSelector::FreeList(0), &plan.space),
+            (AllocatorSelector::Malloc(0), &plan.space),
         ],
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,

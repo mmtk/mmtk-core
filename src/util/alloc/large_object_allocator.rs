@@ -37,7 +37,6 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: isize) -> Address {
-        //println!("Allocated with large object allocator (wrong one!!!)");
         let header = 0; // HashSet is used instead of DoublyLinkedList
         let maxbytes =
             allocator::get_maximum_aligned_size::<VM>(size + header, align, VM::MIN_ALIGNMENT);

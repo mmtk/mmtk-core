@@ -25,7 +25,7 @@ enum_derive = "0.1"
 libc = "0.2"
 jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"] }
 mimalloc-sys = "0.1.6"
-hoard-sys = { path = "../hoard-sys" }
+hoard-sys = { git = "ssh://git@github.com/paigereeves/hoard-sys.git", rev = "d970748a09588b8db3a5c74e9515873274bb0108" }
 scalloc-sys = { path = "../scalloc-sys" }
 tcmalloc-sys = { path = "../tcmalloc-sys" }
 lazy_static = "1.1"
@@ -57,7 +57,7 @@ gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 mygc = ["immortalspace", "largeobjectspace", "copyspace"]
 mygencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 gencopycopy = ["immortalspace", "largeobjectspace", "copyspace"]
-mallocms = ["mallocspace", "malloc_mimalloc"]
+mallocms = ["mallocspace"]
 
 # spaces
 base_spaces = []
