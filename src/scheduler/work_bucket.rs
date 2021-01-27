@@ -146,7 +146,7 @@ impl<C: Context> WorkBucket<C> {
 }
 
 #[derive(Debug, Enum, Copy, Clone, Eq, PartialEq)]
-pub enum WorkBucketId {
+pub enum WorkBucketStage {
     Unconstrained,
     Prepare,
     Closure,

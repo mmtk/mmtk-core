@@ -20,7 +20,7 @@ pub struct Worker<C: Context> {
     pub stat: WorkerLocalStat,
     context: Option<&'static C>,
     is_coordinator: bool,
-    local_work_buffer: Vec<(WorkBucketId, Box<dyn Work<C>>)>,
+    local_work_buffer: Vec<(WorkBucketStage, Box<dyn Work<C>>)>,
 }
 
 unsafe impl<C: Context> Sync for Worker<C> {}
@@ -47,7 +47,7 @@ impl<C: Context> Worker<C> {
     }
 
     #[inline]
-    pub fn add_work(&mut self, bucket: WorkBucketId, work: impl Work<C>) {
+    pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl Work<C>) {
         if !self.scheduler().work_buckets[bucket].is_activated() {
             self.scheduler.work_buckets[bucket].add_with_priority(1000, box work);
             return;

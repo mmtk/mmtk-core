@@ -16,7 +16,7 @@ impl Work<()> for Sort {
         if self.0.len() <= 1 {
             return; /* Do nothing */
         }
-        worker.scheduler().work_buckets[WorkBucketId::Unconstrained]
+        worker.scheduler().work_buckets[WorkBucketStage::Unconstrained]
             .add(Partition(unsafe { &mut *(self.0 as *mut _) }));
     }
 }
@@ -63,8 +63,8 @@ impl Work<()> for Partition {
         let right: &'static mut [usize] =
             unsafe { &mut *(&mut self.0[pivot_index + 1..] as *mut _) };
 
-        worker.scheduler().work_buckets[WorkBucketId::Unconstrained].add(Sort(left));
-        worker.scheduler().work_buckets[WorkBucketId::Unconstrained].add(Sort(right));
+        worker.scheduler().work_buckets[WorkBucketStage::Unconstrained].add(Sort(left));
+        worker.scheduler().work_buckets[WorkBucketStage::Unconstrained].add(Sort(right));
     }
 }
 
@@ -86,7 +86,7 @@ fn quicksort() {
     // println!("Original: {:?}", data);
 
     SCHEDULER.initialize(NUM_WORKERS, &(), OpaquePointer::UNINITIALIZED);
-    SCHEDULER.work_buckets[WorkBucketId::Unconstrained]
+    SCHEDULER.work_buckets[WorkBucketStage::Unconstrained]
         .add(Sort(unsafe { &mut *(data as *mut _) }));
     SCHEDULER.wait_for_completion();
 

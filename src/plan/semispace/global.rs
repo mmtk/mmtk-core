@@ -94,15 +94,15 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.work_buckets[WorkBucketId::Unconstrained]
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<SSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketId::Prepare].add(Prepare::new(self));
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::new(self));
         // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketId::Release].add(Release::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release].add(Release::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketId::Final].add(ScheduleSanityGC);
+        scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC);
         scheduler.set_finalizer(Some(EndOfGC));
     }
 

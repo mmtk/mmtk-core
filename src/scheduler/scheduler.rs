@@ -20,7 +20,7 @@ pub enum CoordinatorMessage<C: Context> {
 }
 
 pub struct Scheduler<C: Context> {
-    pub work_buckets: EnumMap<WorkBucketId, WorkBucket<C>>,
+    pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<C>>,
     /// Works for the coordinator thread
     pub coordinator_works: WorkBucket<C>,
     /// workers
@@ -46,11 +46,11 @@ impl<C: Context> Scheduler<C> {
         let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
         Arc::new(Self {
             work_buckets: enum_map! {
-                WorkBucketId::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
-                WorkBucketId::Prepare => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketId::Closure => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketId::Release => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketId::Final => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
+                WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
             },
             coordinator_works: WorkBucket::new(true, worker_monitor.clone()),
             worker_group: None,
@@ -92,22 +92,22 @@ impl<C: Context> Scheduler<C> {
             .unwrap()
             .spawn_workers(tls, context);
 
-        self_mut.work_buckets[WorkBucketId::Closure].set_open_condition(move || {
-            self.work_buckets[WorkBucketId::Unconstrained].is_drained()
-                && self.work_buckets[WorkBucketId::Prepare].is_drained()
+        self_mut.work_buckets[WorkBucketStage::Closure].set_open_condition(move || {
+            self.work_buckets[WorkBucketStage::Unconstrained].is_drained()
+                && self.work_buckets[WorkBucketStage::Prepare].is_drained()
                 && self.worker_group().all_parked()
         });
-        self_mut.work_buckets[WorkBucketId::Release].set_open_condition(move || {
-            self.work_buckets[WorkBucketId::Unconstrained].is_drained()
-                && self.work_buckets[WorkBucketId::Prepare].is_drained()
-                && self.work_buckets[WorkBucketId::Closure].is_drained()
+        self_mut.work_buckets[WorkBucketStage::Release].set_open_condition(move || {
+            self.work_buckets[WorkBucketStage::Unconstrained].is_drained()
+                && self.work_buckets[WorkBucketStage::Prepare].is_drained()
+                && self.work_buckets[WorkBucketStage::Closure].is_drained()
                 && self.worker_group().all_parked()
         });
-        self_mut.work_buckets[WorkBucketId::Final].set_open_condition(move || {
-            self.work_buckets[WorkBucketId::Unconstrained].is_drained()
-                && self.work_buckets[WorkBucketId::Prepare].is_drained()
-                && self.work_buckets[WorkBucketId::Closure].is_drained()
-                && self.work_buckets[WorkBucketId::Release].is_drained()
+        self_mut.work_buckets[WorkBucketStage::Final].set_open_condition(move || {
+            self.work_buckets[WorkBucketStage::Unconstrained].is_drained()
+                && self.work_buckets[WorkBucketStage::Prepare].is_drained()
+                && self.work_buckets[WorkBucketStage::Closure].is_drained()
+                && self.work_buckets[WorkBucketStage::Release].is_drained()
                 && self.worker_group().all_parked()
         });
     }
@@ -137,7 +137,7 @@ impl<C: Context> Scheduler<C> {
     fn update_buckets(&self) {
         let mut buckets_updated = false;
         for (id, bucket) in self.work_buckets.iter() {
-            if id == WorkBucketId::Unconstrained {
+            if id == WorkBucketStage::Unconstrained {
                 continue;
             }
             buckets_updated |= bucket.update();
@@ -191,24 +191,24 @@ impl<C: Context> Scheduler<C> {
         if let Some(finalizer) = self.finalizer.lock().unwrap().take() {
             self.process_coordinator_work(finalizer);
         }
-        debug_assert!(!self.work_buckets[WorkBucketId::Prepare].is_activated());
-        debug_assert!(!self.work_buckets[WorkBucketId::Closure].is_activated());
-        debug_assert!(!self.work_buckets[WorkBucketId::Release].is_activated());
-        debug_assert!(!self.work_buckets[WorkBucketId::Final].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::Release].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::Final].is_activated());
     }
 
     pub fn deactivate_all(&self) {
-        self.work_buckets[WorkBucketId::Prepare].deactivate();
-        self.work_buckets[WorkBucketId::Closure].deactivate();
-        self.work_buckets[WorkBucketId::Release].deactivate();
-        self.work_buckets[WorkBucketId::Final].deactivate();
+        self.work_buckets[WorkBucketStage::Prepare].deactivate();
+        self.work_buckets[WorkBucketStage::Closure].deactivate();
+        self.work_buckets[WorkBucketStage::Release].deactivate();
+        self.work_buckets[WorkBucketStage::Final].deactivate();
     }
 
     pub fn reset_state(&self) {
-        // self.work_buckets[WorkBucketId::Prepare].deactivate();
-        self.work_buckets[WorkBucketId::Closure].deactivate();
-        self.work_buckets[WorkBucketId::Release].deactivate();
-        self.work_buckets[WorkBucketId::Final].deactivate();
+        // self.work_buckets[WorkBucketStage::Prepare].deactivate();
+        self.work_buckets[WorkBucketStage::Closure].deactivate();
+        self.work_buckets[WorkBucketStage::Release].deactivate();
+        self.work_buckets[WorkBucketStage::Final].deactivate();
     }
 
     pub fn add_coordinator_work(&self, work: impl CoordinatorWork<C>, worker: &Worker<C>) {
@@ -302,8 +302,8 @@ pub type MMTkScheduler<VM> = Scheduler<MMTK<VM>>;
 impl<VM: VMBinding> MMTkScheduler<VM> {
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.plan.base().control_collector_context.clear_request();
-        debug_assert!(!self.work_buckets[WorkBucketId::Prepare].is_activated());
-        self.work_buckets[WorkBucketId::Prepare].activate();
+        debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
+        self.work_buckets[WorkBucketStage::Prepare].activate();
         let _guard = self.worker_monitor.0.lock().unwrap();
         self.worker_monitor.1.notify_all();
     }
