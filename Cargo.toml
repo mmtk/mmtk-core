@@ -42,7 +42,7 @@ crossbeam = "0.7.3"
 rand = "0.7.3"
 
 [features]
-default = ["malloc_hoard"]
+default = []
 
 # plans
 nogc = ["immortalspace", "largeobjectspace"]
