@@ -183,7 +183,8 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
                     }
                 }
             }
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::<E>::new());
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                .add(ScanVMSpecificRoots::<E>::new());
         } else {
             mmtk.scheduler
                 .add_coordinator_work(StopMutators::<E>::new(), worker);
@@ -374,7 +375,8 @@ pub trait ProcessEdgesWork:
             // Executing these works now can remarkably reduce the global synchronization time.
             self.worker().do_work(scan_objects_work);
         } else {
-            self.mmtk.unwrap().scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);
+            self.mmtk.unwrap().scheduler.work_buckets[WorkBucketStage::Closure]
+                .add(scan_objects_work);
         }
     }
 
