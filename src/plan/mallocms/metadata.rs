@@ -16,22 +16,6 @@ lazy_static! {
 pub static mut ALLOCATION_METADATA_ID: SideMetadataID = SideMetadataID::new();
 pub static mut MARKING_METADATA_ID: SideMetadataID = SideMetadataID::new();
 
-// pub struct Malloc;
-
-// unsafe impl GlobalAlloc for Malloc {
-//     unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
-//         calloc(layout.align(), layout.size()) as *mut u8
-//     }
-
-//     unsafe fn dealloc(&self, ptr: *mut u8, _layout: std::alloc::Layout) {
-//         free(ptr as *mut c_void)
-//     }
-// }
-// #[global_allocator]
-// static GLOBAL: Malloc = Malloc;
-
-
-
 pub fn meta_space_mapped(address: Address) -> bool {
     let chunk_start = chunk_align_down(address);
     MAPPED_CHUNKS.read().unwrap().contains(&chunk_start)

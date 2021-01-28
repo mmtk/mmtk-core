@@ -21,8 +21,8 @@ use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
-use crate::util::alloc::malloc::free;
-use crate::util::alloc::malloc::malloc_usable_size;
+use crate::plan::mallocms::malloc::ms_free;
+use crate::plan::mallocms::malloc::ms_malloc_usable_size;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -133,8 +133,8 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
                     if SideMetadata::load_atomic(ALLOCATION_METADATA_ID, address) == 1 {
                         if SideMetadata::load_atomic(MARKING_METADATA_ID, address) == 0 {
                             let ptr = address.to_mut_ptr();
-                            HEAP_USED.fetch_sub(malloc_usable_size(ptr), Ordering::SeqCst);
-                            free(ptr);
+                            HEAP_USED.fetch_sub(ms_malloc_usable_size(ptr), Ordering::SeqCst);
+                            ms_free(ptr);
                             unset_alloc_bit(address);
                         } else {
                             unset_mark_bit(address);

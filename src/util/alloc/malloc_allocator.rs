@@ -6,8 +6,8 @@ use crate::plan::mallocms::metadata::meta_space_mapped;
 use crate::plan::mallocms::metadata::set_alloc_bit;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
-use crate::util::alloc::malloc::calloc;
-use crate::util::alloc::malloc::malloc_usable_size;
+use crate::plan::mallocms::malloc::ms_calloc;
+use crate::plan::mallocms::malloc::ms_malloc_usable_size;
 use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
@@ -45,14 +45,14 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
             assert!(!heap_full(), "MallocAllocator: Out of memory!");
         }
         unsafe {
-            let ptr = calloc(1, size);
+            let ptr = ms_calloc(1, size);
             let address = Address::from_mut_ptr(ptr);
             if !meta_space_mapped(address) {
                 let chunk_start = conversions::chunk_align_down(address);
                 map_meta_space_for_chunk(chunk_start);
             }
             set_alloc_bit(address);
-            HEAP_USED.fetch_add(malloc_usable_size(ptr), Ordering::SeqCst);
+            HEAP_USED.fetch_add(ms_malloc_usable_size(ptr), Ordering::SeqCst);
             address
         }
     }

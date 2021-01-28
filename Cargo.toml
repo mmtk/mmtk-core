@@ -25,7 +25,7 @@ enum_derive = "0.1"
 libc = "0.2"
 jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"] }
 mimalloc-sys = "0.1.6"
-hoard-sys = { git = "ssh://git@github.com/paigereeves/hoard-sys.git", rev = "d970748a09588b8db3a5c74e9515873274bb0108" }
+hoard-sys = { git = "ssh://git@github.com/paigereeves/hoard-sys.git", rev = "36989b877962f086267b1d21d5008c9df0fd0984" }
 scalloc-sys = { path = "../scalloc-sys" }
 tcmalloc-sys = { path = "../tcmalloc-sys" }
 lazy_static = "1.1"
@@ -77,10 +77,18 @@ nogc_no_zeroing = ["nogc_lock_free"]
 
 single_worker = []
 
-# malloc versions
-malloc_libc = []
-malloc_mimalloc = []
-malloc_jemalloc = []
-malloc_tcmalloc = [] #Does not work
-malloc_hoard = []
-malloc_scalloc = [] #Build script does not work
+# malloc implementations used by marksweep
+ms_libc = []
+ms_mimalloc = []
+ms_jemalloc = []
+ms_tcmalloc = [] #Does not work
+ms_hoard = []
+ms_scalloc = [] #Build script does not work
+
+# malloc implementations used as global allocator
+ga_libc = []
+ga_mimalloc = []
+ga_jemalloc = []
+ga_hoard = []
+ga_scalloc = []
+ga_default = []

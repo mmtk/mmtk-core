@@ -3,6 +3,7 @@ mod gc_works;
 mod global;
 mod mutator;
 pub mod metadata;
+pub mod malloc;
 
 pub use self::global::MallocMS;
 
