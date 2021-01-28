@@ -6,6 +6,8 @@ use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
+#[cfg(feature = "finalization")]
+use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
@@ -14,7 +16,7 @@ use crate::vm::VMBinding;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-#[cfg(feature = "sanity")]
+#[cfg(any(feature = "sanity", feature = "finalization"))]
 use std::sync::Mutex;
 
 lazy_static! {
@@ -38,6 +40,8 @@ pub struct MMTK<VM: VMBinding> {
     pub mmapper: &'static Mmapper,
     pub sftmap: &'static SFTMap,
     pub reference_processors: ReferenceProcessors,
+    #[cfg(feature = "finalization")]
+    pub finalizable_processor: Mutex<FinalizableProcessor>,
     pub options: Arc<UnsafeOptionsWrapper>,
     pub scheduler: Arc<Scheduler<Self>>,
     #[cfg(feature = "sanity")]
@@ -61,6 +65,8 @@ impl<VM: VMBinding> MMTK<VM> {
             mmapper: &MMAPPER,
             sftmap: &SFT_MAP,
             reference_processors: ReferenceProcessors::new(),
+            #[cfg(feature = "finalization")]
+            finalizable_processor: Mutex::new(FinalizableProcessor::new()),
             options,
             scheduler,
             #[cfg(feature = "sanity")]

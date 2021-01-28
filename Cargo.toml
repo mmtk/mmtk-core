@@ -62,3 +62,4 @@ nogc_lock_free = ["nogc", "lockfreeimmortalspace"]
 nogc_no_zeroing = ["nogc_lock_free"]
 
 single_worker = []
+finalization = []

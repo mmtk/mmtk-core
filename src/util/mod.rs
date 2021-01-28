@@ -7,6 +7,8 @@ pub mod conversions;
 pub mod address;
 pub mod alloc;
 pub mod constants;
+#[cfg(feature = "finalization")]
+pub mod finalizable_processor;
 pub mod forwarding_word;
 pub mod gc_byte;
 pub mod generic_freelist;

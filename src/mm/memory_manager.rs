@@ -329,3 +329,8 @@ pub fn harness_begin<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
 pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     mmtk.harness_end();
 }
+
+#[cfg(feature = "finalization")]
+pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectReference) {
+    mmtk.finalizable_processor.lock().unwrap().add(object);
+}

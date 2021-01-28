@@ -27,4 +27,10 @@ pub trait TraceLocal: TransitiveClosure {
     fn retain_referent(&mut self, object: ObjectReference) -> ObjectReference {
         self.trace_object(object)
     }
+    fn get_forwarded_finalizable(&mut self, object: ObjectReference) -> ObjectReference {
+        self.get_forwarded_reference(object)
+    }
+    fn return_for_finalize(&mut self, object: ObjectReference) -> ObjectReference {
+        self.trace_object(object)
+    }
 }
