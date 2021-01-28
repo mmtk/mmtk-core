@@ -2,7 +2,7 @@ use super::global::GenCopy;
 use crate::plan::{CopyContext, Plan};
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
-use crate::scheduler::{GCWork, GCWorker};
+use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::forwarding_word;
 use crate::util::{Address, ObjectReference, OpaquePointer};
@@ -186,15 +186,12 @@ impl<VM: VMBinding> GCWork<VM> for GenCopyProcessModBuf {
         if mmtk.plan.in_nursery() {
             let mut modified_nodes = vec![];
             ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
-            worker.scheduler().closure_stage.add(
-                ScanObjects::<GenCopyNurseryProcessEdges<VM>>::new(modified_nodes, false),
-            );
+            let work = ScanObjects::<GenCopyNurseryProcessEdges<VM>>::new(modified_nodes, false);
+            worker.scheduler().work_buckets[WorkBucketStage::Closure].add(work);
 
             let mut modified_edges = vec![];
             ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
-            worker
-                .scheduler()
-                .closure_stage
+            worker.scheduler().work_buckets[WorkBucketStage::Closure]
                 .add(GenCopyNurseryProcessEdges::<VM>::new(modified_edges, true));
         } else {
             // Do nothing
