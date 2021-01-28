@@ -25,7 +25,7 @@ enum_derive = "0.1"
 libc = "0.2"
 jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"] }
 mimalloc-sys = "0.1.6"
-hoard-sys = { git = "https://git@github.com/paigereeves/hoard-sys.git", rev = "d970748a09588b8db3a5c74e9515873274bb0108" }
+hoard-sys = { git = "https://git@github.com/paigereeves/hoard-sys.git", rev = "36989b877962f086267b1d21d5008c9df0fd0984" }
 lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
@@ -67,7 +67,8 @@ nogc_no_zeroing = ["nogc_lock_free"]
 single_worker = []
 
 # malloc implementations
-malloc_libc = []
+# only one of the following features should be enabled, or none to use the default malloc from libc
+# this does not replace the global Rust allocator, but provides these libraries for GC implementation
 malloc_mimalloc = []
 malloc_jemalloc = []
 malloc_hoard = []
