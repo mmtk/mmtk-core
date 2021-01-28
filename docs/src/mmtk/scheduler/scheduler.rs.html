@@ -311,21 +311,6 @@
 <span id="308">308</span>
 <span id="309">309</span>
 <span id="310">310</span>
-<span id="311">311</span>
-<span id="312">312</span>
-<span id="313">313</span>
-<span id="314">314</span>
-<span id="315">315</span>
-<span id="316">316</span>
-<span id="317">317</span>
-<span id="318">318</span>
-<span id="319">319</span>
-<span id="320">320</span>
-<span id="321">321</span>
-<span id="322">322</span>
-<span id="323">323</span>
-<span id="324">324</span>
-<span id="325">325</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">stat</span>::<span class="ident">SchedulerStat</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">work</span>::<span class="ident">Work</span>;
@@ -336,6 +321,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">Plan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
+<span class="kw">use</span> <span class="ident">enum_map</span>::{<span class="ident">enum_map</span>, <span class="ident">EnumMap</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">HashMap</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">Ordering</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>::{<span class="ident">channel</span>, <span class="ident">Receiver</span>, <span class="ident">Sender</span>};
@@ -348,13 +334,7 @@
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Context</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Works that are scheduable at any time</span>
-    <span class="kw">pub</span> <span class="ident">unconstrained_works</span>: <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Works that are scheduable within Stop-the-world</span>
-    <span class="kw">pub</span> <span class="ident">prepare_stage</span>: <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">closure_stage</span>: <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">release_stage</span>: <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">final_stage</span>: <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">work_buckets</span>: <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">WorkBucketStage</span>, <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Works for the coordinator thread</span>
     <span class="kw">pub</span> <span class="ident">coordinator_works</span>: <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
     <span class="doccomment">/// workers</span>
@@ -379,11 +359,13 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">worker_monitor</span>: <span class="ident">Arc</span><span class="op">&lt;</span>(<span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">Condvar</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Default</span>::<span class="ident">default</span>();
         <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="self">Self</span> {
-            <span class="ident">unconstrained_works</span>: <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()), <span class="comment">// `default_bucket` is always activated</span>
-            <span class="ident">prepare_stage</span>: <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
-            <span class="ident">closure_stage</span>: <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
-            <span class="ident">release_stage</span>: <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
-            <span class="ident">final_stage</span>: <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+            <span class="ident">work_buckets</span>: <span class="macro">enum_map</span><span class="macro">!</span> {
+                <span class="ident">WorkBucketStage</span>::<span class="ident">Unconstrained</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+                <span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+                <span class="ident">WorkBucketStage</span>::<span class="ident">Closure</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+                <span class="ident">WorkBucketStage</span>::<span class="ident">Release</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+                <span class="ident">WorkBucketStage</span>::<span class="ident">Final</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+            },
             <span class="ident">coordinator_works</span>: <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             <span class="ident">worker_group</span>: <span class="prelude-val">None</span>,
             <span class="ident">worker_monitor</span>,
@@ -424,22 +406,22 @@
             .<span class="ident">unwrap</span>()
             .<span class="ident">spawn_workers</span>(<span class="ident">tls</span>, <span class="ident">context</span>);
 
-        <span class="ident">self_mut</span>.<span class="ident">closure_stage</span>.<span class="ident">set_open_condition</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="self">self</span>.<span class="ident">unconstrained_works</span>.<span class="ident">is_drained</span>()
-                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">prepare_stage</span>.<span class="ident">is_drained</span>()
+        <span class="ident">self_mut</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Closure</span>].<span class="ident">set_open_condition</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Unconstrained</span>].<span class="ident">is_drained</span>()
+                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>].<span class="ident">is_drained</span>()
                 <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">worker_group</span>().<span class="ident">all_parked</span>()
         });
-        <span class="ident">self_mut</span>.<span class="ident">release_stage</span>.<span class="ident">set_open_condition</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="self">self</span>.<span class="ident">unconstrained_works</span>.<span class="ident">is_drained</span>()
-                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">prepare_stage</span>.<span class="ident">is_drained</span>()
-                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">closure_stage</span>.<span class="ident">is_drained</span>()
+        <span class="ident">self_mut</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Release</span>].<span class="ident">set_open_condition</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Unconstrained</span>].<span class="ident">is_drained</span>()
+                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>].<span class="ident">is_drained</span>()
+                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Closure</span>].<span class="ident">is_drained</span>()
                 <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">worker_group</span>().<span class="ident">all_parked</span>()
         });
-        <span class="ident">self_mut</span>.<span class="ident">final_stage</span>.<span class="ident">set_open_condition</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="self">self</span>.<span class="ident">unconstrained_works</span>.<span class="ident">is_drained</span>()
-                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">prepare_stage</span>.<span class="ident">is_drained</span>()
-                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">closure_stage</span>.<span class="ident">is_drained</span>()
-                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">release_stage</span>.<span class="ident">is_drained</span>()
+        <span class="ident">self_mut</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Final</span>].<span class="ident">set_open_condition</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Unconstrained</span>].<span class="ident">is_drained</span>()
+                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>].<span class="ident">is_drained</span>()
+                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Closure</span>].<span class="ident">is_drained</span>()
+                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Release</span>].<span class="ident">is_drained</span>()
                 <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">worker_group</span>().<span class="ident">all_parked</span>()
         });
     }
@@ -462,20 +444,18 @@
     }
 
     <span class="kw">fn</span> <span class="ident">all_buckets_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">unconstrained_works</span>.<span class="ident">is_empty</span>()
-            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">prepare_stage</span>.<span class="ident">is_empty</span>()
-            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">closure_stage</span>.<span class="ident">is_empty</span>()
-            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">release_stage</span>.<span class="ident">is_empty</span>()
-            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">final_stage</span>.<span class="ident">is_empty</span>()
+        <span class="self">self</span>.<span class="ident">work_buckets</span>.<span class="ident">values</span>().<span class="ident">all</span>(<span class="op">|</span><span class="ident">bucket</span><span class="op">|</span> <span class="ident">bucket</span>.<span class="ident">is_empty</span>())
     }
 
     <span class="doccomment">/// Open buckets if their conditions are met</span>
     <span class="kw">fn</span> <span class="ident">update_buckets</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buckets_updated</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        <span class="ident">buckets_updated</span> <span class="op">|</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">prepare_stage</span>.<span class="ident">update</span>();
-        <span class="ident">buckets_updated</span> <span class="op">|</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">closure_stage</span>.<span class="ident">update</span>();
-        <span class="ident">buckets_updated</span> <span class="op">|</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">release_stage</span>.<span class="ident">update</span>();
-        <span class="ident">buckets_updated</span> <span class="op">|</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">final_stage</span>.<span class="ident">update</span>();
+        <span class="kw">for</span> (<span class="ident">id</span>, <span class="ident">bucket</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">work_buckets</span>.<span class="ident">iter</span>() {
+            <span class="kw">if</span> <span class="ident">id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">WorkBucketStage</span>::<span class="ident">Unconstrained</span> {
+                <span class="kw">continue</span>;
+            }
+            <span class="ident">buckets_updated</span> <span class="op">|</span><span class="op">=</span> <span class="ident">bucket</span>.<span class="ident">update</span>();
+        }
         <span class="kw">if</span> <span class="ident">buckets_updated</span> {
             <span class="comment">// Notify the workers for new works</span>
             <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
@@ -525,24 +505,24 @@
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">finalizer</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">finalizer</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">take</span>() {
             <span class="self">self</span>.<span class="ident">process_coordinator_work</span>(<span class="ident">finalizer</span>);
         }
-        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">prepare_stage</span>.<span class="ident">is_activated</span>());
-        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">closure_stage</span>.<span class="ident">is_activated</span>());
-        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">final_stage</span>.<span class="ident">is_activated</span>());
-        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">release_stage</span>.<span class="ident">is_activated</span>());
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>].<span class="ident">is_activated</span>());
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Closure</span>].<span class="ident">is_activated</span>());
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Release</span>].<span class="ident">is_activated</span>());
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Final</span>].<span class="ident">is_activated</span>());
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">deactivate_all</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">prepare_stage</span>.<span class="ident">deactivate</span>();
-        <span class="self">self</span>.<span class="ident">closure_stage</span>.<span class="ident">deactivate</span>();
-        <span class="self">self</span>.<span class="ident">release_stage</span>.<span class="ident">deactivate</span>();
-        <span class="self">self</span>.<span class="ident">final_stage</span>.<span class="ident">deactivate</span>();
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>].<span class="ident">deactivate</span>();
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Closure</span>].<span class="ident">deactivate</span>();
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Release</span>].<span class="ident">deactivate</span>();
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Final</span>].<span class="ident">deactivate</span>();
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="comment">// self.prepare_stage.deactivate();</span>
-        <span class="self">self</span>.<span class="ident">closure_stage</span>.<span class="ident">deactivate</span>();
-        <span class="self">self</span>.<span class="ident">release_stage</span>.<span class="ident">deactivate</span>();
-        <span class="self">self</span>.<span class="ident">final_stage</span>.<span class="ident">deactivate</span>();
+        <span class="comment">// self.work_buckets[WorkBucketStage::Prepare].deactivate();</span>
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Closure</span>].<span class="ident">deactivate</span>();
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Release</span>].<span class="ident">deactivate</span>();
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Final</span>].<span class="ident">deactivate</span>();
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_coordinator_work</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">work</span>: <span class="kw">impl</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>) {
@@ -557,20 +537,10 @@
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">local_works</span>.<span class="ident">poll</span>() {
             <span class="kw">return</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="ident">worker</span>.<span class="ident">local_works</span>.<span class="ident">is_empty</span>()));
         }
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">unconstrained_works</span>.<span class="ident">poll</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="self">self</span>.<span class="ident">unconstrained_works</span>.<span class="ident">is_empty</span>()));
-        }
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">prepare_stage</span>.<span class="ident">poll</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="self">self</span>.<span class="ident">prepare_stage</span>.<span class="ident">is_empty</span>()));
-        }
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">closure_stage</span>.<span class="ident">poll</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="self">self</span>.<span class="ident">closure_stage</span>.<span class="ident">is_empty</span>()));
-        }
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">release_stage</span>.<span class="ident">poll</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="self">self</span>.<span class="ident">release_stage</span>.<span class="ident">is_empty</span>()));
-        }
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">final_stage</span>.<span class="ident">poll</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="self">self</span>.<span class="ident">final_stage</span>.<span class="ident">is_empty</span>()));
+        <span class="kw">for</span> <span class="ident">work_bucket</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">work_buckets</span>.<span class="ident">values</span>() {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="ident">work_bucket</span>.<span class="ident">poll</span>() {
+                <span class="kw">return</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="ident">work_bucket</span>.<span class="ident">is_empty</span>()));
+            }
         }
         <span class="prelude-val">None</span>
     }
@@ -646,8 +616,8 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">notify_mutators_paused</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">control_collector_context</span>.<span class="ident">clear_request</span>();
-        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">prepare_stage</span>.<span class="ident">is_activated</span>());
-        <span class="self">self</span>.<span class="ident">prepare_stage</span>.<span class="ident">activate</span>();
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>].<span class="ident">is_activated</span>());
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>].<span class="ident">activate</span>();
         <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">notify_all</span>();
     }

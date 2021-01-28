@@ -66,9 +66,14 @@
 <span id="63">63</span>
 <span id="64">64</span>
 <span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">Mutator</span>, <span class="ident">SelectedPlan</span>, <span class="ident">TransitiveClosure</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">gc_works</span>::<span class="ident">ProcessEdgesWork</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">GCWorker</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
@@ -110,7 +115,10 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `objects`: The slice of object references to be scanned.</span>
-    <span class="kw">fn</span> <span class="ident">scan_objects</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">objects</span>: <span class="kw-2">&amp;</span>[<span class="ident">ObjectReference</span>]);
+    <span class="kw">fn</span> <span class="ident">scan_objects</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(
+        <span class="ident">objects</span>: <span class="kw-2">&amp;</span>[<span class="ident">ObjectReference</span>],
+        <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    );
 
     <span class="doccomment">/// Scan all the mutators for roots.</span>
     <span class="kw">fn</span> <span class="ident">scan_thread_roots</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>();

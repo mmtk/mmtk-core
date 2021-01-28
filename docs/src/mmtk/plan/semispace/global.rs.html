@@ -172,7 +172,6 @@
 <span id="169">169</span>
 <span id="170">170</span>
 <span id="171">171</span>
-<span id="172">172</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">gc_works</span>::{<span class="ident">SSCopyContext</span>, <span class="ident">SSProcessEdges</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">MMTK</span>;
@@ -270,16 +269,15 @@
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>();
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus</span>::<span class="ident">GcPrepare</span>);
         <span class="comment">// Stop &amp; scan mutators (mutator scanning can happen before STW)</span>
-        <span class="ident">scheduler</span>
-            .<span class="ident">unconstrained_works</span>
+        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Unconstrained</span>]
             .<span class="ident">add</span>(<span class="ident">StopMutators</span>::<span class="op">&lt;</span><span class="ident">SSProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>::<span class="ident">new</span>());
         <span class="comment">// Prepare global/collectors/mutators</span>
-        <span class="ident">scheduler</span>.<span class="ident">prepare_stage</span>.<span class="ident">add</span>(<span class="ident">Prepare</span>::<span class="ident">new</span>(<span class="self">self</span>));
+        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>].<span class="ident">add</span>(<span class="ident">Prepare</span>::<span class="ident">new</span>(<span class="self">self</span>));
         <span class="comment">// Release global/collectors/mutators</span>
-        <span class="ident">scheduler</span>.<span class="ident">release_stage</span>.<span class="ident">add</span>(<span class="ident">Release</span>::<span class="ident">new</span>(<span class="self">self</span>));
+        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Release</span>].<span class="ident">add</span>(<span class="ident">Release</span>::<span class="ident">new</span>(<span class="self">self</span>));
         <span class="comment">// Resume mutators</span>
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-        <span class="ident">scheduler</span>.<span class="ident">final_stage</span>.<span class="ident">add</span>(<span class="ident">ScheduleSanityGC</span>);
+        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Final</span>].<span class="ident">add</span>(<span class="ident">ScheduleSanityGC</span>);
         <span class="ident">scheduler</span>.<span class="ident">set_finalizer</span>(<span class="prelude-val">Some</span>(<span class="ident">EndOfGC</span>));
     }
 

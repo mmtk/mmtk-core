@@ -771,8 +771,6 @@
 <span id="768">768</span>
 <span id="769">769</span>
 <span id="770">770</span>
-<span id="771">771</span>
-<span id="772">772</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">controller_collector_context</span>::<span class="ident">ControllerCollectorContext</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">MutatorContext</span>;
@@ -896,17 +894,15 @@
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">inside_sanity</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         <span class="comment">// Stop &amp; scan mutators (mutator scanning can happen before STW)</span>
         <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span>::<span class="ident">VMActivePlan</span>::<span class="ident">mutators</span>() {
-            <span class="ident">scheduler</span>
-                .<span class="ident">prepare_stage</span>
+            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>]
                 .<span class="ident">add</span>(<span class="ident">ScanStackRoot</span>::<span class="op">&lt;</span><span class="ident">SanityGCProcessEdges</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">mutator</span>));
         }
-        <span class="ident">scheduler</span>
-            .<span class="ident">prepare_stage</span>
+        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>]
             .<span class="ident">add</span>(<span class="ident">ScanVMSpecificRoots</span>::<span class="op">&lt;</span><span class="ident">SanityGCProcessEdges</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>::<span class="ident">new</span>());
         <span class="comment">// Prepare global/collectors/mutators</span>
-        <span class="ident">scheduler</span>.<span class="ident">prepare_stage</span>.<span class="ident">add</span>(<span class="ident">SanityPrepare</span>::<span class="ident">new</span>(<span class="self">self</span>));
+        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>].<span class="ident">add</span>(<span class="ident">SanityPrepare</span>::<span class="ident">new</span>(<span class="self">self</span>));
         <span class="comment">// Release global/collectors/mutators</span>
-        <span class="ident">scheduler</span>.<span class="ident">release_stage</span>.<span class="ident">add</span>(<span class="ident">SanityRelease</span>::<span class="ident">new</span>(<span class="self">self</span>));
+        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Release</span>].<span class="ident">add</span>(<span class="ident">SanityRelease</span>::<span class="ident">new</span>(<span class="self">self</span>));
     }
     <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Common Plan not handled!&quot;</span>)
