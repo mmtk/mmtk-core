@@ -5,7 +5,7 @@ mod mutator;
 pub mod metadata;
 pub mod malloc;
 
-pub use self::global::MallocMS;
+pub use self::global::MarkSweep;
 
 pub use self::constraints as SelectedConstraints;
 pub use self::global::SelectedPlan;

@@ -5,24 +5,24 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
-use crate::plan::mallocms::mutator::create_ms_mutator;
-use crate::plan::mallocms::mutator::ALLOCATOR_MAPPING;
+use crate::plan::marksweep::mutator::create_ms_mutator;
+use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
-use crate::plan::mallocms::metadata::unset_alloc_bit;
-use crate::plan::mallocms::metadata::unset_mark_bit;
-use crate::plan::mallocms::metadata::ALLOCATION_METADATA_ID;
+use crate::plan::marksweep::metadata::unset_alloc_bit;
+use crate::plan::marksweep::metadata::unset_mark_bit;
+use crate::plan::marksweep::metadata::ALLOCATION_METADATA_ID;
 use crate::util::alloc::malloc_allocator::HEAP_SIZE;
 use crate::util::alloc::malloc_allocator::HEAP_USED;
-use crate::plan::mallocms::metadata::MAPPED_CHUNKS;
-use crate::plan::mallocms::metadata::MARKING_METADATA_ID;
+use crate::plan::marksweep::metadata::MAPPED_CHUNKS;
+use crate::plan::marksweep::metadata::MARKING_METADATA_ID;
 use crate::policy::space::Space;
 use crate::policy::mallocspace::MallocSpace;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
-use crate::plan::mallocms::malloc::ms_free;
-use crate::plan::mallocms::malloc::ms_malloc_usable_size;
+use crate::plan::marksweep::malloc::ms_free;
+use crate::plan::marksweep::malloc::ms_malloc_usable_size;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -41,16 +41,16 @@ use std::{collections::HashSet, sync::Arc};
 use atomic::Ordering;
 use enum_map::EnumMap;
 
-pub type SelectedPlan<VM> = MallocMS<VM>;
+pub type SelectedPlan<VM> = MarkSweep<VM>;
 
-pub struct MallocMS<VM: VMBinding> {
+pub struct MarkSweep<VM: VMBinding> {
     pub base: BasePlan<VM>,
     pub space: MallocSpace<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for MallocMS<VM> {}
+unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
 
-impl<VM: VMBinding> Plan for MallocMS<VM> {
+impl<VM: VMBinding> Plan for MarkSweep<VM> {
     type VM = VM;
     type Mutator = Mutator<Self>;
     type CopyContext = NoCopy<VM>;
@@ -62,7 +62,7 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
         _scheduler: &'static MMTkScheduler<Self::VM>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
-        MallocMS {
+        MarkSweep {
             base: BasePlan::new(vm_map, mmapper, options, heap),
             space: MallocSpace::new(),
         }
@@ -166,6 +166,6 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
 
     #[cfg(all(feature = "largeobjectspace", feature = "immortalspace"))]
     fn common(&self) -> &CommonPlan<VM> {
-        unreachable!("MallocMS does not have a common plan.");
+        unreachable!("MarkSweep does not have a common plan.");
     }
 }

@@ -7,7 +7,7 @@ use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::policy::space::Space;
 use crate::util::alloc::{Allocator, BumpAllocator};
-#[cfg(feature = "mallocms")]
+#[cfg(feature = "marksweep")]
 use crate::util::alloc::MallocAllocator;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
@@ -27,7 +27,7 @@ pub struct Allocators<VM: VMBinding> {
     #[cfg(feature = "largeobjectspace")]
     pub large_object: [MaybeUninit<LargeObjectAllocator<VM>>; MAX_LARGE_OBJECT_ALLOCATORS],
     
-    #[cfg(feature = "mallocms")]
+    #[cfg(feature = "marksweep")]
     pub free_list: [MaybeUninit<MallocAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
 }
 
@@ -43,7 +43,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::LargeObject(index) => {
                 self.large_object[index as usize].assume_init_ref()
             }
-            #[cfg(feature = "mallocms")]
+            #[cfg(feature = "marksweep")]
             AllocatorSelector::Malloc(index) => {
                 self.free_list[index as usize].assume_init_ref()
             }
@@ -64,7 +64,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::LargeObject(index) => {
                 self.large_object[index as usize].assume_init_mut()
             }
-            #[cfg(feature = "mallocms")]
+            #[cfg(feature = "marksweep")]
             AllocatorSelector::Malloc(index) => {
                 self.free_list[index as usize].assume_init_mut()
             }
@@ -80,7 +80,7 @@ impl<VM: VMBinding> Allocators<VM> {
             bump_pointer: unsafe { MaybeUninit::uninit().assume_init() },
             #[cfg(feature = "largeobjectspace")]
             large_object: unsafe { MaybeUninit::uninit().assume_init() },
-            #[cfg(feature = "mallocms")]
+            #[cfg(feature = "marksweep")]
             free_list: unsafe { MaybeUninit::uninit().assume_init() },
         };
 
@@ -101,7 +101,7 @@ impl<VM: VMBinding> Allocators<VM> {
                         plan,
                     ));
                 }
-                #[cfg(feature = "mallocms")]
+                #[cfg(feature = "marksweep")]
                 AllocatorSelector::Malloc(index) => {
                     ret.free_list[index as usize].write(MallocAllocator::new(
                         mutator_tls,
@@ -135,6 +135,6 @@ pub enum AllocatorSelector {
     BumpPointer(u8),
     #[cfg(feature = "largeobjectspace")]
     LargeObject(u8),
-    #[cfg(feature = "mallocms")]
+    #[cfg(feature = "marksweep")]
     Malloc(u8),
 }
