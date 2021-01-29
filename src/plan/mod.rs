@@ -18,11 +18,6 @@ pub mod nogc;
 #[cfg(feature = "nogc")]
 pub use self::nogc as selected_plan;
 
-#[cfg(feature = "mygc")]
-pub mod mygc;
-#[cfg(feature = "mygc")]
-pub use self::mygc as selected_plan;
-
 #[cfg(feature = "semispace")]
 pub mod semispace;
 #[cfg(feature = "semispace")]
@@ -32,16 +27,6 @@ pub use self::semispace as selected_plan;
 pub mod gencopy;
 #[cfg(feature = "gencopy")]
 pub use self::gencopy as selected_plan;
-
-#[cfg(feature = "gencopycopy")]
-pub mod gencopycopy;
-#[cfg(feature = "gencopycopy")]
-pub use self::gencopycopy as selected_plan;
-
-#[cfg(feature = "mygencopy")]
-pub mod mygencopy;
-#[cfg(feature = "mygencopy")]
-pub use self::mygencopy as selected_plan;
 
 #[cfg(feature = "marksweep")]
 pub mod marksweep;

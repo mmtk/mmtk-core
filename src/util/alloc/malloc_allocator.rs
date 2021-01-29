@@ -1,18 +1,18 @@
-use std::sync::atomic::AtomicUsize;
 use crate::plan::global::Plan;
-use crate::plan::selected_plan::SelectedPlan;
+use crate::plan::marksweep::malloc::ms_calloc;
+use crate::plan::marksweep::malloc::ms_malloc_usable_size;
 use crate::plan::marksweep::metadata::map_meta_space_for_chunk;
 use crate::plan::marksweep::metadata::meta_space_mapped;
 use crate::plan::marksweep::metadata::set_alloc_bit;
+use crate::plan::selected_plan::SelectedPlan;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
-use crate::plan::marksweep::malloc::ms_calloc;
-use crate::plan::marksweep::malloc::ms_malloc_usable_size;
+use crate::util::conversions;
 use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::util::conversions;
 use atomic::Ordering;
+use std::sync::atomic::AtomicUsize;
 
 pub static mut HEAP_SIZE: usize = 0;
 pub static HEAP_USED: AtomicUsize = AtomicUsize::new(0);

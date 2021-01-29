@@ -3,12 +3,12 @@ use std::mem::MaybeUninit;
 use crate::plan::selected_plan::SelectedPlan;
 #[cfg(feature = "largeobjectspace")]
 use crate::policy::largeobjectspace::LargeObjectSpace;
+use crate::policy::space::Space;
 #[cfg(feature = "largeobjectspace")]
 use crate::util::alloc::LargeObjectAllocator;
-use crate::policy::space::Space;
-use crate::util::alloc::{Allocator, BumpAllocator};
 #[cfg(feature = "marksweep")]
 use crate::util::alloc::MallocAllocator;
+use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 
@@ -23,10 +23,10 @@ const MAX_FREE_LIST_ALLOCATORS: usize = 5;
 #[repr(C)]
 pub struct Allocators<VM: VMBinding> {
     pub bump_pointer: [MaybeUninit<BumpAllocator<VM>>; MAX_BUMP_ALLOCATORS],
-    
+
     #[cfg(feature = "largeobjectspace")]
     pub large_object: [MaybeUninit<LargeObjectAllocator<VM>>; MAX_LARGE_OBJECT_ALLOCATORS],
-    
+
     #[cfg(feature = "marksweep")]
     pub free_list: [MaybeUninit<MallocAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
 }
@@ -44,9 +44,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_ref()
             }
             #[cfg(feature = "marksweep")]
-            AllocatorSelector::Malloc(index) => {
-                self.free_list[index as usize].assume_init_ref()
-            }
+            AllocatorSelector::Malloc(index) => self.free_list[index as usize].assume_init_ref(),
         }
     }
 
@@ -65,9 +63,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_mut()
             }
             #[cfg(feature = "marksweep")]
-            AllocatorSelector::Malloc(index) => {
-                self.free_list[index as usize].assume_init_mut()
-            }
+            AllocatorSelector::Malloc(index) => self.free_list[index as usize].assume_init_mut(),
         }
     }
 
@@ -109,7 +105,6 @@ impl<VM: VMBinding> Allocators<VM> {
                         plan,
                     ));
                 }
-                
             }
         }
 

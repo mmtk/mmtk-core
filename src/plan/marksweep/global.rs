@@ -5,25 +5,25 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
+use crate::plan::marksweep::malloc::ms_free;
+use crate::plan::marksweep::malloc::ms_malloc_usable_size;
+use crate::plan::marksweep::metadata::unset_alloc_bit;
+use crate::plan::marksweep::metadata::unset_mark_bit;
+use crate::plan::marksweep::metadata::ALLOCATION_METADATA_ID;
+use crate::plan::marksweep::metadata::MAPPED_CHUNKS;
+use crate::plan::marksweep::metadata::MARKING_METADATA_ID;
 use crate::plan::marksweep::mutator::create_ms_mutator;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
-use crate::plan::marksweep::metadata::unset_alloc_bit;
-use crate::plan::marksweep::metadata::unset_mark_bit;
-use crate::plan::marksweep::metadata::ALLOCATION_METADATA_ID;
-use crate::util::alloc::malloc_allocator::HEAP_SIZE;
-use crate::util::alloc::malloc_allocator::HEAP_USED;
-use crate::plan::marksweep::metadata::MAPPED_CHUNKS;
-use crate::plan::marksweep::metadata::MARKING_METADATA_ID;
-use crate::policy::space::Space;
 use crate::policy::mallocspace::MallocSpace;
+use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
-use crate::plan::marksweep::malloc::ms_free;
-use crate::plan::marksweep::malloc::ms_malloc_usable_size;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::alloc::malloc_allocator::HEAP_SIZE;
+use crate::util::alloc::malloc_allocator::HEAP_USED;
 use crate::util::constants;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -147,7 +147,10 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                     now_empty.insert(chunk_start.as_usize());
                 }
             }
-            MAPPED_CHUNKS.write().unwrap().retain(|c| !now_empty.contains(&c.as_usize()));
+            MAPPED_CHUNKS
+                .write()
+                .unwrap()
+                .retain(|c| !now_empty.contains(&c.as_usize()));
         }
     }
 

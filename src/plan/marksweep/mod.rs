@@ -1,9 +1,9 @@
 pub mod constraints;
 mod gc_works;
 mod global;
-mod mutator;
-pub mod metadata;
 pub mod malloc;
+pub mod metadata;
+mod mutator;
 
 pub use self::global::MarkSweep;
 

@@ -19,8 +19,6 @@ rmalloc = "1.1.0"
 
 [features]
 default = []
-mygencopy = ["mmtk/mygencopy","mmtk/sanity"]
-mygc = ["mmtk/mygc"]
 nogc = ["mmtk/nogc"]
 semispace = ["mmtk/semispace"]
 gencopy = ["mmtk/gencopy"]

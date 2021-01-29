@@ -63,13 +63,11 @@ impl<P: Plan<Mutator = Self>> MutatorContext<P::VM> for Mutator<P> {
         allocator: AllocationType,
     ) -> Address {
         //println!("mutator context alloc");
-        let a = unsafe {
+        unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
         }
-        .alloc(size, align, offset);
-        //println!("mut context alloc'd to {}", a);
-        a
+        .alloc(size, align, offset)
     }
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
@@ -118,7 +116,6 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
     fn barrier(&mut self) -> &mut dyn Barrier;
 
     fn record_modified_node(&mut self, obj: ObjectReference) {
-        
         self.barrier().post_write_barrier(WriteTarget::Object(obj));
     }
     fn record_modified_edge(&mut self, slot: Address) {

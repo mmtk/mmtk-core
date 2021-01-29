@@ -3,12 +3,19 @@
 
 use std::marker::PhantomData;
 
-use crate::{policy::space::{Space, SFT}, util::{Address, ObjectReference, heap::{PageResource, layout::heap_layout::VMMap}}, vm::VMBinding};
+use crate::{
+    policy::space::{Space, SFT},
+    util::{
+        heap::{layout::heap_layout::VMMap, PageResource},
+        Address, ObjectReference,
+    },
+    vm::VMBinding,
+};
 
 use super::space::CommonSpace;
 
 pub struct MallocSpace<VM: VMBinding> {
-    phantom: PhantomData<VM>
+    phantom: PhantomData<VM>,
 }
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {

@@ -57,8 +57,6 @@ pub trait SFT {
     fn initialize_header(&self, object: ObjectReference, alloc: bool);
 }
 
-
-
 /// Print debug info for SFT. Should be false when committed.
 const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 

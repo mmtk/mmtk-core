@@ -48,10 +48,7 @@ pub(super) fn address_to_meta_address(addr: Address, metadata_id: SideMetadataID
 }
 
 // Gets the related meta address and clears the low order bits
-pub fn address_to_meta_page_address(
-    data_addr: Address,
-    metadata_id: SideMetadataID,
-) -> Address {
+pub fn address_to_meta_page_address(data_addr: Address, metadata_id: SideMetadataID) -> Address {
     let meta_addr = address_to_meta_address(data_addr, metadata_id);
     unsafe {
         Address::from_usize((meta_addr >> META_SPACE_PAGE_SIZE_LOG) << META_SPACE_PAGE_SIZE_LOG)

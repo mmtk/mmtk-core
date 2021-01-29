@@ -4,14 +4,13 @@ use crate::util::side_metadata::SideMetadata;
 use crate::util::side_metadata::SideMetadataID;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use conversions::chunk_align_down;
 use std::collections::HashSet;
 use std::sync::RwLock;
-use conversions::chunk_align_down;
 
 lazy_static! {
     pub static ref MAPPED_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
 }
-
 
 pub static mut ALLOCATION_METADATA_ID: SideMetadataID = SideMetadataID::new();
 pub static mut MARKING_METADATA_ID: SideMetadataID = SideMetadataID::new();
@@ -30,7 +29,10 @@ pub unsafe fn map_meta_space_for_chunk(chunk_start: Address) {
 // Check if a given object was allocated by malloc
 pub fn is_malloced(object: ObjectReference) -> bool {
     let address = object.to_address();
-    unsafe { meta_space_mapped(address) && SideMetadata::load_atomic(ALLOCATION_METADATA_ID, address) == 1 }
+    unsafe {
+        meta_space_mapped(address)
+            && SideMetadata::load_atomic(ALLOCATION_METADATA_ID, address) == 1
+    }
 }
 
 // check the corresponding bit in the metadata table

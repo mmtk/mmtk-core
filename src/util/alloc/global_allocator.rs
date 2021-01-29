@@ -2,14 +2,14 @@ use std::alloc::GlobalAlloc;
 
 use libc::c_void;
 
+#[cfg(feature = "ga_libc")]
+pub use crate::util::malloc::{c_calloc as ga_calloc, c_free as ga_free};
+#[cfg(feature = "ga_hoard")]
+pub use crate::util::malloc::{ho_calloc as ga_calloc, ho_free as ga_free};
 #[cfg(feature = "ga_jemalloc")]
 pub use crate::util::malloc::{je_calloc as ga_calloc, je_free as ga_free};
 #[cfg(feature = "ga_mimalloc")]
 pub use crate::util::malloc::{mi_calloc as ga_calloc, mi_free as ga_free};
-#[cfg(feature = "ga_hoard")]
-pub use crate::util::malloc::{ho_calloc as ga_calloc, ho_free as ga_free};
-#[cfg(feature = "ga_libc")]
-pub use crate::util::malloc::{c_calloc as ga_calloc, c_free as ga_free};
 // #[cfg(feature = "ga_scalloc")]
 // pub use crate::util::malloc::{sc_calloc as ga_calloc, sc_free as ga_free};
 
