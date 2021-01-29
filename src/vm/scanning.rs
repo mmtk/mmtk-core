@@ -1,5 +1,6 @@
 use crate::plan::{Mutator, SelectedPlan, TransitiveClosure};
 use crate::scheduler::gc_works::ProcessEdgesWork;
+use crate::scheduler::GCWorker;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
@@ -41,7 +42,10 @@ pub trait Scanning<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `objects`: The slice of object references to be scanned.
-    fn scan_objects<W: ProcessEdgesWork<VM = VM>>(objects: &[ObjectReference]);
+    fn scan_objects<W: ProcessEdgesWork<VM = VM>>(
+        objects: &[ObjectReference],
+        worker: &mut GCWorker<VM>,
+    );
 
     /// Scan all the mutators for roots.
     fn scan_thread_roots<W: ProcessEdgesWork<VM = VM>>();

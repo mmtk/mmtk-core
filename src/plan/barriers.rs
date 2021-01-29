@@ -1,5 +1,6 @@
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
+use crate::scheduler::WorkBucketStage;
 use crate::util::*;
 use crate::MMTK;
 
@@ -65,13 +66,11 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for FieldRememberingBarrier<E
         let mut modified_edges = vec![];
         std::mem::swap(&mut modified_edges, &mut self.mod_buffer.modified_edges);
         debug_assert!(
-            !self.mmtk.scheduler.final_stage.is_activated(),
+            !self.mmtk.scheduler.work_buckets[WorkBucketStage::Final].is_activated(),
             "{:?}",
             self as *const _
         );
-        self.mmtk
-            .scheduler
-            .closure_stage
+        self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
             .add(ProcessModBuf::<E>::new(modified_nodes, modified_edges));
     }
     fn post_write_barrier(&mut self, target: WriteTarget) {

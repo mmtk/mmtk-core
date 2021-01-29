@@ -235,19 +235,22 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
-        // debug_assert!(tls != 0);
-        let allow_poll = unsafe { VM::VMActivePlan::is_mutator(tls) }
-            && VM::VMActivePlan::global().is_initialized();
+        // Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.
+        let should_poll = unsafe { VM::VMActivePlan::is_mutator(tls) };
+        // Is a GC allowed here? enable_collection() has to be called so we know GC is initialized.
+        let allow_poll = should_poll && VM::VMActivePlan::global().is_initialized();
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();
         let pages_reserved = pr.reserve_pages(pages);
         trace!("Pages reserved");
-
         trace!("Polling ..");
 
-        if allow_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
+        if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
             debug!("Collection required");
+            if !allow_poll {
+                panic!("Collection is not enabled.");
+            }
             pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(tls);
             unsafe { Address::zero() }
@@ -255,6 +258,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             debug!("Collection not required");
             let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, tls);
             if rtn.is_zero() {
+                // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
                 if !allow_poll {
                     panic!("Physical allocation failed when polling not allowed!");
                 }
