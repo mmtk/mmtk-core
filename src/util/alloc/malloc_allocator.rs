@@ -40,14 +40,11 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     fn alloc(&mut self, size: usize, _align: usize, offset: isize) -> Address {
         trace!("alloc");
         assert!(offset == 0);
-        if heap_full() {
-            self.plan.handle_user_collection_request(self.tls, true);
-            assert!(!heap_full(), "MallocAllocator: Out of memory!");
-        }
         unsafe {
             let ptr = ms_calloc(1, size);
             let address = Address::from_mut_ptr(ptr);
             if !meta_space_mapped(address) {
+                self.plan.poll(true, &self.plan.space);
                 let chunk_start = conversions::chunk_align_down(address);
                 map_meta_space_for_chunk(chunk_start);
             }
@@ -74,8 +71,4 @@ impl<VM: VMBinding> MallocAllocator<VM> {
     ) -> Self {
         MallocAllocator { tls, space, plan }
     }
-}
-
-pub fn heap_full() -> bool {
-    unsafe { HEAP_USED.load(Ordering::SeqCst) >= HEAP_SIZE }
 }

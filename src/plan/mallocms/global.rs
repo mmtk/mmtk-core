@@ -36,7 +36,7 @@ use crate::util::sanity::sanity_checker::*;
 use crate::util::side_metadata::SideMetadata;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use atomic::Ordering;
 use enum_map::EnumMap;
@@ -72,8 +72,7 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
     where
         Self: Sized,
     {
-        unimplemented!();
-        // unsafe { HEAP_USED.load(Ordering::SeqCst) >= HEAP_SIZE }
+        unsafe { HEAP_USED.load(Ordering::SeqCst) >= HEAP_SIZE }
     }
 
     fn gc_init(
@@ -125,8 +124,10 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
     }
 
     fn release(&self, _tls: OpaquePointer) {
+        let mut now_empty = HashSet::new();
         unsafe {
             for chunk_start in &*MAPPED_CHUNKS.read().unwrap() {
+                let mut empty_chunk = true;
                 let mut address = *chunk_start;
                 let chunk_end = chunk_start.add(BYTES_IN_CHUNK);
                 while address.as_usize() < chunk_end.as_usize() {
@@ -138,11 +139,16 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
                             unset_alloc_bit(address);
                         } else {
                             unset_mark_bit(address);
+                            empty_chunk = false;
                         }
                     }
                     address = address.add(VM::MAX_ALIGNMENT);
                 }
+                if empty_chunk {
+                    now_empty.insert(chunk_start.as_usize());
+                }
             }
+            MAPPED_CHUNKS.write().unwrap().retain(|c| !now_empty.contains(&c.as_usize()));
         }
     }
 
