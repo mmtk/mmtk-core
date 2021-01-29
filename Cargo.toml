@@ -57,7 +57,7 @@ gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 mygc = ["immortalspace", "largeobjectspace", "copyspace"]
 mygencopy = ["immortalspace", "largeobjectspace", "copyspace"]
 gencopycopy = ["immortalspace", "largeobjectspace", "copyspace"]
-mallocms = []
+mallocms = ["mallocspace"]
 
 # spaces
 base_spaces = []
@@ -69,6 +69,7 @@ immortalspace = []
 copyspace = []
 largeobjectspace = []
 lockfreeimmortalspace = []
+mallocspace = []
 
 sanity = []
 nogc_lock_free = ["nogc", "lockfreeimmortalspace"]

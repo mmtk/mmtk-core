@@ -37,6 +37,7 @@ pub fn create_ms_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
+            (AllocatorSelector::Malloc(0), &plan.space),
         ],
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,

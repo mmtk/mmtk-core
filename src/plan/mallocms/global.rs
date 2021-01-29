@@ -18,6 +18,7 @@ use crate::util::alloc::malloc_allocator::HEAP_USED;
 use crate::plan::mallocms::metadata::MAPPED_CHUNKS;
 use crate::plan::mallocms::metadata::MARKING_METADATA_ID;
 use crate::policy::space::Space;
+use crate::policy::mallocspace::MallocSpace;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
 use crate::plan::mallocms::malloc::ms_free;
@@ -44,6 +45,7 @@ pub type SelectedPlan<VM> = MallocMS<VM>;
 
 pub struct MallocMS<VM: VMBinding> {
     pub base: BasePlan<VM>,
+    pub space: MallocSpace<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for MallocMS<VM> {}
@@ -62,6 +64,7 @@ impl<VM: VMBinding> Plan for MallocMS<VM> {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
         MallocMS {
             base: BasePlan::new(vm_map, mmapper, options, heap),
+            space: MallocSpace::new(),
         }
     }
 
