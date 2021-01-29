@@ -1,5 +1,5 @@
-// This struct is not a real space. It exists because certain functions (plan::poll and config::new) require a struct implementing Space and SFT.
-// TODO: find a way to use plan::poll and config::new without a dummy struct.
+// This struct is not a real space. It exists because certain functions (plan::poll and allocators::new) require a struct implementing Space and SFT.
+// TODO: find a way to use plan::poll and allocators::new without a dummy struct.
 
 use std::marker::PhantomData;
 
