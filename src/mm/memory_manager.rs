@@ -330,7 +330,9 @@ pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     mmtk.harness_end();
 }
 
-#[cfg(feature = "finalization")]
 pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectReference) {
+    if mmtk.options.no_finalizer {
+        warn!("add_finalizer() is called for no_finalizer = true");
+    }
     mmtk.finalizable_processor.lock().unwrap().add(object);
 }
