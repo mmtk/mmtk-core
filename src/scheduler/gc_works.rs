@@ -1,3 +1,4 @@
+use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::plan::global::GcStatus;
 use crate::util::*;
@@ -38,8 +39,7 @@ impl<P: Plan> GCWork<P::VM> for Prepare<P> {
         trace!("Prepare Global");
         self.plan.prepare(worker.tls);
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler
-                .prepare_stage
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
@@ -97,8 +97,7 @@ impl<P: Plan> GCWork<P::VM> for Release<P> {
         trace!("Release Global");
         self.plan.release(worker.tls);
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler
-                .release_stage
+            mmtk.scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
@@ -175,17 +174,16 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
                 }
                 // Scan mutators
                 if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
-                    mmtk.scheduler.prepare_stage.add(ScanStackRoots::<E>::new());
+                    mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                        .add(ScanStackRoots::<E>::new());
                 } else {
                     for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                        mmtk.scheduler
-                            .prepare_stage
+                        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                             .add(ScanStackRoot::<E>(mutator));
                     }
                 }
             }
-            mmtk.scheduler
-                .prepare_stage
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(ScanVMSpecificRoots::<E>::new());
         } else {
             mmtk.scheduler
@@ -377,10 +375,7 @@ pub trait ProcessEdgesWork:
             // Executing these works now can remarkably reduce the global synchronization time.
             self.worker().do_work(scan_objects_work);
         } else {
-            self.mmtk
-                .unwrap()
-                .scheduler
-                .closure_stage
+            self.mmtk.unwrap().scheduler.work_buckets[WorkBucketStage::Closure]
                 .add(scan_objects_work);
         }
     }
@@ -435,9 +430,9 @@ impl<Edges: ProcessEdgesWork> ScanObjects<Edges> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
-    fn do_work(&mut self, _worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ScanObjects");
-        <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer);
+        <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer, worker);
         trace!("ScanObjects End");
     }
 }
@@ -465,16 +460,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
         if mmtk.plan.in_nursery() {
             let mut modified_nodes = vec![];
             ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
-            worker
-                .scheduler()
-                .closure_stage
+            worker.scheduler().work_buckets[WorkBucketStage::Closure]
                 .add(ScanObjects::<E>::new(modified_nodes, false));
 
             let mut modified_edges = vec![];
             ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
-            worker
-                .scheduler()
-                .closure_stage
+            worker.scheduler().work_buckets[WorkBucketStage::Closure]
                 .add(E::new(modified_edges, true));
         } else {
             // Do nothing

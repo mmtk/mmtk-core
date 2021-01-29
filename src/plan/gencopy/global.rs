@@ -122,21 +122,19 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         if in_nursery {
-            scheduler
-                .unconstrained_works
+            scheduler.work_buckets[WorkBucketStage::Unconstrained]
                 .add(StopMutators::<GenCopyNurseryProcessEdges<VM>>::new());
         } else {
-            scheduler
-                .unconstrained_works
+            scheduler.work_buckets[WorkBucketStage::Unconstrained]
                 .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
         }
         // Prepare global/collectors/mutators
-        scheduler.prepare_stage.add(Prepare::new(self));
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::new(self));
         // Release global/collectors/mutators
-        scheduler.release_stage.add(Release::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release].add(Release::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.final_stage.add(ScheduleSanityGC);
+        scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC);
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
