@@ -1,3 +1,6 @@
+// This struct is not a real space. It exists because certain functions (plan::poll and config::new) require a struct implementing Space and SFT.
+// TODO: find a way to use plan::poll and config::new without a dummy struct.
+
 use std::marker::PhantomData;
 
 use crate::{policy::space::{Space, SFT}, util::{Address, ObjectReference, heap::{PageResource, layout::heap_layout::VMMap}}, vm::VMBinding};
@@ -10,7 +13,7 @@ pub struct MallocSpace<VM: VMBinding> {
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
     fn name(&self) -> &str {
-        "MallocSpace"
+        unimplemented!();
     }
 
     fn is_live(&self, _object: ObjectReference) -> bool {
@@ -28,10 +31,10 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
 impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn as_space(&self) -> &dyn Space<VM> {
-        self
+        unimplemented!();
     }
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
-        self
+        unimplemented!();
     }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         unimplemented!();
