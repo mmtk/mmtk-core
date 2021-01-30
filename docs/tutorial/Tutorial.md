@@ -1,14 +1,14 @@
 # MMTk Tutorial
 
-In this tutorial, you will build multiple garbage collectors using MMTK from scratch. 
+In this tutorial, you will build multiple garbage collectors using MMTk from scratch. This tutorial is aimed at GC implementors who would like to implement new GC algorithms/plans using the MMTk.
 
-This tutorial is a work in progress. Some sections may be rough, and others may be missing information (especially about import statements). If something seems to be missing, it may be worth looking at the relevant section the finished SemiSpace garbage collector.
+This tutorial is a work in progress. Some sections may be rough, and others may be missing information (especially about import statements). If something is missing or inaccurate, refer to the relevant completed garbage collector if possible. Please also raise an issue, or create a pull request addressing the problem. 
 
 
 ## Contents
 * [Introduction](#introduction)
 * [Preliminaries](#preliminaries)
-  * [Set up MMTK and OpenJDK](#set-up-mmtk-and-openjdk)
+  * [Set up MMTk and OpenJDK](#set-up-mmtk-and-openjdk)
     * [Basic set up](#basic-set-up)
     * [Set up benchmarks](#set-up-benchmarks)
     * [Working with multiple VM builds](#working-with-multiple-vm-builds)
@@ -24,7 +24,7 @@ The Memory Management Toolkit (MMTk) is a framework to design and implement memo
 ### What will this tutorial be covering?
 This tutorial is intended to get you comfortable with building garbage collectors in the MMTk.
 
-You will first be guided through building a Semispace collector. After that, you will extend this collector in various ways that are not particularly practical, but introduce different concepts implemented in the MMTk. These exersizes will be less guided, but hints and functional solutions will be available in case you get stuck. There will also be questions at various points in the tutorial, intended to encourage you to think about what the code is *doing* and potentially motivate further research.
+You will first be guided through building a Semispace collector. After that, you will extend this collector to be a generational collector, to further familiarise you with different concepts in the MMTk. There will also be questions and exersizes at various points in the tutorial, intended to encourage you to think about what the code is doing, increase your general understanding of the MMTk, and motivate further research.
 
 ### Terminology
 
@@ -34,19 +34,19 @@ You will first be guided through building a Semispace collector. After that, you
 
 *dead*: An object that can no longer be accessed by any other object is dead.
 
-*GC work (unit), GC worker*: A worker that performs garbage collection operations using a single thread.
+*GC work (unit), GC packet*: A schedulable unit of collection work. 
+
+*GC worker*: A worker that performs garbage collection operations (as required by GC work units) using a single thread.
 
 *live*: An object that can still be accessed by other objects is live/alive.
 
 *mutator*: Something that 'mutates', or changes, the objects stored in memory. That is to say, this is a running program.
 
-*plan*: A garbage collection algorithm composed from components.
+*plan*: A garbage collection algorithm composed of components from the MMTk.
 
 *policy*: A definition of the semantics and behaviour of a memory region. Memory spaces are instances of policies.
 
-*scheduler*: Schedules GC works so that they can safely be run in parallel.
-
-*work packet*: Contains an instance of a GC worker.
+*scheduler*: Dynamically dispatches units of GC work to workers.
 
 *zeroing*, *zero initialization*: Initializing and resetting unused memory bits to have a value of 0, generally to improve memory safety.
 
