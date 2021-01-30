@@ -19,7 +19,7 @@ This tutorial is a work in progress. Some sections may be rough, and others may 
 
 ## Introduction
 ### What *is* the MMTk?
-The Memory Management Toolkit (MMTk) is a framework to design and implement memory managers. It has a core (this repository) written in Rust, and bindings that allow it to work with OpenJDK, V8, and JikesRVM, with more bindings currently in development. The toolkit has a number of pre-built collectors, and is intended to make it relatively simple to expand upon or build new collectors. Many elements common between collectors can be easily implemented.
+The Memory Management Toolkit (MMTk) is a framework to design and implement memory managers. It has a core (mmtk-core) written in Rust, and bindings that allow it to work with OpenJDK, V8, and JikesRVM, with more bindings currently in development. The toolkit has a number of pre-built collectors, and is intended to make it relatively simple to expand upon or build new collectors. Many elements common between collectors can be easily implemented.
 
 ### What will this tutorial be covering?
 This tutorial is intended to get you comfortable with building garbage collectors in the MMTk.
@@ -61,15 +61,16 @@ This tutorial can be completed with any binding. However, for the sake of simpli
 
 First, set up OpenJDK, MMTk, and the binding:
 1. Clone the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk).
-2. Clone this repository and the [OpenJDK VM repository](https://github.com/mmtk/openjdk). Place them both in `mmtk-openjdk/repos`.
-4. Ensure you can build OpenJDK according to the instructions in the READMEs of [this repository](/../master/README.md) and the [OpenJDK binding repository](https://github.com/mmtk/mmtk-openjdk/blob/master/README.md).
+2. Clone the mmtk-core repository and the [OpenJDK VM repository](https://github.com/mmtk/openjdk). Place them both in `mmtk-openjdk/repos`.
+4. Ensure you can build OpenJDK according to the instructions in the READMEs of [the mmtk-core repository](/../master/README.md) and the [OpenJDK binding repository](https://github.com/mmtk/mmtk-openjdk/blob/master/README.md).
+   * Use the `slowdebug` option when building the OpenJDK binding. This is the fastest debug variant to build, and allows for easier debugging and better testing. The rest of the tutorial will assume you are using `slowdebug`.
 
 
 
-#### Set up benchmarks
+#### Test the build
 A few benchmarks of varying size will be used throughout the tutorial. If you haven't already, set them up now. All of the following commands should be entered in `repos/openjdk`.
 1. **HelloWorld** (simplest, will never trigger GC): 
-   * Copy the following code into a new Java file titled "HelloWorld.java" in `mmtk-openjdk/repos/openjdk`:
+   1. Copy the following code into a new Java file titled "HelloWorld.java" in `mmtk-openjdk/repos/openjdk`:
    ```java
    class HelloWorld {
        public static void main(String[] args) {
@@ -77,24 +78,29 @@ A few benchmarks of varying size will be used throughout the tutorial. If you ha
        }
    }
    ```
-   * Use the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac HelloWorld.java`.
-   * Then, run `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java HelloWorld` to run HelloWorld.
+   2. Use the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac HelloWorld.java`.
+   3. Then, run `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java HelloWorld -XX:+UseThirdPartyHeap` to run HelloWorld.
    
-2. The Computer Language Benchmarks Game **fannkuchredux** (toy benchmark, allocates a small amount of memory but not enough to trigger a collection): 
-   * [Copy this code](https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/master/bencher/programs/fannkuchredux/fannkuchredux.java) into a new file named "fannkuchredux.java" in `mmtk-openjdk/repos/openjdk`.
-   * Use the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac fannkuchredux.java`.
-   * Then, run `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java fannkuchredux` to run fannkuchredux.
+2. The Computer Language Benchmarks Game **fannkuchredux** (micro benchmark, allocates a small amount of memory and may not trigger a collection): 
+   1. [Copy this code](https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/master/bencher/programs/fannkuchredux/fannkuchredux.java) into a new file named "fannkuchredux.java" in `mmtk-openjdk/repos/openjdk`.
+   2. Use the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac fannkuchredux.java`.
+   3. Then, run `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java fannkuchredux -XX:+UseThirdPartyHeap` to run fannkuchredux.
    
-3. **DaCapo** benchmark suite (most complex, will trigger multiple collections): 
-   * Fetch using `wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar`.
-   * DaCapo contains a variety of benchmarks, but this tutorial will only be using lusearch. Run the lusearch benchmark using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch` in `repos/openjdk`. 
+3. **DaCapo** benchmark suite (most complex, will likely trigger multiple collections): 
+   1. Fetch using `wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar`.
+   2. DaCapo contains a variety of benchmarks, but this tutorial will only be using lusearch. Run the lusearch benchmark using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch` in `repos/openjdk`. 
 
+There are also two useful debugging tools you can choose to run by changing their environment variables:
+  1. `RUST_LOG=trace` will log all of the information sent by the MMTk.
+  2. `TRACE_LOG=debug` will 
+ 
+These are helpful for observing the behaviour of the MMTk, and of the particular plan being used.
 
 
 #### Working with multiple VM builds
 
 You will need to build multiple versions of the VM in this tutorial. You should familiarise yourself with how to do this now.
-1. To select which garbage collector (GC) plan you would like to use in a given build, you can either use the `MMTK_PLAN` environment variable, or the `--features` flag when building the binding. For example, using `export MMTK_PLAN=semispace` or `--features semispace` will build using the Semispace GC (the default plan). 
+1. To select which garbage collector (GC) plan you would like to use in a given build, you will need to export the `MMTK_PLAN` environment variable before building the binding. For example, using `export MMTK_PLAN=semispace` will cause the build to use the Semispace GC (the default plan). 
 2. The build will always generate in `mmtk-openjdk/repos/openjdk/build`. If you would like to keep a build (for instance, to make quick performance comparisons), you can rename either the `build` folder or the folder generated within it (eg `inux-x86_64-normal-server-$DEBUG_LEVEL`). 
    1. Renaming the `build` folder is the safest method for this.
    2. If you rename the internal folder, there is a possibility that the new build will generate incorrectly. If a build appears to generate strangely quickly, it probably generated badly.
