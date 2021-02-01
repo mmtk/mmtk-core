@@ -212,7 +212,7 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
   1. Delete the existing fields in the constructor.
   2. Add `pub hi: AtomicBool,`. This is a thread-safe bool indicating which copyspace is the to-space.
   3. Add `pub copyspace0: CopySpace<VM>,` and `pub copyspace1: CopySpace<VM>,`. These are the two copyspaces.
-  4. Add `pub common: CommonPlan<VM>,`. Semispace uses the common plan rather than the base plan. 
+  4. Add `pub common: CommonPlan<VM>,`. Semispace uses the common plan rather than the base plan, which includes an immortal space and a large object space. Any garbage collected plan should use `CommonPlan`.
 3. Change `impl<VM: VMBinding> Plan for MyGC<VM> {`. This section initialises and prepares the objects in MyGC that you just defined.
   1. Delete the definition of `mygc_space`. Instead, we will define the two copyspaces here.
   2. Define one of the copyspaces by adding the following code: 
