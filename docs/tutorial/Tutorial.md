@@ -212,7 +212,7 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
   1. Delete the existing fields in the constructor.
   2. Add `pub hi: AtomicBool,`. This is a thread-safe bool indicating which copyspace is the to-space.
   3. Add `pub copyspace0: CopySpace<VM>,` and `pub copyspace1: CopySpace<VM>,`. These are the two copyspaces.
-  4. Add `pub common: CommonPlan<VM>,`. Semispace uses the common plan rather than the base plan, which includes an immortal space and a large object space. Any garbage collected plan should use `CommonPlan`.
+  4. Add `pub common: CommonPlan<VM>,`. Semispace uses the common plan, which includes an immortal space and a large object space, rather than the base plan. Any garbage collected plan should use `CommonPlan`.
 3. Change `impl<VM: VMBinding> Plan for MyGC<VM> {`. This section initialises and prepares the objects in MyGC that you just defined.
   1. Delete the definition of `mygc_space`. Instead, we will define the two copyspaces here.
   2. Define one of the copyspaces by adding the following code: 
@@ -311,8 +311,8 @@ There may seem to be 2 extraneous spaces and allocators that have appeared all o
  1. The immortal space is used for objects that the virtual machine or a library never expects to move.
  2. The large object space is needed because MMTk handles particularly large objects differently to normal objects, as the space overhead of copying large objects is very high. Instead, this space is used by a separate GC algorithm in the common plan to avoid having to copy them. 
  
-1. Create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. Its body can stay empty, as there aren't any preparation steps for this GC.
-2. Create a new function called `mygc_mutator_release` that takes the same inputs as the `prepare` function above, and has the following body:
+1. Create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. This function will be called at the preparation stage of a collection (at the start of a collection) for each mutator. Its body can stay empty, as there aren't any preparation steps for this GC.
+2. Create a new function called `mygc_mutator_release` that takes the same inputs as the `prepare` function above. This function will be called at the release stage of a collection (at the end of a collection) for each mutator. It rebinds the allocator for the `Default` allocation semantics to the new tospace. When the mutator threads resume, any new allocations for `Default` will then go to the new tospace. The function has the following body:
     ```rust
     let bump_allocator = unsafe {
        mutator
@@ -334,6 +334,8 @@ With this, you should have the allocation working, but not garbage collection. T
    
 ### Collector: Implement garbage collection
 
+We need to add a few more things to get garbage collection working. Specifically, we need to add a `CopyContext`, which a GC worker uses for copying objects, and GC work packets that will be scheduled for a collection.
+
 1. Make a new file, called `gc_works`. 
 2. Add the following import statements:
     ```rust
@@ -350,6 +352,12 @@ With this, you should have the allocation working, but not garbage collection. T
     use std::ops::{Deref, DerefMut};
     ```
 3. Add a new structure, `MyGCCopyContext`, with the type parameter `VM: VMBinding`. It should have the fields `plan:&'static MyGC<VM>` and `mygc: BumpAllocator`.
+   ```rust
+   pub struct MyGCCopyContext<VM: VMBinding> {
+       plan:&'static MyGC<VM>,
+       mygc: BumpAllocator<VM>,
+   }
+   ```
 4. Create an implementation block - `impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM>`.
    1. Add a type alias for VMBinding (given to the class as `VM`): `type VM: VM`. 
    2. Add the following skeleton functions (taken from `plan/global.rs`):
@@ -400,7 +408,7 @@ With this, you should have the allocation working, but not garbage collection. T
     }
     ```
 6. Add a new implementations block `impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM>`.
-   1. Add a VM type alias (`type VM = VM`).
+   1. Similarly to before, set `ProcessEdgesWork`'s associate type `VM` to the type parameter of `MyGCProcessEdges`, `VM`: `type VM:VM`.
    2. Add a new method, `new`.
        ```rust
        fn new(edges: Vec<Address>, _roots: bool) -> Self {
@@ -411,7 +419,7 @@ With this, you should have the allocation working, but not garbage collection. T
        }
       ```
    3. Add a new method, `trace_object(&mut self, object: ObjectReference)`.
-     1. This method should return an ObjectReference, and use the inline (*not* always) attribute.
+     1. This method should return an ObjectReference, and use the inline attribute.
      2. Check if the object passed into the function is null (`object.is_null()`). If it is, return the object.
      3. Check if the object is in the tospace (`self.plan().tospace().in_space(object)`). If it is, call `trace_object` through the tospace to check if the object is alive, and return the result:
          ```rust
@@ -424,7 +432,7 @@ With this, you should have the allocation working, but not garbage collection. T
          ```
      4. If it is not in the tospace, check if the object is in the fromspace and return the result of the fromspace's `trace_object` if it is.
      5. If it is in neither space, it must be in the immortal space, or large object space. Trace the object with `self.plan().common.trace_object(self, object)`.
-7. Add two new implementation blocks, `Deref` and `DerefMut` for `MyGCProcessEdges`. 
+7. Add two new implementation blocks, `Deref` and `DerefMut` for `MyGCProcessEdges`. These allow `MyGCProcessEdges` to be dereferenced to `ProcessEdgesBase`, and allows easy access to fields in `ProcessEdgesBase`.
     ```rust
     impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
         type Target = ProcessEdgesBase<Self>;
