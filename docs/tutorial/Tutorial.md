@@ -81,7 +81,7 @@ A few benchmarks of varying size will be used throughout the tutorial. If you ha
    2. Use the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac HelloWorld.java`.
    3. Then, run `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java HelloWorld -XX:+UseThirdPartyHeap` to run HelloWorld.
    
-2. The Computer Language Benchmarks Game **fannkuchredux** (micro benchmark, allocates a small amount of memory and may not trigger a collection): 
+2. The Computer Language Benchmarks Game **fannkuchredux** (micro benchmark, allocates a small amount of memory but - depending on heap size and the GC plan - may not trigger a collection): 
    1. [Copy this code](https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/master/bencher/programs/fannkuchredux/fannkuchredux.java) into a new file named "fannkuchredux.java" in `mmtk-openjdk/repos/openjdk`.
    2. Use the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac fannkuchredux.java`.
    3. Then, run `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java fannkuchredux -XX:+UseThirdPartyHeap` to run fannkuchredux.
@@ -90,23 +90,20 @@ A few benchmarks of varying size will be used throughout the tutorial. If you ha
    1. Fetch using `wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar`.
    2. DaCapo contains a variety of benchmarks, but this tutorial will only be using lusearch. Run the lusearch benchmark using the command `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch` in `repos/openjdk`. 
 
-There are also two useful debugging tools you can choose to run by changing their environment variables:
-  1. `RUST_LOG=trace` will log all of the information sent by the MMTk.
-  2. `TRACE_LOG=debug` will 
+By using one of the debug builds, you gain access to the Rust logs - a useful tool when testing a plan and observing the general behaviour of the MMTk. There are two levels of trace that are useful when using the MMTk - `trace` and `debug`. Generally, `debug` logs information about the slow paths (allocation through MMTk, rather than fast path allocation through the binding). `trace` includes all the information from `debug`, plus more information about both slow and fast paths and garbage collection activities. You can set which level to view the logs at by setting the environment variable `RUST_LOG`. For more information, see the [env_logger crate documentation](https://crates.io/crates/env_logger).
  
-These are helpful for observing the behaviour of the MMTk, and of the particular plan being used.
-
 
 #### Working with multiple VM builds
 
 You will need to build multiple versions of the VM in this tutorial. You should familiarise yourself with how to do this now.
-1. To select which garbage collector (GC) plan you would like to use in a given build, you will need to export the `MMTK_PLAN` environment variable before building the binding. For example, using `export MMTK_PLAN=semispace` will cause the build to use the Semispace GC (the default plan). 
+
+1. To select which garbage collector (GC) plan you would like to use in a given build, you will need to export the `MMTK_PLAN` environment variable before building the binding. For example, using `export MMTK_PLAN=semispace` will cause the build to use the Semispace GC (the default plan).
 2. The build will always generate in `mmtk-openjdk/repos/openjdk/build`. If you would like to keep a build (for instance, to make quick performance comparisons), you can rename either the `build` folder or the folder generated within it (eg `inux-x86_64-normal-server-$DEBUG_LEVEL`). 
    1. Renaming the `build` folder is the safest method for this.
    2. If you rename the internal folder, there is a possibility that the new build will generate incorrectly. If a build appears to generate strangely quickly, it probably generated badly.
    3. A renamed build folder can be tested by changing the file path in commands as appropriate.
    4. If you plan to completely overwrite a build, deleting the folder you are writing over will help prevent errors.
-3. Try building using NoGC. Both HelloWorld and the fannkuchredux benchmark should run without issue. If you then run lusearch, it should fail when a collection is triggered. The messages and errors produced should look identical or nearly identical to the log below.
+3. Try building using NoGC. Both HelloWorld and the fannkuchredux benchmark should run without issue. If you then run lusearch, it should fail when a collection is triggered. It is possible to increase the heap size enough that no collections will be triggered, but it is okay to let it fail for now. When we build using a proper GC, it will be able to pass. The messages and errors produced should look identical or nearly identical to the log below.
     ```
     $ ./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch
     Using scaled threading model. 24 processors detected, 24 threads used to drive the workload, in a possible range of [1,64]
@@ -149,25 +146,28 @@ You will need to build multiple versions of the VM in this tutorial. You should 
 NoGC is a GC plan that only allocates memory, and does not have a collector. We're going to use it as a base for building a new garbage collector.
 1. Each plan is stored in `mmtk-openjdk/repos/mmtk-core/src/plan`. Navigate there and create a copy of the folder `nogc`. Rename it to `mygc`.
 3. In *each file* within `mygc`, rename any reference to `nogc` to `mygc`. You will also have to separately rename any reference to `NoGC` to `MyGC`.
-   - For example, in Visual Studio Code, you can (making sure case sensitivity is selected in the search function) select one instance of `nogc` and either right click and select "Change all instances" or use the CTRL-F2 shortcut, and then type `mygc`, and repeat for `NoGC`.
-4. In order to use MyGC, you will need to make some changes to the following files:
-    1. `mmtk-core/src/plan/mod.rs`, under the import statements, add:
+   * For example, in Visual Studio Code, you can (making sure case sensitivity is selected in the search function) select one instance of `nogc` and either right click and select "Change all instances" or use the CTRL-F2 shortcut, and then type `mygc`, and repeat for `NoGC`.
+4. In order to use MyGC, you will need to make some changes to the following files. 
+    1. `mmtk-core/Cargo.toml`, under `#plans`, add: 
+        ```rust
+        mygc = ["immortalspace", "largeobjectspace"]
+        ```
+        This adds a build-time flag for `mygc`, and tells the compiler that `mygc` will use an immortal space and large object space.
+    2. `mmtk-core/src/plan/mod.rs`, under the import statements, add:
         ```rust
         #[cfg(feature = "mygc")]
         pub mod mygc;
         #[cfg(feature = "mygc")]
         pub use self::mygc as selected_plan;
         ```
-    2. `mmtk-core/Cargo.toml`, under `#plans`, add: 
-        ```rust
-        mygc = ["immortalspace", "largeobjectspace"]
-        ```
+        This adds `mygc` as a module, which can be conditionally compiled using the feature (or environment variable) `mygc`. A GC plan needs to be selected at build time, and only one plan can be selected (as `selected_plan`).
     3. `mmtk-openjdk/mmtk/Cargo.toml`, under `[features]`, add: 
         ```rust 
         mygc = ["mmtk/mygc"] 
         ```
+        This adds the build flag to the binding crate, using the `mygc` flag from mmtk-core.
     
-Note that all of the above changes almost exactly copy the NoGC entries in each of these files. However, NoGC has some features that are not needed for this tutorial. Remove references to them in the MyGC plan now. 
+Note that all of the above changes almost exactly copy the NoGC entries in each of these files. However, NoGC has some variants, such as a lock-free variant, that are not needed for this tutorial. Remove references to them in the MyGC plan now. 
 1. Within `mygc/global.rs`, find any use of `#[cfg(feature = "mygc_lock_free")]` and delete both it *and the line below it*.
 2. Then, delete any use of the above line's negation, `#[cfg(not(feature = "mygc_lock_free"))]`, this time without changing the line below it.
 
@@ -177,8 +177,8 @@ At this point, you should familiarise yourself with the MyGC plan if you haven't
    * Where is the allocator defined?
    * How many memory spaces are there?
    * What kind of memory space policy is used?
-   * What happens if garbage has to be collected?
-   
+   * What happens if garbage has to be collected?   
+
 [**Back to table of contents**](#contents)
 
 
@@ -188,7 +188,7 @@ At this point, you should familiarise yourself with the MyGC plan if you haven't
 ### What is a Semispace collector?
 In a Semispace collector, the heap is divided into two equally-sized spaces, called 'semispaces'. One of these is defined as a 'fromspace', and the other a 'tospace'. The allocator allocates to the tospace until it is full. 
 
-When the tospace is full, the definitions of the spaces are flipped (the 'tospace' becomes a 'fromspace' and vise versa). Then, the collector scans each object in what is now the fromspace. Then, if a live object is found, a copy of it is made in the tospace. That is to say, live objects are copied *from* the fromspace *to* the tospace. After every object is scanned, the fromspace is cleared, and the process begins again. 
+When the tospace is full, a stop-the-world GC is triggered. The mutator is paused, and the definitions of the spaces are flipped (the 'tospace' becomes a 'fromspace', and vise versa). Then, the collector scans each object in what is now the fromspace. If a live object is found, a copy of it is made in the tospace. That is to say, live objects are copied *from* the fromspace *to* the tospace. After every object is scanned, the fromspace is cleared. The GC finishes, and the mutator is resumed.
 
 ### Allocation: Add copyspaces
 
