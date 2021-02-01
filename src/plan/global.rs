@@ -25,6 +25,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::scheduler::gc_works::ProcessEdgesWork;
 use crate::scheduler::GCWork;
+use crate::plan::SelectedConstraints;
 use enum_map::EnumMap;
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
@@ -744,13 +745,16 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     pub fn schedule_common<E: ProcessEdgesWork<VM=VM>>(&self, scheduler: &MMTkScheduler<VM>) {
-        use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
-        if self.base.options.no_finalizer {
-            return;
+        // Schedule finalization
+        if !self.base.options.no_finalizer {
+            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
+            // finalization
+            scheduler.work_buckets[WorkBucketStage::RefClosure].add(Finalization::<E>::new());
+            // forward refs
+            if SelectedConstraints::NEEDS_FORWARD_AFTER_LIVENESS {
+                scheduler.work_buckets[WorkBucketStage::RefForwarding].add(ForwardFinalization::<E>::new());
+            }
         }
-        
-        scheduler.work_buckets[WorkBucketStage::RefClosure].add(Finalization::<E>::new());
-        scheduler.work_buckets[WorkBucketStage::RefForwarding].add(ForwardFinalization::<E>::new());
     }
 
     pub fn stacks_prepared(&self) -> bool {
