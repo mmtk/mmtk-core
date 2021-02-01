@@ -12,18 +12,33 @@ use std::sync::{Arc, Weak};
 /// However, we do not know its concrete type as the plan and its copy context is dynamically selected.
 /// Instead use a void* type to store it, and during trace_object() we cast it to the correct copy context type.
 #[derive(Copy, Clone)]
-pub struct WorkerLocalPtr(*mut c_void);
+pub struct WorkerLocalPtr {
+    data: *mut c_void,
+    // Save the type name for debug builds, so we can later do type check
+    #[cfg(debug_assertions)]
+    ty: &'static str,
+}
 impl WorkerLocalPtr {
-    pub const UNINITIALIZED: Self = WorkerLocalPtr(std::ptr::null_mut());
+    pub const UNINITIALIZED: Self = WorkerLocalPtr {
+        data: std::ptr::null_mut(),
+        #[cfg(debug_assertions)]
+        ty: "uninitialized",
+    };
 
-    pub fn new(worker_local: impl WorkerLocal) -> Self {
-        WorkerLocalPtr(Box::into_raw(Box::new(worker_local)) as *mut c_void)
+    pub fn new<W: WorkerLocal>(worker_local: W) -> Self {
+        WorkerLocalPtr {
+            data: Box::into_raw(Box::new(worker_local)) as *mut c_void,
+            #[cfg(debug_assertions)]
+            ty: std::any::type_name::<W>(),
+        }
     }
 
     /// # Safety
     /// The user needs to guarantee that the type supplied here is the same type used to create this pointer.
     pub unsafe fn as_type<W: WorkerLocal>(&mut self) -> &mut W {
-        &mut *(self.0 as *mut W)
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(self.ty, std::any::type_name::<W>());
+        &mut *(self.data as *mut W)
     }
 }
 
@@ -77,7 +92,7 @@ impl<C: Context> Worker<C> {
     /// # Safety
     /// The user needs to guarantee that the type supplied here is the same type used to create this pointer.
     #[inline]
-    pub unsafe fn local<W: WorkerLocal>(&mut self) -> &mut W {
+    pub unsafe fn local<W: 'static + WorkerLocal>(&mut self) -> &mut W {
         self.local.as_type::<W>()
     }
 
