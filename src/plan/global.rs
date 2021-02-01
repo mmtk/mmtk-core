@@ -540,7 +540,8 @@ impl<VM: VMBinding> BasePlan<VM> {
                 }
             }
         }
-        panic!("No special case for space in trace_object({:?})", _object);
+        // panic!("No special case for space in trace_object({:?})", _object);
+        _object
     }
 
     pub fn prepare(&self, _tls: OpaquePointer, _primary: bool) {

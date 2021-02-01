@@ -1,9 +1,13 @@
+use atomic_traits::fetch::Add;
+
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::util::constants::*;
 use crate::util::metadata::*;
 use crate::util::*;
 use crate::MMTK;
+
+use super::mutator_context::{BARRIER_COUNTER, BARRIER_FAST_COUNT, BARRIER_SLOW_COUNT};
 
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address
 pub enum WriteTarget {
@@ -41,7 +45,13 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
 
     #[inline(always)]
     fn enqueue_node(&mut self, obj: ObjectReference) {
+        if (BARRIER_COUNTER) {
+            BARRIER_FAST_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
+        }
         if BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b0, 0b1) {
+            if (BARRIER_COUNTER) {
+                BARRIER_SLOW_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
+            }
             self.modbuf.push(obj);
             if self.modbuf.len() >= E::CAPACITY {
                 self.flush();

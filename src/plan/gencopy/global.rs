@@ -31,7 +31,7 @@ use std::sync::Arc;
 pub type SelectedPlan<VM> = GenCopy<VM>;
 
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
-pub const NURSERY_SIZE: usize = 16 * 1024 * 1024;
+pub const NURSERY_SIZE: usize = 32 * 1024 * 1024;
 
 pub struct GenCopy<VM: VMBinding> {
     pub nursery: CopySpace<VM>,
@@ -197,7 +197,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
 impl<VM: VMBinding> GenCopy<VM> {
     fn request_full_heap_collection(&self) -> bool {
-        self.get_total_pages() <= self.get_pages_reserved()
+        true // For barrier overhead measurements, we always do full gc
+        // self.get_total_pages() <= self.get_pages_reserved()
     }
 
     pub fn tospace(&self) -> &CopySpace<VM> {

@@ -142,7 +142,7 @@ impl Stats {
             print!("{}\t", value);
         }
         if crate::plan::mutator_context::BARRIER_COUNTER {
-            print!("{:.2}\t", crate::plan::mutator_context::barrier_slow_path_take_rate());
+            print!("{:.5}\t", crate::plan::mutator_context::barrier_slow_path_take_rate());
         }
         println!();
         print!("Total time: ");

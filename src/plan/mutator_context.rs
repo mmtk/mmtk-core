@@ -115,17 +115,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
     fn barrier(&mut self) -> &mut dyn Barrier;
 
     fn record_modified_node(&mut self, obj: ObjectReference) {
-        if BARRIER_COUNTER {
-            BARRIER_FAST_COUNT.fetch_add(1, Ordering::SeqCst);
-            use crate::util::metadata::BitsReference;
-            if BitsReference::of(obj.to_address(), 3, 0).attempt(0b0, 0b1) {
-                BARRIER_SLOW_COUNT.fetch_add(1, Ordering::SeqCst);
-                // assert!(!BitsReference::of(obj.to_address(), 3, 0).attempt(0b0, 0b1));
-            }
-        } else {
-            use crate::util::metadata::BitsReference;
-            BitsReference::of(obj.to_address(), 3, 0).attempt(0b0, 0b1);
-        }
+        self.barrier().post_write_barrier(WriteTarget::Object(obj));
     }
     // TODO(wenyuzhao): Remove this. Looks like OpenJDK will never call this method.
     fn record_modified_edge(&mut self, _slot: Address) {
