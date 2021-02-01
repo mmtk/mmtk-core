@@ -298,7 +298,7 @@ Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace
      2. Add `use crate::util::alloc::BumpAllocator;`.
      3. Delete `use crate::plan::nogc::NoGC;`.
      
-  1. In `lazy_static!`, make the following changes:
+  1. In `lazy_static!`, make the following changes to `ALLOCATOR_MAPPING`, which maps the required allocation semantics to the corresponding allocators. For example, for `Default`, we allocate using the first bump pointer allocator (`BumpPointer(0)`):
      1. Map `Default` to `BumpPointer(0)`.
      2. Map `ReadOnly` to `BumpPointer(1)`.
      3. Map `Los` to `LargeObject(0)`. 
