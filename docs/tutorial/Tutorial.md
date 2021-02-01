@@ -302,7 +302,7 @@ Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace
      1. Map `Default` to `BumpPointer(0)`.
      2. Map `ReadOnly` to `BumpPointer(1)`.
      3. Map `Los` to `LargeObject(0)`. 
-  2. Next, in `create_mygc_mutator`, change which allocator is allocated to what space in `space_mapping`. Note that the space allocation is formatted as a list of tuples.
+  2. Next, in `create_mygc_mutator`, change which allocator is allocated to what space in `space_mapping`. Note that the space allocation is formatted as a list of tuples. For example, the first bump pointer allocator (`BumpPointer(0)`) is bound with `tospace`. 
      1. `BumpPointer(0)` should map to the tospace.
      2. `BumpPointer(1)` should map to `plan.common.get_immortal()`.
      3. `LargeObject(0)` should map to `plan.common.get_los()`.
