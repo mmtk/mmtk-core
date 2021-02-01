@@ -23,6 +23,8 @@ use crate::util::statistics::stats::Stats;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
+use crate::scheduler::gc_works::ProcessEdgesWork;
+use crate::scheduler::GCWork;
 use enum_map::EnumMap;
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
@@ -739,6 +741,16 @@ impl<VM: VMBinding> CommonPlan<VM> {
         unsync.immortal.release();
         unsync.los.release(primary);
         self.base.release(tls, primary)
+    }
+
+    pub fn schedule_common<E: ProcessEdgesWork<VM=VM>>(&self, scheduler: &MMTkScheduler<VM>) {
+        use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
+        if self.base.options.no_finalizer {
+            return;
+        }
+        
+        scheduler.work_buckets[WorkBucketStage::RefClosure].add(Finalization::<E>::new());
+        scheduler.work_buckets[WorkBucketStage::RefForwarding].add(ForwardFinalization::<E>::new());
     }
 
     pub fn stacks_prepared(&self) -> bool {

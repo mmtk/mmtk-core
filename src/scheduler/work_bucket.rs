@@ -150,6 +150,8 @@ pub enum WorkBucketStage {
     Unconstrained,
     Prepare,
     Closure,
+    RefClosure,
+    RefForwarding,
     Release,
     Final,
 }
