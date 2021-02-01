@@ -26,8 +26,6 @@ libc = "0.2"
 jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"] }
 mimalloc-sys = "0.1.6"
 hoard-sys = { git = "https://git@github.com/paigereeves/hoard-sys.git", rev = "36989b877962f086267b1d21d5008c9df0fd0984" }
-scalloc-sys = { path = "../scalloc-sys" }
-tcmalloc-sys = { path = "../tcmalloc-sys" }
 lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
@@ -75,17 +73,8 @@ nogc_no_zeroing = ["nogc_lock_free"]
 single_worker = []
 
 # malloc implementations used by marksweep
+# this does not replace the global Rust allocator, but provides these libraries for GC implementation
 ms_libc = []
 ms_mimalloc = []
 ms_jemalloc = []
-ms_tcmalloc = [] #Does not work
 ms_hoard = []
-ms_scalloc = [] #Build script does not work
-
-# malloc implementations used as global allocator
-ga_libc = []
-ga_mimalloc = []
-ga_jemalloc = []
-ga_hoard = []
-ga_scalloc = []
-ga_default = []
