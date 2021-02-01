@@ -192,7 +192,7 @@ When the tospace is full, a stop-the-world GC is triggered. The mutator is pause
 
 ### Allocation: Add copyspaces
 
-The first step of changing the MyGC plan into a Semispace plan is to add the two copyspaces that the collector will allocate memory into. This requires adding two copyspaces, code to properly initialise and prepare the new spaces, and a copy context.
+The first step of changing the MyGC plan into a Semispace plan is to add the two copyspaces and allow collectors to allocate memory into them during collection. This requires adding two copyspaces, code to properly initialise and prepare the new spaces, and a copy context.
 
 
 Firstly, we need to change the plan constraints.
