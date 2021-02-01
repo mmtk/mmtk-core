@@ -308,8 +308,8 @@ Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace
      3. `LargeObject(0)` should map to `plan.common.get_los()`.
      4. None of the above should be dereferenced (ie, they should not have the `&` prefix).
 There may seem to be 2 extraneous spaces and allocators that have appeared all of a sudden in these past 2 steps. These are parts of the MMTk common plan itself.
- 1. The immortal space is used for objects that the virtual machine or a library never expects to move.
- 2. The large object space is needed because MMTk handles particularly large objects differently to normal objects, as the space overhead of copying large objects is very high. Instead, this space is used by a separate GC algorithm in the common plan to avoid having to copy them. 
+ 1. The immortal space is used for objects that the virtual machine or a library never expects to die.
+ 2. The large object space is needed because MMTk handles particularly large objects differently to normal objects, as the space overhead of copying large objects is very high. Instead, this space is used by a free list allocator in the common plan to avoid having to copy them. 
  
 1. Create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. This function will be called at the preparation stage of a collection (at the start of a collection) for each mutator. Its body can stay empty, as there aren't any preparation steps for this GC.
 2. Create a new function called `mygc_mutator_release` that takes the same inputs as the `prepare` function above. This function will be called at the release stage of a collection (at the end of a collection) for each mutator. It rebinds the allocator for the `Default` allocation semantics to the new tospace. When the mutator threads resume, any new allocations for `Default` will then go to the new tospace. The function has the following body:
@@ -336,7 +336,7 @@ With this, you should have the allocation working, but not garbage collection. T
 
 We need to add a few more things to get garbage collection working. Specifically, we need to add a `CopyContext`, which a GC worker uses for copying objects, and GC work packets that will be scheduled for a collection.
 
-1. Make a new file, called `gc_works`. 
+1. Make a new file under `mygc`, called `gc_works.rs`. 
 2. Add the following import statements:
     ```rust
     use super::global::MyGC;
@@ -359,7 +359,7 @@ We need to add a few more things to get garbage collection working. Specifically
    }
    ```
 4. Create an implementation block - `impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM>`.
-   1. Add a type alias for VMBinding (given to the class as `VM`): `type VM: VM`. 
+   1. Define the associate type `VM` for `CopyContext` as the VMBinding type given to the class as `VM`: `type VM: VM`. 
    2. Add the following skeleton functions (taken from `plan/global.rs`):
        ```rust
        fn new(mmtk: &'static MMTK<Self::VM>) -> Self { };
@@ -453,7 +453,7 @@ We need to add a few more things to get garbage collection working. Specifically
    1. `global.rs`: Import `MyGCCopyContext` and `MyGCProcessEdges`.
    2. `mod.rs`: Import `gc_works` as a module (`mod gc_works;`).
    
-5. In `global.rs`, delete `handle_user_collection_request`. This function was an override of a Common plan function, which can run correctly when collection is handled.   
+5. In `global.rs`, delete `handle_user_collection_request`. This function was an override of a Common plan function to ignore user requested collection for NoGC. Now we remove it and allow user requested collection.   
 
 
 ### Adding another copyspace
