@@ -195,8 +195,8 @@ When the tospace is full, a stop-the-world GC is triggered. The mutator is pause
 The first step of changing the MyGC plan into a Semispace plan is to add the two copyspaces and allow collectors to allocate memory into them during collection. This requires adding two copyspaces, code to properly initialise and prepare the new spaces, and a copy context.
 
 
-Firstly, we need to change the plan constraints.
-1. Look in `plan/plan_constraints.rs`. This file contains all the possible options for constraints. At the moment, `mygc/constraints.rs` contains 2 variables: `GC_HEADER_BITS` and `GC_HEADER_WORDS`. Both are set to 0.
+Firstly, change the plan constraints. Some of these constraints are not used at the moment, but it's good to set them properly regardless.
+1. Look in `plan/plan_constraints.rs`. This file contains all the possible options for constraints. At the moment, `mygc/constraints.rs` contains 2 variables: `GC_HEADER_BITS` and `GC_HEADER_WORDS`. Both are set to 0. Change `GC_HEADER_BITS` to 2.
 2. You will need to change two more options: `MOVES_OBJECTS` and `NUM_SPECIALIZED_SCANS`. Copy the lines containing both to `mygc/constraints.rs`.
 3. Set `MOVES_OBJECTS` to `true`. 
 4. Set `NUM_SPECIALIZED_SCANS` to 1.
@@ -227,7 +227,7 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
             &mut heap,
         );
       ```
-  3. Create another copyspace, called `copyspace1`, defining it as a fromspace instead of a tospace. (Hint: the definitions for copyspaces are in `mmtk-core/policy/copyspace.rs`.) 
+  3. Create another copyspace, called `copyspace1`, defining it as a fromspace instead of a tospace. (Hint: the definitions for copyspaces are in `src/policy/copyspace.rs`.) 
   4. Finally, replace the old MyGC initializer with the following:
       ```rust
        MyGC {
@@ -238,7 +238,7 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
        }
       ```
 4. The plan now has the components it needs for allocation, but not the instructions for how to make use of them.
-     1. Add a helper method to Plan for MyGC called `common` that returns a reference to the common plan.
+     1. The trait `Plan` requires a `common()` method that returns a reference to the common plan. Implement this method in Plan for MyGC.
          ```rust
          fn common(&self) -> &CommonPlan<VM> {
            &self.common
@@ -273,8 +273,8 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
             self.tospace().reserved_pages()
           }
           ``` 
-1. Find the method `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
-2. Find the method `prepare`. Delete the `unreachable!()` call, and add the following code:
+5. Find the method `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
+6. Find the method `prepare`. Delete the `unreachable!()` call, and add the following code:
     ```rust
     self.common.prepare(tls, true);
     self.hi
@@ -283,18 +283,14 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
     self.copyspace0.prepare(hi);
     self.copyspace1.prepare(!hi);
     ```
-   This prepares the two spaces in the common plan, flips the definitions for which space is 'to' and which is 'from', then prepares the copyspaces with the new definition.
-3. Find the method `release`. Delete the `unreachable!()` call, and add the following code:
+   This function is called at the start of a collection. It prepares the two spaces in the common plan, flips the definitions for which space is 'to' and which is 'from', then prepares the copyspaces with the new definition.
+7. Find the method `release`. Delete the `unreachable!()` call, and add the following code:
     ```rust
     self.common.release(tls, true);
     self.fromspace().release();
     ```
-4. Add the following helper method to Plan for MyGC.
-    ```rust
-     fn get_collection_reserve(&self) -> usize {
-      self.tospace().reserved_pages()
-     }
-    ```          
+    This function is called at the end of a collection.
+
           
 Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace, and to the two spaces controlled by the common plan. 
   1. Change the following import statements:
