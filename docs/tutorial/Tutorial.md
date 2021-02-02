@@ -10,10 +10,14 @@ This tutorial is a work in progress. Some sections may be rough, and others may 
 * [Preliminaries](#preliminaries)
   * [Set up MMTk and OpenJDK](#set-up-mmtk-and-openjdk)
     * [Basic set up](#basic-set-up)
-    * [Set up benchmarks](#set-up-benchmarks)
+    * [Test the build](#test-the-build)
     * [Working with multiple VM builds](#working-with-multiple-vm-builds)
   * [Create MyGC](#create-mygc)
 * [Building a Semispace Collector](#building-a-semispace-collector)
+  * [What is a Semispace Collector](#what-is-a-semispace-collector)
+  * [Allocation: Add copyspaces](#allocation:-add-copyspaces)
+  * [Collection: Implement garbage collection](#collection:-implement-garbage-collection)
+  * [Exersize: Adding another copyspace](#exersize:-adding-another-copyspace)
 * [Further Reading](#further-reading)
 
 
@@ -331,7 +335,7 @@ There may seem to be 2 extraneous spaces and allocators that have appeared all o
 
 With this, you should have the allocation working, but not garbage collection. Try building MyGC now. If you run HelloWorld or Fannkunchredux, they should work. DaCapo's lusearch should fail, as it requires garbage to be collected. 
    
-### Collector: Implement garbage collection
+### Collection: Implement garbage collection
 
 We need to add a few more things to get garbage collection working. Specifically, we need to add a `CopyContext`, which a GC worker uses for copying objects, and GC work packets that will be scheduled for a collection.
 
