@@ -6,6 +6,7 @@ use crate::util::alloc::{allocator, Allocator};
 use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+
 #[cfg(feature = "largeobjectspace")]
 #[repr(C)]
 pub struct LargeObjectAllocator<VM: VMBinding> {
@@ -13,6 +14,7 @@ pub struct LargeObjectAllocator<VM: VMBinding> {
     space: Option<&'static LargeObjectSpace<VM>>,
     plan: &'static SelectedPlan<VM>,
 }
+
 #[cfg(feature = "largeobjectspace")]
 impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     fn get_tls(&self) -> OpaquePointer {
@@ -49,6 +51,7 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
         }
     }
 }
+
 #[cfg(feature = "largeobjectspace")]
 impl<VM: VMBinding> LargeObjectAllocator<VM> {
     pub fn new(

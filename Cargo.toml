@@ -17,7 +17,7 @@ crate-type = ["rlib"]
 doctest = false
 
 [package.metadata.docs.rs]
-features = ["marksweep"]
+features = ["semispace"]
 
 [dependencies]
 custom_derive = "0.1"

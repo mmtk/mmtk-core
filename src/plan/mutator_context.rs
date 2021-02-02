@@ -62,7 +62,6 @@ impl<P: Plan<Mutator = Self>> MutatorContext<P::VM> for Mutator<P> {
         offset: isize,
         allocator: AllocationType,
     ) -> Address {
-        //println!("mutator context alloc");
         unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
