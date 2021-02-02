@@ -3,8 +3,9 @@
 ### TODO:
 
 - [x] Move perfmon binding to a separate crate as a dependency
-- [ ] Conditional compilation: x86/x64 linux only
-- [ ] A feature to enable/disable reporting
+- [x] Conditional compilation: x86/x64 linux only
+- [x] A feature to enable/disable reporting
+    - We don't need a feature. Perfmon won't be initialized if `PERF_EVENTS` is empty.
 - [ ] **Per mutator/worker counter**
 
 ### Usage:

@@ -36,6 +36,8 @@ atomic-traits = "0.2.0"
 atomic = "0.4.6"
 spin = "0.5.2"
 env_logger = "0.8.2"
+
+[target.'cfg(all(target_os = "linux", any(target_arch = "x86", target_arch = "x86_64")))'.dependencies]
 perfmon = { git = "https://github.com/wenyuzhao/perfmon-rs" }
 
 [dev-dependencies]

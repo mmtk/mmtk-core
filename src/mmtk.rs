@@ -11,7 +11,7 @@ use crate::util::reference_processor::ReferenceProcessors;
 use crate::util::sanity::sanity_checker::SanityChecker;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use std::default::Default;
+use std::{collections::HashMap, default::Default};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 #[cfg(feature = "sanity")]
@@ -55,6 +55,7 @@ impl<VM: VMBinding> MMTK<VM> {
         let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone(), unsafe {
             &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>)
         });
+        #[cfg(all(target_os = "linux", any(target_arch = "x86", target_arch = "x86_64")))]
         perfmon::initialize();
         MMTK {
             plan,
@@ -76,11 +77,15 @@ impl<VM: VMBinding> MMTK<VM> {
         self.inside_harness.store(true, Ordering::SeqCst);
         self.plan.base().stats.start_all();
         self.scheduler.enable_stat();
+        #[cfg(all(target_os = "linux", any(target_arch = "x86", target_arch = "x86_64")))]
         perfmon::begin();
     }
 
     pub fn harness_end(&'static self) {
-        let mut perf_counters = perfmon::end();
+        #[cfg(all(target_os = "linux", any(target_arch = "x86", target_arch = "x86_64")))]
+        let perf_counters = perfmon::end();
+        #[cfg(not(all(target_os = "linux", any(target_arch = "x86", target_arch = "x86_64"))))]
+        let perf_counters = HashMap::new();
         self.plan.base().stats.stop_all(self, &perf_counters);
         self.inside_harness.store(false, Ordering::SeqCst);
     }
