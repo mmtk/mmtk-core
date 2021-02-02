@@ -35,7 +35,7 @@ pub fn is_malloced(object: ObjectReference) -> bool {
     }
 }
 
-// check the corresponding bit in the metadata table
+// check if a given object is marked
 pub fn is_marked(object: ObjectReference) -> bool {
     let address = object.to_address();
     debug_assert!(meta_space_mapped(address));

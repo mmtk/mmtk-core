@@ -39,7 +39,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     }
     fn alloc(&mut self, size: usize, _align: usize, offset: isize) -> Address {
         trace!("alloc");
-        assert!(offset == 0);
+        debug_assert!(offset == 0);
         unsafe {
             let ptr = ms_calloc(1, size);
             let address = Address::from_mut_ptr(ptr);
@@ -59,7 +59,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, _size: usize, _align: usize, _offset: isize) -> Address {
-        unreachable!(); // No fast path so unnecessary
+        unreachable!();
     }
 }
 
