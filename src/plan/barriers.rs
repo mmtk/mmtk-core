@@ -48,7 +48,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
         if (BARRIER_COUNTER) {
             BARRIER_FAST_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
         }
-        if BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b0, 0b1) {
+        if BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b1, 0b0) {
             if (BARRIER_COUNTER) {
                 BARRIER_SLOW_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
             }
@@ -70,10 +70,12 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for ObjectRememberingBarrier<
             "{:?}",
             self as *const _
         );
-        self.mmtk
-            .scheduler
-            .closure_stage
-            .add(ProcessModBuf::<E>::new(modbuf));
+        if modbuf.len() != 0 {
+            self.mmtk
+                .scheduler
+                .closure_stage
+                .add(ProcessModBuf::<E>::new(modbuf));
+        }
     }
 
     #[inline(always)]

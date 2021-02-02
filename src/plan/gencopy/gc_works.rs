@@ -9,6 +9,8 @@ use crate::vm::*;
 use crate::MMTK;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use crate::util::metadata::BitsReference;
+use crate::util::constants::*;
 
 pub struct GenCopyCopyContext<VM: VMBinding> {
     plan: &'static GenCopy<VM>,
@@ -53,6 +55,7 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
         _semantics: crate::AllocationSemantics,
     ) {
         forwarding_word::clear_forwarding_bits::<VM>(obj);
+        BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).set(0b1);
     }
 }
 

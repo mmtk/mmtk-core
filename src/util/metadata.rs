@@ -54,6 +54,21 @@ impl BitsReference {
             }
         }
     }
+
+    #[inline(always)]
+    pub fn set(&self, value: usize) {
+        let value = value << self.bit_offset;
+        let slot = unsafe { &*((METADATA_BASE.as_usize() + self.word_offset) as *const AtomicUsize) };
+        let old_word = slot.load(Ordering::SeqCst);
+        let new_word = (old_word & !self.mask) | value;
+        slot.store(new_word, Ordering::SeqCst);
+    }
+
+    #[inline(always)]
+    pub fn get(&self) -> usize {
+        let word = unsafe { &*((METADATA_BASE.as_usize() + self.word_offset) as *const AtomicUsize) };
+        return (word.load(Ordering::SeqCst) & self.mask) >> self.bit_offset;
+    }
 }
 
 const fn metadata_start(address: Address) -> Address {
@@ -69,14 +84,4 @@ pub fn map_metadata_pages_for_chunk(chunk: Address, sft: &dyn SFT) {
         SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE,
     )
     .unwrap();
-}
-
-
-pub fn initialize(chunk: Address, sft: &dyn SFT) {
-    let metadata_start = metadata_start(chunk);
-    if sft.is_nursery() {
-        if unsafe { metadata_start.load::<u8>() != 0xff } {
-            // crate::util::memory::fill(metadata_start, SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE, 0xff);
-        }
-    }
 }

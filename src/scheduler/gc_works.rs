@@ -224,6 +224,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
         trace!("ScanStackRoots");
         <E::VM as VMBinding>::VMScanning::scan_thread_roots::<E>();
         <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
+        for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+            mutator.flush();
+        }
         mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
     }
 }
@@ -464,7 +467,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
-                BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b1, 0b0);
+                BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b0, 0b1);
             }
         }
         if mmtk.plan.in_nursery() {
