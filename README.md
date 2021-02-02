@@ -3,7 +3,9 @@
 ### TODO:
 
 - [ ] Move perfmon binding to a separate crate as a dependency
-- [ ] Per mutator/worker counter
+- [ ] Conditional compilation: intel linux only
+- [ ] A feature to enable/disable reporting
+- [ ] **Per mutator/worker counter**
 
 ### Usage:
 
