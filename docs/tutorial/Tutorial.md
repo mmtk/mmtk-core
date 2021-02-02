@@ -326,8 +326,7 @@ There may seem to be 2 extraneous spaces and allocators that have appeared all o
        bump_allocator.rebind(Some(mutator.plan.tospace()));
     ```
 3. In `create_mygc_mutator`, replace `mygc_mutator_noop` in the `prep_func` and `release_func` fields with `mygc_mutator_prepare` and `mygc_mutator_release` respectively.
-4. Delete `mygc_mutator_noop`.
-
+4. Delete `mygc_mutator_noop`. It was a placeholder for the prepare and release functions you just added, so it is now dead code.
 
 
 With this, you should have the allocation working, but not garbage collection. Try building MyGC now. If you run HelloWorld or Fannkunchredux, they should work. DaCapo's lusearch should fail, as it requires garbage to be collected. 
@@ -432,41 +431,91 @@ We need to add a few more things to get garbage collection working. Specifically
          ```
      4. If it is not in the tospace, check if the object is in the fromspace and return the result of the fromspace's `trace_object` if it is.
      5. If it is in neither space, it must be in the immortal space, or large object space. Trace the object with `self.plan().common.trace_object(self, object)`.
-7. Add two new implementation blocks, `Deref` and `DerefMut` for `MyGCProcessEdges`. These allow `MyGCProcessEdges` to be dereferenced to `ProcessEdgesBase`, and allows easy access to fields in `ProcessEdgesBase`.
-    ```rust
-    impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
-        type Target = ProcessEdgesBase<Self>;
-        #[inline]
-        fn deref(&self) -> &Self::Target {
-            &self.base
-        }
-    }
+     6. The completed code is as follows:
+         ```rust
+         #[inline]
+         fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+             if object.is_null() {
+                 return object;
+             }
+             if self.plan().tospace().in_space(object) {
+                 self.plan().tospace().trace_object(
+                     self,
+                     object,
+                     super::global::ALLOC_MyGC,
+                     self.worker().local(),
+                 )
+             } else if self.plan().fromspace().in_space(object) {
+                 self.plan().fromspace().trace_object(
+                     self,
+                     object,
+                     super::global::ALLOC_MyGC,
+                     self.worker().local(),
+                 )
+             } else {
+                 self.plan().common.trace_object(self, object)
+             }
+         }
+         ```
+     7. Add two new implementation blocks, `Deref` and `DerefMut` for `MyGCProcessEdges`. These allow `MyGCProcessEdges` to be dereferenced to `ProcessEdgesBase`, and allows easy access to fields in `ProcessEdgesBase`.
+         ```rust
+         impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
+             type Target = ProcessEdgesBase<Self>;
+             #[inline]
+             fn deref(&self) -> &Self::Target {
+                 &self.base
+             }
+         }
 
-    impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
-        #[inline]
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.base
-        }
-    }
+         impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
+             #[inline]
+             fn deref_mut(&mut self) -> &mut Self::Target {
+                 &mut self.base
+             }
+         }
     ```
 8. A few import statements need to be added to the other files so that they can use the functions in `gc_works`.
    1. `global.rs`: Import `MyGCCopyContext` and `MyGCProcessEdges`.
    2. `mod.rs`: Import `gc_works` as a module (`mod gc_works;`).
    
-5. In `global.rs`, delete `handle_user_collection_request`. This function was an override of a Common plan function to ignore user requested collection for NoGC. Now we remove it and allow user requested collection.   
+9. In `global.rs`:
+   1. Add a new method to `Plan for MyGC`, `schedule_collection`. This function is run when a collection is triggered. It stops all mutators, then runs the scheduler's prepare stage. After this, it resumes the mutators.
+       ```rust
+        fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+            self.base().set_collection_kind();
+            self.base().set_gc_status(GcStatus::GcPrepare);
+            // Stop & scan mutators (mutator scanning can happen before STW)
+            scheduler
+                .unconstrained_works
+                .add(StopMutators::<SSProcessEdges<VM>>::new());
+            // Prepare global/collectors/mutators
+            scheduler.prepare_stage.add(Prepare::new(self));
+            // Release global/collectors/mutators
+            scheduler.release_stage.add(Release::new(self));
+            // Resume mutators
+            scheduler.set_finalizer(Some(EndOfGC));
+        }
+       ```
+   2. Delete `handle_user_collection_request`. This function was an override of a Common plan function to ignore user requested collection for NoGC. Now we remove it and allow user requested collection.
+   
+You should now have MyGC working and able to collect garbage. All three benchmarks should be able to pass now. 
 
 
-### Adding another copyspace
-Now that you have a working Semispace collector, you should be familiar enough with the code to start writing some yourself.
+### Exersize: Adding another copyspace
+Now that you have a working Semispace collector, you should be familiar enough with the code to start writing some yourself. The intention of this exersize is to reinforce the information from the Semispace section, rather than to create a useful new collector.
+
 1. Create a copy of your Semispace collector, called `triplespace`. 
 2. Add a new copyspace to the collector, called the `youngspace`, with the following traits:
     * New objects are allocated to the youngspace (rather than the fromspace).
     * During a collection, live objects in the youngspace are moved to the tospace.
     * Garbage is still collected at the same time for all spaces.
 
+When you are finished, try running the benchmarks and seeing how the performance of this collector compares to MyGC. 
+
 If you get particularly stuck, instructions for how to complete this exersize are available [here](#triplespace-backup-instructions).
 
 ***
+
 Triplespace is a sort of generational garbage collector. These collectors separate out old objects and new objects into separate spaces. Newly allocated objects should be scanned far more often than old objects, which minimises the time spent repeatedly re-scanning long-lived objects. 
 
 Of course, this means that the Triplespace is incredibly inefficient for a generational collector, because the older objects are still being scanned every collection. It wouldn't be very useful in a real-life scenario. The next thing to do is to make this collector into a more efficient proper generational collector.
@@ -485,19 +534,175 @@ This section is currently incomplete.
 
 ### Triplespace backup instructions
 
-global.rs:
- - add youngspace to Plan for TripleSpace new()
- - init in gc_init
- - prepare (as fromspace) in prepare()
- - release in release()
- - add reference function fromspace()
+First, rename all instances of `mygc` to `triplespace`, and add it as a module by following the instructions in [Create MyGC](#create-mygc).
+
+In `global.rs`:
+ 1. Add a `youngspace` field to `pub struct TripleSpace`:
+       ```rust
+       pub struct TripleSpace<VM: VMBinding> {
+          pub hi: AtomicBool,
+          pub copyspace0: CopySpace<VM>,
+          pub copyspace1: CopySpace<VM>,
+          pub youngspace: CopySpace<VM>, // Add this!
+          pub common: CommonPlan<VM>, 
+      }
+      ```
+ 2. Define the parameters for the youngspace in `new()` in `Plan for TripleSpace`:
+      ```rust
+      fn new(
+         vm_map: &'static VMMap,
+         mmapper: &'static Mmapper,
+         options: Arc<UnsafeOptionsWrapper>,
+         _scheduler: &'static MMTkScheduler<Self::VM>,
+     ) -> Self {
+         //change - again, completely changed.
+         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+
+         TripleSpace {
+             hi: AtomicBool::new(false),
+             copyspace0: CopySpace::new(
+                 "copyspace0",
+                 false,
+                 true,
+                 VMRequest::discontiguous(),
+                 vm_map,
+                 mmapper,
+                 &mut heap,
+             ),
+             copyspace1: CopySpace::new(
+                 "copyspace1",
+                 true,
+                 true,
+                 VMRequest::discontiguous(),
+                 vm_map,
+                 mmapper,
+                 &mut heap,
+             ),
+
+             // Add this!
+             youngspace: CopySpace::new(
+                 "youngspace",
+                 true,
+                 true,
+                 VMRequest::discontiguous(),
+                 vm_map,
+                 mmapper,
+                 &mut heap,
+             ),
+             common: CommonPlan::new(vm_map, mmapper, options, heap),
+         }
+     }
+      ```
+ 3. Initialise the youngspace in `gc_init()`:
+     ```rust
+      fn gc_init(
+         &mut self, 
+         heap_size: usize,
+         vm_map: &'static VMMap,
+         scheduler: &Arc<MMTkScheduler<VM>>,
+     ) {
+         self.common.gc_init(heap_size, vm_map, scheduler);
+         self.copyspace0.init(&vm_map);
+         self.copyspace1.init(&vm_map);
+         self.youngspace.init(&vm_map); // Add this!
+     }
+     ```
+ 4. Prepare the youngspace (as a fromspace) in `prepare()`:
+     ```rust
+     fn prepare(&self, tls: OpaquePointer) {
+        self.common.prepare(tls, true);
+        self.hi
+            .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
+        let hi = self.hi.load(Ordering::SeqCst); 
+        self.copyspace0.prepare(hi);
+        self.copyspace1.prepare(!hi);
+        self.youngspace.prepare(true); // Add this!
+    }
+     ```
+ 5. Release the youngspace in `release()`:
+     ```rust
+     fn release(&self, tls: OpaquePointer) {
+        self.common.release(tls, true);
+        self.fromspace().release();
+        self.youngspace().release(); // Add this!
+    }
+     ```
+ 6. Under the reference functions `tospace()` and `fromspace()`, add a similar reference function `youngspace()`:
+     ```rust
+     pub fn youngspace(&self) -> &CopySpace<VM> {
+        &self.youngspace
+    }
+     ```
  
-mutator.rs:
- - add bumppointer to youngspace in space_mapping in create_triplespace_mutator
- - in triplespace_mutator_release: rebind bumpallocator to youngspace
+In `mutator.rs`:
+ 1. Map a bump pointer to the youngspace (replacing the one mapped to the tospace) in `space_mapping` in `create_triplespace_mutator()`:
+     ```rust
+     space_mapping: box vec![
+         (AllocatorSelector::BumpPointer(0), plan.youngspace()), // Change this!
+         (
+             AllocatorSelector::BumpPointer(1),
+             plan.common.get_immortal(),
+         ),
+         (AllocatorSelector::LargeObject(0), plan.common.get_los()),
+     ],
+     ```
+ 2. Rebind the bump pointer to youngspace (rather than the tospace) in `triplespace_mutator_release()`: 
+     ```rust
+     pub fn triplespace_mutator_release<VM: VMBinding> (
+         mutator: &mut Mutator<TripleSpace<VM>>,
+         _tls: OpaquePointer
+     ) {
+         let bump_allocator = unsafe {
+             mutator
+                 .allocators
+                 . get_allocator_mut(
+                     mutator.config.allocator_mapping[AllocationType::Default]
+                 )
+             }
+             .downcast_mut::<BumpAllocator<VM>>()
+             .unwrap();
+             bump_allocator.rebind(Some(mutator.plan.youngspace())); // Change this!
+     }
+     ```
  
-gc_works.rs
- - add youngspace to trace_object, following format of to/fromspace
+In `gc_works.rs`:
+ 1. Add the youngspace to trace_object, following the same fomat as the tospace and fromspace:
+    ```rust
+        fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+            if object.is_null() {
+                return object;
+            }
+
+            // Add this!
+            else if self.plan().youngspace().in_space(object) {
+                self.plan().youngspace.trace_object(
+                    self,
+                    object, 
+                    super::global::ALLOC_TripleSpace, 
+                    self.worker().local(),
+                )
+            }
+
+            else if self.plan().tospace().in_space(object) {
+                self.plan().tospace().trace_object(
+                    self,
+                    object,
+                    super::global::ALLOC_TripleSpace,
+                    self.worker().local(),
+                )
+            } else if self.plan().fromspace().in_space(object) {
+                self.plan().fromspace().trace_object(
+                    self,
+                    object,
+                    super::global::ALLOC_TripleSpace,
+                    self.worker().local(),
+                )
+            } else {
+                self.plan().common.trace_object(self, object)
+            }
+        }
+    }
+    ```
 
 
 [**Back to table of contents**](#contents)
