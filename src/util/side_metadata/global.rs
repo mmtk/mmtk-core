@@ -1,10 +1,9 @@
 use super::constants::*;
 use super::helpers::*;
-use crate::util::{constants, memory, Address};
+use crate::util::{memory, Address};
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 
-pub(crate) struct SideMetadata {
+pub(crate) struct SideMetadataSpec {
     offset: usize,
     log_num_of_bits: usize,
     min_obj_size: usize,
@@ -23,12 +22,12 @@ pub(crate) struct SideMetadata {
 ///
 /// * `metadata_id` - The ID of the side metadata to map the space for.
 ///
-pub fn try_map_metadata_space(start: Address, size: usize, global: SideMetadata, local: SideMetadata) -> bool {
-    try_map_meta(start, size, metadata_id)
+pub fn try_map_metadata_space(start: Address, size: usize, global_per_chunk: usize, local_per_chunk: usize) -> bool {
+    false
 }
 
-pub fn load_atomic(metadata_id: SideMetadataID, data_addr: Address) -> usize {
-    let meta_addr = address_to_meta_address(data_addr, metadata_id);
+pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
+    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     debug_assert!(
         check_and_map_meta_page(address_to_meta_page_address(data_addr, metadata_id)).is_mapped(),
         "load_atomic.metadata_addr({}) for data_addr({}) is not mapped",

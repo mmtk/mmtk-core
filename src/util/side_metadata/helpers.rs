@@ -2,52 +2,12 @@ use crate::util::{constants, conversions, memory, Address};
 use memory::dzmmap;
 use std::io::Error;
 
-use super::global::METADATA_SINGLETON;
-use super::SideMetadataID;
+use super::SideMetadataSpec;
 
-#[cfg(target_pointer_width = "32")]
-pub(super) const MAX_HEAP_SIZE_LOG: usize = 31;
-// FIXME: This must be updated if the heap layout changes
-#[cfg(target_pointer_width = "64")]
-pub(super) const MAX_HEAP_SIZE_LOG: usize = 46;
-
-// This is the maximum number of bits in a metadata bit-set
-pub(super) const MAX_METADATA_BITS: usize = constants::BITS_IN_WORD;
-// This is the maximum number of metadata bit-sets in an MMTk instance
-pub(super) const MAX_METADATA_ID: usize = constants::BITS_IN_WORD;
-
-// const SPACE_PER_META_BIT: usize = 2 << (MAX_HEAP_SIZE_LOG - constants::LOG_BITS_IN_WORD);
-pub(super) const META_SPACE_PAGE_SIZE: usize = constants::BYTES_IN_PAGE;
-
-/// Represents the mapping state of a metadata page.
-///
-/// `NotMappable(Error)` and `Mappable` indicate whether the page is mappable by MMTK.
-/// `Mapped` indicates that the page is already mapped by MMTK.
-pub(super) enum MappingState {
-    NotMappable(Error),
-    Mappable,
-    Mapped,
-}
-
-impl MappingState {
-    pub fn is_mapped(&self) -> bool {
-        matches!(self, MappingState::Mapped)
-    }
-}
 
 #[inline(always)]
-pub(super) fn address_to_meta_address(addr: Address, metadata_id: SideMetadataID) -> Address {
-    debug_assert!(
-        metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
-        "metadata_id ({}) out of range",
-        metadata_id.as_usize()
-    );
-    let bits_num_log = unsafe {
-        METADATA_SINGLETON
-            .meta_bits_num_log_vec
-            .get_unchecked(metadata_id.as_usize())
-    };
-    let bits_num_log = *bits_num_log as i32;
+pub(super) fn address_to_meta_address(metadata_spec: SideMetadataSpec, data_addr: Address) -> Address {
+    let bits_num_log = metadata_spec.
     // right shifts for `align` times, then
     // if bits_num_log < 3, right shift a few more times to cover multi objects per metadata byte
     // if bits_num_log = 3, metadata byte per object is 1

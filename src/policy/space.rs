@@ -432,6 +432,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         }
         println!();
     }
+
+    fn local_side_metadata_per_chunk(&self) -> usize {
+        0
+    }
 }
 
 impl_downcast!(Space<VM> where VM: VMBinding);

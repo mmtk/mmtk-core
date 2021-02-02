@@ -314,6 +314,10 @@ pub trait Plan: Sized + 'static + Sync + Send {
             );
         }
     }
+
+    fn global_side_metadata_per_chuck(&self) -> usize {
+        0
+    }
 }
 
 #[derive(PartialEq)]
