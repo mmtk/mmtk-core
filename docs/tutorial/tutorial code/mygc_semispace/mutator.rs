@@ -10,6 +10,7 @@ use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 // Remove crate::plan::mygc::MyGC
+// Remove mygc_mutator_noop
 
 // Add
 pub fn mygc_mutator_prepare<VM: VMBinding>(
