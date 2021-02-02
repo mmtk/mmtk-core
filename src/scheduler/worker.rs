@@ -42,6 +42,8 @@ impl WorkerLocalPtr {
     }
 }
 
+const LOCALLY_CACHED_WORKS: usize = 1;
+
 pub struct Worker<C: Context> {
     pub tls: OpaquePointer,
     pub ordinal: usize,
@@ -53,6 +55,7 @@ pub struct Worker<C: Context> {
     pub stat: WorkerLocalStat,
     context: Option<&'static C>,
     is_coordinator: bool,
+    local_work_buffer: Vec<(WorkBucketStage, Box<dyn Work<C>>)>,
 }
 
 unsafe impl<C: Context> Sync for Worker<C> {}
@@ -74,6 +77,28 @@ impl<C: Context> Worker<C> {
             stat: Default::default(),
             context: None,
             is_coordinator,
+            local_work_buffer: Vec::with_capacity(LOCALLY_CACHED_WORKS),
+        }
+    }
+
+    #[inline]
+    pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl Work<C>) {
+        if !self.scheduler().work_buckets[bucket].is_activated() {
+            self.scheduler.work_buckets[bucket].add_with_priority(1000, box work);
+            return;
+        }
+        self.local_work_buffer.push((bucket, box work));
+        if self.local_work_buffer.len() > LOCALLY_CACHED_WORKS {
+            self.flush();
+        }
+    }
+
+    #[cold]
+    fn flush(&mut self) {
+        let mut buffer = Vec::with_capacity(LOCALLY_CACHED_WORKS);
+        std::mem::swap(&mut buffer, &mut self.local_work_buffer);
+        for (bucket, work) in buffer {
+            self.scheduler.work_buckets[bucket].add_with_priority(1000, work);
         }
     }
 
@@ -112,6 +137,10 @@ impl<C: Context> Worker<C> {
         self.context = Some(context);
         self.parked.store(false, Ordering::SeqCst);
         loop {
+            while let Some((bucket, mut work)) = self.local_work_buffer.pop() {
+                debug_assert!(self.scheduler.work_buckets[bucket].is_activated());
+                work.do_work_with_stat(self, context);
+            }
             let mut work = self.scheduler().poll(self);
             debug_assert!(!self.is_parked());
             work.do_work_with_stat(self, context);

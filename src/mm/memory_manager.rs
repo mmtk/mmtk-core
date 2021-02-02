@@ -48,6 +48,7 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
             "MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
         ),
     }
+    assert!(heap_size > 0, "Invalid heap size");
     mmtk.plan.gc_init(heap_size, &mmtk.vm_map, &mmtk.scheduler);
     info!("Initialized MMTk with {:?}", mmtk.options.plan);
 }

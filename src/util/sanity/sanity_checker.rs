@@ -50,24 +50,20 @@ impl<VM: VMBinding, P: Plan<VM = VM>, W: CopyContext + WorkerLocal> GCWork<VM>
         plan.base().inside_sanity.store(true, Ordering::SeqCst);
         // Stop & scan mutators (mutator scanning can happen before STW)
         for mutator in VM::VMActivePlan::mutators() {
-            scheduler
-                .prepare_stage
+            scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(ScanStackRoot::<SanityGCProcessEdges<VM>>(mutator));
         }
-        scheduler
-            .prepare_stage
+        scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(ScanVMSpecificRoots::<SanityGCProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
         worker
-            .scheduler()
-            .prepare_stage
+            .scheduler().work_buckets[WorkBucketStage::Prepare]
             .add(SanityPrepare::<P, W>::new(
                 plan.downcast_ref::<P>().unwrap(),
             ));
         // Release global/collectors/mutators
         worker
-            .scheduler()
-            .release_stage
+            .scheduler().work_buckets[WorkBucketStage::Release]
             .add(SanityRelease::<P, W>::new(
                 plan.downcast_ref::<P>().unwrap(),
             ));
@@ -98,8 +94,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityPrepare<P, W
             sanity_checker.refs.clear();
         }
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler
-                .prepare_stage
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
@@ -128,8 +123,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityRelease<P, W
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.plan.leave_sanity();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler
-                .release_stage
+            mmtk.scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
