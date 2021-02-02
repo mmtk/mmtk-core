@@ -15,9 +15,9 @@ This tutorial is a work in progress. Some sections may be rough, and others may 
   * [Create MyGC](#create-mygc)
 * [Building a Semispace Collector](#building-a-semispace-collector)
   * [What is a Semispace Collector](#what-is-a-semispace-collector)
-  * [Allocation: Add copyspaces](#allocation:-add-copyspaces)
-  * [Collection: Implement garbage collection](#collection:-implement-garbage-collection)
-  * [Exersize: Adding another copyspace](#exersize:-adding-another-copyspace)
+  * [Allocation: Add copyspaces](#allocation-add-copyspaces)
+  * [Collection: Implement garbage collection](#collection-implement-garbage-collection)
+  * [Exersize: Adding another copyspace](#exersize-adding-another-copyspace)
 * [Further Reading](#further-reading)
 
 
