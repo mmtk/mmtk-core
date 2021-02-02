@@ -20,7 +20,7 @@ extern void destroy_mutator(MMTk_Mutator mutator);
 extern void* alloc(MMTk_Mutator mutator, size_t size,
     size_t align, size_t offset, int allocator);
 
-extern void post_alloc(MMTk_Mutator mutator, void* refer, void* type_refer,
+extern void post_alloc(MMTk_Mutator mutator, void* refer,
     int bytes, int allocator);
 
 extern bool is_live_object(void* ref);
@@ -52,7 +52,6 @@ extern void* trace_retain_referent(MMTk_TraceLocal trace_local, void* obj);
 extern void gc_init(size_t heap_size);
 extern bool will_never_move(void* object);
 extern bool process(char* name, char* value);
-extern void scan_region();
 extern void handle_user_collection_request(void *tls);
 
 extern void start_control_collector(void *tls);
