@@ -346,46 +346,46 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
    [[Finished code (step 1)]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L2-L28)
    
 2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
-  1. Delete the existing fields in the constructor.
-  2. Add `pub hi: AtomicBool,`. This is a thread-safe bool, indicating which 
-  copyspace is the tospace.
-  3. Add `pub copyspace0: CopySpace<VM>,` 
-  and `pub copyspace1: CopySpace<VM>,`. These are the two copyspaces.
-  4. Add `pub common: CommonPlan<VM>,`.
-   This holds an instance of the common plan.
-  
-  [[Finished code (step 2)]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L34-L40)
+   1. Delete the existing fields in the constructor.
+   2. Add `pub hi: AtomicBool,`. This is a thread-safe bool, indicating which 
+   copyspace is the tospace.
+   3. Add `pub copyspace0: CopySpace<VM>,` 
+   and `pub copyspace1: CopySpace<VM>,`. These are the two copyspaces.
+   4. Add `pub common: CommonPlan<VM>,`.
+    This holds an instance of the common plan.
+
+   [[Finished code (step 2)]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L34-L40)
   
 3. Change `impl<VM: VMBinding> Plan for MyGC<VM> {`. 
 This section initialises and prepares the objects in MyGC that you just defined.
-  1. Delete the definition of `mygc_space`. 
-  Instead, we will define the two copyspaces here.
-  2. Define one of the copyspaces by adding the following code: 
-      ```rust
-       let copyspace0 = CopySpace::new(
-            "copyspace0",
-            false,
-            true,
-            VMRequest::discontiguous(),
-            vm_map,
-            mmapper,
-            &mut heap,
-        );
-      ```
-  3. Create another copyspace, called `copyspace1`, defining it as a fromspace 
-  instead of a tospace. (Hint: the definitions for 
-  copyspaces are in `src/policy/copyspace.rs`.) 
-  4. Finally, replace the old MyGC initializer with the following:
-      ```rust
-       MyGC {
-           hi: AtomicBool::new(false),
-           copyspace0,
-           copyspace1,
-           common: CommonPlan::new(vm_map, mmapper, options, heap),
-       }
-      ```
-      
-   [[Finished code (step 3-4)]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L44-L80)
+   1. Delete the definition of `mygc_space`. 
+   Instead, we will define the two copyspaces here.
+   2. Define one of the copyspaces by adding the following code: 
+       ```rust
+        let copyspace0 = CopySpace::new(
+             "copyspace0",
+             false,
+             true,
+             VMRequest::discontiguous(),
+             vm_map,
+             mmapper,
+             &mut heap,
+         );
+       ```
+   3. Create another copyspace, called `copyspace1`, defining it as a fromspace 
+   instead of a tospace. (Hint: the definitions for 
+   copyspaces are in `src/policy/copyspace.rs`.) 
+   4. Finally, replace the old MyGC initializer with the following:
+       ```rust
+        MyGC {
+            hi: AtomicBool::new(false),
+            copyspace0,
+            copyspace1,
+            common: CommonPlan::new(vm_map, mmapper, options, heap),
+        }
+       ```
+
+    [[Finished code (step 3-4)]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L44-L80)
    
 4. There are a few more functions to add to `Plan for MyGC` next.
      1. Find `gc_init()`. Change it to initialise the common plan and the two 
