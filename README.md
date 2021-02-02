@@ -1,3 +1,26 @@
+# MMTk PerfEvent Support
+
+### TODO:
+
+- [ ] Move perfmon binding to a separate crate as a dependency
+- [ ] Per mutator/worker counter
+
+### Usage:
+
+Before running benchmarks, set environment variable `PERF_EVENTS` to something like:
+
+```sh
+export PERF_EVENTS=PERF_COUNT_HW_CACHE_DTLB:MISS,PERF_COUNT_HW_CACHE_ITLB:MISS
+```
+
+If you are using running scripts, add the following line to the begining of _RunConfig.pm_:
+
+```perl
+$ENV{'PERF_EVENTS'}="PERF_COUNT_HW_CACHE_DTLB:MISS,PERF_COUNT_HW_CACHE_ITLB:MISS";
+```
+
+---
+
 # MMTk
 
 [![crates.io](https://img.shields.io/crates/v/mmtk.svg)](https://crates.io/crates/mmtk)
