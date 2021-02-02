@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["TransitiveClosure","This trait is the fundamental mechanism for performing a transitive closure over an object graph."]]});

@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["NEEDS_UNLOGGED_BIT",""],["TOTAL_BITS",""],["UNLOGGED_BIT",""],["UNLOGGED_BIT_NUMBER",""],["USED_GLOBAL_BITS",""]],"fn":[["is_unlogged",""],["mark_as_logged",""],["mark_as_unlogged",""]]});
+initSidebarItems({"constant":[["TOTAL_BITS",""]],"struct":[["HeaderByte",""]]});

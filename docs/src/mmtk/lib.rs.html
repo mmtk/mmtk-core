@@ -69,9 +69,6 @@
 <span id="66">66</span>
 <span id="67">67</span>
 <span id="68">68</span>
-<span id="69">69</span>
-<span id="70">70</span>
-<span id="71">71</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">incomplete_features</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>)]</span>
@@ -131,13 +128,10 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">util</span>;
 <span class="kw">mod</span> <span class="ident">mm</span>;
 <span class="kw">mod</span> <span class="ident">mmtk</span>;
-<span class="kw">mod</span> <span class="ident">plan</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">plan</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">policy</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">scheduler</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">vm</span>;
-
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">no_inline</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">selected_plan</span>::{<span class="ident">SelectedConstraints</span>, <span class="ident">SelectedPlan</span>};
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mm</span>::<span class="ident">memory_manager</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">MMTK</span>;

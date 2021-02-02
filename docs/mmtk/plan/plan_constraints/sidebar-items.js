@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["PlanConstraints","This struct defines plan-specific constraints. Most of the constraints are constants. Each plan should declare a constant of this struct, and use the constant wherever possible. However, for plan-neutral implementations, these constraints are not constant."]]});

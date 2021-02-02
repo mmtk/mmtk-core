@@ -71,7 +71,7 @@
 <span id="68">68</span>
 <span id="69">69</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">Mutator</span>, <span class="ident">SelectedPlan</span>, <span class="ident">TransitiveClosure</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">Mutator</span>, <span class="ident">TransitiveClosure</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">gc_works</span>::<span class="ident">ProcessEdgesWork</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">GCWorker</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
@@ -129,7 +129,7 @@
     <span class="doccomment">/// * `mutator`: The reference to the mutator whose roots will be scanned.</span>
     <span class="doccomment">/// * `tls`: The GC thread that is performing this scanning.</span>
     <span class="kw">fn</span> <span class="ident">scan_thread_root</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(
-        <span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">SelectedPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
         <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
     );
 

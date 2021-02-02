@@ -203,9 +203,9 @@
 <span id="200">200</span>
 <span id="201">201</span>
 <span id="202">202</span>
+<span id="203">203</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_parameters</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
@@ -228,7 +228,8 @@
 <span class="kw">const</span> <span class="ident">MANTISSA_BITS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">14</span>;
 <span class="kw">const</span> <span class="ident">BASE_EXPONENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">BITS_IN_INT</span> <span class="op">-</span> <span class="ident">MANTISSA_BITS</span>;
 
-<span class="comment">/* 64-bit */</span>
+<span class="comment">// get_index() is only implemented for 64 bits</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">const</span> <span class="ident">INDEX_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="op">!</span><span class="ident">TYPE_MASK</span>;
 <span class="kw">const</span> <span class="ident">INDEX_SHIFT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">TYPE_BITS</span>;
 
@@ -302,6 +303,7 @@
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_start</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+        <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_parameters</span>;
         <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="self">self</span>.<span class="ident">get_index</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">heap_parameters</span>::<span class="ident">LOG_SPACE_SIZE_64</span>) }
     }
 

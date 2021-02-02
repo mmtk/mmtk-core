@@ -68,13 +68,13 @@
 <span id="65">65</span>
 <span id="66">66</span>
 <span id="67">67</span>
-<span id="68">68</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">SemiSpace</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">barriers</span>::<span class="ident">NoBarrier</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">mutator_context</span>::<span class="ident">Mutator</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">mutator_context</span>::<span class="ident">MutatorConfig</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">AllocationSemantics</span> <span class="kw">as</span> <span class="ident">AllocationType</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">Plan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">allocators</span>::{<span class="ident">AllocatorSelector</span>, <span class="ident">Allocators</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">BumpAllocator</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
@@ -82,17 +82,11 @@
 <span class="kw">use</span> <span class="ident">enum_map</span>::<span class="ident">enum_map</span>;
 <span class="kw">use</span> <span class="ident">enum_map</span>::<span class="ident">EnumMap</span>;
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ss_mutator_prepare</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">_mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">SemiSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>,
-) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ss_mutator_prepare</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">_mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>) {
     <span class="comment">// Do nothing</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ss_mutator_release</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">SemiSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>,
-) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ss_mutator_release</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>) {
     <span class="comment">// rebind the allocation bump pointer to the appropriate semispace</span>
     <span class="kw">let</span> <span class="ident">bump_allocator</span> <span class="op">=</span> <span class="kw">unsafe</span> {
         <span class="ident">mutator</span>
@@ -101,7 +95,13 @@
     }
     .<span class="ident">downcast_mut</span>::<span class="op">&lt;</span><span class="ident">BumpAllocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>()
     .<span class="ident">unwrap</span>();
-    <span class="ident">bump_allocator</span>.<span class="ident">rebind</span>(<span class="prelude-val">Some</span>(<span class="ident">mutator</span>.<span class="ident">plan</span>.<span class="ident">tospace</span>()));
+    <span class="ident">bump_allocator</span>.<span class="ident">rebind</span>(<span class="prelude-val">Some</span>(
+        <span class="ident">mutator</span>
+            .<span class="ident">plan</span>
+            .<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">SemiSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>()
+            .<span class="ident">unwrap</span>()
+            .<span class="ident">tospace</span>(),
+    ));
 }
 
 <span class="macro">lazy_static</span><span class="macro">!</span> {
@@ -114,17 +114,15 @@
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_ss_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">mutator_tls</span>: <span class="ident">OpaquePointer</span>,
-    <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">SemiSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">SemiSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">ss</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">SemiSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
     <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">MutatorConfig</span> {
         <span class="ident">allocator_mapping</span>: <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">ALLOCATOR_MAPPING</span>,
         <span class="ident">space_mapping</span>: <span class="kw">box</span> <span class="macro">vec</span><span class="macro">!</span>[
-            (<span class="ident">AllocatorSelector</span>::<span class="ident">BumpPointer</span>(<span class="number">0</span>), <span class="ident">plan</span>.<span class="ident">tospace</span>()),
-            (
-                <span class="ident">AllocatorSelector</span>::<span class="ident">BumpPointer</span>(<span class="number">1</span>),
-                <span class="ident">plan</span>.<span class="ident">common</span>.<span class="ident">get_immortal</span>(),
-            ),
-            (<span class="ident">AllocatorSelector</span>::<span class="ident">LargeObject</span>(<span class="number">0</span>), <span class="ident">plan</span>.<span class="ident">common</span>.<span class="ident">get_los</span>()),
+            (<span class="ident">AllocatorSelector</span>::<span class="ident">BumpPointer</span>(<span class="number">0</span>), <span class="ident">ss</span>.<span class="ident">tospace</span>()),
+            (<span class="ident">AllocatorSelector</span>::<span class="ident">BumpPointer</span>(<span class="number">1</span>), <span class="ident">ss</span>.<span class="ident">common</span>.<span class="ident">get_immortal</span>()),
+            (<span class="ident">AllocatorSelector</span>::<span class="ident">LargeObject</span>(<span class="number">0</span>), <span class="ident">ss</span>.<span class="ident">common</span>.<span class="ident">get_los</span>()),
         ],
         <span class="ident">prepare_func</span>: <span class="kw-2">&amp;</span><span class="ident">ss_mutator_prepare</span>,
         <span class="ident">release_func</span>: <span class="kw-2">&amp;</span><span class="ident">ss_mutator_release</span>,

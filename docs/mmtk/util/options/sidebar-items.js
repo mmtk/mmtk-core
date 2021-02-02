@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["NurseryZeroingOptions",""]],"struct":[["Options",""],["UnsafeOptionsWrapper",""]]});
+initSidebarItems({"enum":[["NurseryZeroingOptions",""],["PlanSelector",""]],"struct":[["Options",""],["UnsafeOptionsWrapper",""]]});

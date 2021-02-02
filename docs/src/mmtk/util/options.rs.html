@@ -216,6 +216,17 @@
 <span id="213">213</span>
 <span id="214">214</span>
 <span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">UnsafeCell</span>;
@@ -229,6 +240,15 @@
         <span class="ident">Nontemporal</span>,
         <span class="ident">Concurrent</span>,
         <span class="ident">Adaptive</span>,
+    }
+}
+
+<span class="macro">custom_derive</span><span class="macro">!</span> {
+    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">EnumFromStr</span>, <span class="ident">Debug</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">PlanSelector</span> {
+        <span class="ident">NoGC</span>,
+        <span class="ident">SemiSpace</span>,
+        <span class="ident">GenCopy</span>
     }
 }
 
@@ -272,6 +292,7 @@
                         <span class="kw">let</span> <span class="ident">validate_fn</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">validator</span>;
                         <span class="ident">validate_fn</span>(<span class="ident">val</span>)
                     } <span class="kw">else</span> {
+                        <span class="macro">eprintln</span><span class="macro">!</span>(<span class="string">&quot;Warn: unable to set {}={}. Default value will be used.&quot;</span>, <span class="ident">s</span>, <span class="ident">val</span>);
                         <span class="bool-val">false</span>
                     })<span class="op">*</span>
                     <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Invalid Options key&quot;</span>)
@@ -303,6 +324,7 @@
     ]
 }
 <span class="macro">options</span><span class="macro">!</span> {
+    <span class="ident">plan</span>:                  <span class="ident">PlanSelector</span>         [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">PlanSelector</span>::<span class="ident">NoGC</span>,
     <span class="ident">threads</span>:               <span class="ident">usize</span>                [<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span>]    <span class="op">=</span> <span class="ident">num_cpus</span>::<span class="ident">get</span>(),
     <span class="ident">use_short_stack_scans</span>: <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
     <span class="ident">use_return_barrier</span>:    <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
