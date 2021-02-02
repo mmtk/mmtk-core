@@ -3,10 +3,12 @@ use crate::plan::TransitiveClosure;
 use crate::plan::SelectedPlan;
 use crate::vm::VMBinding;
 use crate::scheduler::gc_works::ProcessEdgesWork;
+use crate::scheduler::gc_works::ProcessEdgesBase;
 use crate::scheduler::{GCWork, GCWorker};
 use crate::MMTK;
 use crate::plan::Plan;
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 
 pub struct FinalizableProcessor {
     candidates: Vec<ObjectReference>,
@@ -42,14 +44,24 @@ impl FinalizableProcessor {
             0
         };
 
+        // We should go through ready_for_finalize objects and keep them alive.
+        // Unlike candidates, those objects are known to be alive. This means 
+        // theoratically we could do the following loop at any time in a GC (not necessarily after closure phase).
+        // But we have to iterate through candidates after closure.
+        self.candidates.append(&mut self.ready_for_finalize);
+
         for reff in self.candidates.drain(start..).collect::<Vec<ObjectReference>>() {
+            trace!("Pop {:?} for finalization", reff);
             if reff.is_live() {
-                self.candidates.push(FinalizableProcessor::get_forwarded_finalizable(e, reff));
+                let res = FinalizableProcessor::get_forwarded_finalizable(e, reff);
+                trace!("{:?} is live, push {:?} back to candidates", reff, res);
+                self.candidates.push(res);
                 continue;
             }
 
             let retained = FinalizableProcessor::return_for_finalize(e, reff);
             self.ready_for_finalize.push(retained);
+            trace!("{:?} is not live, push {:?} to ready_for_finalize", reff, retained);
         }
 
         self.nursery_index = self.candidates.len();
@@ -68,11 +80,14 @@ pub struct Finalization<E: ProcessEdgesWork>(PhantomData<E>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        trace!("Finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
+        debug!("Finalization, {} objects in candidates, {} objects ready to finalize", finalizable_processor.candidates.len(), finalizable_processor.ready_for_finalize.len());
+
         let mut w = E::new(vec![], false);
+        w.mmtk = Some(mmtk);
+        w.set_worker(worker);
         finalizable_processor.scan(&mut w, mmtk.plan.in_nursery());
-        trace!("Finished finalization");
+        debug!("Finished finalization, {} objects in candidates, {} objects ready to finalize", finalizable_processor.candidates.len(), finalizable_processor.ready_for_finalize.len());
     }
 }
 impl<E: ProcessEdgesWork> Finalization<E> {
