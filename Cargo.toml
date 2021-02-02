@@ -41,6 +41,11 @@ rand = "0.7.3"
 [features]
 default = []
 
+# When adding any new feature, please add the new feature to .github/scripts/ci-common.sh 
+# so their builds are properly tested in the CI.
+
+# -- Non mutally exclusive features --
+
 # spaces
 base_spaces = []
 vm_space = ["base_spaces"]
@@ -56,6 +61,8 @@ nogc_no_zeroing = ["nogc_lock_free"]
 # For using a single GC thread
 # Q: Why do we need this as a compile time flat? We can always set the number of GC threads through options.
 single_worker = []
+
+# -- Mutally exclusive features --
 
 # malloc implementations
 # only one of the following features should be enabled, or none to use the default malloc from libc

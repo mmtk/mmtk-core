@@ -8,10 +8,10 @@ set -xe
 cargo build
 
 # Build features
-cargo build --all-features
+for_all_features "cargo build"
 
 # For x86_64-linux, also see if we can build for i686
 if [[ $arch == "x86_64" && $os == "linux" ]]; then
     cargo build --target i686-unknown-linux-gnu
-    cargo build --target i686-unknown-linux-gnu --all-features
+    for_all_features "cargo build --target i686-unknown-linux-gnu"
 fi

@@ -1,3 +1,3 @@
 set -xe
 
-cargo doc --all-features --no-deps
+cargo doc --features $non_exclusive_features --no-deps

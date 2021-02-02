@@ -7,15 +7,15 @@ export RUSTFLAGS="-D warnings"
 # check base
 cargo clippy
 # check all features
-cargo clippy --all-features
+for_all_features "cargo clippy"
 # check for tests
-cargo clippy --tests --all-features
+for_all_features "cargo clippy --tests"
 # check for dummyvm
-cargo clippy --manifest-path=vmbindings/dummyvm/Cargo.toml --all-features
+cargo clippy --manifest-path=vmbindings/dummyvm/Cargo.toml
 
 # For x86_64-linux, also check for i686
 if [[ $arch == "x86_64" && $os == "linux" ]]; then
-    cargo clippy --target i686-unknown-linux-gnu --all-features
+    for_all_features "cargo clippy --target i686-unknown-linux-gnu"
 fi 
 
 # check format
