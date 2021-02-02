@@ -204,15 +204,15 @@ Firstly, change the plan constraints. Some of these constraints are not used at 
 
 Next, in `global.rs`, replace the old immortal space with two copyspaces.
 1. To the import statement block:
-   1. Replace `crate::plan::global::{BasePlan, NoCopy};` with `use crate::plan::global::BasePlan;`.
-   2. Add `use crate::plan::global::CommonPlan;`.
-   3. Add `use std::sync::atomic::{AtomicBool, Ordering};`.
+   1. Replace `crate::plan::global::{BasePlan, NoCopy};` with `use crate::plan::global::BasePlan;`. This collector is going to use copying, so there's no point to importing NoCopy anymore.
+   2. Add `use crate::plan::global::CommonPlan;`. Semispace uses the common plan, which includes an immortal space and a large object space, rather than the base plan. Any garbage collected plan should use `CommonPlan`.
+   3. Add `use std::sync::atomic::{AtomicBool, Ordering};`. These are going to be used to store an indicator of which copyspace is the tospace.
    4. Delete `#[allow(unused_imports)]`.
 2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
   1. Delete the existing fields in the constructor.
-  2. Add `pub hi: AtomicBool,`. This is a thread-safe bool indicating which copyspace is the to-space.
+  2. Add `pub hi: AtomicBool,`. This is a thread-safe bool, indicating which copyspace is the tospace.
   3. Add `pub copyspace0: CopySpace<VM>,` and `pub copyspace1: CopySpace<VM>,`. These are the two copyspaces.
-  4. Add `pub common: CommonPlan<VM>,`. Semispace uses the common plan, which includes an immortal space and a large object space, rather than the base plan. Any garbage collected plan should use `CommonPlan`.
+  4. Add `pub common: CommonPlan<VM>,`. 
 3. Change `impl<VM: VMBinding> Plan for MyGC<VM> {`. This section initialises and prepares the objects in MyGC that you just defined.
   1. Delete the definition of `mygc_space`. Instead, we will define the two copyspaces here.
   2. Define one of the copyspaces by adding the following code: 
@@ -296,7 +296,7 @@ Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace
   1. Change the following import statements:
      1. Add `use super::MyGC;`.
      2. Add `use crate::util::alloc::BumpAllocator;`.
-     3. Delete `use crate::plan::nogc::NoGC;`.
+     3. Delete `use crate::plan::mygc::MyGC;`.
      
   1. In `lazy_static!`, make the following changes to `ALLOCATOR_MAPPING`, which maps the required allocation semantics to the corresponding allocators. For example, for `Default`, we allocate using the first bump pointer allocator (`BumpPointer(0)`):
      1. Map `Default` to `BumpPointer(0)`.
