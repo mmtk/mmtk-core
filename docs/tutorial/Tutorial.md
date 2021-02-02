@@ -206,7 +206,8 @@ Firstly, change the plan constraints. Some of these constraints are not used at 
 2. You will need to change two more options: `MOVES_OBJECTS` and `NUM_SPECIALIZED_SCANS`. Copy the lines containing both to `mygc/constraints.rs`.
 3. Set `MOVES_OBJECTS` to `true`. 
 4. Set `NUM_SPECIALIZED_SCANS` to 1.
-[Finished code](/tutorial%20code/mygc_semispace/constraints.rs#L1-L6)
+
+[Finished code](/docs/tutorial/tutorial%20code/mygc_semispace/constraints.rs#L1-L6)
 
 Next, in `global.rs`, replace the old immortal space with two copyspaces.
 1. To the import statement block:
@@ -214,7 +215,7 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
    2. Add `use crate::plan::global::CommonPlan;`. Semispace uses the common plan, which includes an immortal space and a large object space, rather than the base plan. Any garbage collected plan should use `CommonPlan`.
    3. Add `use std::sync::atomic::{AtomicBool, Ordering};`. These are going to be used to store an indicator of which copyspace is the tospace.
    4. Delete `#[allow(unused_imports)]`.
-   5. [Finished code](/tutorial%20code/mygc_semispace/global.rs#L1-L28)
+   5. [Finished code](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L1-L28)
 2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
   1. Delete the existing fields in the constructor.
   2. Add `pub hi: AtomicBool,`. This is a thread-safe bool, indicating which copyspace is the tospace.
