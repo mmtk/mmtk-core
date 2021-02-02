@@ -36,13 +36,11 @@ atomic-traits = "0.2.0"
 atomic = "0.4.6"
 spin = "0.5.2"
 env_logger = "0.8.2"
+perfmon = { git = "https://github.com/wenyuzhao/perfmon-rs" }
 
 [dev-dependencies]
 crossbeam = "0.7.3"
 rand = "0.7.3"
-
-[build-dependencies]
-cc = "1.0"
 
 [features]
 default = []
