@@ -6,12 +6,6 @@ use super::global::METADATA_SINGLETON;
 use super::SideMetadataID;
 
 #[cfg(target_pointer_width = "32")]
-pub(super) const METADATA_BASE_ADDRESS: Address = unsafe { Address::from_usize(0) };
-#[cfg(target_pointer_width = "64")]
-pub(super) const METADATA_BASE_ADDRESS: Address =
-    unsafe { Address::from_usize(0x0000_0600_0000_0000) };
-
-#[cfg(target_pointer_width = "32")]
 pub(super) const MAX_HEAP_SIZE_LOG: usize = 31;
 // FIXME: This must be updated if the heap layout changes
 #[cfg(target_pointer_width = "64")]

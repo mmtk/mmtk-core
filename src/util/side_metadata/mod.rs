@@ -63,6 +63,7 @@
 
 mod global;
 mod helpers;
+mod constants;
 
 pub use global::SideMetadata;
 pub use global::SideMetadataID;
