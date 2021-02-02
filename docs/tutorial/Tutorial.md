@@ -385,7 +385,7 @@ This section initialises and prepares the objects in MyGC that you just defined.
         }
        ```
 
-    [[Finished code (step 3-4)]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L44-L80)
+   [[Finished code (step 3-4)]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L44-L80)
    
 4. There are a few more functions to add to `Plan for MyGC` next.
      1. Find `gc_init()`. Change it to initialise the common plan and the two 
@@ -467,13 +467,13 @@ For example, for `Default`, we allocate using the first bump pointer allocator
 space in `space_mapping`. Note that the space allocation is formatted as a list 
 of tuples. For example, the first bump pointer allocator (`BumpPointer(0)`) is 
 bound with `tospace`. 
-     1. `BumpPointer(0)` should map to the tospace.
-     2. `BumpPointer(1)` should map to `plan.common.get_immortal()`.
-     3. `LargeObject(0)` should map to `plan.common.get_los()`.
-     4. None of the above should be dereferenced (ie, they should not have 
-     the `&` prefix).
-     
-     [[Finished code (step 3)]](/docs/tutorial/tutorial%20code/mygc_semispace/mutator.rs#L48-L65)
+   1. `BumpPointer(0)` should map to the tospace.
+   2. `BumpPointer(1)` should map to `plan.common.get_immortal()`.
+   3. `LargeObject(0)` should map to `plan.common.get_los()`.
+   4. None of the above should be dereferenced (ie, they should not have 
+   the `&` prefix).
+   
+   [[Finished code (step 3)]](/docs/tutorial/tutorial%20code/mygc_semispace/mutator.rs#L48-L65)
      
 There may seem to be 2 extraneous spaces and allocators that have appeared all 
 of a sudden in these past 2 steps. These are parts of the MMTk common plan 
@@ -552,28 +552,25 @@ and `mygc: BumpAllocator`.
        ) {
        }
        ```
-   3. To `new`, add an initialiser for the class:
+   3. To `new()`, add an initialiser for the class:
        ```rust
        Self {
              plan: &mmtk.plan,
              mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &mmtk.plan),
          }
        ```
-   4. In `init`, set the `tls` variable in the held instance of `mygc` to 
+   4. In `init()`, set the `tls` variable in the held instance of `mygc` to 
    the one passed to the function.
-   5. In `prepare`, rebind the allocator to the tospace. 
-   6. Leave `release` with an empty body. There are no release steps for 
+   5. In `prepare()`, rebind the allocator to the tospace. 
+   6. Leave `release()` with an empty body. There are no release steps for 
    this collector.
-   7. In `alloc`, call the allocator's `alloc` function. Above the function, 
+   7. In `alloc()`, call the allocator's `alloc` function. Above the function, 
    use an inline attribute (`#[inline(always)]`) to tell the Rust compiler 
    to always inline the function.
-   8. In `post_copy` add the following code. Also, add an inline (always) 
+   8. To `post_copy()` add `forwarding_word::clear_forwarding_bits::<VM>(obj);`. Also, add an inline (always) 
    attribute.
-       ```rust
-       forwarding_word::clear_forwarding_bits::<VM>(obj);
-       ```
-     
-    [[Finished code (step 4)]](/docs/tutorial/tutorial%20code/mygc_semispace/gc_works.rs#L18-L55)
+    
+   [[Finished code (step 4)]](/docs/tutorial/tutorial%20code/mygc_semispace/gc_works.rs#L18-L55)
     
 5. Add a new public structure, `MyGCProcessEdges`, with the type parameter 
 `<VM:VMBinding>`. It will hold an instance of `ProcessEdgesBase` and 
@@ -625,7 +622,7 @@ and `mygc: BumpAllocator`.
 7. Add two new implementation blocks, `Deref` and `DerefMut` for 
 `MyGCProcessEdges`. These allow `MyGCProcessEdges` to be dereferenced to 
 `ProcessEdgesBase`, and allows easy access to fields in `ProcessEdgesBase`.
-    ```rust
+   ```rust
     impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
         type Target = ProcessEdgesBase<Self>;
         #[inline]
@@ -640,15 +637,17 @@ and `mygc: BumpAllocator`.
             &mut self.base
         }
     }
-    ```
+   ```
     
-    [[Finished code (step 7)]](/docs/tutorial/tutorial%20code/mygc_semispace/gc_works.rs#L98-L110)
+   [[Finished code (step 7)]](/docs/tutorial/tutorial%20code/mygc_semispace/gc_works.rs#L98-L110)
 
 
 A few import statements need to be added to the other files so that they can 
 use the functions in `gc_works`.
-1. `global.rs`: Import `MyGCCopyContext` and `MyGCProcessEdges`. [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L1)
-2. `mod.rs`: Import `gc_works` as a module (`mod gc_works;`). [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/mod.rs#L2)
+1. `global.rs`: Import `MyGCCopyContext` and `MyGCProcessEdges`. 
+[[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L1)
+2. `mod.rs`: Import `gc_works` as a module (`mod gc_works;`). 
+[[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/mod.rs#L2)
    
 Going back to `mutator.rs`:
 1. Create a new function called 
@@ -931,7 +930,7 @@ In `mutator.rs`:
      ```
  
 In `gc_works.rs`:
- 1. Add the youngspace to trace_object, following the same fomat as 
+1. Add the youngspace to trace_object, following the same fomat as 
  the tospace and fromspace:
     ```rust
         fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
