@@ -4,7 +4,6 @@ use super::work_bucket::*;
 use super::worker::{Worker, WorkerGroup};
 use super::*;
 use crate::mmtk::MMTK;
-use crate::plan::Plan;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::{enum_map, EnumMap};

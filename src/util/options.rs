@@ -13,6 +13,15 @@ custom_derive! {
     }
 }
 
+custom_derive! {
+    #[derive(Copy, Clone, EnumFromStr, Debug)]
+    pub enum PlanSelector {
+        NoGC,
+        SemiSpace,
+        GenCopy
+    }
+}
+
 pub struct UnsafeOptionsWrapper(UnsafeCell<Options>);
 unsafe impl Sync for UnsafeOptionsWrapper {}
 
@@ -53,6 +62,7 @@ macro_rules! options {
                         let validate_fn = $validator;
                         validate_fn(val)
                     } else {
+                        eprintln!("Warn: unable to set {}={}. Default value will be used.", s, val);
                         false
                     })*
                     _ => panic!("Invalid Options key")
@@ -84,6 +94,7 @@ macro_rules! options {
     ]
 }
 options! {
+    plan:                  PlanSelector         [always_valid] = PlanSelector::NoGC,
     threads:               usize                [|v| v > 0]    = num_cpus::get(),
     use_short_stack_scans: bool                 [always_valid] = false,
     use_return_barrier:    bool                 [always_valid] = false,

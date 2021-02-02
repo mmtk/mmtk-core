@@ -3,11 +3,10 @@ use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::mutator_context::Mutator;
-use crate::plan::semispace::mutator::create_ss_mutator;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
+use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
@@ -28,8 +27,6 @@ use std::sync::Arc;
 
 use enum_map::EnumMap;
 
-pub type SelectedPlan<VM> = SemiSpace<VM>;
-
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 
 pub struct SemiSpace<VM: VMBinding> {
@@ -41,41 +38,29 @@ pub struct SemiSpace<VM: VMBinding> {
 
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
 
+pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    moves_objects: true,
+    gc_header_bits: 2,
+    gc_header_words: 0,
+    num_specialized_scans: 1,
+    ..PlanConstraints::default()
+};
+
 impl<VM: VMBinding> Plan for SemiSpace<VM> {
     type VM = VM;
-    type Mutator = Mutator<Self>;
-    type CopyContext = SSCopyContext<VM>;
 
-    fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<Self::VM>,
-    ) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+    fn constraints(&self) -> &'static PlanConstraints {
+        &SS_CONSTRAINTS
+    }
 
-        SemiSpace {
-            hi: AtomicBool::new(false),
-            copyspace0: CopySpace::new(
-                "copyspace0",
-                false,
-                true,
-                VMRequest::discontiguous(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            copyspace1: CopySpace::new(
-                "copyspace1",
-                true,
-                true,
-                VMRequest::discontiguous(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap),
-        }
+    fn create_worker_local(
+        &self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> GCWorkerLocalPtr {
+        let mut c = SSCopyContext::new(mmtk);
+        c.init(tls);
+        GCWorkerLocalPtr::new(c)
     }
 
     fn gc_init(
@@ -97,21 +82,16 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<SSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::new(self));
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<Self, SSCopyContext<VM>>::new(self));
         // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<Self, SSCopyContext<VM>>::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC);
+        scheduler.work_buckets[WorkBucketStage::Final]
+            .add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new());
         scheduler.set_finalizer(Some(EndOfGC));
-    }
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        _mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Mutator<Self>> {
-        Box::new(create_ss_mutator(tls, self))
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -153,6 +133,38 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 }
 
 impl<VM: VMBinding> SemiSpace<VM> {
+    pub fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+        _scheduler: &'static MMTkScheduler<VM>,
+    ) -> Self {
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+
+        SemiSpace {
+            hi: AtomicBool::new(false),
+            copyspace0: CopySpace::new(
+                "copyspace0",
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            copyspace1: CopySpace::new(
+                "copyspace1",
+                true,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS),
+        }
+    }
+
     pub fn tospace(&self) -> &CopySpace<VM> {
         if self.hi.load(Ordering::SeqCst) {
             &self.copyspace1
