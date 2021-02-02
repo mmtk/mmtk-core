@@ -17,7 +17,7 @@ This tutorial is a work in progress. Some sections may be rough, and others may 
   * [What is a Semispace Collector](#what-is-a-semispace-collector)
   * [Allocation: Add copyspaces](#allocation-add-copyspaces)
   * [Collection: Implement garbage collection](#collection-implement-garbage-collection)
-  * [Exersize: Adding another copyspace](#exersize-adding-another-copyspace)
+  * [Exercise: Adding another copyspace](#exercise-adding-another-copyspace)
 * [Further Reading](#further-reading)
 
 
@@ -28,7 +28,7 @@ The Memory Management Toolkit (MMTk) is a framework to design and implement memo
 ### What will this tutorial be covering?
 This tutorial is intended to get you comfortable with building garbage collectors in the MMTk.
 
-You will first be guided through building a Semispace collector. After that, you will extend this collector to be a generational collector, to further familiarise you with different concepts in the MMTk. There will also be questions and exersizes at various points in the tutorial, intended to encourage you to think about what the code is doing, increase your general understanding of the MMTk, and motivate further research.
+You will first be guided through building a Semispace collector. After that, you will extend this collector to be a generational collector, to further familiarise you with different concepts in the MMTk. There will also be questions and exercises at various points in the tutorial, intended to encourage you to think about what the code is doing, increase your general understanding of the MMTk, and motivate further research.
 
 Where possible, there will be links to finished, functioning code after each section so that you can check that your code is correct. Note, however, that these will be full collectors. Therefore, there may be some differences between these files and your collector due to your position in the tutorial. By the end of each major section, your code should be functionally identical to the finished code provided.
 
@@ -527,8 +527,8 @@ You should now have MyGC working and able to collect garbage. All three benchmar
 
 ***
 
-### Exersize: Adding another copyspace
-Now that you have a working Semispace collector, you should be familiar enough with the code to start writing some yourself. The intention of this exersize is to reinforce the information from the Semispace section, rather than to create a useful new collector.
+### Exercise: Adding another copyspace
+Now that you have a working Semispace collector, you should be familiar enough with the code to start writing some yourself. The intention of this exercise is to reinforce the information from the Semispace section, rather than to create a useful new collector.
 
 1. Create a copy of your Semispace collector, called `triplespace`. 
 2. Add a new copyspace to the collector, called the `youngspace`, with the following traits:
@@ -538,7 +538,7 @@ Now that you have a working Semispace collector, you should be familiar enough w
 
 When you are finished, try running the benchmarks and seeing how the performance of this collector compares to MyGC. 
 
-If you get particularly stuck, instructions for how to complete this exersize are available [here](#triplespace-backup-instructions).
+If you get particularly stuck, instructions for how to complete this exercise are available [here](#triplespace-backup-instructions).
 
 ***
 
