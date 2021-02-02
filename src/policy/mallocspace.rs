@@ -20,7 +20,7 @@ pub struct MallocSpace<VM: VMBinding> {
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
     fn name(&self) -> &str {
-        unimplemented!();
+        "MallocSpace"
     }
 
     fn is_live(&self, _object: ObjectReference) -> bool {

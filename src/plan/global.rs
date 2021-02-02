@@ -220,7 +220,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
     }
 
     fn log_poll(&self, space: &dyn Space<Self::VM>, message: &'static str) {
-        info!("  [POLL] {}: {}", space.get_name(), message);
+        info!("  [POLL] {}: {}", space.name(), message);
     }
 
     /**

@@ -9,21 +9,21 @@ use std::collections::HashSet;
 use std::sync::RwLock;
 
 lazy_static! {
-    pub static ref MAPPED_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
+    pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
 }
 
-pub static mut ALLOCATION_METADATA_ID: SideMetadataID = SideMetadataID::new();
+pub static mut ALLOC_METADATA_ID: SideMetadataID = SideMetadataID::new();
 pub static mut MARKING_METADATA_ID: SideMetadataID = SideMetadataID::new();
 
 pub fn meta_space_mapped(address: Address) -> bool {
     let chunk_start = chunk_align_down(address);
-    MAPPED_CHUNKS.read().unwrap().contains(&chunk_start)
+    ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
 }
 
 pub unsafe fn map_meta_space_for_chunk(chunk_start: Address) {
-    SideMetadata::map_meta_space(chunk_start, BYTES_IN_CHUNK, ALLOCATION_METADATA_ID);
+    SideMetadata::map_meta_space(chunk_start, BYTES_IN_CHUNK, ALLOC_METADATA_ID);
     SideMetadata::map_meta_space(chunk_start, BYTES_IN_CHUNK, MARKING_METADATA_ID);
-    MAPPED_CHUNKS.write().unwrap().insert(chunk_start);
+    ACTIVE_CHUNKS.write().unwrap().insert(chunk_start);
 }
 
 // Check if a given object was allocated by malloc
@@ -31,7 +31,7 @@ pub fn is_malloced(object: ObjectReference) -> bool {
     let address = object.to_address();
     unsafe {
         meta_space_mapped(address)
-            && SideMetadata::load_atomic(ALLOCATION_METADATA_ID, address) == 1
+            && SideMetadata::load_atomic(ALLOC_METADATA_ID, address) == 1
     }
 }
 
@@ -45,7 +45,7 @@ pub fn is_marked(object: ObjectReference) -> bool {
 pub fn set_alloc_bit(address: Address) {
     debug_assert!(meta_space_mapped(address));
     unsafe {
-        SideMetadata::store_atomic(ALLOCATION_METADATA_ID, address, 1);
+        SideMetadata::store_atomic(ALLOC_METADATA_ID, address, 1);
     }
 }
 
@@ -59,7 +59,7 @@ pub fn set_mark_bit(address: Address) {
 pub fn unset_alloc_bit(address: Address) {
     debug_assert!(meta_space_mapped(address));
     unsafe {
-        SideMetadata::store_atomic(ALLOCATION_METADATA_ID, address, 0);
+        SideMetadata::store_atomic(ALLOC_METADATA_ID, address, 0);
     }
 }
 
