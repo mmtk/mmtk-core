@@ -16,13 +16,13 @@ name = "mmtk"
 crate-type = ["rlib"]
 doctest = false
 
-[package.metadata.docs.rs]
-features = ["semispace"]
-
 [dependencies]
 custom_derive = "0.1"
 enum_derive = "0.1"
 libc = "0.2"
+jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"] }
+mimalloc-sys = "0.1.6"
+hoard-sys = { git = "https://git@github.com/paigereeves/hoard-sys.git", rev = "36989b877962f086267b1d21d5008c9df0fd0984" }
 lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
@@ -41,10 +41,10 @@ rand = "0.7.3"
 [features]
 default = []
 
-# plans
-nogc = ["immortalspace", "largeobjectspace"]
-semispace = ["immortalspace", "largeobjectspace", "copyspace"]
-gencopy = ["immortalspace", "largeobjectspace", "copyspace"]
+# When adding any new feature, please add the new feature to .github/scripts/ci-common.sh 
+# so their builds are properly tested in the CI.
+
+# -- Non mutally exclusive features --
 
 # spaces
 base_spaces = []
@@ -52,13 +52,21 @@ vm_space = ["base_spaces"]
 ro_space = ["base_spaces"]
 code_space  = ["base_spaces"]
 
-immortalspace = []
-copyspace = []
-largeobjectspace = []
-lockfreeimmortalspace = []
-
+# Run sanity GC
 sanity = []
-nogc_lock_free = ["nogc", "lockfreeimmortalspace"]
+# Use lock free variant of NoGC
+nogc_lock_free = []
+# Use lock free with no zeroing NoGC
 nogc_no_zeroing = ["nogc_lock_free"]
-
+# For using a single GC thread
+# Q: Why do we need this as a compile time flat? We can always set the number of GC threads through options.
 single_worker = []
+
+# -- Mutally exclusive features --
+
+# malloc implementations
+# only one of the following features should be enabled, or none to use the default malloc from libc
+# this does not replace the global Rust allocator, but provides these libraries for GC implementation
+malloc_mimalloc = []
+malloc_jemalloc = []
+malloc_hoard = []

@@ -11,27 +11,19 @@
 //! it can turn the `Box` pointer to a native pointer (`*mut Mutator`), and forge a mut reference from the native
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
-use std::sync::atomic::Ordering;
-
-use crate::plan::mutator_context::{Mutator, MutatorContext};
-use crate::plan::Plan;
-use crate::scheduler::GCWorker;
-
-use crate::vm::Collection;
-
-use crate::util::{Address, ObjectReference};
-
-use self::selected_plan::SelectedPlan;
-use crate::plan::selected_plan;
-use crate::util::alloc::allocators::AllocatorSelector;
-
 use crate::mmtk::MMTK;
+use crate::plan::mutator_context::{Mutator, MutatorContext};
 use crate::plan::AllocationSemantics;
+use crate::scheduler::GCWorker;
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::OpaquePointer;
+use crate::util::{Address, ObjectReference};
+use crate::vm::Collection;
 use crate::vm::VMBinding;
+use std::sync::atomic::Ordering;
 
 /// Run the main loop for the GC controller thread. This method does not return.
 ///
@@ -56,7 +48,9 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
             "MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
         ),
     }
+    assert!(heap_size > 0, "Invalid heap size");
     mmtk.plan.gc_init(heap_size, &mmtk.vm_map, &mmtk.scheduler);
+    info!("Initialized MMTk with {:?}", mmtk.options.plan);
 }
 
 /// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should
@@ -68,15 +62,15 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
 pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: OpaquePointer,
-) -> Box<Mutator<SelectedPlan<VM>>> {
-    SelectedPlan::bind_mutator(&mmtk.plan, tls, mmtk)
+) -> Box<Mutator<VM>> {
+    crate::plan::global::create_mutator(tls, mmtk)
 }
 
 /// Reclaim a mutator that is no longer needed.
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator to be destroyed.
-pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<SelectedPlan<VM>>>) {
+pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<VM>>) {
     drop(mutator);
 }
 
@@ -84,7 +78,7 @@ pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<SelectedPlan<VM>>>) {
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator.
-pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<SelectedPlan<VM>>) {
+pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
     mutator.flush()
 }
 
@@ -98,7 +92,7 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<SelectedPlan<VM>>) {
 /// * `offset`: Offset associated with the alignment.
 /// * `semantics`: The allocation semantic required for the allocation.
 pub fn alloc<VM: VMBinding>(
-    mutator: &mut Mutator<SelectedPlan<VM>>,
+    mutator: &mut Mutator<VM>,
     size: usize,
     align: usize,
     offset: isize,
@@ -126,7 +120,7 @@ pub fn alloc<VM: VMBinding>(
 /// * `bytes`: The size of the space allocated for the object (in bytes).
 /// * `semantics`: The allocation semantics used for the allocation.
 pub fn post_alloc<VM: VMBinding>(
-    mutator: &mut Mutator<SelectedPlan<VM>>,
+    mutator: &mut Mutator<VM>,
     refer: ObjectReference,
     bytes: usize,
     semantics: AllocationSemantics,
@@ -159,6 +153,7 @@ pub fn start_worker<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
 ) {
     worker.init(tls);
+    worker.set_local(mmtk.plan.create_worker_local(tls, mmtk));
     worker.run(mmtk);
 }
 
@@ -183,6 +178,12 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePoin
 /// * `name`: The name of the option.
 /// * `value`: The value of the option (as a string).
 pub fn process<VM: VMBinding>(mmtk: &'static MMTK<VM>, name: &str, value: &str) -> bool {
+    // Note that currently we cannot process options for setting plan,
+    // as we have set plan when creating an MMTK instance, and processing options is after creating on an instance.
+    // The only way to set plan is to use the env var 'MMTK_PLAN'.
+    // FIXME: We should remove this function, and ask for options when creating an MMTk instance.
+    assert!(name != "plan");
+
     unsafe { mmtk.options.process(name, value) }
 }
 

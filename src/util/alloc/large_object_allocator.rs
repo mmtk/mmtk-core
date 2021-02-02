@@ -1,4 +1,4 @@
-use crate::plan::selected_plan::SelectedPlan;
+use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::{allocator, Allocator};
@@ -10,14 +10,14 @@ use crate::vm::VMBinding;
 pub struct LargeObjectAllocator<VM: VMBinding> {
     pub tls: OpaquePointer,
     space: Option<&'static LargeObjectSpace<VM>>,
-    plan: &'static SelectedPlan<VM>,
+    plan: &'static dyn Plan<VM = VM>,
 }
 
 impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     fn get_tls(&self) -> OpaquePointer {
         self.tls
     }
-    fn get_plan(&self) -> &'static SelectedPlan<VM> {
+    fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
         self.plan
     }
 
@@ -53,7 +53,7 @@ impl<VM: VMBinding> LargeObjectAllocator<VM> {
     pub fn new(
         tls: OpaquePointer,
         space: Option<&'static LargeObjectSpace<VM>>,
-        plan: &'static SelectedPlan<VM>,
+        plan: &'static dyn Plan<VM = VM>,
     ) -> Self {
         LargeObjectAllocator { tls, space, plan }
     }

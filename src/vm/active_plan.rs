@@ -1,4 +1,5 @@
-use crate::plan::{Plan, SelectedPlan};
+use crate::plan::Mutator;
+use crate::plan::Plan;
 use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
@@ -12,7 +13,7 @@ pub struct SynchronizedMutatorIterator<'a, VM: VMBinding> {
 }
 
 impl<'a, VM: VMBinding> Iterator for SynchronizedMutatorIterator<'a, VM> {
-    type Item = &'static mut <SelectedPlan<VM> as Plan>::Mutator;
+    type Item = &'static mut Mutator<VM>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.start {
@@ -29,7 +30,7 @@ pub trait ActivePlan<VM: VMBinding> {
     // TODO: I don't know how this can be implemented when we have multiple MMTk instances.
     // This function is used by space and phase to refer to the current plan.
     // Possibly we should remove the use of this function, and remove this function?
-    fn global() -> &'static SelectedPlan<VM>;
+    fn global() -> &'static dyn Plan<VM = VM>;
 
     /// Return a `GCWorker` reference for the thread.
     ///
@@ -56,7 +57,7 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// # Safety
     /// The caller needs to make sure that the thread is a mutator thread.
-    unsafe fn mutator(tls: OpaquePointer) -> &'static mut <SelectedPlan<VM> as Plan>::Mutator;
+    unsafe fn mutator(tls: OpaquePointer) -> &'static mut Mutator<VM>;
 
     /// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.
     fn reset_mutator_iterator();
@@ -64,7 +65,7 @@ pub trait ActivePlan<VM: VMBinding> {
     /// Return the next mutator if there is any. This method assumes that the VM implements stateful type
     /// to remember which mutator is returned and guarantees to return the next when called again. This does
     /// not need to be thread safe.
-    fn get_next_mutator() -> Option<&'static mut <SelectedPlan<VM> as Plan>::Mutator>;
+    fn get_next_mutator() -> Option<&'static mut Mutator<VM>>;
 
     /// A utility method to provide a thread-safe mutator iterator from `reset_mutator_iterator()` and `get_next_mutator()`.
     fn mutators<'a>() -> SynchronizedMutatorIterator<'a, VM> {
