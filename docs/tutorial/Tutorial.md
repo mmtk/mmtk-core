@@ -30,7 +30,7 @@ This tutorial is intended to get you comfortable with building garbage collector
 
 You will first be guided through building a Semispace collector. After that, you will extend this collector to be a generational collector, to further familiarise you with different concepts in the MMTk. There will also be questions and exersizes at various points in the tutorial, intended to encourage you to think about what the code is doing, increase your general understanding of the MMTk, and motivate further research.
 
-Where possible, there will be links to finished, functioning code after each section so that you can check that your code is correct.
+Where possible, there will be links to finished, functioning code after each section so that you can check that your code is correct. Note, however, that these will be full collectors. Therefore, there may be some differences between these files and your collector due to your position in the tutorial. By the end of each major section, your code should be functionally identical to the finished code provided.
 
 ### Terminology
 
@@ -207,7 +207,7 @@ Firstly, change the plan constraints. Some of these constraints are not used at 
 3. Set `MOVES_OBJECTS` to `true`. 
 4. Set `NUM_SPECIALIZED_SCANS` to 1.
 
-[Finished code](/docs/tutorial/tutorial%20code/mygc_semispace/constraints.rs#L1-L6)
+[[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/constraints.rs#L1-L6)
 
 Next, in `global.rs`, replace the old immortal space with two copyspaces.
 1. To the import statement block:
@@ -215,12 +215,13 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
    2. Add `use crate::plan::global::CommonPlan;`. Semispace uses the common plan, which includes an immortal space and a large object space, rather than the base plan. Any garbage collected plan should use `CommonPlan`.
    3. Add `use std::sync::atomic::{AtomicBool, Ordering};`. These are going to be used to store an indicator of which copyspace is the tospace.
    4. Delete `#[allow(unused_imports)]`.
-   5. [Finished code](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L1-L28)
+   [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L2-L28)
 2. Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
   1. Delete the existing fields in the constructor.
   2. Add `pub hi: AtomicBool,`. This is a thread-safe bool, indicating which copyspace is the tospace.
   3. Add `pub copyspace0: CopySpace<VM>,` and `pub copyspace1: CopySpace<VM>,`. These are the two copyspaces.
   4. Add `pub common: CommonPlan<VM>,`. 
+  [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L34-L40)
 3. Change `impl<VM: VMBinding> Plan for MyGC<VM> {`. This section initialises and prepares the objects in MyGC that you just defined.
   1. Delete the definition of `mygc_space`. Instead, we will define the two copyspaces here.
   2. Define one of the copyspaces by adding the following code: 
@@ -245,8 +246,9 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
            common: CommonPlan::new(vm_map, mmapper, options, heap),
        }
       ```
+   [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L44-L80)
 4. The plan now has the components it needs for allocation, but not the instructions for how to make use of them.
-     1. The trait `Plan` requires a `common()` method that returns a reference to the common plan. Implement this method in Plan for MyGC.
+     1. The trait `Plan` requires a `common()` method that should return a reference to the common plan. Implement this method in Plan for MyGC.
          ```rust
          fn common(&self) -> &CommonPlan<VM> {
            &self.common
@@ -258,69 +260,78 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
             &self.common.base
           }
          ```
-      3. Find the method `get_pages_used`. Replace the current body with `self.tospace().reserved_pages() + self.common.get_pages_used()`, to correctly count the pages contained in the tospace and the common spaces (which will be explained later).
-
-      4. Add a new section of methods for MyGC (outside of the methods for Plan for MyGC).
+      3. Find the method `get_pages_used`. Replace the current body with `self.tospace().reserved_pages() + self.common.get_pages_used()`, to correctly count the pages contained in the tospace and the common plan spaces (which will be explained later).
+      4. Find the method `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
+      5. Find the method `prepare`. Delete the `unreachable!()` call, and add the following code:
           ```rust
-          impl<VM: VMBinding> MyGC<VM> {
-          }
-         ```
-      5. To this, add two helper methods, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. `tospace()` (see below) returns a reference to the tospace, and `fromspace()` returns a reference to the fromspace.
+          self.common.prepare(tls, true);
+          self.hi
+             .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
+          let hi = self.hi.load(Ordering::SeqCst); 
+          self.copyspace0.prepare(hi);
+          self.copyspace1.prepare(!hi);
+          ```
+         This function is called at the start of a collection. It prepares the two spaces in the common plan, flips the definitions for which space is 'to' and which is 'from', then prepares the copyspaces with the new definition.
+      6. Find the method `release`. Delete the `unreachable!()` call, and add the following code:
           ```rust
-          pub fn tospace(&self) -> &CopySpace<VM> {
-            if self.hi.load(Ordering::SeqCst) {
-                &self.copyspace1
-            } else {
-                &self.copyspace0
-            }
-          }
-         ```
-      6. Also add the following helper function:
-          ```rust
-          fn get_collection_reserve(&self) -> usize {
-            self.tospace().reserved_pages()
-          }
-          ``` 
-5. Find the method `gc_init`. Change this function to initialise the common plan and the two copyspaces, rather than the base plan and mygc_space. The contents of the initializer calls are identical.
-6. Find the method `prepare`. Delete the `unreachable!()` call, and add the following code:
+          self.common.release(tls, true);
+          self.fromspace().release();
+          ```
+          This function is called at the end of a collection.
+      
+      [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L44-L154)
+5. Add a new section of methods for MyGC:
     ```rust
-    self.common.prepare(tls, true);
-    self.hi
-       .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
-    let hi = self.hi.load(Ordering::SeqCst); 
-    self.copyspace0.prepare(hi);
-    self.copyspace1.prepare(!hi);
+    impl<VM: VMBinding> MyGC<VM> {
+    }
     ```
-   This function is called at the start of a collection. It prepares the two spaces in the common plan, flips the definitions for which space is 'to' and which is 'from', then prepares the copyspaces with the new definition.
-7. Find the method `release`. Delete the `unreachable!()` call, and add the following code:
-    ```rust
-    self.common.release(tls, true);
-    self.fromspace().release();
-    ```
-    This function is called at the end of a collection.
+   1. To this, add two helper methods, `tospace(&self)` and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, and return a reference to the tospace and fromspace respectively. `tospace()` (see below) returns a reference to the tospace, and `fromspace()` returns a reference to the fromspace.
+       ```rust
+       pub fn tospace(&self) -> &CopySpace<VM> {
+         if self.hi.load(Ordering::SeqCst) {
+             &self.copyspace1
+         } else {
+             &self.copyspace0
+         }
+       }
+      ```
+   2. Also add the following helper function:
+       ```rust
+       fn get_collection_reserve(&self) -> usize {
+         self.tospace().reserved_pages()
+       }
+       ``` 
+   
+   [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L156-L173)
 
           
 Next, we need to change the mutator, in `mutator.rs`, to allocate to the tospace, and to the two spaces controlled by the common plan. 
-  1. Change the following import statements:
-     1. Add `use super::MyGC;`.
-     2. Add `use crate::util::alloc::BumpAllocator;`.
-     3. Delete `use crate::plan::mygc::MyGC;`.
-     
-  1. In `lazy_static!`, make the following changes to `ALLOCATOR_MAPPING`, which maps the required allocation semantics to the corresponding allocators. For example, for `Default`, we allocate using the first bump pointer allocator (`BumpPointer(0)`):
-     1. Map `Default` to `BumpPointer(0)`.
-     2. Map `ReadOnly` to `BumpPointer(1)`.
-     3. Map `Los` to `LargeObject(0)`. 
-  2. Next, in `create_mygc_mutator`, change which allocator is allocated to what space in `space_mapping`. Note that the space allocation is formatted as a list of tuples. For example, the first bump pointer allocator (`BumpPointer(0)`) is bound with `tospace`. 
+1. Change the following import statements:
+   1. Add `use super::MyGC;`.
+   2. Add `use crate::util::alloc::BumpAllocator;`.
+   3. Delete `use crate::plan::mygc::MyGC;`.
+   
+   [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/mutator.rs#L1-L12)
+
+2. In `lazy_static!`, make the following changes to `ALLOCATOR_MAPPING`, which maps the required allocation semantics to the corresponding allocators. For example, for `Default`, we allocate using the first bump pointer allocator (`BumpPointer(0)`):
+   1. Map `Default` to `BumpPointer(0)`.
+   2. Map `ReadOnly` to `BumpPointer(1)`.
+   3. Map `Los` to `LargeObject(0)`. 
+   
+   [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/mutator.rs#L38-L45)
+3. Next, in `create_mygc_mutator`, change which allocator is allocated to what space in `space_mapping`. Note that the space allocation is formatted as a list of tuples. For example, the first bump pointer allocator (`BumpPointer(0)`) is bound with `tospace`. 
      1. `BumpPointer(0)` should map to the tospace.
      2. `BumpPointer(1)` should map to `plan.common.get_immortal()`.
      3. `LargeObject(0)` should map to `plan.common.get_los()`.
      4. None of the above should be dereferenced (ie, they should not have the `&` prefix).
+     
+     [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/mutator.rs#L47-L64)
 There may seem to be 2 extraneous spaces and allocators that have appeared all of a sudden in these past 2 steps. These are parts of the MMTk common plan itself.
  1. The immortal space is used for objects that the virtual machine or a library never expects to die.
  2. The large object space is needed because MMTk handles particularly large objects differently to normal objects, as the space overhead of copying large objects is very high. Instead, this space is used by a free list allocator in the common plan to avoid having to copy them. 
  
-1. Create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. This function will be called at the preparation stage of a collection (at the start of a collection) for each mutator. Its body can stay empty, as there aren't any preparation steps for this GC.
-2. Create a new function called `mygc_mutator_release` that takes the same inputs as the `prepare` function above. This function will be called at the release stage of a collection (at the end of a collection) for each mutator. It rebinds the allocator for the `Default` allocation semantics to the new tospace. When the mutator threads resume, any new allocations for `Default` will then go to the new tospace. The function has the following body:
+4. Going back to `mutator.rs`, create a new function called `mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. This function will be called at the preparation stage of a collection (at the start of a collection) for each mutator. Its body can stay empty, as there aren't any preparation steps for this GC.
+5. Create a new function called `mygc_mutator_release` that takes the same inputs as the `prepare` function above. This function will be called at the release stage of a collection (at the end of a collection) for each mutator. It rebinds the allocator for the `Default` allocation semantics to the new tospace. When the mutator threads resume, any new allocations for `Default` will then go to the new tospace. The function has the following body:
     ```rust
     let bump_allocator = unsafe {
        mutator
@@ -335,6 +346,7 @@ There may seem to be 2 extraneous spaces and allocators that have appeared all o
     ```
 3. In `create_mygc_mutator`, replace `mygc_mutator_noop` in the `prep_func` and `release_func` fields with `mygc_mutator_prepare` and `mygc_mutator_release` respectively.
 4. Delete `mygc_mutator_noop`. It was a placeholder for the prepare and release functions you just added, so it is now dead code.
+[[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/mutator.rs#L14-L36)
 
 
 With this, you should have the allocation working, but not garbage collection. Try building MyGC now. If you run HelloWorld or Fannkunchredux, they should work. DaCapo's lusearch should fail, as it requires garbage to be collected. 
@@ -406,6 +418,9 @@ We need to add a few more things to get garbage collection working. Specifically
        ```rust
        forwarding_word::clear_forwarding_bits::<VM>(obj);
        ```
+     
+    [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/gc_works.rs#L18-L55)
+    
 5. Add a new public structure, `MyGCProcessEdges`, with the type parameter `<VM:VMBinding>`. It will hold an instance of `ProcessEdgesBase` and `PhantomData`, and implement the Default trait:
     ```rust
     #[derive(Default)]
@@ -439,72 +454,53 @@ We need to add a few more things to get garbage collection working. Specifically
          ```
      4. If it is not in the tospace, check if the object is in the fromspace and return the result of the fromspace's `trace_object` if it is.
      5. If it is in neither space, it must be in the immortal space, or large object space. Trace the object with `self.plan().common.trace_object(self, object)`.
-     6. The completed code is as follows:
-         ```rust
-         #[inline]
-         fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-             if object.is_null() {
-                 return object;
-             }
-             if self.plan().tospace().in_space(object) {
-                 self.plan().tospace().trace_object(
-                     self,
-                     object,
-                     super::global::ALLOC_MyGC,
-                     self.worker().local(),
-                 )
-             } else if self.plan().fromspace().in_space(object) {
-                 self.plan().fromspace().trace_object(
-                     self,
-                     object,
-                     super::global::ALLOC_MyGC,
-                     self.worker().local(),
-                 )
-             } else {
-                 self.plan().common.trace_object(self, object)
-             }
-         }
-         ```
-     7. Add two new implementation blocks, `Deref` and `DerefMut` for `MyGCProcessEdges`. These allow `MyGCProcessEdges` to be dereferenced to `ProcessEdgesBase`, and allows easy access to fields in `ProcessEdgesBase`.
-         ```rust
-         impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
-             type Target = ProcessEdgesBase<Self>;
-             #[inline]
-             fn deref(&self) -> &Self::Target {
-                 &self.base
-             }
-         }
-
-         impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
-             #[inline]
-             fn deref_mut(&mut self) -> &mut Self::Target {
-                 &mut self.base
-             }
-         }
-    ```
-8. A few import statements need to be added to the other files so that they can use the functions in `gc_works`.
-   1. `global.rs`: Import `MyGCCopyContext` and `MyGCProcessEdges`.
-   2. `mod.rs`: Import `gc_works` as a module (`mod gc_works;`).
-   
-9. In `global.rs`:
-   1. Add a new method to `Plan for MyGC`, `schedule_collection`. This function is run when a collection is triggered. It stops all mutators, then runs the scheduler's prepare stage. After this, it resumes the mutators.
-       ```rust
-        fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
-            self.base().set_collection_kind();
-            self.base().set_gc_status(GcStatus::GcPrepare);
-            // Stop & scan mutators (mutator scanning can happen before STW)
-            scheduler
-                .unconstrained_works
-                .add(StopMutators::<SSProcessEdges<VM>>::new());
-            // Prepare global/collectors/mutators
-            scheduler.prepare_stage.add(Prepare::new(self));
-            // Release global/collectors/mutators
-            scheduler.release_stage.add(Release::new(self));
-            // Resume mutators
-            scheduler.set_finalizer(Some(EndOfGC));
+     
+  [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/gc_works.rs#L64-L96)
+     
+7. Add two new implementation blocks, `Deref` and `DerefMut` for `MyGCProcessEdges`. These allow `MyGCProcessEdges` to be dereferenced to `ProcessEdgesBase`, and allows easy access to fields in `ProcessEdgesBase`.
+    ```rust
+    impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
+        type Target = ProcessEdgesBase<Self>;
+        #[inline]
+        fn deref(&self) -> &Self::Target {
+            &self.base
         }
-       ```
-   2. Delete `handle_user_collection_request`. This function was an override of a Common plan function to ignore user requested collection for NoGC. Now we remove it and allow user requested collection.
+    }
+
+    impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
+        #[inline]
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.base
+        }
+    }
+    ```
+    
+    [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/gc_works.rs#L98-L110)
+
+
+A few import statements need to be added to the other files so that they can use the functions in `gc_works`.
+1. `global.rs`: Import `MyGCCopyContext` and `MyGCProcessEdges`. [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L1)
+2. `mod.rs`: Import `gc_works` as a module (`mod gc_works;`). [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/mod.rs#L2)
+   
+In `global.rs`:
+1. Add a new method to `Plan for MyGC`, `schedule_collection`. This function is run when a collection is triggered. It stops all mutators, then runs the scheduler's prepare stage. After this, it resumes the mutators.
+    ```rust
+     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+         self.base().set_collection_kind();
+         self.base().set_gc_status(GcStatus::GcPrepare);
+         // Stop & scan mutators (mutator scanning can happen before STW)
+         scheduler
+             .unconstrained_works
+             .add(StopMutators::<SSProcessEdges<VM>>::new());
+         // Prepare global/collectors/mutators
+         scheduler.prepare_stage.add(Prepare::new(self));
+         // Release global/collectors/mutators
+         scheduler.release_stage.add(Release::new(self));
+         // Resume mutators
+         scheduler.set_finalizer(Some(EndOfGC));
+     }
+    ```
+2. Delete `handle_user_collection_request`. This function was an override of a Common plan function to ignore user requested collection for NoGC. Now we remove it and allow user requested collection.
    
 You should now have MyGC working and able to collect garbage. All three benchmarks should be able to pass now. 
 
