@@ -82,12 +82,15 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<SSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<Self, SSCopyContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<Self, SSCopyContext<VM>>::new(self));
         // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<Self, SSCopyContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<Self, SSCopyContext<VM>>::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new());
+        scheduler.work_buckets[WorkBucketStage::Final]
+            .add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new());
         scheduler.set_finalizer(Some(EndOfGC));
     }
 

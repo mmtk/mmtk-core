@@ -56,17 +56,13 @@ impl<VM: VMBinding, P: Plan<VM = VM>, W: CopyContext + WorkerLocal> GCWork<VM>
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(ScanVMSpecificRoots::<SanityGCProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
-        worker
-            .scheduler().work_buckets[WorkBucketStage::Prepare]
-            .add(SanityPrepare::<P, W>::new(
-                plan.downcast_ref::<P>().unwrap(),
-            ));
+        worker.scheduler().work_buckets[WorkBucketStage::Prepare].add(SanityPrepare::<P, W>::new(
+            plan.downcast_ref::<P>().unwrap(),
+        ));
         // Release global/collectors/mutators
-        worker
-            .scheduler().work_buckets[WorkBucketStage::Release]
-            .add(SanityRelease::<P, W>::new(
-                plan.downcast_ref::<P>().unwrap(),
-            ));
+        worker.scheduler().work_buckets[WorkBucketStage::Release].add(SanityRelease::<P, W>::new(
+            plan.downcast_ref::<P>().unwrap(),
+        ));
     }
 }
 

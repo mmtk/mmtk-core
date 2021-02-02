@@ -386,8 +386,7 @@ pub trait ProcessEdgesWork:
             // Executing these works now can remarkably reduce the global synchronization time.
             self.worker().do_work(scan_objects_work);
         } else {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
-                .add(scan_objects_work);
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);
         }
     }
 
@@ -475,8 +474,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
 
             let mut modified_edges = vec![];
             ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
-            worker.scheduler().work_buckets[WorkBucketStage::Closure]
-                .add(E::new(modified_edges, true, mmtk));
+            worker.scheduler().work_buckets[WorkBucketStage::Closure].add(E::new(
+                modified_edges,
+                true,
+                mmtk,
+            ));
         } else {
             // Do nothing
         }

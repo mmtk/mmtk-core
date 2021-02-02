@@ -227,8 +227,9 @@ impl<VM: VMBinding> GCWork<VM> for GenCopyProcessModBuf {
 
             let mut modified_edges = vec![];
             ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
-            worker.scheduler().work_buckets[WorkBucketStage::Closure]
-                .add(GenCopyNurseryProcessEdges::<VM>::new(modified_edges, true, mmtk));
+            worker.scheduler().work_buckets[WorkBucketStage::Closure].add(
+                GenCopyNurseryProcessEdges::<VM>::new(modified_edges, true, mmtk),
+            );
         } else {
             // Do nothing
         }

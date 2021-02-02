@@ -104,12 +104,15 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                 .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
         }
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
         // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<Self, GenCopyCopyContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<Self, GenCopyCopyContext<VM>>::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new());
+        scheduler.work_buckets[WorkBucketStage::Final]
+            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new());
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
