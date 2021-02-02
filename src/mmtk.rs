@@ -1,3 +1,5 @@
+use libc::c_char;
+
 use crate::plan::Plan;
 use crate::plan::SelectedPlan;
 use crate::policy::space::SFTMap;
@@ -11,7 +13,7 @@ use crate::util::reference_processor::ReferenceProcessors;
 use crate::util::sanity::sanity_checker::SanityChecker;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use std::default::Default;
+use std::{collections::HashMap, default::Default, ffi::CStr, slice};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 #[cfg(feature = "sanity")]
@@ -28,6 +30,26 @@ lazy_static! {
     pub static ref VM_MAP: VMMap = VMMap::new();
     pub static ref MMAPPER: Mmapper = Mmapper::new();
     pub static ref SFT_MAP: SFTMap = SFTMap::new();
+}
+
+#[repr(C)]
+struct EventResult {
+    name: *const c_char,
+    pub value: u64,
+}
+
+impl EventResult {
+    pub fn name(&self) -> String {
+        let c_str: &CStr = unsafe { CStr::from_ptr(self.name) };
+        let str_slice: &str = c_str.to_str().unwrap();
+        return str_slice.to_owned();
+    }
+}
+
+extern {
+    fn mmtk_perf_harness_prepare();
+    fn mmtk_perf_harness_begin();
+    fn mmtk_perf_harness_end(size: *mut i32) -> *const EventResult;
 }
 
 /// An MMTk instance. MMTk allows mutiple instances to run independently, and each instance gives users a separate heap.
@@ -55,6 +77,7 @@ impl<VM: VMBinding> MMTK<VM> {
         let plan = SelectedPlan::new(&VM_MAP, &MMAPPER, options.clone(), unsafe {
             &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>)
         });
+        unsafe { mmtk_perf_harness_prepare(); }
         MMTK {
             plan,
             vm_map: &VM_MAP,
@@ -75,10 +98,20 @@ impl<VM: VMBinding> MMTK<VM> {
         self.inside_harness.store(true, Ordering::SeqCst);
         self.plan.base().stats.start_all();
         self.scheduler.enable_stat();
+        unsafe { mmtk_perf_harness_begin(); }
     }
 
     pub fn harness_end(&'static self) {
-        self.plan.base().stats.stop_all(self);
+        let events = unsafe {
+            let mut count = 0;
+            let data = mmtk_perf_harness_end(&mut count);
+            slice::from_raw_parts(data, count as usize)
+        };
+        let mut events_map = HashMap::new();
+        for event in events {
+            events_map.insert(event.name(), event.value);
+        }
+        self.plan.base().stats.stop_all(self, &events_map);
         self.inside_harness.store(false, Ordering::SeqCst);
     }
 }
