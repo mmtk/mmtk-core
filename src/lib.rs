@@ -56,13 +56,10 @@ extern crate downcast_rs;
 pub mod util;
 mod mm;
 mod mmtk;
-mod plan;
+pub mod plan;
 pub mod policy;
 pub mod scheduler;
 pub mod vm;
-
-#[doc(no_inline)]
-pub use crate::plan::selected_plan::{SelectedConstraints, SelectedPlan};
 
 pub use crate::mm::memory_manager;
 pub use crate::mmtk::MMTK;

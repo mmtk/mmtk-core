@@ -1,12 +1,9 @@
 use std::mem::MaybeUninit;
 
-use crate::plan::selected_plan::SelectedPlan;
-#[cfg(feature = "largeobjectspace")]
+use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-#[cfg(feature = "largeobjectspace")]
 use crate::util::alloc::LargeObjectAllocator;
-#[cfg(feature = "marksweep")]
 use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::OpaquePointer;
@@ -23,11 +20,7 @@ const MAX_FREE_LIST_ALLOCATORS: usize = 1;
 #[repr(C)]
 pub struct Allocators<VM: VMBinding> {
     pub bump_pointer: [MaybeUninit<BumpAllocator<VM>>; MAX_BUMP_ALLOCATORS],
-
-    #[cfg(feature = "largeobjectspace")]
     pub large_object: [MaybeUninit<LargeObjectAllocator<VM>>; MAX_LARGE_OBJECT_ALLOCATORS],
-
-    #[cfg(feature = "marksweep")]
     pub free_list: [MaybeUninit<MallocAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
 }
 
@@ -39,11 +32,9 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::BumpPointer(index) => {
                 self.bump_pointer[index as usize].assume_init_ref()
             }
-            #[cfg(feature = "largeobjectspace")]
             AllocatorSelector::LargeObject(index) => {
                 self.large_object[index as usize].assume_init_ref()
             }
-            #[cfg(feature = "marksweep")]
             AllocatorSelector::Malloc(index) => self.free_list[index as usize].assume_init_ref(),
         }
     }
@@ -58,25 +49,21 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::BumpPointer(index) => {
                 self.bump_pointer[index as usize].assume_init_mut()
             }
-            #[cfg(feature = "largeobjectspace")]
             AllocatorSelector::LargeObject(index) => {
                 self.large_object[index as usize].assume_init_mut()
             }
-            #[cfg(feature = "marksweep")]
             AllocatorSelector::Malloc(index) => self.free_list[index as usize].assume_init_mut(),
         }
     }
 
     pub fn new(
         mutator_tls: OpaquePointer,
-        plan: &'static SelectedPlan<VM>,
+        plan: &'static dyn Plan<VM = VM>,
         space_mapping: &[(AllocatorSelector, &'static dyn Space<VM>)],
     ) -> Self {
         let mut ret = Allocators {
             bump_pointer: unsafe { MaybeUninit::uninit().assume_init() },
-            #[cfg(feature = "largeobjectspace")]
             large_object: unsafe { MaybeUninit::uninit().assume_init() },
-            #[cfg(feature = "marksweep")]
             free_list: unsafe { MaybeUninit::uninit().assume_init() },
         };
 
@@ -89,7 +76,6 @@ impl<VM: VMBinding> Allocators<VM> {
                         plan,
                     ));
                 }
-                #[cfg(feature = "largeobjectspace")]
                 AllocatorSelector::LargeObject(index) => {
                     ret.large_object[index as usize].write(LargeObjectAllocator::new(
                         mutator_tls,
@@ -97,7 +83,6 @@ impl<VM: VMBinding> Allocators<VM> {
                         plan,
                     ));
                 }
-                #[cfg(feature = "marksweep")]
                 AllocatorSelector::Malloc(index) => {
                     ret.free_list[index as usize].write(MallocAllocator::new(
                         mutator_tls,
@@ -125,11 +110,9 @@ impl<VM: VMBinding> Allocators<VM> {
 //   LargeObject,
 // }
 #[repr(C, u8)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum AllocatorSelector {
     BumpPointer(u8),
-    #[cfg(feature = "largeobjectspace")]
     LargeObject(u8),
-    #[cfg(feature = "marksweep")]
     Malloc(u8),
 }

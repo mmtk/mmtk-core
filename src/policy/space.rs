@@ -8,8 +8,6 @@ use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_ST
 use crate::util::heap::{PageResource, VMRequest};
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 
-use crate::plan::Plan;
-
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
 use crate::util::OpaquePointer;

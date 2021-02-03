@@ -36,6 +36,7 @@ You may choose from:
 * `--features nogc` for NoGC (allocation only),
 * `--features semispace` for a semi space GC, or
 * `--features gencopy` for a generational copying GC.
+* `--features marksweep` for a mark-sweep GC.
 
 A full list of plans and other available features can be seen by examining [`Cargo.toml`](Cargo.toml).
 By passing the `--features` flag to the Rust compiler,

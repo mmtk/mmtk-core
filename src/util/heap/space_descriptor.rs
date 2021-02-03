@@ -1,5 +1,4 @@
 use crate::util::constants::*;
-use crate::util::heap::layout::heap_parameters;
 use crate::util::heap::layout::vm_layout_constants;
 use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -22,7 +21,8 @@ const MANTISSA_SHIFT: usize = EXPONENT_SHIFT + EXPONENT_BITS;
 const MANTISSA_BITS: usize = 14;
 const BASE_EXPONENT: usize = BITS_IN_INT - MANTISSA_BITS;
 
-/* 64-bit */
+// get_index() is only implemented for 64 bits
+#[cfg(target_pointer_width = "64")]
 const INDEX_MASK: usize = !TYPE_MASK;
 const INDEX_SHIFT: usize = TYPE_BITS;
 
@@ -96,6 +96,7 @@ impl SpaceDescriptor {
 
     #[cfg(target_pointer_width = "64")]
     pub fn get_start(self) -> Address {
+        use crate::util::heap::layout::heap_parameters;
         unsafe { Address::from_usize(self.get_index() << heap_parameters::LOG_SPACE_SIZE_64) }
     }
 

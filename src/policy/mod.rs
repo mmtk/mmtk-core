@@ -13,17 +13,8 @@
 /// memory).
 pub mod space;
 
-#[cfg(feature = "immortalspace")]
-pub mod immortalspace;
-
-#[cfg(feature = "copyspace")]
 pub mod copyspace;
-
-#[cfg(feature = "largeobjectspace")]
+pub mod immortalspace;
 pub mod largeobjectspace;
-
-#[cfg(feature = "lockfreeimmortalspace")]
 pub mod lockfreeimmortalspace;
-
-#[cfg(feature = "mallocspace")]
 pub mod mallocspace;

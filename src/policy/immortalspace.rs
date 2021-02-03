@@ -6,8 +6,9 @@ use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::ObjectReference;
 
 use crate::plan::TransitiveClosure;
-use crate::util::header_byte;
+use crate::util::header_byte::HeaderByte;
 
+use crate::plan::PlanConstraints;
 use crate::policy::space::SpaceOptions;
 use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -19,6 +20,8 @@ pub struct ImmortalSpace<VM: VMBinding> {
     mark_state: u8,
     common: UnsafeCell<CommonSpace<VM>>,
     pr: MonotonePageResource<VM>,
+
+    header_byte: HeaderByte,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmortalSpace<VM> {}
@@ -43,8 +46,8 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
         let old_value = gc_byte::read_gc_byte::<VM>(object);
         let mut new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
-        if header_byte::NEEDS_UNLOGGED_BIT {
-            new_value |= header_byte::UNLOGGED_BIT;
+        if self.header_byte.needs_unlogged_bit {
+            new_value |= self.header_byte.unlogged_bit;
         }
         gc_byte::write_gc_byte::<VM>(object, new_value);
     }
@@ -86,6 +89,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
+        constraints: &'static PlanConstraints,
     ) -> Self {
         let common = CommonSpace::new(
             SpaceOptions {
@@ -112,6 +116,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 )
             },
             common: UnsafeCell::new(common),
+            header_byte: HeaderByte::new(constraints),
         }
     }
 

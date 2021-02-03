@@ -1,3 +1,4 @@
+use crate::plan::global::CopyContext;
 use crate::plan::Plan;
 use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
@@ -7,6 +8,7 @@ use crate::MMTK;
 use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use std::sync::atomic::Ordering;
 
 #[allow(dead_code)]
 pub struct SanityChecker {
@@ -28,28 +30,59 @@ impl SanityChecker {
 }
 
 #[derive(Default)]
-pub struct ScheduleSanityGC;
+pub struct ScheduleSanityGC<P: Plan, W: CopyContext + WorkerLocal>(PhantomData<(P, W)>);
 
-impl<VM: VMBinding> GCWork<VM> for ScheduleSanityGC {
+impl<P: Plan, W: CopyContext + WorkerLocal> ScheduleSanityGC<P, W> {
+    pub fn new() -> Self {
+        ScheduleSanityGC(PhantomData)
+    }
+}
+
+impl<VM: VMBinding, P: Plan<VM = VM>, W: CopyContext + WorkerLocal> GCWork<VM>
+    for ScheduleSanityGC<P, W>
+{
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        worker.scheduler().reset_state();
-        mmtk.plan.schedule_sanity_collection(worker.scheduler());
+        let scheduler = worker.scheduler();
+        let plan = &mmtk.plan;
+
+        scheduler.reset_state();
+
+        plan.base().inside_sanity.store(true, Ordering::SeqCst);
+        // Stop & scan mutators (mutator scanning can happen before STW)
+        for mutator in VM::VMActivePlan::mutators() {
+            scheduler.work_buckets[WorkBucketStage::Prepare]
+                .add(ScanStackRoot::<SanityGCProcessEdges<VM>>(mutator));
+        }
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(ScanVMSpecificRoots::<SanityGCProcessEdges<VM>>::new());
+        // Prepare global/collectors/mutators
+        worker.scheduler().work_buckets[WorkBucketStage::Prepare].add(SanityPrepare::<P, W>::new(
+            plan.downcast_ref::<P>().unwrap(),
+        ));
+        // Release global/collectors/mutators
+        worker.scheduler().work_buckets[WorkBucketStage::Release].add(SanityRelease::<P, W>::new(
+            plan.downcast_ref::<P>().unwrap(),
+        ));
     }
 }
 
-pub struct SanityPrepare<P: Plan> {
+pub struct SanityPrepare<P: Plan, W: CopyContext + WorkerLocal> {
     pub plan: &'static P,
+    _p: PhantomData<W>,
 }
 
-unsafe impl<P: Plan> Sync for SanityPrepare<P> {}
+unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for SanityPrepare<P, W> {}
 
-impl<P: Plan> SanityPrepare<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> SanityPrepare<P, W> {
     pub fn new(plan: &'static P) -> Self {
-        Self { plan }
+        Self {
+            plan,
+            _p: PhantomData,
+        }
     }
 }
 
-impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityPrepare<P, W> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.plan.enter_sanity();
         {
@@ -61,24 +94,28 @@ impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_works.add(PrepareCollector::default());
+            w.local_works.add(PrepareCollector::<W>::new());
         }
     }
 }
 
-pub struct SanityRelease<P: Plan> {
+pub struct SanityRelease<P: Plan, W: CopyContext + WorkerLocal> {
     pub plan: &'static P,
+    _p: PhantomData<W>,
 }
 
-unsafe impl<P: Plan> Sync for SanityRelease<P> {}
+unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for SanityRelease<P, W> {}
 
-impl<P: Plan> SanityRelease<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> SanityRelease<P, W> {
     pub fn new(plan: &'static P) -> Self {
-        Self { plan }
+        Self {
+            plan,
+            _p: PhantomData,
+        }
     }
 }
 
-impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityRelease<P, W> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.plan.leave_sanity();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
@@ -86,15 +123,15 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_works.add(ReleaseCollector::default());
+            w.local_works.add(ReleaseCollector::<W>::new());
         }
     }
 }
 
-#[derive(Default)]
+// #[derive(Default)]
 pub struct SanityGCProcessEdges<VM: VMBinding> {
     base: ProcessEdgesBase<SanityGCProcessEdges<VM>>,
-    phantom: PhantomData<VM>,
+    // phantom: PhantomData<VM>,
 }
 
 impl<VM: VMBinding> Deref for SanityGCProcessEdges<VM> {
@@ -113,10 +150,10 @@ impl<VM: VMBinding> DerefMut for SanityGCProcessEdges<VM> {
 impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
     type VM = VM;
     const OVERWRITE_REFERENCE: bool = false;
-    fn new(edges: Vec<Address>, _roots: bool) -> Self {
+    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         Self {
-            base: ProcessEdgesBase::new(edges),
-            ..Default::default()
+            base: ProcessEdgesBase::new(edges, mmtk),
+            // ..Default::default()
         }
     }
 

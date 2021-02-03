@@ -13,6 +13,16 @@ custom_derive! {
     }
 }
 
+custom_derive! {
+    #[derive(Copy, Clone, EnumFromStr, Debug)]
+    pub enum PlanSelector {
+        NoGC,
+        SemiSpace,
+        GenCopy,
+        MarkSweep
+    }
+}
+
 pub struct UnsafeOptionsWrapper(UnsafeCell<Options>);
 unsafe impl Sync for UnsafeOptionsWrapper {}
 
@@ -53,6 +63,7 @@ macro_rules! options {
                         let validate_fn = $validator;
                         validate_fn(val)
                     } else {
+                        eprintln!("Warn: unable to set {}={}. Default value will be used.", s, val);
                         false
                     })*
                     _ => panic!("Invalid Options key")
@@ -65,8 +76,8 @@ macro_rules! options {
                     $($name: $default),*
                 };
 
-                // If we have env vars that start with MMTK_ and matches any option (such as MMTK_STRESS_FACTOR),
-                // we set the option to its value (if it is a valid value). Otherwise, use the defualt value.
+                // If we have env vars that start with MMTK_ and match any option (such as MMTK_STRESS_FACTOR),
+                // we set the option to its value (if it is a valid value). Otherwise, use the default value.
                 const PREFIX: &str = "MMTK_";
                 for (key, val) in std::env::vars() {
                     // strip the prefix, and get the lower case string
@@ -84,6 +95,7 @@ macro_rules! options {
     ]
 }
 options! {
+    plan:                  PlanSelector         [always_valid] = PlanSelector::NoGC,
     threads:               usize                [|v| v > 0]    = num_cpus::get(),
     use_short_stack_scans: bool                 [always_valid] = false,
     use_return_barrier:    bool                 [always_valid] = false,

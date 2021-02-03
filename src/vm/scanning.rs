@@ -1,4 +1,4 @@
-use crate::plan::{Mutator, SelectedPlan, TransitiveClosure};
+use crate::plan::{Mutator, TransitiveClosure};
 use crate::scheduler::gc_works::ProcessEdgesWork;
 use crate::scheduler::GCWorker;
 use crate::util::ObjectReference;
@@ -56,7 +56,7 @@ pub trait Scanning<VM: VMBinding> {
     /// * `mutator`: The reference to the mutator whose roots will be scanned.
     /// * `tls`: The GC thread that is performing this scanning.
     fn scan_thread_root<W: ProcessEdgesWork<VM = VM>>(
-        mutator: &'static mut Mutator<SelectedPlan<VM>>,
+        mutator: &'static mut Mutator<VM>,
         tls: OpaquePointer,
     );
 

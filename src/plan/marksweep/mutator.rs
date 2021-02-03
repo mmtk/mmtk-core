@@ -1,5 +1,5 @@
 use super::MarkSweep;
-use crate::plan::barriers::NoBarrier;
+use crate::{Plan, plan::barriers::NoBarrier};
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
@@ -10,14 +10,14 @@ use enum_map::enum_map;
 use enum_map::EnumMap;
 
 pub fn ms_mutator_prepare<VM: VMBinding>(
-    _mutator: &mut Mutator<MarkSweep<VM>>,
+    _mutator: &mut Mutator<VM>,
     _tls: OpaquePointer,
 ) {
     // Do nothing
 }
 
 pub fn ms_mutator_release<VM: VMBinding>(
-    _mutator: &mut Mutator<MarkSweep<VM>>,
+    _mutator: &mut Mutator<VM>,
     _tls: OpaquePointer,
 ) {
     // Do nothing
@@ -31,11 +31,12 @@ lazy_static! {
 
 pub fn create_ms_mutator<VM: VMBinding>(
     mutator_tls: OpaquePointer,
-    plan: &'static MarkSweep<VM>,
-) -> Mutator<MarkSweep<VM>> {
+    plan: &'static dyn Plan<VM = VM>,
+) -> Mutator<VM> {
+    let ms = plan.downcast_ref::<MarkSweep<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box vec![(AllocatorSelector::Malloc(0), &plan.space)],
+        space_mapping: box vec![(AllocatorSelector::Malloc(0), &ms.space)],
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,
     };

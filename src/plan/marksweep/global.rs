@@ -1,7 +1,6 @@
 use super::gc_works::MSProcessEdges;
-use crate::mmtk::MMTK;
+use crate::{mmtk::MMTK, plan::PlanConstraints};
 use crate::plan::global::BasePlan;
-#[cfg(all(feature = "largeobjectspace", feature = "immortalspace"))]
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
@@ -50,23 +49,16 @@ pub struct MarkSweep<VM: VMBinding> {
 
 unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
 
+pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    moves_objects: false,
+    gc_header_bits: 2,
+    gc_header_words: 0,
+    num_specialized_scans: 1,
+    ..PlanConstraints::default()
+};
+
 impl<VM: VMBinding> Plan for MarkSweep<VM> {
     type VM = VM;
-    type Mutator = Mutator<Self>;
-    type CopyContext = NoCopy<VM>;
-
-    fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<Self::VM>,
-    ) -> Self {
-        let heap = HeapMeta::new(HEAP_START, HEAP_END);
-        MarkSweep {
-            base: BasePlan::new(vm_map, mmapper, options, heap),
-            space: MallocSpace::new(),
-        }
-    }
 
     fn collection_required(&self, _space_full: bool, _space: &dyn Space<Self::VM>) -> bool
     where
@@ -97,21 +89,16 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<MSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::new(self));
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<Self, NoCopy<VM>>::new(self));
         // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<Self, NoCopy<VM>>::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC);
+        scheduler.work_buckets[WorkBucketStage::Final]
+            .add(ScheduleSanityGC::<Self, NoCopy<VM>>::new());
         scheduler.set_finalizer(Some(EndOfGC));
-    }
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        _mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Mutator<Self>> {
-        Box::new(create_ms_mutator(tls, self))
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -166,8 +153,36 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &self.base
     }
 
-    #[cfg(all(feature = "largeobjectspace", feature = "immortalspace"))]
     fn common(&self) -> &CommonPlan<VM> {
         unreachable!("MarkSweep does not have a common plan.");
+    }
+
+    fn constraints(&self) -> &'static PlanConstraints {
+        &MS_CONSTRAINTS
+    }
+
+    fn create_worker_local(
+        &self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> GCWorkerLocalPtr {
+        let mut c = NoCopy::new(mmtk);
+        c.init(tls);
+        GCWorkerLocalPtr::new(c)
+    }
+}
+
+impl<VM: VMBinding> MarkSweep<VM> {
+    pub fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+        _scheduler: &'static MMTkScheduler<VM>,
+    ) -> Self {
+        let heap = HeapMeta::new(HEAP_START, HEAP_END);
+        MarkSweep {
+            base: BasePlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS),
+            space: MallocSpace::new(),
+        }
     }
 }

@@ -6,8 +6,7 @@ use crate::util::Address;
 
 use crate::util::alloc::Allocator;
 
-use crate::plan::global::Plan;
-use crate::plan::selected_plan::SelectedPlan;
+use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::OpaquePointer;
@@ -23,7 +22,7 @@ pub struct BumpAllocator<VM: VMBinding> {
     cursor: Address,
     limit: Address,
     space: Option<&'static dyn Space<VM>>,
-    plan: &'static SelectedPlan<VM>,
+    plan: &'static dyn Plan<VM = VM>,
 }
 
 impl<VM: VMBinding> BumpAllocator<VM> {
@@ -47,7 +46,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
     fn get_space(&self) -> Option<&'static dyn Space<VM>> {
         self.space
     }
-    fn get_plan(&self) -> &'static SelectedPlan<VM> {
+    fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
         self.plan
     }
 
@@ -94,7 +93,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
     pub fn new(
         tls: OpaquePointer,
         space: Option<&'static dyn Space<VM>>,
-        plan: &'static SelectedPlan<VM>,
+        plan: &'static dyn Plan<VM = VM>,
     ) -> Self {
         BumpAllocator {
             tls,
