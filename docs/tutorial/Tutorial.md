@@ -693,7 +693,7 @@ scheduler's prepare stage. After this, it resumes the mutators.
          // Stop & scan mutators (mutator scanning can happen before STW)
          scheduler
              .unconstrained_works
-             .add(StopMutators::<SSProcessEdges<VM>>::new());
+             .add(StopMutators::<MyGCProcessEdges<VM>>::new());
          // Prepare global/collectors/mutators
          scheduler.prepare_stage.add(Prepare::new(self));
          // Release global/collectors/mutators
