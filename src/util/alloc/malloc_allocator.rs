@@ -1,6 +1,6 @@
-use crate::plan::global::Plan;
-use crate::plan::marksweep::malloc::ms_calloc;
-use crate::plan::marksweep::malloc::ms_malloc_usable_size;
+use crate::plan::{global::Plan, marksweep::MarkSweep};
+// use crate::plan::marksweep::malloc::ms_calloc;
+// use crate::plan::marksweep::malloc::ms_malloc_usable_size;
 use crate::plan::marksweep::metadata::map_meta_space_for_chunk;
 use crate::plan::marksweep::metadata::meta_space_mapped;
 use crate::plan::marksweep::metadata::set_alloc_bit;
@@ -11,6 +11,7 @@ use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use atomic::Ordering;
+use libc::{c_void, size_t};
 use std::sync::atomic::AtomicUsize;
 
 pub static mut HEAP_SIZE: usize = 0;
@@ -40,7 +41,8 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         trace!("alloc");
         debug_assert!(offset == 0);
         unsafe {
-            let ptr = ms_calloc(1, size);
+            let ms = self.plan.downcast_ref::<MarkSweep<VM>>().unwrap();
+            let ptr = ms.calloc(1, size);
             let address = Address::from_mut_ptr(ptr);
             if !meta_space_mapped(address) {
                 self.plan.poll(true, self.space.unwrap());
@@ -48,7 +50,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
                 map_meta_space_for_chunk(chunk_start);
             }
             set_alloc_bit(address);
-            HEAP_USED.fetch_add(ms_malloc_usable_size(ptr), Ordering::SeqCst);
+            HEAP_USED.fetch_add(ms.malloc_usable_size(ptr), Ordering::SeqCst);
             address
         }
     }

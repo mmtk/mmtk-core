@@ -1,4 +1,4 @@
-use crate::util::constants::DEFAULT_STRESS_FACTOR;
+use crate::{policy::mallocspace::MallocSpace, util::constants::DEFAULT_STRESS_FACTOR};
 use std::cell::UnsafeCell;
 use std::default::Default;
 use std::ops::Deref;
@@ -20,6 +20,16 @@ custom_derive! {
         SemiSpace,
         GenCopy,
         MarkSweep
+    }
+}
+
+custom_derive! {
+    #[derive(Copy, Clone, EnumFromStr, Debug)]
+    pub enum MallocSelector {
+        LibC,
+        JeMalloc,
+        MiMalloc,
+        Hoard
     }
 }
 
@@ -96,6 +106,7 @@ macro_rules! options {
 }
 options! {
     plan:                  PlanSelector         [always_valid] = PlanSelector::NoGC,
+    malloc:                MallocSelector       [always_valid] = MallocSelector::LibC,
     threads:               usize                [|v| v > 0]    = num_cpus::get(),
     use_short_stack_scans: bool                 [always_valid] = false,
     use_return_barrier:    bool                 [always_valid] = false,

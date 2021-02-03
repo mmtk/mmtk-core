@@ -4,8 +4,8 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
-use crate::plan::marksweep::malloc::ms_free;
-use crate::plan::marksweep::malloc::ms_malloc_usable_size;
+// use crate::plan::marksweep::malloc::ms_free;
+// use crate::plan::marksweep::malloc::ms_malloc_usable_size;
 use crate::plan::marksweep::metadata::unset_alloc_bit;
 use crate::plan::marksweep::metadata::unset_mark_bit;
 use crate::plan::marksweep::metadata::ALLOC_METADATA_ID;
@@ -13,6 +13,11 @@ use crate::plan::marksweep::metadata::ACTIVE_CHUNKS;
 use crate::plan::marksweep::metadata::MARKING_METADATA_ID;
 use crate::plan::marksweep::mutator::create_ms_mutator;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
+use crate::util::malloc::{c_calloc, c_free, c_malloc_usable_size};
+use crate::util::malloc::{je_calloc, je_free, je_malloc_usable_size};
+use crate::util::malloc::{mi_calloc, mi_free, mi_malloc_usable_size};
+use crate::util::malloc::{ho_calloc, ho_free, ho_malloc_usable_size};
+use crate::util::options::MallocSelector;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -39,6 +44,7 @@ use std::{collections::HashSet, sync::Arc};
 
 use atomic::Ordering;
 use enum_map::EnumMap;
+use libc::{c_void, size_t};
 
 pub type SelectedPlan<VM> = MarkSweep<VM>;
 
@@ -120,8 +126,8 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                     if SideMetadata::load_atomic(ALLOC_METADATA_ID, address) == 1 {
                         if SideMetadata::load_atomic(MARKING_METADATA_ID, address) == 0 {
                             let ptr = address.to_mut_ptr();
-                            HEAP_USED.fetch_sub(ms_malloc_usable_size(ptr), Ordering::SeqCst);
-                            ms_free(ptr);
+                            HEAP_USED.fetch_sub(self.malloc_usable_size(ptr), Ordering::SeqCst);
+                            self.free(ptr);
                             unset_alloc_bit(address);
                         } else {
                             unset_mark_bit(address);
@@ -183,6 +189,36 @@ impl<VM: VMBinding> MarkSweep<VM> {
         MarkSweep {
             base: BasePlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS),
             space: MallocSpace::new(),
+        }
+    }
+
+    pub unsafe fn calloc(&self, nobj: size_t, size: size_t) -> *mut c_void {
+        match self.options().malloc {
+            MallocSelector::LibC => { c_calloc(nobj, size) }
+            MallocSelector::MiMalloc => { mi_calloc(nobj, size) }
+            MallocSelector::Hoard => { ho_calloc(nobj, size) }
+            // MallocSelector::JeMalloc => { je_calloc(nobj, size) }
+            _ => unreachable!()
+        }
+    }
+
+    pub unsafe fn free(&self, p: *mut c_void) {
+        match self.options().malloc {
+            MallocSelector::LibC => { c_free(p) }
+            MallocSelector::MiMalloc => { mi_free(p) }
+            MallocSelector::Hoard => { ho_free(p) }
+            // MallocSelector::JeMalloc => { je_free(p) }
+            _ => unreachable!()
+        }
+    }
+
+    pub unsafe fn malloc_usable_size(&self, p: *mut c_void) -> size_t {
+        match self.options().malloc {
+            MallocSelector::LibC => { c_malloc_usable_size(p) }
+            MallocSelector::MiMalloc => { mi_malloc_usable_size(p) }
+            MallocSelector::Hoard => { ho_malloc_usable_size(p) }
+            // MallocSelector::JeMalloc => { je_malloc_usable_size(p) }
+            _ => unreachable!()
         }
     }
 }
