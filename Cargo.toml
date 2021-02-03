@@ -42,7 +42,7 @@ rand = "0.7.3"
 cc = "1.0"
 
 [features]
-default = ["ms_libc"]
+default = []
 
 # When adding any new feature, please add the new feature to .github/scripts/ci-common.sh 
 # so their builds are properly tested in the CI.
