@@ -19,8 +19,8 @@ the problem.
     * [Test the build](#test-the-build)
     * [Working with multiple VM builds](#working-with-multiple-vm-builds)
   * [Create MyGC](#create-mygc)
-* [Building a Semispace Collector](#building-a-semispace-collector)
-  * [What is a Semispace Collector](#what-is-a-semispace-collector)
+* [Building a semispace collector](#building-a-semispace-collector)
+  * [What is a semispace collector](#what-is-a-semispace-collector)
   * [Allocation: Add copyspaces](#allocation-add-copyspaces)
   * [Collection: Implement garbage collection](#collection-implement-garbage-collection)
   * [Exercise: Adding another copyspace](#exercise-adding-another-copyspace)
@@ -173,7 +173,7 @@ familiarise yourself with how to do this now.
 1. To select which garbage collector (GC) plan you would like to use in a given 
 build, you will need to export the `MMTK_PLAN` environment variable before 
 building the binding. For example, using `export MMTK_PLAN=semispace` will 
-cause the build to use the Semispace GC (the default plan).
+cause the build to use the semispace GC (the default plan).
 2. The build will always generate in `mmtk-openjdk/repos/openjdk/build`. If you 
 would like to keep a build (for instance, to make quick performance 
 comparisons), you can rename either the `build` folder or the folder generated 
@@ -226,7 +226,7 @@ produced should look identical or nearly identical to the log below.
     fatal runtime error: failed to initiate panic, error 5
     Aborted (core dumped)
     ```
-4. If you haven't already, try building using Semispace. lusearch should now 
+4. If you haven't already, try building using semispace. lusearch should now 
 pass, as garbage will be collected, and the smaller benchmarks should run the 
 same as they did while using NoGC.
 
@@ -295,9 +295,9 @@ and [Further Reading](#further-reading):
 
 
 ***
-## Building a Semispace Collector
-### What is a Semispace collector?
-In a Semispace collector, the heap is divided into two equally-sized spaces, 
+## Building a semispace collector
+### What is a semispace collector?
+In a semispace collector, the heap is divided into two equally-sized spaces, 
 called 'semispaces'. One of these is defined as a 'fromspace', and the other 
 a 'tospace'. The allocator allocates to the tospace until it is full. 
 
@@ -311,7 +311,7 @@ finishes, and the mutator is resumed.
 
 ### Allocation: Add copyspaces
 
-The first step of changing the MyGC plan into a Semispace plan is to add the 
+The first step of changing the MyGC plan into a semispace plan is to add the 
 two copyspaces and allow collectors to allocate memory into them during 
 collection. This requires adding two copyspaces, code to properly initialise 
 and prepare the new spaces, and a copy context.
@@ -336,7 +336,7 @@ Next, in `global.rs`, replace the old immortal space with two copyspaces.
    1. Replace `crate::plan::global::{BasePlan, NoCopy};` with 
    `use crate::plan::global::BasePlan;`. This collector is going to use 
    copying, so there's no point to importing NoCopy anymore.
-   2. Add `use crate::plan::global::CommonPlan;`. Semispace uses the common 
+   2. Add `use crate::plan::global::CommonPlan;`. semispace uses the common 
    plan, which includes an immortal space and a large object space, rather 
    than the base plan. Any garbage collected plan should use `CommonPlan`.
    3. Add `use std::sync::atomic::{AtomicBool, Ordering};`. These are going 
@@ -736,12 +736,12 @@ You should now have MyGC working and able to collect garbage. All three
 ***
 
 ### Exercise: Adding another copyspace
-Now that you have a working Semispace collector, you should be familiar 
+Now that you have a working semispace collector, you should be familiar 
 enough with the code to start writing some yourself. The intention of this 
-exercise is to reinforce the information from the Semispace section, rather 
+exercise is to reinforce the information from the semispace section, rather 
 than to create a useful new collector.
 
-1. Create a copy of your Semispace collector, called `triplespace`. 
+1. Create a copy of your semispace collector, called `triplespace`. 
 2. Add a new copyspace to the collector, called the `youngspace`, with the 
 following traits:
     * New objects are allocated to the youngspace (rather than the fromspace).
@@ -783,7 +783,7 @@ scanned. New objects are allocated to a 'nursery', and after one collection
 they move to the 'mature' space. In `triplespace`, `youngspace` is a 
 proto-nursery, and the tospace and fromspace are the mature space.
 
-This collector fixes one of the major problems with Semispace - namely, that 
+This collector fixes one of the major problems with semispace - namely, that 
 any long-lived objects are repeatedly copied back and forth. By separating 
 these objects into a separate 'mature' space, the number of full heap 
 collections needed is greatly reduced.
