@@ -26,8 +26,8 @@ pub struct SideMetadataSpec {
 
 /// Represents the mapping state of a metadata page.
 ///
-/// `NotMappable(Error)` and `Mappable` indicate whether the page is mappable by MMTK.
-/// `Mapped` indicates that the page is already mapped by MMTK.
+/// `NotMappable` indicates whether the page is mappable by MMTK.
+/// `IsMapped` indicates that the page is newly mapped by MMTK, and `WasMapped` means the page was already mapped.
 pub enum MappingState {
     NotMappable,
     IsMapped,
@@ -59,7 +59,9 @@ impl MappingState {
 ///
 /// * `size` - The size of the source data (in bytes).
 ///
-/// * `metadata_id` - The ID of the side metadata to map the space for.
+/// * `global_per_chunk` - The number of bytes of global side metadata required per chunk.
+///
+/// * `local_per_chunk` - The number of bytes of policy-specific side metadata required per chunk.
 ///
 pub fn try_map_metadata_space(
     start: Address,
@@ -100,6 +102,7 @@ pub fn try_map_metadata_space(
     true
 }
 
+// Try to map side metadata for the chunk starting at `start`
 pub fn try_mmap_metadata_chunk(
     start: Address,
     global_per_chunk: usize,
@@ -197,6 +200,7 @@ pub fn ensure_metadata_chunk_is_mmaped(metadata_spec: SideMetadataSpec, data_add
     );
 }
 
+/// Unmaps the metadata for a single chunk starting at `start`
 pub fn ensure_munmap_metadata_chunk(
     start: Address,
     global_per_chunk: usize,
@@ -468,8 +472,8 @@ pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
 ///
 /// This is unsafe because:
 ///
-/// 1. Concurrent access to this operation is undefined behavior.
-/// 2. Interleaving Non-atomic and atomic operations is undefined behavior.
+/// 1. Concurrent access to this operation is undefined behaviour.
+/// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
 pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
@@ -540,15 +544,13 @@ pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
     }
 }
 
-/// Bulk-zero a metadata space.
+/// Bulk-zero a specific metadata for a chunk.
 ///
 /// # Arguments
 ///
-/// * `start` - The starting address of the data whose metadata is being zeroed.
+/// * `metadata_spec` - The specification of the target side metadata.
 ///
-/// * `size` - The size (in bytes) of the source data.
-///
-/// * `metadata_id` - The ID of the target side metadata.
+/// * `chunk_start` - The starting address of the chunk whose metadata is being zeroed.
 ///
 pub fn bzero_metadata_for_chunk(metadata_spec: SideMetadataSpec, chunk_start: Address) {
     debug_assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
