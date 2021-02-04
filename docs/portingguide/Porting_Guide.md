@@ -61,7 +61,7 @@ You may want to take the following steps.
     - The purpose of this step is simply to help you find all allocation calls.
 4. Single Threaded MMTk Allocation
     1. Include the [`mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/api/mmtk.h)
-    2. Initialise MMTk by calling `gc_init`, with the size of the heap. Note that the heap size limit is currently disregarded when using NoGC, but this will be important when you implement more advanced GCs. In the future, you may wish to make this value configurable by a command line argument or environment variable.
+    2. Initialise MMTk by calling `gc_init`, with the size of the heap. In the future, you may wish to make this value configurable via a command line argument or environment variable.
     3. Create a MMTk mutator instance using `bind_mutator` and pass the return value of `gc_init`.
     4. Replace all previous `calloc` calls with `alloc` and optionally add a mutex around `alloc` if the VM is multi-threaded. The MMTk handle is the return value of the `bind_mutator` call.
     - In order to perform allocations, you will need to know what object alignment the VM expects. VMs often align allocations at word boundaries (e.g. 4 or 8 bytes) as it allows the CPU to access the data faster at runtime. Additionally, the language may use the unused lowest order bits to store flags (e.g. type information), so it is important that MMTk respects these expectations.
