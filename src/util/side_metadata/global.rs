@@ -1,7 +1,7 @@
 use super::constants::*;
 use super::helpers::*;
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::{constants, Address};
+use crate::util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK, memory};
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 
 #[derive(Clone, Copy)]
@@ -105,13 +105,13 @@ pub fn try_mmap_metadata_chunk(
     global_per_chunk: usize,
     local_per_chunk: usize,
 ) -> MappingState {
-    println!(
+    trace!(
         "try_mmap_metadata_chunk({}, 0x{:x}, 0x{:x})",
-        start, global_per_chunk, local_per_chunk
+        start,
+        global_per_chunk,
+        local_per_chunk
     );
     let global_meta_start = address_to_meta_chunk_addr(start);
-
-    println!("global_meta_start: {}", global_meta_start);
 
     let prot = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
     // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
@@ -140,7 +140,6 @@ pub fn try_mmap_metadata_chunk(
     }
 
     let policy_meta_start = global_meta_start + POLICY_SIDE_METADATA_OFFSET;
-    println!("policy_meta_start: {}", policy_meta_start);
 
     if local_per_chunk != 0 {
         let result: *mut libc::c_void = unsafe {
@@ -176,8 +175,6 @@ pub fn ensure_metadata_chunk_is_mmaped(metadata_spec: SideMetadataSpec, data_add
         address_to_meta_chunk_addr(data_addr) + POLICY_SIDE_METADATA_OFFSET
     };
 
-    println!("meta_addr {} for data_addr {}", meta_start, data_addr);
-
     let prot = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
     // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
@@ -192,10 +189,6 @@ pub fn ensure_metadata_chunk_is_mmaped(metadata_spec: SideMetadataSpec, data_add
             0,
         )
     };
-
-    println!("result: 0x{:x}, err: 0x{:x}", result as usize, unsafe {
-        *libc::__errno_location()
-    });
 
     assert!(
         result == libc::MAP_FAILED && unsafe { *libc::__errno_location() } == libc::EEXIST,
@@ -557,11 +550,16 @@ pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
 ///
 /// * `metadata_id` - The ID of the target side metadata.
 ///
-// pub fn bzero_meta_space(metadata_spec: SideMetadataSpec, start: Address, size: usize) {
-//     let meta_start = helpers::address_to_meta_address(start, metadata_id);
-//     let meta_end = helpers::address_to_meta_address(start + size, metadata_id);
-//     memory::zero(meta_start, meta_end.as_usize() - meta_start.as_usize());
-// }
+pub fn bzero_metadata_for_chunk(metadata_spec: SideMetadataSpec, chunk_start: Address) {
+    debug_assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
+
+    let meta_start = address_to_meta_address(metadata_spec, chunk_start);
+    let meta_size = meta_bytes_per_chunk(
+        metadata_spec.log_min_obj_size,
+        metadata_spec.log_num_of_bits,
+    );
+    memory::zero(meta_start, meta_size);
+}
 
 #[cfg(test)]
 mod tests {
@@ -683,7 +681,7 @@ mod tests {
     #[test]
     fn test_side_metadata_atomic_fetch_add_sub_2bits() {
         let data_addr =
-            vm_layout_constants::HEAP_START + (vm_layout_constants::BYTES_IN_CHUNK << 2);
+            vm_layout_constants::HEAP_START + (vm_layout_constants::BYTES_IN_CHUNK << 1);
 
         let metadata_1_spec = SideMetadataSpec {
             scope: SideMetadataScope::Global,
@@ -713,5 +711,66 @@ mod tests {
 
         let one = load_atomic(metadata_1_spec, data_addr);
         assert_eq!(one, 1);
+    }
+
+    #[test]
+    fn test_side_metadata_bzero_metadata_for_chunk() {
+        let data_addr =
+            vm_layout_constants::HEAP_START + (vm_layout_constants::BYTES_IN_CHUNK << 2);
+
+        let metadata_1_spec = SideMetadataSpec {
+            scope: SideMetadataScope::PolicySpecific,
+            offset: 0,
+            log_num_of_bits: 4,
+            log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+        };
+
+        let metadata_2_spec = SideMetadataSpec {
+            scope: SideMetadataScope::PolicySpecific,
+            offset: helpers::meta_bytes_per_chunk(
+                metadata_1_spec.log_min_obj_size,
+                metadata_1_spec.log_num_of_bits,
+            ),
+            log_num_of_bits: 3,
+            log_min_obj_size: 7,
+        };
+        assert!(try_map_metadata_space(
+            data_addr,
+            constants::BYTES_IN_PAGE,
+            0,
+            helpers::meta_bytes_per_chunk(
+                metadata_2_spec.log_min_obj_size,
+                metadata_2_spec.log_num_of_bits
+            ) + helpers::meta_bytes_per_chunk(
+                metadata_1_spec.log_min_obj_size,
+                metadata_1_spec.log_num_of_bits
+            )
+        ));
+
+        let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
+        assert_eq!(zero, 0);
+
+        let five = load_atomic(metadata_1_spec, data_addr);
+        assert_eq!(five, 5);
+
+        let zero = fetch_add_atomic(metadata_2_spec, data_addr, 5);
+        assert_eq!(zero, 0);
+
+        let five = load_atomic(metadata_2_spec, data_addr);
+        assert_eq!(five, 5);
+
+        bzero_metadata_for_chunk(metadata_2_spec, data_addr);
+
+        let five = load_atomic(metadata_1_spec, data_addr);
+        assert_eq!(five, 5);
+        let five = load_atomic(metadata_2_spec, data_addr);
+        assert_eq!(five, 0);
+
+        bzero_metadata_for_chunk(metadata_1_spec, data_addr);
+
+        let five = load_atomic(metadata_1_spec, data_addr);
+        assert_eq!(five, 0);
+        let five = load_atomic(metadata_2_spec, data_addr);
+        assert_eq!(five, 0);
     }
 }

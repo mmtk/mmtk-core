@@ -41,8 +41,11 @@ pub(crate) const fn meta_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bit
 #[inline(always)]
 pub(super) fn meta_byte_lshift(metadata_spec: SideMetadataSpec, data_addr: Address) -> u8 {
     let bits_num_log = metadata_spec.log_num_of_bits;
+    if bits_num_log == 3 {
+        return 0;
+    }
     let rem_shift =
-        constants::LOG_BITS_IN_WORD - ((constants::LOG_BITS_IN_BYTE as usize) - bits_num_log);
+        constants::BITS_IN_WORD - ((constants::LOG_BITS_IN_BYTE as usize) - bits_num_log);
     ((((data_addr.as_usize() >> metadata_spec.log_min_obj_size) << rem_shift) >> rem_shift)
         << bits_num_log) as u8
 }
@@ -56,6 +59,7 @@ pub(super) fn meta_byte_mask(metadata_spec: SideMetadataSpec) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::address_to_meta_address;
+    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     use crate::util::side_metadata::constants::*;
     use crate::util::side_metadata::global::*;
     use crate::util::side_metadata::helpers::*;
