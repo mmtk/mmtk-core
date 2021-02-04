@@ -1,12 +1,51 @@
 use super::constants::*;
 use super::helpers::*;
-use crate::util::{memory, Address};
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use crate::util::{constants, Address};
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 
-pub(crate) struct SideMetadataSpec {
-    offset: usize,
-    log_num_of_bits: usize,
-    min_obj_size: usize,
+#[derive(Clone, Copy)]
+pub enum SideMetadataScope {
+    Global,
+    PolicySpecific,
+}
+
+impl SideMetadataScope {
+    pub fn is_global(&self) -> bool {
+        matches!(self, SideMetadataScope::Global)
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct SideMetadataSpec {
+    pub scope: SideMetadataScope,
+    pub offset: usize,
+    pub log_num_of_bits: usize,
+    pub log_min_obj_size: usize,
+}
+
+/// Represents the mapping state of a metadata page.
+///
+/// `NotMappable(Error)` and `Mappable` indicate whether the page is mappable by MMTK.
+/// `Mapped` indicates that the page is already mapped by MMTK.
+pub enum MappingState {
+    NotMappable,
+    IsMapped,
+    WasMapped,
+}
+
+impl MappingState {
+    pub fn is_mapped(&self) -> bool {
+        matches!(self, MappingState::IsMapped)
+    }
+
+    pub fn is_mappable(&self) -> bool {
+        !matches!(self, MappingState::NotMappable)
+    }
+
+    pub fn was_mapped(&self) -> bool {
+        matches!(self, MappingState::WasMapped)
+    }
 }
 
 // ** NOTE: **
@@ -22,33 +61,175 @@ pub(crate) struct SideMetadataSpec {
 ///
 /// * `metadata_id` - The ID of the side metadata to map the space for.
 ///
-pub fn try_map_metadata_space(start: Address, size: usize, global_per_chunk: usize, local_per_chunk: usize) -> bool {
-    false
+pub fn try_map_metadata_space(
+    start: Address,
+    size: usize,
+    global_per_chunk: usize,
+    local_per_chunk: usize,
+) -> bool {
+    let mut aligned_start = start.align_down(BYTES_IN_CHUNK);
+    let aligned_end = (start + size).align_up(BYTES_IN_CHUNK);
+
+    // first chunk is special, as it might already be mapped, so it shouldn't be unmapped on failure
+    let mut munmap_first_chunk: Option<bool> = None;
+
+    while aligned_start < aligned_end {
+        let res = try_mmap_metadata_chunk(aligned_start, global_per_chunk, local_per_chunk);
+        if !res.is_mappable() {
+            if munmap_first_chunk.is_some() {
+                let mut munmap_start = if munmap_first_chunk.unwrap() {
+                    start.align_down(BYTES_IN_CHUNK)
+                } else {
+                    start.align_down(BYTES_IN_CHUNK) + BYTES_IN_CHUNK
+                };
+                // Failure: munmap what has been mmapped before
+                while munmap_start < aligned_start {
+                    ensure_munmap_metadata_chunk(munmap_start, global_per_chunk, local_per_chunk);
+                    munmap_start += SIDE_METADATA_PER_CHUNK;
+                }
+            }
+            return false;
+        }
+        if munmap_first_chunk.is_none() {
+            // if first chunk is newly mapped, it needs munmap on failure
+            munmap_first_chunk = Some(res.is_mapped());
+        }
+        aligned_start += BYTES_IN_CHUNK;
+    }
+
+    true
 }
 
-pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
-    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-    debug_assert!(
-        check_and_map_meta_page(address_to_meta_page_address(data_addr, metadata_id)).is_mapped(),
-        "load_atomic.metadata_addr({}) for data_addr({}) is not mapped",
-        meta_addr,
-        data_addr
+pub fn try_mmap_metadata_chunk(
+    start: Address,
+    global_per_chunk: usize,
+    local_per_chunk: usize,
+) -> MappingState {
+    println!(
+        "try_mmap_metadata_chunk({}, 0x{:x}, 0x{:x})",
+        start, global_per_chunk, local_per_chunk
     );
+    let global_meta_start = address_to_meta_chunk_addr(start);
 
-    debug_assert!(
-        metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
-        "metadata_id ({}) out of range",
-        metadata_id.as_usize()
-    );
-    let bits_num_log = *unsafe {
-        METADATA_SINGLETON
-            .meta_bits_num_log_vec
-            .get_unchecked(metadata_id.as_usize())
+    println!("global_meta_start: {}", global_meta_start);
+
+    let prot = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
+    // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
+    let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
+
+    if global_per_chunk != 0 {
+        let result: *mut libc::c_void = unsafe {
+            libc::mmap(
+                global_meta_start.to_mut_ptr(),
+                global_per_chunk,
+                prot,
+                flags,
+                -1,
+                0,
+            )
+        };
+
+        if result == libc::MAP_FAILED {
+            let err = unsafe { *libc::__errno_location() };
+            if err == libc::EEXIST {
+                return MappingState::WasMapped;
+            } else {
+                return MappingState::NotMappable;
+            }
+        }
+    }
+
+    let policy_meta_start = global_meta_start + POLICY_SIDE_METADATA_OFFSET;
+    println!("policy_meta_start: {}", policy_meta_start);
+
+    if local_per_chunk != 0 {
+        let result: *mut libc::c_void = unsafe {
+            libc::mmap(
+                policy_meta_start.to_mut_ptr(),
+                local_per_chunk,
+                prot,
+                flags,
+                -1,
+                0,
+            )
+        };
+
+        if result == libc::MAP_FAILED {
+            let err = unsafe { *libc::__errno_location() };
+            if err == libc::EEXIST {
+                return MappingState::WasMapped;
+            } else {
+                return MappingState::NotMappable;
+            }
+        }
+    }
+
+    MappingState::IsMapped
+}
+
+// Used only for debugging
+// Panics in the required metadata for data_addr is not mapped
+pub fn ensure_metadata_chunk_is_mmaped(metadata_spec: SideMetadataSpec, data_addr: Address) {
+    let meta_start = if metadata_spec.scope.is_global() {
+        address_to_meta_chunk_addr(data_addr)
+    } else {
+        address_to_meta_chunk_addr(data_addr) + POLICY_SIDE_METADATA_OFFSET
     };
 
+    println!("meta_addr {} for data_addr {}", meta_start, data_addr);
+
+    let prot = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
+    // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
+    let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
+
+    let result: *mut libc::c_void = unsafe {
+        libc::mmap(
+            meta_start.to_mut_ptr(),
+            constants::BYTES_IN_PAGE,
+            prot,
+            flags,
+            -1,
+            0,
+        )
+    };
+
+    println!("result: 0x{:x}, err: 0x{:x}", result as usize, unsafe {
+        *libc::__errno_location()
+    });
+
+    assert!(
+        result == libc::MAP_FAILED && unsafe { *libc::__errno_location() } == libc::EEXIST,
+        "Metadata space is not mapped for data_addr({})",
+        data_addr
+    );
+}
+
+pub fn ensure_munmap_metadata_chunk(
+    start: Address,
+    global_per_chunk: usize,
+    local_per_chunk: usize,
+) {
+    let global_meta_start = address_to_meta_chunk_addr(start);
+    let result = unsafe { libc::munmap(global_meta_start.to_mut_ptr(), global_per_chunk) };
+    assert_eq!(result, 0);
+
+    let policy_meta_start = global_meta_start + POLICY_SIDE_METADATA_OFFSET;
+    let result = unsafe { libc::munmap(policy_meta_start.to_mut_ptr(), local_per_chunk) };
+    assert_eq!(result, 0);
+}
+
+#[inline(always)]
+pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
+    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if cfg!(debug_assertions) {
+        ensure_metadata_chunk_is_mmaped(metadata_spec, data_addr);
+    }
+
+    let bits_num_log = metadata_spec.log_num_of_bits;
+
     if bits_num_log <= 3 {
-        let lshift = meta_byte_lshift(data_addr, metadata_id) as u8;
-        let mask = (((1usize << (1usize << bits_num_log)) - 1) << lshift) as u8;
+        let lshift = meta_byte_lshift(metadata_spec, data_addr);
+        let mask = meta_byte_mask(metadata_spec) << lshift;
         let byte_val = unsafe { meta_addr.atomic_load::<AtomicU8>(Ordering::SeqCst) };
 
         ((byte_val & mask) as usize) >> lshift
@@ -61,34 +242,22 @@ pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
-            MAX_METADATA_BITS
+            constants::BITS_IN_WORD
         );
     }
 }
 
-pub fn store_atomic(metadata_id: SideMetadataID, data_addr: Address, metadata: usize) {
-    let meta_addr = address_to_meta_address(data_addr, metadata_id);
-    debug_assert!(
-        check_and_map_meta_page(address_to_meta_page_address(data_addr, metadata_id)).is_mapped(),
-        "store_atomic.metadata_addr({}) for data_addr({}) is not mapped",
-        meta_addr,
-        data_addr
-    );
+pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
+    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if cfg!(debug_assertions) {
+        ensure_metadata_chunk_is_mmaped(metadata_spec, data_addr);
+    }
 
-    debug_assert!(
-        metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
-        "metadata_id ({}) out of range",
-        metadata_id.as_usize()
-    );
-    let bits_num_log = *unsafe {
-        METADATA_SINGLETON
-            .meta_bits_num_log_vec
-            .get_unchecked(metadata_id.as_usize())
-    };
+    let bits_num_log = metadata_spec.log_num_of_bits;
 
     if bits_num_log < 3 {
-        let lshift = meta_byte_lshift(data_addr, metadata_id);
-        let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
+        let lshift = meta_byte_lshift(metadata_spec, data_addr);
+        let mask = meta_byte_mask(metadata_spec) << lshift;
 
         let mut old_val = unsafe { meta_addr.load::<u8>() };
         let mut new_val = (old_val & !mask) | ((metadata as u8) << lshift);
@@ -112,39 +281,27 @@ pub fn store_atomic(metadata_id: SideMetadataID, data_addr: Address, metadata: u
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
-            MAX_METADATA_BITS
+            constants::BITS_IN_WORD
         );
     }
 }
 
 pub fn compare_exchange_atomic(
-    metadata_id: SideMetadataID,
+    metadata_spec: SideMetadataSpec,
     data_addr: Address,
     old_metadata: usize,
     new_metadata: usize,
 ) -> bool {
-    let meta_addr = address_to_meta_address(data_addr, metadata_id);
-    debug_assert!(
-        check_and_map_meta_page(address_to_meta_page_address(data_addr, metadata_id)).is_mapped(),
-        "cmpxng_atomic.metadata_addr({}) for data_addr({}) is not mapped",
-        meta_addr,
-        data_addr
-    );
+    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if cfg!(debug_assertions) {
+        ensure_metadata_chunk_is_mmaped(metadata_spec, data_addr);
+    }
 
-    debug_assert!(
-        metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
-        "metadata_id ({}) out of range",
-        metadata_id.as_usize()
-    );
-    let bits_num_log = *unsafe {
-        METADATA_SINGLETON
-            .meta_bits_num_log_vec
-            .get_unchecked(metadata_id.as_usize())
-    };
+    let bits_num_log = metadata_spec.log_num_of_bits;
 
     if bits_num_log < 3 {
-        let lshift = meta_byte_lshift(data_addr, metadata_id);
-        let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
+        let lshift = meta_byte_lshift(metadata_spec, data_addr);
+        let mask = meta_byte_mask(metadata_spec) << lshift;
 
         let real_old_byte = unsafe { meta_addr.atomic_load::<AtomicU8>(Ordering::SeqCst) };
         let expected_old_byte = (real_old_byte & !mask) | ((old_metadata as u8) << lshift);
@@ -207,35 +364,23 @@ pub fn compare_exchange_atomic(
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
-            MAX_METADATA_BITS
+            constants::BITS_IN_WORD
         );
     }
 }
 
 // same as Rust atomics, this wraps around on overflow
-pub fn fetch_add_atomic(metadata_id: SideMetadataID, data_addr: Address, val: usize) -> usize {
-    let meta_addr = address_to_meta_address(data_addr, metadata_id);
-    debug_assert!(
-        check_and_map_meta_page(address_to_meta_page_address(data_addr, metadata_id)).is_mapped(),
-        "fetch_add_atomic.metadata_addr({}) for data_addr({}) is not mapped",
-        meta_addr,
-        data_addr
-    );
+pub fn fetch_add_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val: usize) -> usize {
+    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if cfg!(debug_assertions) {
+        ensure_metadata_chunk_is_mmaped(metadata_spec, data_addr);
+    }
 
-    debug_assert!(
-        metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
-        "metadata_id ({}) out of range",
-        metadata_id.as_usize()
-    );
-    let bits_num_log = *unsafe {
-        METADATA_SINGLETON
-            .meta_bits_num_log_vec
-            .get_unchecked(metadata_id.as_usize())
-    };
+    let bits_num_log = metadata_spec.log_num_of_bits;
 
     if bits_num_log < 3 {
-        let lshift = meta_byte_lshift(data_addr, metadata_id);
-        let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
+        let lshift = meta_byte_lshift(metadata_spec, data_addr);
+        let mask = meta_byte_mask(metadata_spec) << lshift;
 
         let mut old_val = unsafe { meta_addr.load::<u8>() };
         let mut new_sub_val = (((old_val & mask) >> lshift) + (val as u8)) & (mask >> lshift);
@@ -269,35 +414,23 @@ pub fn fetch_add_atomic(metadata_id: SideMetadataID, data_addr: Address, val: us
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
-            MAX_METADATA_BITS
+            constants::BITS_IN_WORD
         );
     }
 }
 
 // same as Rust atomics, this wraps around on overflow
-pub fn fetch_sub_atomic(metadata_id: SideMetadataID, data_addr: Address, val: usize) -> usize {
-    let meta_addr = address_to_meta_address(data_addr, metadata_id);
-    debug_assert!(
-        check_and_map_meta_page(address_to_meta_page_address(data_addr, metadata_id)).is_mapped(),
-        "fetch_sub_atomic.metadata_addr({}) for data_addr({}) is not mapped",
-        meta_addr,
-        data_addr
-    );
+pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val: usize) -> usize {
+    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if cfg!(debug_assertions) {
+        ensure_metadata_chunk_is_mmaped(metadata_spec, data_addr);
+    }
 
-    debug_assert!(
-        metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
-        "metadata_id ({}) out of range",
-        metadata_id.as_usize()
-    );
-    let bits_num_log = *unsafe {
-        METADATA_SINGLETON
-            .meta_bits_num_log_vec
-            .get_unchecked(metadata_id.as_usize())
-    };
+    let bits_num_log = metadata_spec.log_num_of_bits;
 
     if bits_num_log < 3 {
-        let lshift = meta_byte_lshift(data_addr, metadata_id);
-        let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
+        let lshift = meta_byte_lshift(metadata_spec, data_addr);
+        let mask = meta_byte_mask(metadata_spec) << lshift;
 
         let mut old_val = unsafe { meta_addr.load::<u8>() };
         let mut new_sub_val = (((old_val & mask) >> lshift) - (val as u8)) & (mask >> lshift);
@@ -331,7 +464,7 @@ pub fn fetch_sub_atomic(metadata_id: SideMetadataID, data_addr: Address, val: us
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
-            MAX_METADATA_BITS
+            constants::BITS_IN_WORD
         );
     }
 }
@@ -345,20 +478,17 @@ pub fn fetch_sub_atomic(metadata_id: SideMetadataID, data_addr: Address, val: us
 /// 1. Concurrent access to this operation is undefined behavior.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behavior.
 ///
-pub unsafe fn load(metadata_id: SideMetadataID, data_addr: Address) -> usize {
-    let meta_addr = address_to_meta_address(data_addr, metadata_id);
-    debug_assert!(
-        metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
-        "metadata_id ({}) out of range",
-        metadata_id.as_usize()
-    );
-    let bits_num_log = *METADATA_SINGLETON
-        .meta_bits_num_log_vec
-        .get_unchecked(metadata_id.as_usize());
+pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
+    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if cfg!(debug_assertions) {
+        ensure_metadata_chunk_is_mmaped(metadata_spec, data_addr);
+    }
+
+    let bits_num_log = metadata_spec.log_num_of_bits;
 
     if bits_num_log <= 3 {
-        let lshift = meta_byte_lshift(data_addr, metadata_id);
-        let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
+        let lshift = meta_byte_lshift(metadata_spec, data_addr);
+        let mask = meta_byte_mask(metadata_spec) << lshift;
         let byte_val = meta_addr.load::<u8>();
 
         ((byte_val & mask) as usize) >> lshift
@@ -371,7 +501,7 @@ pub unsafe fn load(metadata_id: SideMetadataID, data_addr: Address) -> usize {
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
-            MAX_METADATA_BITS
+            constants::BITS_IN_WORD
         );
     }
 }
@@ -385,20 +515,17 @@ pub unsafe fn load(metadata_id: SideMetadataID, data_addr: Address) -> usize {
 /// 1. Concurrent access to this operation is undefined behaviour.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
-pub unsafe fn store(metadata_id: SideMetadataID, data_addr: Address, metadata: usize) {
-    let meta_addr = address_to_meta_address(data_addr, metadata_id);
-    debug_assert!(
-        metadata_id.as_usize() < METADATA_SINGLETON.meta_bits_num_log_vec.len(),
-        "metadata_id ({}) out of range",
-        metadata_id.as_usize()
-    );
-    let bits_num_log = *METADATA_SINGLETON
-        .meta_bits_num_log_vec
-        .get_unchecked(metadata_id.as_usize());
+pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
+    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if cfg!(debug_assertions) {
+        ensure_metadata_chunk_is_mmaped(metadata_spec, data_addr);
+    }
+
+    let bits_num_log = metadata_spec.log_num_of_bits;
 
     if bits_num_log < 3 {
-        let lshift = meta_byte_lshift(data_addr, metadata_id);
-        let mask = ((1 << (1 << bits_num_log)) - 1) << lshift;
+        let lshift = meta_byte_lshift(metadata_spec, data_addr);
+        let mask = meta_byte_mask(metadata_spec) << lshift;
 
         let old_val = meta_addr.load::<u8>();
         let new_val = (old_val & !mask) | ((metadata as u8) << lshift);
@@ -415,7 +542,7 @@ pub unsafe fn store(metadata_id: SideMetadataID, data_addr: Address, metadata: u
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
-            MAX_METADATA_BITS
+            constants::BITS_IN_WORD
         );
     }
 }
@@ -430,157 +557,161 @@ pub unsafe fn store(metadata_id: SideMetadataID, data_addr: Address, metadata: u
 ///
 /// * `metadata_id` - The ID of the target side metadata.
 ///
-pub fn bzero_meta_space(start: Address, size: usize, metadata_id: SideMetadataID) {
-    let meta_start = helpers::address_to_meta_address(start, metadata_id);
-    let meta_end = helpers::address_to_meta_address(start + size, metadata_id);
-    memory::zero(meta_start, meta_end.as_usize() - meta_start.as_usize());
-}
+// pub fn bzero_meta_space(metadata_spec: SideMetadataSpec, start: Address, size: usize) {
+//     let meta_start = helpers::address_to_meta_address(start, metadata_id);
+//     let meta_end = helpers::address_to_meta_address(start + size, metadata_id);
+//     memory::zero(meta_start, meta_end.as_usize() - meta_start.as_usize());
+// }
 
 #[cfg(test)]
 mod tests {
-    use crate::util::constants;
+    use super::*;
     use crate::util::heap::layout::vm_layout_constants;
     use crate::util::side_metadata::helpers;
-    use crate::util::side_metadata::SideMetadata;
-    use crate::util::test_util::serial_test;
+    use crate::util::{constants, Address};
 
     #[test]
-    fn test_side_metadata_request_meta_bits() {
-        serial_test(|| {
-            for i in 0..5 {
-                SideMetadata::request_meta_bits(1 << i, constants::LOG_BYTES_IN_WORD as usize);
-            }
+    fn test_side_metadata_try_mmap_metadata_chunk() {
+        let mut gspec = SideMetadataSpec {
+            scope: SideMetadataScope::Global,
+            offset: 0,
+            log_num_of_bits: 0,
+            log_min_obj_size: 0,
+        };
+        let mut lspec = SideMetadataSpec {
+            scope: SideMetadataScope::PolicySpecific,
+            offset: 0,
+            log_num_of_bits: 1,
+            log_min_obj_size: 0,
+        };
+
+        assert!(try_map_metadata_space(
+            unsafe { Address::from_usize(0) },
+            1,
+            helpers::meta_bytes_per_chunk(0, 0),
+            helpers::meta_bytes_per_chunk(0, 1)
+        ));
+
+        ensure_metadata_chunk_is_mmaped(gspec, unsafe { Address::from_usize(0) });
+        ensure_metadata_chunk_is_mmaped(lspec, unsafe { Address::from_usize(0) });
+        ensure_metadata_chunk_is_mmaped(gspec, unsafe {
+            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK - 1)
         });
-    }
+        ensure_metadata_chunk_is_mmaped(lspec, unsafe {
+            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK - 1)
+        });
 
-    #[test]
-    fn test_side_metadata_try_map_meta_space_lt4kb() {
-        let number_of_bits = 1;
-        let number_of_bits_log = 0;
-        let align = constants::LOG_BYTES_IN_WORD as usize;
-        let space_size = 1;
-
-        let metadata_id = SideMetadata::request_meta_bits(number_of_bits, align);
-        assert!(SideMetadata::try_map_meta_space(
-            vm_layout_constants::HEAP_START,
-            space_size,
-            metadata_id
+        assert!(try_map_metadata_space(
+            unsafe { Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK) },
+            vm_layout_constants::BYTES_IN_CHUNK + 1,
+            helpers::meta_bytes_per_chunk(3, 2),
+            helpers::meta_bytes_per_chunk(4, 2)
         ));
-        assert!(
-            helpers::check_and_map_meta_page(helpers::address_to_meta_page_address(
-                vm_layout_constants::HEAP_START,
-                metadata_id
-            ))
-            .is_mapped()
-        );
-        assert!(
-            helpers::check_and_map_meta_page(helpers::address_to_meta_page_address(
-                vm_layout_constants::HEAP_START + space_size,
-                metadata_id
-            ))
-            .is_mapped()
-        );
-        assert!(
-            !helpers::check_and_map_meta_page(helpers::address_to_meta_page_address(
-                vm_layout_constants::HEAP_START
-                    + (helpers::META_SPACE_PAGE_SIZE
-                        << (align + constants::LOG_BITS_IN_WORD - number_of_bits_log)),
-                metadata_id
-            ))
-            .is_mapped()
-        );
-    }
 
-    #[test]
-    fn test_side_metadata_try_map_meta_space_gt4kb() {
-        let number_of_bits = 8;
-        let align = constants::LOG_BYTES_IN_WORD as usize;
-        let space_size = helpers::META_SPACE_PAGE_SIZE * 64 + 1;
-
-        let metadata_id = SideMetadata::request_meta_bits(number_of_bits, align);
-        assert!(SideMetadata::try_map_meta_space(
-            vm_layout_constants::HEAP_START,
-            space_size,
-            metadata_id
-        ));
-        assert!(
-            helpers::check_and_map_meta_page(helpers::address_to_meta_page_address(
-                vm_layout_constants::HEAP_START,
-                metadata_id
-            ))
-            .is_mapped()
-        );
-        assert!(
-            helpers::check_and_map_meta_page(helpers::address_to_meta_page_address(
-                vm_layout_constants::HEAP_START + space_size,
-                metadata_id
-            ))
-            .is_mapped()
-        );
-        assert!(!helpers::check_and_map_meta_page(
-            helpers::address_to_meta_page_address(
-                vm_layout_constants::HEAP_START + space_size,
-                metadata_id
-            ) + helpers::META_SPACE_PAGE_SIZE
-        )
-        .is_mapped());
+        ensure_metadata_chunk_is_mmaped(gspec, unsafe {
+            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK)
+        });
+        ensure_metadata_chunk_is_mmaped(lspec, unsafe {
+            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK)
+        });
+        ensure_metadata_chunk_is_mmaped(gspec, unsafe {
+            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK * 3 - 1)
+        });
+        ensure_metadata_chunk_is_mmaped(lspec, unsafe {
+            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK * 3 - 1)
+        });
     }
 
     #[test]
     fn test_side_metadata_atomic_fetch_add_sub_ge8bits() {
         let data_addr = vm_layout_constants::HEAP_START;
-        let metadata_id =
-            SideMetadata::request_meta_bits(16, constants::LOG_BYTES_IN_WORD as usize);
-        SideMetadata::try_map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
 
-        let zero = SideMetadata::fetch_add_atomic(metadata_id, data_addr, 5);
+        let metadata_1_spec = SideMetadataSpec {
+            scope: SideMetadataScope::Global,
+            offset: 0,
+            log_num_of_bits: 4,
+            log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+        };
+
+        let metadata_2_spec = SideMetadataSpec {
+            scope: SideMetadataScope::Global,
+            offset: helpers::meta_bytes_per_chunk(
+                metadata_1_spec.log_min_obj_size,
+                metadata_1_spec.log_num_of_bits,
+            ),
+            log_num_of_bits: 3,
+            log_min_obj_size: 7,
+        };
+        assert!(try_map_metadata_space(
+            data_addr,
+            constants::BYTES_IN_PAGE,
+            helpers::meta_bytes_per_chunk(
+                metadata_2_spec.log_min_obj_size,
+                metadata_2_spec.log_num_of_bits
+            ) + helpers::meta_bytes_per_chunk(
+                metadata_1_spec.log_min_obj_size,
+                metadata_1_spec.log_num_of_bits
+            ),
+            0
+        ));
+
+        let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
         assert_eq!(zero, 0);
 
-        let five = SideMetadata::load_atomic(metadata_id, data_addr);
+        let five = load_atomic(metadata_1_spec, data_addr);
         assert_eq!(five, 5);
 
-        let another_five = SideMetadata::fetch_sub_atomic(metadata_id, data_addr, 2);
+        let zero = fetch_add_atomic(metadata_2_spec, data_addr, 5);
+        assert_eq!(zero, 0);
+
+        let five = load_atomic(metadata_2_spec, data_addr);
+        assert_eq!(five, 5);
+
+        let another_five = fetch_sub_atomic(metadata_1_spec, data_addr, 2);
         assert_eq!(another_five, 5);
 
-        let three = SideMetadata::load_atomic(metadata_id, data_addr);
+        let three = load_atomic(metadata_1_spec, data_addr);
         assert_eq!(three, 3);
-    }
 
-    #[test]
-    fn test_side_metadata_atomic_fetch_add_sub_4bits() {
-        let data_addr = vm_layout_constants::HEAP_START;
-        let metadata_id = SideMetadata::request_meta_bits(4, constants::LOG_BYTES_IN_WORD as usize);
-        SideMetadata::try_map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
-
-        let zero = SideMetadata::fetch_add_atomic(metadata_id, data_addr, 5);
-        assert_eq!(zero, 0);
-
-        let five = SideMetadata::load_atomic(metadata_id, data_addr);
-        assert_eq!(five, 5);
-
-        let another_five = SideMetadata::fetch_sub_atomic(metadata_id, data_addr, 2);
+        let another_five = fetch_sub_atomic(metadata_2_spec, data_addr, 2);
         assert_eq!(another_five, 5);
 
-        let three = SideMetadata::load_atomic(metadata_id, data_addr);
+        let three = load_atomic(metadata_2_spec, data_addr);
         assert_eq!(three, 3);
     }
 
     #[test]
     fn test_side_metadata_atomic_fetch_add_sub_2bits() {
-        let data_addr = vm_layout_constants::HEAP_START;
-        let metadata_id = SideMetadata::request_meta_bits(2, constants::LOG_BYTES_IN_WORD as usize);
-        SideMetadata::try_map_meta_space(data_addr, constants::BYTES_IN_PAGE as usize, metadata_id);
+        let data_addr =
+            vm_layout_constants::HEAP_START + (vm_layout_constants::BYTES_IN_CHUNK << 2);
 
-        let zero = SideMetadata::fetch_add_atomic(metadata_id, data_addr, 2);
+        let metadata_1_spec = SideMetadataSpec {
+            scope: SideMetadataScope::Global,
+            offset: 0,
+            log_num_of_bits: 1,
+            log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+        };
+
+        assert!(try_map_metadata_space(
+            data_addr,
+            constants::BYTES_IN_PAGE,
+            helpers::meta_bytes_per_chunk(
+                metadata_1_spec.log_min_obj_size,
+                metadata_1_spec.log_num_of_bits
+            ),
+            0
+        ));
+
+        let zero = fetch_add_atomic(metadata_1_spec, data_addr, 2);
         assert_eq!(zero, 0);
 
-        let two = SideMetadata::load_atomic(metadata_id, data_addr);
+        let two = load_atomic(metadata_1_spec, data_addr);
         assert_eq!(two, 2);
 
-        let another_two = SideMetadata::fetch_sub_atomic(metadata_id, data_addr, 1);
+        let another_two = fetch_sub_atomic(metadata_1_spec, data_addr, 1);
         assert_eq!(another_two, 2);
 
-        let one = SideMetadata::load_atomic(metadata_id, data_addr);
+        let one = load_atomic(metadata_1_spec, data_addr);
         assert_eq!(one, 1);
     }
 }

@@ -61,9 +61,10 @@
 //! 8. bulk zeroing
 //!
 
+mod constants;
 mod global;
 mod helpers;
-mod constants;
 
-pub use global::SideMetadata;
-pub use global::SideMetadataID;
+pub use global::*;
+pub(crate) use helpers::*;
+// pub(crate) use constants::*;
