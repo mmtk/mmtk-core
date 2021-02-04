@@ -4,27 +4,12 @@ use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicU8, Ordering};
 
-use super::Address;
-
 const SIDE_GC_BYTE_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::Global,
     offset: 0,
     log_num_of_bits: 1,
     log_min_obj_size: 3,
 };
-
-const SIDE_GC_BYTE_SPACE_PER_CHUNK: usize = meta_bytes_per_chunk(
-    SIDE_GC_BYTE_SPEC.log_min_obj_size,
-    SIDE_GC_BYTE_SPEC.log_num_of_bits,
-);
-
-pub fn try_map_gcbyte<VM: VMBinding>(start: Address, size: usize) -> bool {
-    if !VM::VMObjectModel::HAS_GC_BYTE {
-        try_map_metadata_space(start, size, SIDE_GC_BYTE_SPACE_PER_CHUNK, 0)
-    } else {
-        true
-    }
-}
 
 // TODO: we probably need to add non-atomic versions of the read and write methods
 /// Return the GC byte of an object as an atomic.

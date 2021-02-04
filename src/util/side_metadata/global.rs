@@ -570,13 +570,13 @@ mod tests {
 
     #[test]
     fn test_side_metadata_try_mmap_metadata_chunk() {
-        let mut gspec = SideMetadataSpec {
+        let gspec = SideMetadataSpec {
             scope: SideMetadataScope::Global,
             offset: 0,
             log_num_of_bits: 0,
             log_min_obj_size: 0,
         };
-        let mut lspec = SideMetadataSpec {
+        let lspec = SideMetadataSpec {
             scope: SideMetadataScope::PolicySpecific,
             offset: 0,
             log_num_of_bits: 1,

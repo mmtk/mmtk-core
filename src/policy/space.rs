@@ -1,5 +1,5 @@
 use crate::util::conversions::*;
-use crate::util::gc_byte;
+use crate::util::side_metadata::try_map_metadata_space;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -266,7 +266,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 unsafe { Address::zero() }
             } else {
                 debug!("Space.acquire(), returned = {}", rtn);
-                if !gc_byte::try_map_gcbyte::<VM>(rtn, conversions::pages_to_bytes(pages)) {
+                if !try_map_metadata_space(
+                    rtn,
+                    conversions::pages_to_bytes(pages),
+                    VM::VMActivePlan::global().global_side_metadata_per_chuck(),
+                    self.local_side_metadata_per_chunk(),
+                ) {
                     // TODO(Javad): handle meta space allocation failure
                     panic!("failed to mmap meta memory");
                 }
@@ -338,7 +343,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        if !gc_byte::try_map_gcbyte::<VM>(self.common().start, self.common().extent) {
+        if !try_map_metadata_space(
+            self.common().start,
+            self.common().extent,
+            VM::VMActivePlan::global().global_side_metadata_per_chuck(),
+            self.local_side_metadata_per_chunk(),
+        ) {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
