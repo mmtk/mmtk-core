@@ -18,20 +18,6 @@ const SIDE_GC_BYTE_SPACE_PER_CHUNK: usize = meta_bytes_per_chunk(
     SIDE_GC_BYTE_SPEC.log_num_of_bits,
 );
 
-#[allow(clippy::cast_ref_to_mut)]
-#[allow(clippy::mut_from_ref)]
-pub(crate) fn init_gcbyte<VM: VMBinding>() {
-    // if !VM::VMObjectModel::HAS_GC_BYTE {
-    //     let res = SideMetadata::request_meta_bits(
-    //         SelectedConstraints::GC_HEADER_BITS,
-    //         constants::LOG_BYTES_IN_WORD as usize,
-    //     );
-    //     unsafe {
-    //         SIDE_GCBYTE_ID = res;
-    //     }
-    // }
-}
-
 pub fn try_map_gcbyte<VM: VMBinding>(start: Address, size: usize) -> bool {
     if !VM::VMObjectModel::HAS_GC_BYTE {
         try_map_metadata_space(start, size, SIDE_GC_BYTE_SPACE_PER_CHUNK, 0)
