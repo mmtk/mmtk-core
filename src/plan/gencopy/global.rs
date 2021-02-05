@@ -197,7 +197,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
 impl<VM: VMBinding> GenCopy<VM> {
     fn request_full_heap_collection(&self) -> bool {
-        if super::NO_SLOW { return true } // For barrier overhead measurements, we always do full gc
+        if super::FULL_NURSERY_GC { return true } // For barrier overhead measurements, we always do full gc
         self.get_total_pages() <= self.get_pages_reserved()
     }
 
