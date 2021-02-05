@@ -329,7 +329,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
         }
     }
 
-    fn global_side_metadata_per_chuck(&self) -> usize {
+    fn global_side_metadata_per_chunk(&self) -> usize {
         0
     }
 }

@@ -269,7 +269,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 if !try_map_metadata_space(
                     rtn,
                     conversions::pages_to_bytes(pages),
-                    VM::VMActivePlan::global().global_side_metadata_per_chuck(),
+                    VM::VMActivePlan::global().global_side_metadata_per_chunk(),
                     self.local_side_metadata_per_chunk(),
                 ) {
                     // TODO(Javad): handle meta space allocation failure
@@ -346,7 +346,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if !try_map_metadata_space(
             self.common().start,
             self.common().extent,
-            VM::VMActivePlan::global().global_side_metadata_per_chuck(),
+            VM::VMActivePlan::global().global_side_metadata_per_chunk(),
             self.local_side_metadata_per_chunk(),
         ) {
             // TODO(Javad): handle meta space allocation failure

@@ -85,7 +85,7 @@
 //!
 //! So far, no metadata space is allocated.
 //!
-//! For this purpose, each plan should override `fn global_side_metadata_per_chuck(&self) -> usize;` to return the size of the global side metadata it needs per chunk. This can be calculated using the `meta_bytes_per_chunk` function.
+//! For this purpose, each plan should override `fn global_side_metadata_per_chunk(&self) -> usize;` to return the size of the global side metadata it needs per chunk. This can be calculated using the `meta_bytes_per_chunk` function.
 //!
 //! For the local metadata bit-sets, each policy needs to follow the same pattern as the global metadata, with two differences:
 //!
