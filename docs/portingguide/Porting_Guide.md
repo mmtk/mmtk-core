@@ -29,6 +29,22 @@ The diagram above illustrates a port of MMTk to OpenJDK with the binding in the 
 
 We structure the code into three repos.  The [MMTk core](https://github.com/mmtk/mmtk-core), the [binding repo](https://github.com/mmtk/mmtk-openjdk) containing both parts of the binding, and the OpenJDK repo, which is currently [a fork](https://github.com/mmtk/openjdk) we maintain.
 
+
+## Things to Consider Before Starting a Port
+
+In principle, a port to MMTk is not particularly difficult. MMTk can present itself as a standard library and the core of the API is relatively simple.
+
+However, porting a runtime to a different GC (any GC) can be difficult and time consuming. Key questions include: 
+ - How well encapsulated is the runtime's existing collector? 
+ - Does the runtime make tacit assumptions about the underlying collector's implementation?
+ - How many places in the runtime codebase reference some part of the GC?
+ - If the runtime has a JIT, how good is the interface between the JIT and the GC (for write barriers and allocations, for example)?
+ - Does the runtime support precise stack scanning? 
+ - etc.
+
+Thinking through these questions should give you a sense for how big a task a GC port will be.
+
+
 ## How to Undertake a Port
 We recommend a highly incremental approach to implementing a port.   The broad idea is:
  - Start with the NoGC plan and gradually move to more advanced collectors
