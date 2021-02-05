@@ -55,7 +55,9 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
         _semantics: crate::AllocationSemantics,
     ) {
         forwarding_word::clear_forwarding_bits::<VM>(obj);
-        BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).set(0b1);
+        if !super::NO_SLOW {
+            BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).set(0b1);
+        }
     }
 }
 
