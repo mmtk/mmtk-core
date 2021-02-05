@@ -4,11 +4,13 @@ use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicU8, Ordering};
 
+use super::constants;
+
 const SIDE_GC_BYTE_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::Global,
     offset: 0,
     log_num_of_bits: 1,
-    log_min_obj_size: 3,
+    log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
 };
 
 // TODO: we probably need to add non-atomic versions of the read and write methods

@@ -20,6 +20,9 @@
 //! 4. Metadata space is only allocated on demand.
 //! 5. Bulk-zeroing of metadata bits should be possible. For this, the memory space for each metadata bit-set is contiguous per chunk.
 //!
+//!‌ MMTK side metadata is organized per chunk of data (each chunk is managed exclusively by one policy).
+//! This means, when a new chunk is mapped, the side metadata for the whole chunk, which includes the global and policy-specific metadata, is also mapped.
+//!
 //!
 //! # How to Use
 //!
@@ -31,25 +34,54 @@
 //! const GLOBAL_META_1: SideMetadataSpec = SideMetadataSpec {
 //!    scope: SideMetadataScope::Global,
 //!    offset: 0,
-//!    log_num_of_bits: b,
-//!    log_min_obj_size: s,
+//!    log_num_of_bits: b1,
+//!    log_min_obj_size: s1,
 //! };
 //! ```
 //!
-//! the offset is zero, the number of bits per data is $2^b$, and the minimum object size is $2^s$.
+//! Here, the number of bits per data is $2^b1$, and the minimum object size is $2^s1$.
+//! The `offset` is a constant which shows the offset of the beginning of this metadata bit-set from the beginning of the metadata chunk.
+//! For the first bit-set, `offset` is zero.
 //!
-//! Not, to add a second side metadata bit-set, offset needs to be calculated based-on the first global bit-set:
+//! Now, to add a second side metadata bit-set, offset needs to be calculated based-on the first global bit-set:
 //!
 //! ```
 //! const GLOBAL_META_2: SideMetadataSpec = SideMetadataSpec {
 //!    scope: SideMetadataScope::Global,
-//!    offset: meta_bytes_per_chunk(s, b),
-//!    log_num_of_bits: bb,
-//!    log_min_obj_size: ss,
+//!    offset: meta_bytes_per_chunk(s1, b1),
+//!    log_num_of_bits: b2,
+//!    log_min_obj_size: s2,
 //! };
 //! ```
 //!
 //! where `meta_bytes_per_chunk` is a const function which calculates the offset based-on `s` and `b` from the first global bit-set.
+//!
+//! A schematic of a sample metadata chunk looks like:
+//!     _______________________________     <= offset-g1 = 0x0
+//!     |                             |
+//!     |        Global-1             |
+//!     |_____________________________|     <= offset-g2 = meta_bytes_per_chunk(s1, b1)
+//!     |                             |
+//!     |        Global-2             |
+//!     |                             |
+//!     |_____________________________|     <= offset-g3 = offset-g2 + meta_bytes_per_chunk(s2, b2)
+//!     |                             |
+//!     |        Not Mapped           |
+//!     |                             |
+//!     |_____________________________|     <= offset-l1 = 4MB * Global_worst_case_ratio
+//!     |                             |
+//!     |      PolicySpecific-1       |
+//!     |                             |
+//!     |_____________________________|     <= offset-l2 = offset-l1 + meta_bytes_per_chunk(s3, b3)
+//!     |                             |
+//!     |      PolicySpecific-2       |
+//!     |                             |
+//!     |_____________________________|     <= offset-l3 = offset-l2 + meta_bytes_per_chunk(s4, b4)
+//!     |                             |
+//!     |         Not Mapped          |
+//!     |                             |
+//!     |                             |
+//!     |_____________________________|     <= 4MB * (Global_WCR + PolicySpecific_WCR)
 //!
 //! So far, no metadata space is allocated.
 //!

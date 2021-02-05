@@ -16,6 +16,12 @@ impl SideMetadataScope {
     }
 }
 
+/// This struct stores the specification of a side metadata bit-set.
+/// It is used as an input to the (inline) functions provided by the side metadata module.
+///
+/// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.
+///
+/// For performance reasons, objects of this struct should be constants.
 #[derive(Clone, Copy)]
 pub struct SideMetadataSpec {
     pub scope: SideMetadataScope,
