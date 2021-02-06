@@ -14,20 +14,20 @@ type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
 // This struct is part of the Mutator struct.
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
 #[repr(C)]
-pub struct MutatorConfig<P: Plan> {
+pub struct MutatorConfig<VM: VMBinding> {
     // Mapping between allocation semantics and allocator selector
     pub allocator_mapping: &'static EnumMap<AllocationType, AllocatorSelector>,
     // Mapping between allocator selector and spaces. Each pair represents a mapping.
     // Put this behind a box, so it is a pointer-sized field.
     #[allow(clippy::box_vec)]
-    pub space_mapping: Box<SpaceMapping<P::VM>>,
+    pub space_mapping: Box<SpaceMapping<VM>>,
     // Plan-specific code for mutator prepare/release
-    pub prepare_func: &'static dyn Fn(&mut Mutator<P>, OpaquePointer),
-    pub release_func: &'static dyn Fn(&mut Mutator<P>, OpaquePointer),
+    pub prepare_func: &'static dyn Fn(&mut Mutator<VM>, OpaquePointer),
+    pub release_func: &'static dyn Fn(&mut Mutator<VM>, OpaquePointer),
 }
 
-unsafe impl<P: Plan> Send for MutatorConfig<P> {}
-unsafe impl<P: Plan> Sync for MutatorConfig<P> {}
+unsafe impl<VM: VMBinding> Send for MutatorConfig<VM> {}
+unsafe impl<VM: VMBinding> Sync for MutatorConfig<VM> {}
 
 /// A mutator is a per-thread data structure that manages allocations and barriers. It is usually highly coupled with the language VM.
 /// It is recommended for MMTk users 1) to have a mutator struct of the same layout in the thread local storage that can be accessed efficiently,
@@ -38,15 +38,15 @@ unsafe impl<P: Plan> Sync for MutatorConfig<P> {}
 // - Allocators are fixed-length arrays of allocators.
 // - MutatorConfig only has pointers/refs (including fat pointers), and is fixed sized.
 #[repr(C)]
-pub struct Mutator<P: Plan> {
-    pub allocators: Allocators<P::VM>,
+pub struct Mutator<VM: VMBinding> {
+    pub allocators: Allocators<VM>,
     pub barrier: Box<dyn Barrier>,
     pub mutator_tls: OpaquePointer,
-    pub plan: &'static P,
-    pub config: MutatorConfig<P>,
+    pub plan: &'static dyn Plan<VM = VM>,
+    pub config: MutatorConfig<VM>,
 }
 
-impl<P: Plan<Mutator = Self>> MutatorContext<P::VM> for Mutator<P> {
+impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
     fn prepare(&mut self, tls: OpaquePointer) {
         (*self.config.prepare_func)(self, tls)
     }
@@ -70,14 +70,7 @@ impl<P: Plan<Mutator = Self>> MutatorContext<P::VM> for Mutator<P> {
     }
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
-    // Q: Can we remove type_refer?
-    fn post_alloc(
-        &mut self,
-        refer: ObjectReference,
-        _type_refer: ObjectReference,
-        _bytes: usize,
-        allocator: AllocationType,
-    ) {
+    fn post_alloc(&mut self, refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
         unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
@@ -111,13 +104,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
         offset: isize,
         allocator: AllocationType,
     ) -> Address;
-    fn post_alloc(
-        &mut self,
-        refer: ObjectReference,
-        type_refer: ObjectReference,
-        bytes: usize,
-        allocator: AllocationType,
-    );
+    fn post_alloc(&mut self, refer: ObjectReference, bytes: usize, allocator: AllocationType);
     fn flush_remembered_sets(&mut self) {
         self.barrier().flush();
     }

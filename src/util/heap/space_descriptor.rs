@@ -1,7 +1,4 @@
-use super::vmrequest::HEAP_LAYOUT_64BIT;
 use crate::util::constants::*;
-#[cfg(target_pointer_width = "64")]
-use crate::util::heap::layout::heap_parameters;
 use crate::util::heap::layout::vm_layout_constants;
 use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -14,6 +11,7 @@ const TYPE_CONTIGUOUS_HI: usize = 3;
 const TYPE_MASK: usize = (1 << TYPE_BITS) - 1;
 const SIZE_SHIFT: usize = TYPE_BITS;
 const SIZE_BITS: usize = 10;
+#[cfg(target_pointer_width = "32")]
 const SIZE_MASK: usize = ((1 << SIZE_BITS) - 1) << SIZE_SHIFT;
 const EXPONENT_SHIFT: usize = SIZE_SHIFT + SIZE_BITS;
 const EXPONENT_BITS: usize = 5;
@@ -23,11 +21,12 @@ const MANTISSA_SHIFT: usize = EXPONENT_SHIFT + EXPONENT_BITS;
 const MANTISSA_BITS: usize = 14;
 const BASE_EXPONENT: usize = BITS_IN_INT - MANTISSA_BITS;
 
-/* 64-bit */
+// get_index() is only implemented for 64 bits
+#[cfg(target_pointer_width = "64")]
 const INDEX_MASK: usize = !TYPE_MASK;
 const INDEX_SHIFT: usize = TYPE_BITS;
 
-static DISCONTIGUOUS_SPACE_INDEX: AtomicUsize = AtomicUsize::new(0);
+static DISCONTIGUOUS_SPACE_INDEX: AtomicUsize = AtomicUsize::new(DISCONTIG_INDEX_INCREMENT);
 const DISCONTIG_INDEX_INCREMENT: usize = 1 << TYPE_BITS;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -38,7 +37,7 @@ impl SpaceDescriptor {
 
     pub fn create_descriptor_from_heap_range(start: Address, end: Address) -> SpaceDescriptor {
         let top = end == vm_layout_constants::HEAP_END;
-        if HEAP_LAYOUT_64BIT {
+        if cfg!(target_pointer_width = "64") {
             let space_index = if start > vm_layout_constants::HEAP_END {
                 ::std::usize::MAX
             } else {
@@ -54,15 +53,7 @@ impl SpaceDescriptor {
             );
         }
         let chunks = (end - start) >> vm_layout_constants::LOG_BYTES_IN_CHUNK;
-        if cfg!(debug) {
-            // if (!start.isZero() && (chunks <= 0 || chunks >= (1 << SIZE_BITS))) {
-            //   Log.write("SpaceDescriptor.createDescriptor(", start);
-            //   Log.write(",", end);
-            //   Log.writeln(")");
-            //   Log.writeln("chunks = ", chunks);
-            // }
-            debug_assert!(!start.is_zero() && chunks > 0 && chunks < (1 << SIZE_BITS));
-        }
+        debug_assert!(!start.is_zero() && chunks > 0 && chunks < (1 << SIZE_BITS));
         let mut tmp = start >> BASE_EXPONENT;
         let mut exponent = 0;
         while (tmp != 0) && ((tmp & 1) == 0) {
@@ -105,6 +96,7 @@ impl SpaceDescriptor {
 
     #[cfg(target_pointer_width = "64")]
     pub fn get_start(self) -> Address {
+        use crate::util::heap::layout::heap_parameters;
         unsafe { Address::from_usize(self.get_index() << heap_parameters::LOG_SPACE_SIZE_64) }
     }
 
@@ -118,21 +110,94 @@ impl SpaceDescriptor {
         unsafe { Address::from_usize(mantissa << (BASE_EXPONENT + exponent)) }
     }
 
+    #[cfg(target_pointer_width = "64")]
     pub fn get_extent(self) -> usize {
-        if HEAP_LAYOUT_64BIT {
-            return vm_layout_constants::SPACE_SIZE_64;
-        }
+        vm_layout_constants::SPACE_SIZE_64
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    pub fn get_extent(self) -> usize {
         debug_assert!(self.is_contiguous());
         let chunks = (self.0 & SIZE_MASK) >> SIZE_SHIFT;
         chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK
     }
 
-    // FIXME: This function should only work for 64 bit heap.
-    // However, HEAP_LAYOUT_64BIT is a constant at the moment (which is not correct), and
-    // we do want this function failed the assertion if HEAP_LAYOUT_64BIT is no longer constantly true.
-    #[allow(clippy::assertions_on_constants)]
+    #[cfg(target_pointer_width = "64")]
     pub fn get_index(self) -> usize {
-        debug_assert!(HEAP_LAYOUT_64BIT);
         (self.0 & INDEX_MASK) >> INDEX_SHIFT
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util::heap::layout::vm_layout_constants::*;
+
+    #[test]
+    fn create_discontiguous_descriptor() {
+        let d1 = SpaceDescriptor::create_descriptor();
+        assert!(!d1.is_empty());
+        assert!(!d1.is_contiguous());
+        assert!(!d1.is_contiguous_hi());
+
+        let d2 = SpaceDescriptor::create_descriptor();
+        assert!(!d2.is_empty());
+        assert!(!d2.is_contiguous());
+        assert!(!d2.is_contiguous_hi());
+    }
+
+    const TEST_SPACE_SIZE: usize = BYTES_IN_CHUNK * 10;
+
+    #[test]
+    fn create_contiguous_descriptor_at_heap_start() {
+        let d = SpaceDescriptor::create_descriptor_from_heap_range(
+            HEAP_START,
+            HEAP_START + TEST_SPACE_SIZE,
+        );
+        assert!(!d.is_empty());
+        assert!(d.is_contiguous());
+        assert!(!d.is_contiguous_hi());
+        assert_eq!(d.get_start(), HEAP_START);
+        if cfg!(target_pointer_width = "64") {
+            assert_eq!(d.get_extent(), SPACE_SIZE_64);
+        } else {
+            assert_eq!(d.get_extent(), TEST_SPACE_SIZE);
+        }
+    }
+
+    #[test]
+    fn create_contiguous_descriptor_in_heap() {
+        let d = SpaceDescriptor::create_descriptor_from_heap_range(
+            HEAP_START + TEST_SPACE_SIZE,
+            HEAP_START + TEST_SPACE_SIZE * 2,
+        );
+        assert!(!d.is_empty());
+        assert!(d.is_contiguous());
+        assert!(!d.is_contiguous_hi());
+        if cfg!(target_pointer_width = "64") {
+            assert_eq!(d.get_start(), HEAP_START);
+            assert_eq!(d.get_extent(), SPACE_SIZE_64);
+        } else {
+            assert_eq!(d.get_start(), HEAP_START + TEST_SPACE_SIZE);
+            assert_eq!(d.get_extent(), TEST_SPACE_SIZE);
+        }
+    }
+
+    #[test]
+    fn create_contiguous_descriptor_at_heap_end() {
+        let d = SpaceDescriptor::create_descriptor_from_heap_range(
+            HEAP_END - TEST_SPACE_SIZE,
+            HEAP_END,
+        );
+        assert!(!d.is_empty());
+        assert!(d.is_contiguous());
+        assert!(d.is_contiguous_hi());
+        if cfg!(target_pointer_width = "64") {
+            assert_eq!(d.get_start(), HEAP_END - SPACE_SIZE_64);
+            assert_eq!(d.get_extent(), SPACE_SIZE_64);
+        } else {
+            assert_eq!(d.get_start(), HEAP_END - TEST_SPACE_SIZE);
+            assert_eq!(d.get_extent(), TEST_SPACE_SIZE);
+        }
     }
 }

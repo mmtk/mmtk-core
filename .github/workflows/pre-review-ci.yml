@@ -8,13 +8,12 @@ on:
 jobs:
   pre-code-review-checks:
     runs-on: ubuntu-18.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v2
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2020-07-08
           components: rustfmt, clippy
           target: i686-unknown-linux-gnu
           # This overwrites the default toolchain with the toolchain specified above.
@@ -33,7 +32,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install libc6-dev-i386
-          export RUSTUP_TOOLCHAIN=nightly-2020-07-08
           ./.github/scripts/ci-test.sh
 
       # Style checks

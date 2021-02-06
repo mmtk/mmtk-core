@@ -1,3 +1,5 @@
 set -xe
 
-cargo doc --features semispace --no-deps -Z crate-versions
+. $(dirname "$0")/ci-common.sh
+
+cargo doc --features $non_exclusive_features --no-deps

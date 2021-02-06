@@ -1,4 +1,4 @@
-use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use std::cell::UnsafeCell;
 use std::default::Default;
 use std::ops::Deref;
@@ -10,6 +10,15 @@ custom_derive! {
         Nontemporal,
         Concurrent,
         Adaptive,
+    }
+}
+
+custom_derive! {
+    #[derive(Copy, Clone, EnumFromStr, Debug)]
+    pub enum PlanSelector {
+        NoGC,
+        SemiSpace,
+        GenCopy
     }
 }
 
@@ -53,6 +62,7 @@ macro_rules! options {
                         let validate_fn = $validator;
                         validate_fn(val)
                     } else {
+                        eprintln!("Warn: unable to set {}={}. Default value will be used.", s, val);
                         false
                     })*
                     _ => panic!("Invalid Options key")
@@ -69,11 +79,11 @@ macro_rules! options {
                 // we set the option to its value (if it is a valid value). Otherwise, use the defualt value.
                 const PREFIX: &str = "MMTK_";
                 for (key, val) in std::env::vars() {
-                    if key.starts_with(PREFIX) {
-                        // strip the prefix, and get the lower case string
-                        let rest_of_key: &str = &key[PREFIX.len()..].to_lowercase();
-                        match rest_of_key {
-                            $(stringify!($name) => { options.set_from_str(rest_of_key, &val); },)*
+                    // strip the prefix, and get the lower case string
+                    if let Some(rest_of_key) = key.strip_prefix(PREFIX) {
+                        let lowercase: &str = &rest_of_key.to_lowercase();
+                        match lowercase {
+                            $(stringify!($name) => { options.set_from_str(lowercase, &val); },)*
                             _ => {}
                         }
                     }
@@ -84,6 +94,7 @@ macro_rules! options {
     ]
 }
 options! {
+    plan:                  PlanSelector         [always_valid] = PlanSelector::NoGC,
     threads:               usize                [|v| v > 0]    = num_cpus::get(),
     use_short_stack_scans: bool                 [always_valid] = false,
     use_return_barrier:    bool                 [always_valid] = false,
@@ -97,7 +108,7 @@ options! {
     // Note: This gets ignored. Use RUST_LOG to specify log level.
     // TODO: Delete this option.
     verbose:               usize                [always_valid] = 0,
-    stress_factor:         usize                [always_valid] = usize::max_value() >> LOG_BYTES_IN_PAGE,
+    stress_factor:         usize                [always_valid] = DEFAULT_STRESS_FACTOR,
     // vmspace
     // FIXME: These options are set for JikesRVM. We need a proper way to set options.
     //   We need to set these values programmatically in VM specific code.
@@ -136,11 +147,9 @@ impl Options {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::constants::LOG_BYTES_IN_PAGE;
+    use crate::util::constants::DEFAULT_STRESS_FACTOR;
     use crate::util::options::Options;
     use crate::util::test_util::serial_test;
-
-    const DEFAULT_STRESS_FACTOR: usize = usize::max_value() >> LOG_BYTES_IN_PAGE;
 
     #[test]
     fn no_env_var() {

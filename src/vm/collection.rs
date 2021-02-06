@@ -3,7 +3,6 @@ use crate::scheduler::gc_works::ProcessEdgesWork;
 use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::MMTK;
 
 /// VM-specific methods for garbage collection.
 pub trait Collection<VM: VMBinding> {
@@ -41,7 +40,7 @@ pub trait Collection<VM: VMBinding> {
     ///   calls `enable_collection()` and passes as an argument.
     /// * `ctx`: The GC worker context for the GC thread. If `None` is passed, it means spawning a GC thread for the GC controller,
     ///   which does not have a worker context.
-    fn spawn_worker_thread(tls: OpaquePointer, ctx: Option<&Worker<MMTK<VM>>>);
+    fn spawn_worker_thread(tls: OpaquePointer, ctx: Option<&GCWorker<VM>>);
 
     /// Allow VM-specific behaviors for a mutator after all the mutators are stopped and before any actual GC work starts.
     ///

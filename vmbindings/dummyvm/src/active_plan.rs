@@ -1,18 +1,19 @@
-use mmtk::{Plan, SelectedPlan};
+use mmtk::Plan;
 use mmtk::vm::ActivePlan;
 use mmtk::util::OpaquePointer;
 use mmtk::scheduler::*;
+use mmtk::Mutator;
 use DummyVM;
 use SINGLETON;
 
 pub struct VMActivePlan<> {}
 
 impl ActivePlan<DummyVM> for VMActivePlan {
-    fn global() -> &'static SelectedPlan<DummyVM> {
-        &SINGLETON.plan
+    fn global() -> &'static dyn Plan<VM=DummyVM> {
+        &*SINGLETON.plan
     }
 
-    fn worker(_tls: OpaquePointer) -> &'static mut GCWorker<DummyVM> {
+    unsafe fn worker(_tls: OpaquePointer) -> &'static mut GCWorker<DummyVM> {
         unimplemented!()
     }
 
@@ -25,11 +26,7 @@ impl ActivePlan<DummyVM> for VMActivePlan {
         true
     }
 
-    unsafe fn mutator(_tls: OpaquePointer) -> &'static mut <SelectedPlan<DummyVM> as Plan>::Mutator {
-        unimplemented!()
-    }
-
-    fn collector_count() -> usize {
+    unsafe fn mutator(_tls: OpaquePointer) -> &'static mut Mutator<DummyVM> {
         unimplemented!()
     }
 
@@ -37,7 +34,7 @@ impl ActivePlan<DummyVM> for VMActivePlan {
         unimplemented!()
     }
 
-    fn get_next_mutator() -> Option<&'static mut <SelectedPlan<DummyVM> as Plan>::Mutator> {
+    fn get_next_mutator() -> Option<&'static mut Mutator<DummyVM>> {
         unimplemented!()
     }
 }

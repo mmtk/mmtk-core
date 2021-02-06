@@ -14,10 +14,10 @@ pub mod header_byte;
 pub mod heap;
 pub mod int_array_freelist;
 pub mod logger;
+pub mod malloc;
 pub mod memory;
 pub mod opaque_pointer;
 pub mod options;
-pub mod queue;
 pub mod raw_memory_freelist;
 pub mod reference_processor;
 #[cfg(feature = "sanity")]

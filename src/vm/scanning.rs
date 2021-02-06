@@ -1,5 +1,6 @@
-use crate::plan::{Mutator, SelectedPlan, TransitiveClosure};
+use crate::plan::{Mutator, TransitiveClosure};
 use crate::scheduler::gc_works::ProcessEdgesWork;
+use crate::scheduler::GCWorker;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
@@ -28,9 +29,6 @@ pub trait Scanning<VM: VMBinding> {
         tls: OpaquePointer,
     );
 
-    #[deprecated]
-    fn reset_thread_counter();
-
     /// MMTk calls this method at the first time during a collection that thread's stacks
     /// have been scanned. This can be used (for example) to clean up
     /// obsolete compiled methods that are no longer being executed.
@@ -44,7 +42,10 @@ pub trait Scanning<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `objects`: The slice of object references to be scanned.
-    fn scan_objects<W: ProcessEdgesWork<VM = VM>>(objects: &[ObjectReference]);
+    fn scan_objects<W: ProcessEdgesWork<VM = VM>>(
+        objects: &[ObjectReference],
+        worker: &mut GCWorker<VM>,
+    );
 
     /// Scan all the mutators for roots.
     fn scan_thread_roots<W: ProcessEdgesWork<VM = VM>>();
@@ -55,11 +56,9 @@ pub trait Scanning<VM: VMBinding> {
     /// * `mutator`: The reference to the mutator whose roots will be scanned.
     /// * `tls`: The GC thread that is performing this scanning.
     fn scan_thread_root<W: ProcessEdgesWork<VM = VM>>(
-        mutator: &'static mut Mutator<SelectedPlan<VM>>,
+        mutator: &'static mut Mutator<VM>,
         tls: OpaquePointer,
     );
-
-    // TODO: compute_new_thread_roots
 
     /// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)
     /// goes here.

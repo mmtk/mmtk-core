@@ -1,3 +1,4 @@
+use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::plan::global::GcStatus;
 use crate::util::*;
@@ -21,29 +22,32 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
 impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for ScheduleCollection {}
 
 /// GC Preparation Work (include updating global states)
-pub struct Prepare<P: Plan> {
+pub struct Prepare<P: Plan, W: CopyContext + WorkerLocal> {
     pub plan: &'static P,
+    _p: PhantomData<W>,
 }
 
-unsafe impl<P: Plan> Sync for Prepare<P> {}
+unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for Prepare<P, W> {}
 
-impl<P: Plan> Prepare<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> Prepare<P, W> {
     pub fn new(plan: &'static P) -> Self {
-        Self { plan }
+        Self {
+            plan,
+            _p: PhantomData,
+        }
     }
 }
 
-impl<P: Plan> GCWork<P::VM> for Prepare<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Prepare<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Prepare Global");
         self.plan.prepare(worker.tls);
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler
-                .prepare_stage
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_works.add(PrepareCollector::default());
+            w.local_works.add(PrepareCollector::<W>::new());
         }
     }
 }
@@ -52,13 +56,13 @@ impl<P: Plan> GCWork<P::VM> for Prepare<P> {
 pub struct PrepareMutator<VM: VMBinding> {
     // The mutator reference has static lifetime.
     // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
-    pub mutator: &'static mut Mutator<SelectedPlan<VM>>,
+    pub mutator: &'static mut Mutator<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for PrepareMutator<VM> {}
 
 impl<VM: VMBinding> PrepareMutator<VM> {
-    pub fn new(mutator: &'static mut Mutator<SelectedPlan<VM>>) -> Self {
+    pub fn new(mutator: &'static mut Mutator<VM>) -> Self {
         Self { mutator }
     }
 }
@@ -71,38 +75,47 @@ impl<VM: VMBinding> GCWork<VM> for PrepareMutator<VM> {
 }
 
 #[derive(Default)]
-pub struct PrepareCollector;
+pub struct PrepareCollector<W: CopyContext + WorkerLocal>(PhantomData<W>);
 
-impl<VM: VMBinding> GCWork<VM> for PrepareCollector {
+impl<W: CopyContext + WorkerLocal> PrepareCollector<W> {
+    pub fn new() -> Self {
+        PrepareCollector(PhantomData)
+    }
+}
+
+impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for PrepareCollector<W> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Prepare Collector");
-        worker.local().prepare();
+        unsafe { worker.local::<W>() }.prepare();
     }
 }
 
-pub struct Release<P: Plan> {
+pub struct Release<P: Plan, W: CopyContext + WorkerLocal> {
     pub plan: &'static P,
+    _p: PhantomData<W>,
 }
 
-unsafe impl<P: Plan> Sync for Release<P> {}
+unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for Release<P, W> {}
 
-impl<P: Plan> Release<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> Release<P, W> {
     pub fn new(plan: &'static P) -> Self {
-        Self { plan }
+        Self {
+            plan,
+            _p: PhantomData,
+        }
     }
 }
 
-impl<P: Plan> GCWork<P::VM> for Release<P> {
+impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Release Global");
         self.plan.release(worker.tls);
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler
-                .release_stage
+            mmtk.scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_works.add(ReleaseCollector::default());
+            w.local_works.add(ReleaseCollector::<W>(PhantomData));
         }
         // TODO: Process weak references properly
         mmtk.reference_processors.clear();
@@ -112,13 +125,13 @@ impl<P: Plan> GCWork<P::VM> for Release<P> {
 pub struct ReleaseMutator<VM: VMBinding> {
     // The mutator reference has static lifetime.
     // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
-    pub mutator: &'static mut Mutator<SelectedPlan<VM>>,
+    pub mutator: &'static mut Mutator<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for ReleaseMutator<VM> {}
 
 impl<VM: VMBinding> ReleaseMutator<VM> {
-    pub fn new(mutator: &'static mut Mutator<SelectedPlan<VM>>) -> Self {
+    pub fn new(mutator: &'static mut Mutator<VM>) -> Self {
         Self { mutator }
     }
 }
@@ -131,12 +144,18 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseMutator<VM> {
 }
 
 #[derive(Default)]
-pub struct ReleaseCollector;
+pub struct ReleaseCollector<W: CopyContext + WorkerLocal>(PhantomData<W>);
 
-impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
+impl<W: CopyContext + WorkerLocal> ReleaseCollector<W> {
+    pub fn new() -> Self {
+        ReleaseCollector(PhantomData)
+    }
+}
+
+impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for ReleaseCollector<W> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Release Collector");
-        worker.local().release();
+        unsafe { worker.local::<W>() }.release();
     }
 }
 
@@ -175,17 +194,16 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
                 }
                 // Scan mutators
                 if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
-                    mmtk.scheduler.prepare_stage.add(ScanStackRoots::<E>::new());
+                    mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                        .add(ScanStackRoots::<E>::new());
                 } else {
                     for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                        mmtk.scheduler
-                            .prepare_stage
+                        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                             .add(ScanStackRoot::<E>(mutator));
                     }
                 }
             }
-            mmtk.scheduler
-                .prepare_stage
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(ScanVMSpecificRoots::<E>::new());
         } else {
             mmtk.scheduler
@@ -226,29 +244,52 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     }
 }
 
-pub struct ScanStackRoot<Edges: ProcessEdgesWork>(
-    pub &'static mut Mutator<SelectedPlan<Edges::VM>>,
-);
+pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Edges::VM>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        let base = &mmtk.plan.base();
+        let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
         trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
         <E::VM as VMBinding>::VMScanning::scan_thread_root::<E>(
             unsafe { &mut *(self.0 as *mut _) },
             worker.tls,
         );
         self.0.flush();
-        let old = mmtk
-            .plan
-            .base()
-            .scanned_stacks
-            .fetch_add(1, Ordering::SeqCst);
-        if old + 1 == <E::VM as VMBinding>::VMActivePlan::number_of_mutators() {
-            mmtk.plan.base().scanned_stacks.store(0, Ordering::SeqCst);
-            <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
-                false, worker.tls,
-            );
-            mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
+        let old = base.scanned_stacks.fetch_add(1, Ordering::SeqCst);
+        trace!(
+            "mutator {:?} old scanned_stacks = {}, new scanned_stacks = {}",
+            self.0.get_tls(),
+            old,
+            base.scanned_stacks.load(Ordering::Relaxed)
+        );
+
+        if old + 1 >= mutators {
+            loop {
+                let current = base.scanned_stacks.load(Ordering::Relaxed);
+                if current < mutators {
+                    break;
+                } else if base.scanned_stacks.compare_exchange(
+                    current,
+                    current - mutators,
+                    Ordering::Release,
+                    Ordering::Relaxed,
+                ) == Ok(current)
+                {
+                    trace!(
+                        "mutator {:?} old scanned_stacks = {}, new scanned_stacks = {}, number_of_mutators = {}",
+                        self.0.get_tls(),
+                        current,
+                        base.scanned_stacks.load(Ordering::Relaxed),
+                        mutators
+                    );
+                    <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
+                        false, worker.tls,
+                    );
+                    base.set_gc_status(GcStatus::GcProper);
+                    break;
+                }
+            }
         }
     }
 }
@@ -272,7 +313,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
 pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
     pub edges: Vec<Address>,
     pub nodes: Vec<ObjectReference>,
-    pub mmtk: Option<&'static MMTK<E::VM>>,
+    mmtk: &'static MMTK<E::VM>,
     // Use raw pointer for fast pointer dereferencing, instead of using `Option<&'static mut GCWorker<E::VM>>`.
     // Because a copying gc will dereference this pointer at least once for every object copy.
     worker: *mut GCWorker<E::VM>,
@@ -281,22 +322,15 @@ pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
 unsafe impl<E: ProcessEdgesWork> Sync for ProcessEdgesBase<E> {}
 unsafe impl<E: ProcessEdgesWork> Send for ProcessEdgesBase<E> {}
 
-impl<E: ProcessEdgesWork> Default for ProcessEdgesBase<E> {
-    fn default() -> Self {
-        Self {
-            edges: vec![],
-            nodes: vec![],
-            mmtk: None,
-            worker: 0 as _,
-        }
-    }
-}
-
 impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
-    pub fn new(edges: Vec<Address>) -> Self {
+    // Requires an MMTk reference. Each plan-specific type that uses ProcessEdgesBase can get a static plan reference
+    // at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.
+    pub fn new(edges: Vec<Address>, mmtk: &'static MMTK<E::VM>) -> Self {
         Self {
             edges,
-            ..Self::default()
+            nodes: vec![],
+            mmtk,
+            worker: std::ptr::null_mut(),
         }
     }
     pub fn set_worker(&mut self, worker: &mut GCWorker<E::VM>) {
@@ -308,11 +342,11 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
     }
     #[inline]
     pub fn mmtk(&self) -> &'static MMTK<E::VM> {
-        self.mmtk.unwrap()
+        self.mmtk
     }
     #[inline]
-    pub fn plan(&self) -> &'static SelectedPlan<E::VM> {
-        &self.mmtk.unwrap().plan
+    pub fn plan(&self) -> &'static dyn Plan<VM = E::VM> {
+        &*self.mmtk.plan
     }
 }
 
@@ -324,7 +358,7 @@ pub trait ProcessEdgesWork:
     const CAPACITY: usize = 4096;
     const OVERWRITE_REFERENCE: bool = true;
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
-    fn new(edges: Vec<Address>, roots: bool) -> Self;
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<Self::VM>) -> Self;
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 
     #[inline]
@@ -352,11 +386,7 @@ pub trait ProcessEdgesWork:
             // Executing these works now can remarkably reduce the global synchronization time.
             self.worker().do_work(scan_objects_work);
         } else {
-            self.mmtk
-                .unwrap()
-                .scheduler
-                .closure_stage
-                .add(scan_objects_work);
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);
         }
     }
 
@@ -379,9 +409,8 @@ pub trait ProcessEdgesWork:
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     #[inline]
-    default fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    default fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessEdgesWork");
-        self.mmtk = Some(mmtk);
         self.set_worker(worker);
         self.process_edges();
         if !self.nodes.is_empty() {
@@ -410,9 +439,9 @@ impl<Edges: ProcessEdgesWork> ScanObjects<Edges> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
-    fn do_work(&mut self, _worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ScanObjects");
-        <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer);
+        <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer, worker);
         trace!("ScanObjects End");
     }
 }
@@ -440,17 +469,16 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
         if mmtk.plan.in_nursery() {
             let mut modified_nodes = vec![];
             ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
-            worker
-                .scheduler()
-                .closure_stage
+            worker.scheduler().work_buckets[WorkBucketStage::Closure]
                 .add(ScanObjects::<E>::new(modified_nodes, false));
 
             let mut modified_edges = vec![];
             ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
-            worker
-                .scheduler()
-                .closure_stage
-                .add(E::new(modified_edges, true));
+            worker.scheduler().work_buckets[WorkBucketStage::Closure].add(E::new(
+                modified_edges,
+                true,
+                mmtk,
+            ));
         } else {
             // Do nothing
         }

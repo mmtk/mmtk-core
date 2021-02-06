@@ -1,28 +1,26 @@
 use super::controller_collector_context::ControllerCollectorContext;
-use super::MutatorContext;
+use super::PlanConstraints;
 use crate::mmtk::MMTK;
 use crate::plan::transitive_closure::TransitiveClosure;
+use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-#[cfg(feature = "sanity")]
-use crate::scheduler::gc_works::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::constants::*;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::*;
 use crate::util::statistics::stats::Stats;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
+use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
@@ -32,10 +30,9 @@ use std::sync::{Arc, Mutex};
 /// A GC worker's context for copying GCs.
 /// Each GC plan should provide their implementation of a CopyContext.
 /// For non-copying GC, NoCopy can be used.
-pub trait CopyContext: Sized + 'static + Sync + Send {
+pub trait CopyContext: 'static + Sync + Send {
     type VM: VMBinding;
-    const MAX_NON_LOS_COPY_BYTES: usize = MAX_INT;
-    fn new(mmtk: &'static MMTK<Self::VM>) -> Self;
+    fn constraints(&self) -> &'static PlanConstraints;
     fn init(&mut self, tls: OpaquePointer);
     fn prepare(&mut self);
     fn release(&mut self);
@@ -66,7 +63,7 @@ pub trait CopyContext: Sized + 'static + Sync + Send {
             bytes,
             align,
             Self::VM::MIN_ALIGNMENT,
-        ) > Self::MAX_NON_LOS_COPY_BYTES;
+        ) > self.constraints().max_non_los_copy_bytes;
         if large {
             AllocationSemantics::Los
         } else {
@@ -79,10 +76,11 @@ pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
 
 impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     type VM = VM;
-    fn new(_mmtk: &'static MMTK<Self::VM>) -> Self {
-        Self(PhantomData)
-    }
+
     fn init(&mut self, _tls: OpaquePointer) {}
+    fn constraints(&self) -> &'static PlanConstraints {
+        unreachable!()
+    }
     fn prepare(&mut self) {}
     fn release(&mut self) {}
     fn alloc_copy(
@@ -97,41 +95,67 @@ impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     }
 }
 
+impl<VM: VMBinding> NoCopy<VM> {
+    pub fn new(_mmtk: &'static MMTK<VM>) -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<VM: VMBinding> WorkerLocal for NoCopy<VM> {
+    fn init(&mut self, tls: OpaquePointer) {
+        CopyContext::init(self, tls);
+    }
+}
+
+pub fn create_mutator<VM: VMBinding>(
+    tls: OpaquePointer,
+    mmtk: &'static MMTK<VM>,
+) -> Box<Mutator<VM>> {
+    Box::new(match mmtk.options.plan {
+        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, &*mmtk.plan),
+        PlanSelector::SemiSpace => {
+            crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
+        }
+        PlanSelector::GenCopy => crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
+    })
+}
+
+pub fn create_plan<VM: VMBinding>(
+    plan: PlanSelector,
+    vm_map: &'static VMMap,
+    mmapper: &'static Mmapper,
+    options: Arc<UnsafeOptionsWrapper>,
+    scheduler: &'static MMTkScheduler<VM>,
+) -> Box<dyn Plan<VM = VM>> {
+    match plan {
+        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(
+            vm_map, mmapper, options, scheduler,
+        )),
+        PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
+            vm_map, mmapper, options, scheduler,
+        )),
+        PlanSelector::GenCopy => Box::new(crate::plan::gencopy::GenCopy::new(
+            vm_map, mmapper, options, scheduler,
+        )),
+    }
+}
+
 /// A plan describes the global core functionality for all memory management schemes.
 /// All global MMTk plans should implement this trait.
 ///
 /// The global instance defines and manages static resources
 /// (such as memory and virtual memory resources).
-pub trait Plan: Sized + 'static + Sync + Send {
+pub trait Plan: 'static + Sync + Send + Downcast {
     type VM: VMBinding;
-    type Mutator: MutatorContext<Self::VM>;
-    type CopyContext: CopyContext;
 
-    fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-        scheduler: &'static MMTkScheduler<Self::VM>,
-    ) -> Self;
+    fn constraints(&self) -> &'static PlanConstraints;
+    fn create_worker_local(
+        &self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> GCWorkerLocalPtr;
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
-    #[cfg(feature = "sanity")]
-    fn schedule_sanity_collection(&'static self, scheduler: &MMTkScheduler<Self::VM>) {
-        self.base().inside_sanity.store(true, Ordering::SeqCst);
-        // Stop & scan mutators (mutator scanning can happen before STW)
-        for mutator in <Self::VM as VMBinding>::VMActivePlan::mutators() {
-            scheduler
-                .prepare_stage
-                .add(ScanStackRoot::<SanityGCProcessEdges<Self::VM>>(mutator));
-        }
-        scheduler
-            .prepare_stage
-            .add(ScanVMSpecificRoots::<SanityGCProcessEdges<Self::VM>>::new());
-        // Prepare global/collectors/mutators
-        scheduler.prepare_stage.add(SanityPrepare::new(self));
-        // Release global/collectors/mutators
-        scheduler.release_stage.add(SanityRelease::new(self));
-    }
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
@@ -149,12 +173,6 @@ pub trait Plan: Sized + 'static + Sync + Send {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<Self::VM>>,
     );
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Self::Mutator>;
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
@@ -229,10 +247,7 @@ pub trait Plan: Sized + 'static + Sync + Send {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
-    where
-        Self: Sized,
-    {
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool {
         let stress_force_gc = self.stress_test_gc_required();
         debug!(
             "self.get_pages_reserved()={}, self.get_total_pages()={}",
@@ -272,17 +287,17 @@ pub trait Plan: Sized + 'static + Sync + Send {
 
     #[inline]
     fn stress_test_gc_required(&self) -> bool {
-        let pages = self.base().vm_map.get_cumulative_committed_pages();
-        trace!("stress_gc pages={}", pages);
-
+        let stress_factor = self.base().options.stress_factor;
         if self.is_initialized()
-            && (pages ^ self.base().last_stress_pages.load(Ordering::Relaxed)
-                > self.options().stress_factor)
+            && (self.base().allocation_bytes.load(Ordering::SeqCst) > stress_factor)
         {
-            self.base()
-                .last_stress_pages
-                .store(pages, Ordering::Relaxed);
+            trace!(
+                "Stress GC: allocation_bytes = {}, stress_factor = {}",
+                self.base().allocation_bytes.load(Ordering::Relaxed),
+                stress_factor
+            );
             trace!("Doing stress GC");
+            self.base().allocation_bytes.store(0, Ordering::SeqCst);
             true
         } else {
             false
@@ -314,6 +329,8 @@ pub trait Plan: Sized + 'static + Sync + Send {
         }
     }
 }
+
+impl_downcast!(Plan assoc VM);
 
 #[derive(PartialEq)]
 pub enum GcStatus {
@@ -354,6 +371,8 @@ pub struct BasePlan<VM: VMBinding> {
     // A counter for per-mutator stack scanning
     pub scanned_stacks: AtomicUsize,
     pub mutator_iterator_lock: Mutex<()>,
+    // A counter that keeps tracks of the number of bytes allocated since last stress test
+    pub allocation_bytes: AtomicUsize,
 }
 
 #[cfg(feature = "base_spaces")]
@@ -372,7 +391,9 @@ pub fn create_vm_space<VM: VMBinding>(
     mmapper: &'static Mmapper,
     heap: &mut HeapMeta,
     boot_segment_bytes: usize,
+    constraints: &'static PlanConstraints,
 ) -> ImmortalSpace<VM> {
+    use crate::util::constants::LOG_BYTES_IN_MBYTE;
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
     debug_assert!(boot_segment_bytes > 0);
 
@@ -387,16 +408,19 @@ pub fn create_vm_space<VM: VMBinding>(
         vm_map,
         mmapper,
         heap,
+        constraints,
     )
 }
 
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'heap' only needs to be mutable for certain features
+    #[allow(unused_variables)] // 'constraints' is only needed for certain features
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
+        constraints: &'static PlanConstraints,
     ) -> BasePlan<VM> {
         BasePlan {
             #[cfg(feature = "base_spaces")]
@@ -409,6 +433,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     vm_map,
                     mmapper,
                     &mut heap,
+                    constraints,
                 ),
                 #[cfg(feature = "ro_space")]
                 ro_space: ImmortalSpace::new(
@@ -418,9 +443,16 @@ impl<VM: VMBinding> BasePlan<VM> {
                     vm_map,
                     mmapper,
                     &mut heap,
+                    constraints,
                 ),
                 #[cfg(feature = "vm_space")]
-                vm_space: create_vm_space(vm_map, mmapper, &mut heap, options.vm_space_size),
+                vm_space: create_vm_space(
+                    vm_map,
+                    mmapper,
+                    &mut heap,
+                    options.vm_space_size,
+                    constraints,
+                ),
             }),
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),
@@ -442,6 +474,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             inside_sanity: AtomicBool::new(false),
             scanned_stacks: AtomicUsize::new(0),
             mutator_iterator_lock: Mutex::new(()),
+            allocation_bytes: AtomicUsize::new(0),
         }
     }
 
@@ -504,7 +537,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         0
     }
 
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
         &self,
         _trace: &mut T,
         _object: ObjectReference,
@@ -517,7 +550,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             {
                 if unsync.code_space.in_space(_object) {
                     trace!("trace_object: object in code space");
-                    return unsync.code_space.trace_object(_trace, _object);
+                    return unsync.code_space.trace_object::<T>(_trace, _object);
                 }
             }
 
@@ -636,6 +669,16 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     fn force_full_heap_collection(&self) {}
+
+    pub fn increase_allocation_bytes_by(&self, size: usize) {
+        let old_allocation_bytes = self.allocation_bytes.fetch_add(size, Ordering::SeqCst);
+        trace!(
+            "Stress GC: old_allocation_bytes = {}, size = {}, allocation_bytes = {}",
+            old_allocation_bytes,
+            size,
+            self.allocation_bytes.load(Ordering::Relaxed),
+        );
+    }
 }
 
 /**
@@ -657,6 +700,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
+        constraints: &'static PlanConstraints,
     ) -> CommonPlan<VM> {
         CommonPlan {
             unsync: UnsafeCell::new(CommonUnsync {
@@ -667,6 +711,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     vm_map,
                     mmapper,
                     &mut heap,
+                    constraints,
                 ),
                 los: LargeObjectSpace::new(
                     "los",
@@ -675,9 +720,10 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     vm_map,
                     mmapper,
                     &mut heap,
+                    constraints,
                 ),
             }),
-            base: BasePlan::new(vm_map, mmapper, options, heap),
+            base: BasePlan::new(vm_map, mmapper, options, heap, constraints),
         }
     }
 
@@ -698,7 +744,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         unsync.immortal.reserved_pages() + unsync.los.reserved_pages() + self.base.get_pages_used()
     }
 
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -713,7 +759,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             trace!("trace_object: object in los");
             return unsync.los.trace_object(trace, object);
         }
-        self.base.trace_object(trace, object)
+        self.base.trace_object::<T, C>(trace, object)
     }
 
     pub fn prepare(&self, tls: OpaquePointer, primary: bool) {

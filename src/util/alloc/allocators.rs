@@ -1,6 +1,6 @@
 use std::mem::MaybeUninit;
 
-use crate::plan::selected_plan::SelectedPlan;
+use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::{Allocator, BumpAllocator, LargeObjectAllocator};
@@ -25,8 +25,12 @@ impl<VM: VMBinding> Allocators<VM> {
     /// The selector needs to be valid, and points to an allocator that has been initialized.
     pub unsafe fn get_allocator(&self, selector: AllocatorSelector) -> &dyn Allocator<VM> {
         match selector {
-            AllocatorSelector::BumpPointer(index) => self.bump_pointer[index as usize].get_ref(),
-            AllocatorSelector::LargeObject(index) => self.large_object[index as usize].get_ref(),
+            AllocatorSelector::BumpPointer(index) => {
+                self.bump_pointer[index as usize].assume_init_ref()
+            }
+            AllocatorSelector::LargeObject(index) => {
+                self.large_object[index as usize].assume_init_ref()
+            }
         }
     }
 
@@ -37,14 +41,18 @@ impl<VM: VMBinding> Allocators<VM> {
         selector: AllocatorSelector,
     ) -> &mut dyn Allocator<VM> {
         match selector {
-            AllocatorSelector::BumpPointer(index) => self.bump_pointer[index as usize].get_mut(),
-            AllocatorSelector::LargeObject(index) => self.large_object[index as usize].get_mut(),
+            AllocatorSelector::BumpPointer(index) => {
+                self.bump_pointer[index as usize].assume_init_mut()
+            }
+            AllocatorSelector::LargeObject(index) => {
+                self.large_object[index as usize].assume_init_mut()
+            }
         }
     }
 
     pub fn new(
         mutator_tls: OpaquePointer,
-        plan: &'static SelectedPlan<VM>,
+        plan: &'static dyn Plan<VM = VM>,
         space_mapping: &[(AllocatorSelector, &'static dyn Space<VM>)],
     ) -> Self {
         let mut ret = Allocators {
@@ -88,7 +96,7 @@ impl<VM: VMBinding> Allocators<VM> {
 //   LargeObject,
 // }
 #[repr(C, u8)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum AllocatorSelector {
     BumpPointer(u8),
     LargeObject(u8),
