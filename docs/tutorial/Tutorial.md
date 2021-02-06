@@ -1,8 +1,13 @@
 # MMTk Tutorial
 
-In this tutorial, you will build multiple garbage collectors using MMTk from 
-scratch. This tutorial is aimed at GC implementors who would like to implement 
-new GC algorithms/plans using the MMTk.
+In this tutorial, you will build multiple garbage collectors from 
+scratch using MMTk. 
+You will start with an incredibly simple 'collector' called NoGC, 
+and through a series of additions and refinements end up with a 
+generational copying garbage collector. 
+
+This tutorial is aimed at GC implementors who would like to implement 
+new GC algorithms/plans with MMTk.
 
 This tutorial is a work in progress. Some sections may be rough, and others may 
 be missing information (especially about import statements). If something is 
@@ -13,10 +18,15 @@ the problem.
 
 ## Contents
 * [Introduction](#introduction)
+  * [What *is* MMTk?](#what-is-mmtk)
+  * [What will this tutorial cover?](#what-will-this-tutorial-cover)
+  * [Terminology](#terminology)
+    * [Plans and Policies](#plans-and-policies)
 * [Preliminaries](#preliminaries)
   * [Set up MMTk and OpenJDK](#set-up-mmtk-and-openjdk)
     * [Basic set up](#basic-set-up)
     * [Test the build](#test-the-build)
+    * [Rust Logs](#rust-logs)
     * [Working with multiple VM builds](#working-with-multiple-vm-builds)
   * [Create MyGC](#create-mygc)
 * [Building a semispace collector](#building-a-semispace-collector)
@@ -28,24 +38,26 @@ the problem.
 
 
 ## Introduction
-### What *is* the MMTk?
-The Memory Management Toolkit (MMTk) is a framework to design and implement 
-memory managers. It has a core (mmtk-core) written in Rust, and bindings that 
-allow it to work with OpenJDK, V8, and JikesRVM, with more bindings currently in
-development. The toolkit has a number of pre-built collectors, and is intended 
-to make it relatively simple to expand upon or build new collectors. Many 
-elements common between collectors can be easily implemented.
+### What *is* MMTk?
+The Memory Management Toolkit (MMTk) is a framework for designing and 
+implementing memory managers. It has a runtime-neutral core (mmtk-core) 
+written in Rust, and bindings that allow it to work with OpenJDK, V8, 
+and JikesRVM, with more bindings currently in
+development. The principal idea of MMTk is that it can be used as a 
+toolkit, allowing new GC algorithms to be rapidly developed using 
+common components. It also allows different GC algorithms to be 
+compared on an apples-to-apples basis, since they share common mechanisms.
 
-### What will this tutorial be covering?
-This tutorial is intended to get you comfortable with building garbage 
-collectors in the MMTk.
+### What will this tutorial cover?
+This tutorial is intended to get you comfortable constructing new plans in 
+MMTk.
 
 You will first be guided through building a Semispace collector. After that, 
 you will extend this collector to be a generational collector, to further 
-familiarise you with different concepts in the MMTk. There will also be 
+familiarise you with different concepts in MMTk. There will also be 
 questions and exercises at various points in the tutorial, intended to 
 encourage you to think about what the code is doing, increase your general 
-understanding of the MMTk, and motivate further research.
+understanding of MMTk, and motivate further research.
 
 Where possible, there will be links to finished, functioning code after each 
 section so that you can check that your code is correct. Note, however, that 
@@ -56,33 +68,62 @@ finished code provided.
 
 ### Terminology
 
-*allocator*: Handles allocation requests. Allocates objects into memory.
+*allocator*: Code that allocates new objects into memory.
 
-*collector*: Finds and frees memory used by 'dead' objects. 
+*collector*: Finds and frees memory occupied by 'dead' objects. 
 
-*dead*: An object that can no longer be accessed by any other object is dead.
+*dead*: An object that is not live.
 
 *GC work (unit), GC packet*: A schedulable unit of collection work. 
 
 *GC worker*: A worker that performs garbage collection operations (as required 
-by GC work units) using a single thread.
+by GC work units).
 
-*live*: An object that can still be accessed by other objects is live/alive.
+*live*: An object that is reachable, and thus can still be accessed by other 
+objects, is live/alive.
 
 *mutator*: Something that 'mutates', or changes, the objects stored in memory. 
-That is to say, this is a running program.
+This is the term that is traditionally used in the garbage collection literature 
+to describe the running program (because it 'mutates' the object graph).
 
-*plan*: A garbage collection algorithm composed of components from the MMTk.
+*plan*: A garbage collection algorithm expressed as a configuration of policies.
 
-*policy*: A definition of the semantics and behaviour of a memory region. 
-Memory spaces are instances of policies.
+See also [Plans and policies](#plans-and-policies) below.
+
+*policy*: A specific garbage collection algorithm, such as marksweep, copying, 
+immix, etc. Plans are made up of an arrangement of one or more policies. 
+
+See also [Plans and policies](#plans-and-policies) below.
 
 *scheduler*: Dynamically dispatches units of GC work to workers.
 
 *zeroing*, *zero initialization*: Initializing and resetting unused memory 
-bits to have a value of 0, generally to improve memory safety.
+bits to have a value of 0. Required by most memory-safe programming languages.
 
 See also: [Further Reading](#further-reading)
+
+
+#### Plans and Policies
+
+In MMTk, collectors are instantiated as plans, which can be thought of as 
+configurations of collector policies. In practice, most production 
+collectors and almost all collectors in MMTk are comprised of multiple 
+algorithms/policies. For example the gencopy plan describes a configuration 
+that combines a copying nursery with a semispace mature space. In MMTk we 
+think of these as three spaces, each of which happen to use the copyspace 
+policy, and which have a relationship which is defined by the gencopy plan. 
+Under the hood, gencopy builds upon a common plan which may also contain other 
+policies including a space for code, a read-only space, etc.
+
+Thus, someone wishing to construct a new collector based entirely on existing 
+policies may be able to do so in MMTk by simply writing a new plan, which is 
+what this tutorial covers.
+
+On the other hand, someone wishing to introduce an entirely new garbage 
+collection policy (such as Immix, for example), would need to first create 
+a policy which specifies that algorithm, before creating a plan which defines 
+how the GC algorithm fits together and utilizes that policy.
+
 
 [**Back to table of contents**](#contents)
 ***
@@ -132,6 +173,7 @@ entered in `repos/openjdk`.
    3. Then, run 
    `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java HelloWorld -XX:+UseThirdPartyHeap` 
    to run HelloWorld.
+   4. If your program printed out `Hello World!` as expected, then congratulations, you have MMTk working with OpenJDK!
    
 2. The Computer Language Benchmarks Game **fannkuchredux** (micro benchmark, 
 allocates a small amount of memory but - depending on heap size and the GC 
@@ -153,9 +195,12 @@ collections):
    using lusearch. Run the lusearch benchmark using the command 
    `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch` in `repos/openjdk`. 
 
+
+#### Rust Logs
+
 By using one of the debug builds, you gain access to the Rust logs - a useful 
-tool when testing a plan and observing the general behaviour of the MMTk. 
-There are two levels of trace that are useful when using the MMTk - `trace` 
+tool when testing a plan and observing the general behaviour of MMTk. 
+There are two levels of trace that are useful when using MMTk - `trace` 
 and `debug`. Generally, `debug` logs information about the slow paths 
 (allocation through MMTk, rather than fast path allocation through the binding). 
 `trace` includes all the information from `debug`, plus more information about 
@@ -235,6 +280,13 @@ same as they did while using NoGC.
 ### Create MyGC
 NoGC is a GC plan that only allocates memory, and does not have a collector. 
 We're going to use it as a base for building a new garbage collector.
+
+Recall that this tutorial will take you through the steps of building a 
+collector from basic principles. To do that, you'll create your own plan 
+called `MyGC` which you'll gradually refine and improve upon through the 
+course of this tutorial. At the beginning MyGC will resemble the very 
+simple NoGC plan.
+
 1. Each plan is stored in `mmtk-openjdk/repos/mmtk-core/src/plan`. Navigate 
 there and create a copy of the folder `nogc`. Rename it to `mygc`.
 3. In *each file* within `mygc`, rename any reference to `nogc` to `mygc`. 
@@ -279,8 +331,11 @@ and delete both it *and the line below it*.
 `#[cfg(not(feature = "mygc_lock_free"))]`, this time without changing the 
 line below it.
 
-After you rebuild OpenJDK (and the MMTk core), you can use MyGC. Try testing it 
+After you rebuild OpenJDK (and `mmtk-core`), you can use MyGC. Try testing it 
 with the each of the three benchmarks. It should work identically to NoGC.
+
+If you've got to this point, then congratulations! You have created your first working MMTk collector!
+
 
 At this point, you should familiarise yourself with the MyGC plan if you 
 haven't already. Try answering the following questions by looking at the code 
@@ -311,9 +366,10 @@ finishes, and the mutator is resumed.
 
 ### Allocation: Add copyspaces
 
-The first step of changing the MyGC plan into a semispace plan is to add the 
-two copyspaces and allow collectors to allocate memory into them during 
-collection. This requires adding two copyspaces, code to properly initialise 
+We will now change your MyGC plan from one that cannot collect garbage
+into one that implements the semispace algorithm. The first step of this
+is to add the two copyspaces, and allow collectors to allocate memory 
+into them. This involves adding two copyspaces, the code to properly initialise 
 and prepare the new spaces, and a copy context.
 
 
