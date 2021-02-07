@@ -1,34 +1,17 @@
-use crate::util::side_metadata::{SideMetadata, SideMetadataID};
-use crate::util::{constants, ObjectReference};
+use crate::util::side_metadata::*;
+use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicU8, Ordering};
 
-use super::Address;
+use super::constants;
 
-/// This struct encapsulates operations on the per-object GC byte (metadata)
-pub struct GCByte {}
-
-// For performance reasons, mutable static is used over lazy_static or sync::once.
-// This requires several unsafe blocks in the current file, but it looks safe to use these unsafe blocks, because we only assign the mutable static once.
-//
-// NOTE: A more suitable implementation may also be possible.
-static mut SIDE_GCBYTE_ID: SideMetadataID = SideMetadataID::new();
-
-#[allow(clippy::cast_ref_to_mut)]
-#[allow(clippy::mut_from_ref)]
-pub(crate) unsafe fn init_side_gcbyte() {
-    let res = SideMetadata::request_meta_bits(
-        // constants::BITS_IN_BYTE,
-        2,
-        constants::LOG_BYTES_IN_WORD as usize,
-    );
-    SIDE_GCBYTE_ID = res;
-}
-
-pub fn ensure_gcbyte_space_is_mapped(start: Address, size: usize) -> bool {
-    unsafe { SideMetadata::map_meta_space(start, size, SIDE_GCBYTE_ID) }
-}
+const SIDE_GC_BYTE_SPEC: SideMetadataSpec = SideMetadataSpec {
+    scope: SideMetadataScope::Global,
+    offset: 0,
+    log_num_of_bits: 1,
+    log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+};
 
 // TODO: we probably need to add non-atomic versions of the read and write methods
 /// Return the GC byte of an object as an atomic.
@@ -41,11 +24,8 @@ pub fn ensure_gcbyte_space_is_mapped(start: Address, size: usize) -> bool {
 /// Otherwise, MMTk provides the metadata on its side.
 ///
 fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 {
-    if VM::VMObjectModel::HAS_GC_BYTE {
-        unsafe { &*(object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET).to_ptr::<AtomicU8>() }
-    } else {
-        unreachable!()
-    }
+    debug_assert!(VM::VMObjectModel::HAS_GC_BYTE);
+    unsafe { &*(object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET).to_ptr::<AtomicU8>() }
 }
 
 /// Atomically reads the current value of an object's GC byte.
@@ -56,7 +36,7 @@ pub fn read_gc_byte<VM: VMBinding>(object: ObjectReference) -> u8 {
         get_gc_byte::<VM>(object).load(Ordering::SeqCst)
     } else {
         // is safe, because we only assign SIDE_GCBYTE_ID once
-        unsafe { SideMetadata::load_atomic(SIDE_GCBYTE_ID, object.to_address()) as u8 }
+        load_atomic(SIDE_GC_BYTE_SPEC, object.to_address()) as u8
     }
 }
 
@@ -66,9 +46,7 @@ pub fn write_gc_byte<VM: VMBinding>(object: ObjectReference, val: u8) {
         get_gc_byte::<VM>(object).store(val, Ordering::SeqCst);
     } else {
         // is safe, because we only assign SIDE_GCBYTE_ID once
-        unsafe {
-            SideMetadata::store_atomic(SIDE_GCBYTE_ID, object.to_address(), val as usize);
-        }
+        store_atomic(SIDE_GC_BYTE_SPEC, object.to_address(), val as usize);
     }
 }
 
@@ -86,13 +64,11 @@ pub fn compare_exchange_gc_byte<VM: VMBinding>(
             .is_ok()
     } else {
         // is safe, because we only assign SIDE_GCBYTE_ID once
-        unsafe {
-            SideMetadata::compare_exchange_atomic(
-                SIDE_GCBYTE_ID,
-                object.to_address(),
-                old_val as usize,
-                new_val as usize,
-            )
-        }
+        compare_exchange_atomic(
+            SIDE_GC_BYTE_SPEC,
+            object.to_address(),
+            old_val as usize,
+            new_val as usize,
+        )
     }
 }

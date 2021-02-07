@@ -1,5 +1,5 @@
 use crate::util::conversions::*;
-use crate::util::gc_byte;
+use crate::util::side_metadata::try_map_metadata_space;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -266,12 +266,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 unsafe { Address::zero() }
             } else {
                 debug!("Space.acquire(), returned = {}", rtn);
-                if !VM::VMObjectModel::HAS_GC_BYTE
-                    && !gc_byte::ensure_gcbyte_space_is_mapped(
-                        rtn,
-                        conversions::pages_to_bytes(pages),
-                    )
-                {
+                if !try_map_metadata_space(
+                    rtn,
+                    conversions::pages_to_bytes(pages),
+                    VM::VMActivePlan::global().global_side_metadata_per_chunk(),
+                    self.local_side_metadata_per_chunk(),
+                ) {
                     // TODO(Javad): handle meta space allocation failure
                     panic!("failed to mmap meta memory");
                 }
@@ -343,9 +343,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        if !VM::VMObjectModel::HAS_GC_BYTE
-            && !gc_byte::ensure_gcbyte_space_is_mapped(self.common().start, self.common().extent)
-        {
+        if !try_map_metadata_space(
+            self.common().start,
+            self.common().extent,
+            VM::VMActivePlan::global().global_side_metadata_per_chunk(),
+            self.local_side_metadata_per_chunk(),
+        ) {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
@@ -440,6 +443,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             }
         }
         println!();
+    }
+
+    fn local_side_metadata_per_chunk(&self) -> usize {
+        0
     }
 }
 
