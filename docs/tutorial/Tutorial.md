@@ -549,6 +549,8 @@ work. DaCapo's lusearch should fail, as it requires garbage to be collected.
    
 ### Collection: Implement garbage collection
 
+#### CopyContext and Scheduler
+
 We need to add a few more things to get garbage collection working. 
 Specifically, we need to add a `CopyContext`, which a GC worker uses for 
 copying objects, and GC work packets that will be scheduled for a collection.
@@ -559,7 +561,7 @@ structures and functions that will give the collector proper functionality.
 
 1. Make a new file under `mygc`, called `gc_works.rs`. 
 2. In `mod.rs`, import `gc_works` as a module by adding the line `mod gc_works`.
-3. In `gc_works`, add the following import statements:
+3. In `gc_works.rs`, add the following import statements:
     ```rust
     use super::global::MyGC;
     use crate::policy::space::Space;
@@ -568,10 +570,7 @@ structures and functions that will give the collector proper functionality.
     use crate::MMTK;
     ```
 
-
-#### CopyContext and Scheduler
-
-3. Add a new structure, `MyGCCopyContext`, with the type parameter 
+4. Add a new structure, `MyGCCopyContext`, with the type parameter 
 `VM: VMBinding`. It should have the fields `plan:&'static MyGC<VM>` 
 and `mygc: BumpAllocator`.
    ```rust
@@ -580,7 +579,8 @@ and `mygc: BumpAllocator`.
        mygc: BumpAllocator<VM>,
    }
    ```
-4. Create an implementation block - 
+   
+5. Create an implementation block - 
 `impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM>`.
    1. Define the associate type `VM` for `CopyContext` as the VMBinding type 
    given to the class as `VM`: `type VM: VM`. 
@@ -617,8 +617,9 @@ and `mygc: BumpAllocator`.
        ```
    4. In `init()`, set the `tls` variable in the held instance of `mygc` to 
    the one passed to the function.
+   [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/gc_works.rs#L26-L28)
     
-5. Add a new public structure, `MyGCProcessEdges`, with the type parameter 
+6. Add a new public structure, `MyGCProcessEdges`, with the type parameter 
 `<VM:VMBinding>`. It will hold an instance of `ProcessEdgesBase` and 
 `PhantomData`, and implement the Default trait:
     ```rust
@@ -628,7 +629,7 @@ and `mygc: BumpAllocator`.
         phantom: PhantomData<VM>,
     }
     ```
-6. Add a new implementations block 
+7. Add a new implementations block 
 `impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM>`.
    1. Similarly to before, set `ProcessEdgesWork`'s associate type `VM` to 
    the type parameter of `MyGCProcessEdges`, `VM`: `type VM:VM`.
@@ -642,16 +643,20 @@ and `mygc: BumpAllocator`.
        }
       ```
 
-7. Now that they've been added, you should import `MyGCCopyContext` and
-`MyGCProcessEdges` into `global.rs`. `MyGCProcessEdges` isn't needed until the
-next step, but it's convenient to add it now.
-   1. Change the CopyContext in `Plan for MyGC` from `NoCopy` to
-   `MyGCCopyContext`.
-   2. `NoCopy` is no longer needed. Remove it from the import statement block.
-8. Also import `crate::scheduler::gc_works::*;`, and modify the line importing
-`MMTK` scheduler to read `use crate::scheduler::*;`.
+8. Now that they've been added, you should import `MyGCCopyContext` and
+`MyGCProcessEdges` into `global.rs`, which we will be working in for the
+next few steps. [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L1)
 
-8. Add a new method to `Plan for MyGC`, `schedule_collection`. This function 
+9. Change the `CopyContext` field in `Plan for MyGC` from `NoCopy` to
+`MyGCCopyContext`.
+   
+10. `NoCopy` is now no longer needed. Remove it from the import statement block.
+
+11. For the next step, import `crate::scheduler::gc_works::*;`, and modify the 
+line importing `MMTK` scheduler to read `use crate::scheduler::*;`.
+[[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/global.rs#L13-L14)
+
+12. Add a new method to `Plan for MyGC`, `schedule_collection()`. This function 
 is run when a collection is triggered. It stops all mutators, then runs the 
 scheduler's prepare stage. After this, it resumes the mutators.
     ```rust
@@ -673,13 +678,19 @@ scheduler's prepare stage. After this, it resumes the mutators.
 
 #### Prepare for collection
 
-1. CopyContext: 
-   1. In `prepare`: rebind allocator to tospace
-   2. In `alloc()`, call the allocator's `alloc` function. Above the function, 
+The collector has a number of steps it needs to perform before each collection.
+We'll add these now.
+
+1. First, fill in some more of the skeleton functions we added to the 
+`CopyContext` (in `gc_works.rs`) earlier: 
+   1. In `prepare()`, rebind the allocator to the tospace using the function
+   `self.mygc.rebind(Some(self.plan.tospace()))`.
+   2. In `alloc_copy()`, call the allocator's `alloc` function. Above the function, 
    use an inline attribute (`#[inline(always)]`) to tell the Rust compiler 
-   to always inline the function.
-2. `global.rs`: Find the method `prepare`. Delete the `unreachable!()` call, and add the 
-following code:
+   to always inline the function. 
+   [[Finished code]](/docs/tutorial/tutorial%20code/mygc_semispace/gc_works.rs#L34-L44)
+2. In `global.rs`, find the method `prepare`. Delete the `unreachable!()` 
+call, and add the following code:
     ```rust
     self.common.prepare(tls, true);
     self.hi
@@ -696,33 +707,40 @@ following code:
 This function will be called at the preparation stage of a collection 
 (at the start of a collection) for each mutator. Its body can stay empty, as 
 there aren't any preparation steps for the mutator in this GC.
+4. In `create_mygc_mutator()`, find the field `prep_func` and change it from
+`mygc_mutator_noop()` to `mygc_mutator_prepare()`.
+
 
 #### Collection steps
 
+Next, we'll add the code to allow the plan to collect garbage - filling out 
+functions for work packets.
+
 1. In `gc_works.rs`, add a new method to `ProcessEdgesWork for MyGCProcessEdges`, 
 `trace_object(&mut self, object: ObjectReference)`.
-    1. This method should return an ObjectReference, and use the 
-    inline attribute.
-    2. Check if the object passed into the function is null 
-    (`object.is_null()`). If it is, return the object.
-    3. Check if the object is in the tospace 
-    (`self.plan().tospace().in_space(object)`). If it is, call `trace_object` 
-    through the tospace to check if the object is alive, and return the result:
-        ```rust
-        self.plan().tospace().trace_object(
-            self,
-            object,
-            super::global::ALLOC_MyGC,
-            self.worker().local(),
-        )
-        ```
-    4. If it is not in the tospace, check if the object is in the fromspace 
-    and return the result of the fromspace's `trace_object` if it is.
-    5. If it is in neither space, it must be in the immortal space, or large 
-    object space. Trace the object with 
-    `self.plan().common.trace_object(self, object)`.
+   1. This method should return an ObjectReference, and use the 
+   inline attribute.
+   2. Check if the object passed into the function is null 
+   (`object.is_null()`). If it is, return the object.
+   3. Check if the object is in the tospace 
+   (`self.plan().tospace().in_space(object)`). If it is, call `trace_object` 
+   through the tospace to check if the object is alive, and return the result:
+       ```rust
+       self.plan().tospace().trace_object(
+           self,
+           object,
+           super::global::ALLOC_MyGC,
+           self.worker().local(),
+       )
+       ```
+   4. If it is not in the tospace, check if the object is in the fromspace 
+   and return the result of the fromspace's `trace_object` if it is.
+   5. If it is in neither space, it must be in the immortal space, or large 
+   object space. Trace the object with 
+   `self.plan().common.trace_object(self, object)`.
 
-2. Add two new implementation blocks, `Deref` and `DerefMut`, both for 
+   [[Finished code (step 1)]](/docs/tutorial/tutorial%20code/mygc_semispace/gc_works.rs#L73-L95)
+2. Add two new implementation blocks, `Deref` and `DerefMut` for 
 `MyGCProcessEdges`. These allow `MyGCProcessEdges` to be dereferenced to 
 `ProcessEdgesBase`, and allows easy access to fields in `ProcessEdgesBase`.
    ```rust
@@ -746,25 +764,27 @@ there aren't any preparation steps for the mutator in this GC.
 
 #### Release and Finalise
 
-8. To `post_copy()` add `forwarding_word::clear_forwarding_bits::<VM>(obj);`. 
-Also, add an inline (always) attribute.
+Finally, we need to fill out the functions that are, roughly speaking, 
+run after each collection.
 
-3. Find the method `release`. Delete the `unreachable!()` call, and add the 
-following code:
+1. To `post_copy()`, in the `CopyContext` implementations block, add 
+`forwarding_word::clear_forwarding_bits::<VM>(obj);`. Also, add an 
+inline attribute.
+
+2. Find the method `release()` in `global.rs`. Replace the 
+`unreachable!()` call with the following code:
     ```rust
     self.common.release(tls, true);
     self.fromspace().release();
     ```
-    This function is called at the end of a collection.
-3. In `create_mygc_mutator`, replace `mygc_mutator_noop` in the `prep_func` 
-and `release_func` fields with `mygc_mutator_prepare` and `mygc_mutator_release` 
-respectively.
-4. Delete `mygc_mutator_noop`. It was a placeholder for the prepare and 
-release functions you just added, so it is now dead code.
-6. Leave `release()` with an empty body. There are no release steps for 
-`CopyContext` in this collector.
-2. Create a new function called `mygc_mutator_release` that takes the same 
-inputs as the `prepare` function above. This function will be called at the 
+    This function is called at the end of a collection. It releases the common
+    plan spaces and the fromspace.
+3. Go back to `mutator.rs`. In `create_mygc_mutator()`, replace 
+`mygc_mutator_noop()` in the `release_func` field with `mygc_mutator_release()`.
+4. Leave the `release()` function in the `CopyContext` empty. There are no 
+release steps for `CopyContext` in this collector.
+5. Create a new function called `mygc_mutator_release()` that takes the same 
+inputs as the `prepare()` function above. This function will be called at the 
 release stage of a collection (at the end of a collection) for each mutator. 
 It rebinds the allocator for the `Default` allocation semantics to the new 
 tospace. When the mutator threads resume, any new allocations for `Default` 
@@ -781,11 +801,13 @@ will then go to the new tospace. The function has the following body:
        .unwrap();
        bump_allocator.rebind(Some(mutator.plan.tospace()));
     ```
-
-4. Delete `handle_user_collection_request`. This function was an override of 
+6. Delete `mygc_mutator_noop()`. It was a placeholder for the prepare and 
+release functions that you have now added, so it is now dead code.
+7. Delete `handle_user_collection_request()`. This function was an override of 
 a Common plan function to ignore user requested collection for NoGC. Now we 
 remove it and allow user requested collection.
-   
+
+
 You should now have MyGC working and able to collect garbage. All three
  benchmarks should be able to pass now. 
 
@@ -795,6 +817,7 @@ collector!
 ***
 
 ### Exercise: Adding another copyspace
+
 Now that you have a working semispace collector, you should be familiar 
 enough with the code to start writing some yourself. The intention of this 
 exercise is to reinforce the information from the semispace section, rather 
@@ -848,9 +871,10 @@ these objects into a separate 'mature' space, the number of full heap
 collections needed is greatly reduced.
 
 
-This section is currently incomplete. 
+This section is currently incomplete. Instructions for building a
+generational copying (gencopy) collector will be added in future.
 
-### Triplespace backup instructions
+## Triplespace backup instructions
 
 First, rename all instances of `mygc` to `triplespace`, and add it as a 
 module by following the instructions in [Create MyGC](#create-mygc).
