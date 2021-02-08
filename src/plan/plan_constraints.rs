@@ -1,4 +1,5 @@
 use crate::util::constants::*;
+use crate::plan::barriers::BarrierSelector;
 
 /// This struct defines plan-specific constraints.
 /// Most of the constraints are constants. Each plan should declare a constant of this struct,
@@ -13,6 +14,7 @@ pub struct PlanConstraints {
     pub needs_write_barrier: bool,
     pub needs_log_bit_in_header: bool,
     pub needs_log_bit_in_header_num: usize,
+    pub barrier: BarrierSelector,
     // the following seems unused for now
     pub needs_linear_scan: bool,
     pub needs_concurrent_workers: bool,
@@ -35,6 +37,7 @@ impl PlanConstraints {
             needs_concurrent_workers: false,
             generate_gc_trace: false,
             needs_forward_after_liveness: false,
+            barrier: BarrierSelector::NoBarrier,
         }
     }
 }
