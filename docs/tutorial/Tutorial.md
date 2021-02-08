@@ -20,7 +20,7 @@ the problem.
 * [Introduction](#introduction)
   * [What *is* MMTk?](#what-is-mmtk)
   * [What will this tutorial cover?](#what-will-this-tutorial-cover)
-  * [Terminology](#terminology)
+  * [Glossary](#glossary)
     * [Plans and Policies](#plans-and-policies)
 * [Preliminaries](#preliminaries)
   * [Set up MMTk and OpenJDK](#set-up-mmtk-and-openjdk)
@@ -66,7 +66,7 @@ these files and your collector due to your position in the tutorial. By the end
 of each major section, your code should be functionally identical to the 
 finished code provided.
 
-### Terminology
+### Glossary
 
 *allocator*: Code that allocates new objects into memory.
 
