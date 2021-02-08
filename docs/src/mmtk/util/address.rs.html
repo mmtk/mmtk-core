@@ -497,6 +497,14 @@
 <span id="494">494</span>
 <span id="495">495</span>
 <span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">atomic_traits</span>::<span class="ident">Atomic</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>;
@@ -615,6 +623,14 @@
     <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">usize</span>;
     <span class="kw">fn</span> <span class="ident">shr</span>(<span class="self">self</span>, <span class="ident">shift</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">shift</span>
+    }
+}
+
+<span class="doccomment">/// Address &lt;&lt; shift (get an index)</span>
+<span class="kw">impl</span> <span class="ident">Shl</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
+    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">usize</span>;
+    <span class="kw">fn</span> <span class="ident">shl</span>(<span class="self">self</span>, <span class="ident">shift</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="number">0</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">shift</span>
     }
 }
 

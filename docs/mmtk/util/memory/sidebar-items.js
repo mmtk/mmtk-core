@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["dzmmap","Demand-zero mmap: This function guarantees to zero all mapped memory."],["mprotect",""],["munprotect",""],["zero",""]]});
+initSidebarItems({"fn":[["dzmmap","Demand-zero mmap: This function guarantees to zero all mapped memory."],["mmap_noreserve","mmap with no swap space reserve: This function only maps the address range, but doesn't occupy any physical memory."],["mprotect",""],["munprotect",""],["zero",""]]});

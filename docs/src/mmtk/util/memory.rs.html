@@ -52,6 +52,44 @@
 <span id="49">49</span>
 <span id="50">50</span>
 <span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="ident">libc</span>::{<span class="ident">c_void</span>, <span class="ident">PROT_EXEC</span>, <span class="ident">PROT_NONE</span>, <span class="ident">PROT_READ</span>, <span class="ident">PROT_WRITE</span>};
@@ -78,11 +116,13 @@
         }
         <span class="prelude-val">Ok</span>(<span class="ident">addr</span>)
     } <span class="kw">else</span> {
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">result</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">127</span>,
-                <span class="string">&quot;mmap with MAP_FIXED has unexpected behavior: demand zero mmap with MAP_FIXED on {:?} returned some other address {:?}&quot;</span>,
-                <span class="ident">start</span>, <span class="ident">result</span>
-        );
-        <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">from_raw_os_error</span>(<span class="ident">result</span> <span class="kw">as</span> <span class="kw">_</span>))
+        <span class="comment">// assert!(result as usize &lt;= 127,</span>
+        <span class="comment">//         &quot;mmap with MAP_FIXED has unexpected behavior: demand zero mmap with MAP_FIXED on {:?} returned some other address {:?}&quot;,</span>
+        <span class="comment">//         start, result</span>
+        <span class="comment">// );</span>
+        <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">from_raw_os_error</span>(
+            <span class="kw">unsafe</span> { <span class="kw-2">*</span><span class="ident">libc</span>::<span class="ident">__errno_location</span>() } <span class="kw">as</span> <span class="kw">_</span>,
+        ))
     }
 }
 
@@ -103,6 +143,42 @@
     } <span class="kw">else</span> {
         <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">from_raw_os_error</span>(<span class="ident">result</span>))
     }
+}
+
+<span class="doccomment">/// mmap with no swap space reserve:</span>
+<span class="doccomment">/// This function only maps the address range, but doesn&#39;t occupy any physical memory.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Before using any part of the address range, dzmmap must be called.</span>
+<span class="doccomment">///</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mmap_noreserve</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">prot</span> <span class="op">=</span> <span class="ident">libc</span>::<span class="ident">PROT_NONE</span>;
+    <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span>
+        <span class="ident">libc</span>::<span class="ident">MAP_ANON</span> <span class="op">|</span> <span class="ident">libc</span>::<span class="ident">MAP_PRIVATE</span> <span class="op">|</span> <span class="ident">libc</span>::<span class="ident">MAP_FIXED_NOREPLACE</span> <span class="op">|</span> <span class="ident">libc</span>::<span class="ident">MAP_NORESERVE</span>;
+
+    <span class="kw">let</span> <span class="ident">page_addr</span> <span class="op">=</span> <span class="ident">start</span>;
+    <span class="kw">let</span> <span class="ident">result</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">libc</span>::<span class="ident">c_void</span> <span class="op">=</span>
+        <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">mmap</span>(<span class="ident">page_addr</span>.<span class="ident">to_mut_ptr</span>(), <span class="ident">size</span>, <span class="ident">prot</span>, <span class="ident">flags</span>, <span class="op">-</span><span class="number">1</span>, <span class="number">0</span>) };
+    <span class="kw">if</span> <span class="ident">result</span> <span class="op">=</span><span class="op">=</span> <span class="ident">libc</span>::<span class="ident">MAP_FAILED</span> {
+        <span class="kw">let</span> <span class="ident">err</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">*</span><span class="ident">libc</span>::<span class="ident">__errno_location</span>() };
+        <span class="kw">if</span> <span class="ident">err</span> <span class="op">=</span><span class="op">=</span> <span class="ident">libc</span>::<span class="ident">EEXIST</span> {
+            <span class="comment">// mmtk already mapped it</span>
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
+        } <span class="kw">else</span> {
+            <span class="comment">// mmtk can&#39;t map it</span>
+            <span class="macro">println</span><span class="macro">!</span>(
+                <span class="string">&quot;ERR mapping({}): {}&quot;</span>,
+                <span class="ident">page_addr</span>,
+                <span class="ident">Error</span>::<span class="ident">from_raw_os_error</span>(<span class="ident">err</span> <span class="kw">as</span> <span class="kw">_</span>)
+            );
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">from_raw_os_error</span>(<span class="ident">err</span> <span class="kw">as</span> <span class="kw">_</span>));
+        }
+    }
+
+    <span class="macro">println</span><span class="macro">!</span>(
+        <span class="string">&quot;mmap_noreserve({}, 0x{:x}) -&gt; result(0x{:x})&quot;</span>,
+        <span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">result</span> <span class="kw">as</span> <span class="ident">usize</span>
+    );
+    <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>)
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "mmtk";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

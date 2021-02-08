@@ -243,6 +243,7 @@
 <span id="240">240</span>
 <span id="241">241</span>
 <span id="242">242</span>
+<span id="243">243</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">gc_byte</span>;
 <span class="doccomment">/// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java</span>
@@ -304,9 +305,10 @@
         }
     } <span class="kw">else</span> {
         <span class="macro">panic</span><span class="macro">!</span>(
-            <span class="string">&quot;Invalid header value 0x{:x} 0x{:x}&quot;</span>,
+            <span class="string">&quot;Invalid header value 0x{:x} 0x{:x} for object{}&quot;</span>,
             <span class="ident">gc_byte</span>,
-            <span class="ident">read_forwarding_word</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
+            <span class="ident">read_forwarding_word</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>),
+            <span class="ident">object</span>
         )
     }
 }

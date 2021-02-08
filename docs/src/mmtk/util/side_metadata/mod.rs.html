@@ -1,0 +1,230 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/side_metadata/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
+<link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png">
+<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../mmtk/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="doccomment">//! This is a generic module to work with side metadata (vs. in-object metadata)</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This module enables the implementation of a wide range of GC algorithms for VMs which do not provide (any/sufficient) in-object space for GC-specific metadata (e.g. marking bits, logging bit, etc.).</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Design</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! MMTk side metadata is designed to be **generic**, and **space-** and **time-** efficient.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! It aims to support two categories of side metadata:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! 1. **Global** metadata bits which are plan-specific but common to all policies, and</span>
+<span class="doccomment">//! 2. **Policy-specific** bits which are only used exclusively by certain policies.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! To support these categories, MMTk side metadata provides the following features:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! 1. The granularity of the source data (minimum data size) is configurable to $2^n$ bytes, where $n &gt;= 0$.</span>
+<span class="doccomment">//! 2. The number of metadata bits per source data unit is configurable to $2^m$ bits, where $m &gt;= 0$.</span>
+<span class="doccomment">//! 3. The total number of metadata bit-sets is constrained by the worst-case ratio of global and policy-specific metadata.</span>
+<span class="doccomment">//! 4. Metadata space is only allocated on demand.</span>
+<span class="doccomment">//! 5. Bulk-zeroing of metadata bits should be possible. For this, the memory space for each metadata bit-set is contiguous per chunk.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//!‌ MMTK side metadata is organized per chunk of data (each chunk is managed exclusively by one policy).</span>
+<span class="doccomment">//! This means, when a new chunk is mapped, the side metadata for the whole chunk, which includes the global and policy-specific metadata, is also mapped.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # How to Use</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! For each global side metadata bit-set, a constant object of the `SideMetadataSpec` struct should be created.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! For the first global side metadata bit-set:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! const GLOBAL_META_1: SideMetadataSpec = SideMetadataSpec {</span>
+<span class="doccomment">//!    scope: SideMetadataScope::Global,</span>
+<span class="doccomment">//!    offset: 0,</span>
+<span class="doccomment">//!    log_num_of_bits: b1,</span>
+<span class="doccomment">//!    log_min_obj_size: s1,</span>
+<span class="doccomment">//! };</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Here, the number of bits per data is $2^b1$, and the minimum object size is $2^s1$.</span>
+<span class="doccomment">//! The `offset` is a constant which shows the offset of the beginning of this metadata bit-set from the beginning of the metadata chunk.</span>
+<span class="doccomment">//! For the first bit-set, `offset` is zero.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Now, to add a second side metadata bit-set, offset needs to be calculated based-on the first global bit-set:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! const GLOBAL_META_2: SideMetadataSpec = SideMetadataSpec {</span>
+<span class="doccomment">//!    scope: SideMetadataScope::Global,</span>
+<span class="doccomment">//!    offset: meta_bytes_per_chunk(s1, b1),</span>
+<span class="doccomment">//!    log_num_of_bits: b2,</span>
+<span class="doccomment">//!    log_min_obj_size: s2,</span>
+<span class="doccomment">//! };</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! where `meta_bytes_per_chunk` is a const function which calculates the offset based-on `s` and `b` from the first global bit-set.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! A schematic of a sample metadata chunk looks like:</span>
+<span class="doccomment">//!     _______________________________     &lt;= offset-g1 = 0x0</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |        Global-1             |</span>
+<span class="doccomment">//!     |_____________________________|     &lt;= offset-g2 = meta_bytes_per_chunk(s1, b1)</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |        Global-2             |</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |_____________________________|     &lt;= offset-g3 = offset-g2 + meta_bytes_per_chunk(s2, b2)</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |        Not Mapped           |</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |_____________________________|     &lt;= offset-l1 = 4MB * Global_worst_case_ratio</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |      PolicySpecific-1       |</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |_____________________________|     &lt;= offset-l2 = offset-l1 + meta_bytes_per_chunk(s3, b3)</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |      PolicySpecific-2       |</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |_____________________________|     &lt;= offset-l3 = offset-l2 + meta_bytes_per_chunk(s4, b4)</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |         Not Mapped          |</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |                             |</span>
+<span class="doccomment">//!     |_____________________________|     &lt;= 4MB * (Global_WCR + PolicySpecific_WCR)</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! So far, no metadata space is allocated.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! For this purpose, each plan should override `fn global_side_metadata_per_chunk(&amp;self) -&gt; usize;` to return the size of the global side metadata it needs per chunk. This can be calculated using the `meta_bytes_per_chunk` function.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! For the local metadata bit-sets, each policy needs to follow the same pattern as the global metadata, with two differences:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! 1. scope should be `SideMetadataScope::PolicySpecific`,</span>
+<span class="doccomment">//! 2. each policy needs to override `fn local_side_metadata_per_chuck(&amp;self) -&gt; usize;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! After mapping the metadata space, the following operations can be performed on the metadata:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! 1. atomic load</span>
+<span class="doccomment">//! 2. atomic store</span>
+<span class="doccomment">//! 3. atomic compare-and-exchange</span>
+<span class="doccomment">//! 4. atomic fetch-and-add</span>
+<span class="doccomment">//! 5. atomic fetch-and-sub</span>
+<span class="doccomment">//! 6. load (non-atomic)</span>
+<span class="doccomment">//! 7. store (non-atomic)</span>
+<span class="doccomment">//! 8. bulk zeroing</span>
+<span class="doccomment">//!</span>
+
+<span class="kw">mod</span> <span class="ident">constants</span>;
+<span class="kw">mod</span> <span class="ident">global</span>;
+<span class="kw">mod</span> <span class="ident">helpers</span>;
+
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">global</span>::<span class="kw-2">*</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">helpers</span>::<span class="kw-2">*</span>;
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../../";window.currentCrate = "mmtk";</script><script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>
