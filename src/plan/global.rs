@@ -328,6 +328,10 @@ pub trait Plan: 'static + Sync + Send + Downcast {
             );
         }
     }
+
+    fn global_side_metadata_per_chunk(&self) -> usize {
+        0
+    }
 }
 
 impl_downcast!(Plan assoc VM);
