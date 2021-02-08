@@ -1,6 +1,5 @@
 use super::gc_works::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
 use super::mutator::ALLOCATOR_MAPPING;
-use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -23,6 +22,7 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::*;
+use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

@@ -1,5 +1,5 @@
-use crate::util::constants::*;
 use crate::plan::barriers::BarrierSelector;
+use crate::util::constants::*;
 
 /// This struct defines plan-specific constraints.
 /// Most of the constraints are constants. Each plan should declare a constant of this struct,
