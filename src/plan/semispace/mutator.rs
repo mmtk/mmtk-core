@@ -56,6 +56,7 @@ pub fn create_ss_mutator<VM: VMBinding>(
         prepare_func: &ss_mutator_prepare,
         release_func: &ss_mutator_release,
     };
+    println!("creating ss mutator");
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),

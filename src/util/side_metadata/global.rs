@@ -75,6 +75,7 @@ pub fn try_map_metadata_space(
     global_per_chunk: usize,
     local_per_chunk: usize,
 ) -> bool {
+    // debug!("try_map_metadata_space");
     let mut aligned_start = start.align_down(BYTES_IN_CHUNK);
     let aligned_end = (start + size).align_up(BYTES_IN_CHUNK);
 
@@ -114,6 +115,7 @@ pub fn try_mmap_metadata_chunk(
     global_per_chunk: usize,
     local_per_chunk: usize,
 ) -> MappingState {
+    // debug!("try_mmap_metadata_chunk");
     trace!(
         "try_mmap_metadata_chunk({}, 0x{:x}, 0x{:x})",
         start,
@@ -212,6 +214,7 @@ pub fn ensure_munmap_metadata_chunk(
     global_per_chunk: usize,
     local_per_chunk: usize,
 ) {
+    // debug!("ensure_munmap_metadata_chunk");
     let global_meta_start = address_to_meta_chunk_addr(start);
     let result = unsafe { libc::munmap(global_meta_start.to_mut_ptr(), global_per_chunk) };
     assert_eq!(result, 0);
@@ -223,6 +226,7 @@ pub fn ensure_munmap_metadata_chunk(
 
 #[inline(always)]
 pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
+    // debug!("load_atomic at address {}", data_addr);
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_chunk_is_mmaped(metadata_spec, data_addr);

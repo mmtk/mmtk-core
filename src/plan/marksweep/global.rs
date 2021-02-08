@@ -1,5 +1,5 @@
 use super::gc_works::MSProcessEdges;
-use crate::{mmtk::MMTK, plan::PlanConstraints};
+use crate::{mmtk::MMTK, plan::PlanConstraints, util::side_metadata::{SideMetadataScope, SideMetadataSpec, load_atomic, meta_bytes_per_chunk}};
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -8,9 +8,9 @@ use crate::plan::marksweep::malloc::ms_free;
 use crate::plan::marksweep::malloc::ms_malloc_usable_size;
 use crate::plan::marksweep::metadata::unset_alloc_bit;
 use crate::plan::marksweep::metadata::unset_mark_bit;
-use crate::plan::marksweep::metadata::ALLOC_METADATA_ID;
+use crate::plan::marksweep::metadata::ALLOC_METADATA_SPEC;
 use crate::plan::marksweep::metadata::ACTIVE_CHUNKS;
-use crate::plan::marksweep::metadata::MARKING_METADATA_ID;
+use crate::plan::marksweep::metadata::MARKING_METADATA_SPEC;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -30,7 +30,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::SideMetadata;
+use crate::util::side_metadata;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::{collections::HashSet, sync::Arc};
@@ -74,8 +74,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         unsafe {
             let align = constants::LOG_BYTES_IN_WORD as usize;
             HEAP_SIZE = heap_size;
-            ALLOC_METADATA_ID = SideMetadata::request_meta_bits(1, align);
-            MARKING_METADATA_ID = SideMetadata::request_meta_bits(1, align);
         }
         self.base.gc_init(heap_size, vm_map, scheduler);
     }
@@ -109,17 +107,19 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn release(&self, _tls: OpaquePointer) {
         let mut released_chunks = HashSet::new();
+        let mut released_addresses = HashSet::new();
         unsafe {
             for chunk_start in &*ACTIVE_CHUNKS.read().unwrap() {
                 let mut chunk_is_empty = true;
                 let mut address = *chunk_start;
                 let chunk_end = chunk_start.add(BYTES_IN_CHUNK);
                 while address.as_usize() < chunk_end.as_usize() {
-                    if SideMetadata::load_atomic(ALLOC_METADATA_ID, address) == 1 {
-                        if SideMetadata::load_atomic(MARKING_METADATA_ID, address) == 0 {
+                    if load_atomic(ALLOC_METADATA_SPEC, address) == 1 {
+                        if load_atomic(MARKING_METADATA_SPEC, address) == 0 {
                             let ptr = address.to_mut_ptr();
                             HEAP_USED.fetch_sub(ms_malloc_usable_size(ptr), Ordering::SeqCst);
                             ms_free(ptr);
+                            released_addresses.insert(address.as_usize());
                             unset_alloc_bit(address);
                         } else {
                             unset_mark_bit(address);
@@ -136,6 +136,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                 .write()
                 .unwrap()
                 .retain(|c| !released_chunks.contains(&c.as_usize()));
+            super::metadata::NODES.lock().unwrap().retain(|a| !released_addresses.contains(&a));
         }
     }
 
