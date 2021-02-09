@@ -4,6 +4,7 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
 use crate::util::constants::*;
 use crate::util::metadata::*;
+use crate::scheduler::WorkBucketStage;
 use crate::util::*;
 use crate::MMTK;
 
@@ -66,14 +67,14 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for ObjectRememberingBarrier<
         let mut modbuf = vec![];
         std::mem::swap(&mut modbuf, &mut self.modbuf);
         debug_assert!(
-            !self.mmtk.scheduler.final_stage.is_activated(),
+            !self.mmtk.scheduler.work_buckets[WorkBucketStage::Final].is_activated(),
             "{:?}",
             self as *const _
         );
         if modbuf.len() != 0 {
             self.mmtk
                 .scheduler
-                .closure_stage
+                .work_buckets[WorkBucketStage::Closure]
                 .add(ProcessModBuf::<E>::new(modbuf));
         }
     }

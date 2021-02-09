@@ -1,3 +1,5 @@
+use crate::{Plan, util::conversions::*};
+use crate::util::side_metadata::try_map_metadata_space;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{conversions::*, metadata::map_metadata_pages_for_chunk};
@@ -6,8 +8,6 @@ use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
 use crate::util::heap::{PageResource, VMRequest};
 use crate::vm::{ActivePlan, Collection, ObjectModel};
-
-use crate::plan::Plan;
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
@@ -21,7 +21,6 @@ use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
-use crate::SelectedConstraints;
 use crate::util::metadata;
 
 use crate::vm::VMBinding;
@@ -51,6 +50,7 @@ use downcast_rs::Downcast;
  */
 pub trait SFT {
     fn name(&self) -> &str;
+    fn is_empty(&self) -> bool { false }
     fn is_nursery(&self) -> bool { false }
     fn is_live(&self, object: ObjectReference) -> bool;
     fn is_movable(&self) -> bool;
@@ -71,6 +71,9 @@ const EMPTY_SFT_NAME: &str = "empty";
 impl SFT for EmptySpaceSFT {
     fn name(&self) -> &str {
         EMPTY_SFT_NAME
+    }
+    fn is_empty(&self) -> bool {
+        true
     }
     fn is_live(&self, object: ObjectReference) -> bool {
         panic!(
@@ -182,24 +185,24 @@ impl SFTMap {
 
     /// Update SFT map for the given address range.
     /// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-    pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+    pub fn update<VM: VMBinding>(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
         if DEBUG_SFT {
             self.log_update(space, start, chunks);
         }
         let first = start.chunk_index();
         for chunk in first..(first + chunks) {
-            self.set(chunk, space);
+            self.set::<VM>(chunk, space);
         }
         if DEBUG_SFT {
             self.trace_sft_map();
         }
     }
 
-    pub fn clear(&self, chunk_idx: usize) {
-        self.set(chunk_idx, &EMPTY_SPACE_SFT);
+    pub fn clear<VM: VMBinding>(&self, chunk_idx: usize) {
+        self.set::<VM>(chunk_idx, &EMPTY_SPACE_SFT);
     }
 
-    fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
+    fn set<VM: VMBinding>(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
         /*
          * This is safe (only) because a) this is only called during the
          * allocation and deallocation of chunks, which happens under a global
@@ -223,10 +226,10 @@ impl SFTMap {
                 new
             );
         }
-        if SelectedConstraints::METADATA_PAGES_PER_CHUNK != 0
-            && self_mut.sft[chunk] == &EMPTY_SPACE_SFT
+        if VM::VMActivePlan::global().constraints().metadata_pages_per_chunk != 0
+            && unsafe { &*self_mut.sft[chunk] }.is_empty()
         {
-            map_metadata_pages_for_chunk(conversions::chunk_index_to_address(chunk), unsafe { &*sft });
+            map_metadata_pages_for_chunk::<VM>(conversions::chunk_index_to_address(chunk), unsafe { &*sft });
         }
         self_mut.sft[chunk] = sft;
     }
@@ -240,7 +243,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
-        // debug_assert!(tls != 0);
         // Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.
         let should_poll = unsafe { VM::VMActivePlan::is_mutator(tls) };
         // Is a GC allowed here? enable_collection() has to be called so we know GC is initialized.
@@ -250,7 +252,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         let pr = self.get_page_resource();
         let pages_reserved = pr.reserve_pages(pages);
         trace!("Pages reserved");
-
         trace!("Polling ..");
 
         if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
@@ -265,6 +266,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             debug!("Collection not required");
             let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, tls);
             if rtn.is_zero() {
+                // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
                 if !allow_poll {
                     panic!("Physical allocation failed when polling not allowed!");
                 }
@@ -276,6 +278,15 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 unsafe { Address::zero() }
             } else {
                 debug!("Space.acquire(), returned = {}", rtn);
+                if !try_map_metadata_space(
+                    rtn,
+                    conversions::pages_to_bytes(pages),
+                    VM::VMActivePlan::global().global_side_metadata_per_chunk(),
+                    self.local_side_metadata_per_chunk(),
+                ) {
+                    // TODO(Javad): handle meta space allocation failure
+                    panic!("failed to mmap meta memory");
+                }
                 rtn
             }
         }
@@ -334,7 +345,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         );
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
-            SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
+            SFT_MAP.update::<VM>(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
         }
     }
 
@@ -344,7 +355,16 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        SFT_MAP.update(
+        if !try_map_metadata_space(
+            self.common().start,
+            self.common().extent,
+            VM::VMActivePlan::global().global_side_metadata_per_chunk(),
+            self.local_side_metadata_per_chunk(),
+        ) {
+            // TODO(Javad): handle meta space allocation failure
+            panic!("failed to mmap meta memory");
+        }
+        SFT_MAP.update::<VM>(
             self.as_sft() as *const (dyn SFT + Sync),
             self.common().start,
             chunks,
@@ -435,6 +455,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             }
         }
         println!();
+    }
+
+    fn local_side_metadata_per_chunk(&self) -> usize {
+        0
     }
 }
 
@@ -562,7 +586,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn init(&self, sft: *const (dyn SFT + Sync)) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            SFT_MAP.update(sft, self.start, bytes_to_chunks_up(self.extent));
+            SFT_MAP.update::<VM>(sft, self.start, bytes_to_chunks_up(self.extent));
         }
     }
 

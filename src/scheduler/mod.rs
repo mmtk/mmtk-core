@@ -13,6 +13,7 @@ pub use context::*;
 pub use mmtk_context::*;
 pub use scheduler::*;
 pub use work::*;
+pub use work_bucket::WorkBucketStage;
 pub use worker::*;
 
 pub mod gc_works;

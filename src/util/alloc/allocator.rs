@@ -3,7 +3,6 @@ use crate::util::constants::DEFAULT_STRESS_FACTOR;
 
 use std::sync::atomic::Ordering;
 
-use crate::plan::selected_plan::SelectedPlan;
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::constants::*;
@@ -109,7 +108,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     fn get_tls(&self) -> OpaquePointer;
 
     fn get_space(&self) -> Option<&'static dyn Space<VM>>;
-    fn get_plan(&self) -> &'static SelectedPlan<VM>;
+    fn get_plan(&self) -> &'static dyn Plan<VM = VM>;
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 

@@ -143,12 +143,12 @@ impl<VM: VMBinding> CopySpace<VM> {
     }
 
     #[inline]
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
         &self,
         trace: &mut T,
         object: ObjectReference,
         semantics: AllocationSemantics,
-        copy_context: &mut impl CopyContext,
+        copy_context: &mut C,
     ) -> ObjectReference {
         trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
         if !self.from_space() {

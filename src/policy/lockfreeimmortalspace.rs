@@ -6,7 +6,6 @@ use crate::util::heap::PageResource;
 
 use crate::util::ObjectReference;
 
-use crate::plan::Plan;
 use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{
@@ -95,7 +94,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         self.limit = AVAILABLE_START + total_bytes;
         // Eagerly memory map the entire heap (also zero all the memory)
         crate::util::memory::dzmmap(AVAILABLE_START, total_bytes).unwrap();
-        SFT_MAP.update(
+        SFT_MAP.update::<VM>(
             self.as_sft(),
             AVAILABLE_START,
             bytes_to_chunks_up(total_bytes),

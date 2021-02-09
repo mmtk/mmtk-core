@@ -2,9 +2,9 @@ use super::constants::*;
 use super::conversions;
 use super::heap::layout::vm_layout_constants::*;
 use super::{memory::dzmmap, Address};
-use crate::SelectedConstraints;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::policy::space::*;
+use crate::{policy::space::*, vm::VMBinding};
+use crate::vm::ActivePlan;
 
 pub const METADATA_BASE: Address = HEAP_END;
 
@@ -71,17 +71,17 @@ impl BitsReference {
     }
 }
 
-const fn metadata_start(address: Address) -> Address {
+fn metadata_start<VM: VMBinding>(address: Address) -> Address {
     let chunk_index = conversions::address_to_chunk_index(address);
-    let offset = (chunk_index * SelectedConstraints::METADATA_PAGES_PER_CHUNK) << LOG_BYTES_IN_PAGE;
+    let offset = (chunk_index * VM::VMActivePlan::global().constraints().metadata_pages_per_chunk) << LOG_BYTES_IN_PAGE;
     unsafe { Address::from_usize(METADATA_BASE.as_usize() + offset) }
 }
 
-pub fn map_metadata_pages_for_chunk(chunk: Address, sft: &dyn SFT) {
-    let metadata_start = metadata_start(chunk);
+pub fn map_metadata_pages_for_chunk<VM: VMBinding>(chunk: Address, sft: &dyn SFT) {
+    let metadata_start = metadata_start::<VM>(chunk);
     dzmmap(
         metadata_start,
-        SelectedConstraints::METADATA_PAGES_PER_CHUNK << LOG_BYTES_IN_PAGE,
+        VM::VMActivePlan::global().constraints().metadata_pages_per_chunk << LOG_BYTES_IN_PAGE,
     )
     .unwrap();
 }

@@ -1,11 +1,12 @@
 use std::cell::UnsafeCell;
 
+use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
 use crate::util::gc_byte;
-use crate::util::header_byte;
+use crate::util::header_byte::HeaderByte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
@@ -31,6 +32,7 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     mark_state: u8,
     in_nursery_gc: bool,
     treadmill: TreadMill,
+    header_byte: HeaderByte,
 }
 
 unsafe impl<VM: VMBinding> Sync for LargeObjectSpace<VM> {}
@@ -63,10 +65,10 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 0
             };
         self.treadmill.add_to_treadmill(cell, alloc);
-        if header_byte::NEEDS_UNLOGGED_BIT {
+        if self.header_byte.needs_unlogged_bit {
             gc_byte::write_gc_byte::<VM>(
                 object,
-                gc_byte::read_gc_byte::<VM>(object) | header_byte::UNLOGGED_BIT,
+                gc_byte::read_gc_byte::<VM>(object) | self.header_byte.unlogged_bit,
             );
         }
     }
@@ -108,6 +110,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
+        constraints: &'static PlanConstraints,
     ) -> Self {
         let common = CommonSpace::new(
             SpaceOptions {
@@ -131,6 +134,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new(),
+            header_byte: HeaderByte::new(constraints),
         }
     }
 
