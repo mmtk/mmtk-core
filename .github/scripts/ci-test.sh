@@ -1,5 +1,3 @@
-set -xe
-
 cargo test
 
 # For x86_64-linux, also check for i686
