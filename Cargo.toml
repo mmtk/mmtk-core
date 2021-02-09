@@ -41,7 +41,7 @@ rand = "0.7.3"
 [features]
 default = []
 
-# When adding any new feature, please add the new feature to .github/scripts/ci-common.sh 
+# When adding any new feature, please add the new feature to .github/scripts/ci-common.sh
 # so their builds are properly tested in the CI.
 
 # -- Non mutally exclusive features --
@@ -54,6 +54,8 @@ code_space  = ["base_spaces"]
 
 # Run sanity GC
 sanity = []
+# Run analysis
+analysis = []
 # Use lock free variant of NoGC
 nogc_lock_free = []
 # Use lock free with no zeroing NoGC

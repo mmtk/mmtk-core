@@ -1,10 +1,10 @@
 arch=`rustc --print cfg | grep target_arch | cut -f2 -d"\""`
 os=`rustc --print cfg | grep target_os | cut -f2 -d"\""`
 
-feature_list="vm_space,ro_space,code_space,sanity,nogc_lock_free,nogc_no_zeroing,single_worker"
+feature_list="vm_space,ro_space,code_space,analysis,sanity,nogc_lock_free,nogc_no_zeroing,single_worker"
 
 # non mutally exclusive features
-non_exclusive_features="vm_space,ro_space,code_space,sanity,nogc_lock_free,nogc_no_zeroing,single_worker"
+non_exclusive_features="vm_space,ro_space,code_space,analysis,sanity,nogc_lock_free,nogc_no_zeroing,single_worker"
 # mutally exclusive features ("name:option1,option2,..." - name doesnt matter, but opition needs to match features in Cargo.toml)
 exclusive_features=("malloc:malloc_mimalloc,malloc_jemalloc,malloc_hoard")
 

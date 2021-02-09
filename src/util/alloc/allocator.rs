@@ -121,7 +121,8 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let tls = self.get_tls();
         let plan = self.get_plan().base();
-        let stress_test = plan.options.stress_factor != DEFAULT_STRESS_FACTOR;
+        let stress_test = plan.options.stress_factor != DEFAULT_STRESS_FACTOR
+            || plan.options.analysis_factor != DEFAULT_STRESS_FACTOR;
 
         // Information about the previous collection.
         let mut emergency_collection = false;
