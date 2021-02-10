@@ -166,11 +166,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn global_side_metadata_per_chunk(&self) -> usize {
-        if !VM::VMObjectModel::HAS_GC_BYTE {
-            meta_bytes_per_chunk(3, 1)
-        } else {
-            0
-        }
+        assert!(VM::VMObjectModel::HAS_GC_BYTE);
+        meta_bytes_per_chunk(3, 0)
     }
 }
 

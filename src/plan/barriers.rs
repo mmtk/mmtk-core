@@ -7,6 +7,7 @@ use crate::util::metadata::*;
 use crate::scheduler::WorkBucketStage;
 use crate::util::*;
 use crate::MMTK;
+use crate::util::side_metadata::*;
 
 use super::mutator_context::{BARRIER_COUNTER, BARRIER_FAST_COUNT, BARRIER_SLOW_COUNT};
 
@@ -32,15 +33,17 @@ pub struct ObjectRememberingBarrier<E: ProcessEdgesWork, S: Space<E::VM>> {
     mmtk: &'static MMTK<E::VM>,
     nursery: &'static S,
     modbuf: Vec<ObjectReference>,
+    meta: SideMetadataSpec,
 }
 
 impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
     #[allow(unused)]
-    pub fn new(mmtk: &'static MMTK<E::VM>, nursery: &'static S) -> Self {
+    pub fn new(mmtk: &'static MMTK<E::VM>, nursery: &'static S, meta: SideMetadataSpec) -> Self {
         Self {
             mmtk,
             nursery,
             modbuf: vec![],
+            meta,
         }
     }
 
@@ -49,7 +52,8 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
         if (BARRIER_COUNTER) {
             BARRIER_FAST_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
         }
-        if BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b1, 0b0) {
+        if compare_exchange_atomic(self.meta, obj.to_address(), 0b0, 0b1) {
+            // store_atomic(self.meta, obj.to_address(), 0b1);
             if (BARRIER_COUNTER) {
                 BARRIER_SLOW_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
             }
