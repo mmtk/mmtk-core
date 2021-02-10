@@ -1,10 +1,10 @@
-set -xe
+. $(dirname "$0")/ci-common.sh
 
-cargo test
+for_all_features "cargo test"
 
 # For x86_64-linux, also check for i686
 if [[ $arch == "x86_64" && $os == "linux" ]]; then
-    cargo test --target i686-unknown-linux-gnu
+    for_all_features "cargo test --target i686-unknown-linux-gnu"
 fi
 
 python examples/build.py
