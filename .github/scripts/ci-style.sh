@@ -1,5 +1,3 @@
-set -xe
-
 . $(dirname "$0")/ci-common.sh
 
 export RUSTFLAGS="-D warnings"

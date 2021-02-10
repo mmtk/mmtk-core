@@ -1,5 +1,3 @@
-set -xe
-
 . $(dirname "$0")/ci-common.sh
 
 # Execute this script under the root folder of this repo. Otherwise it will fail.
