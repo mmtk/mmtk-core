@@ -24,7 +24,7 @@ pub(crate) fn address_to_meta_address(
 
     let meta_chunk_addr = address_to_meta_chunk_addr(data_addr);
     let internal_addr = data_addr.as_usize() & CHUNK_MASK;
-    let rshift = (constants::LOG_BITS_IN_WORD as i32) + log_min_obj_size - bits_num_log;
+    let rshift = (constants::LOG_BITS_IN_BYTE as i32) + log_min_obj_size - bits_num_log;
     debug_assert!(rshift >= 0);
 
     let second_offset = internal_addr >> rshift;
@@ -64,6 +64,28 @@ mod tests {
     use crate::util::side_metadata::global::*;
     use crate::util::side_metadata::helpers::*;
     use crate::util::Address;
+
+    #[test]
+    fn test_different_metadata_address() {
+        let spec = SideMetadataSpec {
+            scope: SideMetadataScope::Global,
+            offset: 0,
+            log_num_of_bits: 1, 
+            log_min_obj_size: 3
+        };
+        unsafe {
+            let data_addr_1 = Address::from_usize(0x30); 
+            let data_addr_2 = Address::from_usize(0x70);
+            let meta_addr_1 = address_to_meta_address(spec, data_addr_1);
+            let meta_addr_2 = address_to_meta_address(spec, data_addr_2);
+            let lshift_1 = meta_byte_lshift(spec, data_addr_1);
+            let lshift_2 = meta_byte_lshift(spec, data_addr_1);
+            println!("lshift 1 = {}, lshift 2 = {}", lshift_1, lshift_2);
+            println!("meta addr 1 = {}, meta addr 2 = {}", meta_addr_1, meta_addr_2);
+            assert!(meta_addr_1 != meta_addr_2);
+        }
+
+    }
 
     #[test]
     fn test_side_metadata_address_to_meta_address() {

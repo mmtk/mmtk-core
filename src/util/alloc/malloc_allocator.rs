@@ -1,4 +1,4 @@
-use crate::{plan::{global::Plan, marksweep::metadata::ALLOC_METADATA_SPEC}, util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK, side_metadata::load_atomic}};
+use crate::{plan::{global::Plan, marksweep::metadata::ALLOC_METADATA_SPEC}, util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK, side_metadata::{address_to_meta_address, load_atomic}}};
 use crate::plan::marksweep::malloc::ms_calloc;
 use crate::plan::marksweep::malloc::ms_malloc_usable_size;
 use crate::plan::marksweep::metadata::map_meta_space_for_chunk;
@@ -43,43 +43,24 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         unsafe {
             let ptr = ms_calloc(1, size);
             let address = Address::from_mut_ptr(ptr);
+            // debug!("address = {}", address);
             if !meta_space_mapped(address) {
                 self.plan.poll(true, self.space.unwrap());
                 let chunk_start = conversions::chunk_align_down(address);
                 map_meta_space_for_chunk(chunk_start);
             }
-            let start = chunk_align_down(address);
-            let mut a = start;
-            while a < start + BYTES_IN_CHUNK {
-                assert!((load_atomic(ALLOC_METADATA_SPEC, a) == 1) == crate::plan::marksweep::metadata::NODES.lock().unwrap().contains(&a.as_usize()), "metadata = {}, nodes = {} for address = {}", (load_atomic(ALLOC_METADATA_SPEC, a) == 1), !(load_atomic(ALLOC_METADATA_SPEC, a) == 1), a );
-                a = a.add(8);
-            }
-            let address_left = address.sub(8);
-            let address_right = address.add(8);
-            let test_addr = address.sub(56*8);
-            debug!("l address = {}, r address = {} t addr = {}", address_left, address_right, test_addr);
-            let leftbit_before = load_atomic(ALLOC_METADATA_SPEC, address_left);
-            let rightbit_before = load_atomic(ALLOC_METADATA_SPEC, address_right);
-            let testbit_before = load_atomic(ALLOC_METADATA_SPEC, test_addr);
-            debug!("lb before = {}, rb before = {} t before = {}", leftbit_before, rightbit_before, testbit_before);
-            set_alloc_bit(address);
+            let chunk_start = conversions::chunk_align_down(address);
             crate::plan::marksweep::metadata::NODES.lock().unwrap().insert(address.as_usize());
-            let leftbit_after = load_atomic(ALLOC_METADATA_SPEC, address_left);
-            let rightbit_after = load_atomic(ALLOC_METADATA_SPEC, address_right);
-            let testbit_after = load_atomic(ALLOC_METADATA_SPEC, test_addr);
-            debug!("lb after = {}, rb after = {} tb after = {}", leftbit_after, rightbit_after, testbit_after);
-            assert!(leftbit_after == leftbit_before);
-            assert!(rightbit_after == rightbit_before);
-            // assert!(testbit_before == testbit_after);
-            assert!(load_atomic(ALLOC_METADATA_SPEC, address) == 1);
-            a = start;
-            while a < start + BYTES_IN_CHUNK {
-                if a == test_addr {
-                    a = a.add(8);
-                }
-                assert!((load_atomic(ALLOC_METADATA_SPEC, a) == 1) == crate::plan::marksweep::metadata::NODES.lock().unwrap().contains(&a.as_usize()), "metadata = {}, nodes = {} for address = {}", (load_atomic(ALLOC_METADATA_SPEC, a) == 1), !(load_atomic(ALLOC_METADATA_SPEC, a) == 1), a );
-                a = a.add(8);
-            }
+            let meta_l = address_to_meta_address(ALLOC_METADATA_SPEC, chunk_start);
+            let meta_r = address_to_meta_address(ALLOC_METADATA_SPEC, chunk_start + BYTES_IN_CHUNK);
+            // println!("metadata for obj at {} should fall between {} and {}", address, meta_l, meta_r);
+
+            set_alloc_bit(address);
+            // let mut a = chunk_start;
+            // while a < chunk_start + BYTES_IN_CHUNK {
+            //     super::is_malloced(a.to_object_reference());
+            //     a = a.add(8);
+            // }
             HEAP_USED.fetch_add(ms_malloc_usable_size(ptr), Ordering::SeqCst);
             address
         }
