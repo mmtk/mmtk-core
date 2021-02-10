@@ -7,7 +7,9 @@ and through a series of additions and refinements end up with a
 generational copying garbage collector. 
 
 This tutorial is aimed at GC implementors who would like to implement 
-new GC algorithms/plans with MMTk.
+new GC algorithms/plans with MMTk. If you are a language implementor 
+interested in *porting* your runtime to MMTk, you should refer to the 
+[porting guide](/docs/portingguide/Porting_Guide.md) instead.
 
 This tutorial is a work in progress. Some sections may be rough, and others may 
 be missing information (especially about import statements). If something is 
@@ -42,17 +44,22 @@ the problem.
 The Memory Management Toolkit (MMTk) is a framework for designing and 
 implementing memory managers. It has a runtime-neutral core (mmtk-core) 
 written in Rust, and bindings that allow it to work with OpenJDK, V8, 
-and JikesRVM, with more bindings currently in
-development. The principal idea of MMTk is that it can be used as a 
+and JikesRVM, with more bindings currently in development. 
+MMTk was originally written in Java as part of the Jikes RVM Java runtime.
+The current version is similar in its purpose, but was made to be 
+very flexible with runtime and able to be ported to many different VMs.
+
+The principal idea of MMTk is that it can be used as a 
 toolkit, allowing new GC algorithms to be rapidly developed using 
 common components. It also allows different GC algorithms to be 
 compared on an apples-to-apples basis, since they share common mechanisms.
+
 
 ### What will this tutorial cover?
 This tutorial is intended to get you comfortable constructing new plans in 
 MMTk.
 
-You will first be guided through building a Semispace collector. After that, 
+You will first be guided through building a semispace collector. After that, 
 you will extend this collector to be a generational collector, to further 
 familiarise you with different concepts in MMTk. There will also be 
 questions and exercises at various points in the tutorial, intended to 
@@ -76,8 +83,8 @@ finished code provided.
 
 *GC work (unit), GC packet*: A schedulable unit of collection work. 
 
-*GC worker*: A worker that performs garbage collection operations (as required 
-by GC work units).
+*GC worker*: A worker thread that performs garbage collection operations 
+(as required by GC work units).
 
 *live*: An object that is reachable, and thus can still be accessed by other 
 objects, is live/alive.
@@ -761,17 +768,18 @@ functions for work packets.
    ```
     
    [[Finished code (step 2)]](/docs/tutorial/tutorial%20code/mygc_semispace/gc_works.rs#L98-L110)
+   
+3. To `post_copy()`, in the `CopyContext` implementations block, add 
+`forwarding_word::clear_forwarding_bits::<VM>(obj);`. Also, add an 
+inline attribute.
 
-#### Release and Finalise
+
+#### Release and Finalize
 
 Finally, we need to fill out the functions that are, roughly speaking, 
 run after each collection.
 
-1. To `post_copy()`, in the `CopyContext` implementations block, add 
-`forwarding_word::clear_forwarding_bits::<VM>(obj);`. Also, add an 
-inline attribute.
-
-2. Find the method `release()` in `global.rs`. Replace the 
+1. Find the method `release()` in `global.rs`. Replace the 
 `unreachable!()` call with the following code:
     ```rust
     self.common.release(tls, true);
@@ -779,11 +787,11 @@ inline attribute.
     ```
     This function is called at the end of a collection. It releases the common
     plan spaces and the fromspace.
-3. Go back to `mutator.rs`. In `create_mygc_mutator()`, replace 
+2. Go back to `mutator.rs`. In `create_mygc_mutator()`, replace 
 `mygc_mutator_noop()` in the `release_func` field with `mygc_mutator_release()`.
-4. Leave the `release()` function in the `CopyContext` empty. There are no 
+3. Leave the `release()` function in the `CopyContext` empty. There are no 
 release steps for `CopyContext` in this collector.
-5. Create a new function called `mygc_mutator_release()` that takes the same 
+4. Create a new function called `mygc_mutator_release()` that takes the same 
 inputs as the `prepare()` function above. This function will be called at the 
 release stage of a collection (at the end of a collection) for each mutator. 
 It rebinds the allocator for the `Default` allocation semantics to the new 
@@ -801,9 +809,9 @@ will then go to the new tospace. The function has the following body:
        .unwrap();
        bump_allocator.rebind(Some(mutator.plan.tospace()));
     ```
-6. Delete `mygc_mutator_noop()`. It was a placeholder for the prepare and 
+5. Delete `mygc_mutator_noop()`. It was a placeholder for the prepare and 
 release functions that you have now added, so it is now dead code.
-7. Delete `handle_user_collection_request()`. This function was an override of 
+6. Delete `handle_user_collection_request()`. This function was an override of 
 a Common plan function to ignore user requested collection for NoGC. Now we 
 remove it and allow user requested collection.
 
