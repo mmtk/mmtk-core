@@ -70,7 +70,7 @@ init_non_exclusive_features() {
 init_exclusive_features() {
     parse_features=false
     i=0
-
+    
     # Current group
     group=
     # Group index
