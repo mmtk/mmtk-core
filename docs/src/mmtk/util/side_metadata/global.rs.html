@@ -785,6 +785,76 @@
 <span id="782">782</span>
 <span id="783">783</span>
 <span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
+<span id="796">796</span>
+<span id="797">797</span>
+<span id="798">798</span>
+<span id="799">799</span>
+<span id="800">800</span>
+<span id="801">801</span>
+<span id="802">802</span>
+<span id="803">803</span>
+<span id="804">804</span>
+<span id="805">805</span>
+<span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
+<span id="810">810</span>
+<span id="811">811</span>
+<span id="812">812</span>
+<span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
+<span id="831">831</span>
+<span id="832">832</span>
+<span id="833">833</span>
+<span id="834">834</span>
+<span id="835">835</span>
+<span id="836">836</span>
+<span id="837">837</span>
+<span id="838">838</span>
+<span id="839">839</span>
+<span id="840">840</span>
+<span id="841">841</span>
+<span id="842">842</span>
+<span id="843">843</span>
+<span id="844">844</span>
+<span id="845">845</span>
+<span id="846">846</span>
+<span id="847">847</span>
+<span id="848">848</span>
+<span id="849">849</span>
+<span id="850">850</span>
+<span id="851">851</span>
+<span id="852">852</span>
+<span id="853">853</span>
+<span id="854">854</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">helpers</span>::<span class="kw-2">*</span>;
@@ -1001,12 +1071,16 @@
     <span class="ident">local_per_chunk</span>: <span class="ident">usize</span>,
 ) {
     <span class="kw">let</span> <span class="ident">global_meta_start</span> <span class="op">=</span> <span class="ident">address_to_meta_chunk_addr</span>(<span class="ident">start</span>);
-    <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">munmap</span>(<span class="ident">global_meta_start</span>.<span class="ident">to_mut_ptr</span>(), <span class="ident">global_per_chunk</span>) };
-    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">result</span>, <span class="number">0</span>);
+    <span class="kw">if</span> <span class="ident">global_per_chunk</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">munmap</span>(<span class="ident">global_meta_start</span>.<span class="ident">to_mut_ptr</span>(), <span class="ident">global_per_chunk</span>) };
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">result</span>, <span class="number">0</span>);
+    }
 
-    <span class="kw">let</span> <span class="ident">policy_meta_start</span> <span class="op">=</span> <span class="ident">global_meta_start</span> <span class="op">+</span> <span class="ident">POLICY_SIDE_METADATA_OFFSET</span>;
-    <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">munmap</span>(<span class="ident">policy_meta_start</span>.<span class="ident">to_mut_ptr</span>(), <span class="ident">local_per_chunk</span>) };
-    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">result</span>, <span class="number">0</span>);
+    <span class="kw">if</span> <span class="ident">local_per_chunk</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+        <span class="kw">let</span> <span class="ident">policy_meta_start</span> <span class="op">=</span> <span class="ident">global_meta_start</span> <span class="op">+</span> <span class="ident">POLICY_SIDE_METADATA_OFFSET</span>;
+        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">munmap</span>(<span class="ident">policy_meta_start</span>.<span class="ident">to_mut_ptr</span>(), <span class="ident">local_per_chunk</span>) };
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">result</span>, <span class="number">0</span>);
+    }
 }
 
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
@@ -1360,214 +1434,280 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">helpers</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">constants</span>, <span class="ident">Address</span>};
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">test_util</span>::<span class="ident">serial_test</span>;
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_side_metadata_try_mmap_metadata_chunk</span>() {
-        <span class="kw">let</span> <span class="ident">gspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
-            <span class="ident">offset</span>: <span class="number">0</span>,
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
-        };
-        <span class="kw">let</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">PolicySpecific</span>,
-            <span class="ident">offset</span>: <span class="number">0</span>,
-            <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
-        };
+        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">gspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
+                <span class="ident">offset</span>: <span class="number">0</span>,
+                <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
+                <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            };
+            <span class="kw">let</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">PolicySpecific</span>,
+                <span class="ident">offset</span>: <span class="number">0</span>,
+                <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
+                <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            };
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
-            <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0</span>) },
-            <span class="number">1</span>,
-            <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">0</span>, <span class="number">1</span>)
-        ));
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>,
+                <span class="number">1</span>,
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">0</span>, <span class="number">0</span>),
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">0</span>, <span class="number">1</span>)
+            ));
 
-        <span class="ident">ensure_metadata_chunk_is_mmaped</span>(<span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0</span>) });
-        <span class="ident">ensure_metadata_chunk_is_mmaped</span>(<span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0</span>) });
-        <span class="ident">ensure_metadata_chunk_is_mmaped</span>(<span class="ident">gspec</span>, <span class="kw">unsafe</span> {
-            <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">-</span> <span class="number">1</span>)
-        });
-        <span class="ident">ensure_metadata_chunk_is_mmaped</span>(<span class="ident">lspec</span>, <span class="kw">unsafe</span> {
-            <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">-</span> <span class="number">1</span>)
-        });
+            <span class="ident">ensure_metadata_chunk_is_mmaped</span>(<span class="ident">gspec</span>, <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>);
+            <span class="ident">ensure_metadata_chunk_is_mmaped</span>(<span class="ident">lspec</span>, <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>);
+            <span class="ident">ensure_metadata_chunk_is_mmaped</span>(
+                <span class="ident">gspec</span>,
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">-</span> <span class="number">1</span>,
+            );
+            <span class="ident">ensure_metadata_chunk_is_mmaped</span>(
+                <span class="ident">lspec</span>,
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">-</span> <span class="number">1</span>,
+            );
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
-            <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>) },
-            <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">+</span> <span class="number">1</span>,
-            <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">3</span>, <span class="number">2</span>),
-            <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">4</span>, <span class="number">2</span>)
-        ));
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>,
+                <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">+</span> <span class="number">1</span>,
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">3</span>, <span class="number">2</span>),
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">4</span>, <span class="number">2</span>)
+            ));
 
-        <span class="ident">ensure_metadata_chunk_is_mmaped</span>(<span class="ident">gspec</span>, <span class="kw">unsafe</span> {
-            <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>)
-        });
-        <span class="ident">ensure_metadata_chunk_is_mmaped</span>(<span class="ident">lspec</span>, <span class="kw">unsafe</span> {
-            <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>)
-        });
-        <span class="ident">ensure_metadata_chunk_is_mmaped</span>(<span class="ident">gspec</span>, <span class="kw">unsafe</span> {
-            <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">*</span> <span class="number">3</span> <span class="op">-</span> <span class="number">1</span>)
-        });
-        <span class="ident">ensure_metadata_chunk_is_mmaped</span>(<span class="ident">lspec</span>, <span class="kw">unsafe</span> {
-            <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">*</span> <span class="number">3</span> <span class="op">-</span> <span class="number">1</span>)
-        });
+            <span class="ident">ensure_metadata_chunk_is_mmaped</span>(
+                <span class="ident">gspec</span>,
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>,
+            );
+            <span class="ident">ensure_metadata_chunk_is_mmaped</span>(
+                <span class="ident">lspec</span>,
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>,
+            );
+            <span class="ident">ensure_metadata_chunk_is_mmaped</span>(
+                <span class="ident">gspec</span>,
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">*</span> <span class="number">3</span> <span class="op">-</span> <span class="number">1</span>,
+            );
+            <span class="ident">ensure_metadata_chunk_is_mmaped</span>(
+                <span class="ident">lspec</span>,
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">*</span> <span class="number">3</span> <span class="op">-</span> <span class="number">1</span>,
+            );
+
+            <span class="ident">ensure_munmap_metadata_chunk</span>(
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>,
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">0</span>, <span class="number">0</span>),
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">0</span>, <span class="number">1</span>),
+            );
+
+            <span class="ident">ensure_munmap_metadata_chunk</span>(
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>,
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">3</span>, <span class="number">2</span>),
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">4</span>, <span class="number">2</span>),
+            );
+
+            <span class="ident">ensure_munmap_metadata_chunk</span>(
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="number">2</span> <span class="op">*</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>,
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">3</span>, <span class="number">2</span>),
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="number">4</span>, <span class="number">2</span>),
+            );
+        })
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_side_metadata_atomic_fetch_add_sub_ge8bits</span>() {
-        <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>;
+        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>;
 
-        <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
-            <span class="ident">offset</span>: <span class="number">0</span>,
-            <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">usize</span>,
-        };
+            <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
+                <span class="ident">offset</span>: <span class="number">0</span>,
+                <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
+                <span class="ident">log_min_obj_size</span>: <span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">usize</span>,
+            };
 
-        <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
-            <span class="ident">offset</span>: <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
-                <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
-                <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>,
-            ),
-            <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">7</span>,
-        };
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
-            <span class="ident">data_addr</span>,
-            <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
-            <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
-                <span class="ident">metadata_2_spec</span>.<span class="ident">log_min_obj_size</span>,
-                <span class="ident">metadata_2_spec</span>.<span class="ident">log_num_of_bits</span>
-            ) <span class="op">+</span> <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
-                <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
-                <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>
-            ),
-            <span class="number">0</span>
-        ));
+            <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
+                <span class="ident">offset</span>: <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>,
+                ),
+                <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
+                <span class="ident">log_min_obj_size</span>: <span class="number">7</span>,
+            };
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
+                <span class="ident">data_addr</span>,
+                <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_2_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_2_spec</span>.<span class="ident">log_num_of_bits</span>
+                ) <span class="op">+</span> <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>
+                ),
+                <span class="number">0</span>
+            ));
 
-        <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
+            <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
 
-        <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">5</span>);
+            <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">5</span>);
 
-        <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
+            <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
 
-        <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">5</span>);
+            <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">5</span>);
 
-        <span class="kw">let</span> <span class="ident">another_five</span> <span class="op">=</span> <span class="ident">fetch_sub_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">2</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">another_five</span>, <span class="number">5</span>);
+            <span class="kw">let</span> <span class="ident">another_five</span> <span class="op">=</span> <span class="ident">fetch_sub_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">2</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">another_five</span>, <span class="number">5</span>);
 
-        <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">three</span>, <span class="number">3</span>);
+            <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">three</span>, <span class="number">3</span>);
 
-        <span class="kw">let</span> <span class="ident">another_five</span> <span class="op">=</span> <span class="ident">fetch_sub_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="number">2</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">another_five</span>, <span class="number">5</span>);
+            <span class="kw">let</span> <span class="ident">another_five</span> <span class="op">=</span> <span class="ident">fetch_sub_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="number">2</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">another_five</span>, <span class="number">5</span>);
 
-        <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">three</span>, <span class="number">3</span>);
+            <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">three</span>, <span class="number">3</span>);
+
+            <span class="ident">ensure_munmap_metadata_chunk</span>(
+                <span class="ident">data_addr</span>,
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_2_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_2_spec</span>.<span class="ident">log_num_of_bits</span>,
+                ) <span class="op">+</span> <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>,
+                ),
+                <span class="number">0</span>,
+            );
+        })
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_side_metadata_atomic_fetch_add_sub_2bits</span>() {
-        <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span>
-            <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> (<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>);
+        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span>
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> (<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>);
 
-        <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
-            <span class="ident">offset</span>: <span class="number">0</span>,
-            <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">usize</span>,
-        };
+            <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
+                <span class="ident">offset</span>: <span class="number">0</span>,
+                <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
+                <span class="ident">log_min_obj_size</span>: <span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">usize</span>,
+            };
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
-            <span class="ident">data_addr</span>,
-            <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
-            <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
-                <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
-                <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>
-            ),
-            <span class="number">0</span>
-        ));
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
+                <span class="ident">data_addr</span>,
+                <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>
+                ),
+                <span class="number">0</span>
+            ));
 
-        <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">2</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
+            <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">2</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
 
-        <span class="kw">let</span> <span class="ident">two</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">two</span>, <span class="number">2</span>);
+            <span class="kw">let</span> <span class="ident">two</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">two</span>, <span class="number">2</span>);
 
-        <span class="kw">let</span> <span class="ident">another_two</span> <span class="op">=</span> <span class="ident">fetch_sub_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">another_two</span>, <span class="number">2</span>);
+            <span class="kw">let</span> <span class="ident">another_two</span> <span class="op">=</span> <span class="ident">fetch_sub_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">1</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">another_two</span>, <span class="number">2</span>);
 
-        <span class="kw">let</span> <span class="ident">one</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">one</span>, <span class="number">1</span>);
+            <span class="kw">let</span> <span class="ident">one</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">one</span>, <span class="number">1</span>);
+
+            <span class="ident">ensure_munmap_metadata_chunk</span>(
+                <span class="ident">data_addr</span>,
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>,
+                ),
+                <span class="number">0</span>,
+            );
+        })
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_side_metadata_bzero_metadata_for_chunk</span>() {
-        <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span>
-            <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> (<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>);
+        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span>
+                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> (<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>);
 
-        <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">PolicySpecific</span>,
-            <span class="ident">offset</span>: <span class="number">0</span>,
-            <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">usize</span>,
-        };
+            <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">PolicySpecific</span>,
+                <span class="ident">offset</span>: <span class="number">0</span>,
+                <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
+                <span class="ident">log_min_obj_size</span>: <span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">usize</span>,
+            };
 
-        <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">PolicySpecific</span>,
-            <span class="ident">offset</span>: <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
-                <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
-                <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>,
-            ),
-            <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">7</span>,
-        };
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
-            <span class="ident">data_addr</span>,
-            <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
-            <span class="number">0</span>,
-            <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
-                <span class="ident">metadata_2_spec</span>.<span class="ident">log_min_obj_size</span>,
-                <span class="ident">metadata_2_spec</span>.<span class="ident">log_num_of_bits</span>
-            ) <span class="op">+</span> <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
-                <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
-                <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>
-            )
-        ));
+            <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">PolicySpecific</span>,
+                <span class="ident">offset</span>: <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>,
+                ),
+                <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
+                <span class="ident">log_min_obj_size</span>: <span class="number">7</span>,
+            };
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
+                <span class="ident">data_addr</span>,
+                <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
+                <span class="number">0</span>,
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_2_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_2_spec</span>.<span class="ident">log_num_of_bits</span>
+                ) <span class="op">+</span> <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>
+                )
+            ));
 
-        <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
+            <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
 
-        <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">5</span>);
+            <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">5</span>);
 
-        <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
+            <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
 
-        <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">5</span>);
+            <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">5</span>);
 
-        <span class="ident">bzero_metadata_for_chunk</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
+            <span class="ident">bzero_metadata_for_chunk</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
 
-        <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">5</span>);
-        <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">0</span>);
+            <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">5</span>);
+            <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">0</span>);
 
-        <span class="ident">bzero_metadata_for_chunk</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
+            <span class="ident">bzero_metadata_for_chunk</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
 
-        <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">0</span>);
-        <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">0</span>);
+            <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">0</span>);
+            <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">0</span>);
+
+            <span class="ident">ensure_munmap_metadata_chunk</span>(
+                <span class="ident">data_addr</span>,
+                <span class="number">0</span>,
+                <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_2_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_2_spec</span>.<span class="ident">log_num_of_bits</span>,
+                ) <span class="op">+</span> <span class="ident">helpers</span>::<span class="ident">meta_bytes_per_chunk</span>(
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>,
+                ),
+            );
+        })
     }
 }
 </pre></div>
