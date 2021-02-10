@@ -38,7 +38,7 @@ use downcast_rs::Downcast;
  * The underlying mechanism exploits the fact that spaces use the address space
  * at an MMTk chunk granularity with the consequence that each chunk maps to
  * exactluy one space, so knowing the chunk for an object reveals its space.
- * The dispatch then works by performing simple address arithmetic on the object
+ * The dispatch then work by performing simple address arithmetic on the object
  * reference to find a chunk index which is used to index a table which returns
  * the space.   The relevant function is then dispatched against that space
  * object.

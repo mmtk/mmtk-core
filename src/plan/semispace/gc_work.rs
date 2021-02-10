@@ -2,7 +2,7 @@ use super::global::SemiSpace;
 use crate::plan::CopyContext;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
-use crate::scheduler::gc_works::*;
+use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkerLocal;
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::forwarding_word;

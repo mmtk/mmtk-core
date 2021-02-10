@@ -1,6 +1,6 @@
 use crate::plan::global::CopyContext;
 use crate::plan::Plan;
-use crate::scheduler::gc_works::*;
+use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -94,7 +94,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityPrepare<P, W
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_works.add(PrepareCollector::<W>::new());
+            w.local_work.add(PrepareCollector::<W>::new());
         }
     }
 }
@@ -123,7 +123,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityRelease<P, W
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_works.add(ReleaseCollector::<W>::new());
+            w.local_work.add(ReleaseCollector::<W>::new());
         }
     }
 }

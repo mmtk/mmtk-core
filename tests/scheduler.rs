@@ -23,7 +23,7 @@ impl Work<()> for Sort {
 
 /// A work-packet to do array partition
 ///
-/// Recursively generates `Sort` works for partitioned sub-arrays.
+/// Recursively generates `Sort` work for partitioned sub-arrays.
 struct Partition(&'static mut [usize]);
 
 impl Work<()> for Partition {

@@ -115,10 +115,10 @@ impl<C: Context> WorkBucket<C> {
     pub fn add<W: Work<C>>(&self, work: W) {
         self.add_with_priority(1000, box work);
     }
-    pub fn bulk_add(&self, priority: usize, works: Vec<Box<dyn Work<C>>>) {
+    pub fn bulk_add(&self, priority: usize, work: Vec<Box<dyn Work<C>>>) {
         {
             let mut queue = self.queue.write();
-            for w in works {
+            for w in work {
                 queue.push(PrioritizedWork::new(priority, w));
             }
         }
