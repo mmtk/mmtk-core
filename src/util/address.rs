@@ -118,6 +118,14 @@ impl Shr<usize> for Address {
     }
 }
 
+/// Address << shift (get an index)
+impl Shl<usize> for Address {
+    type Output = usize;
+    fn shl(self, shift: usize) -> usize {
+        self.0 << shift
+    }
+}
+
 impl Address {
     pub const ZERO: Self = Address(0);
     pub const MAX: Self = Address(usize::max_value());

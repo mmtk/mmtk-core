@@ -20,7 +20,9 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
+use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::OpaquePointer;
+use crate::vm::ObjectModel;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
 use enum_map::EnumMap;
@@ -161,6 +163,14 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn in_nursery(&self) -> bool {
         self.in_nursery.load(Ordering::SeqCst)
+    }
+
+    fn global_side_metadata_per_chunk(&self) -> usize {
+        if !VM::VMObjectModel::HAS_GC_BYTE {
+            meta_bytes_per_chunk(3, 1)
+        } else {
+            0
+        }
     }
 }
 
