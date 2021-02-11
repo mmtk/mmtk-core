@@ -136,7 +136,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                 .write()
                 .unwrap()
                 .retain(|c| !released_chunks.contains(&c.as_usize()));
-            super::metadata::NODES.lock().unwrap().retain(|a| !released_addresses.contains(&a));
         }
     }
 

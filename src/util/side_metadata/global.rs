@@ -149,7 +149,6 @@ pub fn try_mmap_metadata_chunk(
     }
 
     let policy_meta_start = global_meta_start + POLICY_SIDE_METADATA_OFFSET;
-    debug!("mapping metadata from {} to {}",policy_meta_start, policy_meta_start + local_per_chunk);
     if local_per_chunk != 0 {
         let result: *mut libc::c_void = unsafe {
             libc::mmap(
@@ -227,13 +226,10 @@ pub fn ensure_munmap_metadata_chunk(
 
 #[inline(always)]
 pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
-    // debug!("load_atomic");
-    // assert!(false);
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_chunk_is_mmaped(metadata_spec, data_addr);
     }
-    // println!("load_atomic: data_addr = {}, meta_addr = {}", data_addr, meta_addr);
 
     let bits_num_log = metadata_spec.log_num_of_bits;
     
@@ -260,13 +256,11 @@ pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
 
 pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-    println!("store_atomic: data_addr = {}, meta_addr = {}", data_addr, meta_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_chunk_is_mmaped(metadata_spec, data_addr);
     }
 
     let bits_num_log = metadata_spec.log_num_of_bits;
-    // debug!("bit num log = {}", bits_num_log);
 
     if bits_num_log < 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
