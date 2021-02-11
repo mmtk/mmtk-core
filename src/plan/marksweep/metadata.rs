@@ -61,33 +61,25 @@ pub unsafe fn map_meta_space_for_chunk(chunk_start: Address) {
 // Check if a given object was allocated by malloc
 pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
     let address = object.to_address();
-    unsafe { meta_space_mapped(address) && load_atomic(ALLOC_METADATA_SPEC, address) == 1 }
+    meta_space_mapped(address) && load_atomic(ALLOC_METADATA_SPEC, address) == 1
 }
 
 pub fn is_marked(address: Address) -> bool {
-    unsafe { load_atomic(MARKING_METADATA_SPEC, address) == 1 }
+    load_atomic(MARKING_METADATA_SPEC, address) == 1
 }
 
 pub fn set_alloc_bit(address: Address) {
-    unsafe {
-        store_atomic(ALLOC_METADATA_SPEC, address, 1);
-    }
+    store_atomic(ALLOC_METADATA_SPEC, address, 1);
 }
 
 pub fn set_mark_bit(address: Address) {
-    unsafe {
-        store_atomic(MARKING_METADATA_SPEC, address, 1);
-    }
+    store_atomic(MARKING_METADATA_SPEC, address, 1);
 }
 
 pub fn unset_alloc_bit(address: Address) {
-    unsafe {
-        store_atomic(ALLOC_METADATA_SPEC, address, 0);
-    }
+    store_atomic(ALLOC_METADATA_SPEC, address, 0);
 }
 
 pub fn unset_mark_bit(address: Address) {
-    unsafe {
-        store_atomic(MARKING_METADATA_SPEC, address, 0);
-    }
+    store_atomic(MARKING_METADATA_SPEC, address, 0);
 }

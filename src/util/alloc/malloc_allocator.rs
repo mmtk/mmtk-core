@@ -47,8 +47,6 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
                 let chunk_start = conversions::chunk_align_down(address);
                 map_meta_space_for_chunk(chunk_start);
             }
-            let chunk_start = conversions::chunk_align_down(address);
-
             set_alloc_bit(address);
             HEAP_USED.fetch_add(malloc_usable_size(ptr), Ordering::SeqCst);
             address

@@ -73,7 +73,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
         unsafe {
-            let align = constants::LOG_BYTES_IN_WORD as usize;
             HEAP_SIZE = heap_size;
         }
         self.base.gc_init(heap_size, vm_map, scheduler);
