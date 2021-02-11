@@ -7,8 +7,6 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
-use super::MarkSweep;
-
 pub struct MSProcessEdges<VM: VMBinding> {
     base: ProcessEdgesBase<MSProcessEdges<VM>>,
 }
