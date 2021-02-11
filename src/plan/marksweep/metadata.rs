@@ -39,7 +39,7 @@ pub fn meta_space_mapped(address: Address) -> bool {
     ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
 }
 
-pub unsafe fn map_meta_space_for_chunk(chunk_start: Address) {
+pub fn map_meta_space_for_chunk(chunk_start: Address) {
     let mut active_chunks = ACTIVE_CHUNKS.write().unwrap();
     if active_chunks.contains(&chunk_start) {
         return;
