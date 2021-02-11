@@ -20,7 +20,6 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::malloc_allocator::HEAP_SIZE;
 use crate::util::alloc::malloc_allocator::HEAP_USED;
-use crate::util::constants;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
