@@ -94,7 +94,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityPrepare<P, W
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work.add(PrepareCollector::<W>::new());
+            w.local_work_bucket.add(PrepareCollector::<W>::new());
         }
     }
 }
@@ -123,7 +123,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityRelease<P, W
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work.add(ReleaseCollector::<W>::new());
+            w.local_work_bucket.add(ReleaseCollector::<W>::new());
         }
     }
 }
