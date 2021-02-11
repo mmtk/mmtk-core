@@ -219,8 +219,8 @@ impl<C: Context> Scheduler<C> {
 
     #[inline]
     fn pop_scheduable_work(&self, worker: &Worker<C>) -> Option<(Box<dyn Work<C>>, bool)> {
-        if let Some(work) = worker.local_work.poll() {
-            return Some((work, worker.local_work.is_empty()));
+        if let Some(work) = worker.local_work_bucket.poll() {
+            return Some((work, worker.local_work_bucket.is_empty()));
         }
         for work_bucket in self.work_buckets.values() {
             if let Some(work) = work_bucket.poll() {

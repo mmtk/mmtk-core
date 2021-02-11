@@ -104,7 +104,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         }
     }
 
-    // Slow path for allocation if the stress test flag has been enabled. It work
+    // Slow path for allocation if the stress test flag has been enabled. It works
     // by manipulating the limit to be below the cursor always.
     // Performs three kinds of allocations: (i) if the hard limit has been met;
     // (ii) the bump pointer semantics from the fastpath; and (iii) if the stress
