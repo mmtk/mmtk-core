@@ -20,15 +20,15 @@ pub enum CoordinatorMessage<C: Context> {
 
 pub struct Scheduler<C: Context> {
     pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<C>>,
-    /// Works for the coordinator thread
-    pub coordinator_works: WorkBucket<C>,
+    /// Work for the coordinator thread
+    pub coordinator_work: WorkBucket<C>,
     /// workers
     worker_group: Option<Arc<WorkerGroup<C>>>,
     /// Condition Variable for worker synchronization
     pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
     context: Option<&'static C>,
     coordinator_worker: Option<RwLock<Worker<C>>>,
-    /// A message channel to send new coordinator works and other actions to the coordinator thread
+    /// A message channel to send new coordinator work and other actions to the coordinator thread
     pub channel: (
         Sender<CoordinatorMessage<C>>,
         Receiver<CoordinatorMessage<C>>,
@@ -51,7 +51,7 @@ impl<C: Context> Scheduler<C> {
                 WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
             },
-            coordinator_works: WorkBucket::new(true, worker_monitor.clone()),
+            coordinator_work: WorkBucket::new(true, worker_monitor.clone()),
             worker_group: None,
             worker_monitor,
             context: None,
@@ -142,20 +142,20 @@ impl<C: Context> Scheduler<C> {
             buckets_updated |= bucket.update();
         }
         if buckets_updated {
-            // Notify the workers for new works
+            // Notify the workers for new work
             let _guard = self.worker_monitor.0.lock().unwrap();
             self.worker_monitor.1.notify_all();
         }
     }
 
-    /// Execute coordinator works, in the controller thread
+    /// Execute coordinator work, in the controller thread
     fn process_coordinator_work(&self, mut work: Box<dyn CoordinatorWork<C>>) {
         let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
         let context = self.context.unwrap();
         work.do_work_with_stat(&mut coordinator_worker, context);
     }
 
-    /// Drain the message queue and execute coordinator works
+    /// Drain the message queue and execute coordinator work
     pub fn wait_for_completion(&self) {
         // At the start of a GC, we probably already have received a `ScheduleCollection` work. Run it now.
         if let Some(initializer) = self.startup.lock().unwrap().take() {
@@ -219,8 +219,8 @@ impl<C: Context> Scheduler<C> {
 
     #[inline]
     fn pop_scheduable_work(&self, worker: &Worker<C>) -> Option<(Box<dyn Work<C>>, bool)> {
-        if let Some(work) = worker.local_works.poll() {
-            return Some((work, worker.local_works.is_empty()));
+        if let Some(work) = worker.local_work_bucket.poll() {
+            return Some((work, worker.local_work_bucket.is_empty()));
         }
         for work_bucket in self.work_buckets.values() {
             if let Some(work) = work_bucket.poll() {

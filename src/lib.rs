@@ -24,12 +24,12 @@
 //!   * [Allocators](util/alloc/allocator/trait.Allocator.html): handlers of allocation requests which allocate objects to the bound space.
 //!   * [Policies](policy/space/trait.Space.html): definitions of semantics and behaviors for memory regions.
 //!      Each space is an instance of a policy, and takes up a unique proportion of the heap.
-//!   * [Work packets](scheduler/work/trait.GCWork.html): units of GC works scheduled by the MMTk's scheduler.
+//!   * [Work packets](scheduler/work/trait.GCWork.html): units of GC work scheduled by the MMTk's scheduler.
 //! * [GC plans](plan/global/trait.Plan.html): GC algorithms composed from components.
 //!   *Note that currently the choice of plans is made through Rust features, which is a build-time config, so only one plan is present in the generated binary
 //!   and in this documentation. We plan to make this a run-time config so that users can choose GC plans at boot time.*
 //! * [Heap implementations](util/heap/index.html): the underlying implementations of memory resources that support spaces.
-//! * [Scheduler](scheduler/scheduler/struct.Scheduler.html): the MMTk scheduler to allow flexible and parallel execution of GC works.
+//! * [Scheduler](scheduler/scheduler/struct.Scheduler.html): the MMTk scheduler to allow flexible and parallel execution of GC work.
 //! * Interfaces: bi-directional interfaces between MMTk and language implementations
 //!   i.e. [the memory manager API](memory_manager/index.html) that allows a language's memory manager to use MMTk
 //!   and [the VMBinding trait](vm/trait.VMBinding.html) that allows MMTk to call the language implementation.

@@ -1,4 +1,4 @@
-use super::gc_works::*;
+use super::gc_work::*;
 use super::GenCopy;
 use crate::plan::barriers::*;
 use crate::plan::mutator_context::Mutator;

@@ -2,7 +2,7 @@ use mmtk::vm::Scanning;
 use mmtk::{TransitiveClosure, Mutator};
 use mmtk::util::ObjectReference;
 use mmtk::util::OpaquePointer;
-use mmtk::scheduler::gc_works::*;
+use mmtk::scheduler::gc_work::*;
 use mmtk::scheduler::GCWorker;
 use crate::DummyVM;
 

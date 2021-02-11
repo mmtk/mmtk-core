@@ -12,7 +12,7 @@ pub struct SchedulerStat {
 
 impl SchedulerStat {
     /// Extract the work-packet name from the full type name.
-    /// i.e. simplifies `crate::scheduler::gc_works::SomeWorkPacket<Semispace>` to `SomeWorkPacket`.
+    /// i.e. simplifies `crate::scheduler::gc_work::SomeWorkPacket<Semispace>` to `SomeWorkPacket`.
     fn work_name(&self, name: &str) -> String {
         let end_index = name.find('<').unwrap_or_else(|| name.len());
         let name = name[..end_index].to_owned();
@@ -55,11 +55,11 @@ impl SchedulerStat {
             total_count += c;
             let n = self.work_id_name_map[t];
             stat.insert(
-                format!("works.{}.count", self.work_name(n)),
+                format!("work.{}.count", self.work_name(n)),
                 format!("{}", c),
             );
         }
-        stat.insert("total-works.count".to_owned(), format!("{}", total_count));
+        stat.insert("total-work.count".to_owned(), format!("{}", total_count));
         // Work execution times
         let mut total_durations = vec![];
         for (t, durations) in &self.work_durations {
@@ -74,7 +74,7 @@ impl SchedulerStat {
                     .collect::<Vec<_>>(),
             );
             stat.insert(
-                format!("works.{}.time.geomean", self.work_name(n)),
+                format!("work.{}.time.geomean", self.work_name(n)),
                 format!("{:.2}", geomean),
             );
         }
@@ -84,15 +84,15 @@ impl SchedulerStat {
             .collect::<Vec<_>>();
         if !durations.is_empty() {
             stat.insert(
-                "total-works.time.geomean".to_owned(),
+                "total-work.time.geomean".to_owned(),
                 format!("{:.2}", self.geomean(&durations)),
             );
             stat.insert(
-                "total-works.time.min".to_owned(),
+                "total-work.time.min".to_owned(),
                 format!("{:.2}", self.min(&durations)),
             );
             stat.insert(
-                "total-works.time.max".to_owned(),
+                "total-work.time.max".to_owned(),
                 format!("{:.2}", self.max(&durations)),
             );
         }
