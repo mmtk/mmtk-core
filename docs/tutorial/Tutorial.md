@@ -148,11 +148,10 @@ README files in their respective repositories
  account, it is not required for this tutorial.
 
 First, set up OpenJDK, MMTk, and the binding:
-1. Clone the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk).
-2. Clone the mmtk-core repository and the 
-[OpenJDK VM repository](https://github.com/mmtk/openjdk). 
-Place them both in `mmtk-openjdk/repos`.
-4. Ensure you can build OpenJDK according to the instructions in the READMEs of 
+1. Clone the OpenJDK binding and mmtk-core repository, and install any relevant
+dependancies by following the instructions in the
+[OpenJDK binding repository]([OpenJDK binding repository](https://github.com/mmtk/mmtk-openjdk/blob/master/README.md).
+2. Ensure you can build OpenJDK according to the instructions in the READMEs of 
 [the mmtk-core repository](/../master/README.md) and the 
 [OpenJDK binding repository](https://github.com/mmtk/mmtk-openjdk/blob/master/README.md).
    * Use the `slowdebug` option when building the OpenJDK binding. This is the 
