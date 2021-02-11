@@ -41,9 +41,10 @@ rand = "0.7.3"
 [features]
 default = []
 
-# When adding any new feature, please add the new feature to .github/scripts/ci-common.sh 
-# so their builds are properly tested in the CI.
+# .github/scripts/ci-common.sh extracts features from the following part (including from comments).
+# So be careful when editing or adding stuff to the section below.
 
+# Do not modify the following line - ci-common.sh matches it
 # -- Non mutally exclusive features --
 
 # spaces
@@ -62,11 +63,17 @@ nogc_no_zeroing = ["nogc_lock_free"]
 # Q: Why do we need this as a compile time flat? We can always set the number of GC threads through options.
 single_worker = []
 
+# Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
+# Only one feature from each group can be provided. Otherwise build will fail.
 
-# malloc implementations
+# Name of the mutualy exclusive feature group. ci-common.sh matches lines like this one.
+# Group:malloc
 # only one of the following features should be enabled, or none to use the default malloc from libc
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
 malloc_mimalloc = []
 malloc_jemalloc = []
 malloc_hoard = []
+
+# If there are more groups, they should be inserted above this line
+# Group:end
