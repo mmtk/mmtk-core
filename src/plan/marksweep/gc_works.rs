@@ -1,9 +1,10 @@
-use crate::{MMTK, plan::marksweep::metadata::is_marked};
+use crate::plan::marksweep::metadata::is_marked;
 use crate::plan::marksweep::metadata::set_mark_bit;
 use crate::scheduler::gc_works::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
+use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
 use super::MarkSweep;
@@ -19,18 +20,16 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<MarkSweep<VM>>().unwrap();
-        Self {
-            plan,
-            base,
-        }
+        Self { plan, base }
     }
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
         }
-        if !is_marked(object) {
-            set_mark_bit(object.to_address());
+        let address = object.to_address();
+        if !is_marked(address) {
+            set_mark_bit(address);
             self.process_node(object);
         }
         object

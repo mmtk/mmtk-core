@@ -74,10 +74,9 @@ single_worker = []
 # Group:malloc
 # only one of the following features should be enabled, or none to use the default malloc from libc
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
-ms_libc = []
-ms_mimalloc = []
-ms_jemalloc = []
-ms_hoard = []
+malloc_mimalloc = []
+malloc_jemalloc = []
+malloc_hoard = []
 
 # If there are more groups, they should be inserted above this line
 # Group:end

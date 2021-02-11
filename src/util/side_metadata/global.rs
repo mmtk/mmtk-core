@@ -232,11 +232,10 @@ pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
     }
 
     let bits_num_log = metadata_spec.log_num_of_bits;
-    
+
     if bits_num_log <= 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
         let mask = meta_byte_mask(metadata_spec) << lshift;
-        // println!("lshift = {}, mask = 0x{:x}", lshift, mask);
         let byte_val = unsafe { meta_addr.atomic_load::<AtomicU8>(Ordering::SeqCst) };
 
         ((byte_val & mask) as usize) >> lshift

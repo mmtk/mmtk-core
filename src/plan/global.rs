@@ -117,7 +117,9 @@ pub fn create_mutator<VM: VMBinding>(
             crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
         }
         PlanSelector::GenCopy => crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
-        PlanSelector::MarkSweep => crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
+        PlanSelector::MarkSweep => {
+            crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
+        }
     })
 }
 
@@ -240,7 +242,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
     }
 
     fn log_poll(&self, space: &dyn Space<Self::VM>, message: &'static str) {
-        info!("  [POLL] {}: {}", space.name(), message);
+        info!("  [POLL] {}: {}", space.get_name(), message);
     }
 
     /**

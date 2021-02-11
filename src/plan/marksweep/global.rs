@@ -1,19 +1,18 @@
-use super::gc_works::MSProcessEdges;
-use crate::{mmtk::MMTK, plan::PlanConstraints, util::side_metadata::{SideMetadataScope, SideMetadataSpec, load_atomic, meta_bytes_per_chunk}};
+use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
-use crate::plan::marksweep::malloc::ms_free;
-use crate::plan::marksweep::malloc::ms_malloc_usable_size;
+use crate::plan::marksweep::gc_works::MSProcessEdges;
+use crate::plan::marksweep::metadata::is_marked;
 use crate::plan::marksweep::metadata::unset_alloc_bit;
 use crate::plan::marksweep::metadata::unset_mark_bit;
-use crate::plan::marksweep::metadata::ALLOC_METADATA_SPEC;
 use crate::plan::marksweep::metadata::ACTIVE_CHUNKS;
-use crate::plan::marksweep::metadata::MARKING_METADATA_SPEC;
+use crate::plan::marksweep::metadata::ALLOC_METADATA_SPEC;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
+use crate::plan::PlanConstraints;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_works::*;
@@ -27,10 +26,12 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
+use crate::util::malloc::free;
+use crate::util::malloc::malloc_usable_size;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata;
+use crate::util::side_metadata::load_atomic;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::{collections::HashSet, sync::Arc};
@@ -107,7 +108,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn release(&self, _tls: OpaquePointer) {
         let mut released_chunks = HashSet::new();
-        let mut released_addresses = HashSet::new();
         unsafe {
             for chunk_start in &*ACTIVE_CHUNKS.read().unwrap() {
                 let mut chunk_is_empty = true;
@@ -115,11 +115,10 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                 let chunk_end = chunk_start.add(BYTES_IN_CHUNK);
                 while address.as_usize() < chunk_end.as_usize() {
                     if load_atomic(ALLOC_METADATA_SPEC, address) == 1 {
-                        if load_atomic(MARKING_METADATA_SPEC, address) == 0 {
+                        if !is_marked(address) {
                             let ptr = address.to_mut_ptr();
-                            HEAP_USED.fetch_sub(ms_malloc_usable_size(ptr), Ordering::SeqCst);
-                            ms_free(ptr);
-                            released_addresses.insert(address.as_usize());
+                            HEAP_USED.fetch_sub(malloc_usable_size(ptr), Ordering::SeqCst);
+                            free(ptr);
                             unset_alloc_bit(address);
                         } else {
                             unset_mark_bit(address);

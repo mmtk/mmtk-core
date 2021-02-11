@@ -1,8 +1,17 @@
-pub use hoard_sys::{
-    calloc as ho_calloc, free as ho_free, malloc_usable_size as ho_malloc_usable_size,
+#[cfg(feature = "malloc_jemalloc")]
+pub use jemalloc_sys::{calloc, free, malloc_usable_size};
+
+#[cfg(feature = "malloc_mimalloc")]
+pub use mimalloc_sys::{
+    mi_calloc as calloc, mi_free as free, mi_malloc_usable_size as malloc_usable_size,
 };
-pub use jemalloc_sys::{
-    calloc as je_calloc, free as je_free, malloc_usable_size as je_malloc_usable_size,
-};
-pub use mimalloc_sys::{mi_calloc, mi_free, mi_malloc_usable_size};
-pub use libc::{calloc as c_calloc, free as c_free, malloc_usable_size as c_malloc_usable_size};
+
+#[cfg(feature = "malloc_hoard")]
+pub use hoard_sys::{calloc, free, malloc_usable_size};
+
+#[cfg(not(any(
+    feature = "malloc_jemalloc",
+    feature = "malloc_mimalloc",
+    feature = "malloc_hoard",
+)))]
+pub use libc::{calloc, free, malloc_usable_size};

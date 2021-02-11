@@ -1,18 +1,14 @@
-// This struct is not a real space. It exists because certain functions (plan::poll and allocators::new) require a struct implementing Space and SFT.
-// TODO: find a way to use plan::poll and allocators::new without a dummy struct.
-
-use std::marker::PhantomData;
-
-use crate::{
-    policy::space::{Space, SFT},
-    util::{
-        heap::{layout::heap_layout::VMMap, PageResource},
-        Address, ObjectReference,
-    },
-    vm::VMBinding,
-};
+// This struct is not a real space. It exists because certain functions used by malloc-marksweep (plan::poll and allocators::new) require a struct implementing Space and SFT.
 
 use super::space::CommonSpace;
+use crate::policy::space::Space;
+use crate::policy::space::SFT;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::PageResource;
+use crate::util::Address;
+use crate::util::ObjectReference;
+use crate::vm::VMBinding;
+use std::marker::PhantomData;
 
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
@@ -59,6 +55,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
     fn release_multiple_pages(&mut self, _start: Address) {
         unimplemented!();
+    }
+
+    fn get_name(&self) -> &'static str {
+        "MallocSpace"
     }
 }
 

@@ -56,7 +56,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         let new_cursor = result + size;
 
         if new_cursor > self.limit {
-            debug!("Thread local buffer used up, go to alloc slow path");
+            trace!("Thread local buffer used up, go to alloc slow path");
             self.alloc_slow(size, align, offset)
         } else {
             fill_alignment_gap::<VM>(self.cursor, result);

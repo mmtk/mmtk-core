@@ -1,18 +1,17 @@
-use crate::{plan::{global::Plan, marksweep::metadata::ALLOC_METADATA_SPEC}, util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK, side_metadata::{address_to_meta_address, load_atomic}}};
-use crate::plan::marksweep::malloc::ms_calloc;
-use crate::plan::marksweep::malloc::ms_malloc_usable_size;
+use crate::plan::global::Plan;
 use crate::plan::marksweep::metadata::map_meta_space_for_chunk;
 use crate::plan::marksweep::metadata::meta_space_mapped;
 use crate::plan::marksweep::metadata::set_alloc_bit;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::conversions;
+use crate::util::malloc::calloc;
+use crate::util::malloc::malloc_usable_size;
 use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use atomic::Ordering;
-use conversions::chunk_align_down;
-use std::{ops::Sub, sync::atomic::AtomicUsize};
+use std::sync::atomic::AtomicUsize;
 
 pub static mut HEAP_SIZE: usize = 0;
 pub static HEAP_USED: AtomicUsize = AtomicUsize::new(0);
@@ -41,7 +40,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         trace!("alloc");
         debug_assert!(offset == 0);
         unsafe {
-            let ptr = ms_calloc(1, size);
+            let ptr = calloc(1, size);
             let address = Address::from_mut_ptr(ptr);
             if !meta_space_mapped(address) {
                 self.plan.poll(true, self.space.unwrap());
@@ -51,7 +50,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
             let chunk_start = conversions::chunk_align_down(address);
 
             set_alloc_bit(address);
-            HEAP_USED.fetch_add(ms_malloc_usable_size(ptr), Ordering::SeqCst);
+            HEAP_USED.fetch_add(malloc_usable_size(ptr), Ordering::SeqCst);
             address
         }
     }
