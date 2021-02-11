@@ -18,7 +18,6 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
     const OVERWRITE_REFERENCE: bool = false;
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
-        let plan = base.plan().downcast_ref::<MarkSweep<VM>>().unwrap();
         Self { base }
     }
     #[inline]
