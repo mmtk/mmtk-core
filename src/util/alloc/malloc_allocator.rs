@@ -1,4 +1,4 @@
-use crate::plan::global::Plan;
+use crate::{plan::global::Plan, util::{heap::layout::vm_layout_constants::PAGES_IN_CHUNK}};
 use crate::plan::marksweep::metadata::map_meta_space_for_chunk;
 use crate::plan::marksweep::metadata::meta_space_mapped;
 use crate::plan::marksweep::metadata::set_alloc_bit;
@@ -6,15 +6,10 @@ use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::conversions;
 use crate::util::malloc::calloc;
-use crate::util::malloc::malloc_usable_size;
 use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use atomic::Ordering;
-use std::sync::atomic::AtomicUsize;
 
-pub static mut HEAP_SIZE: usize = 0;
-pub static HEAP_USED: AtomicUsize = AtomicUsize::new(0);
 
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
@@ -43,12 +38,12 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
             let ptr = calloc(1, size);
             let address = Address::from_mut_ptr(ptr);
             if !meta_space_mapped(address) {
-                self.plan.poll(true, self.space.unwrap());
+                self.plan.poll(false, self.space.unwrap());
                 let chunk_start = conversions::chunk_align_down(address);
                 map_meta_space_for_chunk(chunk_start);
+                self.space.unwrap().get_page_resource().reserve_pages(PAGES_IN_CHUNK);
             }
             set_alloc_bit(address);
-            HEAP_USED.fetch_add(malloc_usable_size(ptr), Ordering::SeqCst);
             address
         }
     }

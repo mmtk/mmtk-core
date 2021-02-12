@@ -1,9 +1,5 @@
-// This struct is not a real space. It exists because certain functions used by malloc-marksweep (plan::poll and allocators::new) require a struct implementing Space and SFT.
-
-use atomic::Ordering;
-
 use super::space::CommonSpace;
-use crate::plan::marksweep::metadata::*;
+use crate::{plan::marksweep::metadata::*, util::{heap::{MonotonePageResource, layout::vm_layout_constants::PAGES_IN_CHUNK, pageresource::CommonPageResource}}};
 use crate::policy::space::SFT;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
@@ -13,15 +9,16 @@ use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::{
     policy::space::Space,
-    util::{
-        alloc::malloc_allocator::HEAP_USED, heap::layout::vm_layout_constants::BYTES_IN_CHUNK,
+    util::{ heap::layout::vm_layout_constants::BYTES_IN_CHUNK,
         side_metadata::load_atomic,
     },
 };
 use std::{collections::HashSet, marker::PhantomData};
 
+const META_DATA_PAGES_PER_REGION: usize = crate::util::constants::CARD_META_PAGES_PER_REGION;
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
+    pr: MonotonePageResource<VM>,
 }
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
@@ -50,7 +47,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         unimplemented!();
     }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
-        unimplemented!();
+        &self.pr
     }
     fn common(&self) -> &CommonSpace<VM> {
         unimplemented!();
@@ -80,6 +77,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         "MallocSpace"
     }
 
+    fn reserved_pages(&self) -> usize {
+        self.pr.common().get_reserved()
+    }
+
     unsafe fn release_all_chunks(&self) {
         let mut released_chunks = HashSet::new();
         for chunk_start in &*ACTIVE_CHUNKS.read().unwrap() {
@@ -90,7 +91,6 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                 if load_atomic(ALLOC_METADATA_SPEC, address) == 1 {
                     if !is_marked(address) {
                         let ptr = address.to_mut_ptr();
-                        HEAP_USED.fetch_sub(malloc_usable_size(ptr), Ordering::SeqCst);
                         free(ptr);
                         unset_alloc_bit(address);
                     } else {
@@ -104,6 +104,8 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                 released_chunks.insert(chunk_start.as_usize());
             }
         }
+        self.pr.common().release_reserved(PAGES_IN_CHUNK * released_chunks.len());
+
         ACTIVE_CHUNKS
             .write()
             .unwrap()
@@ -112,15 +114,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 }
 
 impl<VM: VMBinding> MallocSpace<VM> {
-    pub fn new() -> Self {
+    pub fn new(vm_map: &'static VMMap) -> Self {
         MallocSpace {
             phantom: PhantomData,
+            pr: MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map),
         }
-    }
-}
-
-impl<VM: VMBinding> Default for MallocSpace<VM> {
-    fn default() -> Self {
-        Self::new()
     }
 }
