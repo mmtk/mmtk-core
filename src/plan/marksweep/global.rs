@@ -105,35 +105,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn release(&self, _tls: OpaquePointer) {
-        let mut released_chunks = HashSet::new();
-        unsafe {
-            for chunk_start in &*ACTIVE_CHUNKS.read().unwrap() {
-                let mut chunk_is_empty = true;
-                let mut address = *chunk_start;
-                let chunk_end = chunk_start.add(BYTES_IN_CHUNK);
-                while address.as_usize() < chunk_end.as_usize() {
-                    if load_atomic(ALLOC_METADATA_SPEC, address) == 1 {
-                        if !is_marked(address) {
-                            let ptr = address.to_mut_ptr();
-                            HEAP_USED.fetch_sub(malloc_usable_size(ptr), Ordering::SeqCst);
-                            free(ptr);
-                            unset_alloc_bit(address);
-                        } else {
-                            unset_mark_bit(address);
-                            chunk_is_empty = false;
-                        }
-                    }
-                    address = address.add(VM::MAX_ALIGNMENT);
-                }
-                if chunk_is_empty {
-                    released_chunks.insert(chunk_start.as_usize());
-                }
-            }
-            ACTIVE_CHUNKS
-                .write()
-                .unwrap()
-                .retain(|c| !released_chunks.contains(&c.as_usize()));
-        }
+        unsafe { self.space.release_all_chunks() };
     }
 
     fn get_collection_reserve(&self) -> usize {

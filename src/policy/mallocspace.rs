@@ -1,14 +1,24 @@
 // This struct is not a real space. It exists because certain functions used by malloc-marksweep (plan::poll and allocators::new) require a struct implementing Space and SFT.
 
+use atomic::Ordering;
+
 use super::space::CommonSpace;
-use crate::policy::space::Space;
+use crate::plan::marksweep::metadata::*;
 use crate::policy::space::SFT;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
+use crate::util::malloc::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
-use std::marker::PhantomData;
+use crate::{
+    policy::space::Space,
+    util::{
+        alloc::malloc_allocator::HEAP_USED, heap::layout::vm_layout_constants::BYTES_IN_CHUNK,
+        side_metadata::load_atomic,
+    },
+};
+use std::{collections::HashSet, marker::PhantomData};
 
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
@@ -59,6 +69,36 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
     fn get_name(&self) -> &'static str {
         "MallocSpace"
+    }
+
+    unsafe fn release_all_chunks(&self) {
+        let mut released_chunks = HashSet::new();
+        for chunk_start in &*ACTIVE_CHUNKS.read().unwrap() {
+            let mut chunk_is_empty = true;
+            let mut address = *chunk_start;
+            let chunk_end = chunk_start.add(BYTES_IN_CHUNK);
+            while address.as_usize() < chunk_end.as_usize() {
+                if load_atomic(ALLOC_METADATA_SPEC, address) == 1 {
+                    if !is_marked(address) {
+                        let ptr = address.to_mut_ptr();
+                        HEAP_USED.fetch_sub(malloc_usable_size(ptr), Ordering::SeqCst);
+                        free(ptr);
+                        unset_alloc_bit(address);
+                    } else {
+                        unset_mark_bit(address);
+                        chunk_is_empty = false;
+                    }
+                }
+                address = address.add(VM::MAX_ALIGNMENT);
+            }
+            if chunk_is_empty {
+                released_chunks.insert(chunk_start.as_usize());
+            }
+            ACTIVE_CHUNKS
+                .write()
+                .unwrap()
+                .retain(|c| !released_chunks.contains(&c.as_usize()));
+        }
     }
 }
 
