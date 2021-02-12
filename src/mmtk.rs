@@ -1,11 +1,11 @@
 use crate::plan::Plan;
 use crate::policy::space::SFTMap;
 use crate::scheduler::Scheduler;
+use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
-use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;

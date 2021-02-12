@@ -344,5 +344,8 @@ pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<Ob
         warn!("get_object_for_finalization() is called when no_finalizer = true");
     }
 
-    mmtk.finalizable_processor.lock().unwrap().get_ready_object()
+    mmtk.finalizable_processor
+        .lock()
+        .unwrap()
+        .get_ready_object()
 }

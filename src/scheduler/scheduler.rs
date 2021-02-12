@@ -144,7 +144,7 @@ impl<C: Context> Scheduler<C> {
         //         && self.work_buckets[WorkBucketStage::Prepare].is_drained()
         //         && self.work_buckets[WorkBucketStage::Closure].is_drained()
         //         && self.work_buckets[WorkBucketStage::RefClosure].is_drained()
-        //         && self.work_buckets[WorkBucketStage::RefForwarding].is_drained()                
+        //         && self.work_buckets[WorkBucketStage::RefForwarding].is_drained()
         //         && self.work_buckets[WorkBucketStage::Release].is_drained()
         //         && self.worker_group().all_parked()
         // });

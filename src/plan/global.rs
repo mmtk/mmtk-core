@@ -6,6 +6,7 @@ use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
+use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::conversions::bytes_to_pages;
@@ -19,7 +20,6 @@ use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
-use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::vm::*;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
@@ -781,7 +781,11 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.release(tls, primary)
     }
 
-    pub fn schedule_common<E: ProcessEdgesWork<VM=VM>>(&self, constraints: &'static PlanConstraints, scheduler: &MMTkScheduler<VM>) {
+    pub fn schedule_common<E: ProcessEdgesWork<VM = VM>>(
+        &self,
+        constraints: &'static PlanConstraints,
+        scheduler: &MMTkScheduler<VM>,
+    ) {
         // Schedule finalization
         if !self.base.options.no_finalizer {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
@@ -789,7 +793,8 @@ impl<VM: VMBinding> CommonPlan<VM> {
             scheduler.work_buckets[WorkBucketStage::RefClosure].add(Finalization::<E>::new());
             // forward refs
             if constraints.needs_forward_after_liveness {
-                scheduler.work_buckets[WorkBucketStage::RefForwarding].add(ForwardFinalization::<E>::new());
+                scheduler.work_buckets[WorkBucketStage::RefForwarding]
+                    .add(ForwardFinalization::<E>::new());
             }
         }
     }
