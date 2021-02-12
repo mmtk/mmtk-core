@@ -15,7 +15,7 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
-use crate::scheduler::gc_works::*;
+use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::malloc_allocator::HEAP_SIZE;

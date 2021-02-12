@@ -1,6 +1,6 @@
 use crate::plan::marksweep::metadata::is_marked;
 use crate::plan::marksweep::metadata::set_mark_bit;
-use crate::scheduler::gc_works::*;
+use crate::scheduler::gc_work::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
