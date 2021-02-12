@@ -41,7 +41,7 @@ use enum_map::EnumMap;
 pub type SelectedPlan<VM> = MarkSweep<VM>;
 
 pub struct MarkSweep<VM: VMBinding> {
-    pub base: BasePlan<VM>,
+    pub common: CommonPlan<VM>,
     pub space: MallocSpace<VM>,
 }
 
@@ -74,7 +74,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         unsafe {
             HEAP_SIZE = heap_size;
         }
-        self.base.gc_init(heap_size, vm_map, scheduler);
+        self.common.gc_init(heap_size, vm_map, scheduler);
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
@@ -141,11 +141,11 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        self.base.get_pages_used()
+        self.common.get_pages_used()
     }
 
     fn base(&self) -> &BasePlan<VM> {
-        &self.base
+        &self.common.base
     }
 
     fn common(&self) -> &CommonPlan<VM> {
@@ -176,7 +176,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
         MarkSweep {
-            base: BasePlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS),
             space: MallocSpace::new(),
         }
     }
