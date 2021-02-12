@@ -1,11 +1,12 @@
 use crate::mmtk::MMTK;
 use crate::plan::global::{BasePlan, NoCopy};
-use crate::plan::mutator_context::Mutator;
-use crate::plan::nogc::mutator::create_nogc_mutator;
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
+use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
+use crate::scheduler::GCWorkerLocal;
+use crate::scheduler::GCWorkerLocalPtr;
 use crate::scheduler::MMTkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -25,8 +26,6 @@ use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
 #[cfg(feature = "nogc_lock_free")]
 use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
 
-pub type SelectedPlan<VM> = NoGC<VM>;
-
 pub struct NoGC<VM: VMBinding> {
     pub base: BasePlan<VM>,
     pub nogc_space: NoGCImmortalSpace<VM>,
@@ -34,39 +33,23 @@ pub struct NoGC<VM: VMBinding> {
 
 unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
 
+pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
+
 impl<VM: VMBinding> Plan for NoGC<VM> {
     type VM = VM;
-    type Mutator = Mutator<Self>;
-    type CopyContext = NoCopy<VM>;
 
-    fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<Self::VM>,
-    ) -> Self {
-        #[cfg(not(feature = "nogc_lock_free"))]
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        #[cfg(feature = "nogc_lock_free")]
-        let heap = HeapMeta::new(HEAP_START, HEAP_END);
+    fn constraints(&self) -> &'static PlanConstraints {
+        &NOGC_CONSTRAINTS
+    }
 
-        #[cfg(feature = "nogc_lock_free")]
-        let nogc_space =
-            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")));
-        #[cfg(not(feature = "nogc_lock_free"))]
-        let nogc_space = NoGCImmortalSpace::new(
-            "nogc_space",
-            true,
-            VMRequest::discontiguous(),
-            vm_map,
-            mmapper,
-            &mut heap,
-        );
-
-        NoGC {
-            nogc_space,
-            base: BasePlan::new(vm_map, mmapper, options, heap),
-        }
+    fn create_worker_local(
+        &self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> GCWorkerLocalPtr {
+        let mut c = NoCopy::new(mmtk);
+        c.init(tls);
+        GCWorkerLocalPtr::new(c)
     }
 
     fn gc_init(
@@ -83,14 +66,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn base(&self) -> &BasePlan<VM> {
         &self.base
-    }
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        _mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Mutator<Self>> {
-        Box::new(create_nogc_mutator(tls, self))
     }
 
     fn prepare(&self, _tls: OpaquePointer) {
@@ -115,5 +90,38 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn handle_user_collection_request(&self, _tls: OpaquePointer, _force: bool) {
         println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
+    }
+}
+
+impl<VM: VMBinding> NoGC<VM> {
+    pub fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+        _scheduler: &'static MMTkScheduler<VM>,
+    ) -> Self {
+        #[cfg(not(feature = "nogc_lock_free"))]
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        #[cfg(feature = "nogc_lock_free")]
+        let heap = HeapMeta::new(HEAP_START, HEAP_END);
+
+        #[cfg(feature = "nogc_lock_free")]
+        let nogc_space =
+            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")));
+        #[cfg(not(feature = "nogc_lock_free"))]
+        let nogc_space = NoGCImmortalSpace::new(
+            "nogc_space",
+            true,
+            VMRequest::discontiguous(),
+            vm_map,
+            mmapper,
+            &mut heap,
+            &NOGC_CONSTRAINTS,
+        );
+
+        NoGC {
+            nogc_space,
+            base: BasePlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS),
+        }
     }
 }

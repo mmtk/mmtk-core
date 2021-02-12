@@ -1,9 +1,8 @@
 use crate::util::ObjectReference;
 use crate::plan::TransitiveClosure;
-use crate::plan::SelectedPlan;
 use crate::vm::VMBinding;
-use crate::scheduler::gc_works::ProcessEdgesWork;
-use crate::scheduler::gc_works::ProcessEdgesBase;
+use crate::scheduler::gc_work::ProcessEdgesWork;
+use crate::scheduler::gc_work::ProcessEdgesBase;
 use crate::scheduler::{GCWork, GCWorker};
 use crate::MMTK;
 use crate::plan::Plan;
@@ -83,8 +82,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
         debug!("Finalization, {} objects in candidates, {} objects ready to finalize", finalizable_processor.candidates.len(), finalizable_processor.ready_for_finalize.len());
 
-        let mut w = E::new(vec![], false);
-        w.mmtk = Some(mmtk);
+        let mut w = E::new(vec![], false, mmtk);
         w.set_worker(worker);
         finalizable_processor.scan(&mut w, mmtk.plan.in_nursery());
         debug!("Finished finalization, {} objects in candidates, {} objects ready to finalize", finalizable_processor.candidates.len(), finalizable_processor.ready_for_finalize.len());
@@ -102,7 +100,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ForwardFinalization<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
-        let mut w = E::new(vec![], false);
+        let mut w = E::new(vec![], false, mmtk);
         finalizable_processor.forward(&mut w, mmtk.plan.in_nursery());
         trace!("Finished forwarding finlizable");
     }

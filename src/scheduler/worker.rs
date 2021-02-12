@@ -3,9 +3,44 @@ use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::OpaquePointer;
+use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Weak};
+
+/// This struct will be accessed during trace_object(), which is performance critical.
+/// However, we do not know its concrete type as the plan and its copy context is dynamically selected.
+/// Instead use a void* type to store it, and during trace_object() we cast it to the correct copy context type.
+#[derive(Copy, Clone)]
+pub struct WorkerLocalPtr {
+    data: *mut c_void,
+    // Save the type name for debug builds, so we can later do type check
+    #[cfg(debug_assertions)]
+    ty: &'static str,
+}
+impl WorkerLocalPtr {
+    pub const UNINITIALIZED: Self = WorkerLocalPtr {
+        data: std::ptr::null_mut(),
+        #[cfg(debug_assertions)]
+        ty: "uninitialized",
+    };
+
+    pub fn new<W: WorkerLocal>(worker_local: W) -> Self {
+        WorkerLocalPtr {
+            data: Box::into_raw(Box::new(worker_local)) as *mut c_void,
+            #[cfg(debug_assertions)]
+            ty: std::any::type_name::<W>(),
+        }
+    }
+
+    /// # Safety
+    /// The user needs to guarantee that the type supplied here is the same type used to create this pointer.
+    pub unsafe fn as_type<W: WorkerLocal>(&mut self) -> &mut W {
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(self.ty, std::any::type_name::<W>());
+        &mut *(self.data as *mut W)
+    }
+}
 
 const LOCALLY_CACHED_WORKS: usize = 1;
 
@@ -14,8 +49,8 @@ pub struct Worker<C: Context> {
     pub ordinal: usize,
     pub parked: AtomicBool,
     scheduler: Arc<Scheduler<C>>,
-    local: Option<C::WorkerLocal>,
-    pub local_works: WorkBucket<C>,
+    local: WorkerLocalPtr,
+    pub local_work_bucket: WorkBucket<C>,
     pub sender: Sender<CoordinatorMessage<C>>,
     pub stat: WorkerLocalStat,
     context: Option<&'static C>,
@@ -35,8 +70,8 @@ impl<C: Context> Worker<C> {
             tls: OpaquePointer::UNINITIALIZED,
             ordinal,
             parked: AtomicBool::new(true),
-            local: None,
-            local_works: WorkBucket::new(true, scheduler.worker_monitor.clone()),
+            local: WorkerLocalPtr::UNINITIALIZED,
+            local_work_bucket: WorkBucket::new(true, scheduler.worker_monitor.clone()),
             sender: scheduler.channel.0.clone(),
             scheduler,
             stat: Default::default(),
@@ -79,9 +114,15 @@ impl<C: Context> Worker<C> {
         &self.scheduler
     }
 
+    /// # Safety
+    /// The user needs to guarantee that the type supplied here is the same type used to create this pointer.
     #[inline]
-    pub fn local(&mut self) -> &mut C::WorkerLocal {
-        self.local.as_mut().unwrap()
+    pub unsafe fn local<W: 'static + WorkerLocal>(&mut self) -> &mut W {
+        self.local.as_type::<W>()
+    }
+
+    pub fn set_local(&mut self, local: WorkerLocalPtr) {
+        self.local = local;
     }
 
     pub fn init(&mut self, tls: OpaquePointer) {
@@ -94,9 +135,6 @@ impl<C: Context> Worker<C> {
 
     pub fn run(&mut self, context: &'static C) {
         self.context = Some(context);
-        self.local = Some(C::WorkerLocal::new(context));
-        let tls = self.tls;
-        self.local().init(tls);
         self.parked.store(false, Ordering::SeqCst);
         loop {
             while let Some((bucket, mut work)) = self.local_work_buffer.pop() {
