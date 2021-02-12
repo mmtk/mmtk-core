@@ -1,4 +1,4 @@
-//! A general scheduler implementation. MMTk uses it to schedule GC-related works.
+//! A general scheduler implementation. MMTk uses it to schedule GC-related work.
 
 mod context;
 mod mmtk_context;
@@ -16,4 +16,4 @@ pub use work::*;
 pub use work_bucket::WorkBucketStage;
 pub use worker::*;
 
-pub mod gc_works;
+pub mod gc_work;

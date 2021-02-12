@@ -1,6 +1,5 @@
-use super::gc_works::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
+use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
 use super::mutator::ALLOCATOR_MAPPING;
-use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -9,7 +8,7 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
-use crate::scheduler::gc_works::*;
+use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
@@ -25,6 +24,7 @@ use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::OpaquePointer;
 use crate::vm::ObjectModel;
 use crate::vm::*;
+use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -49,7 +49,7 @@ pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
-    needs_write_barrier: true,
+    barrier: BarrierSelector::ObjectBarrier,
     ..PlanConstraints::default()
 };
 
