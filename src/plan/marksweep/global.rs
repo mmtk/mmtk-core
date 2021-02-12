@@ -3,7 +3,7 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
-use crate::plan::marksweep::gc_works::MSProcessEdges;
+use crate::plan::marksweep::gc_work::MSProcessEdges;
 use crate::plan::marksweep::metadata::is_marked;
 use crate::plan::marksweep::metadata::unset_alloc_bit;
 use crate::plan::marksweep::metadata::unset_mark_bit;
