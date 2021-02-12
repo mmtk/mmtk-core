@@ -67,6 +67,15 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         unimplemented!();
     }
 
+    fn in_space(&self, object: ObjectReference) -> bool {
+        let address = object.to_address();
+        self.address_in_space(address)
+    }
+
+    fn address_in_space(&self, start: Address) -> bool {
+        meta_space_mapped(start) && load_atomic(ALLOC_METADATA_SPEC, start) == 1
+    }
+
     fn get_name(&self) -> &'static str {
         "MallocSpace"
     }
@@ -94,11 +103,11 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             if chunk_is_empty {
                 released_chunks.insert(chunk_start.as_usize());
             }
-            ACTIVE_CHUNKS
-                .write()
-                .unwrap()
-                .retain(|c| !released_chunks.contains(&c.as_usize()));
         }
+        ACTIVE_CHUNKS
+            .write()
+            .unwrap()
+            .retain(|c| !released_chunks.contains(&c.as_usize()));
     }
 }
 

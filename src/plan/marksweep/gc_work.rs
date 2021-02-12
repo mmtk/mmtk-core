@@ -1,13 +1,16 @@
-use crate::plan::marksweep::metadata::is_marked;
 use crate::plan::marksweep::metadata::set_mark_bit;
 use crate::scheduler::gc_work::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::MMTK;
+use crate::{plan::marksweep::metadata::is_marked, policy::space::Space};
 use std::ops::{Deref, DerefMut};
 
+use super::MarkSweep;
+
 pub struct MSProcessEdges<VM: VMBinding> {
+    plan: &'static MarkSweep<VM>,
     base: ProcessEdgesBase<MSProcessEdges<VM>>,
 }
 
@@ -16,7 +19,8 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
     const OVERWRITE_REFERENCE: bool = false;
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
-        Self { base }
+        let plan = base.plan().downcast_ref::<MarkSweep<VM>>().unwrap();
+        Self { plan, base }
     }
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
@@ -24,6 +28,10 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
             return object;
         }
         let address = object.to_address();
+        assert!(
+            self.plan.space.address_in_space(address),
+            "Cannot mark an object that was not alloced by malloc."
+        );
         if !is_marked(address) {
             set_mark_bit(address);
             self.process_node(object);
