@@ -4,10 +4,18 @@ use crate::util::ObjectReference;
 use crate::MMTK;
 use std::marker::PhantomData;
 
+/// A special processor for Finalizable objects.
+// TODO: Should we consider if we want to merge FinalizableProcessor with ReferenceProcessor,
+// and treat final reference as a special reference type in ReferenceProcessor.
 #[derive(Default)]
 pub struct FinalizableProcessor {
+    /// Candidate objects that has finalizers with them
     candidates: Vec<ObjectReference>,
+    /// Index into candidates to record where we are up to in the last scan of the candidates. 
+    /// Index after nursery_index are new objects inserted after the last GC.
     nursery_index: usize,
+    /// Objects that can be finalized. They are actually dead, but we keep them alive
+    /// until the binding pops them from the queue.
     ready_for_finalize: Vec<ObjectReference>,
 }
 

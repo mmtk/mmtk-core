@@ -96,6 +96,7 @@ impl<C: Context> Scheduler<C> {
 
         {
             // Unconstrained is always open. Prepare will be opened at the beginning of a GC.
+            // This vec will grow for each stage we call with open_next()
             let mut open_stages: Vec<WorkBucketStage> = vec![Unconstrained, Prepare];
             // The rest will open after the previous stage is done.
             let mut open_next = |s: WorkBucketStage| {
@@ -112,42 +113,6 @@ impl<C: Context> Scheduler<C> {
             open_next(Release);
             open_next(Final);
         }
-
-        // self_mut.work_buckets[WorkBucketStage::Closure].set_open_condition(move || {
-        //     self.work_buckets[WorkBucketStage::Unconstrained].is_drained()
-        //         && self.work_buckets[WorkBucketStage::Prepare].is_drained()
-        //         && self.worker_group().all_parked()
-        // });
-        // self_mut.work_buckets[WorkBucketStage::RefClosure].set_open_condition(move || {
-        //     self.work_buckets[WorkBucketStage::Unconstrained].is_drained()
-        //         && self.work_buckets[WorkBucketStage::Prepare].is_drained()
-        //         && self.work_buckets[WorkBucketStage::Closure].is_drained()
-        //         && self.worker_group().all_parked()
-        // });
-        // self_mut.work_buckets[WorkBucketStage::RefForwarding].set_open_condition(move || {
-        //     self.work_buckets[WorkBucketStage::Unconstrained].is_drained()
-        //         && self.work_buckets[WorkBucketStage::Prepare].is_drained()
-        //         && self.work_buckets[WorkBucketStage::Closure].is_drained()
-        //         && self.work_buckets[WorkBucketStage::RefClosure].is_drained()
-        //         && self.worker_group().all_parked()
-        // });
-        // self_mut.work_buckets[WorkBucketStage::Release].set_open_condition(move || {
-        //     self.work_buckets[WorkBucketStage::Unconstrained].is_drained()
-        //         && self.work_buckets[WorkBucketStage::Prepare].is_drained()
-        //         && self.work_buckets[WorkBucketStage::Closure].is_drained()
-        //         && self.work_buckets[WorkBucketStage::RefClosure].is_drained()
-        //         && self.work_buckets[WorkBucketStage::RefForwarding].is_drained()
-        //         && self.worker_group().all_parked()
-        // });
-        // self_mut.work_buckets[WorkBucketStage::Final].set_open_condition(move || {
-        //     self.work_buckets[WorkBucketStage::Unconstrained].is_drained()
-        //         && self.work_buckets[WorkBucketStage::Prepare].is_drained()
-        //         && self.work_buckets[WorkBucketStage::Closure].is_drained()
-        //         && self.work_buckets[WorkBucketStage::RefClosure].is_drained()
-        //         && self.work_buckets[WorkBucketStage::RefForwarding].is_drained()
-        //         && self.work_buckets[WorkBucketStage::Release].is_drained()
-        //         && self.worker_group().all_parked()
-        // });
     }
 
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
