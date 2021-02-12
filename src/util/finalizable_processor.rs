@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 pub struct FinalizableProcessor {
     /// Candidate objects that has finalizers with them
     candidates: Vec<ObjectReference>,
-    /// Index into candidates to record where we are up to in the last scan of the candidates. 
+    /// Index into candidates to record where we are up to in the last scan of the candidates.
     /// Index after nursery_index are new objects inserted after the last GC.
     nursery_index: usize,
     /// Objects that can be finalized. They are actually dead, but we keep them alive
