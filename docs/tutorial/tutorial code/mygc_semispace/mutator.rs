@@ -1,24 +1,31 @@
-use super::gc_work::*;
-use super::GenCopy;
-use crate::plan::barriers::*;
+use super::MyGC; // Add
+use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
-use crate::policy::copyspace::CopySpace;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::MMTK;
 use enum_map::enum_map;
 use enum_map::EnumMap;
+// Remove crate::plan::mygc::MyGC
+// Remove mygc_mutator_noop
 
-pub fn gencopy_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
+// Add
+pub fn mygc_mutator_prepare<VM: VMBinding>(
+    _mutator: &mut Mutator<MyGC<VM>>,
+    _tls: OpaquePointer,
+) {
     // Do nothing
 }
 
-pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
-    // reset nursery allocator
+// Add
+pub fn mygc_mutator_release<VM: VMBinding>(
+    mutator: &mut Mutator<MyGC<VM>>,
+    _tls: OpaquePointer,
+) {
+    // rebind the allocation bump pointer to the appropriate semispace
     let bump_allocator = unsafe {
         mutator
             .allocators
@@ -26,9 +33,10 @@ pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: O
     }
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
-    bump_allocator.reset();
+    bump_allocator.rebind(Some(mutator.plan.tospace()));
 }
 
+// Modify
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::BumpPointer(0),
@@ -37,33 +45,30 @@ lazy_static! {
     };
 }
 
-pub fn create_gencopy_mutator<VM: VMBinding>(
+pub fn create_mygc_mutator<VM: VMBinding>(
     mutator_tls: OpaquePointer,
-    mmtk: &'static MMTK<VM>,
-) -> Mutator<VM> {
-    let gencopy = mmtk.plan.downcast_ref::<GenCopy<VM>>().unwrap();
+    plan: &'static MyGC<VM>,
+) -> Mutator<MyGC<VM>> {
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
+        // Modify
         space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), &gencopy.nursery),
+            (AllocatorSelector::BumpPointer(0), plan.tospace()),
             (
                 AllocatorSelector::BumpPointer(1),
-                gencopy.common.get_immortal(),
+                plan.common.get_immortal(),
             ),
-            (AllocatorSelector::LargeObject(0), gencopy.common.get_los()),
+            (AllocatorSelector::LargeObject(0), plan.common.get_los()),
         ],
-        prepare_func: &gencopy_mutator_prepare,
-        release_func: &gencopy_mutator_release,
+        prepare_func: &mygc_mutator_prepare, // Modify
+        release_func: &mygc_mutator_release, // Modify
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
-        barrier: box FieldRememberingBarrier::<GenCopyNurseryProcessEdges<VM>, CopySpace<VM>>::new(
-            mmtk,
-            &gencopy.nursery,
-        ),
+        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
+        barrier: box NoBarrier,
         mutator_tls,
         config,
-        plan: gencopy,
+        plan,
     }
 }

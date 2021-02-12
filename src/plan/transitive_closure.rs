@@ -1,4 +1,4 @@
-use crate::scheduler::gc_works::ProcessEdgesWork;
+use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::util::{Address, ObjectReference};
 
 /// This trait is the fundamental mechanism for performing a
