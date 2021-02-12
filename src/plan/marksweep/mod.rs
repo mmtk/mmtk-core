@@ -1,4 +1,4 @@
-mod gc_works;
+mod gc_work;
 mod global;
 pub mod metadata;
 pub mod mutator;
