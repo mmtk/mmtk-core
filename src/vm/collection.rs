@@ -1,5 +1,5 @@
 use crate::plan::MutatorContext;
-use crate::scheduler::gc_works::ProcessEdgesWork;
+use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;

@@ -1,8 +1,14 @@
 use crate::policy::space::Space;
-use crate::scheduler::gc_works::*;
+use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
 use crate::util::*;
 use crate::MMTK;
+
+#[derive(Copy, Clone, Debug)]
+pub enum BarrierSelector {
+    NoBarrier,
+    ObjectBarrier,
+}
 
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address
 pub enum WriteTarget {
