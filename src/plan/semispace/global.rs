@@ -94,8 +94,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         // Analysis routine that is ran. It is generally recommended to take advantage
         // of the scheduling system we have in place for more performance
         #[cfg(feature = "analysis")]
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(GcCounterWork::new());
+        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcCounterWork::new());
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]

@@ -28,6 +28,7 @@ impl RtAnalysis<(), ()> for GcCounter {
 // We could have simply called gc_hook() in schedule_collection(), however it is not advised as
 // creating a work packet will be more performant in general as this allows the work to be
 // completed asynchronously whenever a worker thread is free.
+#[derive(Default)]
 pub struct GcCounterWork;
 
 impl GcCounterWork {

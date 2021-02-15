@@ -9,9 +9,9 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
-use crate::util::analysis::obj_size::PerSizeClassObjectCounter;
-#[cfg(feature = "analysis")]
 use crate::util::analysis::gc_count::GcCounter;
+#[cfg(feature = "analysis")]
+use crate::util::analysis::obj_size::PerSizeClassObjectCounter;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
