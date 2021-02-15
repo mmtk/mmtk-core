@@ -7,25 +7,25 @@ use std::sync::{Arc, Mutex};
 /**
  * This file implements an analysis routine that counts the number of objects allocated
  * in each size class. Here, a size class 'sizeX' is defined as 'X bytes or lower'. For
- * example, size64 is the size class with objects <= 64 bytes but >= 32 bytes which is
- * previous size class.
+ * example, size64 is the size class with objects <= 64 bytes but > 32 bytes which is
+ * the previous size class.
  *
  * We keep track of the size classes using a HashMap with the key being the name of the
  * size class.
  */
 #[derive(Default)]
-pub struct ObjSize {
+pub struct PerSizeClassObjectCounter {
     size_classes: Mutex<HashMap<String, Arc<Mutex<EventCounter>>>>,
 }
 
 // We require access to both the stats instance in order to create counters for size classes
 // on the fly as well as the size of the object allocated
-pub struct ObjSizeArgs<'a> {
+pub struct PerSizeClassObjectCounterArgs<'a> {
     stats: &'a Stats,
     size: usize,
 }
 
-impl<'a> ObjSizeArgs<'a> {
+impl<'a> PerSizeClassObjectCounterArgs<'a> {
     pub fn new(stats: &'a Stats, size: usize) -> Self {
         Self { stats, size }
     }
@@ -41,7 +41,7 @@ macro_rules! new_ctr {
     }};
 }
 
-impl ObjSize {
+impl PerSizeClassObjectCounter {
     pub fn new() -> Self {
         Self {
             size_classes: Mutex::new(HashMap::new()),
@@ -55,8 +55,8 @@ impl ObjSize {
     }
 }
 
-impl RtAnalysis<ObjSizeArgs<'_>> for ObjSize {
-    fn alloc_hook(&mut self, args: ObjSizeArgs) {
+impl RtAnalysis<PerSizeClassObjectCounterArgs<'_>, ()> for PerSizeClassObjectCounter {
+    fn alloc_hook(&mut self, args: PerSizeClassObjectCounterArgs) {
         let stats = args.stats;
         let size = args.size;
         let size_class = format!("size{}", self.size_class(size));

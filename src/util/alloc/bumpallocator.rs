@@ -9,7 +9,7 @@ use crate::util::alloc::Allocator;
 use crate::plan::Plan;
 use crate::policy::space::Space;
 #[cfg(feature = "analysis")]
-use crate::util::analysis::obj_size::ObjSizeArgs;
+use crate::util::analysis::obj_size::PerSizeClassObjectCounterArgs;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::RtAnalysis;
 use crate::util::conversions::bytes_to_pages;
@@ -155,7 +155,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
                 );
 
                 let mut obj_size = base.obj_size.lock().unwrap();
-                obj_size.alloc_hook(ObjSizeArgs::new(&base.stats, size));
+                obj_size.alloc_hook(PerSizeClassObjectCounterArgs::new(&base.stats, size));
             }
 
             fill_alignment_gap::<VM>(self.cursor, result);
