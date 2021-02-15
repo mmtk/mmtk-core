@@ -76,6 +76,7 @@ impl FinalizableProcessor {
                 retained
             );
         }
+        e.flush();
 
         self.nursery_index = self.candidates.len();
     }
@@ -84,6 +85,7 @@ impl FinalizableProcessor {
         self.candidates
             .iter_mut()
             .for_each(|reff| *reff = FinalizableProcessor::get_forwarded_finalizable(e, *reff));
+        e.flush();
     }
 
     pub fn get_ready_object(&mut self) -> Option<ObjectReference> {
