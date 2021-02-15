@@ -52,7 +52,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
         if (BARRIER_COUNTER) {
             BARRIER_FAST_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
         }
-        if compare_exchange_atomic(self.meta, obj.to_address(), 0b0, 0b1) {
+        if compare_exchange_atomic(self.meta, obj.to_address(), 0b1, 0b0) {
             // store_atomic(self.meta, obj.to_address(), 0b1);
             if (BARRIER_COUNTER) {
                 BARRIER_SLOW_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
@@ -79,7 +79,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for ObjectRememberingBarrier<
             self.mmtk
                 .scheduler
                 .work_buckets[WorkBucketStage::Closure]
-                .add(ProcessModBuf::<E>::new(modbuf));
+                .add(ProcessModBuf::<E>::new(modbuf, self.meta));
         }
     }
 

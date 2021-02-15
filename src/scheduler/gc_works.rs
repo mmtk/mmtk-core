@@ -10,6 +10,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
+use crate::util::side_metadata::*;
 
 pub struct ScheduleCollection;
 
@@ -453,16 +454,17 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
     }
 }
 
-#[derive(Default)]
 pub struct ProcessModBuf<E: ProcessEdgesWork> {
     modbuf: Vec<ObjectReference>,
     phantom: PhantomData<E>,
+    meta: SideMetadataSpec,
 }
 
 impl<E: ProcessEdgesWork> ProcessModBuf<E> {
-    pub fn new(modbuf: Vec<ObjectReference>) -> Self {
+    pub fn new(modbuf: Vec<ObjectReference>, meta: SideMetadataSpec) -> Self {
         Self {
             modbuf,
+            meta,
             phantom: PhantomData,
         }
     }
@@ -473,7 +475,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
-                BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).attempt(0b0, 0b1);
+                compare_exchange_atomic(self.meta, obj.to_address(), 0b0, 0b1);
             }
         }
         if mmtk.plan.in_nursery() {

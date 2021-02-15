@@ -213,12 +213,16 @@ pub fn ensure_munmap_metadata_chunk(
     local_per_chunk: usize,
 ) {
     let global_meta_start = address_to_meta_chunk_addr(start);
-    let result = unsafe { libc::munmap(global_meta_start.to_mut_ptr(), global_per_chunk) };
-    assert_eq!(result, 0);
+    if global_per_chunk != 0 {
+        let result = unsafe { libc::munmap(global_meta_start.to_mut_ptr(), global_per_chunk) };
+        assert_eq!(result, 0);
+    }
 
-    let policy_meta_start = global_meta_start + POLICY_SIDE_METADATA_OFFSET;
-    let result = unsafe { libc::munmap(policy_meta_start.to_mut_ptr(), local_per_chunk) };
-    assert_eq!(result, 0);
+    if local_per_chunk != 0 {
+        let policy_meta_start = global_meta_start + POLICY_SIDE_METADATA_OFFSET;
+        let result = unsafe { libc::munmap(policy_meta_start.to_mut_ptr(), local_per_chunk) };
+        assert_eq!(result, 0);
+    }
 }
 
 #[inline(always)]
@@ -308,7 +312,7 @@ pub fn compare_exchange_atomic(
 
         let real_old_byte = unsafe { meta_addr.atomic_load::<AtomicU8>(Ordering::SeqCst) };
         let expected_old_byte = (real_old_byte & !mask) | ((old_metadata as u8) << lshift);
-        let expected_new_byte = expected_old_byte | ((new_metadata as u8) << lshift);
+        let expected_new_byte = (expected_old_byte & !mask) | ((new_metadata as u8) << lshift);
 
         unsafe {
             meta_addr

@@ -12,6 +12,7 @@ use std::ops::{Deref, DerefMut};
 use crate::util::metadata::BitsReference;
 use crate::util::constants::*;
 use crate::scheduler::WorkerLocal;
+use crate::util::side_metadata::*;
 
 pub struct GenCopyCopyContext<VM: VMBinding> {
     plan: &'static GenCopy<VM>,
@@ -55,7 +56,7 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
     ) {
         forwarding_word::clear_forwarding_bits::<VM>(obj);
         if !super::NO_SLOW {
-            BitsReference::of(obj.to_address(), LOG_BYTES_IN_WORD, 0).set(0b1);
+            store_atomic(super::LOGGING_META, obj.to_address(), 0b1);
         }
     }
 }

@@ -24,7 +24,7 @@ pub(crate) fn address_to_meta_address(
 
     let meta_chunk_addr = address_to_meta_chunk_addr(data_addr);
     let internal_addr = data_addr.as_usize() & CHUNK_MASK;
-    let rshift = (constants::LOG_BITS_IN_WORD as i32) + log_min_obj_size - bits_num_log;
+    let rshift = (constants::LOG_BITS_IN_BYTE as i32) + log_min_obj_size - bits_num_log;
     debug_assert!(rshift >= 0);
 
     let second_offset = internal_addr >> rshift;
@@ -35,7 +35,7 @@ pub(crate) fn address_to_meta_address(
 #[inline(always)]
 pub(crate) const fn meta_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bits: usize) -> usize {
     1usize
-        << (LOG_BYTES_IN_CHUNK - constants::LOG_BITS_IN_WORD - log_min_obj_size + log_num_of_bits)
+        << (LOG_BYTES_IN_CHUNK - constants::LOG_BITS_IN_BYTE as usize - log_min_obj_size + log_num_of_bits)
 }
 
 #[inline(always)]
