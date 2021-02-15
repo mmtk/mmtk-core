@@ -143,6 +143,9 @@ impl Stats {
         }
         if crate::plan::mutator_context::BARRIER_COUNTER {
             print!("{:.5}\t", crate::plan::mutator_context::barrier_slow_path_take_rate());
+            let (total, slow) = crate::plan::mutator_context::barrier_counters();
+            print!("{:.5}\t", total);
+            print!("{:.5}\t", slow);
         }
         println!();
         print!("Total time: ");
@@ -170,6 +173,8 @@ impl Stats {
         }
         if crate::plan::mutator_context::BARRIER_COUNTER {
             print!("takerate\t");
+            print!("takerate.total\t");
+            print!("takerate.slow\t");
         }
         println!();
     }

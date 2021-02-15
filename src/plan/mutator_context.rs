@@ -123,7 +123,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
     }
 }
 
-pub const BARRIER_COUNTER: bool = false;
+pub const BARRIER_COUNTER: bool = true;
 pub static BARRIER_FAST_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub static BARRIER_SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -135,4 +135,9 @@ pub fn barrier_slow_path_take_rate() -> f64 {
     let fast = BARRIER_FAST_COUNT.load(Ordering::SeqCst) as f64;
     let slow = BARRIER_SLOW_COUNT.load(Ordering::SeqCst) as f64;
     slow / fast
+}
+pub fn barrier_counters() -> (f64, f64) {
+    let fast = BARRIER_FAST_COUNT.load(Ordering::SeqCst) as f64;
+    let slow = BARRIER_SLOW_COUNT.load(Ordering::SeqCst) as f64;
+    (fast, slow)
 }
