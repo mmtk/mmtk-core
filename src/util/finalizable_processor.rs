@@ -5,7 +5,7 @@ use crate::MMTK;
 use std::marker::PhantomData;
 
 /// A special processor for Finalizable objects.
-// TODO: Should we consider if we want to merge FinalizableProcessor with ReferenceProcessor,
+// TODO: we should consider if we want to merge FinalizableProcessor with ReferenceProcessor,
 // and treat final reference as a special reference type in ReferenceProcessor.
 #[derive(Default)]
 pub struct FinalizableProcessor {
