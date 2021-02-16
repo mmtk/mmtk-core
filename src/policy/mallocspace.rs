@@ -1,5 +1,5 @@
 use super::space::CommonSpace;
-use crate::{plan::marksweep::metadata::*, util::{heap::{MonotonePageResource, layout::vm_layout_constants::PAGES_IN_CHUNK, pageresource::CommonPageResource}}};
+use crate::plan::TransitiveClosure;
 use crate::policy::space::SFT;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
@@ -8,10 +8,12 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::{
+    plan::marksweep::metadata::*,
+    util::heap::{layout::vm_layout_constants::PAGES_IN_CHUNK, MonotonePageResource},
+};
+use crate::{
     policy::space::Space,
-    util::{ heap::layout::vm_layout_constants::BYTES_IN_CHUNK,
-        side_metadata::load_atomic,
-    },
+    util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK, side_metadata::load_atomic},
 };
 use std::{collections::HashSet, marker::PhantomData};
 
@@ -104,7 +106,9 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                 released_chunks.insert(chunk_start.as_usize());
             }
         }
-        self.pr.common().release_reserved(PAGES_IN_CHUNK * released_chunks.len());
+        self.pr
+            .common()
+            .release_reserved(PAGES_IN_CHUNK * released_chunks.len());
 
         ACTIVE_CHUNKS
             .write()
@@ -119,5 +123,26 @@ impl<VM: VMBinding> MallocSpace<VM> {
             phantom: PhantomData,
             pr: MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map),
         }
+    }
+
+    #[inline]
+    pub fn trace_object<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+    ) -> ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+        let address = object.to_address();
+        assert!(
+            self.address_in_space(address),
+            "Cannot mark an object that was not alloced by malloc."
+        );
+        if !is_marked(address) {
+            set_mark_bit(address);
+            trace.process_node(object);
+        }
+        object
     }
 }

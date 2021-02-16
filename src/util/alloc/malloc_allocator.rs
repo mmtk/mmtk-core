@@ -1,4 +1,3 @@
-use crate::{plan::global::Plan, util::{heap::layout::vm_layout_constants::PAGES_IN_CHUNK}};
 use crate::plan::marksweep::metadata::map_meta_space_for_chunk;
 use crate::plan::marksweep::metadata::meta_space_mapped;
 use crate::plan::marksweep::metadata::set_alloc_bit;
@@ -9,7 +8,7 @@ use crate::util::malloc::calloc;
 use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-
+use crate::{plan::global::Plan, util::heap::layout::vm_layout_constants::PAGES_IN_CHUNK};
 
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
@@ -41,7 +40,10 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
                 self.plan.poll(false, self.space.unwrap());
                 let chunk_start = conversions::chunk_align_down(address);
                 map_meta_space_for_chunk(chunk_start);
-                self.space.unwrap().get_page_resource().reserve_pages(PAGES_IN_CHUNK);
+                self.space
+                    .unwrap()
+                    .get_page_resource()
+                    .reserve_pages(PAGES_IN_CHUNK);
             }
             set_alloc_bit(address);
             address
