@@ -1,3 +1,7 @@
+//! GC algorithms from the MMTk suite.
+//!
+//! This module provides various GC plans, each implements a GC algorithm.
+
 pub mod barriers;
 pub mod controller_collector_context;
 pub mod global;
