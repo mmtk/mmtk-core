@@ -1,3 +1,5 @@
+//! The GC controller thread.
+
 use crate::scheduler::gc_work::ScheduleCollection;
 use crate::scheduler::*;
 use crate::util::OpaquePointer;

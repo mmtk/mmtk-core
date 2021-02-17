@@ -1,3 +1,5 @@
+//! Unsynchronized thread-local trace mechanism (superseded by [ProcessEdgesWork](crate::scheduler::gc_work::ProcessEdgesWork)).
+
 use crate::plan::TransitiveClosure;
 use crate::util::{Address, ObjectReference};
 
