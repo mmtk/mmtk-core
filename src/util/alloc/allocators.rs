@@ -2,6 +2,7 @@ use std::mem::MaybeUninit;
 
 use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
+use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::util::alloc::MallocAllocator;
@@ -86,7 +87,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 AllocatorSelector::Malloc(index) => {
                     ret.malloc[index as usize].write(MallocAllocator::new(
                         mutator_tls,
-                        Some(space),
+                        Some(space.downcast_ref::<MallocSpace<VM>>().unwrap()),
                         plan,
                     ));
                 }

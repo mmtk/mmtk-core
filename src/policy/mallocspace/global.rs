@@ -8,7 +8,9 @@ use crate::util::heap::{layout::vm_layout_constants::PAGES_IN_CHUNK, MonotonePag
 use crate::util::malloc::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::conversions;
 use crate::vm::VMBinding;
+use crate::vm::ActivePlan;
 use crate::{
     policy::space::Space,
     util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK, side_metadata::load_atomic},
@@ -23,45 +25,45 @@ pub struct MallocSpace<VM: VMBinding> {
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
     fn name(&self) -> &str {
-        "MallocSpace"
+        self.get_name()
     }
 
     fn is_live(&self, _object: ObjectReference) -> bool {
         unimplemented!();
     }
     fn is_movable(&self) -> bool {
-        unimplemented!();
+        false
     }
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
-        unimplemented!();
+        true
     }
     fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
 }
 
 impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn as_space(&self) -> &dyn Space<VM> {
-        unimplemented!();
+        self
     }
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
-        unimplemented!();
+        self
     }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
     fn common(&self) -> &CommonSpace<VM> {
-        unimplemented!();
+        unreachable!()
     }
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
-        unimplemented!();
+        unreachable!()
     }
 
     fn init(&mut self, _vm_map: &'static VMMap) {
-        unimplemented!();
+
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
-        unimplemented!();
+        unreachable!()
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
@@ -121,6 +123,21 @@ impl<VM: VMBinding> MallocSpace<VM> {
             phantom: PhantomData,
             pr: MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map),
         }
+    }
+
+    pub fn alloc(&self, size: usize) -> Address {
+        let address = Address::from_mut_ptr(unsafe { calloc(1, size) });
+        if !address.is_zero() {
+            if !meta_space_mapped(address) {
+                VM::VMActivePlan::global().poll(false, self);
+                let chunk_start = conversions::chunk_align_down(address);
+                map_meta_space_for_chunk(chunk_start);
+                self.get_page_resource()
+                    .reserve_pages(PAGES_IN_CHUNK);
+            }
+            set_alloc_bit(address);
+        }
+        address
     }
 
     #[inline]
