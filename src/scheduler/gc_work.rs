@@ -50,7 +50,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Prepare<P, W> {
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_works.add(PrepareCollector::<W>::new());
+            w.local_work_bucket.add(PrepareCollector::<W>::new());
         }
     }
 }
@@ -118,7 +118,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_works.add(ReleaseCollector::<W>(PhantomData));
+            w.local_work_bucket.add(ReleaseCollector::<W>(PhantomData));
         }
         // TODO: Process weak references properly
         mmtk.reference_processors.clear();
@@ -389,9 +389,9 @@ pub trait ProcessEdgesWork:
         if Self::SCAN_OBJECTS_IMMEDIATELY {
             // We execute this `scan_objects_work` immediately.
             // This is expected to be a useful optimization because,
-            // say for _pmd_ with 200M heap, we're likely to have 50000~60000 `ScanObjects` works
+            // say for _pmd_ with 200M heap, we're likely to have 50000~60000 `ScanObjects` work packets
             // being dispatched (similar amount to `ProcessEdgesWork`).
-            // Executing these works now can remarkably reduce the global synchronization time.
+            // Executing these work packets now can remarkably reduce the global synchronization time.
             self.worker().do_work(scan_objects_work);
         } else {
             self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);

@@ -35,7 +35,8 @@ pub(crate) fn address_to_meta_address(
 #[inline(always)]
 pub(crate) const fn meta_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bits: usize) -> usize {
     1usize
-        << (LOG_BYTES_IN_CHUNK - constants::LOG_BITS_IN_BYTE as usize - log_min_obj_size + log_num_of_bits)
+        << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) - log_min_obj_size
+            + log_num_of_bits)
 }
 
 #[inline(always)]
@@ -184,7 +185,7 @@ mod tests {
     #[test]
     fn test_side_metadata_meta_bytes_per_chunk() {
         let ch_sz = BYTES_IN_CHUNK;
-        let bw = constants::BITS_IN_WORD;
+        let bw = constants::BITS_IN_BYTE;
         assert_eq!(meta_bytes_per_chunk(0, 0), ch_sz / bw);
         assert_eq!(meta_bytes_per_chunk(3, 0), (ch_sz / bw) >> 3);
         assert_eq!(meta_bytes_per_chunk(0, 3), (ch_sz / bw) << 3);

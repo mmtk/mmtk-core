@@ -1,7 +1,7 @@
 use atomic_traits::fetch::Add;
 
 use crate::policy::space::Space;
-use crate::scheduler::gc_works::*;
+use crate::scheduler::gc_work::*;
 use crate::util::constants::*;
 use crate::util::metadata::*;
 use crate::scheduler::WorkBucketStage;
@@ -10,6 +10,12 @@ use crate::MMTK;
 use crate::util::side_metadata::*;
 
 use super::mutator_context::{BARRIER_COUNTER, BARRIER_FAST_COUNT, BARRIER_SLOW_COUNT};
+
+#[derive(Copy, Clone, Debug)]
+pub enum BarrierSelector {
+    NoBarrier,
+    ObjectBarrier,
+}
 
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address
 pub enum WriteTarget {

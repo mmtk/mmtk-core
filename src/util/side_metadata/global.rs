@@ -576,213 +576,279 @@ pub fn bzero_metadata_for_chunk(metadata_spec: SideMetadataSpec, chunk_start: Ad
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::constants;
     use crate::util::heap::layout::vm_layout_constants;
     use crate::util::side_metadata::helpers;
-    use crate::util::{constants, Address};
+    use crate::util::test_util::serial_test;
 
     #[test]
     fn test_side_metadata_try_mmap_metadata_chunk() {
-        let gspec = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
-            offset: 0,
-            log_num_of_bits: 0,
-            log_min_obj_size: 0,
-        };
-        let lspec = SideMetadataSpec {
-            scope: SideMetadataScope::PolicySpecific,
-            offset: 0,
-            log_num_of_bits: 1,
-            log_min_obj_size: 0,
-        };
+        serial_test(|| {
+            let gspec = SideMetadataSpec {
+                scope: SideMetadataScope::Global,
+                offset: 0,
+                log_num_of_bits: 0,
+                log_min_obj_size: 0,
+            };
+            let lspec = SideMetadataSpec {
+                scope: SideMetadataScope::PolicySpecific,
+                offset: 0,
+                log_num_of_bits: 1,
+                log_min_obj_size: 0,
+            };
 
-        assert!(try_map_metadata_space(
-            unsafe { Address::from_usize(0) },
-            1,
-            helpers::meta_bytes_per_chunk(0, 0),
-            helpers::meta_bytes_per_chunk(0, 1)
-        ));
+            assert!(try_map_metadata_space(
+                vm_layout_constants::HEAP_START,
+                1,
+                helpers::meta_bytes_per_chunk(0, 0),
+                helpers::meta_bytes_per_chunk(0, 1)
+            ));
 
-        ensure_metadata_chunk_is_mmaped(gspec, unsafe { Address::from_usize(0) });
-        ensure_metadata_chunk_is_mmaped(lspec, unsafe { Address::from_usize(0) });
-        ensure_metadata_chunk_is_mmaped(gspec, unsafe {
-            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK - 1)
-        });
-        ensure_metadata_chunk_is_mmaped(lspec, unsafe {
-            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK - 1)
-        });
+            ensure_metadata_chunk_is_mmaped(gspec, vm_layout_constants::HEAP_START);
+            ensure_metadata_chunk_is_mmaped(lspec, vm_layout_constants::HEAP_START);
+            ensure_metadata_chunk_is_mmaped(
+                gspec,
+                vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK - 1,
+            );
+            ensure_metadata_chunk_is_mmaped(
+                lspec,
+                vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK - 1,
+            );
 
-        assert!(try_map_metadata_space(
-            unsafe { Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK) },
-            vm_layout_constants::BYTES_IN_CHUNK + 1,
-            helpers::meta_bytes_per_chunk(3, 2),
-            helpers::meta_bytes_per_chunk(4, 2)
-        ));
+            assert!(try_map_metadata_space(
+                vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
+                vm_layout_constants::BYTES_IN_CHUNK + 1,
+                helpers::meta_bytes_per_chunk(3, 2),
+                helpers::meta_bytes_per_chunk(4, 2)
+            ));
 
-        ensure_metadata_chunk_is_mmaped(gspec, unsafe {
-            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK)
-        });
-        ensure_metadata_chunk_is_mmaped(lspec, unsafe {
-            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK)
-        });
-        ensure_metadata_chunk_is_mmaped(gspec, unsafe {
-            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK * 3 - 1)
-        });
-        ensure_metadata_chunk_is_mmaped(lspec, unsafe {
-            Address::from_usize(vm_layout_constants::BYTES_IN_CHUNK * 3 - 1)
-        });
+            ensure_metadata_chunk_is_mmaped(
+                gspec,
+                vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
+            );
+            ensure_metadata_chunk_is_mmaped(
+                lspec,
+                vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
+            );
+            ensure_metadata_chunk_is_mmaped(
+                gspec,
+                vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * 3 - 1,
+            );
+            ensure_metadata_chunk_is_mmaped(
+                lspec,
+                vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * 3 - 1,
+            );
+
+            ensure_munmap_metadata_chunk(
+                vm_layout_constants::HEAP_START,
+                helpers::meta_bytes_per_chunk(0, 0),
+                helpers::meta_bytes_per_chunk(0, 1),
+            );
+
+            ensure_munmap_metadata_chunk(
+                vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
+                helpers::meta_bytes_per_chunk(3, 2),
+                helpers::meta_bytes_per_chunk(4, 2),
+            );
+
+            ensure_munmap_metadata_chunk(
+                vm_layout_constants::HEAP_START + 2 * vm_layout_constants::BYTES_IN_CHUNK,
+                helpers::meta_bytes_per_chunk(3, 2),
+                helpers::meta_bytes_per_chunk(4, 2),
+            );
+        })
     }
 
     #[test]
     fn test_side_metadata_atomic_fetch_add_sub_ge8bits() {
-        let data_addr = vm_layout_constants::HEAP_START;
+        serial_test(|| {
+            let data_addr = vm_layout_constants::HEAP_START;
 
-        let metadata_1_spec = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
-            offset: 0,
-            log_num_of_bits: 4,
-            log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
-        };
+            let metadata_1_spec = SideMetadataSpec {
+                scope: SideMetadataScope::Global,
+                offset: 0,
+                log_num_of_bits: 4,
+                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+            };
 
-        let metadata_2_spec = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
-            offset: helpers::meta_bytes_per_chunk(
-                metadata_1_spec.log_min_obj_size,
-                metadata_1_spec.log_num_of_bits,
-            ),
-            log_num_of_bits: 3,
-            log_min_obj_size: 7,
-        };
-        assert!(try_map_metadata_space(
-            data_addr,
-            constants::BYTES_IN_PAGE,
-            helpers::meta_bytes_per_chunk(
-                metadata_2_spec.log_min_obj_size,
-                metadata_2_spec.log_num_of_bits
-            ) + helpers::meta_bytes_per_chunk(
-                metadata_1_spec.log_min_obj_size,
-                metadata_1_spec.log_num_of_bits
-            ),
-            0
-        ));
+            let metadata_2_spec = SideMetadataSpec {
+                scope: SideMetadataScope::Global,
+                offset: helpers::meta_bytes_per_chunk(
+                    metadata_1_spec.log_min_obj_size,
+                    metadata_1_spec.log_num_of_bits,
+                ),
+                log_num_of_bits: 3,
+                log_min_obj_size: 7,
+            };
+            assert!(try_map_metadata_space(
+                data_addr,
+                constants::BYTES_IN_PAGE,
+                helpers::meta_bytes_per_chunk(
+                    metadata_2_spec.log_min_obj_size,
+                    metadata_2_spec.log_num_of_bits
+                ) + helpers::meta_bytes_per_chunk(
+                    metadata_1_spec.log_min_obj_size,
+                    metadata_1_spec.log_num_of_bits
+                ),
+                0
+            ));
 
-        let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
-        assert_eq!(zero, 0);
+            let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
+            assert_eq!(zero, 0);
 
-        let five = load_atomic(metadata_1_spec, data_addr);
-        assert_eq!(five, 5);
+            let five = load_atomic(metadata_1_spec, data_addr);
+            assert_eq!(five, 5);
 
-        let zero = fetch_add_atomic(metadata_2_spec, data_addr, 5);
-        assert_eq!(zero, 0);
+            let zero = fetch_add_atomic(metadata_2_spec, data_addr, 5);
+            assert_eq!(zero, 0);
 
-        let five = load_atomic(metadata_2_spec, data_addr);
-        assert_eq!(five, 5);
+            let five = load_atomic(metadata_2_spec, data_addr);
+            assert_eq!(five, 5);
 
-        let another_five = fetch_sub_atomic(metadata_1_spec, data_addr, 2);
-        assert_eq!(another_five, 5);
+            let another_five = fetch_sub_atomic(metadata_1_spec, data_addr, 2);
+            assert_eq!(another_five, 5);
 
-        let three = load_atomic(metadata_1_spec, data_addr);
-        assert_eq!(three, 3);
+            let three = load_atomic(metadata_1_spec, data_addr);
+            assert_eq!(three, 3);
 
-        let another_five = fetch_sub_atomic(metadata_2_spec, data_addr, 2);
-        assert_eq!(another_five, 5);
+            let another_five = fetch_sub_atomic(metadata_2_spec, data_addr, 2);
+            assert_eq!(another_five, 5);
 
-        let three = load_atomic(metadata_2_spec, data_addr);
-        assert_eq!(three, 3);
+            let three = load_atomic(metadata_2_spec, data_addr);
+            assert_eq!(three, 3);
+
+            ensure_munmap_metadata_chunk(
+                data_addr,
+                helpers::meta_bytes_per_chunk(
+                    metadata_2_spec.log_min_obj_size,
+                    metadata_2_spec.log_num_of_bits,
+                ) + helpers::meta_bytes_per_chunk(
+                    metadata_1_spec.log_min_obj_size,
+                    metadata_1_spec.log_num_of_bits,
+                ),
+                0,
+            );
+        })
     }
 
     #[test]
     fn test_side_metadata_atomic_fetch_add_sub_2bits() {
-        let data_addr =
-            vm_layout_constants::HEAP_START + (vm_layout_constants::BYTES_IN_CHUNK << 1);
+        serial_test(|| {
+            let data_addr =
+                vm_layout_constants::HEAP_START + (vm_layout_constants::BYTES_IN_CHUNK << 1);
 
-        let metadata_1_spec = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
-            offset: 0,
-            log_num_of_bits: 1,
-            log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
-        };
+            let metadata_1_spec = SideMetadataSpec {
+                scope: SideMetadataScope::Global,
+                offset: 0,
+                log_num_of_bits: 1,
+                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+            };
 
-        assert!(try_map_metadata_space(
-            data_addr,
-            constants::BYTES_IN_PAGE,
-            helpers::meta_bytes_per_chunk(
-                metadata_1_spec.log_min_obj_size,
-                metadata_1_spec.log_num_of_bits
-            ),
-            0
-        ));
+            assert!(try_map_metadata_space(
+                data_addr,
+                constants::BYTES_IN_PAGE,
+                helpers::meta_bytes_per_chunk(
+                    metadata_1_spec.log_min_obj_size,
+                    metadata_1_spec.log_num_of_bits
+                ),
+                0
+            ));
 
-        let zero = fetch_add_atomic(metadata_1_spec, data_addr, 2);
-        assert_eq!(zero, 0);
+            let zero = fetch_add_atomic(metadata_1_spec, data_addr, 2);
+            assert_eq!(zero, 0);
 
-        let two = load_atomic(metadata_1_spec, data_addr);
-        assert_eq!(two, 2);
+            let two = load_atomic(metadata_1_spec, data_addr);
+            assert_eq!(two, 2);
 
-        let another_two = fetch_sub_atomic(metadata_1_spec, data_addr, 1);
-        assert_eq!(another_two, 2);
+            let another_two = fetch_sub_atomic(metadata_1_spec, data_addr, 1);
+            assert_eq!(another_two, 2);
 
-        let one = load_atomic(metadata_1_spec, data_addr);
-        assert_eq!(one, 1);
+            let one = load_atomic(metadata_1_spec, data_addr);
+            assert_eq!(one, 1);
+
+            ensure_munmap_metadata_chunk(
+                data_addr,
+                helpers::meta_bytes_per_chunk(
+                    metadata_1_spec.log_min_obj_size,
+                    metadata_1_spec.log_num_of_bits,
+                ),
+                0,
+            );
+        })
     }
 
     #[test]
     fn test_side_metadata_bzero_metadata_for_chunk() {
-        let data_addr =
-            vm_layout_constants::HEAP_START + (vm_layout_constants::BYTES_IN_CHUNK << 2);
+        serial_test(|| {
+            let data_addr =
+                vm_layout_constants::HEAP_START + (vm_layout_constants::BYTES_IN_CHUNK << 2);
 
-        let metadata_1_spec = SideMetadataSpec {
-            scope: SideMetadataScope::PolicySpecific,
-            offset: 0,
-            log_num_of_bits: 4,
-            log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
-        };
+            let metadata_1_spec = SideMetadataSpec {
+                scope: SideMetadataScope::PolicySpecific,
+                offset: 0,
+                log_num_of_bits: 4,
+                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+            };
 
-        let metadata_2_spec = SideMetadataSpec {
-            scope: SideMetadataScope::PolicySpecific,
-            offset: helpers::meta_bytes_per_chunk(
-                metadata_1_spec.log_min_obj_size,
-                metadata_1_spec.log_num_of_bits,
-            ),
-            log_num_of_bits: 3,
-            log_min_obj_size: 7,
-        };
-        assert!(try_map_metadata_space(
-            data_addr,
-            constants::BYTES_IN_PAGE,
-            0,
-            helpers::meta_bytes_per_chunk(
-                metadata_2_spec.log_min_obj_size,
-                metadata_2_spec.log_num_of_bits
-            ) + helpers::meta_bytes_per_chunk(
-                metadata_1_spec.log_min_obj_size,
-                metadata_1_spec.log_num_of_bits
-            )
-        ));
+            let metadata_2_spec = SideMetadataSpec {
+                scope: SideMetadataScope::PolicySpecific,
+                offset: helpers::meta_bytes_per_chunk(
+                    metadata_1_spec.log_min_obj_size,
+                    metadata_1_spec.log_num_of_bits,
+                ),
+                log_num_of_bits: 3,
+                log_min_obj_size: 7,
+            };
+            assert!(try_map_metadata_space(
+                data_addr,
+                constants::BYTES_IN_PAGE,
+                0,
+                helpers::meta_bytes_per_chunk(
+                    metadata_2_spec.log_min_obj_size,
+                    metadata_2_spec.log_num_of_bits
+                ) + helpers::meta_bytes_per_chunk(
+                    metadata_1_spec.log_min_obj_size,
+                    metadata_1_spec.log_num_of_bits
+                )
+            ));
 
-        let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
-        assert_eq!(zero, 0);
+            let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
+            assert_eq!(zero, 0);
 
-        let five = load_atomic(metadata_1_spec, data_addr);
-        assert_eq!(five, 5);
+            let five = load_atomic(metadata_1_spec, data_addr);
+            assert_eq!(five, 5);
 
-        let zero = fetch_add_atomic(metadata_2_spec, data_addr, 5);
-        assert_eq!(zero, 0);
+            let zero = fetch_add_atomic(metadata_2_spec, data_addr, 5);
+            assert_eq!(zero, 0);
 
-        let five = load_atomic(metadata_2_spec, data_addr);
-        assert_eq!(five, 5);
+            let five = load_atomic(metadata_2_spec, data_addr);
+            assert_eq!(five, 5);
 
-        bzero_metadata_for_chunk(metadata_2_spec, data_addr);
+            bzero_metadata_for_chunk(metadata_2_spec, data_addr);
 
-        let five = load_atomic(metadata_1_spec, data_addr);
-        assert_eq!(five, 5);
-        let five = load_atomic(metadata_2_spec, data_addr);
-        assert_eq!(five, 0);
+            let five = load_atomic(metadata_1_spec, data_addr);
+            assert_eq!(five, 5);
+            let five = load_atomic(metadata_2_spec, data_addr);
+            assert_eq!(five, 0);
 
-        bzero_metadata_for_chunk(metadata_1_spec, data_addr);
+            bzero_metadata_for_chunk(metadata_1_spec, data_addr);
 
-        let five = load_atomic(metadata_1_spec, data_addr);
-        assert_eq!(five, 0);
-        let five = load_atomic(metadata_2_spec, data_addr);
-        assert_eq!(five, 0);
+            let five = load_atomic(metadata_1_spec, data_addr);
+            assert_eq!(five, 0);
+            let five = load_atomic(metadata_2_spec, data_addr);
+            assert_eq!(five, 0);
+
+            ensure_munmap_metadata_chunk(
+                data_addr,
+                0,
+                helpers::meta_bytes_per_chunk(
+                    metadata_2_spec.log_min_obj_size,
+                    metadata_2_spec.log_num_of_bits,
+                ) + helpers::meta_bytes_per_chunk(
+                    metadata_1_spec.log_min_obj_size,
+                    metadata_1_spec.log_num_of_bits,
+                ),
+            );
+        })
     }
 }

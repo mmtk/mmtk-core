@@ -1,4 +1,4 @@
-use crate::scheduler::gc_works::ScheduleCollection;
+use crate::scheduler::gc_work::ScheduleCollection;
 use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;

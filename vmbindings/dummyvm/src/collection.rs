@@ -3,7 +3,7 @@ use mmtk::MutatorContext;
 use mmtk::util::OpaquePointer;
 use mmtk::MMTK;
 use mmtk::scheduler::*;
-use mmtk::scheduler::gc_works::*;
+use mmtk::scheduler::gc_work::*;
 use DummyVM;
 
 pub struct VMCollection {}
