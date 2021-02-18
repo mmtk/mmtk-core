@@ -27,3 +27,6 @@ Cargo.lock
 /bench-exe
 /test_mmtk
 /test_mmtk_32
+
+# Generated for testing tutorial code build
+/src/plan/mygc

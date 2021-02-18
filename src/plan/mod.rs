@@ -19,7 +19,6 @@ pub mod controller_collector_context;
 pub mod global;
 pub mod mutator_context;
 pub mod plan_constraints;
-#[deprecated(note = "Superseded by ProcessEdgesWork")]
 pub mod tracelocal;
 pub mod transitive_closure;
 pub use self::global::AllocationSemantics;
