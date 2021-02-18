@@ -12,4 +12,4 @@ pub use self::bumpallocator::BumpAllocator;
 pub use self::large_object_allocator::LargeObjectAllocator;
 pub use self::malloc_allocator::MallocAllocator;
 
-pub use crate::plan::marksweep::metadata::is_alloced_by_malloc;
+pub use crate::policy::mallocspace::metadata::is_alloced_by_malloc;

@@ -1,6 +1,6 @@
-use crate::plan::marksweep::metadata::map_meta_space_for_chunk;
-use crate::plan::marksweep::metadata::meta_space_mapped;
-use crate::plan::marksweep::metadata::set_alloc_bit;
+use crate::policy::mallocspace::metadata::{
+    map_meta_space_for_chunk, meta_space_mapped, set_alloc_bit,
+};
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::conversions;

@@ -1,16 +1,14 @@
-use super::space::CommonSpace;
+use super::metadata::*;
 use crate::plan::TransitiveClosure;
+use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
+use crate::util::heap::{layout::vm_layout_constants::PAGES_IN_CHUNK, MonotonePageResource};
 use crate::util::malloc::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
-use crate::{
-    plan::marksweep::metadata::*,
-    util::heap::{layout::vm_layout_constants::PAGES_IN_CHUNK, MonotonePageResource},
-};
 use crate::{
     policy::space::Space,
     util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK, side_metadata::load_atomic},
