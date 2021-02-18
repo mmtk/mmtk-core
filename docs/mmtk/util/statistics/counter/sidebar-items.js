@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["LongCounter",""],["MonotoneNanoTime",""]],"trait":[["Counter",""],["Diffable",""]],"type":[["Timer",""]]});
+initSidebarItems({"struct":[["EventCounter","This file implements a simple event counter (counting number events that occur for each phase)."],["LongCounter",""],["MonotoneNanoTime",""],["SizeCounter",""]],"trait":[["Counter",""],["Diffable",""]],"type":[["Timer",""]]});

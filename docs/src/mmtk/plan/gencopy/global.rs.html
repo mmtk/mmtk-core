@@ -241,9 +241,8 @@
 <span id="238">238</span>
 <span id="239">239</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">gc_works</span>::{<span class="ident">GenCopyCopyContext</span>, <span class="ident">GenCopyMatureProcessEdges</span>, <span class="ident">GenCopyNurseryProcessEdges</span>};
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">gc_work</span>::{<span class="ident">GenCopyCopyContext</span>, <span class="ident">GenCopyMatureProcessEdges</span>, <span class="ident">GenCopyNurseryProcessEdges</span>};
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">mutator</span>::<span class="ident">ALLOCATOR_MAPPING</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">MMTK</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">global</span>::<span class="ident">BasePlan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">global</span>::<span class="ident">CommonPlan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">global</span>::<span class="ident">GcStatus</span>;
@@ -252,7 +251,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">PlanConstraints</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">copyspace</span>::<span class="ident">CopySpace</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">Space</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">gc_works</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">gc_work</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">allocators</span>::<span class="ident">AllocatorSelector</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_PAGE</span>;
@@ -268,6 +267,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">ObjectModel</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">mmtk</span>::<span class="ident">MMTK</span>, <span class="ident">plan</span>::<span class="ident">barriers</span>::<span class="ident">BarrierSelector</span>};
 <span class="kw">use</span> <span class="ident">enum_map</span>::<span class="ident">EnumMap</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
@@ -292,7 +292,7 @@
     <span class="ident">gc_header_bits</span>: <span class="number">2</span>,
     <span class="ident">gc_header_words</span>: <span class="number">0</span>,
     <span class="ident">num_specialized_scans</span>: <span class="number">1</span>,
-    <span class="ident">needs_write_barrier</span>: <span class="bool-val">true</span>,
+    <span class="ident">barrier</span>: <span class="ident">BarrierSelector</span>::<span class="ident">ObjectBarrier</span>,
     ..<span class="ident">PlanConstraints</span>::<span class="ident">default</span>()
 };
 

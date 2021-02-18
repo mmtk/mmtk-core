@@ -187,6 +187,29 @@
 <span id="184">184</span>
 <span id="185">185</span>
 <span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">Ordering</span>;
@@ -198,6 +221,10 @@
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">Plan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">Space</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">analysis</span>::<span class="ident">obj_size</span>::<span class="ident">PerSizeClassObjectCounterArgs</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">analysis</span>::<span class="ident">RtAnalysis</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>::<span class="ident">bytes_to_pages</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">VMBinding</span>};
@@ -267,7 +294,9 @@
         <span class="comment">// TODO: internalLimit etc.</span>
         <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">base</span>();
 
-        <span class="kw">if</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span> <span class="op">=</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span> {
+        <span class="kw">if</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span> <span class="op">=</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>
+            <span class="op">&amp;&amp;</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span> <span class="op">=</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>
+        {
             <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">false</span>)
         } <span class="kw">else</span> {
             <span class="self">self</span>.<span class="ident">alloc_slow_once_stress_test</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
@@ -315,7 +344,7 @@
                 <span class="kw">unsafe</span> { <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="self">self</span>.<span class="ident">tls</span>) } <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">is_initialized</span>();
 
             <span class="kw">if</span> <span class="ident">is_mutator</span>
-                <span class="op">&amp;&amp;</span> (<span class="ident">base</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) <span class="op">&gt;</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span>)
+                <span class="op">&amp;&amp;</span> <span class="ident">base</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) <span class="op">&gt;</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span>
             {
                 <span class="macro">trace</span><span class="macro">!</span>(
                     <span class="string">&quot;Stress GC: allocation_bytes = {} more than stress_factor = {}&quot;</span>,
@@ -323,6 +352,23 @@
                     <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span>
                 );
                 <span class="kw">return</span> <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">true</span>);
+            }
+
+            <span class="comment">// This is the allocation hook for the analysis trait. Note that we pack up</span>
+            <span class="comment">// the arguments in a struct to be passed on for the trait to process. This</span>
+            <span class="comment">// is generally how more complicated analyses can be performed</span>
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
+            <span class="kw">if</span> <span class="ident">is_mutator</span>
+                <span class="op">&amp;&amp;</span> <span class="ident">base</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) <span class="op">&gt;</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span>
+            {
+                <span class="macro">trace</span><span class="macro">!</span>(
+                    <span class="string">&quot;Analysis: allocation_bytes = {} more than analysis_factor = {}&quot;</span>,
+                    <span class="ident">base</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>),
+                    <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span>
+                );
+
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj_size</span> <span class="op">=</span> <span class="ident">base</span>.<span class="ident">obj_size</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+                <span class="ident">obj_size</span>.<span class="ident">alloc_hook</span>(<span class="ident">PerSizeClassObjectCounterArgs</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">base</span>.<span class="ident">stats</span>, <span class="ident">size</span>));
             }
 
             <span class="ident">fill_alignment_gap</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">cursor</span>, <span class="ident">result</span>);

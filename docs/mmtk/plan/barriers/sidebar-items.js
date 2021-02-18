@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["WriteTarget","For field writes in HotSpot, we cannot always get the source object pointer and the field address"]],"struct":[["FieldRememberingBarrier",""],["ModBuffer",""],["NoBarrier",""]],"trait":[["Barrier",""]]});
+initSidebarItems({"enum":[["BarrierSelector",""],["WriteTarget","For field writes in HotSpot, we cannot always get the source object pointer and the field address"]],"struct":[["FieldRememberingBarrier",""],["ModBuffer",""],["NoBarrier",""]],"trait":[["Barrier",""]]});

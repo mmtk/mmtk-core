@@ -333,15 +333,15 @@
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Context</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">work_buckets</span>: <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">WorkBucketStage</span>, <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Works for the coordinator thread</span>
-    <span class="kw">pub</span> <span class="ident">coordinator_works</span>: <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Work for the coordinator thread</span>
+    <span class="kw">pub</span> <span class="ident">coordinator_work</span>: <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
     <span class="doccomment">/// workers</span>
     <span class="ident">worker_group</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Condition Variable for worker synchronization</span>
     <span class="kw">pub</span> <span class="ident">worker_monitor</span>: <span class="ident">Arc</span><span class="op">&lt;</span>(<span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">Condvar</span>)<span class="op">&gt;</span>,
     <span class="ident">context</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">C</span><span class="op">&gt;</span>,
     <span class="ident">coordinator_worker</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A message channel to send new coordinator works and other actions to the coordinator thread</span>
+    <span class="doccomment">/// A message channel to send new coordinator work and other actions to the coordinator thread</span>
     <span class="kw">pub</span> <span class="ident">channel</span>: (
         <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -364,7 +364,7 @@
                 <span class="ident">WorkBucketStage</span>::<span class="ident">Release</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
                 <span class="ident">WorkBucketStage</span>::<span class="ident">Final</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             },
-            <span class="ident">coordinator_works</span>: <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+            <span class="ident">coordinator_work</span>: <span class="ident">WorkBucket</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             <span class="ident">worker_group</span>: <span class="prelude-val">None</span>,
             <span class="ident">worker_monitor</span>,
             <span class="ident">context</span>: <span class="prelude-val">None</span>,
@@ -455,20 +455,20 @@
             <span class="ident">buckets_updated</span> <span class="op">|</span><span class="op">=</span> <span class="ident">bucket</span>.<span class="ident">update</span>();
         }
         <span class="kw">if</span> <span class="ident">buckets_updated</span> {
-            <span class="comment">// Notify the workers for new works</span>
+            <span class="comment">// Notify the workers for new work</span>
             <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">notify_all</span>();
         }
     }
 
-    <span class="doccomment">/// Execute coordinator works, in the controller thread</span>
+    <span class="doccomment">/// Execute coordinator work, in the controller thread</span>
     <span class="kw">fn</span> <span class="ident">process_coordinator_work</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">work</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">coordinator_worker</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">coordinator_worker</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">write</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">context</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">unwrap</span>();
         <span class="ident">work</span>.<span class="ident">do_work_with_stat</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">coordinator_worker</span>, <span class="ident">context</span>);
     }
 
-    <span class="doccomment">/// Drain the message queue and execute coordinator works</span>
+    <span class="doccomment">/// Drain the message queue and execute coordinator work</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">wait_for_completion</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="comment">// At the start of a GC, we probably already have received a `ScheduleCollection` work. Run it now.</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">initializer</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">startup</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">take</span>() {
@@ -532,8 +532,8 @@
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">pop_scheduable_work</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Work</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">bool</span>)<span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">local_works</span>.<span class="ident">poll</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="ident">worker</span>.<span class="ident">local_works</span>.<span class="ident">is_empty</span>()));
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">local_work_bucket</span>.<span class="ident">poll</span>() {
+            <span class="kw">return</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="ident">worker</span>.<span class="ident">local_work_bucket</span>.<span class="ident">is_empty</span>()));
         }
         <span class="kw">for</span> <span class="ident">work_bucket</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">work_buckets</span>.<span class="ident">values</span>() {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="ident">work_bucket</span>.<span class="ident">poll</span>() {

@@ -214,6 +214,7 @@
 <span id="211">211</span>
 <span id="212">212</span>
 <span id="213">213</span>
+<span id="214">214</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">address</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">DEFAULT_STRESS_FACTOR</span>;
@@ -338,7 +339,8 @@
     <span class="kw">fn</span> <span class="ident">alloc_slow_inline</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
         <span class="kw">let</span> <span class="ident">tls</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_tls</span>();
         <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">base</span>();
-        <span class="kw">let</span> <span class="ident">stress_test</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span> <span class="op">!</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>;
+        <span class="kw">let</span> <span class="ident">stress_test</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span> <span class="op">!</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>
+            <span class="op">|</span><span class="op">|</span> <span class="ident">plan</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span> <span class="op">!</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>;
 
         <span class="comment">// Information about the previous collection.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">emergency_collection</span> <span class="op">=</span> <span class="bool-val">false</span>;

@@ -227,6 +227,7 @@
 <span id="224">224</span>
 <span id="225">225</span>
 <span id="226">226</span>
+<span id="227">227</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">UnsafeCell</span>;
@@ -339,6 +340,7 @@
     <span class="comment">// TODO: Delete this option.</span>
     <span class="ident">verbose</span>:               <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="number">0</span>,
     <span class="ident">stress_factor</span>:         <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>,
+    <span class="ident">analysis_factor</span>:       <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>,
     <span class="comment">// vmspace</span>
     <span class="comment">// FIXME: These options are set for JikesRVM. We need a proper way to set options.</span>
     <span class="comment">//   We need to set these values programmatically in VM specific code.</span>
