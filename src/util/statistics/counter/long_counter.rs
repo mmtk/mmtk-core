@@ -1,53 +1,13 @@
-use crate::util::statistics::stats::SharedStats;
+use super::*;
+use crate::util::statistics::stats::{SharedStats, MAX_PHASES};
 use std::fmt;
 use std::sync::Arc;
-use std::time::Instant;
-
-pub trait Counter {
-    fn start(&mut self);
-    fn stop(&mut self);
-    fn phase_change(&mut self, old_phase: usize);
-    fn print_count(&self, phase: usize);
-    fn print_total(&self, mutator: Option<bool>);
-    fn print_min(&self, mutator: bool);
-    fn print_max(&self, mutator: bool);
-    fn print_last(&self);
-    fn merge_phases(&self) -> bool;
-    fn implicitly_start(&self) -> bool;
-    fn name(&self) -> &String;
-}
-
-pub trait Diffable {
-    type Val;
-    fn current_value() -> Self::Val;
-    fn diff(current: &Self::Val, earlier: &Self::Val) -> u64;
-    fn print_diff(val: u64);
-}
-
-pub struct MonotoneNanoTime;
-
-impl Diffable for MonotoneNanoTime {
-    type Val = Instant;
-
-    fn current_value() -> Instant {
-        Instant::now()
-    }
-
-    fn diff(current: &Instant, earlier: &Instant) -> u64 {
-        let delta = current.duration_since(*earlier);
-        delta.as_secs() * 1_000_000_000 + u64::from(delta.subsec_nanos())
-    }
-
-    fn print_diff(val: u64) {
-        print!("{}", format!("{:.*}", 2, val as f64 / 1e6f64));
-    }
-}
 
 pub struct LongCounter<T: Diffable> {
     name: String,
     pub implicitly_start: bool,
     merge_phases: bool,
-    count: Box<[u64; super::stats::MAX_PHASES]>, // FIXME make this resizable
+    count: Box<[u64; MAX_PHASES]>, // FIXME make this resizable
     start_value: Option<T::Val>,
     total_count: u64,
     running: bool,
@@ -170,7 +130,7 @@ impl<T: Diffable> LongCounter<T> {
             name,
             implicitly_start,
             merge_phases,
-            count: box [0; super::stats::MAX_PHASES],
+            count: box [0; MAX_PHASES],
             start_value: None,
             total_count: 0,
             running: false,

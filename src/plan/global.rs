@@ -8,6 +8,10 @@ use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+#[cfg(feature = "analysis")]
+use crate::util::analysis::gc_count::GcCounter;
+#[cfg(feature = "analysis")]
+use crate::util::analysis::obj_size::PerSizeClassObjectCounter;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -383,6 +387,12 @@ pub struct BasePlan<VM: VMBinding> {
     pub mutator_iterator_lock: Mutex<()>,
     // A counter that keeps tracks of the number of bytes allocated since last stress test
     pub allocation_bytes: AtomicUsize,
+    // Concrete implementation of the analysis trait -- in this case the implementation
+    // counts the number of objects in different size classes
+    #[cfg(feature = "analysis")]
+    pub obj_size: Mutex<PerSizeClassObjectCounter>,
+    #[cfg(feature = "analysis")]
+    pub gc_count: Mutex<GcCounter>,
 }
 
 #[cfg(feature = "base_spaces")]
@@ -432,6 +442,8 @@ impl<VM: VMBinding> BasePlan<VM> {
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
     ) -> BasePlan<VM> {
+        let stats = Stats::new();
+        let ctr = stats.new_event_counter("gc.num", true, true);
         BasePlan {
             #[cfg(feature = "base_spaces")]
             unsync: UnsafeCell::new(BaseUnsync {
@@ -475,7 +487,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             cur_collection_attempts: AtomicUsize::new(0),
             oom_lock: Mutex::new(()),
             control_collector_context: ControllerCollectorContext::new(),
-            stats: Stats::new(),
+            stats,
             mmapper,
             heap,
             vm_map,
@@ -485,6 +497,10 @@ impl<VM: VMBinding> BasePlan<VM> {
             scanned_stacks: AtomicUsize::new(0),
             mutator_iterator_lock: Mutex::new(()),
             allocation_bytes: AtomicUsize::new(0),
+            #[cfg(feature = "analysis")]
+            obj_size: Mutex::new(PerSizeClassObjectCounter::new()),
+            #[cfg(feature = "analysis")]
+            gc_count: Mutex::new(GcCounter::new(ctr)),
         }
     }
 

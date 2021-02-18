@@ -8,6 +8,10 @@ use crate::util::alloc::Allocator;
 
 use crate::plan::Plan;
 use crate::policy::space::Space;
+#[cfg(feature = "analysis")]
+use crate::util::analysis::obj_size::PerSizeClassObjectCounterArgs;
+#[cfg(feature = "analysis")]
+use crate::util::analysis::RtAnalysis;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::OpaquePointer;
 use crate::vm::{ActivePlan, VMBinding};
@@ -77,7 +81,9 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         // TODO: internalLimit etc.
         let base = &self.plan.base();
 
-        if base.options.stress_factor == DEFAULT_STRESS_FACTOR {
+        if base.options.stress_factor == DEFAULT_STRESS_FACTOR
+            && base.options.analysis_factor == DEFAULT_STRESS_FACTOR
+        {
             self.acquire_block(size, align, offset, false)
         } else {
             self.alloc_slow_once_stress_test(size, align, offset)
@@ -125,7 +131,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
                 unsafe { VM::VMActivePlan::is_mutator(self.tls) } && self.plan.is_initialized();
 
             if is_mutator
-                && (base.allocation_bytes.load(Ordering::SeqCst) > base.options.stress_factor)
+                && base.allocation_bytes.load(Ordering::SeqCst) > base.options.stress_factor
             {
                 trace!(
                     "Stress GC: allocation_bytes = {} more than stress_factor = {}",
@@ -133,6 +139,23 @@ impl<VM: VMBinding> BumpAllocator<VM> {
                     base.options.stress_factor
                 );
                 return self.acquire_block(size, align, offset, true);
+            }
+
+            // This is the allocation hook for the analysis trait. Note that we pack up
+            // the arguments in a struct to be passed on for the trait to process. This
+            // is generally how more complicated analyses can be performed
+            #[cfg(feature = "analysis")]
+            if is_mutator
+                && base.allocation_bytes.load(Ordering::SeqCst) > base.options.analysis_factor
+            {
+                trace!(
+                    "Analysis: allocation_bytes = {} more than analysis_factor = {}",
+                    base.allocation_bytes.load(Ordering::Relaxed),
+                    base.options.analysis_factor
+                );
+
+                let mut obj_size = base.obj_size.lock().unwrap();
+                obj_size.alloc_hook(PerSizeClassObjectCounterArgs::new(&base.stats, size));
             }
 
             fill_alignment_gap::<VM>(self.cursor, result);
