@@ -2,11 +2,11 @@ use atomic_traits::fetch::Add;
 
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::util::constants::*;
 use crate::scheduler::WorkBucketStage;
+use crate::util::constants::*;
+use crate::util::side_metadata::*;
 use crate::util::*;
 use crate::MMTK;
-use crate::util::side_metadata::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Copy, Clone, Debug)]
@@ -79,9 +79,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for ObjectRememberingBarrier<
             self as *const _
         );
         if modbuf.len() != 0 {
-            self.mmtk
-                .scheduler
-                .work_buckets[WorkBucketStage::Closure]
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
                 .add(ProcessModBuf::<E>::new(modbuf, self.meta));
         }
     }
@@ -126,7 +124,8 @@ impl BarrierCounter {
         let total = self.total.load(Ordering::SeqCst) as f64;
         let slow = self.slow.load(Ordering::SeqCst) as f64;
         BarrierCounterResults {
-            total, slow,
+            total,
+            slow,
             take_rate: slow / total,
         }
     }

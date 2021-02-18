@@ -216,7 +216,9 @@ impl<VM: VMBinding> GenCopy<VM> {
 
     fn request_full_heap_collection(&self) -> bool {
         // For barrier overhead measurements, we always do full gc in nursery collections.
-        if super::FULL_NURSERY_GC { return true }
+        if super::FULL_NURSERY_GC {
+            return true;
+        }
         self.get_total_pages() <= self.get_pages_reserved()
     }
 

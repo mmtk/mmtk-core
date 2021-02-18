@@ -6,13 +6,13 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkerLocal;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::alloc::{Allocator, BumpAllocator};
+use crate::util::constants::*;
 use crate::util::forwarding_word;
+use crate::util::side_metadata::*;
 use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::*;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
-use crate::util::constants::*;
-use crate::util::side_metadata::*;
 
 pub struct GenCopyCopyContext<VM: VMBinding> {
     plan: &'static GenCopy<VM>,

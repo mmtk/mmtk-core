@@ -61,7 +61,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
         barrier: box ObjectRememberingBarrier::<GenCopyNurseryProcessEdges<VM>, CopySpace<VM>>::new(
             mmtk,
             &gencopy.nursery,
-            super::LOGGING_META
+            super::LOGGING_META,
         ),
         mutator_tls,
         config,

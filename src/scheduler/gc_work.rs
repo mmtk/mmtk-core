@@ -2,6 +2,7 @@ use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::plan::global::GcStatus;
 use crate::util::constants::*;
+use crate::util::side_metadata::*;
 use crate::util::*;
 use crate::vm::*;
 use crate::*;
@@ -9,7 +10,6 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
-use crate::util::side_metadata::*;
 
 pub struct ScheduleCollection;
 

@@ -1,4 +1,5 @@
 use crate::mmtk::MMTK;
+use crate::plan::barriers::{BARRIER_COUNTER, ENABLE_BARRIER_COUNTER};
 use crate::util::statistics::counter::{Counter, LongCounter};
 use crate::util::statistics::Timer;
 use crate::vm::VMBinding;
@@ -6,7 +7,6 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
-use crate::plan::barriers::{ENABLE_BARRIER_COUNTER, BARRIER_COUNTER};
 
 pub const MAX_PHASES: usize = 1 << 12;
 pub const MAX_COUNTERS: usize = 100;
