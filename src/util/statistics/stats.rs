@@ -1,5 +1,5 @@
 use crate::mmtk::MMTK;
-use crate::util::statistics::counter::{Counter, LongCounter};
+use crate::util::statistics::counter::*;
 use crate::util::statistics::Timer;
 use crate::vm::VMBinding;
 use std::collections::HashMap;
@@ -65,6 +65,34 @@ impl Stats {
         }
     }
 
+    pub fn new_event_counter(
+        &self,
+        name: &str,
+        implicit_start: bool,
+        merge_phases: bool,
+    ) -> Arc<Mutex<EventCounter>> {
+        let mut guard = self.counters.lock().unwrap();
+        let counter = Arc::new(Mutex::new(EventCounter::new(
+            name.to_string(),
+            self.shared.clone(),
+            implicit_start,
+            merge_phases,
+        )));
+        guard.push(counter.clone());
+        counter
+    }
+
+    pub fn new_size_counter(
+        &self,
+        name: &str,
+        implicit_start: bool,
+        merge_phases: bool,
+    ) -> Mutex<SizeCounter> {
+        let u = self.new_event_counter(name, implicit_start, merge_phases);
+        let v = self.new_event_counter(&format!("{}.volume", name), implicit_start, merge_phases);
+        Mutex::new(SizeCounter::new(u, v))
+    }
+
     pub fn new_timer(
         &self,
         name: &str,
@@ -88,10 +116,10 @@ impl Stats {
             return;
         }
         if self.get_phase() < MAX_PHASES - 1 {
-            self.total_time
-                .lock()
-                .unwrap()
-                .phase_change(self.get_phase());
+            let counters = self.counters.lock().unwrap();
+            for counter in &(*counters) {
+                counter.lock().unwrap().phase_change(self.get_phase());
+            }
             self.shared.increment_phase();
         } else if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
             println!("Warning: number of GC phases exceeds MAX_PHASES");
@@ -104,10 +132,10 @@ impl Stats {
             return;
         }
         if self.get_phase() < MAX_PHASES - 1 {
-            self.total_time
-                .lock()
-                .unwrap()
-                .phase_change(self.get_phase());
+            let counters = self.counters.lock().unwrap();
+            for counter in &(*counters) {
+                counter.lock().unwrap().phase_change(self.get_phase());
+            }
             self.shared.increment_phase();
         } else if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
             println!("Warning: number of GC phases exceeds MAX_PHASES");
@@ -163,7 +191,7 @@ impl Stats {
     }
 
     pub fn start_all(&self) {
-        let _counter = self.counters.lock().unwrap();
+        let counters = self.counters.lock().unwrap();
         if self.get_gathering_stats() {
             println!("Error: calling Stats.startAll() while stats running");
             println!("       verbosity > 0 and the harness mechanism may be conflicting");
@@ -171,9 +199,8 @@ impl Stats {
         }
         self.shared.set_gathering_stats(true);
 
-        let mut total_time_timer = self.total_time.lock().unwrap();
-        if total_time_timer.implicitly_start {
-            total_time_timer.start()
+        for c in &(*counters) {
+            c.lock().unwrap().start();
         }
     }
 
@@ -183,8 +210,10 @@ impl Stats {
     }
 
     fn stop_all_counters(&self) {
-        let _counter = self.counters.lock().unwrap();
-        self.total_time.lock().unwrap().stop();
+        let counters = self.counters.lock().unwrap();
+        for c in &(*counters) {
+            c.lock().unwrap().stop();
+        }
         self.shared.set_gathering_stats(false);
     }
 
