@@ -12,7 +12,7 @@
 //! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC. If the plan
 //!   implements a copying GC, a [`CopyContext`](crate::plan::global::CopyContext) also needs to be provided.
 //!
-//! For more about implementing a plan, it is recommended to read the [MMTk tutorial](https://github.com/mmtk/mmtk-core/tree/master/docs/tutorial).
+//! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).
 
 pub mod barriers;
 pub mod controller_collector_context;
