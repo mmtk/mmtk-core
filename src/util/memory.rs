@@ -8,12 +8,6 @@ pub fn zero(start: Address, len: usize) {
     }
 }
 
-pub fn fill(start: Address, len: usize, byte: u8) {
-    unsafe {
-        libc::memset(start.to_mut_ptr() as *mut libc::c_void, byte as _, len);
-    }
-}
-
 /// Demand-zero mmap:
 /// This function guarantees to zero all mapped memory.
 pub fn dzmmap(start: Address, size: usize) -> Result<Address> {

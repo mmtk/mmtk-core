@@ -5,7 +5,6 @@ use crate::util::constants::*;
 use crate::util::*;
 use crate::vm::*;
 use crate::*;
-use metadata::BitsReference;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};

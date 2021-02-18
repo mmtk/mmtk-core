@@ -54,9 +54,6 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
-    fn get_name(&self) -> &'static str {
-        "LockFreeImmortalSpace"
-    }
     fn as_space(&self) -> &dyn Space<VM> {
         self
     }
@@ -94,7 +91,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         self.limit = AVAILABLE_START + total_bytes;
         // Eagerly memory map the entire heap (also zero all the memory)
         crate::util::memory::dzmmap(AVAILABLE_START, total_bytes).unwrap();
-        SFT_MAP.update::<VM>(
+        SFT_MAP.update(
             self.as_sft(),
             AVAILABLE_START,
             bytes_to_chunks_up(total_bytes),

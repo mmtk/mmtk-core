@@ -38,8 +38,8 @@ pub fn bytes_to_chunks_up(bytes: usize) -> usize {
     (bytes + BYTES_IN_CHUNK - 1) >> LOG_BYTES_IN_CHUNK
 }
 
-pub const fn address_to_chunk_index(addr: Address) -> usize {
-    addr.as_usize() >> LOG_BYTES_IN_CHUNK
+pub fn address_to_chunk_index(addr: Address) -> usize {
+    addr >> LOG_BYTES_IN_CHUNK
 }
 
 pub fn chunk_index_to_address(chunk: usize) -> Address {

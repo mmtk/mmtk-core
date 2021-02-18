@@ -123,7 +123,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
     }
 }
 
-pub const BARRIER_COUNTER: bool = true;
+pub const BARRIER_COUNTER: bool = false;
 pub static BARRIER_FAST_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub static BARRIER_SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 

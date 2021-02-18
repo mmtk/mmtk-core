@@ -165,7 +165,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn global_side_metadata_per_chunk(&self) -> usize {
-        assert!(VM::VMObjectModel::HAS_GC_BYTE);
+        debug_assert!(VM::VMObjectModel::HAS_GC_BYTE);
         meta_bytes_per_chunk(3, 0)
     }
 }
@@ -215,7 +215,8 @@ impl<VM: VMBinding> GenCopy<VM> {
     }
 
     fn request_full_heap_collection(&self) -> bool {
-        if super::FULL_NURSERY_GC { return true } // For barrier overhead measurements, we always do full gc
+        // For barrier overhead measurements, we always do full gc in nursery collections.
+        if super::FULL_NURSERY_GC { return true }
         self.get_total_pages() <= self.get_pages_reserved()
     }
 

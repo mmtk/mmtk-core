@@ -1,8 +1,7 @@
-use crate::{Plan, util::conversions::*};
+use crate::util::conversions::*;
 use crate::util::side_metadata::try_map_metadata_space;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::{conversions::*, metadata::map_metadata_pages_for_chunk};
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
@@ -21,7 +20,6 @@ use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
-use crate::util::metadata;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -50,8 +48,6 @@ use downcast_rs::Downcast;
  */
 pub trait SFT {
     fn name(&self) -> &str;
-    fn is_empty(&self) -> bool { false }
-    fn is_nursery(&self) -> bool { false }
     fn is_live(&self, object: ObjectReference) -> bool;
     fn is_movable(&self) -> bool;
     #[cfg(feature = "sanity")]
@@ -71,9 +67,6 @@ const EMPTY_SFT_NAME: &str = "empty";
 impl SFT for EmptySpaceSFT {
     fn name(&self) -> &str {
         EMPTY_SFT_NAME
-    }
-    fn is_empty(&self) -> bool {
-        true
     }
     fn is_live(&self, object: ObjectReference) -> bool {
         panic!(
@@ -185,24 +178,24 @@ impl SFTMap {
 
     /// Update SFT map for the given address range.
     /// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-    pub fn update<VM: VMBinding>(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+    pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
         if DEBUG_SFT {
             self.log_update(space, start, chunks);
         }
         let first = start.chunk_index();
         for chunk in first..(first + chunks) {
-            self.set::<VM>(chunk, space);
+            self.set(chunk, space);
         }
         if DEBUG_SFT {
             self.trace_sft_map();
         }
     }
 
-    pub fn clear<VM: VMBinding>(&self, chunk_idx: usize) {
-        self.set::<VM>(chunk_idx, &EMPTY_SPACE_SFT);
+    pub fn clear(&self, chunk_idx: usize) {
+        self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
 
-    fn set<VM: VMBinding>(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
+    fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
         /*
          * This is safe (only) because a) this is only called during the
          * allocation and deallocation of chunks, which happens under a global
@@ -225,11 +218,6 @@ impl SFTMap {
                 old,
                 new
             );
-        }
-        if VM::VMActivePlan::global().constraints().metadata_pages_per_chunk != 0
-            && unsafe { &*self_mut.sft[chunk] }.is_empty()
-        {
-            map_metadata_pages_for_chunk::<VM>(conversions::chunk_index_to_address(chunk), unsafe { &*sft });
         }
         self_mut.sft[chunk] = sft;
     }
@@ -345,7 +333,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         );
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
-            SFT_MAP.update::<VM>(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
+            SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
         }
     }
 
@@ -364,7 +352,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update::<VM>(
+        SFT_MAP.update(
             self.as_sft() as *const (dyn SFT + Sync),
             self.common().start,
             chunks,
@@ -586,7 +574,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn init(&self, sft: *const (dyn SFT + Sync)) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            SFT_MAP.update::<VM>(sft, self.start, bytes_to_chunks_up(self.extent));
+            SFT_MAP.update(sft, self.start, bytes_to_chunks_up(self.extent));
         }
     }
 

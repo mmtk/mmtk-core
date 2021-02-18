@@ -168,14 +168,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
             if !object.is_sane() {
                 panic!("Invalid reference {:?}", object);
             }
-            // TODO: Remove this check
-            use crate::util::side_metadata::*;
-            assert_eq!(load_atomic(SideMetadataSpec {
-                scope: SideMetadataScope::Global,
-                offset: 0,
-                log_num_of_bits: 0,
-                log_min_obj_size: 3,
-            }, object.to_address()), 0b0, "object = {:?}", object);
             // Object is not "marked"
             sanity_checker.refs.insert(object); // "Mark" it
             ProcessEdgesWork::process_node(self, object);

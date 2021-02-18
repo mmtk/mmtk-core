@@ -19,7 +19,6 @@ pub struct PlanConstraints {
     pub needs_concurrent_workers: bool,
     pub generate_gc_trace: bool,
     pub needs_forward_after_liveness: bool,
-    pub metadata_pages_per_chunk: usize,
 }
 
 impl PlanConstraints {
@@ -36,7 +35,6 @@ impl PlanConstraints {
             needs_concurrent_workers: false,
             generate_gc_trace: false,
             needs_forward_after_liveness: false,
-            metadata_pages_per_chunk: 0,
             barrier: BarrierSelector::NoBarrier,
         }
     }

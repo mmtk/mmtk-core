@@ -3,7 +3,6 @@ use atomic_traits::fetch::Add;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::constants::*;
-use crate::util::metadata::*;
 use crate::scheduler::WorkBucketStage;
 use crate::util::*;
 use crate::MMTK;
@@ -59,7 +58,6 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
             BARRIER_FAST_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
         }
         if compare_exchange_atomic(self.meta, obj.to_address(), 0b1, 0b0) {
-            // store_atomic(self.meta, obj.to_address(), 0b1);
             if (BARRIER_COUNTER) {
                 BARRIER_SLOW_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
             }
