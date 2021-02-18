@@ -6,7 +6,7 @@ use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
-use std::sync::atomic::{AtomicUsize, Ordering};
+
 use enum_map::EnumMap;
 
 type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
@@ -121,23 +121,4 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
     fn record_modified_edge(&mut self, _slot: Address) {
         unreachable!()
     }
-}
-
-pub const BARRIER_COUNTER: bool = false;
-pub static BARRIER_FAST_COUNT: AtomicUsize = AtomicUsize::new(0);
-pub static BARRIER_SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-pub fn clear_barrier_counter() {
-    BARRIER_FAST_COUNT.store(0, Ordering::SeqCst);
-    BARRIER_SLOW_COUNT.store(0, Ordering::SeqCst);
-}
-pub fn barrier_slow_path_take_rate() -> f64 {
-    let fast = BARRIER_FAST_COUNT.load(Ordering::SeqCst) as f64;
-    let slow = BARRIER_SLOW_COUNT.load(Ordering::SeqCst) as f64;
-    slow / fast
-}
-pub fn barrier_counters() -> (f64, f64) {
-    let fast = BARRIER_FAST_COUNT.load(Ordering::SeqCst) as f64;
-    let slow = BARRIER_SLOW_COUNT.load(Ordering::SeqCst) as f64;
-    (fast, slow)
 }

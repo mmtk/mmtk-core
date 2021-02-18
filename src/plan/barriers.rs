@@ -7,8 +7,7 @@ use crate::scheduler::WorkBucketStage;
 use crate::util::*;
 use crate::MMTK;
 use crate::util::side_metadata::*;
-
-use super::mutator_context::{BARRIER_COUNTER, BARRIER_FAST_COUNT, BARRIER_SLOW_COUNT};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Copy, Clone, Debug)]
 pub enum BarrierSelector {
@@ -54,12 +53,12 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
 
     #[inline(always)]
     fn enqueue_node(&mut self, obj: ObjectReference) {
-        if (BARRIER_COUNTER) {
-            BARRIER_FAST_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
+        if ENABLE_BARRIER_COUNTER {
+            BARRIER_COUNTER.total.fetch_add(1, atomic::Ordering::SeqCst);
         }
         if compare_exchange_atomic(self.meta, obj.to_address(), 0b1, 0b0) {
-            if (BARRIER_COUNTER) {
-                BARRIER_SLOW_COUNT.fetch_add(1, atomic::Ordering::SeqCst);
+            if ENABLE_BARRIER_COUNTER {
+                BARRIER_COUNTER.slow.fetch_add(1, atomic::Ordering::SeqCst);
             }
             self.modbuf.push(obj);
             if self.modbuf.len() >= E::CAPACITY {
@@ -94,6 +93,41 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for ObjectRememberingBarrier<
                 self.enqueue_node(obj);
             }
             _ => unreachable!(),
+        }
+    }
+}
+
+/// Note: Please also disable vm-binding's barrier fast-path.
+pub const ENABLE_BARRIER_COUNTER: bool = false;
+
+pub static BARRIER_COUNTER: BarrierCounter = BarrierCounter {
+    total: AtomicUsize::new(0),
+    slow: AtomicUsize::new(0),
+};
+
+pub struct BarrierCounter {
+    pub total: AtomicUsize,
+    pub slow: AtomicUsize,
+}
+
+pub struct BarrierCounterResults {
+    pub total: f64,
+    pub slow: f64,
+    pub take_rate: f64,
+}
+
+impl BarrierCounter {
+    pub fn reset(&self) {
+        self.total.store(0, Ordering::SeqCst);
+        self.slow.store(0, Ordering::SeqCst);
+    }
+
+    pub fn get_results(&self) -> BarrierCounterResults {
+        let total = self.total.load(Ordering::SeqCst) as f64;
+        let slow = self.slow.load(Ordering::SeqCst) as f64;
+        BarrierCounterResults {
+            total, slow,
+            take_rate: slow / total,
         }
     }
 }

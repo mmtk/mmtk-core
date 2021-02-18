@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
+use crate::plan::barriers::{ENABLE_BARRIER_COUNTER, BARRIER_COUNTER};
 
 pub const MAX_PHASES: usize = 1 << 12;
 pub const MAX_COUNTERS: usize = 100;
@@ -138,11 +139,11 @@ impl Stats {
         for value in scheduler_stat.values() {
             print!("{}\t", value);
         }
-        if crate::plan::mutator_context::BARRIER_COUNTER {
-            print!("{:.5}\t", crate::plan::mutator_context::barrier_slow_path_take_rate());
-            let (total, slow) = crate::plan::mutator_context::barrier_counters();
-            print!("{:.5}\t", total);
-            print!("{:.5}\t", slow);
+        if ENABLE_BARRIER_COUNTER {
+            let barrier_counter_results = BARRIER_COUNTER.get_results();
+            print!("{:.5}\t", barrier_counter_results.take_rate);
+            print!("{:.0}\t", barrier_counter_results.total);
+            print!("{:.0}\t", barrier_counter_results.slow);
         }
         println!();
         print!("Total time: ");
@@ -165,10 +166,10 @@ impl Stats {
         for name in scheduler_stat.keys() {
             print!("{}\t", name);
         }
-        if crate::plan::mutator_context::BARRIER_COUNTER {
-            print!("takerate\t");
-            print!("takerate.total\t");
-            print!("takerate.slow\t");
+        if ENABLE_BARRIER_COUNTER {
+            print!("barrier.takerate\t");
+            print!("barrier.total\t");
+            print!("barrier.slow\t");
         }
         println!();
     }
@@ -185,6 +186,9 @@ impl Stats {
         let mut total_time_timer = self.total_time.lock().unwrap();
         if total_time_timer.implicitly_start {
             total_time_timer.start()
+        }
+        if ENABLE_BARRIER_COUNTER {
+            BARRIER_COUNTER.reset();
         }
     }
 
