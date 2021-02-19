@@ -85,6 +85,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for ObjectRememberingBarrier<
 
     #[inline(always)]
     fn post_write_barrier(&mut self, target: WriteTarget) {
+        unreachable!();
         match target {
             WriteTarget::Object(obj) => {
                 self.enqueue_node(obj);
