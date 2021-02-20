@@ -11,7 +11,11 @@ use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::gc_count::GcCounter;
 #[cfg(feature = "analysis")]
+use crate::util::analysis::obj_num::ObjectCounter;
+#[cfg(feature = "analysis")]
 use crate::util::analysis::obj_size::PerSizeClassObjectCounter;
+#[cfg(feature = "analysis")]
+use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -381,12 +385,9 @@ pub struct BasePlan<VM: VMBinding> {
     pub mutator_iterator_lock: Mutex<()>,
     // A counter that keeps tracks of the number of bytes allocated since last stress test
     pub allocation_bytes: AtomicUsize,
-    // Concrete implementation of the analysis trait -- in this case the implementation
-    // counts the number of objects in different size classes
+    // Wrapper around analysis counters
     #[cfg(feature = "analysis")]
-    pub obj_size: Mutex<PerSizeClassObjectCounter>,
-    #[cfg(feature = "analysis")]
-    pub gc_count: Mutex<GcCounter>,
+    pub analysis_manager: Mutex<AnalysisManager<VM>>,
 }
 
 #[cfg(feature = "base_spaces")]
@@ -437,7 +438,35 @@ impl<VM: VMBinding> BasePlan<VM> {
         constraints: &'static PlanConstraints,
     ) -> BasePlan<VM> {
         let stats = Stats::new();
-        let ctr = stats.new_event_counter("gc.num", true, true);
+        // TODO kunals: better interface for initializing analysis routines
+        // Initializing the analysis manager and routines
+        #[cfg(feature = "analysis")]
+        let ctr = stats.new_event_counter("obj.num", true, true);
+        #[cfg(feature = "analysis")]
+        let gc_ctr = stats.new_event_counter("gc.num", true, true);
+        #[cfg(feature = "analysis")]
+        let obj_num = Arc::new(Mutex::new(ObjectCounter::new(true, ctr)));
+        #[cfg(feature = "analysis")]
+        let gc_count = Arc::new(Mutex::new(GcCounter::new(true, gc_ctr)));
+        #[cfg(feature = "analysis")]
+        let obj_size = Arc::new(Mutex::new(PerSizeClassObjectCounter::new(true)));
+        #[cfg(feature = "analysis")]
+        let mut analysis_manager = Mutex::new(AnalysisManager::new());
+        #[cfg(feature = "analysis")]
+        analysis_manager
+            .lock()
+            .unwrap()
+            .add_analysis_routine(obj_num);
+        #[cfg(feature = "analysis")]
+        analysis_manager
+            .lock()
+            .unwrap()
+            .add_analysis_routine(gc_count);
+        #[cfg(feature = "analysis")]
+        analysis_manager
+            .lock()
+            .unwrap()
+            .add_analysis_routine(obj_size);
         BasePlan {
             #[cfg(feature = "base_spaces")]
             unsync: UnsafeCell::new(BaseUnsync {
@@ -492,9 +521,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             mutator_iterator_lock: Mutex::new(()),
             allocation_bytes: AtomicUsize::new(0),
             #[cfg(feature = "analysis")]
-            obj_size: Mutex::new(PerSizeClassObjectCounter::new()),
-            #[cfg(feature = "analysis")]
-            gc_count: Mutex::new(GcCounter::new(ctr)),
+            analysis_manager,
         }
     }
 
