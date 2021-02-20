@@ -9,12 +9,6 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
-use crate::util::analysis::gc_count::GcCounter;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::obj_num::ObjectCounter;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::obj_size::PerSizeClassObjectCounter;
-#[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -438,35 +432,11 @@ impl<VM: VMBinding> BasePlan<VM> {
         constraints: &'static PlanConstraints,
     ) -> BasePlan<VM> {
         let stats = Stats::new();
-        // TODO kunals: better interface for initializing analysis routines
         // Initializing the analysis manager and routines
-        #[cfg(feature = "analysis")]
-        let ctr = stats.new_event_counter("obj.num", true, true);
-        #[cfg(feature = "analysis")]
-        let gc_ctr = stats.new_event_counter("gc.num", true, true);
-        #[cfg(feature = "analysis")]
-        let obj_num = Arc::new(Mutex::new(ObjectCounter::new(true, ctr)));
-        #[cfg(feature = "analysis")]
-        let gc_count = Arc::new(Mutex::new(GcCounter::new(true, gc_ctr)));
-        #[cfg(feature = "analysis")]
-        let obj_size = Arc::new(Mutex::new(PerSizeClassObjectCounter::new(true)));
         #[cfg(feature = "analysis")]
         let mut analysis_manager = Mutex::new(AnalysisManager::new());
         #[cfg(feature = "analysis")]
-        analysis_manager
-            .lock()
-            .unwrap()
-            .add_analysis_routine(obj_num);
-        #[cfg(feature = "analysis")]
-        analysis_manager
-            .lock()
-            .unwrap()
-            .add_analysis_routine(gc_count);
-        #[cfg(feature = "analysis")]
-        analysis_manager
-            .lock()
-            .unwrap()
-            .add_analysis_routine(obj_size);
+        analysis_manager.lock().unwrap().initialize_routines(&stats);
         BasePlan {
             #[cfg(feature = "base_spaces")]
             unsync: UnsafeCell::new(BaseUnsync {
