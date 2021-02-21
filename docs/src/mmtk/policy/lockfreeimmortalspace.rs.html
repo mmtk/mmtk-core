@@ -130,12 +130,23 @@
 <span id="127">127</span>
 <span id="128">128</span>
 <span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">SFT_MAP</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">address</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>::<span class="ident">bytes_to_chunks_up</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">PageResource</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">try_map_metadata_space</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
 
@@ -224,6 +235,15 @@
         <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">AVAILABLE_START</span> <span class="op">+</span> <span class="ident">total_bytes</span>;
         <span class="comment">// Eagerly memory map the entire heap (also zero all the memory)</span>
         <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">memory</span>::<span class="ident">dzmmap</span>(<span class="ident">AVAILABLE_START</span>, <span class="ident">total_bytes</span>).<span class="ident">unwrap</span>();
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">try_map_metadata_space</span>(
+            <span class="ident">AVAILABLE_START</span>,
+            <span class="ident">total_bytes</span>,
+            <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_per_chunk</span>(),
+            <span class="self">self</span>.<span class="ident">local_side_metadata_per_chunk</span>(),
+        ) {
+            <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
+            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
+        }
         <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(
             <span class="self">self</span>.<span class="ident">as_sft</span>(),
             <span class="ident">AVAILABLE_START</span>,

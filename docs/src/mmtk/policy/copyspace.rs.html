@@ -255,7 +255,7 @@
         <span class="comment">// Borrow-checker fighting so that we can have a cyclic reference</span>
         <span class="kw">let</span> <span class="ident">me</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="self">Self</span>) };
         <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">bind_space</span>(<span class="ident">me</span>);
-        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">init</span>(<span class="self">self</span>.<span class="ident">as_sft</span>());
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">init</span>(<span class="self">self</span>.<span class="ident">as_space</span>());
     }
 
     <span class="kw">fn</span> <span class="ident">release_multiple_pages</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) {
