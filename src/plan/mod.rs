@@ -17,3 +17,4 @@ pub use self::transitive_closure::TransitiveClosure;
 pub mod gencopy;
 pub mod nogc;
 pub mod semispace;
+pub mod immix;

@@ -18,7 +18,8 @@ custom_derive! {
     pub enum PlanSelector {
         NoGC,
         SemiSpace,
-        GenCopy
+        GenCopy,
+        Immix,
     }
 }
 
