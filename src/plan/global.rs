@@ -381,7 +381,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub allocation_bytes: AtomicUsize,
     // Wrapper around analysis counters
     #[cfg(feature = "analysis")]
-    pub analysis_manager: Mutex<AnalysisManager<VM>>,
+    pub analysis_manager: AnalysisManager<VM>,
 }
 
 #[cfg(feature = "base_spaces")]
@@ -434,9 +434,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         let stats = Stats::new();
         // Initializing the analysis manager and routines
         #[cfg(feature = "analysis")]
-        let mut analysis_manager = Mutex::new(AnalysisManager::new());
-        #[cfg(feature = "analysis")]
-        analysis_manager.lock().unwrap().initialize_routines(&stats);
+        let mut analysis_manager = AnalysisManager::new(&stats);
         BasePlan {
             #[cfg(feature = "base_spaces")]
             unsync: UnsafeCell::new(BaseUnsync {

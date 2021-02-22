@@ -12,16 +12,16 @@ use self::gc_count::GcCounter;
 use self::obj_num::ObjectCounter;
 use self::obj_size::PerSizeClassObjectCounter;
 
-/**
- * This trait exposes hooks for developers to implement their own analysis routines.
- *
- * Most traits would want to hook into the `Stats` and counters provided by the MMTk
- * framework that are exposed to the Harness.
- *
- * The arguments for the hooks should be sufficient, however, if one wishes to add
- * other arguments, then they can create an analysis routine specific function and
- * invoke it in its respective place.
- */
+///
+/// This trait exposes hooks for developers to implement their own analysis routines.
+///
+/// Most traits would want to hook into the `Stats` and counters provided by the MMTk
+/// framework that are exposed to the Harness.
+///
+/// The arguments for the hooks should be sufficient, however, if one wishes to add
+/// other arguments, then they can create an analysis routine specific function and
+/// invoke it in its respective place.
+///
 pub trait RtAnalysis<VM: VMBinding> {
     fn alloc_hook(&mut self, _size: usize, _align: usize, _offset: isize) {}
     fn gc_hook(&mut self, _mmtk: &'static MMTK<VM>) {}
@@ -34,7 +34,7 @@ pub struct GcHookWork;
 impl<VM: VMBinding> GCWork<VM> for GcHookWork {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let base = &mmtk.plan.base();
-        base.analysis_manager.lock().unwrap().gc_hook(mmtk);
+        base.analysis_manager.gc_hook(mmtk);
     }
 }
 
@@ -46,15 +46,17 @@ pub struct AnalysisManager<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> AnalysisManager<VM> {
-    pub fn new() -> Self {
-        AnalysisManager {
+    pub fn new(stats: &Stats) -> Self {
+        let mut manager = AnalysisManager {
             routines: Mutex::new(vec![]),
-        }
+        };
+        manager.initialize_routines(stats);
+        manager
     }
 
     // Initializing all routines. If you want to add a new routine, here is the place
     // to do so
-    pub fn initialize_routines(&mut self, stats: &Stats) {
+    fn initialize_routines(&mut self, stats: &Stats) {
         let ctr = stats.new_event_counter("obj.num", true, true);
         let gc_ctr = stats.new_event_counter("gc.num", true, true);
         let obj_num = Arc::new(Mutex::new(ObjectCounter::new(true, ctr)));

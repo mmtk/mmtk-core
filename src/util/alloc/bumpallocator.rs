@@ -149,8 +149,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
                     base.options.analysis_factor
                 );
 
-                let analysis_manager = base.analysis_manager.lock().unwrap();
-                analysis_manager.alloc_hook(size, align, offset);
+                base.analysis_manager.alloc_hook(size, align, offset);
             }
 
             fill_alignment_gap::<VM>(self.cursor, result);
