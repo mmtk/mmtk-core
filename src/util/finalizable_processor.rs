@@ -32,7 +32,14 @@ impl FinalizableProcessor {
         self.candidates.push(object);
     }
 
-    fn prepare_finalizable_object<E: ProcessEdgesWork>(
+    fn get_forwarded_finalizable<E: ProcessEdgesWork>(
+        e: &mut E,
+        object: ObjectReference,
+    ) -> ObjectReference {
+        e.trace_object(object)
+    }
+
+    fn return_for_finalize<E: ProcessEdgesWork>(
         e: &mut E,
         object: ObjectReference,
     ) -> ObjectReference {
@@ -54,18 +61,20 @@ impl FinalizableProcessor {
             .collect::<Vec<ObjectReference>>()
         {
             trace!("Pop {:?} for finalization", reff);
-            let res = FinalizableProcessor::prepare_finalizable_object(e, reff);
             if reff.is_live() {
+                let res = FinalizableProcessor::get_forwarded_finalizable(e, reff);
                 trace!("{:?} is live, push {:?} back to candidates", reff, res);
                 self.candidates.push(res);
-            } else {
-                trace!(
-                    "{:?} is not live, push {:?} to ready_for_finalize",
-                    reff,
-                    res
-                );
-                self.ready_for_finalize.push(res);
+                continue;
             }
+
+            let retained = FinalizableProcessor::return_for_finalize(e, reff);
+            self.ready_for_finalize.push(retained);
+            trace!(
+                "{:?} is not live, push {:?} to ready_for_finalize",
+                reff,
+                retained
+            );
         }
         e.flush();
 
@@ -75,7 +84,7 @@ impl FinalizableProcessor {
     pub fn forward<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
         self.candidates
             .iter_mut()
-            .for_each(|reff| *reff = FinalizableProcessor::prepare_finalizable_object(e, *reff));
+            .for_each(|reff| *reff = FinalizableProcessor::get_forwarded_finalizable(e, *reff));
         e.flush();
     }
 
