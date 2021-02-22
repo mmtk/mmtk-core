@@ -204,12 +204,6 @@
 <span id="201">201</span>
 <span id="202">202</span>
 <span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
-<span id="209">209</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">Ordering</span>;
@@ -221,10 +215,6 @@
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">Plan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">Space</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">analysis</span>::<span class="ident">obj_size</span>::<span class="ident">PerSizeClassObjectCounterArgs</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">analysis</span>::<span class="ident">RtAnalysis</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>::<span class="ident">bytes_to_pages</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">VMBinding</span>};
@@ -354,9 +344,8 @@
                 <span class="kw">return</span> <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">true</span>);
             }
 
-            <span class="comment">// This is the allocation hook for the analysis trait. Note that we pack up</span>
-            <span class="comment">// the arguments in a struct to be passed on for the trait to process. This</span>
-            <span class="comment">// is generally how more complicated analyses can be performed</span>
+            <span class="comment">// This is the allocation hook for the analysis trait. If you want to call</span>
+            <span class="comment">// an analysis counter specific allocation hook, then here is the place to do so</span>
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
             <span class="kw">if</span> <span class="ident">is_mutator</span>
                 <span class="op">&amp;&amp;</span> <span class="ident">base</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) <span class="op">&gt;</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span>
@@ -367,8 +356,7 @@
                     <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span>
                 );
 
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj_size</span> <span class="op">=</span> <span class="ident">base</span>.<span class="ident">obj_size</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-                <span class="ident">obj_size</span>.<span class="ident">alloc_hook</span>(<span class="ident">PerSizeClassObjectCounterArgs</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">base</span>.<span class="ident">stats</span>, <span class="ident">size</span>));
+                <span class="ident">base</span>.<span class="ident">analysis_manager</span>.<span class="ident">alloc_hook</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
             }
 
             <span class="ident">fill_alignment_gap</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">cursor</span>, <span class="ident">result</span>);

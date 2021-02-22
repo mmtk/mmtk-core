@@ -216,7 +216,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">allocators</span>::<span class="ident">AllocatorSelector</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">analysis</span>::<span class="ident">gc_count</span>::<span class="ident">GcCounterWork</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">analysis</span>::<span class="ident">GcHookWork</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::<span class="ident">Mmapper</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::<span class="ident">VMMap</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::{<span class="ident">HEAP_END</span>, <span class="ident">HEAP_START</span>};
@@ -294,10 +294,10 @@
         <span class="comment">// Release global/collectors/mutators</span>
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Release</span>]
             .<span class="ident">add</span>(<span class="ident">Release</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">SSCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="self">self</span>));
-        <span class="comment">// Analysis routine that is ran. It is generally recommended to take advantage</span>
-        <span class="comment">// of the scheduling system we have in place for more performance</span>
+        <span class="comment">// Scheduling all the gc hooks of analysis routines. It is generally recommended</span>
+        <span class="comment">// to take advantage of the scheduling system we have in place for more performance</span>
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Unconstrained</span>].<span class="ident">add</span>(<span class="ident">GcCounterWork</span>::<span class="ident">new</span>());
+        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Unconstrained</span>].<span class="ident">add</span>(<span class="ident">GcHookWork</span>);
         <span class="comment">// Resume mutators</span>
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Final</span>]

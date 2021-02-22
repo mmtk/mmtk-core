@@ -33,21 +33,7 @@
 <span id="30">30</span>
 <span id="31">31</span>
 <span id="32">32</span>
-<span id="33">33</span>
-<span id="34">34</span>
-<span id="35">35</span>
-<span id="36">36</span>
-<span id="37">37</span>
-<span id="38">38</span>
-<span id="39">39</span>
-<span id="40">40</span>
-<span id="41">41</span>
-<span id="42">42</span>
-<span id="43">43</span>
-<span id="44">44</span>
-<span id="45">45</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">analysis</span>::<span class="ident">RtAnalysis</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">statistics</span>::<span class="ident">counter</span>::<span class="ident">EventCounter</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
@@ -58,38 +44,26 @@
  * Simple analysis routine that counts the number of collections over course of program execution
  */</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GcCounter</span> {
+    <span class="ident">running</span>: <span class="ident">bool</span>,
     <span class="ident">counter</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">GcCounter</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">counter</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span> { <span class="ident">counter</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">running</span>: <span class="ident">bool</span>, <span class="ident">counter</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="self">Self</span> { <span class="ident">running</span>, <span class="ident">counter</span> }
     }
 }
 
-<span class="comment">// Since no special arguments are required, the routine uses unit/void for implementing the trait</span>
-<span class="kw">impl</span> <span class="ident">RtAnalysis</span><span class="op">&lt;</span>(), ()<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">GcCounter</span> {
-    <span class="kw">fn</span> <span class="ident">gc_hook</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_args</span>: ()) {
-        <span class="self">self</span>.<span class="ident">counter</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">inc</span>();
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">RtAnalysis</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">GcCounter</span> {
+    <span class="kw">fn</span> <span class="ident">gc_hook</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">running</span> {
+            <span class="comment">// The analysis routine simply updates the counter when the allocation hook is called</span>
+            <span class="self">self</span>.<span class="ident">counter</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">inc</span>();
+        }
     }
-}
 
-<span class="comment">// We could have simply called gc_hook() in schedule_collection(), however it is not advised as</span>
-<span class="comment">// creating a work packet will be more performant in general as this allows the work to be</span>
-<span class="comment">// completed asynchronously whenever a worker thread is free.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GcCounterWork</span>;
-
-<span class="kw">impl</span> <span class="ident">GcCounterWork</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">GcCounterWork</span>
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">GcCounterWork</span> {
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">plan</span>;
-        <span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">gc_count</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">gc_hook</span>(());
+    <span class="kw">fn</span> <span class="ident">set_running</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">running</span>: <span class="ident">bool</span>) {
+        <span class="self">self</span>.<span class="ident">running</span> <span class="op">=</span> <span class="ident">running</span>;
     }
 }
 </pre></div>
