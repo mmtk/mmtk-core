@@ -1,3 +1,5 @@
+//! Plan: nogc (allocation-only)
+
 pub(super) mod global;
 pub(super) mod mutator;
 

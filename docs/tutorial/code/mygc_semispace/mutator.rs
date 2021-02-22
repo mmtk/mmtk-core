@@ -14,7 +14,7 @@ use enum_map::EnumMap;
 
 // Add
 pub fn mygc_mutator_prepare<VM: VMBinding>(
-    _mutator: &mut Mutator<MyGC<VM>>,
+    _mutator: &mut Mutator<VM>,
     _tls: OpaquePointer,
 ) {
     // Do nothing
@@ -22,7 +22,7 @@ pub fn mygc_mutator_prepare<VM: VMBinding>(
 
 // Add
 pub fn mygc_mutator_release<VM: VMBinding>(
-    mutator: &mut Mutator<MyGC<VM>>,
+    mutator: &mut Mutator<VM>,
     _tls: OpaquePointer,
 ) {
     // rebind the allocation bump pointer to the appropriate semispace
@@ -33,7 +33,13 @@ pub fn mygc_mutator_release<VM: VMBinding>(
     }
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
-    bump_allocator.rebind(Some(mutator.plan.tospace()));
+    bump_allocator.rebind(Some(
+        mutator
+            .plan
+            .downcast_ref::<MyGC<VM>>()
+            .unwrap()
+            .tospace(),
+    ));
 }
 
 // Modify
@@ -48,7 +54,7 @@ lazy_static! {
 pub fn create_mygc_mutator<VM: VMBinding>(
     mutator_tls: OpaquePointer,
     plan: &'static MyGC<VM>,
-) -> Mutator<MyGC<VM>> {
+) -> Mutator<VM> {
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         // Modify
