@@ -67,8 +67,6 @@
 <span id="64">64</span>
 <span id="65">65</span>
 <span id="66">66</span>
-<span id="67">67</span>
-<span id="68">68</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">incomplete_features</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>)]</span>
@@ -98,8 +96,6 @@
 <span class="doccomment">//!      Each space is an instance of a policy, and takes up a unique proportion of the heap.</span>
 <span class="doccomment">//!   * [Work packets](scheduler/work/trait.GCWork.html): units of GC work scheduled by the MMTk&#39;s scheduler.</span>
 <span class="doccomment">//! * [GC plans](plan/global/trait.Plan.html): GC algorithms composed from components.</span>
-<span class="doccomment">//!   *Note that currently the choice of plans is made through Rust features, which is a build-time config, so only one plan is present in the generated binary</span>
-<span class="doccomment">//!   and in this documentation. We plan to make this a run-time config so that users can choose GC plans at boot time.*</span>
 <span class="doccomment">//! * [Heap implementations](util/heap/index.html): the underlying implementations of memory resources that support spaces.</span>
 <span class="doccomment">//! * [Scheduler](scheduler/scheduler/struct.Scheduler.html): the MMTk scheduler to allow flexible and parallel execution of GC work.</span>
 <span class="doccomment">//! * Interfaces: bi-directional interfaces between MMTk and language implementations</span>

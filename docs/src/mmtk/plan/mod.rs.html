@@ -20,7 +20,39 @@
 <span id="17">17</span>
 <span id="18">18</span>
 <span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
 </pre><div class="example-wrap"><pre class="rust ">
+<span class="doccomment">//! GC algorithms from the MMTk suite.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This module provides various GC plans, each of which implements a GC algorithm.</span>
+<span class="doccomment">//! Generally a plan consists of a few parts:</span>
+<span class="doccomment">//! * A plan type that implements the [`Plan`](crate::plan::global::Plan) trait, which defines</span>
+<span class="doccomment">//!   spaces used in the plan, and their behaviors in GC and page accounting.</span>
+<span class="doccomment">//! * A mutator definition, which describes the mapping between allocators and allocation semantics,</span>
+<span class="doccomment">//!   and the mapping between allocators and spaces. If the plan needs barrier, the barrier definition is</span>
+<span class="doccomment">//!   also included here.</span>
+<span class="doccomment">//! * A constant for [`PlanConstraints`](crate::plan::plan_constraints::PlanConstraints), which defines</span>
+<span class="doccomment">//!   plan-specific constants.</span>
+<span class="doccomment">//! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC. If the plan</span>
+<span class="doccomment">//!   implements a copying GC, a [`CopyContext`](crate::plan::global::CopyContext) also needs to be provided.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).</span>
+
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">barriers</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">controller_collector_context</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">global</span>;
