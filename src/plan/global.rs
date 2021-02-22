@@ -434,7 +434,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         let stats = Stats::new();
         // Initializing the analysis manager and routines
         #[cfg(feature = "analysis")]
-        let mut analysis_manager = AnalysisManager::new(&stats);
+        let analysis_manager = AnalysisManager::new(&stats);
         BasePlan {
             #[cfg(feature = "base_spaces")]
             unsync: UnsafeCell::new(BaseUnsync {

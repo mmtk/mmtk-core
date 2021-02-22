@@ -19,7 +19,9 @@ pub struct PerSizeClassObjectCounter {
     size_classes: Mutex<HashMap<String, Arc<Mutex<EventCounter>>>>,
 }
 
-// Macro to simplify the creation of a new counter for a particular size class
+// Macro to simplify the creation of a new counter for a particular size class.
+// This is a macro as opposed to a function as otherwise we would have to unlock
+// and relock the size_classes map
 macro_rules! new_ctr {
     ( $stats:expr, $map:expr, $size_class:expr ) => {{
         let ctr = $stats.new_event_counter(&$size_class, true, true);
