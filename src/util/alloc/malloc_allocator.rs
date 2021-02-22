@@ -7,6 +7,7 @@ use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::{plan::global::Plan, util::heap::layout::vm_layout_constants::PAGES_IN_CHUNK};
+use crate::util::alloc::allocator::align_allocation_no_fill;
 
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
@@ -31,10 +32,13 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        trace!("alloc");
-        assert!(offset == 0);
+        // assert!(offset == 0);
         assert!(align <= 16);
-        self.space.unwrap().alloc(size)
+        let ret = self.space.unwrap().alloc(size);
+        trace!("MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}", size, align, offset, ret);
+        // let aligned = align_allocation_no_fill::<VM>(ret, align, offset);
+        // trace!("MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}, aligned = {}", size, align, offset, ret, aligned);
+        ret
     }
 }
 

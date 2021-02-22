@@ -131,4 +131,8 @@ impl<VM: VMBinding> MarkSweep<VM> {
             space: MallocSpace::new(vm_map),
         }
     }
+
+    pub fn ms_space(&self) -> &MallocSpace<VM> {
+        &self.space
+    }
 }

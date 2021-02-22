@@ -30,6 +30,7 @@ pub trait GCWork<VM: VMBinding>: 'static + Send + Sync + Sized + Work<MMTK<VM>> 
 impl<VM: VMBinding, W: GCWork<VM>> Work<MMTK<VM>> for W {
     #[inline(always)]
     default fn do_work(&mut self, worker: &mut Worker<MMTK<VM>>, mmtk: &'static MMTK<VM>) {
+        trace!("do_work {}", std::any::type_name::<W>());
         GCWork::do_work(self, worker, mmtk)
     }
 }

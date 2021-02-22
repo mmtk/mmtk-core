@@ -3,5 +3,4 @@ mod global;
 pub mod mutator;
 
 pub use self::global::MarkSweep;
-
-pub use self::global::SelectedPlan;
+pub use self::global::MS_CONSTRAINTS;

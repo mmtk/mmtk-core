@@ -10,7 +10,9 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::conversions;
 use crate::vm::VMBinding;
-use crate::vm::ActivePlan;
+use crate::vm::{ActivePlan, ObjectModel};
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::mmapper::Mmapper as IMmapper;
 use crate::{
     policy::space::Space,
     util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK, side_metadata::load_atomic},
@@ -38,7 +40,9 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
+    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
+        set_alloc_bit(object.to_address());
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
@@ -72,7 +76,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     fn address_in_space(&self, start: Address) -> bool {
-        meta_space_mapped(start) && load_atomic(ALLOC_METADATA_SPEC, start) == 1
+        is_meta_space_mapped(start) && load_atomic(ALLOC_METADATA_SPEC, start) == 1
     }
 
     fn get_name(&self) -> &'static str {
@@ -128,14 +132,13 @@ impl<VM: VMBinding> MallocSpace<VM> {
     pub fn alloc(&self, size: usize) -> Address {
         let address = Address::from_mut_ptr(unsafe { calloc(1, size) });
         if !address.is_zero() {
-            if !meta_space_mapped(address) {
+            if !is_meta_space_mapped(address) {
                 VM::VMActivePlan::global().poll(false, self);
                 let chunk_start = conversions::chunk_align_down(address);
                 map_meta_space_for_chunk(chunk_start);
                 self.get_page_resource()
                     .reserve_pages(PAGES_IN_CHUNK);
             }
-            set_alloc_bit(address);
         }
         address
     }
@@ -152,7 +155,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let address = object.to_address();
         assert!(
             self.address_in_space(address),
-            "Cannot mark an object that was not alloced by malloc."
+            "Cannot mark an object {} that was not alloced by malloc.",
+            address,
         );
         if !is_marked(address) {
             set_mark_bit(address);

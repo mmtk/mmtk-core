@@ -3,6 +3,8 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::MMTK;
+use crate::policy::space::Space;
+use crate::plan::global::NoCopy;
 use std::ops::{Deref, DerefMut};
 
 use super::MarkSweep;
@@ -23,7 +25,15 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
 
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        self.plan.space.trace_object::<Self>(self, object)
+        if object.is_null() {
+            return object;
+        }
+        trace!("Tracing object {}", object);
+        if self.plan.ms_space().in_space(object) {
+            self.plan.space.trace_object::<Self>(self, object)
+        } else {
+            self.plan.common.trace_object::<Self, NoCopy<VM>>(self, object)
+        }
     }
 }
 

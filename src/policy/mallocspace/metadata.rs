@@ -8,7 +8,8 @@ use crate::util::side_metadata::SideMetadataScope;
 use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use conversions::chunk_align_down;
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+
 use std::collections::HashSet;
 use std::sync::RwLock;
 
@@ -34,8 +35,8 @@ pub const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
 };
 
-pub fn meta_space_mapped(address: Address) -> bool {
-    let chunk_start = chunk_align_down(address);
+pub fn is_meta_space_mapped(address: Address) -> bool {
+    let chunk_start = conversions::chunk_align_down(address);
     ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
 }
 
@@ -61,7 +62,11 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
 // Check if a given object was allocated by malloc
 pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
     let address = object.to_address();
-    meta_space_mapped(address) && load_atomic(ALLOC_METADATA_SPEC, address) == 1
+    is_in_mallocspace(address)
+}
+
+pub fn is_in_mallocspace(address: Address) -> bool {
+    is_meta_space_mapped(address) && load_atomic(ALLOC_METADATA_SPEC, address) == 1
 }
 
 pub fn is_marked(address: Address) -> bool {
