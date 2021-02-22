@@ -4,7 +4,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkerLocal;
-use crate::util::alloc::{Allocator, BumpAllocator};
+use crate::util::alloc::{Allocator, ImmixAllocator};
 use crate::util::forwarding_word;
 use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::VMBinding;
@@ -13,7 +13,7 @@ use std::ops::{Deref, DerefMut};
 
 pub struct ImmixCopyContext<VM: VMBinding> {
     plan: &'static Immix<VM>,
-    immix: BumpAllocator<VM>,
+    immix: ImmixAllocator<VM>,
 }
 
 impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
@@ -58,7 +58,7 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
             plan: &mmtk.plan.downcast_ref::<Immix<VM>>().unwrap(),
-            immix: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
+            immix: ImmixAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
         }
     }
 }

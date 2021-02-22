@@ -5,7 +5,7 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::BumpAllocator;
+use crate::util::alloc::ImmixAllocator;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::enum_map;
@@ -17,14 +17,14 @@ pub fn immix_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: Op
 
 pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
     // rebind the allocation bump pointer to the appropriate semispace
-    let bump_allocator = unsafe {
+    let immix_allocator = unsafe {
         mutator
             .allocators
             .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
     }
-    .downcast_mut::<BumpAllocator<VM>>()
+    .downcast_mut::<ImmixAllocator<VM>>()
     .unwrap();
-    bump_allocator.rebind(Some(
+    immix_allocator.rebind(Some(
         mutator
             .plan
             .downcast_ref::<Immix<VM>>()
@@ -35,8 +35,8 @@ pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: Opa
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default => AllocatorSelector::BumpPointer(0),
-        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
+        AllocationType::Default => AllocatorSelector::Immix(0),
+        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::Immix(0),
         AllocationType::Los => AllocatorSelector::LargeObject(0),
     };
 }
@@ -49,7 +49,7 @@ pub fn create_immix_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), immix.tospace()),
+            (AllocatorSelector::Immix(0), immix.tospace()),
             (AllocatorSelector::BumpPointer(1), immix.common.get_immortal()),
             (AllocatorSelector::LargeObject(0), immix.common.get_los()),
         ],
