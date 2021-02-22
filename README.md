@@ -21,26 +21,20 @@ We maintain an up to date list of the prerequisite for building MMTk and its bin
 ## Build
 
 Building MMTk requires a nightly Rust toolchain.
-As the Rust language and its libraries (crates) are frequently evolving, we recommend using the nightly toolchain specified in the [mmtk-dev-env](https://github.com/mmtk/mmtk-dev-env).
+As the Rust language and its libraries (crates) are frequently evolving, we recommend using the nightly toolchain specified in the [`rust-toolchain`](rust-toolchain) file.
 
 ```console
 $ # replace nightly-YYYY-MM-DD with the toolchain version specified in mmtk-dev-env
 $ export RUSTUP_TOOLCHAIN=nightly-YYYY-MM-DD
 
-$ cargo build --features <space separated features>
+$ cargo build
 ```
 
-You must specify a GC plan as a feature at build time.
-You may choose from:
-
-* `--features nogc` for NoGC (allocation only),
-* `--features semispace` for a semi space GC, or
-* `--features gencopy` for a generational copying GC.
-
-A full list of plans and other available features can be seen by examining [`Cargo.toml`](Cargo.toml).
+MMTk also provides a list of optional features that users can choose from. 
+A full list of available features can be seen by examining [`Cargo.toml`](Cargo.toml).
 By passing the `--features` flag to the Rust compiler,
-we conditionally compile plan-specific code.
-You can optionally enable sanity checks by adding `sanity` to the set of features
+we conditionally compile feature-related code.
+For example, you can optionally enable sanity checks by adding `sanity` to the set of features
 you want to use.
 
 You can pass the `--release` flag to the `cargo build` command to use the
@@ -81,10 +75,10 @@ We use both unit tests and VM binding tests to test MMTk in the CI.
 
 ### Unit tests
 
-MMTk uses Rust's testing framework for unit tests. For example, you can use the following to run unit tests for the `nogc` plan.
+MMTk uses Rust's testing framework for unit tests. For example, you can use the following to run unit tests.
 
 ```console
-$ cargo test --features nogc
+$ cargo test
 ```
 
 A full list of all the unit tests we run in our CI can be found [here](.github/scripts/ci-test.sh).

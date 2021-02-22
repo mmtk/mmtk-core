@@ -1,3 +1,5 @@
+//! The global part of a plan implementation.
+
 use super::controller_collector_context::ControllerCollectorContext;
 use super::PlanConstraints;
 use crate::mmtk::MMTK;
