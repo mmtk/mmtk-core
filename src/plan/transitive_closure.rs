@@ -1,3 +1,5 @@
+//! The fundamental mechanism for performing a transitive closure over an object graph.
+
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::util::{Address, ObjectReference};
 

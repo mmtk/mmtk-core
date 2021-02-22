@@ -109,6 +109,7 @@ options! {
     // TODO: Delete this option.
     verbose:               usize                [always_valid] = 0,
     stress_factor:         usize                [always_valid] = DEFAULT_STRESS_FACTOR,
+    analysis_factor:       usize                [always_valid] = DEFAULT_STRESS_FACTOR,
     // vmspace
     // FIXME: These options are set for JikesRVM. We need a proper way to set options.
     //   We need to set these values programmatically in VM specific code.

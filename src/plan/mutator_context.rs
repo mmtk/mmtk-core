@@ -1,3 +1,5 @@
+//! Mutator context for each application thread.
+
 use crate::plan::barriers::{Barrier, WriteTarget};
 use crate::plan::global::Plan;
 use crate::plan::AllocationSemantics as AllocationType;

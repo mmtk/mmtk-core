@@ -6,6 +6,8 @@ pub mod macros;
 pub mod conversions;
 pub mod address;
 pub mod alloc;
+#[cfg(feature = "analysis")]
+pub mod analysis;
 pub mod constants;
 pub mod finalizable_processor;
 pub mod forwarding_word;
