@@ -1,7 +1,8 @@
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWork, GCWorker};
-use crate::util::ObjectReference;
+use crate::util::{ObjectReference, OpaquePointer};
 use crate::MMTK;
+use crate::vm::{Collection, VMBinding};
 use std::marker::PhantomData;
 
 /// A special processor for Finalizable objects.
@@ -46,7 +47,7 @@ impl FinalizableProcessor {
         e.trace_object(object)
     }
 
-    pub fn scan<E: ProcessEdgesWork>(&mut self, e: &mut E, nursery: bool) {
+    pub fn scan<E: ProcessEdgesWork>(&mut self, tls: OpaquePointer, e: &mut E, nursery: bool) {
         let start = if nursery { self.nursery_index } else { 0 };
 
         // We should go through ready_for_finalize objects and keep them alive.
@@ -79,6 +80,8 @@ impl FinalizableProcessor {
         e.flush();
 
         self.nursery_index = self.candidates.len();
+
+        <<E as ProcessEdgesWork>::VM as VMBinding>::VMCollection::schedule_finalization(tls);
     }
 
     pub fn forward<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
@@ -107,7 +110,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
 
         let mut w = E::new(vec![], false, mmtk);
         w.set_worker(worker);
-        finalizable_processor.scan(&mut w, mmtk.plan.in_nursery());
+        finalizable_processor.scan(worker.tls, &mut w, mmtk.plan.in_nursery());
         debug!(
             "Finished finalization, {} objects in candidates, {} objects ready to finalize",
             finalizable_processor.candidates.len(),
