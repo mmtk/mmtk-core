@@ -228,7 +228,7 @@ build, you can run different GC plans by using the environment variable `MMTK_PL
 Generally you won't need multiple VM builds. However, if you
 do need to keep a build (for instance, to make quick performance
 comparisons), you can do the following: rename either the `build` folder or the folder generated
-within it (eg `inux-x86_64-normal-server-$DEBUG_LEVEL`). 
+within it (eg `linux-x86_64-normal-server-$DEBUG_LEVEL`). 
    1. Renaming the `build` folder is the safest method for this.
    2. If you rename the internal folder, there is a possibility that the new 
    build will generate incorrectly. If a build appears to generate strangely 
@@ -237,7 +237,7 @@ within it (eg `inux-x86_64-normal-server-$DEBUG_LEVEL`).
    commands as appropriate.
    4. If you plan to completely overwrite a build, deleting the folder you are 
    writing over will help prevent errors.
-1. Try run your build with `NoGC`. Both HelloWorld and the fannkuchredux benchmark
+1. Try running your build with `NoGC`. Both HelloWorld and the fannkuchredux benchmark
 should run without issue. If you then run lusearch, it should fail when a 
 collection is triggered. It is possible to increase the heap size enough that 
 no collections will be triggered, but it is okay to let it fail for now. When 
@@ -277,7 +277,7 @@ produced should look identical or nearly identical to the log below.
     fatal runtime error: failed to initiate panic, error 5
     Aborted (core dumped)
     ```
-4. Try run your build with `SemiSpace`. lusearch should now
+4. Try running your build with `SemiSpace`. lusearch should now
 pass, as garbage will be collected, and the smaller benchmarks should run the 
 same as they did while using NoGC.
     ```
@@ -322,7 +322,7 @@ files.
             MyGC
         }
         ```
-    1. `mmtk-core/src/plan/global.rs`, change `create_mutator()` and `create_plan()` to create `MyGC` mutator and `MyGC` plan
+    1. `mmtk-core/src/plan/global.rs`, change `create_mutator()` and `create_plan()` to create the `MyGC` mutator and the `MyGC` plan
     based on `PlanSelector`:
         ```rust
         pub fn create_mutator<VM: VMBinding>(
@@ -663,7 +663,7 @@ and `mygc: BumpAllocator`.
    1. In `init()`, set the `tls` variable in the held instance of `mygc` to
    the one passed to the function.
    1. In `constraints()`, return a reference of `MYGC_CONSTRAINTS`.
-   1. We just leave the rest empty for now and will implement them later.
+   1. We just leave the rest of the functions empty for now and will implement them later.
    1. Add a constructor to `MyGCCopyContext`:
        ```rust
        impl<VM: VMBinding> MyGCCopyContext<VM> {
