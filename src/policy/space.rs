@@ -221,6 +221,17 @@ impl SFTMap {
         }
         self_mut.sft[chunk] = sft;
     }
+
+    pub fn is_in_space(&self, object: ObjectReference) -> bool {
+        let sft = self.get(object.to_address());
+        if sft.name() != EMPTY_SPACE_SFT.name() {
+            true
+        } else {
+            // special case - we do not yet have SFT entries for malloc space
+            use crate::policy::mallocspace::is_alloced_by_malloc;
+            is_alloced_by_malloc(object)
+        }
+    }
 }
 
 pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {

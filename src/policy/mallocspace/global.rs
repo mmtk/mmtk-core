@@ -18,6 +18,7 @@ use crate::{
     util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK, side_metadata::load_atomic},
 };
 use std::{collections::HashSet, marker::PhantomData};
+use std::collections::LinkedList;
 
 const META_DATA_PAGES_PER_REGION: usize = crate::util::constants::CARD_META_PAGES_PER_REGION;
 pub struct MallocSpace<VM: VMBinding> {
@@ -95,18 +96,26 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             let chunk_end = chunk_start.add(BYTES_IN_CHUNK);
             while address.as_usize() < chunk_end.as_usize() {
                 if load_atomic(ALLOC_METADATA_SPEC, address) == 1 {
+                    // We know it is an object
+                    let object = unsafe { address.to_object_reference() };
+
                     if !is_marked(address) {
-                        let ptr = address.to_mut_ptr();
+                        trace!("Address {} has alloc bit but no mark bit, it is dead. ", address);
+
+                        // get the start address of the object
+                        let ptr = VM::VMObjectModel::object_start_ref(object).to_mut_ptr();
+                        trace!("Free memory {:?}", ptr);
                         free(ptr);
-                        unset_alloc_bit(address);
+                        unset_alloc_bit(object.to_address());
                     } else {
                         unset_mark_bit(address);
                         chunk_is_empty = false;
                     }
                 }
-                address = address.add(VM::MAX_ALIGNMENT);
+                address = address.add(VM::MIN_ALIGNMENT);
             }
             if chunk_is_empty {
+                debug!("Release malloc chunk {} to {}", chunk_start, *chunk_start + BYTES_IN_CHUNK);
                 released_chunks.insert(chunk_start.as_usize());
             }
         }
@@ -135,6 +144,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             if !is_meta_space_mapped(address) {
                 VM::VMActivePlan::global().poll(false, self);
                 let chunk_start = conversions::chunk_align_down(address);
+                debug!("Add active malloc chunk {} to {}", chunk_start, chunk_start + BYTES_IN_CHUNK);
                 map_meta_space_for_chunk(chunk_start);
                 self.get_page_resource()
                     .reserve_pages(PAGES_IN_CHUNK);

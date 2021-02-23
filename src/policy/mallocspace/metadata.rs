@@ -62,10 +62,6 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
 // Check if a given object was allocated by malloc
 pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
     let address = object.to_address();
-    is_in_mallocspace(address)
-}
-
-pub fn is_in_mallocspace(address: Address) -> bool {
     is_meta_space_mapped(address) && load_atomic(ALLOC_METADATA_SPEC, address) == 1
 }
 

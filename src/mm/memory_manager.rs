@@ -245,7 +245,8 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// Arguments:
 /// * `object`: The object reference to query.
 pub fn is_mapped_object(object: ObjectReference) -> bool {
-    object.is_mapped()
+    // object.is_mapped()
+    crate::mmtk::SFT_MAP.is_in_space(object)
 }
 
 /// Is the address in the mapped memory?

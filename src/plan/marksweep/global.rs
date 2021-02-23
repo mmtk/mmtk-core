@@ -82,8 +82,9 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         // Do nothing
     }
 
-    fn release(&self, _tls: OpaquePointer) {
+    fn release(&self, tls: OpaquePointer) {
         trace!("Marksweep: Release");
+        self.common.release(tls, true);
         unsafe { self.space.release_all_chunks() };
     }
 
