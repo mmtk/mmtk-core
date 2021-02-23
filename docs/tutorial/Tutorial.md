@@ -425,7 +425,7 @@ the default value for `PlanConstraints`. We will make the following changes.
 1. Initialize `gc_header_bits` to 2. We reserve 2 bits in the header for GC use.
 1. Initialize `moves_objects` to `true`.
 1. Initialize `num_specialized_scans` to 1.
-[[Finished code (step 1-4]](/docs/tutorial/code/mygc_semispace/global.rs#L45-L51)
+[[Finished code (step 1-4)]](/docs/tutorial/code/mygc_semispace/global.rs#L45-L51)
 
 Next, in `global.rs`, replace the old immortal (nogc) space with two copyspaces.
 1. To the import statement block:
