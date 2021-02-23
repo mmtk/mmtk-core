@@ -50,7 +50,7 @@ pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_words: 0,
     num_specialized_scans: 1,
     needs_write_barrier: !super::NO_BARRIER,
-    metadata_pages_per_chunk: 16,
+    metadata_pages_per_chunk: 0,
     ..PlanConstraints::default()
 };
 
