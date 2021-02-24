@@ -20,6 +20,8 @@ pub trait PageResource<VM: VMBinding>: 'static {
         zeroed: bool,
         tls: OpaquePointer,
     ) -> Address {
+        println!("get_new_pages");
+        println!("get_new_pages {:?}", self as *const _);
         self.alloc_pages(reserved_pages, required_pages, zeroed, tls)
     }
 

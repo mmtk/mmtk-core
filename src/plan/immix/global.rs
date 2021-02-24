@@ -1,5 +1,5 @@
 use super::gc_work::{ImmixCopyContext, ImmixProcessEdges};
-use crate::mmtk::MMTK;
+use crate::{mmtk::MMTK, policy::immix::ImmixSpace};
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -7,7 +7,6 @@ use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
@@ -34,9 +33,7 @@ use enum_map::EnumMap;
 pub const ALLOC_IMMIX: AllocationSemantics = AllocationSemantics::Default;
 
 pub struct Immix<VM: VMBinding> {
-    pub hi: AtomicBool,
-    pub copyspace0: CopySpace<VM>,
-    pub copyspace1: CopySpace<VM>,
+    pub immix_space: ImmixSpace<VM>,
     pub common: CommonPlan<VM>,
 }
 
@@ -76,8 +73,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         println!("Immix::gc_init");
         self.common.gc_init(heap_size, vm_map, scheduler);
 
-        self.copyspace0.init(&vm_map);
-        self.copyspace1.init(&vm_map);
+        self.immix_space.init(&vm_map);
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
@@ -109,27 +105,21 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn prepare(&self, tls: OpaquePointer) {
         self.common.prepare(tls, true);
-
-        self.hi
-            .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
-                                                                       // prepare each of the collected regions
-        let hi = self.hi.load(Ordering::SeqCst);
-        self.copyspace0.prepare(hi);
-        self.copyspace1.prepare(!hi);
+        self.immix_space.prepare();
     }
 
     fn release(&self, tls: OpaquePointer) {
         self.common.release(tls, true);
         // release the collected region
-        self.fromspace().release();
+        self.immix_space.release();
     }
 
     fn get_collection_reserve(&self) -> usize {
-        self.tospace().reserved_pages()
+        self.immix_space.defrag_headroom_pages()
     }
 
     fn get_pages_used(&self) -> usize {
-        self.tospace().reserved_pages() + self.common.get_pages_used()
+        self.immix_space.reserved_pages() + self.common.get_pages_used()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -141,11 +131,8 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn global_side_metadata_per_chunk(&self) -> usize {
-        if !VM::VMObjectModel::HAS_GC_BYTE {
-            meta_bytes_per_chunk(3, 1)
-        } else {
-            0
-        }
+        debug_assert!(VM::VMObjectModel::HAS_GC_BYTE);
+        0
     }
 }
 
@@ -159,42 +146,8 @@ impl<VM: VMBinding> Immix<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         Immix {
-            hi: AtomicBool::new(false),
-            copyspace0: CopySpace::new(
-                "copyspace0",
-                false,
-                true,
-                VMRequest::discontiguous(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            copyspace1: CopySpace::new(
-                "copyspace1",
-                true,
-                true,
-                VMRequest::discontiguous(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
+            immix_space: ImmixSpace::new("immix", vm_map, mmapper, &mut heap),
             common: CommonPlan::new(vm_map, mmapper, options, heap, &IMMIX_CONSTRAINTS),
-        }
-    }
-
-    pub fn tospace(&self) -> &CopySpace<VM> {
-        if self.hi.load(Ordering::SeqCst) {
-            &self.copyspace1
-        } else {
-            &self.copyspace0
-        }
-    }
-
-    pub fn fromspace(&self) -> &CopySpace<VM> {
-        if self.hi.load(Ordering::SeqCst) {
-            &self.copyspace0
-        } else {
-            &self.copyspace1
         }
     }
 }

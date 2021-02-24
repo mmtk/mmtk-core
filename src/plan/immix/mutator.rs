@@ -24,13 +24,7 @@ pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: Opa
     }
     .downcast_mut::<ImmixAllocator<VM>>()
     .unwrap();
-    immix_allocator.rebind(Some(
-        mutator
-            .plan
-            .downcast_ref::<Immix<VM>>()
-            .unwrap()
-            .tospace(),
-    ));
+    immix_allocator.reset();
 }
 
 lazy_static! {
@@ -49,7 +43,7 @@ pub fn create_immix_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
-            (AllocatorSelector::Immix(0), immix.tospace()),
+            (AllocatorSelector::Immix(0), &immix.immix_space),
             (AllocatorSelector::BumpPointer(1), immix.common.get_immortal()),
             (AllocatorSelector::LargeObject(0), immix.common.get_los()),
         ],

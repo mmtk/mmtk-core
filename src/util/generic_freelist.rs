@@ -23,6 +23,7 @@ pub trait GenericFreeList: Sized {
     fn set_entry(&mut self, index: i32, value: i32);
 
     fn alloc(&mut self, size: i32) -> i32 {
+        println!("gfl alloc");
         let mut unit = self.head();
         let mut s = 0;
         while ({
