@@ -78,8 +78,9 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, _tls: OpaquePointer) {
-        // Do nothing
+    fn prepare(&self, tls: OpaquePointer) {
+        self.common.prepare(tls, true);
+        // Dont need to prepare for MallocSpace
     }
 
     fn release(&self, tls: OpaquePointer) {

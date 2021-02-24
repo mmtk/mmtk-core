@@ -91,6 +91,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     unsafe fn release_all_chunks(&self) {
         let mut released_chunks = HashSet::new();
         for chunk_start in &*ACTIVE_CHUNKS.read().unwrap() {
+            debug!("Check active chunk {:?}", chunk_start);
             let mut chunk_is_empty = true;
             let mut address = *chunk_start;
             let chunk_end = chunk_start.add(BYTES_IN_CHUNK);

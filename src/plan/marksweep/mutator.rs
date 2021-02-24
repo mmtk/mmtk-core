@@ -21,7 +21,11 @@ pub fn ms_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: Opaqu
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::Malloc(0),
+        AllocationType::Default => AllocatorSelector::Malloc(0),
+        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(0),
+        AllocationType::Los => AllocatorSelector::LargeObject(0),
+
+        // AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::Malloc(0),
     };
 }
 
@@ -32,7 +36,11 @@ pub fn create_ms_mutator<VM: VMBinding>(
     let ms = plan.downcast_ref::<MarkSweep<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box vec![(AllocatorSelector::Malloc(0), &ms.space)],
+        space_mapping: box vec![
+            (AllocatorSelector::Malloc(0), &ms.space),
+            (AllocatorSelector::BumpPointer(0), ms.common.get_immortal()),
+            (AllocatorSelector::LargeObject(0), ms.common.get_los()),
+        ],
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,
     };
