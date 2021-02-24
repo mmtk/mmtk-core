@@ -19,11 +19,13 @@ use crate::{
 };
 use std::{collections::HashSet, marker::PhantomData};
 use std::collections::LinkedList;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 const META_DATA_PAGES_PER_REGION: usize = crate::util::constants::CARD_META_PAGES_PER_REGION;
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
-    pr: MonotonePageResource<VM>,
+    active_bytes: AtomicUsize,
 }
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
@@ -54,7 +56,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         self
     }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
-        &self.pr
+        unreachable!()
     }
     fn common(&self) -> &CommonSpace<VM> {
         unreachable!()
@@ -85,7 +87,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     fn reserved_pages(&self) -> usize {
-        self.pr.common().get_reserved()
+        conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst))
     }
 
     unsafe fn release_all_chunks(&self) {
@@ -105,8 +107,11 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
                         // get the start address of the object
                         let ptr = VM::VMObjectModel::object_start_ref(object).to_mut_ptr();
+                        let bytes = malloc_usable_size(ptr);
+                        debug_assert!(bytes != 0);
                         trace!("Free memory {:?}", ptr);
                         free(ptr);
+                        self.active_bytes.fetch_sub(bytes, Ordering::SeqCst);
                         unset_alloc_bit(object.to_address());
                     } else {
                         unset_mark_bit(address);
@@ -120,9 +125,6 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                 released_chunks.insert(chunk_start.as_usize());
             }
         }
-        self.pr
-            .common()
-            .release_reserved(PAGES_IN_CHUNK * released_chunks.len());
 
         ACTIVE_CHUNKS
             .write()
@@ -135,7 +137,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     pub fn new(vm_map: &'static VMMap) -> Self {
         MallocSpace {
             phantom: PhantomData,
-            pr: MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map),
+            active_bytes: AtomicUsize::new(0),
         }
     }
 
@@ -147,9 +149,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 let chunk_start = conversions::chunk_align_down(address);
                 debug!("Add active malloc chunk {} to {}", chunk_start, chunk_start + BYTES_IN_CHUNK);
                 map_meta_space_for_chunk(chunk_start);
-                self.get_page_resource()
-                    .reserve_pages(PAGES_IN_CHUNK);
             }
+            self.active_bytes.fetch_add(size, Ordering::SeqCst);
         }
         address
     }
