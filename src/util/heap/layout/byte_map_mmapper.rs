@@ -47,7 +47,7 @@ impl Mmapper for ByteMapMmapper {
         }
     }
 
-    fn ensure_mapped(&self, start: Address, pages: usize) {
+    fn ensure_mapped(&self, start: Address, pages: usize, notify_mmap: &impl Fn(Address)) {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         trace!(
