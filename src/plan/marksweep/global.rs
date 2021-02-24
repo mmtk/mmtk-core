@@ -94,7 +94,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        self.space.reserved_pages()
+        self.common.get_pages_used() + self.space.reserved_pages()
     }
 
     fn base(&self) -> &BasePlan<VM> {

@@ -20,12 +20,18 @@ use crate::{
 use std::{collections::HashSet, marker::PhantomData};
 use std::collections::LinkedList;
 use std::sync::atomic::AtomicUsize;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use std::sync::atomic::Ordering;
 
-const META_DATA_PAGES_PER_REGION: usize = crate::util::constants::CARD_META_PAGES_PER_REGION;
+const ASSERT_ALLOCATION: bool = cfg!(debug_assertions) && true;
+
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
+    // Mapping between allocated address and its size - this is used to check correctness.
+    #[cfg(debug_assertions)]
+    active_mem: Mutex<HashMap<Address, usize>>,
 }
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
@@ -66,7 +72,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     fn init(&mut self, _vm_map: &'static VMMap) {
-
+        // Do nothing
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -91,45 +97,72 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     unsafe fn release_all_chunks(&self) {
-        let mut released_chunks = HashSet::new();
-        for chunk_start in &*ACTIVE_CHUNKS.read().unwrap() {
+        let mut released_chunks: HashSet<Address> = HashSet::new();
+
+        // To sum up the total size of live objects. We check this against the active_bytes we maintain.
+        #[cfg(debug_assertions)]
+        let mut live_bytes = 0;
+
+        debug!("Used bytes before releasing: {}", self.active_bytes.load(Ordering::Relaxed));
+
+        for chunk_start in ACTIVE_CHUNKS.read().unwrap().iter() {
             debug!("Check active chunk {:?}", chunk_start);
             let mut chunk_is_empty = true;
             let mut address = *chunk_start;
             let chunk_end = chunk_start.add(BYTES_IN_CHUNK);
-            while address.as_usize() < chunk_end.as_usize() {
+
+            // Linear scan through the chunk
+            while address < chunk_end {
                 if load_atomic(ALLOC_METADATA_SPEC, address) == 1 {
                     // We know it is an object
                     let object = unsafe { address.to_object_reference() };
 
-                    if !is_marked(address) {
-                        trace!("Address {} has alloc bit but no mark bit, it is dead. ", address);
-
-                        // get the start address of the object
+                    #[cfg(debug_assertions)]
+                    if ASSERT_ALLOCATION {
+                        let obj_start = VM::VMObjectModel::object_start_ref(object);
                         let ptr = VM::VMObjectModel::object_start_ref(object).to_mut_ptr();
                         let bytes = malloc_usable_size(ptr);
-                        debug_assert!(bytes != 0);
-                        trace!("Free memory {:?}", ptr);
-                        free(ptr);
-                        self.active_bytes.fetch_sub(bytes, Ordering::SeqCst);
+
+                        debug_assert!(self.active_mem.lock().unwrap().contains_key(&obj_start), "Object with alloc bit is not in active_mem");
+                        debug_assert_eq!(self.active_mem.lock().unwrap().get(&obj_start), Some(&bytes), "Object size in active_mem does not match the size from malloc_usable_size");
+                    }
+
+                    if !is_marked(address) {
+                        // Dead object
+                        trace!("Address {} has alloc bit but no mark bit, it is dead. ", address);
+
+                        // Get the start address of the object, and free it
+                        self.free(VM::VMObjectModel::object_start_ref(object));
                         unset_alloc_bit(object.to_address());
                     } else {
+                        // Live object. Unset mark bit
                         unset_mark_bit(address);
+                        // This chunk is still active.
                         chunk_is_empty = false;
+
+                        #[cfg(debug_assertions)]
+                        {
+                            // Accumulate live bytes
+                            live_bytes += malloc_usable_size(VM::VMObjectModel::object_start_ref(object).to_mut_ptr());
+                        }
                     }
                 }
                 address = address.add(VM::MIN_ALIGNMENT);
             }
             if chunk_is_empty {
                 debug!("Release malloc chunk {} to {}", chunk_start, *chunk_start + BYTES_IN_CHUNK);
-                released_chunks.insert(chunk_start.as_usize());
+                released_chunks.insert(*chunk_start);
             }
         }
+
+        debug!("Used bytes after releasing: {}", self.active_bytes.load(Ordering::SeqCst));
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(live_bytes, self.active_bytes.load(Ordering::SeqCst));
 
         ACTIVE_CHUNKS
             .write()
             .unwrap()
-            .retain(|c| !released_chunks.contains(&c.as_usize()));
+            .retain(|c| !released_chunks.contains(&*c));
     }
 }
 
@@ -138,11 +171,16 @@ impl<VM: VMBinding> MallocSpace<VM> {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
+            #[cfg(debug_assertions)]
+            active_mem: Mutex::new(HashMap::new()),
         }
     }
 
     pub fn alloc(&self, size: usize) -> Address {
-        let address = Address::from_mut_ptr(unsafe { calloc(1, size) });
+        let raw = unsafe { calloc(1, size) };
+        let actual_size = unsafe { malloc_usable_size(raw) };
+        let address = Address::from_mut_ptr(raw);
+
         if !address.is_zero() {
             if !is_meta_space_mapped(address) {
                 VM::VMActivePlan::global().poll(false, self);
@@ -150,9 +188,25 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 debug!("Add active malloc chunk {} to {}", chunk_start, chunk_start + BYTES_IN_CHUNK);
                 map_meta_space_for_chunk(chunk_start);
             }
-            self.active_bytes.fetch_add(size, Ordering::SeqCst);
+            self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
+
+            #[cfg(debug_assertions)]
+            if ASSERT_ALLOCATION {
+                self.active_mem.lock().unwrap().insert(address, actual_size);
+            }
         }
         address
+    }
+
+    pub fn free(&self, addr: Address) {
+        let ptr = addr.to_mut_ptr();
+        let bytes = unsafe { malloc_usable_size(ptr) };
+        trace!("Free memory {:?}", ptr);
+        unsafe { free(ptr); }
+        self.active_bytes.fetch_sub(bytes, Ordering::SeqCst);
+
+        #[cfg(debug_assertions)]
+        self.active_mem.lock().unwrap().remove(&addr);
     }
 
     #[inline]
