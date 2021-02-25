@@ -12,9 +12,7 @@ use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
-use crate::util::analysis::gc_count::GcCounter;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::obj_size::PerSizeClassObjectCounter;
+use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -385,12 +383,9 @@ pub struct BasePlan<VM: VMBinding> {
     pub mutator_iterator_lock: Mutex<()>,
     // A counter that keeps tracks of the number of bytes allocated since last stress test
     pub allocation_bytes: AtomicUsize,
-    // Concrete implementation of the analysis trait -- in this case the implementation
-    // counts the number of objects in different size classes
+    // Wrapper around analysis counters
     #[cfg(feature = "analysis")]
-    pub obj_size: Mutex<PerSizeClassObjectCounter>,
-    #[cfg(feature = "analysis")]
-    pub gc_count: Mutex<GcCounter>,
+    pub analysis_manager: AnalysisManager<VM>,
 }
 
 #[cfg(feature = "base_spaces")]
@@ -441,7 +436,9 @@ impl<VM: VMBinding> BasePlan<VM> {
         constraints: &'static PlanConstraints,
     ) -> BasePlan<VM> {
         let stats = Stats::new();
-        let ctr = stats.new_event_counter("gc.num", true, true);
+        // Initializing the analysis manager and routines
+        #[cfg(feature = "analysis")]
+        let analysis_manager = AnalysisManager::new(&stats);
         BasePlan {
             #[cfg(feature = "base_spaces")]
             unsync: UnsafeCell::new(BaseUnsync {
@@ -496,9 +493,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             mutator_iterator_lock: Mutex::new(()),
             allocation_bytes: AtomicUsize::new(0),
             #[cfg(feature = "analysis")]
-            obj_size: Mutex::new(PerSizeClassObjectCounter::new()),
-            #[cfg(feature = "analysis")]
-            gc_count: Mutex::new(GcCounter::new(ctr)),
+            analysis_manager,
         }
     }
 

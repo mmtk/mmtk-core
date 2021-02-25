@@ -45,7 +45,7 @@ The Memory Management Toolkit (MMTk) is a framework for designing and
 implementing memory managers. It has a runtime-neutral core (mmtk-core) 
 written in Rust, and bindings that allow it to work with OpenJDK, V8, 
 and JikesRVM, with more bindings currently in development. 
-MMTk was originally written in Java as part of the Jikes RVM Java runtime.
+MMTk was originally written in Java as part of the JikesRVM Java runtime.
 The current version is similar in its purpose, but was made to be 
 very flexible with runtime and able to be ported to many different VMs.
 
@@ -149,8 +149,8 @@ README files in their respective repositories
 
 First, set up OpenJDK, MMTk, and the binding:
 1. Clone the OpenJDK binding and mmtk-core repository, and install any relevant
-dependancies by following the instructions in the
-[OpenJDK binding repository]([OpenJDK binding repository](https://github.com/mmtk/mmtk-openjdk/blob/master/README.md).
+dependencies by following the instructions in the
+[OpenJDK binding repository](https://github.com/mmtk/mmtk-openjdk/blob/master/README.md).
 2. Ensure you can build OpenJDK according to the instructions in the READMEs of 
 [the mmtk-core repository](/../master/README.md) and the 
 [OpenJDK binding repository](https://github.com/mmtk/mmtk-openjdk/blob/master/README.md).
@@ -425,7 +425,7 @@ the default value for `PlanConstraints`. We will make the following changes.
 1. Initialize `gc_header_bits` to 2. We reserve 2 bits in the header for GC use.
 1. Initialize `moves_objects` to `true`.
 1. Initialize `num_specialized_scans` to 1.
-[[Finished code (step 1-4]](/docs/tutorial/code/mygc_semispace/global.rs#L45-L51)
+[[Finished code (step 1-4)]](/docs/tutorial/code/mygc_semispace/global.rs#L45-L51)
 
 Next, in `global.rs`, replace the old immortal (nogc) space with two copyspaces.
 1. To the import statement block:
