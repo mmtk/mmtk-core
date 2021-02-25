@@ -1,3 +1,5 @@
+//! Plan-specific constraints.
+
 use crate::plan::barriers::BarrierSelector;
 use crate::util::constants::*;
 

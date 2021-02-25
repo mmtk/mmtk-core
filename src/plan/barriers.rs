@@ -1,3 +1,5 @@
+//! Read/Write barrier implementations.
+
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;

@@ -1,4 +1,4 @@
-use super::gc_works::{MyGCCopyContext, MyGCProcessEdges}; // Add
+use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
 use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
@@ -10,7 +10,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace; // Add
 use crate::policy::space::Space;
-use crate::scheduler::gc_works::*; // Add
+use crate::scheduler::gc_work::*; // Add
 use crate::scheduler::*; // Modify
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -21,6 +21,7 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+use crate::plan::PlanConstraints;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add 
 use std::sync::Arc;
 use enum_map::EnumMap;
@@ -41,42 +42,29 @@ pub struct MyGC<VM: VMBinding> {
 
 unsafe impl<VM: VMBinding> Sync for MyGC<VM> {}
 
+pub const MYGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    moves_objects: true,
+    gc_header_bits: 2,
+    gc_header_words: 0,
+    num_specialized_scans: 1,
+    ..PlanConstraints::default()
+};
+
 impl<VM: VMBinding> Plan for MyGC<VM> {
     type VM = VM;
-    type Mutator = Mutator<Self>;
-    type CopyContext = MyGCCopyContext<VM>; // Modify
 
-    fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<Self::VM>,
-    ) -> Self {
-        // Modify
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+    fn constraints(&self) -> &'static PlanConstraints {
+        &MYGC_CONSTRAINTS
+    }
 
-        MyGC {
-            hi: AtomicBool::new(false),
-            copyspace0: CopySpace::new(
-                "copyspace0",
-                false,
-                true,
-                VMRequest::discontiguous(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            copyspace1: CopySpace::new(
-                "copyspace1",
-                true,
-                true,
-                VMRequest::discontiguous(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap),
-        }
+    fn create_worker_local(
+        &self,
+        tls: OpaquePointer,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> GCWorkerLocalPtr {
+        let mut c = MyGCCopyContext::new(mmtk);
+        c.init(tls);
+        GCWorkerLocalPtr::new(c)
     }
 
     // Modify
@@ -95,19 +83,11 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     fn schedule_collection(&'static self, scheduler:&MMTkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
-        scheduler.unconstrained_works
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<MyGCProcessEdges<VM>>::new());
-        scheduler.prepare_stage.add(Prepare::new(self));
-        scheduler.release_stage.add(Release::new(self));
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<Self, MyGCCopyContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<Self, MyGCCopyContext<VM>>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
-    }
-
-    fn bind_mutator(
-        &'static self,
-        tls: OpaquePointer,
-        _mmtk: &'static MMTK<Self::VM>,
-    ) -> Box<Mutator<Self>> {
-        Box::new(create_mygc_mutator(tls, self))
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -155,6 +135,39 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
 // Add
 impl<VM: VMBinding> MyGC<VM> {
+    fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+        _scheduler: &'static MMTkScheduler<VM>,
+    ) -> Self {
+        // Modify
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+
+        MyGC {
+            hi: AtomicBool::new(false),
+            copyspace0: CopySpace::new(
+                "copyspace0",
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            copyspace1: CopySpace::new(
+                "copyspace1",
+                true,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &mut heap,
+            ),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS),
+        }
+    }
+    
     pub fn tospace(&self) -> &CopySpace<VM> {
         if self.hi.load(Ordering::SeqCst) {
             &self.copyspace1
