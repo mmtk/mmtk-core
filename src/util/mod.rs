@@ -9,6 +9,7 @@ pub mod alloc;
 #[cfg(feature = "analysis")]
 pub mod analysis;
 pub mod constants;
+pub mod finalizable_processor;
 pub mod forwarding_word;
 pub mod gc_byte;
 pub mod generic_freelist;
