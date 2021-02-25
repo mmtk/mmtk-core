@@ -1,8 +1,8 @@
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWork, GCWorker};
 use crate::util::{ObjectReference, OpaquePointer};
-use crate::MMTK;
 use crate::vm::{Collection, VMBinding};
+use crate::MMTK;
 use std::marker::PhantomData;
 
 /// A special processor for Finalizable objects.
