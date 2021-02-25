@@ -29,8 +29,8 @@ use enum_map::EnumMap;
 pub type SelectedPlan<VM> = MarkSweep<VM>;
 
 pub struct MarkSweep<VM: VMBinding> {
-    pub common: CommonPlan<VM>,
-    pub space: MallocSpace<VM>,
+    common: CommonPlan<VM>,
+    ms: MallocSpace<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
@@ -86,7 +86,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn release(&self, tls: OpaquePointer) {
         trace!("Marksweep: Release");
         self.common.release(tls, true);
-        unsafe { self.space.release_all_chunks() };
+        unsafe { self.ms.release_all_chunks() };
     }
 
     fn get_collection_reserve(&self) -> usize {
@@ -94,7 +94,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        self.common.get_pages_used() + self.space.reserved_pages()
+        self.common.get_pages_used() + self.ms.reserved_pages()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -102,7 +102,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn common(&self) -> &CommonPlan<VM> {
-        unreachable!("MarkSweep does not have a common plan.");
+        &self.common
     }
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -130,11 +130,11 @@ impl<VM: VMBinding> MarkSweep<VM> {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
         MarkSweep {
             common: CommonPlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS),
-            space: MallocSpace::new(vm_map),
+            ms: MallocSpace::new(vm_map),
         }
     }
 
     pub fn ms_space(&self) -> &MallocSpace<VM> {
-        &self.space
+        &self.ms
     }
 }
