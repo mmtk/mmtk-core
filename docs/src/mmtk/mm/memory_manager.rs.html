@@ -333,6 +333,40 @@
 <span id="330">330</span>
 <span id="331">331</span>
 <span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
@@ -665,6 +699,40 @@
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">harness_end</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
     <span class="ident">mmtk</span>.<span class="ident">harness_end</span>();
+}
+
+<span class="doccomment">/// Register a finalizable object. MMTk will retain the liveness of</span>
+<span class="doccomment">/// the object even if it is not reachable from the program.</span>
+<span class="doccomment">/// Note that finalization upon exit is not supported.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Arguments:</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance</span>
+<span class="doccomment">/// * `object`: The object that has a finalizer</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_finalizer</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
+    <span class="kw">if</span> <span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">no_finalizer</span> {
+        <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;add_finalizer() is called when no_finalizer = true&quot;</span>);
+    }
+
+    <span class="ident">mmtk</span>.<span class="ident">finalizable_processor</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">add</span>(<span class="ident">object</span>);
+}
+
+<span class="doccomment">/// Get an object that is ready for finalization. After each GC, if any registered object is not</span>
+<span class="doccomment">/// alive, this call will return one of the objects. MMTk will retain the liveness of those objects</span>
+<span class="doccomment">/// until they are popped through this call. Once an object is popped, it is the responsibility of</span>
+<span class="doccomment">/// the VM to make sure they are properly finalized before reclaimed by the GC. This call is non-blocking,</span>
+<span class="doccomment">/// and will return None if no object is ready for finalization.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Arguments:</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_finalized_object</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
+    <span class="kw">if</span> <span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">no_finalizer</span> {
+        <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;get_object_for_finalization() is called when no_finalizer = true&quot;</span>);
+    }
+
+    <span class="ident">mmtk</span>.<span class="ident">finalizable_processor</span>
+        .<span class="ident">lock</span>()
+        .<span class="ident">unwrap</span>()
+        .<span class="ident">get_ready_object</span>()
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "mmtk";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

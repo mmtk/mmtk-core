@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["FinalizableProcessor","A special processor for Finalizable objects."],["Finalization",""],["ForwardFinalization",""]]});

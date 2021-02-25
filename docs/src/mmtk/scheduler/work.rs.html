@@ -36,6 +36,7 @@
 <span id="33">33</span>
 <span id="34">34</span>
 <span id="35">35</span>
+<span id="36">36</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">worker</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -69,6 +70,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">W</span>: <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Work</span><span class="op">&lt;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">W</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="ident">default</span> <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;GCWork.do_work() {}&quot;</span>, <span class="ident">std</span>::<span class="ident">any</span>::<span class="ident">type_name</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>());
         <span class="ident">GCWork</span>::<span class="ident">do_work</span>(<span class="self">self</span>, <span class="ident">worker</span>, <span class="ident">mmtk</span>)
     }
 }

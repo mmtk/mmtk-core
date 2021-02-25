@@ -156,6 +156,10 @@
 <span id="153">153</span>
 <span id="154">154</span>
 <span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">work</span>::<span class="ident">Work</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -309,6 +313,10 @@
     <span class="ident">Unconstrained</span>,
     <span class="ident">Prepare</span>,
     <span class="ident">Closure</span>,
+    <span class="comment">// TODO: We only support final reference at the moment. If we have references of multiple strengths,</span>
+    <span class="comment">// we may need more than one buckets for each reference strength.</span>
+    <span class="ident">RefClosure</span>,
+    <span class="ident">RefForwarding</span>,
     <span class="ident">Release</span>,
     <span class="ident">Final</span>,
 }
