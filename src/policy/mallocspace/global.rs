@@ -50,7 +50,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         true
     }
     fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
-        set_alloc_bit(object.to_address());
+        set_alloc_bit(object);
     }
 }
 
@@ -80,12 +80,18 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
-        let address = object.to_address();
-        self.address_in_space(address)
+        let ret = is_alloced_by_malloc(object);
+
+        #[cfg(debug_assertions)]
+        if ASSERT_ALLOCATION {
+            let addr = VM::VMObjectModel::object_start_ref(object);
+            debug_assert_eq!(self.active_mem.lock().unwrap().contains_key(&addr), ret, "active mem check failed for {}", addr);
+        }
+        ret
     }
 
     fn address_in_space(&self, start: Address) -> bool {
-        is_meta_space_mapped(start) && load_atomic(ALLOC_METADATA_SPEC, start) == 1
+        unreachable!()
     }
 
     fn get_name(&self) -> &'static str {
@@ -123,20 +129,20 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                         let ptr = VM::VMObjectModel::object_start_ref(object).to_mut_ptr();
                         let bytes = malloc_usable_size(ptr);
 
-                        debug_assert!(self.active_mem.lock().unwrap().contains_key(&obj_start), "Object with alloc bit is not in active_mem");
-                        debug_assert_eq!(self.active_mem.lock().unwrap().get(&obj_start), Some(&bytes), "Object size in active_mem does not match the size from malloc_usable_size");
+                        debug_assert!(self.active_mem.lock().unwrap().contains_key(&obj_start), "Address {} with alloc bit is not in active_mem", obj_start);
+                        debug_assert_eq!(self.active_mem.lock().unwrap().get(&obj_start), Some(&bytes), "Address {} size in active_mem does not match the size from malloc_usable_size", obj_start);
                     }
 
-                    if !is_marked(address) {
+                    if !is_marked(object) {
                         // Dead object
-                        trace!("Address {} has alloc bit but no mark bit, it is dead. ", address);
+                        trace!("Object {} has alloc bit but no mark bit, it is dead. ", object);
 
                         // Get the start address of the object, and free it
                         self.free(VM::VMObjectModel::object_start_ref(object));
-                        unset_alloc_bit(object.to_address());
+                        unset_alloc_bit(object);
                     } else {
                         // Live object. Unset mark bit
-                        unset_mark_bit(address);
+                        unset_mark_bit(object);
                         // This chunk is still active.
                         chunk_is_empty = false;
 
@@ -162,7 +168,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         ACTIVE_CHUNKS
             .write()
             .unwrap()
-            .retain(|c| !released_chunks.contains(&*c));
+            .retain(|c|  {
+                debug!("Release malloc chunk {} to {}", *c, *c + BYTES_IN_CHUNK);
+                !released_chunks.contains(&*c)
+            });
     }
 }
 
@@ -185,7 +194,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             if !is_meta_space_mapped(address) {
                 VM::VMActivePlan::global().poll(false, self);
                 let chunk_start = conversions::chunk_align_down(address);
-                debug!("Add active malloc chunk {} to {}", chunk_start, chunk_start + BYTES_IN_CHUNK);
+                debug!("Add malloc chunk {} to {}", chunk_start, chunk_start + BYTES_IN_CHUNK);
                 map_meta_space_for_chunk(chunk_start);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
@@ -206,7 +215,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
         self.active_bytes.fetch_sub(bytes, Ordering::SeqCst);
 
         #[cfg(debug_assertions)]
-        self.active_mem.lock().unwrap().remove(&addr);
+        if ASSERT_ALLOCATION {
+            self.active_mem.lock().unwrap().remove(&addr);
+        }
     }
 
     #[inline]
@@ -220,12 +231,12 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
         let address = object.to_address();
         assert!(
-            self.address_in_space(address),
+            self.in_space(object),
             "Cannot mark an object {} that was not alloced by malloc.",
             address,
         );
-        if !is_marked(address) {
-            set_mark_bit(address);
+        if !is_marked(object) {
+            set_mark_bit(object);
             trace.process_node(object);
         }
         object

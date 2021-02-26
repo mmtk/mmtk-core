@@ -61,26 +61,29 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
 
 // Check if a given object was allocated by malloc
 pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
-    let address = object.to_address();
-    is_meta_space_mapped(address) && load_atomic(ALLOC_METADATA_SPEC, address) == 1
+    is_meta_space_mapped(object.to_address()) && is_alloced_unchecked(object)
 }
 
-pub fn is_marked(address: Address) -> bool {
-    load_atomic(MARKING_METADATA_SPEC, address) == 1
+pub(crate) fn is_alloced_unchecked(object: ObjectReference) -> bool {
+    load_atomic(ALLOC_METADATA_SPEC, object.to_address()) == 1
 }
 
-pub fn set_alloc_bit(address: Address) {
-    store_atomic(ALLOC_METADATA_SPEC, address, 1);
+pub fn is_marked(object: ObjectReference) -> bool {
+    load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1
 }
 
-pub fn set_mark_bit(address: Address) {
-    store_atomic(MARKING_METADATA_SPEC, address, 1);
+pub fn set_alloc_bit(object: ObjectReference) {
+    store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 1);
 }
 
-pub fn unset_alloc_bit(address: Address) {
-    store_atomic(ALLOC_METADATA_SPEC, address, 0);
+pub fn set_mark_bit(object: ObjectReference) {
+    store_atomic(MARKING_METADATA_SPEC, object.to_address(), 1);
 }
 
-pub fn unset_mark_bit(address: Address) {
-    store_atomic(MARKING_METADATA_SPEC, address, 0);
+pub fn unset_alloc_bit(object: ObjectReference) {
+    store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 0);
+}
+
+pub fn unset_mark_bit(object: ObjectReference) {
+    store_atomic(MARKING_METADATA_SPEC, object.to_address(), 0);
 }
