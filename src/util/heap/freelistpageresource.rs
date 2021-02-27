@@ -75,8 +75,6 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         zeroed: bool,
         tls: OpaquePointer,
     ) -> Address {
-        println!("Alloc pages 0");
-        println!("Alloc pages 0 {:?}", self as *const _);
         debug_assert!(
             self.meta_data_pages_per_region == 0
                 || required_pages <= PAGES_IN_CHUNK - self.meta_data_pages_per_region
@@ -86,10 +84,8 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         let self_mut: &mut Self = unsafe { &mut *(self as *const _ as *mut _) };
         let mut sync = self.sync.lock().unwrap();
         let mut new_chunk = false;
-        println!("Alloc pages 0.1 {:?}", self as *const _);
         let mut page_offset = self_mut.free_list.alloc(required_pages as _);
 
-        println!("Alloc pages 1");
         if page_offset == generic_freelist::FAILURE && self.common.growable {
             page_offset = self_mut.allocate_contiguous_chunks(required_pages, &mut sync);
             new_chunk = true;
@@ -112,12 +108,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
             }
         }
 
-        println!("Alloc pages 2");
-
-        println!("Alloc pages 2 {}", page_offset);
-        println!("Alloc pages 2 {:?}", self as *const _);
         let rtn = self.start + conversions::pages_to_bytes(page_offset as _);
-        println!("Alloc pages {:?}", rtn);
         let bytes = conversions::pages_to_bytes(required_pages);
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
@@ -311,14 +302,14 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         }
     }
 
-    pub fn release_pages(&mut self, first: Address) {
+    pub fn release_pages(&self, first: Address) {
         debug_assert!(conversions::is_page_aligned(first));
         let page_offset = conversions::bytes_to_pages(first - self.start);
         let pages = self.free_list.size(page_offset as _);
         // if (VM.config.ZERO_PAGES_ON_RELEASE)
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
         debug_assert!(pages as usize <= self.common.get_committed());
-        let me = unsafe { &mut *(self as *mut Self) };
+        let me = unsafe { &mut *(self as *const Self as *mut Self) };
         let freed = {
             let mut sync = self.sync.lock().unwrap();
             self.common.release_reserved(pages as _);

@@ -203,7 +203,7 @@ pub fn compare_exchange_forwarding_word<VM: VMBinding>(
 // A return value of `Some(fw_offset)` implies that GC byte and forwarding word can be loaded/stored with a single instruction.
 //
 #[cfg(target_endian = "little")]
-pub(super) fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize> {
+pub fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize> {
     let gcbyte_lshift = VM::VMObjectModel::GC_BYTE_OFFSET % constants::BYTES_IN_WORD as isize;
     if VM::VMObjectModel::HAS_GC_BYTE {
         if gcbyte_lshift == 0 {

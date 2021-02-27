@@ -11,7 +11,7 @@ use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
-use std::cell::UnsafeCell;
+use std::{cell::UnsafeCell, collections::HashSet, sync::Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -21,6 +21,9 @@ const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 pub struct ImmixSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
     pr: FreeListPageResource<VM>,
+    all_regions: Mutex<HashSet<Address>>,
+    marked_objects: Mutex<HashSet<ObjectReference>>,
+    marked_regions: Mutex<HashSet<Address>>,
 }
 
 impl<VM: VMBinding> SFT for ImmixSpace<VM> {
@@ -88,8 +91,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             heap,
         );
         ImmixSpace {
-            pr: FreeListPageResource::new_discontiguous(0, vm_map),
+            pr: if common.vmrequest.is_discontiguous() {
+                FreeListPageResource::new_discontiguous(0, vm_map)
+            } else {
+                FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
+            },
             common: UnsafeCell::new(common),
+            marked_objects: Default::default(),
+            all_regions: Default::default(),
+            marked_regions: Default::default(),
         }
     }
 
@@ -99,18 +109,47 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn prepare(&self) {
         // TODO: Clear block marks
+        self.marked_objects.lock().unwrap().clear();
+        self.marked_regions.lock().unwrap().clear();
     }
 
     pub fn release(&self) {
         // TODO: Release unmarked blocks
+        let marked_regions = self.marked_regions.lock().unwrap();
+        let mut all_regions = self.all_regions.lock().unwrap();
+        let unmarked_regions = all_regions.drain_filter(|r| !marked_regions.contains(r));
+        for region in unmarked_regions {
+            // for i in 0..(8 * 4096 / 4) {
+            //     let a = region + (i as usize);
+            //     unsafe { a.store(0xdeadbeefu32); }
+            // }
+            // println!("Release Region {:?}", region);
+            self.pr.release_pages(region);
+        }
     }
 
     pub fn get_space(&self, tls: OpaquePointer) -> Address {
-        self.acquire(tls, 8)
+        let region = self.acquire(tls, 8);
+        if region.is_zero() { return region }
+        let mut all_regions = self.all_regions.lock().unwrap();
+        debug_assert!(!all_regions.contains(&region), "Duplicate region {:?}", region);
+        all_regions.insert(region);
+        // println!("New Region {:?}", region);
+        region
     }
 
     #[inline]
     pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, semantics: AllocationSemantics) -> ObjectReference {
+        let mut marked_objects = self.marked_objects.lock().unwrap();
+        if !marked_objects.contains(&object) {
+            marked_objects.insert(object);
+            // Mark region
+            let mut marked_regions = self.marked_regions.lock().unwrap();
+            let region = object.to_address().align_down(8 * 4096);
+            marked_regions.insert(region);
+            trace.process_node(object);
+        }
+        object
         // trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
         // if !self.from_space() {
         //     return object;
@@ -133,7 +172,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         //     trace!("Copying [{:?} -> {:?}]", object, new_object);
         //     new_object
         // }
-        unreachable!()
+        // unreachable!()
     }
 
     // #[inline]

@@ -90,12 +90,9 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        println!("alloc_slow start");
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
         let acquired_start = self.space.unwrap().downcast_ref::<ImmixSpace<VM>>().unwrap().get_space(self.tls);
-        println!("alloc_slow end");
         if acquired_start.is_zero() {
-            println!("Failed to acquire a new block");
             acquired_start
         } else {
             trace!(

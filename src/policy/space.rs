@@ -251,8 +251,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             VM::VMCollection::block_for_gc(tls);
             unsafe { Address::zero() }
         } else {
-            println!("Collection not required");
-            println!("Collection not required {:?} {:?}", self as *const _, self.get_page_resource() as *const _);
             let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, tls);
             if rtn.is_zero() {
                 // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.

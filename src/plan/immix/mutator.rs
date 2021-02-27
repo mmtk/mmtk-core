@@ -44,7 +44,6 @@ pub fn create_immix_mutator<VM: VMBinding>(
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
             (AllocatorSelector::Immix(0), &immix.immix_space),
-            (AllocatorSelector::BumpPointer(1), immix.common.get_immortal()),
             (AllocatorSelector::LargeObject(0), immix.common.get_los()),
         ],
         prepare_func: &immix_mutator_prepare,

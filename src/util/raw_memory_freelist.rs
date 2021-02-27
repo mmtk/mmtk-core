@@ -50,13 +50,11 @@ impl GenericFreeList for RawMemoryFreeList {
         unsafe { (self.base + offset).store(value) }
     }
     fn alloc(&mut self, size: i32) -> i32 {
-        println!("rmfl alloc _");
         if self.current_units == 0 {
             return FAILURE;
         }
         let mut unit = self.head();
         let mut s = 0;
-        println!("rmfl alloc 0");
         while ({
             unit = self.get_next(unit);
             unit != self.head()
@@ -65,7 +63,6 @@ impl GenericFreeList for RawMemoryFreeList {
             s < size
         }) {}
 
-        println!("rmfl alloc 1");
         if unit == self.head() {
             FAILURE
         } else {

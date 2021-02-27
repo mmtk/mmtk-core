@@ -107,7 +107,11 @@ pub fn alloc<VM: VMBinding>(
     // meet the min object size in the fastpath.
     #[cfg(debug_assertions)]
     crate::util::forwarding_word::check_alloc_size::<VM>(size);
-    mutator.alloc(size, align, offset, semantics)
+
+    let semantics = if size > 8 * 4096 { AllocationSemantics::Los } else { semantics };
+    let a = mutator.alloc(size, align, offset, semantics);
+    post_alloc(mutator, unsafe { a.to_object_reference() }, size, semantics);
+    a
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are
