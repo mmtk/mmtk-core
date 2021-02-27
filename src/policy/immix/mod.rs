@@ -1,6 +1,6 @@
-mod immixspace;
-mod block;
-mod line;
+pub mod immixspace;
+pub mod block;
+pub mod line;
 
 pub use immixspace::*;
 

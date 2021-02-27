@@ -16,6 +16,7 @@ impl Block {
     pub const PAGES: usize = 1 << Self::LOG_PAGES;
 
     pub const LOG_LINES: usize = Self::LOG_BYTES - Line::LOG_BYTES;
+    pub const LINES: usize = 1 << Self::LOG_LINES;
 
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         scope: SideMetadataScope::PolicySpecific,

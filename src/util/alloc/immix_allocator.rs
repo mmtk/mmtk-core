@@ -1,5 +1,5 @@
 use crate::{policy::immix::ImmixSpace, util::constants::DEFAULT_STRESS_FACTOR};
-use std::sync::atomic::Ordering;
+use std::{ops::Add, sync::atomic::Ordering};
 
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
 use crate::util::Address;
@@ -8,6 +8,8 @@ use crate::util::alloc::Allocator;
 
 use crate::plan::Plan;
 use crate::policy::space::Space;
+use crate::policy::immix::block::*;
+use crate::policy::immix::line::*;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::obj_size::PerSizeClassObjectCounterArgs;
 #[cfg(feature = "analysis")]
@@ -48,14 +50,16 @@ pub struct ImmixAllocator<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> ImmixAllocator<VM> {
-    pub fn set_limit(&mut self, cursor: Address, limit: Address) {
-        self.cursor = cursor;
-        self.limit = limit;
-    }
-
     pub fn reset(&mut self) {
-        self.cursor = unsafe { Address::zero() };
-        self.limit = unsafe { Address::zero() };
+        self.cursor = Address::ZERO;
+        self.limit = Address::ZERO;
+        self.large_cursor = Address::ZERO;
+        self.large_limit = Address::ZERO;
+        self.recyclable_block = Address::ZERO;
+        self.request_for_large = false;
+        self.recyclable_exhausted = false;
+        self.line = Block::LINES as _;
+        self.line_use_count = 0;
     }
 }
 
@@ -67,6 +71,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         self.plan
     }
 
+    #[inline(always)]
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc");
         let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
@@ -74,7 +79,11 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
 
         if new_cursor > self.limit {
             trace!("Thread local buffer used up, go to alloc slow path");
-            self.alloc_slow(size, align, offset)
+            if size > Line::BYTES {
+                self.overflow_alloc(size, align, offset)
+            } else {
+                self.alloc_slow_hot(size, align, offset)
+            }
         } else {
             fill_alignment_gap::<VM>(self.cursor, result);
             self.cursor = new_cursor;
@@ -90,12 +99,21 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
         match self.space.unwrap().downcast_ref::<ImmixSpace<VM>>().unwrap().get_space(self.tls) {
-            None => Address::ZERO,
+            None => {
+                self.line_use_count = 0;
+                Address::ZERO
+            },
             Some(block) => {
+                self.line_use_count = Block::LINES as _;
                 trace!("Acquired a new block {:?}", block);
-                self.set_limit(block.start(), block.end());
+                if self.request_for_large {
+                    self.large_cursor = block.start();
+                    self.large_limit = block.end();
+                } else {
+                    self.cursor = block.start();
+                    self.limit = block.end();
+                }
                 self.alloc(size, align, offset)
             }
         }
@@ -130,5 +148,33 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             line: 0,
             recyclable_exhausted: false,
         }
+    }
+
+    fn overflow_alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        let start = align_allocation_no_fill::<VM>(self.large_cursor, align, offset);
+        let end = start + size;
+        if end > self.large_limit {
+            self.request_for_large = true;
+            let rtn = self.alloc_slow_inline(size, align, offset);
+            self.request_for_large = false;
+            rtn
+        } else {
+            fill_alignment_gap::<VM>(self.large_cursor, start);
+            self.large_cursor = end;
+            start
+        }
+    }
+
+    #[cold]
+    fn alloc_slow_hot(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        if self.acquire_recycable_lines(size, align, offset) {
+            self.alloc(size, align, offset)
+        } else {
+            self.alloc_slow_inline(size, align, offset)
+        }
+    }
+
+    fn acquire_recycable_lines(&mut self, size: usize, align: usize, offset: isize) -> bool {
+        false
     }
 }
