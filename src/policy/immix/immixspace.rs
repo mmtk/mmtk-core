@@ -1,54 +1,28 @@
-use crate::{plan::TransitiveClosure, util::{OpaquePointer, constants::{LOG_BYTES_IN_PAGE, LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
-use crate::plan::{AllocationSemantics, CopyContext};
+use crate::{plan::TransitiveClosure, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
+use crate::plan::AllocationSemantics;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
-use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::forwarding_word as ForwardingWord;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::conversions;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
-use crate::util::heap::{MonotonePageResource, PageResource};
+use crate::util::heap::PageResource;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::util::side_metadata::{self, *};
-use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::{cell::UnsafeCell, collections::HashSet, sync::Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
+use super::block::*;
 
-unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
 
-const LOG_PAGES_IN_BLOCK: usize = 3;
-const PAGES_IN_BLOCK: usize = 1 << LOG_PAGES_IN_BLOCK;
-const LOG_BYTES_IN_BLOCK: usize = LOG_PAGES_IN_BLOCK + LOG_BYTES_IN_PAGE as usize;
-const BYTES_IN_BLOCK: usize = 1 << LOG_BYTES_IN_BLOCK;
-
-const META_BLOCK_MARK: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
-    offset: 0,
-    log_num_of_bits: 0,
-    log_min_obj_size: LOG_BYTES_IN_BLOCK,
-};
-
-const META_OBJECT_MARK: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
-    offset: META_BLOCK_MARK.meta_bytes_per_chunk(),
-    log_num_of_bits: 0,
-    log_min_obj_size: LOG_BYTES_IN_WORD as usize,
-};
-
-// const GLOBAL_META_2: SideMetadataSpec = SideMetadataSpec {
-//    scope: SideMetadataScope::Global,
-//    offset: meta_bytes_per_chunk(s1, b1),
-//    log_num_of_bits: b2,
-//    log_min_obj_size: s2,
-// };
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
     pr: FreeListPageResource<VM>,
     all_regions: Mutex<HashSet<Address>>,
 }
+
+unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
 
 impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn name(&self) -> &str {
@@ -95,7 +69,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
 
     fn local_side_metadata_per_chunk(&self) -> usize {
-        META_BLOCK_MARK.meta_bytes_per_chunk() + META_OBJECT_MARK.meta_bytes_per_chunk()
+        Block::MARK_TABLE.meta_bytes_per_chunk() + Self::OBJECT_MARK_TABLE.meta_bytes_per_chunk()
     }
 }
 
@@ -134,18 +108,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn prepare(&self) {
-        let mut all_regions = self.all_regions.lock().unwrap();
-        for region in all_regions.iter() {
-            unsafe { side_metadata::store_atomic(META_BLOCK_MARK, *region, 0); }
-            unsafe { side_metadata::bzero_metadata_for_chunk(META_OBJECT_MARK, conversions::chunk_align_down(*region)); }
+        for region in self.all_regions.lock().unwrap().iter() {
+            Block::from(*region).clear_mark();
+            side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, conversions::chunk_align_down(*region))
         }
     }
 
     pub fn release(&self) {
         let mut all_regions = self.all_regions.lock().unwrap();
-        let unmarked_regions = all_regions.drain_filter(|r| {
-            unsafe { side_metadata::load(META_BLOCK_MARK, *r) == 0 }
-        });
+        let unmarked_regions = all_regions.drain_filter(|r| !Block::from(*r).is_marked());
         for region in unmarked_regions {
             self.pr.release_pages(region);
         }
@@ -162,46 +133,27 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     #[inline]
-    pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, semantics: AllocationSemantics) -> ObjectReference {
-        if unsafe { side_metadata::compare_exchange_atomic(META_OBJECT_MARK, object.to_address(), 0, 1) } {
+    pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, _semantics: AllocationSemantics) -> ObjectReference {
+        if Self::attempt_mark(object) {
             // Mark block
-            let region = object.to_address().align_down(8 * 4096);
-            unsafe { side_metadata::compare_exchange_atomic(META_BLOCK_MARK, region, 0, 1); }
+            Block::containing(object).mark();
             // Visit node
             trace.process_node(object);
         }
         object
     }
 
-    // #[inline]
-    // pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
-    //     &self,
-    //     trace: &mut T,
-    //     object: ObjectReference,
-    //     semantics: AllocationSemantics,
-    //     copy_context: &mut C,
-    // ) -> ObjectReference {
-    //     trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
-    //     if !self.from_space() {
-    //         return object;
-    //     }
-    //     trace!("attempting to forward");
-    //     let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
-    //     trace!("checking if object is being forwarded");
-    //     if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
-    //         trace!("... yes it is");
-    //         let new_object =
-    //             ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
-    //         trace!("Returning");
-    //         new_object
-    //     } else {
-    //         trace!("... no it isn't. Copying");
-    //         let new_object =
-    //             ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context);
-    //         trace!("Forwarding pointer");
-    //         trace.process_node(new_object);
-    //         trace!("Copying [{:?} -> {:?}]", object, new_object);
-    //         new_object
-    //     }
-    // }
+    /* Object Marking */
+
+    const OBJECT_MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
+        scope: SideMetadataScope::PolicySpecific,
+        offset: Block::MARK_TABLE.meta_bytes_per_chunk(),
+        log_num_of_bits: 0,
+        log_min_obj_size: LOG_BYTES_IN_WORD as usize,
+    };
+
+    #[inline(always)]
+    fn attempt_mark(object: ObjectReference) -> bool {
+        side_metadata::compare_exchange_atomic(Self::OBJECT_MARK_TABLE, object.to_address(), 0, 1)
+    }
 }

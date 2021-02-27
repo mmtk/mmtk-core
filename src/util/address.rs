@@ -271,7 +271,7 @@ impl Address {
     }
 
     /// is this address aligned to the given alignment
-    pub fn is_aligned_to(self, align: usize) -> bool {
+    pub const fn is_aligned_to(self, align: usize) -> bool {
         use crate::util::conversions;
         conversions::raw_is_aligned(self.0, align)
     }
@@ -438,7 +438,7 @@ pub struct ObjectReference(usize);
 impl ObjectReference {
     /// converts the ObjectReference to an Address
     #[inline(always)]
-    pub fn to_address(self) -> Address {
+    pub const fn to_address(self) -> Address {
         Address(self.0)
     }
 

@@ -13,6 +13,7 @@
 #![feature(specialization)]
 #![feature(trait_alias)]
 #![feature(hash_drain_filter)]
+#![feature(const_panic)]
 
 //! Memory Management ToolKit (MMTk) is a portable and high performance memory manager
 //! that includes various garbage collection algorithms and provides clean and efficient
