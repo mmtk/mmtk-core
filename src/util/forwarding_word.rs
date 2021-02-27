@@ -81,8 +81,8 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
             );
         }
         None => {
-            gc_byte::write_gc_byte::<VM>(object, FORWARDED);
             write_forwarding_word::<VM>(object, new_object.to_address().as_usize());
+            gc_byte::write_gc_byte::<VM>(object, FORWARDED);
         }
     };
     new_object
