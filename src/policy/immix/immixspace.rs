@@ -13,6 +13,7 @@ use crate::vm::*;
 use crate::util::side_metadata::{self, *};
 use std::cell::UnsafeCell;
 use super::block::*;
+use super::line::*;
 
 
 
@@ -69,7 +70,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
 
     fn local_side_metadata_per_chunk(&self) -> usize {
-        Block::MARK_TABLE.meta_bytes_per_chunk() + Self::OBJECT_MARK_TABLE.meta_bytes_per_chunk()
+        Self::OBJECT_MARK_TABLE.accumulated_size()
     }
 }
 
@@ -110,6 +111,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     pub fn prepare(&self) {
         for block in self.block_list.iter() {
             block.clear_mark();
+            // TODO: clear metadata for a block only
+            for line in block.lines() {
+                line.clear_mark()
+            }
             side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, conversions::chunk_align_down(block.start()))
         }
     }
@@ -133,6 +138,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if Self::attempt_mark(object) {
             // Mark block
             Block::containing(object).mark();
+            Line::containing(object).mark();
             // Visit node
             trace.process_node(object);
         }
@@ -143,7 +149,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     const OBJECT_MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         scope: SideMetadataScope::PolicySpecific,
-        offset: Block::MARK_TABLE.meta_bytes_per_chunk(),
+        offset: Block::MARK_TABLE.accumulated_size(),
         log_num_of_bits: 0,
         log_min_obj_size: LOG_BYTES_IN_WORD as usize,
     };

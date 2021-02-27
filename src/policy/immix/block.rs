@@ -2,31 +2,35 @@ use crate::util::{Address, ObjectReference};
 use crate::util::side_metadata::{self, *};
 use crate::util::constants::*;
 use std::sync::atomic::{AtomicPtr, Ordering};
+use super::line::Line;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Block(Address);
 
 impl Block {
-    pub const LOG_PAGES_IN_BLOCK: usize = 3;
-    pub const PAGES_IN_BLOCK: usize = 1 << Self::LOG_PAGES_IN_BLOCK;
-    pub const LOG_BYTES_IN_BLOCK: usize = Self::LOG_PAGES_IN_BLOCK + LOG_BYTES_IN_PAGE as usize;
-    pub const BYTES_IN_BLOCK: usize = 1 << Self::LOG_BYTES_IN_BLOCK;
+    pub const LOG_BYTES: usize = 15;
+
+    pub const BYTES: usize = 1 << Self::LOG_BYTES;
+    pub const LOG_PAGES: usize = Self::LOG_BYTES - LOG_BYTES_IN_PAGE as usize;
+    pub const PAGES: usize = 1 << Self::LOG_PAGES;
+
+    pub const LOG_LINES: usize = Self::LOG_BYTES - Line::LOG_BYTES;
 
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         scope: SideMetadataScope::PolicySpecific,
-        offset: 0,
-        log_num_of_bits: 0,
-        log_min_obj_size: Self::LOG_BYTES_IN_BLOCK,
+        offset: Line::MARK_TABLE.accumulated_size(),
+        log_num_of_bits: 3,
+        log_min_obj_size: Self::LOG_BYTES,
     };
 
     pub const fn from(address: Address) -> Self {
-        debug_assert!(address.is_aligned_to(Self::BYTES_IN_BLOCK));
+        debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
 
     pub const fn containing(object: ObjectReference) -> Self {
-        Self(object.to_address().align_down(Self::BYTES_IN_BLOCK))
+        Self(object.to_address().align_down(Self::BYTES))
     }
 
     pub const fn start(&self) -> Address {
@@ -34,19 +38,32 @@ impl Block {
     }
 
     pub const fn end(&self) -> Address {
-        unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES_IN_BLOCK) }
+        unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
     }
 
-    pub fn mark(&self) -> bool {
+    #[inline]
+    pub fn attempt_mark(&self) -> bool {
         side_metadata::compare_exchange_atomic(Self::MARK_TABLE, self.start(), 0, 1)
     }
 
+    #[inline]
+    pub fn mark(&self) {
+        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), 1); }
+    }
+
+    #[inline]
     pub fn is_marked(&self) -> bool {
         unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) == 1 }
     }
 
+    #[inline]
     pub fn clear_mark(&self) {
-        side_metadata::store_atomic(Self::MARK_TABLE, self.start(), 0);
+        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), 0); }
+    }
+
+    #[inline]
+    pub fn lines(&self) -> impl Iterator<Item=Line> {
+        LineIter { cursor: self.start(), limit: self.end() }
     }
 }
 
@@ -67,6 +84,7 @@ impl BlockList {
         }
     }
 
+    #[inline]
     pub fn add(&self, block: Block) {
         let node = Box::leak(box Node { value: block, next: AtomicPtr::default() });
         loop {
@@ -78,20 +96,36 @@ impl BlockList {
         }
     }
 
-    pub fn release(&self) {
-
-    }
-
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item=Block> {
         BlockListIter { head: self.head.load(Ordering::SeqCst) }
     }
 
     #[inline]
-    pub fn drain_filter<F: FnMut(&mut Block) -> bool>(&self, filter: F) -> DrainFilter<'_, F> {
+    pub fn drain_filter<'a, F: 'a + FnMut(&mut Block) -> bool>(&'a self, filter: F) -> impl 'a + Iterator<Item=Block> {
         DrainFilter {
             head: &self.head,
             predicate: filter,
+        }
+    }
+}
+
+struct LineIter {
+    cursor: Address,
+    limit: Address,
+}
+
+impl Iterator for LineIter {
+    type Item = Line;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cursor >= self.limit {
+            None
+        } else {
+            let line = Line::from(self.cursor);
+            self.cursor = self.cursor + Line::BYTES;
+            Some(line)
         }
     }
 }
@@ -115,7 +149,7 @@ impl Iterator for BlockListIter {
     }
 }
 
-pub struct DrainFilter<'a, F: 'a + FnMut(&mut Block) -> bool> {
+struct DrainFilter<'a, F: 'a + FnMut(&mut Block) -> bool> {
     head: &'a AtomicPtr<Node<Block>>,
     predicate: F,
 }

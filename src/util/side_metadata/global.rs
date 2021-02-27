@@ -31,8 +31,8 @@ pub struct SideMetadataSpec {
 }
 
 impl SideMetadataSpec {
-    pub const fn meta_bytes_per_chunk(&self) -> usize {
-        super::meta_bytes_per_chunk(self.log_min_obj_size, self.log_num_of_bits)
+    pub const fn accumulated_size(&self) -> usize {
+        self.offset + super::meta_bytes_per_chunk(self.log_min_obj_size, self.log_num_of_bits)
     }
 }
 

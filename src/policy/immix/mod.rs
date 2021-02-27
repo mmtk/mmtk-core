@@ -1,5 +1,5 @@
 mod immixspace;
 mod block;
+mod line;
 
 pub use immixspace::*;
-pub use block::*;
