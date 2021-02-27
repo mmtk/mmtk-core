@@ -11,7 +11,7 @@ use crate::util::heap::PageResource;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::util::side_metadata::{self, *};
-use std::{cell::UnsafeCell, collections::HashSet, sync::Mutex};
+use std::cell::UnsafeCell;
 use super::block::*;
 
 

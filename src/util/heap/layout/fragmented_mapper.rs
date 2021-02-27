@@ -366,7 +366,7 @@ mod tests {
     fn ensure_mapped_1page() {
         let mmapper = FragmentedMapper::new();
         let pages = 1;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &|_| {});
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -380,7 +380,7 @@ mod tests {
     fn ensure_mapped_1chunk() {
         let mmapper = FragmentedMapper::new();
         let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &|_| {});
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -395,7 +395,7 @@ mod tests {
     fn ensure_mapped_more_than_1chunk() {
         let mmapper = FragmentedMapper::new();
         let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &|_| {});
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -411,7 +411,7 @@ mod tests {
         // map 2 chunks
         let mmapper = FragmentedMapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &|_| {});
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -431,7 +431,7 @@ mod tests {
         // map 2 chunks
         let mmapper = FragmentedMapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &|_| {});
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -446,7 +446,7 @@ mod tests {
         );
 
         // ensure mapped - this will unprotect the previously protected chunk
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &|_| {});
         assert_eq!(
             get_chunk_map_state(&mmapper, FIXED_ADDRESS),
             Some(MapState::Mapped)

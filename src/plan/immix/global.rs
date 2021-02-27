@@ -17,15 +17,12 @@ use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
-use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::OpaquePointer;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use enum_map::EnumMap;

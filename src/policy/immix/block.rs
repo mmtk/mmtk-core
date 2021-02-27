@@ -68,7 +68,7 @@ impl BlockList {
     }
 
     pub fn add(&self, block: Block) {
-        let mut node = Box::leak(box Node { value: block, next: AtomicPtr::default() });
+        let node = Box::leak(box Node { value: block, next: AtomicPtr::default() });
         loop {
             let next = self.head.load(Ordering::SeqCst);
             node.next.store(next, Ordering::SeqCst);
