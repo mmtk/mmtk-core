@@ -17,6 +17,8 @@ use crate::util::OpaquePointer;
 use crate::util::{generic_freelist, memory};
 use crate::vm::VMBinding;
 use std::mem::MaybeUninit;
+use crate::util::side_metadata::*;
+use crate::vm::ActivePlan;
 
 pub struct CommonFreeListPageResource {
     free_list: Box<<VMMap as Map>::FreeList>,
@@ -116,12 +118,23 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
             .space
             .unwrap()
             .grow_space(rtn, bytes, new_chunk);
+        let local_side_metadata_per_chunk = self.common().space.unwrap().local_side_metadata_per_chunk();
         self.common()
             .space
             .unwrap()
             .common()
             .mmapper
-            .ensure_mapped(rtn, required_pages);
+            .ensure_mapped(rtn, required_pages, &|chunk| {
+                if !try_map_metadata_space(
+                    chunk,
+                    BYTES_IN_CHUNK,
+                    VM::VMActivePlan::global().global_side_metadata_per_chunk(),
+                    local_side_metadata_per_chunk,
+                ) {
+                    // TODO(Javad): handle meta space allocation failure
+                    panic!("failed to mmap meta memory");
+                }
+            });
         if zeroed {
             memory::zero(rtn, bytes);
         }

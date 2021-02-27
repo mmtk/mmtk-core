@@ -1,29 +1,53 @@
-use crate::{plan::TransitiveClosure, util::{OpaquePointer, heap::FreeListPageResource}};
+use crate::{plan::TransitiveClosure, util::{OpaquePointer, constants::{LOG_BYTES_IN_PAGE, LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
 use crate::plan::{AllocationSemantics, CopyContext};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::forwarding_word as ForwardingWord;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
+use crate::util::conversions;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
+use crate::util::side_metadata::{self, *};
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::{cell::UnsafeCell, collections::HashSet, sync::Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
 
-const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
+const LOG_PAGES_IN_BLOCK: usize = 3;
+const PAGES_IN_BLOCK: usize = 1 << LOG_PAGES_IN_BLOCK;
+const LOG_BYTES_IN_BLOCK: usize = LOG_PAGES_IN_BLOCK + LOG_BYTES_IN_PAGE as usize;
+const BYTES_IN_BLOCK: usize = 1 << LOG_BYTES_IN_BLOCK;
+
+const META_BLOCK_MARK: SideMetadataSpec = SideMetadataSpec {
+    scope: SideMetadataScope::PolicySpecific,
+    offset: 0,
+    log_num_of_bits: 0,
+    log_min_obj_size: LOG_BYTES_IN_BLOCK,
+};
+
+const META_OBJECT_MARK: SideMetadataSpec = SideMetadataSpec {
+    scope: SideMetadataScope::PolicySpecific,
+    offset: META_BLOCK_MARK.meta_bytes_per_chunk(),
+    log_num_of_bits: 0,
+    log_min_obj_size: LOG_BYTES_IN_WORD as usize,
+};
+
+// const GLOBAL_META_2: SideMetadataSpec = SideMetadataSpec {
+//    scope: SideMetadataScope::Global,
+//    offset: meta_bytes_per_chunk(s1, b1),
+//    log_num_of_bits: b2,
+//    log_min_obj_size: s2,
+// };
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
     pr: FreeListPageResource<VM>,
     all_regions: Mutex<HashSet<Address>>,
-    marked_objects: Mutex<HashSet<ObjectReference>>,
-    marked_regions: Mutex<HashSet<Address>>,
 }
 
 impl<VM: VMBinding> SFT for ImmixSpace<VM> {
@@ -69,6 +93,10 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
     }
+
+    fn local_side_metadata_per_chunk(&self) -> usize {
+        META_BLOCK_MARK.meta_bytes_per_chunk() + META_OBJECT_MARK.meta_bytes_per_chunk()
+    }
 }
 
 impl<VM: VMBinding> ImmixSpace<VM> {
@@ -97,9 +125,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common: UnsafeCell::new(common),
-            marked_objects: Default::default(),
             all_regions: Default::default(),
-            marked_regions: Default::default(),
         }
     }
 
@@ -108,22 +134,19 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn prepare(&self) {
-        // TODO: Clear block marks
-        self.marked_objects.lock().unwrap().clear();
-        self.marked_regions.lock().unwrap().clear();
+        let mut all_regions = self.all_regions.lock().unwrap();
+        for region in all_regions.iter() {
+            unsafe { side_metadata::store_atomic(META_BLOCK_MARK, *region, 0); }
+            unsafe { side_metadata::bzero_metadata_for_chunk(META_OBJECT_MARK, conversions::chunk_align_down(*region)); }
+        }
     }
 
     pub fn release(&self) {
-        // TODO: Release unmarked blocks
-        let marked_regions = self.marked_regions.lock().unwrap();
         let mut all_regions = self.all_regions.lock().unwrap();
-        let unmarked_regions = all_regions.drain_filter(|r| !marked_regions.contains(r));
+        let unmarked_regions = all_regions.drain_filter(|r| {
+            unsafe { side_metadata::load(META_BLOCK_MARK, *r) == 0 }
+        });
         for region in unmarked_regions {
-            // for i in 0..(8 * 4096 / 4) {
-            //     let a = region + (i as usize);
-            //     unsafe { a.store(0xdeadbeefu32); }
-            // }
-            // println!("Release Region {:?}", region);
             self.pr.release_pages(region);
         }
     }
@@ -140,39 +163,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     #[inline]
     pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, semantics: AllocationSemantics) -> ObjectReference {
-        let mut marked_objects = self.marked_objects.lock().unwrap();
-        if !marked_objects.contains(&object) {
-            marked_objects.insert(object);
-            // Mark region
-            let mut marked_regions = self.marked_regions.lock().unwrap();
+        if unsafe { side_metadata::compare_exchange_atomic(META_OBJECT_MARK, object.to_address(), 0, 1) } {
+            // Mark block
             let region = object.to_address().align_down(8 * 4096);
-            marked_regions.insert(region);
+            unsafe { side_metadata::compare_exchange_atomic(META_BLOCK_MARK, region, 0, 1); }
+            // Visit node
             trace.process_node(object);
         }
         object
-        // trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
-        // if !self.from_space() {
-        //     return object;
-        // }
-        // trace!("attempting to forward");
-        // let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
-        // trace!("checking if object is being forwarded");
-        // if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
-        //     trace!("... yes it is");
-        //     let new_object =
-        //         ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
-        //     trace!("Returning");
-        //     new_object
-        // } else {
-        //     trace!("... no it isn't. Copying");
-        //     let new_object =
-        //         ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context);
-        //     trace!("Forwarding pointer");
-        //     trace.process_node(new_object);
-        //     trace!("Copying [{:?} -> {:?}]", object, new_object);
-        //     new_object
-        // }
-        // unreachable!()
     }
 
     // #[inline]
