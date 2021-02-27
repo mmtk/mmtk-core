@@ -19,7 +19,7 @@ use super::block::*;
 pub struct ImmixSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
     pr: FreeListPageResource<VM>,
-    all_regions: Mutex<HashSet<Address>>,
+    block_list: BlockList,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -99,7 +99,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common: UnsafeCell::new(common),
-            all_regions: Default::default(),
+            block_list: BlockList::new(),
         }
     }
 
@@ -108,28 +108,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn prepare(&self) {
-        for region in self.all_regions.lock().unwrap().iter() {
-            Block::from(*region).clear_mark();
-            side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, conversions::chunk_align_down(*region))
+        for block in self.block_list.iter() {
+            block.clear_mark();
+            side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, conversions::chunk_align_down(block.start()))
         }
     }
 
     pub fn release(&self) {
-        let mut all_regions = self.all_regions.lock().unwrap();
-        let unmarked_regions = all_regions.drain_filter(|r| !Block::from(*r).is_marked());
-        for region in unmarked_regions {
-            self.pr.release_pages(region);
+        for block in self.block_list.drain_filter(|block| !block.is_marked()) {
+            self.pr.release_pages(block.start());
         }
     }
 
-    pub fn get_space(&self, tls: OpaquePointer) -> Address {
-        let region = self.acquire(tls, 8);
-        if region.is_zero() { return region }
-        let mut all_regions = self.all_regions.lock().unwrap();
-        debug_assert!(!all_regions.contains(&region), "Duplicate region {:?}", region);
-        all_regions.insert(region);
-        // println!("New Region {:?}", region);
-        region
+    pub fn get_space(&self, tls: OpaquePointer) -> Option<Block> {
+        let block_address = self.acquire(tls, 8);
+        if block_address.is_zero() { return None }
+        let block = Block::from(block_address);
+        self.block_list.add(block);
+        Some(block)
     }
 
     #[inline]

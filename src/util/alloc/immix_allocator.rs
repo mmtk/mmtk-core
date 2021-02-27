@@ -91,17 +91,13 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start = self.space.unwrap().downcast_ref::<ImmixSpace<VM>>().unwrap().get_space(self.tls);
-        if acquired_start.is_zero() {
-            acquired_start
-        } else {
-            trace!(
-                "Acquired a new block of size {} with start address {}",
-                block_size,
-                acquired_start
-            );
-            self.set_limit(acquired_start, acquired_start + (8usize * 4096));
-            self.alloc(size, align, offset)
+        match self.space.unwrap().downcast_ref::<ImmixSpace<VM>>().unwrap().get_space(self.tls) {
+            None => Address::ZERO,
+            Some(block) => {
+                trace!("Acquired a new block {:?}", block);
+                self.set_limit(block.start(), block.end());
+                self.alloc(size, align, offset)
+            }
         }
     }
 
