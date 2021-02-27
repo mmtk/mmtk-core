@@ -112,8 +112,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         for block in self.block_list.iter() {
             block.clear_mark();
             // TODO: clear metadata for a block only
-            for line in block.lines() {
-                line.clear_mark()
+            if !super::BLOCK_ONLY {
+                for line in block.lines() {
+                    line.clear_mark()
+                }
             }
             side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, conversions::chunk_align_down(block.start()))
         }
@@ -138,7 +140,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if Self::attempt_mark(object) {
             // Mark block
             Block::containing(object).mark();
-            Line::containing(object).mark();
+            if !super::BLOCK_ONLY {
+                Line::containing(object).mark();
+            }
             // Visit node
             trace.process_node(object);
         }

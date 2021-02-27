@@ -19,7 +19,7 @@ impl Block {
 
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         scope: SideMetadataScope::PolicySpecific,
-        offset: Line::MARK_TABLE.accumulated_size(),
+        offset: if super::BLOCK_ONLY { 0 } else { Line::MARK_TABLE.accumulated_size() },
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,
     };
