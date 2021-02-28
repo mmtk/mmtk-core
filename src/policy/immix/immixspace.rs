@@ -13,7 +13,7 @@ use crate::util::heap::PageResource;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::util::side_metadata::{self, *};
-use std::{cell::UnsafeCell, ops::Range, sync::atomic::{AtomicBool, AtomicU8}};
+use std::{cell::UnsafeCell, iter::Step, ops::Range, sync::atomic::{AtomicBool, AtomicU8}};
 use super::block::*;
 use super::line::*;
 
@@ -202,32 +202,27 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn get_next_available_lines(&self, start: Line) -> Option<Range<Line>> {
         let block = start.block();
-        let mut cursor = start.index(block);
+        let line_limit = block.lines().end;
+        let mut line_cursor = start;
         let unavail_state = self.line_unavail_state.load(Ordering::SeqCst);
         // Find start
-        while cursor < Block::LINES {
-            let line = Line::from(block.start() + (cursor << Line::LOG_BYTES));
-            if !line.is_marked(unavail_state) {
+        while line_cursor < line_limit {
+            if !line_cursor.is_marked(unavail_state) {
                 break;
             }
-            cursor += 1;
+            line_cursor = Line::forward(line_cursor, 1);
         }
-        if cursor == Block::LINES { return None }
-        let start = Line::from(block.start() + (cursor << Line::LOG_BYTES));
+        if line_cursor == line_limit { return None }
+        let start = line_cursor;
         // Find limit
-        while cursor < Block::LINES {
-            let line = Line::from(block.start() + (cursor << Line::LOG_BYTES));
-            if line.is_marked(unavail_state) {
+        while line_cursor < line_limit {
+            if line_cursor.is_marked(unavail_state) {
                 break;
             }
-            cursor += 1;
+            line_cursor = Line::forward(line_cursor, 1);
         }
-        let end = Line::from(block.start() + (cursor << Line::LOG_BYTES));
-        if cfg!(debug_assertions) {
-            for line in start..end {
-                assert!(!line.is_marked(unavail_state));
-            }
-        }
+        let end = line_cursor;
+        debug_assert!((start..end).all(|line| !line.is_marked(unavail_state)));
         return Some(Range { start, end })
     }
 }

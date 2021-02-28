@@ -43,10 +43,6 @@ impl Line {
         Self(VM::VMObjectModel::object_start_ref(object).align_down(Self::BYTES))
     }
 
-    pub const fn index(&self, block: Block) -> usize {
-        (self.start().as_usize() - block.start().as_usize()) >> Self::LOG_BYTES
-    }
-
     pub const fn block(&self) -> Block {
         Block::from(Block::align(self.0))
     }
@@ -57,11 +53,6 @@ impl Line {
 
     pub const fn end(&self) -> Address {
         unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
-    }
-
-    #[inline]
-    pub fn get_mark(&self) -> u8 {
-        unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) as u8 }
     }
 
     #[inline]
@@ -88,13 +79,16 @@ impl Line {
 }
 
 unsafe impl Step for Line {
+    #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
         if start < end { return None }
         Some((end.start() - start.start()) >> Line::LOG_BYTES)
     }
+    #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
         Some(Line::from(start.start() + (count << Line::LOG_BYTES)))
     }
+    #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
         Some(Line::from(start.start() - (count << Line::LOG_BYTES)))
     }

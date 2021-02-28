@@ -1,26 +1,14 @@
-use crate::{policy::immix::ImmixSpace, util::{constants::DEFAULT_STRESS_FACTOR, memory}};
-use std::{ops::Add, sync::atomic::Ordering};
-
+use crate::{policy::immix::ImmixSpace, util::memory};
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
 use crate::util::Address;
-
 use crate::util::alloc::Allocator;
-
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::policy::immix::block::*;
 use crate::policy::immix::line::*;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::obj_size::PerSizeClassObjectCounterArgs;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::RtAnalysis;
-use crate::util::conversions::bytes_to_pages;
 use crate::util::OpaquePointer;
-use crate::vm::{ActivePlan, VMBinding};
+use crate::vm::*;
 
-const BYTES_IN_PAGE: usize = 1 << 12;
-const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
-const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 #[repr(C)]
 pub struct ImmixAllocator<VM: VMBinding> {
@@ -45,7 +33,7 @@ pub struct ImmixAllocator<VM: VMBinding> {
     line_use_count: usize,
     mark_table: Address,
     recyclable_block: Option<Block>,
-    line: usize,
+    line: Option<Line>,
     recyclable_exhausted: bool,
 }
 
@@ -58,7 +46,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         self.recyclable_block = None;
         self.request_for_large = false;
         self.recyclable_exhausted = false;
-        self.line = Block::LINES;
+        self.line = None;
         self.line_use_count = 0;
     }
 }
@@ -145,7 +133,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             line_use_count: 0,
             mark_table: Address::ZERO,
             recyclable_block: None,
-            line: Block::LINES,
+            line: None,
             recyclable_exhausted: false,
         }
     }
@@ -179,18 +167,17 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     }
 
     fn acquire_recycable_lines(&mut self, size: usize, align: usize, offset: isize) -> bool {
-        while self.line < Block::LINES || self.acquire_recycable_block() {
-            let prev_line = Line::from(self.recyclable_block.unwrap().start() + (self.line << Line::LOG_BYTES));
-            if let Some(lines) = self.immix_space().get_next_available_lines(prev_line) {
+        while self.line.is_some() || self.acquire_recycable_block() {
+            if let Some(lines) = self.immix_space().get_next_available_lines(self.line.unwrap()) {
                 self.cursor = lines.start.start();
                 self.limit = lines.end.start();
-                trace!("acquire_recycable_lines -> {} {:?} {:?} {}", self.line, lines, self.tls, lines.end.index(self.recyclable_block.unwrap()));
+                trace!("acquire_recycable_lines -> {:?} {:?} {:?}", self.line, lines, self.tls);
                 memory::zero(self.cursor, self.limit - self.cursor);
                 debug_assert!(align_allocation_no_fill::<VM>(self.cursor, align, offset) + size <= self.limit);
-                self.line = lines.end.index(self.recyclable_block.unwrap());
+                self.line = if lines.end == self.recyclable_block.unwrap().lines().end { None } else { Some(lines.end) };
                 return true;
             } else {
-                self.line = Block::LINES;
+                self.line = None;
                 self.recyclable_block = None;
             }
         }
@@ -201,7 +188,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         match self.immix_space().get_reusable_block() {
             Some(block) => {
                 trace!("acquire_recycable_block -> {:?}", block);
-                self.line = 0;
+                self.line = Some(block.lines().start);
                 self.recyclable_block = Some(block);
                 true
             }
