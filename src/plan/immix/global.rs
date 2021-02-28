@@ -67,14 +67,12 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
-        println!("Immix::gc_init");
         self.common.gc_init(heap_size, vm_map, scheduler);
 
         self.immix_space.init(&vm_map);
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
-        println!("Immix::schedule_collection");
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         // Stop & scan mutators (mutator scanning can happen before STW)

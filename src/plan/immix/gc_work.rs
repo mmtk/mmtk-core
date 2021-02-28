@@ -95,13 +95,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
             return object;
         }
         if self.immix().immix_space.in_space(object) {
-            self.immix()
-                .immix_space
-                .trace_mark_object::<Self>(
-                    self,
-                    object,
-                    super::global::ALLOC_IMMIX,
-                )
+            self.immix().immix_space.trace_mark_object::<Self>(self, object)
         } else {
             self.immix()
                 .common

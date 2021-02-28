@@ -43,6 +43,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         self.limit = Address::ZERO;
         self.large_cursor = Address::ZERO;
         self.large_limit = Address::ZERO;
+        self.mark_table = Address::ZERO;
         self.recyclable_block = None;
         self.request_for_large = false;
         self.recyclable_exhausted = false;
@@ -168,17 +169,18 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     fn acquire_recycable_lines(&mut self, size: usize, align: usize, offset: isize) -> bool {
         while self.line.is_some() || self.acquire_recycable_block() {
-            if let Some(lines) = self.immix_space().get_next_available_lines(self.line.unwrap()) {
+            let line = self.line.unwrap();
+            if let Some(lines) = self.immix_space().get_next_available_lines(line) {
                 self.cursor = lines.start.start();
                 self.limit = lines.end.start();
                 trace!("acquire_recycable_lines -> {:?} {:?} {:?}", self.line, lines, self.tls);
                 memory::zero(self.cursor, self.limit - self.cursor);
                 debug_assert!(align_allocation_no_fill::<VM>(self.cursor, align, offset) + size <= self.limit);
-                self.line = if lines.end == self.recyclable_block.unwrap().lines().end { None } else { Some(lines.end) };
+                let block = line.block();
+                self.line = if lines.end == block.lines().end { None } else { Some(lines.end) };
                 return true;
             } else {
                 self.line = None;
-                self.recyclable_block = None;
             }
         }
         false
@@ -189,7 +191,6 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             Some(block) => {
                 trace!("acquire_recycable_block -> {:?}", block);
                 self.line = Some(block.lines().start);
-                self.recyclable_block = Some(block);
                 true
             }
             _ => false,

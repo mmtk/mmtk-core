@@ -5,6 +5,14 @@ use std::{ops::Range, sync::{Mutex, MutexGuard, atomic::{AtomicPtr, Ordering}}};
 use super::line::Line;
 use crate::vm::*;
 
+
+
+#[repr(u8)]
+pub enum BlockMarkState {
+    Unmarked = 0,
+    Marked = 1,
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Block(Address);
@@ -50,22 +58,22 @@ impl Block {
 
     #[inline]
     pub fn attempt_mark(&self) -> bool {
-        side_metadata::compare_exchange_atomic(Self::MARK_TABLE, self.start(), 0, 1)
+        side_metadata::compare_exchange_atomic(Self::MARK_TABLE, self.start(), BlockMarkState::Unmarked as usize, BlockMarkState::Marked as usize)
     }
 
     #[inline]
     pub fn mark(&self) {
-        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), 1); }
+        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), BlockMarkState::Marked as usize); }
     }
 
     #[inline]
     pub fn is_marked(&self) -> bool {
-        unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) == 1 }
+        unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) == BlockMarkState::Marked as usize }
     }
 
     #[inline]
     pub fn clear_mark(&self) {
-        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), 0); }
+        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), BlockMarkState::Unmarked as usize); }
     }
 
     pub const fn lines(&self) -> Range<Line> {

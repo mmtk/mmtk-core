@@ -1,7 +1,5 @@
 use atomic::Ordering;
-
 use crate::{plan::TransitiveClosure, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
-use crate::plan::AllocationSemantics;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::forwarding_word as ForwardingWord;
@@ -119,7 +117,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn prepare(&self) {
-        for block in self.block_list.iter() {
+        for block in &self.block_list {
             block.clear_mark();
             // TODO: clear metadata for a block only
             side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, conversions::chunk_align_down(block.start()))
@@ -171,7 +169,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     #[inline]
-    pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, _semantics: AllocationSemantics) -> ObjectReference {
+    pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference) -> ObjectReference {
         if Self::attempt_mark(object) {
             // Mark block
             Block::containing::<VM>(object).mark();
