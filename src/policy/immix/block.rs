@@ -77,6 +77,7 @@ impl Block {
     }
 
     pub const fn lines(&self) -> Range<Line> {
+        debug_assert!(!super::BLOCK_ONLY);
         Range { start: Line::from(self.start()), end: Line::from(self.end()) }
     }
 }

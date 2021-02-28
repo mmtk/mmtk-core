@@ -132,24 +132,28 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn release(&self) {
-        self.line_unavail_state.store(self.line_mark_state.load(Ordering::SeqCst), Ordering::SeqCst);
+        if !super::BLOCK_ONLY {
+            self.line_unavail_state.store(self.line_mark_state.load(Ordering::SeqCst), Ordering::SeqCst);
+        }
 
         for block in self.block_list.drain_filter(|block| !block.is_marked()) {
             self.pr.release_pages(block.start());
         }
 
-        self.reusable_blocks.reset();
-        for block in &self.block_list {
-            let mut marked_lines = 0;
-            for line in block.lines() {
-                if line.is_marked(self.line_mark_state.load(Ordering::SeqCst)) {
-                    marked_lines += 1;
+        if !super::BLOCK_ONLY {
+            self.reusable_blocks.reset();
+            for block in &self.block_list {
+                let mut marked_lines = 0;
+                for line in block.lines() {
+                    if line.is_marked(self.line_mark_state.load(Ordering::SeqCst)) {
+                        marked_lines += 1;
+                    }
                 }
-            }
-            debug_assert!(block.is_marked());
-            debug_assert!(marked_lines > 0);
-            if marked_lines < Block::LINES {
-                self.reusable_blocks.push(block);
+                debug_assert!(block.is_marked());
+                debug_assert!(marked_lines > 0);
+                if marked_lines < Block::LINES {
+                    self.reusable_blocks.push(block);
+                }
             }
         }
 
@@ -165,6 +169,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn get_reusable_block(&self) -> Option<Block> {
+        if !super::BLOCK_ONLY { return None }
         self.reusable_blocks.pop()
     }
 
@@ -199,6 +204,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /* Line searching */
 
     pub fn get_next_available_lines(&self, start: Line) -> Option<Range<Line>> {
+        debug_assert!(!super::BLOCK_ONLY);
         let block = start.block();
         let line_limit = block.lines().end;
         let mut line_cursor = start;

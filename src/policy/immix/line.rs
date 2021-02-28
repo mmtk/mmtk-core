@@ -26,47 +26,57 @@ impl Line {
     };
 
     pub const fn align(address: Address) -> Address {
+        debug_assert!(!super::BLOCK_ONLY);
         address.align_down(Self::BYTES)
     }
 
     pub const fn is_aligned(address: Address) -> bool {
+        debug_assert!(!super::BLOCK_ONLY);
         Self::align(address).as_usize() == address.as_usize()
     }
 
     pub const fn from(address: Address) -> Self {
+        debug_assert!(!super::BLOCK_ONLY);
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
 
     #[inline(always)]
     pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
+        debug_assert!(!super::BLOCK_ONLY);
         Self(VM::VMObjectModel::object_start_ref(object).align_down(Self::BYTES))
     }
 
     pub const fn block(&self) -> Block {
+        debug_assert!(!super::BLOCK_ONLY);
         Block::from(Block::align(self.0))
     }
 
     pub const fn start(&self) -> Address {
+        debug_assert!(!super::BLOCK_ONLY);
         self.0
     }
 
     pub const fn end(&self) -> Address {
+        debug_assert!(!super::BLOCK_ONLY);
         unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
     }
 
     #[inline]
     pub fn mark(&self, state: u8) {
+        debug_assert!(!super::BLOCK_ONLY);
         unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), state as _); }
     }
 
     #[inline]
     pub fn is_marked(&self, state: u8) -> bool {
+        debug_assert!(!super::BLOCK_ONLY);
         unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) as u8 == state }
     }
 
     #[inline]
     pub fn mark_lines_for_object<VM: VMBinding>(object: ObjectReference, state: u8) {
+        debug_assert!(!super::BLOCK_ONLY);
         let start = VM::VMObjectModel::object_start_ref(object);
         let end  = start + VM::VMObjectModel::get_current_size(object);
         let start_line = Line::from(Line::align(start));
@@ -81,15 +91,18 @@ impl Line {
 unsafe impl Step for Line {
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+        debug_assert!(!super::BLOCK_ONLY);
         if start < end { return None }
         Some((end.start() - start.start()) >> Line::LOG_BYTES)
     }
     #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
+        debug_assert!(!super::BLOCK_ONLY);
         Some(Line::from(start.start() + (count << Line::LOG_BYTES)))
     }
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
+        debug_assert!(!super::BLOCK_ONLY);
         Some(Line::from(start.start() - (count << Line::LOG_BYTES)))
     }
 }
