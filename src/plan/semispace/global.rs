@@ -13,7 +13,7 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
-use crate::util::analysis::gc_count::GcCounterWork;
+use crate::util::analysis::GcHookWork;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -82,6 +82,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
+        self.common()
+            .schedule_common::<SSProcessEdges<VM>>(&SS_CONSTRAINTS, scheduler);
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<SSProcessEdges<VM>>::new());
@@ -91,10 +93,10 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, SSCopyContext<VM>>::new(self));
-        // Analysis routine that is ran. It is generally recommended to take advantage
-        // of the scheduling system we have in place for more performance
+        // Scheduling all the gc hooks of analysis routines. It is generally recommended
+        // to take advantage of the scheduling system we have in place for more performance
         #[cfg(feature = "analysis")]
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcCounterWork::new());
+        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]

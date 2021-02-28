@@ -1,6 +1,6 @@
 use crate::util::analysis::RtAnalysis;
 use crate::util::statistics::counter::EventCounter;
-use crate::util::statistics::stats::Stats;
+use crate::vm::{ActivePlan, VMBinding};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -15,35 +15,25 @@ use std::sync::{Arc, Mutex};
  */
 #[derive(Default)]
 pub struct PerSizeClassObjectCounter {
+    running: bool,
     size_classes: Mutex<HashMap<String, Arc<Mutex<EventCounter>>>>,
 }
 
-// We require access to both the stats instance in order to create counters for size classes
-// on the fly as well as the size of the object allocated
-pub struct PerSizeClassObjectCounterArgs<'a> {
-    stats: &'a Stats,
-    size: usize,
-}
-
-impl<'a> PerSizeClassObjectCounterArgs<'a> {
-    pub fn new(stats: &'a Stats, size: usize) -> Self {
-        Self { stats, size }
-    }
-}
-
-// Macro to simplify the creation of a new counter for a particular size class
+// Macro to simplify the creation of a new counter for a particular size class.
+// This is a macro as opposed to a function as otherwise we would have to unlock
+// and relock the size_classes map
 macro_rules! new_ctr {
-    ( $stats:expr, $map:expr, $size:expr ) => {{
-        let name = format!("size{}", $size);
-        let ctr = $stats.new_event_counter(&name, true, true);
-        $map.insert(name, ctr.clone());
+    ( $stats:expr, $map:expr, $size_class:expr ) => {{
+        let ctr = $stats.new_event_counter(&$size_class, true, true);
+        $map.insert($size_class.to_string(), ctr.clone());
         ctr
     }};
 }
 
 impl PerSizeClassObjectCounter {
-    pub fn new() -> Self {
+    pub fn new(running: bool) -> Self {
         Self {
+            running,
             size_classes: Mutex::new(HashMap::new()),
         }
     }
@@ -55,18 +45,20 @@ impl PerSizeClassObjectCounter {
     }
 }
 
-impl RtAnalysis<PerSizeClassObjectCounterArgs<'_>, ()> for PerSizeClassObjectCounter {
-    fn alloc_hook(&mut self, args: PerSizeClassObjectCounterArgs) {
-        let stats = args.stats;
-        let size = args.size;
+impl<VM: VMBinding> RtAnalysis<VM> for PerSizeClassObjectCounter {
+    fn alloc_hook(&mut self, size: usize, _align: usize, _offset: isize) {
+        if !self.running {
+            return;
+        }
+
+        let stats = &(VM::VMActivePlan::global().base()).stats;
         let size_class = format!("size{}", self.size_class(size));
         let mut size_classes = self.size_classes.lock().unwrap();
-
         let c = size_classes.get_mut(&size_class);
         match c {
             None => {
                 // Create (and increment) the counter associated with the size class if it doesn't exist
-                let ctr = new_ctr!(stats, size_classes, self.size_class(size));
+                let ctr = new_ctr!(stats, size_classes, &size_class);
                 ctr.lock().unwrap().inc();
             }
             Some(ctr) => {
@@ -74,5 +66,9 @@ impl RtAnalysis<PerSizeClassObjectCounterArgs<'_>, ()> for PerSizeClassObjectCou
                 ctr.lock().unwrap().inc();
             }
         }
+    }
+
+    fn set_running(&mut self, running: bool) {
+        self.running = running;
     }
 }
