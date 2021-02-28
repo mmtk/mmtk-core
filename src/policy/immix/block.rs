@@ -1,8 +1,9 @@
 use crate::util::{Address, ObjectReference};
 use crate::util::side_metadata::{self, *};
 use crate::util::constants::*;
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::{ops::Range, sync::{Mutex, MutexGuard, atomic::{AtomicPtr, Ordering}}};
 use super::line::Line;
+use crate::vm::*;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -25,13 +26,18 @@ impl Block {
         log_min_obj_size: Self::LOG_BYTES,
     };
 
+    pub const fn align(address: Address) -> Address {
+        address.align_down(Self::BYTES)
+    }
+
     pub const fn from(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
 
-    pub const fn containing(object: ObjectReference) -> Self {
-        Self(object.to_address().align_down(Self::BYTES))
+    #[inline(always)]
+    pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
+        Self(VM::VMObjectModel::object_start_ref(object).align_down(Self::BYTES))
     }
 
     pub const fn start(&self) -> Address {
@@ -62,9 +68,8 @@ impl Block {
         unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), 0); }
     }
 
-    #[inline]
-    pub fn lines(&self) -> impl Iterator<Item=Line> {
-        LineIter { cursor: self.start(), limit: self.end() }
+    pub const fn lines(&self) -> Range<Line> {
+        Range { start: Line::from(self.start()), end: Line::from(self.end()) }
     }
 }
 
@@ -76,17 +81,19 @@ struct Node<T> {
 
 pub struct BlockList {
     head: AtomicPtr<Node<Block>>,
+    sync: Mutex<()>,
 }
 
 impl BlockList {
     pub fn new() -> Self {
         Self {
             head: AtomicPtr::default(),
+            sync: Mutex::new(()),
         }
     }
 
     #[inline]
-    pub fn add(&self, block: Block) {
+    pub fn push(&self, block: Block) {
         let node = Box::leak(box Node { value: block, next: AtomicPtr::default() });
         loop {
             let next = self.head.load(Ordering::SeqCst);
@@ -94,6 +101,31 @@ impl BlockList {
             if self.head.compare_exchange(next, node, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
                 return
             }
+        }
+    }
+
+    #[inline]
+    pub fn pop(&self) -> Option<Block> {
+        loop {
+            let head = self.head.load(Ordering::SeqCst);
+            if head.is_null() { return None }
+            let next = unsafe { (*head).next.load(Ordering::SeqCst) };
+            if self.head.compare_exchange(head, next, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+                let block = unsafe { (*head).value };
+                unsafe { Box::from_raw(head) };
+                return Some(block);
+            }
+        }
+    }
+
+    #[inline]
+    pub fn reset(&self) {
+        let _guard = self.sync.lock().unwrap();
+        loop {
+            let head = self.head.load(Ordering::SeqCst);
+            if head.is_null() { return }
+            self.head.store(unsafe { (*head).next.load(Ordering::SeqCst) }, Ordering::SeqCst);
+            unsafe { Box::from_raw(head) };
         }
     }
 
@@ -107,27 +139,17 @@ impl BlockList {
         DrainFilter {
             head: &self.head,
             predicate: filter,
+            _guard: self.sync.lock().unwrap(),
         }
     }
 }
 
-struct LineIter {
-    cursor: Address,
-    limit: Address,
-}
+impl<'a> IntoIterator for &'a BlockList {
+    type Item = Block;
+    type IntoIter = impl Iterator<Item=Self::Item>;
 
-impl Iterator for LineIter {
-    type Item = Line;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.cursor >= self.limit {
-            None
-        } else {
-            let line = Line::from(self.cursor);
-            self.cursor = self.cursor + Line::BYTES;
-            Some(line)
-        }
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -153,6 +175,7 @@ impl Iterator for BlockListIter {
 struct DrainFilter<'a, F: 'a + FnMut(&mut Block) -> bool> {
     head: &'a AtomicPtr<Node<Block>>,
     predicate: F,
+    _guard: MutexGuard<'a, ()>,
 }
 
 impl<'a, F: 'a + FnMut(&mut Block) -> bool> Iterator for DrainFilter<'a, F> {

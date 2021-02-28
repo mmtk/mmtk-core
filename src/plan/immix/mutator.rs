@@ -11,8 +11,16 @@ use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn immix_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
-    // Do nothing
+pub fn immix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
+    // rebind the allocation bump pointer to the appropriate semispace
+    let immix_allocator = unsafe {
+        mutator
+            .allocators
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
+    }
+    .downcast_mut::<ImmixAllocator<VM>>()
+    .unwrap();
+    immix_allocator.reset();
 }
 
 pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: OpaquePointer) {

@@ -1,3 +1,5 @@
+use atomic::Ordering;
+
 use crate::{plan::TransitiveClosure, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
 use crate::plan::AllocationSemantics;
 use crate::policy::space::SpaceOptions;
@@ -11,7 +13,7 @@ use crate::util::heap::PageResource;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::util::side_metadata::{self, *};
-use std::cell::UnsafeCell;
+use std::{cell::UnsafeCell, ops::Range, sync::atomic::{AtomicBool, AtomicU8}};
 use super::block::*;
 use super::line::*;
 
@@ -21,6 +23,10 @@ pub struct ImmixSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
     pr: FreeListPageResource<VM>,
     block_list: BlockList,
+    line_mark_state: AtomicU8,
+    line_unavail_state: AtomicU8,
+    in_collection: AtomicBool,
+    reusable_blocks: BlockList,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -101,6 +107,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             },
             common: UnsafeCell::new(common),
             block_list: BlockList::new(),
+            line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
+            line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
+            in_collection: AtomicBool::new(false),
+            reusable_blocks: BlockList::new(),
         }
     }
 
@@ -112,36 +122,61 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         for block in self.block_list.iter() {
             block.clear_mark();
             // TODO: clear metadata for a block only
-            if !super::BLOCK_ONLY {
-                for line in block.lines() {
-                    line.clear_mark()
-                }
-            }
             side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, conversions::chunk_align_down(block.start()))
         }
+        if !super::BLOCK_ONLY {
+            self.line_mark_state.fetch_add(1, Ordering::SeqCst);
+            if self.line_mark_state.load(Ordering::SeqCst) > Line::MAX_MARK_STATE {
+                self.line_mark_state.store(Line::RESET_MARK_STATE, Ordering::SeqCst);
+            }
+        }
+        self.in_collection.store(true, Ordering::SeqCst);
     }
 
     pub fn release(&self) {
+        self.line_unavail_state.store(self.line_mark_state.load(Ordering::SeqCst), Ordering::SeqCst);
+
         for block in self.block_list.drain_filter(|block| !block.is_marked()) {
             self.pr.release_pages(block.start());
         }
+
+        self.reusable_blocks.reset();
+        for block in &self.block_list {
+            let mut marked_lines = 0;
+            for line in block.lines() {
+                if line.is_marked(self.line_mark_state.load(Ordering::SeqCst)) {
+                    marked_lines += 1;
+                }
+            }
+            debug_assert!(block.is_marked());
+            debug_assert!(marked_lines > 0);
+            if marked_lines < Block::LINES {
+                self.reusable_blocks.push(block);
+            }
+        }
+
+        self.in_collection.store(false, Ordering::SeqCst);
     }
 
-    pub fn get_space(&self, tls: OpaquePointer) -> Option<Block> {
+    pub fn get_clean_block(&self, tls: OpaquePointer) -> Option<Block> {
         let block_address = self.acquire(tls, 8);
         if block_address.is_zero() { return None }
         let block = Block::from(block_address);
-        self.block_list.add(block);
+        self.block_list.push(block);
         Some(block)
+    }
+
+    pub fn get_reusable_block(&self) -> Option<Block> {
+        self.reusable_blocks.pop()
     }
 
     #[inline]
     pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, _semantics: AllocationSemantics) -> ObjectReference {
         if Self::attempt_mark(object) {
             // Mark block
-            Block::containing(object).mark();
+            Block::containing::<VM>(object).mark();
             if !super::BLOCK_ONLY {
-                Line::containing(object).mark();
+                Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::SeqCst));
             }
             // Visit node
             trace.process_node(object);
@@ -161,5 +196,38 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     fn attempt_mark(object: ObjectReference) -> bool {
         side_metadata::compare_exchange_atomic(Self::OBJECT_MARK_TABLE, object.to_address(), 0, 1)
+    }
+
+    /* Line searching */
+
+    pub fn get_next_available_lines(&self, start: Line) -> Option<Range<Line>> {
+        let block = start.block();
+        let mut cursor = start.index(block);
+        let unavail_state = self.line_unavail_state.load(Ordering::SeqCst);
+        // Find start
+        while cursor < Block::LINES {
+            let line = Line::from(block.start() + (cursor << Line::LOG_BYTES));
+            if !line.is_marked(unavail_state) {
+                break;
+            }
+            cursor += 1;
+        }
+        if cursor == Block::LINES { return None }
+        let start = Line::from(block.start() + (cursor << Line::LOG_BYTES));
+        // Find limit
+        while cursor < Block::LINES {
+            let line = Line::from(block.start() + (cursor << Line::LOG_BYTES));
+            if line.is_marked(unavail_state) {
+                break;
+            }
+            cursor += 1;
+        }
+        let end = Line::from(block.start() + (cursor << Line::LOG_BYTES));
+        if cfg!(debug_assertions) {
+            for line in start..end {
+                assert!(!line.is_marked(unavail_state));
+            }
+        }
+        return Some(Range { start, end })
     }
 }
