@@ -198,7 +198,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     #[inline(always)]
     fn attempt_mark(object: ObjectReference) -> bool {
-        side_metadata::compare_exchange_atomic(Self::OBJECT_MARK_TABLE, object.to_address(), 0, 1)
+        side_metadata::compare_exchange_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object), 0, 1)
     }
 
     /* Line searching */

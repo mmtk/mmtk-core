@@ -45,7 +45,7 @@ impl Block {
 
     #[inline(always)]
     pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self(VM::VMObjectModel::object_start_ref(object).align_down(Self::BYTES))
+        Self(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
     }
 
     pub const fn start(&self) -> Address {
