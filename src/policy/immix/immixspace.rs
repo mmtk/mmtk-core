@@ -63,7 +63,6 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
         &mut *self.common.get()
     }
     fn init(&mut self, _vm_map: &'static VMMap) {
-        println!("Init Space {:?}", self as *const _);
         // Borrow-checker fighting so that we can have a cyclic reference
         let me = unsafe { &*(self as *const Self) };
         self.pr.bind_space(me);
