@@ -161,7 +161,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn get_clean_block(&self, tls: OpaquePointer) -> Option<Block> {
-        let block_address = self.acquire(tls, 8);
+        let block_address = self.acquire(tls, Block::PAGES);
         if block_address.is_zero() { return None }
         let block = Block::from(block_address);
         self.block_list.push(block);
