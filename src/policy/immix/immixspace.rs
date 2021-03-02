@@ -63,6 +63,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
         &mut *self.common.get()
     }
     fn init(&mut self, _vm_map: &'static VMMap) {
+        super::validate_features();
         // Borrow-checker fighting so that we can have a cyclic reference
         let me = unsafe { &*(self as *const Self) };
         self.pr.bind_space(me);
@@ -141,14 +142,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         if !super::BLOCK_ONLY {
             self.reusable_blocks.reset();
+            let line_mark_state = self.line_mark_state.load(Ordering::SeqCst);
             for block in &self.block_list {
-                let mut marked_lines = 0;
-                for line in block.lines() {
-                    if line.is_marked(self.line_mark_state.load(Ordering::SeqCst)) {
-                        marked_lines += 1;
-                    }
-                }
                 debug_assert!(block.is_marked());
+                let marked_lines = block.count_marked_lines(line_mark_state);
                 debug_assert!(marked_lines > 0);
                 if marked_lines < Block::LINES {
                     self.reusable_blocks.push(block);
@@ -175,10 +172,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline]
     pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference) -> ObjectReference {
         if Self::attempt_mark(object) {
-            // Mark block
-            Block::containing::<VM>(object).mark();
+            // Mark block and lines
             if !super::BLOCK_ONLY {
-                Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::SeqCst));
+                let marked_lines = Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::SeqCst));
+                Block::containing::<VM>(object).mark(Some(marked_lines));
+            } else {
+                Block::containing::<VM>(object).mark(None);
             }
             // Visit node
             trace.process_node(object);

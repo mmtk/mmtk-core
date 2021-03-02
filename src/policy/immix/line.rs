@@ -75,16 +75,21 @@ impl Line {
     }
 
     #[inline]
-    pub fn mark_lines_for_object<VM: VMBinding>(object: ObjectReference, state: u8) {
+    pub fn mark_lines_for_object<VM: VMBinding>(object: ObjectReference, state: u8) -> usize {
         debug_assert!(!super::BLOCK_ONLY);
         let start = VM::VMObjectModel::object_start_ref(object);
         let end  = start + VM::VMObjectModel::get_current_size(object);
         let start_line = Line::from(Line::align(start));
         let mut end_line = Line::from(Line::align(end));
         if !Line::is_aligned(end) { end_line = Line::forward(end_line, 1) }
+        let mut marked_lines = 0;
         for line in start_line .. end_line {
+            if !line.is_marked(state) {
+                marked_lines += 1;
+            }
             line.mark(state)
         }
+        return marked_lines;
     }
 }
 

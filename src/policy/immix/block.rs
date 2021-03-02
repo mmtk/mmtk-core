@@ -62,13 +62,31 @@ impl Block {
     }
 
     #[inline]
-    pub fn mark(&self) {
-        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), BlockMarkState::Marked as usize); }
+    pub fn mark(&self, line_counter_increment: Option<usize>) {
+        let state = if super::LINE_COUNTER {
+            unsafe {
+                let old_counter = side_metadata::load(Self::MARK_TABLE, self.start());
+                old_counter + line_counter_increment.unwrap()
+            }
+        } else {
+            BlockMarkState::Marked as usize
+        };
+        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), state); }
+    }
+
+    #[inline]
+    pub fn count_marked_lines(&self, line_mark_state: u8) -> usize {
+        if super::LINE_COUNTER {
+            unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) }
+        } else {
+            self.lines().filter(|line| line.is_marked(line_mark_state)).count()
+        }
     }
 
     #[inline]
     pub fn is_marked(&self) -> bool {
-        unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) == BlockMarkState::Marked as usize }
+        let mark_state = unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) };
+        mark_state != BlockMarkState::Unmarked as usize
     }
 
     #[inline]
