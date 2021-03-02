@@ -35,7 +35,7 @@ pub trait Mmapper {
      * @param start The start of the range to be mapped.
      * @param pages The size of the range to be mapped, in pages
      */
-    fn ensure_mapped(&self, start: Address, pages: usize);
+    fn ensure_mapped(&self, start: Address, pages: usize, notify_mmap: &impl Fn(Address));
 
     /**
      * Is the page pointed to by this address mapped ?

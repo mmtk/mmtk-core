@@ -266,15 +266,15 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 unsafe { Address::zero() }
             } else {
                 debug!("Space.acquire(), returned = {}", rtn);
-                if !try_map_metadata_space(
-                    rtn,
-                    conversions::pages_to_bytes(pages),
-                    VM::VMActivePlan::global().global_side_metadata_per_chunk(),
-                    self.local_side_metadata_per_chunk(),
-                ) {
-                    // TODO(Javad): handle meta space allocation failure
-                    panic!("failed to mmap meta memory");
-                }
+                // if !try_map_metadata_space(
+                //     rtn,
+                //     conversions::pages_to_bytes(pages),
+                //     VM::VMActivePlan::global().global_side_metadata_per_chunk(),
+                //     self.local_side_metadata_per_chunk(),
+                // ) {
+                //     // TODO(Javad): handle meta space allocation failure
+                //     panic!("failed to mmap meta memory");
+                // }
                 rtn
             }
         }
@@ -571,10 +571,10 @@ impl<VM: VMBinding> CommonSpace<VM> {
         rtn
     }
 
-    pub fn init(&self, sft: *const (dyn SFT + Sync)) {
+    pub fn init(&self, space: &dyn Space<VM>) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            SFT_MAP.update(sft, self.start, bytes_to_chunks_up(self.extent));
+            SFT_MAP.update(space.as_sft(), self.start, bytes_to_chunks_up(self.extent));
         }
     }
 

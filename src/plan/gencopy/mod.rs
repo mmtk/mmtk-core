@@ -4,6 +4,7 @@ pub(super) mod mutator;
 
 pub use self::global::GenCopy;
 
+pub const NO_BARRIER: bool = false;
 pub const FULL_NURSERY_GC: bool = false;
 pub const NO_SLOW: bool = false;
 

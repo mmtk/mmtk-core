@@ -119,7 +119,9 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
             .unwrap()
             .common()
             .mmapper
-            .ensure_mapped(rtn, required_pages);
+            .ensure_mapped(rtn, required_pages, &|_| {
+                unreachable!()
+            });
         if zeroed {
             memory::zero(rtn, bytes);
         }
