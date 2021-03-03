@@ -1,3 +1,5 @@
+//! The global part of a plan implementation.
+
 use super::controller_collector_context::ControllerCollectorContext;
 use super::PlanConstraints;
 use crate::mmtk::MMTK;
@@ -8,6 +10,8 @@ use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+#[cfg(feature = "analysis")]
+use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -377,6 +381,9 @@ pub struct BasePlan<VM: VMBinding> {
     pub mutator_iterator_lock: Mutex<()>,
     // A counter that keeps tracks of the number of bytes allocated since last stress test
     pub allocation_bytes: AtomicUsize,
+    // Wrapper around analysis counters
+    #[cfg(feature = "analysis")]
+    pub analysis_manager: AnalysisManager<VM>,
 }
 
 #[cfg(feature = "base_spaces")]
@@ -426,6 +433,10 @@ impl<VM: VMBinding> BasePlan<VM> {
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
     ) -> BasePlan<VM> {
+        let stats = Stats::new();
+        // Initializing the analysis manager and routines
+        #[cfg(feature = "analysis")]
+        let analysis_manager = AnalysisManager::new(&stats);
         BasePlan {
             #[cfg(feature = "base_spaces")]
             unsync: UnsafeCell::new(BaseUnsync {
@@ -469,7 +480,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             cur_collection_attempts: AtomicUsize::new(0),
             oom_lock: Mutex::new(()),
             control_collector_context: ControllerCollectorContext::new(),
-            stats: Stats::new(),
+            stats,
             mmapper,
             heap,
             vm_map,
@@ -479,6 +490,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             scanned_stacks: AtomicUsize::new(0),
             mutator_iterator_lock: Mutex::new(()),
             allocation_bytes: AtomicUsize::new(0),
+            #[cfg(feature = "analysis")]
+            analysis_manager,
         }
     }
 

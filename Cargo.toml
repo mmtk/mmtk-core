@@ -55,6 +55,8 @@ code_space  = ["base_spaces"]
 
 # Run sanity GC
 sanity = []
+# Run analysis
+analysis = []
 # Use lock free variant of NoGC
 nogc_lock_free = []
 # Use lock free with no zeroing NoGC

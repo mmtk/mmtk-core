@@ -1,7 +1,9 @@
 arch=`rustc --print cfg | grep target_arch | cut -f2 -d"\""`
 os=`rustc --print cfg | grep target_os | cut -f2 -d"\""`
 
-cargo_toml=$(dirname "$0")/../../Cargo.toml
+project_root=$(dirname "$0")/../..
+
+cargo_toml=$project_root/Cargo.toml
 
 # Repeat a command for all the features. Requires the command as one argument (with double quotes)
 for_all_features() {

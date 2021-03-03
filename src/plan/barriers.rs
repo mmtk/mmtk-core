@@ -1,4 +1,4 @@
-use atomic_traits::fetch::Add;
+//! Read/Write barrier implementations.
 
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
