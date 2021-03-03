@@ -90,6 +90,7 @@ impl<VM: VMBinding> Allocators<VM> {
                         mutator_tls,
                         Some(space),
                         plan,
+                        false,
                     ));
                 }
             }

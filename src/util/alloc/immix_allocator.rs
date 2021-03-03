@@ -118,6 +118,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         tls: OpaquePointer,
         space: Option<&'static dyn Space<VM>>,
         plan: &'static dyn Plan<VM = VM>,
+        copy: bool,
     ) -> Self {
         ImmixAllocator {
             tls,
@@ -126,7 +127,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             cursor: Address::ZERO,
             limit: Address::ZERO,
             hot: false,
-            copy: false,
+            copy,
             large_cursor: Address::ZERO,
             large_limit: Address::ZERO,
             request_for_large: false,

@@ -1,5 +1,5 @@
 use atomic::Ordering;
-use crate::{plan::TransitiveClosure, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
+use crate::{AllocationSemantics, CopyContext, plan::TransitiveClosure, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::forwarding_word as ForwardingWord;
@@ -118,7 +118,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn prepare(&self) {
         for block in &self.block_list {
-            block.clear_mark();
+            if !block.is_defrag() {
+                block.clear_mark();
+            }
             // TODO: clear metadata for a block only
             side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, conversions::chunk_align_down(block.start()))
         }
@@ -136,7 +138,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.line_unavail_state.store(self.line_mark_state.load(Ordering::SeqCst), Ordering::SeqCst);
         }
 
-        for block in self.block_list.drain_filter(|block| !block.is_marked()) {
+        for block in self.block_list.drain_filter(|block| !block.is_marked() || block.is_defrag()) {
             self.pr.release_pages(block.start());
         }
 
@@ -147,7 +149,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 debug_assert!(block.is_marked());
                 let marked_lines = block.count_marked_lines(line_mark_state);
                 debug_assert!(marked_lines > 0);
-                if marked_lines < Block::LINES {
+                if super::DEFRAG && marked_lines <= super::DEFRAG_THRESHOLD {
+                    block.mark_as_defrag()
+                } else if marked_lines < Block::LINES {
                     self.reusable_blocks.push(block);
                 }
             }
@@ -160,6 +164,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let block_address = self.acquire(tls, Block::PAGES);
         if block_address.is_zero() { return None }
         let block = Block::from(block_address);
+        block.clear_mark();
         self.block_list.push(block);
         Some(block)
     }
@@ -169,8 +174,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.reusable_blocks.pop()
     }
 
-    #[inline]
-    pub fn trace_mark_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference) -> ObjectReference {
+    #[inline(always)]
+    pub fn trace_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
+        if Block::containing::<VM>(object).is_defrag() {
+            self.trace_evacuate_object(trace, object, semantics, copy_context)
+        } else {
+            self.trace_mark_object(trace, object)
+        }
+    }
+
+    #[inline(always)]
+    pub fn trace_mark_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference) -> ObjectReference {
         if Self::attempt_mark(object) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
@@ -183,6 +197,26 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             trace.process_node(object);
         }
         object
+    }
+
+    #[inline]
+    pub fn trace_evacuate_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
+        let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
+        if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
+            ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
+        } else {
+            let new_object = ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context);
+            trace.process_node(new_object);
+            trace!("{:?} => {:?} in block {:?} {}", object, new_object, Block::containing::<VM>(new_object), Block::containing::<VM>(new_object).mark_byte());
+            // Mark block and lines
+            if !super::BLOCK_ONLY {
+                let marked_lines = Line::mark_lines_for_object::<VM>(new_object, self.line_mark_state.load(Ordering::SeqCst));
+                Block::containing::<VM>(new_object).mark(Some(marked_lines));
+            } else {
+                Block::containing::<VM>(new_object).mark(None);
+            }
+            new_object
+        }
     }
 
     /* Object Marking */

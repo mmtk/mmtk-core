@@ -10,6 +10,10 @@ pub const BLOCK_ONLY: bool = false;
 /// Use (sloppy) line counter as block mark
 pub const LINE_COUNTER: bool = true;
 
+/// Opportunistic copying
+pub const DEFRAG: bool = true;
+/// A block will be marked as defrag if the number of marked lines is less than thius threshold
+pub const DEFRAG_THRESHOLD: usize = 16;
 
 
 macro_rules! validate {
@@ -19,4 +23,5 @@ macro_rules! validate {
 
 const fn validate_features() {
     validate!(LINE_COUNTER => !BLOCK_ONLY);
+    validate!(DEFRAG => !BLOCK_ONLY);
 }

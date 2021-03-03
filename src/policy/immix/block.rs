@@ -11,6 +11,7 @@ use crate::vm::*;
 pub enum BlockMarkState {
     Unmarked = 0,
     Marked = 1,
+    Defrag = u8::MAX,
 }
 
 #[repr(C)]
@@ -56,28 +57,36 @@ impl Block {
         unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
     }
 
+    #[inline(always)]
+    pub fn mark_byte(&self) -> u8 {
+        unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) as u8 }
+    }
+
+    #[inline(always)]
+    fn set_mark_byte(&self, byte: u8) {
+        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), byte as usize) }
+    }
+
     #[inline]
-    pub fn attempt_mark(&self) -> bool {
-        side_metadata::compare_exchange_atomic(Self::MARK_TABLE, self.start(), BlockMarkState::Unmarked as usize, BlockMarkState::Marked as usize)
+    pub fn mark_as_defrag(&self) {
+        debug_assert!(super::DEFRAG);
+        self.set_mark_byte(BlockMarkState::Defrag as _);
     }
 
     #[inline]
     pub fn mark(&self, line_counter_increment: Option<usize>) {
         let state = if super::LINE_COUNTER {
-            unsafe {
-                let old_counter = side_metadata::load(Self::MARK_TABLE, self.start());
-                old_counter + line_counter_increment.unwrap()
-            }
+            self.mark_byte() + line_counter_increment.unwrap() as u8
         } else {
-            BlockMarkState::Marked as usize
+            BlockMarkState::Marked as u8
         };
-        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), state); }
+        self.set_mark_byte(state)
     }
 
     #[inline]
     pub fn count_marked_lines(&self, line_mark_state: u8) -> usize {
         if super::LINE_COUNTER {
-            unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) }
+            self.mark_byte() as usize
         } else {
             self.lines().filter(|line| line.is_marked(line_mark_state)).count()
         }
@@ -85,13 +94,17 @@ impl Block {
 
     #[inline]
     pub fn is_marked(&self) -> bool {
-        let mark_state = unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) };
-        mark_state != BlockMarkState::Unmarked as usize
+        self.mark_byte() != BlockMarkState::Unmarked as _
+    }
+
+    #[inline]
+    pub fn is_defrag(&self) -> bool {
+        self.mark_byte() == BlockMarkState::Defrag as _
     }
 
     #[inline]
     pub fn clear_mark(&self) {
-        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), BlockMarkState::Unmarked as usize); }
+        self.set_mark_byte(BlockMarkState::Unmarked as _)
     }
 
     pub const fn lines(&self) -> Range<Line> {

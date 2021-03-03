@@ -26,10 +26,10 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
         self.immix.tls = tls;
     }
     fn prepare(&mut self) {
-        // self.immix.rebind(Some(self.plan.tospace()));
+        self.immix.reset()
     }
     fn release(&mut self) {
-        // self.ss.rebind(Some(self.plan.tospace()));
+        self.immix.reset()
     }
     #[inline(always)]
     fn alloc_copy(
@@ -58,7 +58,7 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
             plan: &mmtk.plan.downcast_ref::<Immix<VM>>().unwrap(),
-            immix: ImmixAllocator::new(OpaquePointer::UNINITIALIZED, Some(&mmtk.plan.downcast_ref::<Immix<VM>>().unwrap().immix_space), &*mmtk.plan),
+            immix: ImmixAllocator::new(OpaquePointer::UNINITIALIZED, Some(&mmtk.plan.downcast_ref::<Immix<VM>>().unwrap().immix_space), &*mmtk.plan, true),
         }
     }
 }
@@ -95,7 +95,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
             return object;
         }
         if self.immix().immix_space.in_space(object) {
-            self.immix().immix_space.trace_mark_object::<Self>(self, object)
+            self.immix().immix_space.trace_object(self, object, super::global::ALLOC_IMMIX, unsafe { self.worker().local::<ImmixCopyContext<VM>>() })
         } else {
             self.immix()
                 .common
