@@ -18,8 +18,8 @@ lazy_static! {
 }
 
 // We use the following hashset to assert if bits are set/unset properly in side metadata.
-
-const ASSERT_METADATA: bool = cfg!(debug_assertions) && true;
+#[cfg(debug_assertions)]
+const ASSERT_METADATA: bool = true;
 
 #[cfg(debug_assertions)]
 lazy_static! {

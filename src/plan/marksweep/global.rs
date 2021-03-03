@@ -26,8 +26,6 @@ use std::sync::Arc;
 
 use enum_map::EnumMap;
 
-pub type SelectedPlan<VM> = MarkSweep<VM>;
-
 pub struct MarkSweep<VM: VMBinding> {
     common: CommonPlan<VM>,
     ms: MallocSpace<VM>,
@@ -130,7 +128,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
         MarkSweep {
             common: CommonPlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS),
-            ms: MallocSpace::new(vm_map),
+            ms: MallocSpace::new(),
         }
     }
 

@@ -1,13 +1,10 @@
 use crate::policy::space::Space;
 use crate::policy::mallocspace::MallocSpace;
 use crate::util::alloc::Allocator;
-use crate::util::conversions;
-use crate::util::malloc::calloc;
 use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::{plan::global::Plan, util::heap::layout::vm_layout_constants::PAGES_IN_CHUNK};
-use crate::util::alloc::allocator::align_allocation_no_fill;
+use crate::plan::global::Plan;
 
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
@@ -32,12 +29,11 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        // TODO: We currently ignore the offset field. This is wrong.
         // assert!(offset == 0);
         assert!(align <= 16);
         let ret = self.space.unwrap().alloc(size);
         trace!("MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}", size, align, offset, ret);
-        // let aligned = align_allocation_no_fill::<VM>(ret, align, offset);
-        // trace!("MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}, aligned = {}", size, align, offset, ret, aligned);
         ret
     }
 }

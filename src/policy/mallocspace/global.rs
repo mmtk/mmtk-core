@@ -4,27 +4,27 @@ use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
-use crate::util::heap::{layout::vm_layout_constants::PAGES_IN_CHUNK, MonotonePageResource};
 use crate::util::malloc::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::conversions;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, ObjectModel};
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::mmapper::Mmapper as IMmapper;
 use crate::{
     policy::space::Space,
-    util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK, side_metadata::load_atomic},
+    util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK},
 };
 use std::{collections::HashSet, marker::PhantomData};
-use std::collections::LinkedList;
 use std::sync::atomic::AtomicUsize;
-use std::collections::HashMap;
-use std::sync::Mutex;
 use std::sync::atomic::Ordering;
+// only used for debugging
+#[cfg(debug_assertions)]
+use std::collections::HashMap;
+#[cfg(debug_assertions)]
+use std::sync::Mutex;
 
-const ASSERT_ALLOCATION: bool = cfg!(debug_assertions) && true;
+#[cfg(debug_assertions)]
+const ASSERT_ALLOCATION: bool = true;
 
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
@@ -104,8 +104,8 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         ret
     }
 
-    fn address_in_space(&self, start: Address) -> bool {
-        unreachable!()
+    fn address_in_space(&self, _start: Address) -> bool {
+        unreachable!("We do not know if an address is in malloc space. Use in_space() to check if an object is in malloc space.")
     }
 
     fn get_name(&self) -> &'static str {
@@ -135,7 +135,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             while address < chunk_end {
                 if is_alloced_object(address) {
                     // We know it is an object
-                    let object = unsafe { address.to_object_reference() };
+                    let object = address.to_object_reference();
 
                     #[cfg(debug_assertions)]
                     if ASSERT_ALLOCATION {
@@ -191,7 +191,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 }
 
 impl<VM: VMBinding> MallocSpace<VM> {
-    pub fn new(vm_map: &'static VMMap) -> Self {
+    pub fn new() -> Self {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
