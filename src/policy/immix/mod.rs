@@ -12,7 +12,7 @@ pub const LINE_COUNTER: bool = true;
 
 /// Opportunistic copying
 pub const DEFRAG: bool = true;
-/// A block will be marked as defrag if the number of marked lines is less than thius threshold
+/// A block will be marked as defrag if the number of marked lines is less than this threshold
 pub const DEFRAG_THRESHOLD: usize = 16;
 
 
