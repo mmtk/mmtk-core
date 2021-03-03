@@ -109,7 +109,7 @@ pub fn try_map_metadata_space(
 }
 
 // Try to map side metadata for the chunk starting at `start`
-pub fn try_mmap_metadata_chunk(
+fn try_mmap_metadata_chunk(
     start: Address,
     global_per_chunk: usize,
     local_per_chunk: usize,

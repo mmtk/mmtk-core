@@ -3,7 +3,7 @@ use crate::util::conversions;
 use crate::util::side_metadata::load_atomic;
 use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::side_metadata::store_atomic;
-use crate::util::side_metadata::try_mmap_metadata_chunk;
+use crate::util::side_metadata::try_map_metadata_space;
 use crate::util::side_metadata::SideMetadataScope;
 use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::Address;
@@ -15,16 +15,19 @@ use std::sync::RwLock;
 
 lazy_static! {
     pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
+
+    pub static ref ALLOC_MAP: RwLock<HashSet<ObjectReference>> = RwLock::default();
+    pub static ref MARK_MAP: RwLock<HashSet<ObjectReference>> = RwLock::default();
 }
 
-pub const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::PolicySpecific,
     offset: 0,
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
 };
 
-pub const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::PolicySpecific,
     offset: ALLOC_METADATA_SPEC.offset
         + meta_bytes_per_chunk(
@@ -46,8 +49,9 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
         return;
     }
     active_chunks.insert(chunk_start);
-    try_mmap_metadata_chunk(
+    let mmap_metadata_result = try_map_metadata_space(
         chunk_start,
+        BYTES_IN_CHUNK,
         0,
         meta_bytes_per_chunk(
             ALLOC_METADATA_SPEC.log_min_obj_size,
@@ -57,33 +61,52 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
             MARKING_METADATA_SPEC.log_num_of_bits,
         ),
     );
+    debug_assert!(mmap_metadata_result, "mmap sidemetadata failed");
 }
 
 // Check if a given object was allocated by malloc
 pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
-    is_meta_space_mapped(object.to_address()) && is_alloced_unchecked(object)
+    is_meta_space_mapped(object.to_address()) && is_alloced(object)
 }
 
-pub(crate) fn is_alloced_unchecked(object: ObjectReference) -> bool {
-    load_atomic(ALLOC_METADATA_SPEC, object.to_address()) == 1
+pub fn is_alloced(object: ObjectReference) -> bool {
+    is_alloced_object(object.to_address())
+}
+
+pub fn is_alloced_object(address: Address) -> bool {
+    let alloc_map = ALLOC_MAP.read().unwrap();
+    let ret = load_atomic(ALLOC_METADATA_SPEC, address) == 1;
+    debug_assert_eq!(alloc_map.contains(&unsafe { address.to_object_reference() }), ret, "is_alloced_object(): alloc bit does not match alloc map");
+    ret
 }
 
 pub fn is_marked(object: ObjectReference) -> bool {
-    load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1
+    let mark_map = MARK_MAP.read().unwrap();
+    let ret = load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1;
+    debug_assert_eq!(mark_map.contains(&object), ret, "is_marked(): mark bit does not match mark map");
+    ret
 }
 
 pub fn set_alloc_bit(object: ObjectReference) {
+    let mut alloc_map = ALLOC_MAP.write().unwrap();
     store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 1);
+    alloc_map.insert(object);
 }
 
 pub fn set_mark_bit(object: ObjectReference) {
+    let mut mark_map = MARK_MAP.write().unwrap();
     store_atomic(MARKING_METADATA_SPEC, object.to_address(), 1);
+    mark_map.insert(object);
 }
 
 pub fn unset_alloc_bit(object: ObjectReference) {
+    let mut alloc_map = ALLOC_MAP.write().unwrap();
     store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 0);
+    alloc_map.remove(&object);
 }
 
 pub fn unset_mark_bit(object: ObjectReference) {
+    let mut mark_map = MARK_MAP.write().unwrap();
     store_atomic(MARKING_METADATA_SPEC, object.to_address(), 0);
+    mark_map.remove(&object);
 }

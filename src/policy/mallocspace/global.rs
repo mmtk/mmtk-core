@@ -133,7 +133,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
             // Linear scan through the chunk
             while address < chunk_end {
-                if load_atomic(ALLOC_METADATA_SPEC, address) == 1 {
+                if is_alloced_object(address) {
                     // We know it is an object
                     let object = unsafe { address.to_object_reference() };
 
