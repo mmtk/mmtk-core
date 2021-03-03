@@ -15,7 +15,14 @@ use std::sync::RwLock;
 
 lazy_static! {
     pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
+}
 
+// We use the following hashset to assert if bits are set/unset properly in side metadata.
+
+const ASSERT_METADATA: bool = cfg!(debug_assertions) && true;
+
+#[cfg(debug_assertions)]
+lazy_static! {
     pub static ref ALLOC_MAP: RwLock<HashSet<ObjectReference>> = RwLock::default();
     pub static ref MARK_MAP: RwLock<HashSet<ObjectReference>> = RwLock::default();
 }
@@ -74,39 +81,55 @@ pub fn is_alloced(object: ObjectReference) -> bool {
 }
 
 pub fn is_alloced_object(address: Address) -> bool {
-    let alloc_map = ALLOC_MAP.read().unwrap();
     let ret = load_atomic(ALLOC_METADATA_SPEC, address) == 1;
-    debug_assert_eq!(alloc_map.contains(&unsafe { address.to_object_reference() }), ret, "is_alloced_object(): alloc bit does not match alloc map, meta_start = {}", ALLOC_METADATA_SPEC.meta_start(address));
+
+    #[cfg(debug_assertions)]
+    if ASSERT_METADATA {
+        debug_assert_eq!(ALLOC_MAP.read().unwrap().contains(&unsafe { address.to_object_reference() }), ret, "is_alloced_object(): alloc bit does not match alloc map, meta_start = {}", ALLOC_METADATA_SPEC.meta_start(address));
+    }
+
     ret
 }
 
 pub fn is_marked(object: ObjectReference) -> bool {
-    let mark_map = MARK_MAP.read().unwrap();
     let ret = load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1;
-    debug_assert_eq!(mark_map.contains(&object), ret, "is_marked(): mark bit does not match mark map, meta_start = {}", MARKING_METADATA_SPEC.meta_start(object.to_address()));
+
+    #[cfg(debug_assertions)]
+    if ASSERT_METADATA {
+        debug_assert_eq!(MARK_MAP.read().unwrap().contains(&object), ret, "is_marked(): mark bit does not match mark map, meta_start = {}", MARKING_METADATA_SPEC.meta_start(object.to_address()));
+    }
+
     ret
 }
 
 pub fn set_alloc_bit(object: ObjectReference) {
-    let mut alloc_map = ALLOC_MAP.write().unwrap();
     store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 1);
-    alloc_map.insert(object);
+    #[cfg(debug_assertions)]
+    if ASSERT_METADATA {
+        ALLOC_MAP.write().unwrap().insert(object);
+    }
 }
 
 pub fn set_mark_bit(object: ObjectReference) {
-    let mut mark_map = MARK_MAP.write().unwrap();
     store_atomic(MARKING_METADATA_SPEC, object.to_address(), 1);
-    mark_map.insert(object);
+    #[cfg(debug_assertions)]
+    if ASSERT_METADATA {
+        MARK_MAP.write().unwrap().insert(object);
+    }
 }
 
 pub fn unset_alloc_bit(object: ObjectReference) {
-    let mut alloc_map = ALLOC_MAP.write().unwrap();
     store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 0);
-    alloc_map.remove(&object);
+    #[cfg(debug_assertions)]
+    if ASSERT_METADATA {
+        ALLOC_MAP.write().unwrap().remove(&object);
+    }
 }
 
 pub fn unset_mark_bit(object: ObjectReference) {
-    let mut mark_map = MARK_MAP.write().unwrap();
     store_atomic(MARKING_METADATA_SPEC, object.to_address(), 0);
-    mark_map.remove(&object);
+    #[cfg(debug_assertions)]
+    if ASSERT_METADATA {
+        MARK_MAP.write().unwrap().remove(&object);
+    }
 }
