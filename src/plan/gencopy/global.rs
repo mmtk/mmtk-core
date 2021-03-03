@@ -96,6 +96,13 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.in_nursery.store(in_nursery, Ordering::SeqCst);
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
+        if in_nursery {
+            self.common()
+                .schedule_common::<GenCopyNurseryProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
+        } else {
+            self.common()
+                .schedule_common::<GenCopyMatureProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
+        }
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         if in_nursery {
