@@ -1,11 +1,11 @@
+use crate::plan::global::NoCopy;
+use crate::plan::global::Plan;
+use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::MMTK;
-use crate::policy::space::Space;
-use crate::plan::global::NoCopy;
-use crate::plan::global::Plan;
 use std::ops::{Deref, DerefMut};
 
 use super::MarkSweep;
@@ -33,7 +33,9 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
         if self.plan.ms_space().in_space(object) {
             self.plan.ms_space().trace_object::<Self>(self, object)
         } else {
-            self.plan.common().trace_object::<Self, NoCopy<VM>>(self, object)
+            self.plan
+                .common()
+                .trace_object::<Self, NoCopy<VM>>(self, object)
         }
     }
 }

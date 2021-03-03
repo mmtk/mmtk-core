@@ -94,7 +94,10 @@ pub fn try_map_metadata_space(
 
     while aligned_start < aligned_end {
         let res = try_mmap_metadata_chunk(aligned_start, global_per_chunk, local_per_chunk);
-        debug!("try_mmap_metadata_chunk({}, {:X}, {:X}) = {:?}", aligned_start, global_per_chunk, local_per_chunk, res);
+        debug!(
+            "try_mmap_metadata_chunk({}, {:X}, {:X}) = {:?}",
+            aligned_start, global_per_chunk, local_per_chunk, res
+        );
         if !res.is_mappable() {
             if munmap_first_chunk.is_some() {
                 let mut munmap_start = if munmap_first_chunk.unwrap() {

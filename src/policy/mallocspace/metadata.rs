@@ -1,5 +1,6 @@
 use crate::util::constants;
 use crate::util::conversions;
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::side_metadata::load_atomic;
 use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::side_metadata::store_atomic;
@@ -8,7 +9,6 @@ use crate::util::side_metadata::SideMetadataScope;
 use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 
 use std::collections::HashSet;
 use std::sync::RwLock;
@@ -85,7 +85,15 @@ pub fn is_alloced_object(address: Address) -> bool {
 
     #[cfg(debug_assertions)]
     if ASSERT_METADATA {
-        debug_assert_eq!(ALLOC_MAP.read().unwrap().contains(&unsafe { address.to_object_reference() }), ret, "is_alloced_object(): alloc bit does not match alloc map, meta_start = {}", ALLOC_METADATA_SPEC.meta_start(address));
+        debug_assert_eq!(
+            ALLOC_MAP
+                .read()
+                .unwrap()
+                .contains(&unsafe { address.to_object_reference() }),
+            ret,
+            "is_alloced_object(): alloc bit does not match alloc map, meta_start = {}",
+            ALLOC_METADATA_SPEC.meta_start(address)
+        );
     }
 
     ret
@@ -96,7 +104,12 @@ pub fn is_marked(object: ObjectReference) -> bool {
 
     #[cfg(debug_assertions)]
     if ASSERT_METADATA {
-        debug_assert_eq!(MARK_MAP.read().unwrap().contains(&object), ret, "is_marked(): mark bit does not match mark map, meta_start = {}", MARKING_METADATA_SPEC.meta_start(object.to_address()));
+        debug_assert_eq!(
+            MARK_MAP.read().unwrap().contains(&object),
+            ret,
+            "is_marked(): mark bit does not match mark map, meta_start = {}",
+            MARKING_METADATA_SPEC.meta_start(object.to_address())
+        );
     }
 
     ret

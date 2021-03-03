@@ -38,7 +38,10 @@ pub fn create_ms_mutator<VM: VMBinding>(
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
             (AllocatorSelector::Malloc(0), ms.ms_space()),
-            (AllocatorSelector::BumpPointer(0), ms.common().get_immortal()),
+            (
+                AllocatorSelector::BumpPointer(0),
+                ms.common().get_immortal(),
+            ),
             (AllocatorSelector::LargeObject(0), ms.common().get_los()),
         ],
         prepare_func: &ms_mutator_prepare,

@@ -1,10 +1,10 @@
-use crate::policy::space::Space;
+use crate::plan::global::Plan;
 use crate::policy::mallocspace::MallocSpace;
+use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::plan::global::Plan;
 
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
@@ -33,7 +33,13 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         // assert!(offset == 0);
         assert!(align <= 16);
         let ret = self.space.unwrap().alloc(size);
-        trace!("MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}", size, align, offset, ret);
+        trace!(
+            "MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}",
+            size,
+            align,
+            offset,
+            ret
+        );
         ret
     }
 }

@@ -2,21 +2,18 @@ use super::metadata::*;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
+use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::conversions;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, ObjectModel};
-use crate::{
-    policy::space::Space,
-    util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK},
-};
-use std::{collections::HashSet, marker::PhantomData};
+use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
+use std::{collections::HashSet, marker::PhantomData};
 // only used for debugging
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
@@ -90,14 +87,26 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             let active_mem = self.active_mem.lock().unwrap();
             if ret {
                 // The alloc bit tells that the object is in space.
-                debug_assert!(*active_mem.get(&addr).unwrap() != 0, "active mem check failed for {} (object {}) - was freed", addr, object);
+                debug_assert!(
+                    *active_mem.get(&addr).unwrap() != 0,
+                    "active mem check failed for {} (object {}) - was freed",
+                    addr,
+                    object
+                );
             } else {
                 // The alloc bit tells that the object is not in space. It could never be allocated, or have been freed.
-                debug_assert!((!active_mem.contains_key(&addr)) || (active_mem.contains_key(&addr) && *active_mem.get(&addr).unwrap() == 0),
+                debug_assert!(
+                    (!active_mem.contains_key(&addr))
+                        || (active_mem.contains_key(&addr) && *active_mem.get(&addr).unwrap() == 0),
                     "mem check failed for {} (object {}): allocated = {}, size = {:?}",
-                    addr, object,
+                    addr,
+                    object,
                     active_mem.contains_key(&addr),
-                    if active_mem.contains_key(&addr) { active_mem.get(&addr) } else { None }
+                    if active_mem.contains_key(&addr) {
+                        active_mem.get(&addr)
+                    } else {
+                        None
+                    }
                 );
             }
         }
@@ -123,7 +132,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         #[cfg(debug_assertions)]
         let mut live_bytes = 0;
 
-        debug!("Used bytes before releasing: {}", self.active_bytes.load(Ordering::Relaxed));
+        debug!(
+            "Used bytes before releasing: {}",
+            self.active_bytes.load(Ordering::Relaxed)
+        );
 
         for chunk_start in ACTIVE_CHUNKS.read().unwrap().iter() {
             debug!("Check active chunk {:?}", chunk_start);
@@ -143,13 +155,20 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                         let ptr = VM::VMObjectModel::object_start_ref(object).to_mut_ptr();
                         let bytes = malloc_usable_size(ptr);
 
-                        debug_assert!(self.active_mem.lock().unwrap().contains_key(&obj_start), "Address {} with alloc bit is not in active_mem", obj_start);
+                        debug_assert!(
+                            self.active_mem.lock().unwrap().contains_key(&obj_start),
+                            "Address {} with alloc bit is not in active_mem",
+                            obj_start
+                        );
                         debug_assert_eq!(self.active_mem.lock().unwrap().get(&obj_start), Some(&bytes), "Address {} size in active_mem does not match the size from malloc_usable_size", obj_start);
                     }
 
                     if !is_marked(object) {
                         // Dead object
-                        trace!("Object {} has alloc bit but no mark bit, it is dead. ", object);
+                        trace!(
+                            "Object {} has alloc bit but no mark bit, it is dead. ",
+                            object
+                        );
 
                         // Get the start address of the object, and free it
                         self.free(VM::VMObjectModel::object_start_ref(object));
@@ -164,29 +183,35 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                         #[cfg(debug_assertions)]
                         {
                             // Accumulate live bytes
-                            live_bytes += malloc_usable_size(VM::VMObjectModel::object_start_ref(object).to_mut_ptr());
+                            live_bytes += malloc_usable_size(
+                                VM::VMObjectModel::object_start_ref(object).to_mut_ptr(),
+                            );
                         }
                     }
                 }
                 address = address.add(VM::MIN_ALIGNMENT);
             }
             if chunk_is_empty {
-                debug!("Release malloc chunk {} to {}", chunk_start, *chunk_start + BYTES_IN_CHUNK);
+                debug!(
+                    "Release malloc chunk {} to {}",
+                    chunk_start,
+                    *chunk_start + BYTES_IN_CHUNK
+                );
                 released_chunks.insert(*chunk_start);
             }
         }
 
-        debug!("Used bytes after releasing: {}", self.active_bytes.load(Ordering::SeqCst));
+        debug!(
+            "Used bytes after releasing: {}",
+            self.active_bytes.load(Ordering::SeqCst)
+        );
         #[cfg(debug_assertions)]
         debug_assert_eq!(live_bytes, self.active_bytes.load(Ordering::SeqCst));
 
-        ACTIVE_CHUNKS
-            .write()
-            .unwrap()
-            .retain(|c|  {
-                debug!("Release malloc chunk {} to {}", *c, *c + BYTES_IN_CHUNK);
-                !released_chunks.contains(&*c)
-            });
+        ACTIVE_CHUNKS.write().unwrap().retain(|c| {
+            debug!("Release malloc chunk {} to {}", *c, *c + BYTES_IN_CHUNK);
+            !released_chunks.contains(&*c)
+        });
     }
 }
 
@@ -209,7 +234,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
             if !is_meta_space_mapped(address) {
                 VM::VMActivePlan::global().poll(false, self);
                 let chunk_start = conversions::chunk_align_down(address);
-                debug!("Add malloc chunk {} to {}", chunk_start, chunk_start + BYTES_IN_CHUNK);
+                debug!(
+                    "Add malloc chunk {} to {}",
+                    chunk_start,
+                    chunk_start + BYTES_IN_CHUNK
+                );
                 map_meta_space_for_chunk(chunk_start);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
@@ -227,7 +256,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let ptr = addr.to_mut_ptr();
         let bytes = unsafe { malloc_usable_size(ptr) };
         trace!("Free memory {:?}", ptr);
-        unsafe { free(ptr); }
+        unsafe {
+            free(ptr);
+        }
         self.active_bytes.fetch_sub(bytes, Ordering::SeqCst);
 
         #[cfg(debug_assertions)]
