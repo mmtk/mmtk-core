@@ -76,14 +76,14 @@ pub fn is_alloced(object: ObjectReference) -> bool {
 pub fn is_alloced_object(address: Address) -> bool {
     let alloc_map = ALLOC_MAP.read().unwrap();
     let ret = load_atomic(ALLOC_METADATA_SPEC, address) == 1;
-    debug_assert_eq!(alloc_map.contains(&unsafe { address.to_object_reference() }), ret, "is_alloced_object(): alloc bit does not match alloc map");
+    debug_assert_eq!(alloc_map.contains(&unsafe { address.to_object_reference() }), ret, "is_alloced_object(): alloc bit does not match alloc map, meta_start = {}", ALLOC_METADATA_SPEC.meta_start(address));
     ret
 }
 
 pub fn is_marked(object: ObjectReference) -> bool {
     let mark_map = MARK_MAP.read().unwrap();
     let ret = load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1;
-    debug_assert_eq!(mark_map.contains(&object), ret, "is_marked(): mark bit does not match mark map");
+    debug_assert_eq!(mark_map.contains(&object), ret, "is_marked(): mark bit does not match mark map, meta_start = {}", MARKING_METADATA_SPEC.meta_start(object.to_address()));
     ret
 }
 

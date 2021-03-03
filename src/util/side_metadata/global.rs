@@ -30,10 +30,21 @@ pub struct SideMetadataSpec {
     pub log_min_obj_size: usize,
 }
 
+impl SideMetadataSpec {
+    pub fn meta_start(&self, data_addr: Address) -> Address {
+        if self.scope.is_global() {
+            address_to_meta_chunk_addr(data_addr)
+        } else {
+            address_to_meta_chunk_addr(data_addr) + POLICY_SIDE_METADATA_OFFSET
+        }
+    }
+}
+
 /// Represents the mapping state of a metadata page.
 ///
 /// `NotMappable` indicates whether the page is mappable by MMTK.
 /// `IsMapped` indicates that the page is newly mapped by MMTK, and `WasMapped` means the page was already mapped.
+#[derive(Debug, Clone, Copy)]
 pub enum MappingState {
     NotMappable,
     IsMapped,
@@ -83,6 +94,7 @@ pub fn try_map_metadata_space(
 
     while aligned_start < aligned_end {
         let res = try_mmap_metadata_chunk(aligned_start, global_per_chunk, local_per_chunk);
+        debug!("try_mmap_metadata_chunk({}, {:X}, {:X}) = {:?}", aligned_start, global_per_chunk, local_per_chunk, res);
         if !res.is_mappable() {
             if munmap_first_chunk.is_some() {
                 let mut munmap_start = if munmap_first_chunk.unwrap() {
