@@ -8,6 +8,7 @@ use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
+use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
@@ -316,6 +317,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
 
     fn handle_user_collection_request(&self, tls: OpaquePointer, force: bool) {
         if force || !self.options().ignore_system_g_c {
+            info!("User triggerring collection");
             self.base()
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
@@ -797,6 +799,24 @@ impl<VM: VMBinding> CommonPlan<VM> {
         unsync.immortal.release();
         unsync.los.release(primary);
         self.base.release(tls, primary)
+    }
+
+    pub fn schedule_common<E: ProcessEdgesWork<VM = VM>>(
+        &self,
+        constraints: &'static PlanConstraints,
+        scheduler: &MMTkScheduler<VM>,
+    ) {
+        // Schedule finalization
+        if !self.base.options.no_finalizer {
+            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
+            // finalization
+            scheduler.work_buckets[WorkBucketStage::RefClosure].add(Finalization::<E>::new());
+            // forward refs
+            if constraints.needs_forward_after_liveness {
+                scheduler.work_buckets[WorkBucketStage::RefForwarding]
+                    .add(ForwardFinalization::<E>::new());
+            }
+        }
     }
 
     pub fn stacks_prepared(&self) -> bool {

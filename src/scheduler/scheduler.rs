@@ -48,6 +48,8 @@ impl<C: Context> Scheduler<C> {
                 WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
                 WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::RefClosure => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
             },
@@ -73,6 +75,7 @@ impl<C: Context> Scheduler<C> {
         context: &'static C,
         tls: OpaquePointer,
     ) {
+        use crate::scheduler::work_bucket::WorkBucketStage::*;
         let num_workers = if cfg!(feature = "single_worker") {
             1
         } else {
@@ -91,24 +94,29 @@ impl<C: Context> Scheduler<C> {
             .unwrap()
             .spawn_workers(tls, context);
 
-        self_mut.work_buckets[WorkBucketStage::Closure].set_open_condition(move || {
-            self.work_buckets[WorkBucketStage::Unconstrained].is_drained()
-                && self.work_buckets[WorkBucketStage::Prepare].is_drained()
-                && self.worker_group().all_parked()
-        });
-        self_mut.work_buckets[WorkBucketStage::Release].set_open_condition(move || {
-            self.work_buckets[WorkBucketStage::Unconstrained].is_drained()
-                && self.work_buckets[WorkBucketStage::Prepare].is_drained()
-                && self.work_buckets[WorkBucketStage::Closure].is_drained()
-                && self.worker_group().all_parked()
-        });
-        self_mut.work_buckets[WorkBucketStage::Final].set_open_condition(move || {
-            self.work_buckets[WorkBucketStage::Unconstrained].is_drained()
-                && self.work_buckets[WorkBucketStage::Prepare].is_drained()
-                && self.work_buckets[WorkBucketStage::Closure].is_drained()
-                && self.work_buckets[WorkBucketStage::Release].is_drained()
-                && self.worker_group().all_parked()
-        });
+        {
+            // Unconstrained is always open. Prepare will be opened at the beginning of a GC.
+            // This vec will grow for each stage we call with open_next()
+            let mut open_stages: Vec<WorkBucketStage> = vec![Unconstrained, Prepare];
+            // The rest will open after the previous stage is done.
+            let mut open_next = |s: WorkBucketStage| {
+                let cur_stages = open_stages.clone();
+                self_mut.work_buckets[s].set_open_condition(move || {
+                    self.are_buckets_drained(&cur_stages) && self.worker_group().all_parked()
+                });
+                open_stages.push(s);
+            };
+
+            open_next(Closure);
+            open_next(RefClosure);
+            open_next(RefForwarding);
+            open_next(Release);
+            open_next(Final);
+        }
+    }
+
+    fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
+        buckets.iter().all(|&b| self.work_buckets[b].is_drained())
     }
 
     pub fn initialize_worker(self: &Arc<Self>, tls: OpaquePointer) {
@@ -192,6 +200,8 @@ impl<C: Context> Scheduler<C> {
         }
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::RefClosure].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::RefForwarding].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Release].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Final].is_activated());
     }
@@ -199,6 +209,8 @@ impl<C: Context> Scheduler<C> {
     pub fn deactivate_all(&self) {
         self.work_buckets[WorkBucketStage::Prepare].deactivate();
         self.work_buckets[WorkBucketStage::Closure].deactivate();
+        self.work_buckets[WorkBucketStage::RefClosure].deactivate();
+        self.work_buckets[WorkBucketStage::RefForwarding].deactivate();
         self.work_buckets[WorkBucketStage::Release].deactivate();
         self.work_buckets[WorkBucketStage::Final].deactivate();
     }
@@ -206,6 +218,8 @@ impl<C: Context> Scheduler<C> {
     pub fn reset_state(&self) {
         // self.work_buckets[WorkBucketStage::Prepare].deactivate();
         self.work_buckets[WorkBucketStage::Closure].deactivate();
+        self.work_buckets[WorkBucketStage::RefClosure].deactivate();
+        self.work_buckets[WorkBucketStage::RefForwarding].deactivate();
         self.work_buckets[WorkBucketStage::Release].deactivate();
         self.work_buckets[WorkBucketStage::Final].deactivate();
     }

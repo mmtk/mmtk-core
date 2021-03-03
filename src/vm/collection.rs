@@ -56,4 +56,10 @@ pub trait Collection<VM: VMBinding> {
     fn out_of_memory(_tls: OpaquePointer) {
         panic!("Out of memory!");
     }
+
+    /// Inform the VM to schedule finalization threads.
+    ///
+    /// Arguments:
+    /// * `tls`: The thread pointer for the current GC thread.
+    fn schedule_finalization(_tls: OpaquePointer) {}
 }

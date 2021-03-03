@@ -1,6 +1,7 @@
 use crate::plan::Plan;
 use crate::policy::space::SFTMap;
 use crate::scheduler::Scheduler;
+use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -13,7 +14,6 @@ use crate::vm::VMBinding;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-#[cfg(feature = "sanity")]
 use std::sync::Mutex;
 
 lazy_static! {
@@ -37,6 +37,7 @@ pub struct MMTK<VM: VMBinding> {
     pub mmapper: &'static Mmapper,
     pub sftmap: &'static SFTMap,
     pub reference_processors: ReferenceProcessors,
+    pub finalizable_processor: Mutex<FinalizableProcessor>,
     pub options: Arc<UnsafeOptionsWrapper>,
     pub scheduler: Arc<Scheduler<Self>>,
     #[cfg(feature = "sanity")]
@@ -64,6 +65,7 @@ impl<VM: VMBinding> MMTK<VM> {
             mmapper: &MMAPPER,
             sftmap: &SFT_MAP,
             reference_processors: ReferenceProcessors::new(),
+            finalizable_processor: Mutex::new(FinalizableProcessor::new()),
             options,
             scheduler,
             #[cfg(feature = "sanity")]

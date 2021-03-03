@@ -331,3 +331,37 @@ pub fn harness_begin<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
 pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     mmtk.harness_end();
 }
+
+/// Register a finalizable object. MMTk will retain the liveness of
+/// the object even if it is not reachable from the program.
+/// Note that finalization upon exit is not supported.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance
+/// * `object`: The object that has a finalizer
+pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectReference) {
+    if mmtk.options.no_finalizer {
+        warn!("add_finalizer() is called when no_finalizer = true");
+    }
+
+    mmtk.finalizable_processor.lock().unwrap().add(object);
+}
+
+/// Get an object that is ready for finalization. After each GC, if any registered object is not
+/// alive, this call will return one of the objects. MMTk will retain the liveness of those objects
+/// until they are popped through this call. Once an object is popped, it is the responsibility of
+/// the VM to make sure they are properly finalized before reclaimed by the GC. This call is non-blocking,
+/// and will return None if no object is ready for finalization.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<ObjectReference> {
+    if mmtk.options.no_finalizer {
+        warn!("get_object_for_finalization() is called when no_finalizer = true");
+    }
+
+    mmtk.finalizable_processor
+        .lock()
+        .unwrap()
+        .get_ready_object()
+}
