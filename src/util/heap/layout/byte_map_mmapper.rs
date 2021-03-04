@@ -47,7 +47,7 @@ impl Mmapper for ByteMapMmapper {
         }
     }
 
-    fn ensure_mapped(&self, start: Address, pages: usize, notify_mmap: &impl Fn(Address)) {
+    fn ensure_mapped(&self, start: Address, pages: usize, _notify_mmap: &impl Fn(Address)) {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         trace!(
@@ -206,7 +206,7 @@ mod tests {
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use std::sync::atomic::Ordering;
 
-    const MEGABYTE: usize = 1 << 20;
+    const MEGABYTE: usize = 1 << 22;
     #[cfg(target_os = "linux")]
     const FIXED_ADDRESS: Address =
         unsafe { conversions::chunk_align_down(Address::from_usize(0x6000_0000)) };
@@ -255,7 +255,7 @@ mod tests {
     fn ensure_mapped_1page() {
         let mmapper = ByteMapMmapper::new();
         let pages = 1;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &|_| {});
 
         let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
         let end_chunk =
@@ -269,7 +269,7 @@ mod tests {
     fn ensure_mapped_1chunk() {
         let mmapper = ByteMapMmapper::new();
         let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &|_| {});
 
         let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
         let end_chunk =
@@ -283,7 +283,7 @@ mod tests {
     fn ensure_mapped_more_than_1chunk() {
         let mmapper = ByteMapMmapper::new();
         let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &|_| {});
 
         let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
         let end_chunk =
@@ -299,7 +299,7 @@ mod tests {
         // map 2 chunks
         let mmapper = ByteMapMmapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &|_| {});
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -314,7 +314,7 @@ mod tests {
         // map 2 chunks
         let mmapper = ByteMapMmapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &|_| {});
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -324,7 +324,7 @@ mod tests {
         assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MAPPED);
 
         // ensure mapped - this will unprotect the previously protected chunk
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &|_| {});
         assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MAPPED);
         assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MAPPED);
     }

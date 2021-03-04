@@ -1,7 +1,6 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::plan::global::GcStatus;
-use crate::util::constants::*;
 use crate::util::side_metadata::*;
 use crate::util::*;
 use crate::vm::*;
@@ -253,8 +252,6 @@ pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Edges
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        let base = &mmtk.plan.base();
-        let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
         trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
         let base = &mmtk.plan.base();
         let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();

@@ -3,7 +3,6 @@
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
-use crate::util::constants::*;
 use crate::util::side_metadata::*;
 use crate::util::*;
 use crate::MMTK;
@@ -35,7 +34,7 @@ impl Barrier for NoBarrier {
 
 pub struct ObjectRememberingBarrier<E: ProcessEdgesWork, S: Space<E::VM>> {
     mmtk: &'static MMTK<E::VM>,
-    nursery: &'static S,
+    _nursery: &'static S,
     modbuf: Vec<ObjectReference>,
     meta: SideMetadataSpec,
 }
@@ -45,7 +44,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
     pub fn new(mmtk: &'static MMTK<E::VM>, nursery: &'static S, meta: SideMetadataSpec) -> Self {
         Self {
             mmtk,
-            nursery,
+            _nursery: nursery,
             modbuf: vec![],
             meta,
         }
@@ -78,7 +77,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for ObjectRememberingBarrier<
             "{:?}",
             self as *const _
         );
-        if modbuf.len() != 0 {
+        if !modbuf.is_empty() {
             self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
                 .add(ProcessModBuf::<E>::new(modbuf, self.meta));
         }
