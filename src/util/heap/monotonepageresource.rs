@@ -11,10 +11,10 @@ use crate::util::OpaquePointer;
 
 use super::layout::map::Map;
 use super::layout::Mmapper;
-use crate::vm::ActivePlan;
 use super::PageResource;
-use crate::util::side_metadata::*;
 use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::side_metadata::*;
+use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
 use libc::{c_void, memset};
 
@@ -157,14 +157,13 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
                 .unwrap()
                 .grow_space(old, bytes, new_chunk);
 
-            let local_side_metadata_per_chunk = self.common().space.unwrap().local_side_metadata_per_chunk();
+            let local_side_metadata_per_chunk =
+                self.common().space.unwrap().local_side_metadata_per_chunk();
 
-            self.common()
-                .space
-                .unwrap()
-                .common()
-                .mmapper
-                .ensure_mapped(old, required_pages, &|chunk| {
+            self.common().space.unwrap().common().mmapper.ensure_mapped(
+                old,
+                required_pages,
+                &|chunk| {
                     if !try_map_metadata_space(
                         chunk,
                         BYTES_IN_CHUNK,
@@ -174,7 +173,8 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
                         // TODO(Javad): handle meta space allocation failure
                         panic!("failed to mmap meta memory");
                     }
-                });
+                },
+            );
 
             // FIXME: concurrent zeroing
             if zeroed {

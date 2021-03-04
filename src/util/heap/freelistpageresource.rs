@@ -114,14 +114,11 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
             .space
             .unwrap()
             .grow_space(rtn, bytes, new_chunk);
-        self.common()
-            .space
-            .unwrap()
-            .common()
-            .mmapper
-            .ensure_mapped(rtn, required_pages, &|_| {
-                unreachable!()
-            });
+        self.common().space.unwrap().common().mmapper.ensure_mapped(
+            rtn,
+            required_pages,
+            &|_| unreachable!(),
+        );
         if zeroed {
             memory::zero(rtn, bytes);
         }
