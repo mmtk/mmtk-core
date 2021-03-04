@@ -83,7 +83,7 @@ pub fn try_map_metadata_space(
 
     while aligned_start < aligned_end {
         let res = try_mmap_metadata_chunk(aligned_start, global_per_chunk, local_per_chunk);
-        if !res.is_mappable() {
+        if !res.is_mapped() {
             if munmap_first_chunk.is_some() {
                 let mut munmap_start = if munmap_first_chunk.unwrap() {
                     start.align_down(BYTES_IN_CHUNK)
@@ -114,7 +114,7 @@ pub fn try_mmap_metadata_chunk(
     global_per_chunk: usize,
     local_per_chunk: usize,
 ) -> MappingState {
-    println!(
+    trace!(
         "try_mmap_metadata_chunk({}, 0x{:x}, 0x{:x})",
         start,
         global_per_chunk,
@@ -140,14 +140,12 @@ pub fn try_mmap_metadata_chunk(
 
         if result == libc::MAP_FAILED {
             let err = unsafe { *libc::__errno_location() };
-            panic!("mmap global ({}) failed: (0x{:x})", global_meta_start, err);
-            // if err == libc::EEXIST {
-            //     return MappingState::WasMapped;
-            // } else {
-            //     return MappingState::NotMappable;
-            // }
+            if err == libc::EEXIST {
+                return MappingState::WasMapped;
+            } else {
+                return MappingState::NotMappable;
+            }
         }
-        println!("mmap global ({}) successful", global_meta_start);
     }
 
     let policy_meta_start = global_meta_start + POLICY_SIDE_METADATA_OFFSET;
@@ -166,14 +164,12 @@ pub fn try_mmap_metadata_chunk(
 
         if result == libc::MAP_FAILED {
             let err = unsafe { *libc::__errno_location() };
-            panic!("mmap local ({}) failed: (0x{:x})", policy_meta_start, err);
-            // if err == libc::EEXIST {
-            //     return MappingState::WasMapped;
-            // } else {
-            //     return MappingState::NotMappable;
-            // }
+            if err == libc::EEXIST {
+                return MappingState::WasMapped;
+            } else {
+                return MappingState::NotMappable;
+            }
         }
-        println!("mmap local ({}) successful", policy_meta_start);
     }
 
     MappingState::IsMapped
