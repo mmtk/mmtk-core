@@ -615,7 +615,7 @@ mod tests {
                 vm_layout_constants::HEAP_START,
                 1,
                 helpers::meta_bytes_per_chunk(0, 0),
-                helpers::meta_bytes_per_chunk(0, 1)
+                helpers::meta_bytes_per_chunk(1, 1)
             ));
 
             ensure_metadata_chunk_is_mmaped(gspec, vm_layout_constants::HEAP_START);
@@ -656,7 +656,7 @@ mod tests {
             ensure_munmap_metadata_chunk(
                 vm_layout_constants::HEAP_START,
                 helpers::meta_bytes_per_chunk(0, 0),
-                helpers::meta_bytes_per_chunk(0, 1),
+                helpers::meta_bytes_per_chunk(1, 1),
             );
 
             ensure_munmap_metadata_chunk(
