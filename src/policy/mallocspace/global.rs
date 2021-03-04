@@ -289,3 +289,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
         object
     }
 }
+
+impl<VM: VMBinding> Default for MallocSpace<VM> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
