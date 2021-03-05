@@ -89,7 +89,8 @@ pub fn is_alloced_object(address: Address) -> bool {
         debug_assert_eq!(
             lock.contains(&unsafe { address.to_object_reference() }),
             ret,
-            "is_alloced_object(): alloc bit does not match alloc map, meta_start = {}",
+            "is_alloced_object(): alloc bit does not match alloc map, address = {}, meta_start = {}",
+            address,
             ALLOC_METADATA_SPEC.meta_start(address)
         );
         return ret;
@@ -107,7 +108,8 @@ pub fn is_marked(object: ObjectReference) -> bool {
         debug_assert_eq!(
             lock.contains(&object),
             ret,
-            "is_marked(): mark bit does not match mark map, meta_start = {}",
+            "is_marked(): mark bit does not match mark map, address = {}, meta_start = {}",
+            object.to_address(),
             MARKING_METADATA_SPEC.meta_start(object.to_address())
         );
         return ret;
