@@ -9,6 +9,8 @@ use crate::util::side_metadata::SideMetadataScope;
 use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
+#[cfg(debug_assertions)]
+use crate::util::constants::BYTES_IN_WORD;
 
 use std::collections::HashSet;
 use std::sync::RwLock;
@@ -27,14 +29,14 @@ lazy_static! {
     pub static ref MARK_MAP: RwLock<HashSet<ObjectReference>> = RwLock::default();
 }
 
-const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::PolicySpecific,
     offset: 0,
     log_num_of_bits: 0,
-    log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
-const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::PolicySpecific,
     offset: ALLOC_METADATA_SPEC.offset
         + meta_bytes_per_chunk(
@@ -42,7 +44,7 @@ const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
             ALLOC_METADATA_SPEC.log_num_of_bits,
         ),
     log_num_of_bits: 0,
-    log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
 pub fn is_meta_space_mapped(address: Address) -> bool {
@@ -85,12 +87,14 @@ pub fn is_alloced_object(address: Address) -> bool {
     if ASSERT_METADATA {
         // Need to make sure we atomically access the side metadata and the map.
         let lock = ALLOC_MAP.read().unwrap();
+        let check = lock.contains(&unsafe { address.align_down(BYTES_IN_WORD).to_object_reference() });
         let ret = load_atomic(ALLOC_METADATA_SPEC, address) == 1;
         debug_assert_eq!(
-            lock.contains(&unsafe { address.to_object_reference() }),
+            check,
             ret,
-            "is_alloced_object(): alloc bit does not match alloc map, address = {}, meta_start = {}",
+            "is_alloced_object(): alloc bit does not match alloc map, address = {} (aligned to {}), meta_start = {}",
             address,
+            address.align_down(BYTES_IN_WORD),
             ALLOC_METADATA_SPEC.meta_start(address)
         );
         return ret;
@@ -106,10 +110,11 @@ pub fn is_marked(object: ObjectReference) -> bool {
         let lock = MARK_MAP.read().unwrap();
         let ret = load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1;
         debug_assert_eq!(
-            lock.contains(&object),
+            lock.contains(&unsafe { object.to_address().align_down(BYTES_IN_WORD).to_object_reference() }),
             ret,
-            "is_marked(): mark bit does not match mark map, address = {}, meta_start = {}",
+            "is_marked(): mark bit does not match mark map, address = {} (aligned to {}), meta_start = {}",
             object.to_address(),
+            object.to_address().align_down(BYTES_IN_WORD),
             MARKING_METADATA_SPEC.meta_start(object.to_address())
         );
         return ret;

@@ -682,7 +682,7 @@ mod tests {
                 scope: SideMetadataScope::Global,
                 offset: 0,
                 log_num_of_bits: 4,
-                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+                log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
             };
 
             let metadata_2_spec = SideMetadataSpec {
@@ -755,7 +755,7 @@ mod tests {
                 scope: SideMetadataScope::Global,
                 offset: 0,
                 log_num_of_bits: 1,
-                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+                log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
             };
 
             assert!(try_map_metadata_space(
@@ -801,7 +801,7 @@ mod tests {
                 scope: SideMetadataScope::PolicySpecific,
                 offset: 0,
                 log_num_of_bits: 4,
-                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+                log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
             };
 
             let metadata_2_spec = SideMetadataSpec {

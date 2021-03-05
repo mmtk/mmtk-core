@@ -145,16 +145,15 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
             // Linear scan through the chunk
             while address < chunk_end {
+                trace!("Check address {}", address);
                 if is_alloced_object(address) {
                     // We know it is an object
                     let object = address.to_object_reference();
+                    let obj_start = VM::VMObjectModel::object_start_ref(object);
+                    let bytes = malloc_usable_size(obj_start.to_mut_ptr());
 
                     #[cfg(debug_assertions)]
                     if ASSERT_ALLOCATION {
-                        let obj_start = VM::VMObjectModel::object_start_ref(object);
-                        let ptr = VM::VMObjectModel::object_start_ref(object).to_mut_ptr();
-                        let bytes = malloc_usable_size(ptr);
-
                         debug_assert!(
                             self.active_mem.lock().unwrap().contains_key(&obj_start),
                             "Address {} with alloc bit is not in active_mem",
@@ -188,8 +187,12 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                             );
                         }
                     }
+
+                    // Skip to next object
+                    address += bytes;
+                } else {
+                    address += VM::MIN_ALIGNMENT;
                 }
-                address = address.add(VM::MIN_ALIGNMENT);
             }
             if chunk_is_empty {
                 debug!(
