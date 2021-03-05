@@ -4,7 +4,6 @@ use crate::plan::barriers::*;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
-use crate::policy::copyspace::CopySpace;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::OpaquePointer;
@@ -58,9 +57,8 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
-        barrier: box ObjectRememberingBarrier::<GenCopyNurseryProcessEdges<VM>, CopySpace<VM>>::new(
+        barrier: box ObjectRememberingBarrier::<GenCopyNurseryProcessEdges<VM>>::new(
             mmtk,
-            &gencopy.nursery,
             super::LOGGING_META,
         ),
         mutator_tls,

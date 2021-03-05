@@ -206,7 +206,7 @@ mod tests {
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use std::sync::atomic::Ordering;
 
-    const MEGABYTE: usize = 1 << 22;
+    const CHUNK_SIZE: usize = 1 << 22;
     #[cfg(target_os = "linux")]
     const FIXED_ADDRESS: Address =
         unsafe { conversions::chunk_align_down(Address::from_usize(0x6000_0000)) };
@@ -218,7 +218,7 @@ mod tests {
     fn address_to_mmap_chunks() {
         for i in 0..10 {
             unsafe {
-                let start = MEGABYTE * i;
+                let start = CHUNK_SIZE * i;
                 assert_eq!(
                     ByteMapMmapper::address_to_mmap_chunks_up(Address::from_usize(start)),
                     i
@@ -238,7 +238,7 @@ mod tests {
                     i
                 );
 
-                let end = start + MEGABYTE;
+                let end = start + CHUNK_SIZE;
                 assert_eq!(
                     ByteMapMmapper::address_to_mmap_chunks_up(Address::from_usize(end)),
                     i + 1

@@ -1,5 +1,4 @@
 use crate::mmtk::MMTK;
-use crate::plan::barriers::{BARRIER_COUNTER, ENABLE_BARRIER_COUNTER};
 use crate::util::statistics::counter::*;
 use crate::util::statistics::Timer;
 use crate::vm::VMBinding;
@@ -167,12 +166,6 @@ impl Stats {
         for value in scheduler_stat.values() {
             print!("{}\t", value);
         }
-        if ENABLE_BARRIER_COUNTER {
-            let barrier_counter_results = BARRIER_COUNTER.get_results();
-            print!("{:.5}\t", barrier_counter_results.take_rate);
-            print!("{:.0}\t", barrier_counter_results.total);
-            print!("{:.0}\t", barrier_counter_results.slow);
-        }
         println!();
         print!("Total time: ");
         self.total_time.lock().unwrap().print_total(None);
@@ -194,11 +187,6 @@ impl Stats {
         for name in scheduler_stat.keys() {
             print!("{}\t", name);
         }
-        if ENABLE_BARRIER_COUNTER {
-            print!("barrier.takerate\t");
-            print!("barrier.total\t");
-            print!("barrier.slow\t");
-        }
         println!();
     }
 
@@ -213,9 +201,6 @@ impl Stats {
 
         for c in &(*counters) {
             c.lock().unwrap().start();
-        }
-        if ENABLE_BARRIER_COUNTER {
-            BARRIER_COUNTER.reset();
         }
     }
 

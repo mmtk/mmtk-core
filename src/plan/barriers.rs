@@ -1,12 +1,10 @@
 //! Read/Write barrier implementations.
 
-use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
 use crate::util::side_metadata::*;
 use crate::util::*;
 use crate::MMTK;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Copy, Clone, Debug)]
 pub enum BarrierSelector {
@@ -32,19 +30,17 @@ impl Barrier for NoBarrier {
     fn post_write_barrier(&mut self, _target: WriteTarget) {}
 }
 
-pub struct ObjectRememberingBarrier<E: ProcessEdgesWork, S: Space<E::VM>> {
+pub struct ObjectRememberingBarrier<E: ProcessEdgesWork> {
     mmtk: &'static MMTK<E::VM>,
-    _nursery: &'static S,
     modbuf: Vec<ObjectReference>,
     meta: SideMetadataSpec,
 }
 
-impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
+impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     #[allow(unused)]
-    pub fn new(mmtk: &'static MMTK<E::VM>, nursery: &'static S, meta: SideMetadataSpec) -> Self {
+    pub fn new(mmtk: &'static MMTK<E::VM>, meta: SideMetadataSpec) -> Self {
         Self {
             mmtk,
-            _nursery: nursery,
             modbuf: vec![],
             meta,
         }
@@ -52,13 +48,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
 
     #[inline(always)]
     fn enqueue_node(&mut self, obj: ObjectReference) {
-        if ENABLE_BARRIER_COUNTER {
-            BARRIER_COUNTER.total.fetch_add(1, atomic::Ordering::SeqCst);
-        }
         if compare_exchange_atomic(self.meta, obj.to_address(), 0b1, 0b0) {
-            if ENABLE_BARRIER_COUNTER {
-                BARRIER_COUNTER.slow.fetch_add(1, atomic::Ordering::SeqCst);
-            }
             self.modbuf.push(obj);
             if self.modbuf.len() >= E::CAPACITY {
                 self.flush();
@@ -67,7 +57,7 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> ObjectRememberingBarrier<E, S> {
     }
 }
 
-impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for ObjectRememberingBarrier<E, S> {
+impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     #[cold]
     fn flush(&mut self) {
         let mut modbuf = vec![];
@@ -90,42 +80,6 @@ impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for ObjectRememberingBarrier<
                 self.enqueue_node(obj);
             }
             _ => unreachable!(),
-        }
-    }
-}
-
-/// Note: Please also disable vm-binding's barrier fast-path.
-pub const ENABLE_BARRIER_COUNTER: bool = false;
-
-pub static BARRIER_COUNTER: BarrierCounter = BarrierCounter {
-    total: AtomicUsize::new(0),
-    slow: AtomicUsize::new(0),
-};
-
-pub struct BarrierCounter {
-    pub total: AtomicUsize,
-    pub slow: AtomicUsize,
-}
-
-pub struct BarrierCounterResults {
-    pub total: f64,
-    pub slow: f64,
-    pub take_rate: f64,
-}
-
-impl BarrierCounter {
-    pub fn reset(&self) {
-        self.total.store(0, Ordering::SeqCst);
-        self.slow.store(0, Ordering::SeqCst);
-    }
-
-    pub fn get_results(&self) -> BarrierCounterResults {
-        let total = self.total.load(Ordering::SeqCst) as f64;
-        let slow = self.slow.load(Ordering::SeqCst) as f64;
-        BarrierCounterResults {
-            total,
-            slow,
-            take_rate: slow / total,
         }
     }
 }
