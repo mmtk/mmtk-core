@@ -122,16 +122,19 @@ impl SFTMap {
     }
 
     pub fn get(&self, address: Address) -> &'static dyn SFT {
-        let res = self.sft[address.chunk_index()];
+        let res: &'static dyn SFT = match self.sft.get(address.chunk_index()) {
+            Some(res) => unsafe { &*(*res) },
+            None => &EMPTY_SPACE_SFT,
+        };
         if DEBUG_SFT {
             trace!(
                 "Get SFT for {} #{} = {}",
                 address,
                 address.chunk_index(),
-                unsafe { &(*res) }.name()
+                res.name()
             );
         }
-        unsafe { &*res }
+        res
     }
 
     fn log_update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
