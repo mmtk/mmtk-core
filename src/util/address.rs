@@ -466,7 +466,7 @@ impl ObjectReference {
     }
 
     pub fn is_mapped(self) -> bool {
-        SFT_MAP.is_in_space(object)
+        SFT_MAP.is_in_space(self)
     }
 
     #[cfg(feature = "sanity")]
