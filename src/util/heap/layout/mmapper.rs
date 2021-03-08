@@ -1,4 +1,4 @@
-use crate::util::{Address, side_metadata::try_map_metadata_space};
+use crate::util::{side_metadata::try_map_metadata_space, Address};
 
 use super::vm_layout_constants::BYTES_IN_CHUNK;
 
@@ -37,10 +37,21 @@ pub trait Mmapper {
      * @param start The start of the range to be mapped.
      * @param pages The size of the range to be mapped, in pages
      */
-    fn ensure_mapped(&self, start: Address, pages: usize, global_metadata_per_chunk: usize, local_metadata_per_chunk: usize);
+    fn ensure_mapped(
+        &self,
+        start: Address,
+        pages: usize,
+        global_metadata_per_chunk: usize,
+        local_metadata_per_chunk: usize,
+    );
 
     /// Map metadata memory for a given chunk
-    fn map_metadata(&self, chunk: Address, global_metadata_per_chunk: usize, local_metadata_per_chunk: usize) -> Result<(), ()> {
+    fn map_metadata(
+        &self,
+        chunk: Address,
+        global_metadata_per_chunk: usize,
+        local_metadata_per_chunk: usize,
+    ) -> Result<(), ()> {
         if !try_map_metadata_space(
             chunk,
             BYTES_IN_CHUNK,
