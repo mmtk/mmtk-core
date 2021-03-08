@@ -1,4 +1,6 @@
 use crate::util::constants;
+#[cfg(debug_assertions)]
+use crate::util::constants::BYTES_IN_WORD;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::side_metadata::load_atomic;
@@ -9,8 +11,6 @@ use crate::util::side_metadata::SideMetadataScope;
 use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
-#[cfg(debug_assertions)]
-use crate::util::constants::BYTES_IN_WORD;
 
 use std::collections::HashSet;
 use std::sync::RwLock;
@@ -87,7 +87,8 @@ pub fn is_alloced_object(address: Address) -> bool {
     if ASSERT_METADATA {
         // Need to make sure we atomically access the side metadata and the map.
         let lock = ALLOC_MAP.read().unwrap();
-        let check = lock.contains(&unsafe { address.align_down(BYTES_IN_WORD).to_object_reference() });
+        let check =
+            lock.contains(&unsafe { address.align_down(BYTES_IN_WORD).to_object_reference() });
         let ret = load_atomic(ALLOC_METADATA_SPEC, address) == 1;
         debug_assert_eq!(
             check,
