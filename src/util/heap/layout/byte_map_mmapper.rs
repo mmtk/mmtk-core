@@ -256,7 +256,7 @@ mod tests {
     fn ensure_mapped_1page() {
         let mmapper = ByteMapMmapper::new();
         let pages = 1;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &|_| {});
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, 0, 0);
 
         let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
         let end_chunk =
@@ -270,7 +270,7 @@ mod tests {
     fn ensure_mapped_1chunk() {
         let mmapper = ByteMapMmapper::new();
         let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &|_| {});
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, 0, 0);
 
         let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
         let end_chunk =
@@ -284,7 +284,7 @@ mod tests {
     fn ensure_mapped_more_than_1chunk() {
         let mmapper = ByteMapMmapper::new();
         let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &|_| {});
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, 0, 0);
 
         let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
         let end_chunk =
@@ -300,7 +300,7 @@ mod tests {
         // map 2 chunks
         let mmapper = ByteMapMmapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &|_| {});
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, 0, 0);
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -315,7 +315,7 @@ mod tests {
         // map 2 chunks
         let mmapper = ByteMapMmapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &|_| {});
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, 0, 0);
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -325,7 +325,7 @@ mod tests {
         assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MAPPED);
 
         // ensure mapped - this will unprotect the previously protected chunk
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &|_| {});
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, 0, 0);
         assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MAPPED);
         assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MAPPED);
     }
