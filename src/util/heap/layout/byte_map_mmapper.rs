@@ -47,7 +47,7 @@ impl Mmapper for ByteMapMmapper {
         }
     }
 
-    fn ensure_mapped(&self, start: Address, pages: usize, _notify_mmap: &impl Fn(Address)) {
+    fn ensure_mapped(&self, start: Address, pages: usize, global_metadata_per_chunk: usize, local_metadata_per_chunk: usize) {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         trace!(
@@ -69,6 +69,7 @@ impl Mmapper for ByteMapMmapper {
             if self.mapped[chunk].load(Ordering::Relaxed) == UNMAPPED {
                 match dzmmap(mmap_start, MMAP_CHUNK_BYTES) {
                     Ok(_) => {
+                        self.map_metadata(mmap_start, global_metadata_per_chunk, local_metadata_per_chunk).expect("failed to map metadata memory");
                         if VERBOSE {
                             trace!(
                                 "mmap succeeded at chunk {}  {} with len = {}",

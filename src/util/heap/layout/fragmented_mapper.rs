@@ -82,7 +82,7 @@ impl Mmapper for FragmentedMapper {
         }
     }
 
-    fn ensure_mapped(&self, mut start: Address, pages: usize, notify_mmap: &impl Fn(Address)) {
+    fn ensure_mapped(&self, mut start: Address, pages: usize, global_metadata_per_chunk: usize, local_metadata_per_chunk: usize) {
         let end = start + conversions::pages_to_bytes(pages);
         // Iterate over the slabs covered
         while start < end {
@@ -107,7 +107,7 @@ impl Mmapper for FragmentedMapper {
                         let mmap_start = Self::chunk_index_to_address(base, chunk);
                         let _guard = self.lock.lock().unwrap();
                         crate::util::memory::dzmmap(mmap_start, MMAP_CHUNK_BYTES).unwrap();
-                        notify_mmap(mmap_start);
+                        self.map_metadata(mmap_start, global_metadata_per_chunk, local_metadata_per_chunk).expect("failed to map metadata memory");
                     }
                     MapState::Protected => {
                         let mmap_start = Self::chunk_index_to_address(base, chunk);

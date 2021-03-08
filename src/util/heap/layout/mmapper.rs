@@ -1,4 +1,6 @@
-use crate::util::Address;
+use crate::util::{Address, side_metadata::try_map_metadata_space};
+
+use super::vm_layout_constants::BYTES_IN_CHUNK;
 
 pub trait Mmapper {
     /****************************************************************************
@@ -35,7 +37,21 @@ pub trait Mmapper {
      * @param start The start of the range to be mapped.
      * @param pages The size of the range to be mapped, in pages
      */
-    fn ensure_mapped(&self, start: Address, pages: usize, notify_mmap: &impl Fn(Address));
+    fn ensure_mapped(&self, start: Address, pages: usize, global_metadata_per_chunk: usize, local_metadata_per_chunk: usize);
+
+    /// Map metadata memory for a given chunk
+    fn map_metadata(&self, chunk: Address, global_metadata_per_chunk: usize, local_metadata_per_chunk: usize) -> Result<(), ()> {
+        if !try_map_metadata_space(
+            chunk,
+            BYTES_IN_CHUNK,
+            global_metadata_per_chunk,
+            local_metadata_per_chunk,
+        ) {
+            Err(())
+        } else {
+            Ok(())
+        }
+    }
 
     /**
      * Is the page pointed to by this address mapped ?
