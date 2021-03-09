@@ -32,7 +32,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         // TODO: We currently ignore the offset field. This is wrong.
         // assert!(offset == 0);
         assert!(align <= 16);
-        let ret = self.space.unwrap().alloc(size);
+        let ret = self.space.unwrap().alloc(self.tls, size);
         trace!(
             "MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}",
             size,

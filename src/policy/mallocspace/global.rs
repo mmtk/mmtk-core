@@ -8,8 +8,9 @@ use crate::util::heap::PageResource;
 use crate::util::malloc::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::vm::{ActivePlan, ObjectModel};
+use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -230,14 +231,19 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    pub fn alloc(&self, size: usize) -> Address {
+    pub fn alloc(&self, tls: OpaquePointer, size: usize) -> Address {
+        // TODO: Should refactor this and Space.acquire()
+        if VM::VMActivePlan::global().poll(false, self) {
+            VM::VMCollection::block_for_gc(tls);
+            return unsafe { Address::zero() };
+        }
+
         let raw = unsafe { calloc(1, size) };
         let address = Address::from_mut_ptr(raw);
 
         if !address.is_zero() {
             let actual_size = unsafe { malloc_usable_size(raw) };
             if !is_meta_space_mapped(address) {
-                VM::VMActivePlan::global().poll(false, self);
                 let chunk_start = conversions::chunk_align_down(address);
                 debug!(
                     "Add malloc chunk {} to {}",
