@@ -24,8 +24,6 @@ lazy_static! {
         AllocationType::Default => AllocatorSelector::Malloc(0),
         AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(0),
         AllocationType::Los => AllocatorSelector::LargeObject(0),
-
-        // AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::Malloc(0),
     };
 }
 

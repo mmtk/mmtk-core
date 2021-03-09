@@ -122,19 +122,16 @@ impl SFTMap {
     }
 
     pub fn get(&self, address: Address) -> &'static dyn SFT {
-        let res: &'static dyn SFT = match self.sft.get(address.chunk_index()) {
-            Some(res) => unsafe { &*(*res) },
-            None => &EMPTY_SPACE_SFT,
-        };
+        let res = self.sft[address.chunk_index()];
         if DEBUG_SFT {
             trace!(
                 "Get SFT for {} #{} = {}",
                 address,
                 address.chunk_index(),
-                res.name()
+                unsafe { &(*res) }.name()
             );
         }
-        res
+        unsafe { &(*res) }
     }
 
     fn log_update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
@@ -226,13 +223,14 @@ impl SFTMap {
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
-        let sft = self.get(object.to_address());
-        if sft.name() != EMPTY_SPACE_SFT.name() {
-            true
-        } else {
+        let not_in_space = object.to_address().chunk_index() >= self.sft.len() || self.get(object.to_address()).name() == EMPTY_SPACE_SFT.name();
+
+        if not_in_space {
             // special case - we do not yet have SFT entries for malloc space
             use crate::policy::mallocspace::is_alloced_by_malloc;
             is_alloced_by_malloc(object)
+        } else {
+            true
         }
     }
 }

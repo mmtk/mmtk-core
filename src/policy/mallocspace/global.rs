@@ -20,6 +20,8 @@ use std::collections::HashMap;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;
 
+// If true, we will use a hashmap to store all the allocated memory from malloc, and use it
+// to make sure our allocation is correct.
 #[cfg(debug_assertions)]
 const ASSERT_ALLOCATION: bool = true;
 
@@ -37,8 +39,8 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         self.get_name()
     }
 
-    fn is_live(&self, _object: ObjectReference) -> bool {
-        unimplemented!();
+    fn is_live(&self, object: ObjectReference) -> bool {
+        is_marked(object)
     }
     fn is_movable(&self) -> bool {
         false
@@ -230,10 +232,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     pub fn alloc(&self, size: usize) -> Address {
         let raw = unsafe { calloc(1, size) };
-        let actual_size = unsafe { malloc_usable_size(raw) };
         let address = Address::from_mut_ptr(raw);
 
         if !address.is_zero() {
+            let actual_size = unsafe { malloc_usable_size(raw) };
             if !is_meta_space_mapped(address) {
                 VM::VMActivePlan::global().poll(false, self);
                 let chunk_start = conversions::chunk_align_down(address);
