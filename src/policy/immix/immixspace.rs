@@ -121,8 +121,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             if !block.is_defrag() {
                 block.clear_mark();
             }
-            // TODO: clear metadata for a block only
-            side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, conversions::chunk_align_down(block.start()))
+            side_metadata::bzero_metadata_for_range(Self::OBJECT_MARK_TABLE, Range { start: block.start(), end: block.end() });
         }
         if !super::BLOCK_ONLY {
             self.line_mark_state.fetch_add(1, Ordering::SeqCst);
@@ -241,9 +240,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let line_limit = block.lines().end;
         let mut line_cursor = start;
         let unavail_state = self.line_unavail_state.load(Ordering::SeqCst);
+        let current_state = self.line_mark_state.load(Ordering::SeqCst);
         // Find start
         while line_cursor < line_limit {
-            if !line_cursor.is_marked(unavail_state) {
+            if !line_cursor.is_marked(unavail_state) && !line_cursor.is_marked(current_state) {
                 break;
             }
             line_cursor = Line::forward(line_cursor, 1);
@@ -252,13 +252,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let start = line_cursor;
         // Find limit
         while line_cursor < line_limit {
-            if line_cursor.is_marked(unavail_state) {
+            if line_cursor.is_marked(unavail_state) || line_cursor.is_marked(current_state) {
                 break;
             }
             line_cursor = Line::forward(line_cursor, 1);
         }
         let end = line_cursor;
-        debug_assert!((start..end).all(|line| !line.is_marked(unavail_state)));
+        debug_assert!((start..end).all(|line| !line.is_marked(unavail_state) && !line_cursor.is_marked(current_state)));
         return Some(Range { start, end })
     }
 }

@@ -68,7 +68,7 @@ impl Line {
         unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), state as _); }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_marked(&self, state: u8) -> bool {
         debug_assert!(!super::BLOCK_ONLY);
         unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) as u8 == state }

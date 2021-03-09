@@ -24,6 +24,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
+use crate::policy::immix::block::Block;
 
 /// Run the main loop for the GC controller thread. This method does not return.
 ///
@@ -108,10 +109,13 @@ pub fn alloc<VM: VMBinding>(
     #[cfg(debug_assertions)]
     crate::util::forwarding_word::check_alloc_size::<VM>(size);
 
-    let semantics = if size > 8 * 4096 { AllocationSemantics::Los } else { semantics };
-    let a = mutator.alloc(size, align, offset, semantics);
-    post_alloc(mutator, unsafe { a.to_object_reference() }, size, semantics);
-    a
+    if size > Block::BYTES {
+        let address = mutator.alloc(size, align, offset, AllocationSemantics::Los);
+        post_alloc(mutator, unsafe { address.to_object_reference() }, size, AllocationSemantics::Los);
+        address
+    } else {
+        mutator.alloc(size, align, offset, semantics)
+    }
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are

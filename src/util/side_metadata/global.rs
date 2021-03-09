@@ -1,8 +1,10 @@
+use constants::LOG_BITS_IN_BYTE;
+
 use super::constants::*;
 use super::helpers::*;
 use crate::util::{constants, Address};
 use crate::util::{heap::layout::vm_layout_constants::BYTES_IN_CHUNK, memory};
-use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
+use std::{ops::Range, sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering}};
 
 #[derive(Clone, Copy)]
 pub enum SideMetadataScope {
@@ -299,6 +301,7 @@ pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
     }
 }
 
+#[inline(always)]
 pub fn compare_exchange_atomic(
     metadata_spec: SideMetadataSpec,
     data_addr: Address,
@@ -491,6 +494,7 @@ pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
 /// 1. Concurrent access to this operation is undefined behaviour.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
+#[inline(always)]
 pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
@@ -528,6 +532,7 @@ pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
 /// 1. Concurrent access to this operation is undefined behaviour.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
+#[inline(always)]
 pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
@@ -577,6 +582,19 @@ pub fn bzero_metadata_for_chunk(metadata_spec: SideMetadataSpec, chunk_start: Ad
         metadata_spec.log_num_of_bits,
     );
     memory::zero(meta_start, meta_size);
+}
+
+#[inline(always)]
+pub fn bzero_metadata_for_range(metadata_spec: SideMetadataSpec, heap_range: Range<Address>) {
+    let meta_start = address_to_meta_address(metadata_spec, heap_range.start);
+    let metadata_bytes = {
+        let bytes = heap_range.end - heap_range.start;
+        let bits = bytes >> metadata_spec.log_min_obj_size << metadata_spec.log_num_of_bits;
+        let metadata_bytes = bits >> LOG_BITS_IN_BYTE;
+        debug_assert_eq!(metadata_bytes << LOG_BITS_IN_BYTE, bits);
+        metadata_bytes
+    };
+    memory::zero(meta_start, metadata_bytes);
 }
 
 #[cfg(test)]
