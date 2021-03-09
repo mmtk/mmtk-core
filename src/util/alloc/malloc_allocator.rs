@@ -1,10 +1,10 @@
 use crate::plan::global::Plan;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
+use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
 use crate::util::Address;
 use crate::util::OpaquePointer;
-use crate::util::alloc::allocator;
 use crate::vm::VMBinding;
 
 #[repr(C)]
