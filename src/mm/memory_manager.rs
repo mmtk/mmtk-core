@@ -257,6 +257,7 @@ pub fn is_mapped_object(object: ObjectReference) -> bool {
 ///
 /// Arguments:
 /// * `address`: The address to query.
+// TODO: Do we really need this function? Can a runtime always use is_mapped_object()?
 pub fn is_mapped_address(address: Address) -> bool {
     address.is_mapped()
 }

@@ -23,7 +23,7 @@ use std::sync::Mutex;
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
 #[cfg(debug_assertions)]
-const ASSERT_ALLOCATION: bool = true;
+const ASSERT_ALLOCATION: bool = false;
 
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
