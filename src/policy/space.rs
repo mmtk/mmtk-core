@@ -223,7 +223,8 @@ impl SFTMap {
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
-        let not_in_space = object.to_address().chunk_index() >= self.sft.len() || self.get(object.to_address()).name() == EMPTY_SPACE_SFT.name();
+        let not_in_space = object.to_address().chunk_index() >= self.sft.len()
+            || self.get(object.to_address()).name() == EMPTY_SPACE_SFT.name();
 
         if not_in_space {
             // special case - we do not yet have SFT entries for malloc space
