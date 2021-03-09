@@ -13,7 +13,6 @@ use super::layout::map::Map;
 use super::layout::Mmapper;
 use super::PageResource;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::side_metadata::*;
 use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
 use libc::{c_void, memset};

@@ -13,7 +13,6 @@ use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::pageresource::CommonPageResource;
-use crate::util::side_metadata::*;
 use crate::util::OpaquePointer;
 use crate::util::{generic_freelist, memory};
 use crate::vm::*;

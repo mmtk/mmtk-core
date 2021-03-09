@@ -46,6 +46,7 @@ pub trait Mmapper {
     );
 
     /// Map metadata memory for a given chunk
+    #[allow(clippy::result_unit_err)]
     fn map_metadata(
         &self,
         chunk: Address,
