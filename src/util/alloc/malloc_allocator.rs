@@ -22,8 +22,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         self.plan
     }
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        let cell = self.alloc_slow(size, align, offset);
-        allocator::align_allocation::<VM>(cell, align, offset, VM::MIN_ALIGNMENT, true)
+        self.alloc_slow(size, align, offset)
     }
 
     fn get_tls(&self) -> OpaquePointer {
@@ -31,8 +30,10 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        let maxbytes = allocator::get_maximum_aligned_size::<VM>(size, align, VM::MIN_ALIGNMENT);
-        let ret = self.space.unwrap().alloc(maxbytes);
+        // TODO: We currently ignore the offset field. This is wrong.
+        // assert!(offset == 0);
+        assert!(align <= 16);
+        let ret = self.space.unwrap().alloc(size);
         trace!(
             "MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}",
             size,
