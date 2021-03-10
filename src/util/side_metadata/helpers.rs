@@ -24,11 +24,11 @@ pub(crate) fn address_to_meta_address(
         let internal_addr = data_addr.as_usize() & CHUNK_MASK;
         let second_offset = internal_addr >> rshift;
 
-        return meta_chunk_addr + metadata_spec.offset + second_offset;
+        meta_chunk_addr + metadata_spec.offset + second_offset
     } else {
-        return unsafe {
+        unsafe {
             Address::from_usize(metadata_spec.offset + (data_addr.as_usize() >> rshift))
-        };
+        }
     }
 }
 

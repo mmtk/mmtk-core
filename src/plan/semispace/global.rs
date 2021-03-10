@@ -31,12 +31,6 @@ use std::sync::Arc;
 
 use enum_map::EnumMap;
 
-lazy_static! {
-    pub static ref GC_BYTE_SPEC_VEC_BOX: Box<Vec<SideMetadataSpec>> =
-        Box::new(vec![gc_byte::SIDE_GC_BYTE_SPEC]);
-    pub static ref EMPTY_SPEC_VEC_BOX: Box<Vec<SideMetadataSpec>> = Box::new(vec![]);
-}
-
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 
 pub struct SemiSpace<VM: VMBinding> {
