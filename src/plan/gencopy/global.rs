@@ -1,6 +1,5 @@
 use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
 use super::mutator::ALLOCATOR_MAPPING;
-use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
@@ -20,11 +19,14 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::OpaquePointer;
 use crate::vm::ObjectModel;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
+use crate::{
+    plan::global::BasePlan,
+    util::{gc_byte, side_metadata::SideMetadataSpec},
+};
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -40,6 +42,7 @@ pub struct GenCopy<VM: VMBinding> {
     pub common: CommonPlan<VM>,
     in_nursery: AtomicBool,
     pub scheduler: &'static MMTkScheduler<VM>,
+    pub metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
 }
 
 unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
@@ -171,12 +174,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.in_nursery.load(Ordering::SeqCst)
     }
 
-    fn global_side_metadata_per_chunk(&self) -> usize {
-        if !VM::VMObjectModel::HAS_GC_BYTE {
-            meta_bytes_per_chunk(3, 1)
-        } else {
-            0
-        }
+    fn global_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>> {
+        self.metadata_spec_vec.clone()
     }
 }
 
@@ -188,6 +187,11 @@ impl<VM: VMBinding> GenCopy<VM> {
         scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let metadata_spec_vec = if VM::VMObjectModel::HAS_GC_BYTE {
+            Arc::new(vec![])
+        } else {
+            Arc::new(vec![gc_byte::SIDE_GC_BYTE_SPEC])
+        };
 
         GenCopy {
             nursery: CopySpace::new(
@@ -221,6 +225,7 @@ impl<VM: VMBinding> GenCopy<VM> {
             common: CommonPlan::new(vm_map, mmapper, options, heap, &GENCOPY_CONSTRAINTS),
             in_nursery: AtomicBool::default(),
             scheduler,
+            metadata_spec_vec,
         }
     }
 

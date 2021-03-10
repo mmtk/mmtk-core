@@ -2,7 +2,6 @@
 
 use super::controller_collector_context::ControllerCollectorContext;
 use super::PlanConstraints;
-use crate::mmtk::MMTK;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -25,6 +24,7 @@ use crate::util::statistics::stats::Stats;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
+use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::cell::UnsafeCell;
@@ -335,8 +335,8 @@ pub trait Plan: 'static + Sync + Send + Downcast {
         }
     }
 
-    fn global_side_metadata_per_chunk(&self) -> usize {
-        0
+    fn global_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>> {
+        Arc::new(vec![])
     }
 }
 

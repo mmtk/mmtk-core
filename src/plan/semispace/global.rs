@@ -1,5 +1,4 @@
 use super::gc_work::{SSCopyContext, SSProcessEdges};
-use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -14,6 +13,7 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::GcHookWork;
+use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -22,14 +22,20 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::OpaquePointer;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use enum_map::EnumMap;
+
+lazy_static! {
+    pub static ref GC_BYTE_SPEC_VEC_BOX: Box<Vec<SideMetadataSpec>> =
+        Box::new(vec![gc_byte::SIDE_GC_BYTE_SPEC]);
+    pub static ref EMPTY_SPEC_VEC_BOX: Box<Vec<SideMetadataSpec>> = Box::new(vec![]);
+}
 
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 
@@ -38,6 +44,7 @@ pub struct SemiSpace<VM: VMBinding> {
     pub copyspace0: CopySpace<VM>,
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
+    pub metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
 }
 
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
@@ -141,12 +148,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &self.common
     }
 
-    fn global_side_metadata_per_chunk(&self) -> usize {
-        if !VM::VMObjectModel::HAS_GC_BYTE {
-            meta_bytes_per_chunk(3, 1)
-        } else {
-            0
-        }
+    fn global_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>> {
+        self.metadata_spec_vec.clone()
     }
 }
 
@@ -158,6 +161,11 @@ impl<VM: VMBinding> SemiSpace<VM> {
         _scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let metadata_spec_vec = if VM::VMObjectModel::HAS_GC_BYTE {
+            Arc::new(vec![])
+        } else {
+            Arc::new(vec![gc_byte::SIDE_GC_BYTE_SPEC])
+        };
 
         SemiSpace {
             hi: AtomicBool::new(false),
@@ -180,6 +188,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 &mut heap,
             ),
             common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS),
+            metadata_spec_vec,
         }
     }
 

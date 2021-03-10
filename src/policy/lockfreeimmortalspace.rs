@@ -95,8 +95,8 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         if !try_map_metadata_space(
             AVAILABLE_START,
             total_bytes,
-            VM::VMActivePlan::global().global_side_metadata_per_chunk(),
-            self.local_side_metadata_per_chunk(),
+            VM::VMActivePlan::global().global_side_metadata_spec_vec(),
+            self.local_side_metadata_spec_vec(),
         ) {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");

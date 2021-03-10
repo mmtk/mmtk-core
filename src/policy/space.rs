@@ -1,7 +1,7 @@
-use crate::util::conversions::*;
 use crate::util::side_metadata::try_map_metadata_space;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
@@ -22,7 +22,7 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 
 use crate::vm::VMBinding;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
 
 use downcast_rs::Downcast;
 
@@ -328,8 +328,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             if !try_map_metadata_space(
                 start,
                 bytes,
-                VM::VMActivePlan::global().global_side_metadata_per_chunk(),
-                self.local_side_metadata_per_chunk(),
+                VM::VMActivePlan::global().global_side_metadata_spec_vec(),
+                self.local_side_metadata_spec_vec(),
             ) {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
@@ -346,8 +346,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if !try_map_metadata_space(
             self.common().start,
             self.common().extent,
-            VM::VMActivePlan::global().global_side_metadata_per_chunk(),
-            self.local_side_metadata_per_chunk(),
+            VM::VMActivePlan::global().global_side_metadata_spec_vec(),
+            self.local_side_metadata_spec_vec(),
         ) {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
@@ -445,8 +445,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         println!();
     }
 
-    fn local_side_metadata_per_chunk(&self) -> usize {
-        0
+    fn local_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>> {
+        Arc::new(vec![])
     }
 }
 
@@ -577,8 +577,8 @@ impl<VM: VMBinding> CommonSpace<VM> {
             if !try_map_metadata_space(
                 self.start,
                 self.extent,
-                VM::VMActivePlan::global().global_side_metadata_per_chunk(),
-                space.local_side_metadata_per_chunk(),
+                VM::VMActivePlan::global().global_side_metadata_spec_vec(),
+                space.local_side_metadata_spec_vec(),
             ) {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");

@@ -17,3 +17,5 @@ pub mod copyspace;
 pub mod immortalspace;
 pub mod largeobjectspace;
 pub mod lockfreeimmortalspace;
+
+pub const NUMBER_OF_POLICIES_REQUIRING_SIDE_METADATA: usize = 0;
