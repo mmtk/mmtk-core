@@ -16,9 +16,18 @@ mod tests {
             log_num_of_bits: 0,
             log_min_obj_size: 0,
         };
+        #[cfg(target_pointer_width = "64")]
         let mut lspec = SideMetadataSpec {
             scope: SideMetadataScope::PolicySpecific,
             offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            log_num_of_bits: 0,
+            log_min_obj_size: 0,
+        };
+
+        #[cfg(target_pointer_width = "32")]
+        let mut lspec = SideMetadataSpec {
+            scope: SideMetadataScope::PolicySpecific,
+            offset: 0,
             log_num_of_bits: 0,
             log_min_obj_size: 0,
         };
@@ -169,9 +178,17 @@ mod tests {
                 log_num_of_bits: 0,
                 log_min_obj_size: 0,
             };
+            #[cfg(target_pointer_width = "64")]
             let mut lspec = SideMetadataSpec {
                 scope: SideMetadataScope::PolicySpecific,
                 offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+                log_num_of_bits: 1,
+                log_min_obj_size: 0,
+            };
+            #[cfg(target_pointer_width = "32")]
+            let mut lspec = SideMetadataSpec {
+                scope: SideMetadataScope::PolicySpecific,
+                offset: 0,
                 log_num_of_bits: 1,
                 log_min_obj_size: 0,
             };
@@ -357,16 +374,36 @@ mod tests {
             let data_addr =
                 vm_layout_constants::HEAP_START + (vm_layout_constants::BYTES_IN_CHUNK << 2);
 
+            #[cfg(target_pointer_width = "64")]
             let metadata_1_spec = SideMetadataSpec {
                 scope: SideMetadataScope::PolicySpecific,
                 offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
                 log_num_of_bits: 4,
                 log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
             };
-
+            #[cfg(target_pointer_width = "64")]
             let metadata_2_spec = SideMetadataSpec {
                 scope: SideMetadataScope::PolicySpecific,
                 offset: metadata_1_spec.offset + metadata_address_range_size(metadata_1_spec),
+                log_num_of_bits: 3,
+                log_min_obj_size: 7,
+            };
+
+            #[cfg(target_pointer_width = "32")]
+            let metadata_1_spec = SideMetadataSpec {
+                scope: SideMetadataScope::PolicySpecific,
+                offset: 0,
+                log_num_of_bits: 4,
+                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+            };
+            #[cfg(target_pointer_width = "32")]
+            let metadata_2_spec = SideMetadataSpec {
+                scope: SideMetadataScope::PolicySpecific,
+                offset: metadata_1_spec.offset
+                    + meta_bytes_per_chunk(
+                        metadata_1_spec.log_min_obj_size,
+                        metadata_1_spec.log_num_of_bits,
+                    ),
                 log_num_of_bits: 3,
                 log_min_obj_size: 7,
             };

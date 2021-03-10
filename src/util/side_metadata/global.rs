@@ -1,4 +1,4 @@
-use super::helpers::*;
+use super::*;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::memory;
 use crate::util::{constants, Address};
@@ -100,18 +100,28 @@ pub fn try_map_metadata_space(
         }
     }
 
+    let mut lsize: usize = 0;
+
     for i in 0..local_metadata_spec_vec.len() {
         let spec = local_metadata_spec_vec[i];
-        // nearest page-aligned starting address
-        let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
-        // nearest page-aligned ending address
-        let mmap_size = address_to_meta_address(spec, start + size)
-            .align_up(BYTES_IN_PAGE)
-            .as_usize()
-            - mmap_start.as_usize();
-        if mmap_size > 0 && !try_mmap_metadata(mmap_start, mmap_size).is_mapped() {
-            return false;
+        if cfg!(target_pointer_width = "64") {
+            // nearest page-aligned starting address
+            let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+            // nearest page-aligned ending address
+            let mmap_size = address_to_meta_address(spec, start + size)
+                .align_up(BYTES_IN_PAGE)
+                .as_usize()
+                - mmap_start.as_usize();
+            if mmap_size > 0 && !try_mmap_metadata(mmap_start, mmap_size).is_mapped() {
+                return false;
+            }
+        } else {
+            lsize += meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
         }
+    }
+
+    if cfg!(target_pointer_width = "32") {
+        return try_map_per_chunk_metadata_space(start, size, lsize);
     }
 
     true

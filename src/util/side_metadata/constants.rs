@@ -1,4 +1,6 @@
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, LOG_ADDRESS_SPACE, LOG_BYTES_IN_CHUNK};
+use crate::util::heap::layout::vm_layout_constants::{
+    BYTES_IN_CHUNK, HEAP_END, LOG_ADDRESS_SPACE, LOG_BYTES_IN_CHUNK,
+};
 use crate::util::Address;
 
 #[cfg(target_pointer_width = "32")]
@@ -24,8 +26,9 @@ pub(crate) const LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 1;
 
 pub(crate) const LOG_MAX_GLOBAL_SIDE_METADATA_SIZE: usize =
     LOG_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;
-pub(crate) const LOG_MAX_LOCAL_SIDE_METADATA_SIZE: usize =
-    1 << (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO);
+// TODO - we should check this limit somewhere
+// pub(crate) const LOG_MAX_LOCAL_SIDE_METADATA_SIZE: usize =
+//     1 << (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO);
 
 pub const LOCAL_SIDE_METADATA_BASE_ADDRESS: Address = unsafe {
     Address::from_usize(
@@ -35,3 +38,6 @@ pub const LOCAL_SIDE_METADATA_BASE_ADDRESS: Address = unsafe {
 };
 
 pub(crate) const CHUNK_MASK: usize = (1 << LOG_BYTES_IN_CHUNK) - 1;
+
+pub(crate) const LOCAL_SIDE_METADATA_PER_CHUNK: usize =
+    BYTES_IN_CHUNK >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
