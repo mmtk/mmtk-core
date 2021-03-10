@@ -1,5 +1,8 @@
-use super::{LOGGING_META, gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges}};
 use super::mutator::ALLOCATOR_MAPPING;
+use super::{
+    gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges},
+    LOGGING_META,
+};
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;

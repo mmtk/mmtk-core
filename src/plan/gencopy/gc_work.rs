@@ -1,6 +1,6 @@
 use super::global::GenCopy;
-use crate::plan::{CopyContext, barriers::BarrierSelector};
 use crate::plan::PlanConstraints;
+use crate::plan::{barriers::BarrierSelector, CopyContext};
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkerLocal;
