@@ -1,5 +1,5 @@
 use super::global::GenCopy;
-use crate::plan::CopyContext;
+use crate::plan::{CopyContext, barriers::BarrierSelector};
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
@@ -53,7 +53,7 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
         _semantics: crate::AllocationSemantics,
     ) {
         forwarding_word::clear_forwarding_bits::<VM>(obj);
-        if !super::NO_SLOW {
+        if !super::NO_SLOW && super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
             store_atomic(super::LOGGING_META, obj.to_address(), 0b1);
         }
     }

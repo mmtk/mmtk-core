@@ -30,6 +30,12 @@ pub struct SideMetadataSpec {
     pub log_min_obj_size: usize,
 }
 
+impl SideMetadataSpec {
+    pub const fn meta_bytes_per_chunk(&self) -> usize {
+        super::meta_bytes_per_chunk(self.log_min_obj_size, self.log_num_of_bits)
+    }
+}
+
 /// Represents the mapping state of a metadata page.
 ///
 /// `NotMappable` indicates whether the page is mappable by MMTK.

@@ -6,7 +6,7 @@ use crate::util::side_metadata::*;
 use crate::util::*;
 use crate::MMTK;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BarrierSelector {
     NoBarrier,
     ObjectBarrier,

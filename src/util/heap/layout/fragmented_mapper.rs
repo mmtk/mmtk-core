@@ -23,7 +23,7 @@ const LOG_MAPPABLE_BYTES: usize = 36; // 128GB - physical memory larger than thi
                                        * chunks per slab, ie a 1k slab map.  In a 64-bit address space, this
                                        * will require 1M of slab maps.
                                        */
-const LOG_MMAP_CHUNKS_PER_SLAB: usize = 10;
+const LOG_MMAP_CHUNKS_PER_SLAB: usize = 8;
 const LOG_MMAP_SLAB_BYTES: usize = LOG_MMAP_CHUNKS_PER_SLAB + LOG_MMAP_CHUNK_BYTES;
 const MMAP_SLAB_EXTENT: usize = 1 << LOG_MMAP_SLAB_BYTES;
 const MMAP_SLAB_MASK: usize = (1 << LOG_MMAP_SLAB_BYTES) - 1;
@@ -364,12 +364,11 @@ mod tests {
                     i ^ ((i + 1) << 1)
                 );
 
-                // TODO(wenyuzhao): Looks like hashing is incorrect with a different mmap chunk size?
-                // let c = b + ((i + 2) << (LOG_MMAP_SLAB_BYTES + LOG_SLAB_TABLE_SIZE * 2 + 2));
-                // assert_eq!(
-                //     FragmentedMapper::hash(Address::from_usize(c)),
-                //     i ^ ((i + 1) << 1) ^ ((i + 2) << 2)
-                // );
+                let c = b + ((i + 2) << (LOG_MMAP_SLAB_BYTES + LOG_SLAB_TABLE_SIZE * 2 + 2));
+                assert_eq!(
+                    FragmentedMapper::hash(Address::from_usize(c)),
+                    i ^ ((i + 1) << 1) ^ ((i + 2) << 2)
+                );
             }
         }
     }
