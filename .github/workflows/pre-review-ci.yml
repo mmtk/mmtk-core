@@ -40,4 +40,6 @@ jobs:
 
       # Document check
       - name: Rustdoc
-        run: ./.github/scripts/ci-doc.sh
+        run: |
+          cargo install mdbook
+          ./.github/scripts/ci-doc.sh
