@@ -12,7 +12,7 @@ pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address = HEAP_END;
 /// A value of 2 means the space required for global side metadata must be less than 1/4th of the source data.
 /// So, a value of `n` means this ratio must be less than $2^-n$.
 #[cfg(target_pointer_width = "32")]
-pub(crate) const LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 2;
+pub(crate) const LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 3;
 #[cfg(target_pointer_width = "64")]
 pub(crate) const LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 1;
 
@@ -20,7 +20,7 @@ pub(crate) const LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 1;
 /// A value of 1 means the space required for global+local side metadata must be less than 1/2nd of the source data.
 /// So, a value of `n` means this ratio must be less than $2^-n$.
 #[cfg(target_pointer_width = "32")]
-pub(crate) const LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 2;
+pub(crate) const LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 3;
 #[cfg(target_pointer_width = "64")]
 pub(crate) const LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 1;
 
