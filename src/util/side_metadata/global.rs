@@ -1,5 +1,6 @@
 use super::*;
 use crate::util::constants::BYTES_IN_PAGE;
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
 use crate::util::{constants, Address};
 use std::sync::{
@@ -68,9 +69,9 @@ impl MappingState {
 ///
 /// * `size` - The size of the source data (in bytes).
 ///
-/// * `global_per_chunk` - The number of bytes of global side metadata required per chunk.
+/// * `global_metadata_spec_vec` - A vector of SideMetadataSpec objects containing all global side metadata.
 ///
-/// * `local_per_chunk` - The number of bytes of policy-specific side metadata required per chunk.
+/// * `local_per_chunk` - A vector of SideMetadataSpec objects containing all local side metadata.
 ///
 pub fn try_map_metadata_space(
     start: Address,
@@ -127,7 +128,7 @@ pub fn try_map_metadata_space(
     true
 }
 
-// Try to map side metadata for the chunk starting at `start`
+// Try to map side metadata for the data starting at `start` and a size of `size`
 fn try_mmap_metadata(start: Address, size: usize) -> MappingState {
     trace!("try_mmap_metadata({}, 0x{:x})", start, size);
 
@@ -152,12 +153,20 @@ fn try_mmap_metadata(start: Address, size: usize) -> MappingState {
     MappingState::IsMapped
 }
 
+/// Unmap the corresponding metadata space or panic.
+///
+/// Note-1: This function is only used for test and debug right now.
+///
+/// Note-2: This function uses munmap() which works at page granularity.
+///     If the corresponding metadata space's size is not a multiple of page size,
+///     the actual unmapped space will be bigger than what you specify.
 pub fn ensure_unmap_metadata_space(
     start: Address,
     size: usize,
     global_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
     local_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
 ) {
+    debug!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
     debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
     debug_assert!(size % BYTES_IN_PAGE == 0);
 
@@ -178,14 +187,50 @@ pub fn ensure_unmap_metadata_space(
     for i in 0..local_metadata_spec_vec.len() {
         let spec = local_metadata_spec_vec[i];
         // nearest page-aligned starting address
-        let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
-        // nearest page-aligned ending address
-        let mmap_size = address_to_meta_address(spec, start + size)
-            .align_up(BYTES_IN_PAGE)
-            .as_usize()
-            - mmap_start.as_usize();
-        if mmap_size > 0 {
-            ensure_munmap_metadata(mmap_start, mmap_size);
+        let meta_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+        if cfg!(target_pointer_width = "64") {
+            // nearest page-aligned ending address
+            let meta_size = address_to_meta_address(spec, start + size)
+                .align_up(BYTES_IN_PAGE)
+                .as_usize()
+                - meta_start.as_usize();
+            if meta_size > 0 {
+                ensure_munmap_metadata(meta_start, meta_size);
+            }
+        } else {
+            // per chunk policy-specific metadata for 32-bits targets
+            let chunk_num = ((start + size - 1usize).align_down(BYTES_IN_CHUNK)
+                - start.align_down(BYTES_IN_CHUNK))
+                / BYTES_IN_CHUNK;
+            if chunk_num == 0 {
+                ensure_munmap_metadata(
+                    meta_start,
+                    address_to_meta_address(spec, start + size) - meta_start,
+                );
+            } else {
+                let second_data_chunk = (start + 1usize).align_up(BYTES_IN_CHUNK);
+                // unmap the first sub-chunk
+                ensure_munmap_metadata(
+                    meta_start,
+                    address_to_meta_address(spec, second_data_chunk) - meta_start,
+                );
+                let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
+                let last_meta_chunk = address_to_meta_address(spec, last_data_chunk);
+                // unmap the last sub-chunk
+                ensure_munmap_metadata(
+                    last_meta_chunk,
+                    address_to_meta_address(spec, start + size) - last_meta_chunk,
+                );
+                let mut next_data_chunk = second_data_chunk;
+                // unmap all chunks in the middle
+                while next_data_chunk != last_data_chunk {
+                    ensure_munmap_metadata(
+                        address_to_meta_address(spec, next_data_chunk),
+                        meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits),
+                    );
+                    next_data_chunk += BYTES_IN_CHUNK;
+                }
+            }
         }
     }
 }
@@ -193,7 +238,7 @@ pub fn ensure_unmap_metadata_space(
 fn ensure_munmap_metadata(start: Address, size: usize) {
     debug!("try_munmap_metadata({}, 0x{:x})", start, size);
 
-    debug_assert!(size > 0 && size % BYTES_IN_PAGE == 0);
+    debug_assert!(size > 0);
     assert_eq!(unsafe { libc::munmap(start.to_mut_ptr(), size) }, 0);
 }
 
@@ -573,8 +618,47 @@ pub fn bzero_metadata(metadata_spec: SideMetadataSpec, start: Address, size: usi
     );
 
     let meta_start = address_to_meta_address(metadata_spec, start);
-    memory::zero(
-        meta_start,
-        address_to_meta_address(metadata_spec, start + size) - meta_start,
-    );
+    if cfg!(target_pointer_width = "64") || metadata_spec.scope.is_global() {
+        memory::zero(
+            meta_start,
+            address_to_meta_address(metadata_spec, start + size) - meta_start,
+        );
+    } else {
+        // per chunk policy-specific metadata for 32-bits targets
+        let chunk_num = ((start + size).align_down(BYTES_IN_CHUNK)
+            - start.align_down(BYTES_IN_CHUNK))
+            / BYTES_IN_CHUNK;
+        if chunk_num == 0 {
+            memory::zero(
+                meta_start,
+                address_to_meta_address(metadata_spec, start + size) - meta_start,
+            );
+        } else {
+            let second_data_chunk = start.align_up(BYTES_IN_CHUNK);
+            // bzero the first sub-chunk
+            memory::zero(
+                meta_start,
+                address_to_meta_address(metadata_spec, second_data_chunk) - meta_start,
+            );
+            let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
+            let last_meta_chunk = address_to_meta_address(metadata_spec, last_data_chunk);
+            // bzero the last sub-chunk
+            memory::zero(
+                last_meta_chunk,
+                address_to_meta_address(metadata_spec, start + size) - last_meta_chunk,
+            );
+            let mut next_data_chunk = second_data_chunk;
+            // bzero all chunks in the middle
+            while next_data_chunk != last_data_chunk {
+                memory::zero(
+                    address_to_meta_address(metadata_spec, next_data_chunk),
+                    meta_bytes_per_chunk(
+                        metadata_spec.log_min_obj_size,
+                        metadata_spec.log_num_of_bits,
+                    ),
+                );
+                next_data_chunk += BYTES_IN_CHUNK;
+            }
+        }
+    }
 }

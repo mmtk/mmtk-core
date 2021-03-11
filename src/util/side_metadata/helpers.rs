@@ -19,17 +19,26 @@ pub(crate) fn address_to_meta_address(
     let rshift = (constants::LOG_BITS_IN_BYTE as i32) + log_min_obj_size - log_bits_num;
 
     // policy-specific side metadata is per chunk in 32-bit targets
-    if cfg!(target_pointer_width = "32") && !metadata_spec.scope.is_global() {
+    let res = if cfg!(target_pointer_width = "32") && !metadata_spec.scope.is_global() {
         let meta_chunk_addr = address_to_meta_chunk_addr(data_addr);
         let internal_addr = data_addr.as_usize() & CHUNK_MASK;
         let second_offset = internal_addr >> rshift;
 
         meta_chunk_addr + metadata_spec.offset + second_offset
     } else {
-        unsafe {
-            Address::from_usize(metadata_spec.offset + (data_addr.as_usize() >> rshift))
-        }
-    }
+        unsafe { Address::from_usize(metadata_spec.offset + (data_addr.as_usize() >> rshift)) }
+    };
+
+    trace!(
+        "address_to_meta_address(addr: {}, off: 0x{:x}, lbits: {}, lmin: {}) -> 0x{:x}",
+        data_addr,
+        metadata_spec.offset,
+        metadata_spec.log_num_of_bits,
+        metadata_spec.log_min_obj_size,
+        res
+    );
+
+    res
 }
 
 const fn addr_rshift(metadata_spec: SideMetadataSpec) -> i32 {
