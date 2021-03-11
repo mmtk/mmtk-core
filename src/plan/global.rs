@@ -122,6 +122,9 @@ pub fn create_mutator<VM: VMBinding>(
             crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
         }
         PlanSelector::GenCopy => crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
+        PlanSelector::MarkSweep => {
+            crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
+        }
     })
 }
 
@@ -140,6 +143,9 @@ pub fn create_plan<VM: VMBinding>(
             vm_map, mmapper, options, scheduler,
         )),
         PlanSelector::GenCopy => Box::new(crate::plan::gencopy::GenCopy::new(
+            vm_map, mmapper, options, scheduler,
+        )),
+        PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
             vm_map, mmapper, options, scheduler,
         )),
     }

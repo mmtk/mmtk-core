@@ -185,7 +185,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
             if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
                 // Prepare mutators if necessary
                 // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
-                if !mmtk.plan.common().stacks_prepared() {
+                if !mmtk.plan.base().stacks_prepared() {
                     for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
                         <E::VM as VMBinding>::VMCollection::prepare_mutator(
                             mutator.get_tls(),
@@ -220,7 +220,8 @@ pub struct EndOfGC;
 
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        mmtk.plan.common().base.set_gc_status(GcStatus::NotInGC);
+        info!("End of GC");
+        mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
 }
