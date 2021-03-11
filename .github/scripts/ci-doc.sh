@@ -9,5 +9,6 @@ cp -r $tutorial_code_dir $project_root/src/plan/mygc
 echo "pub mod mygc;" >> $project_root/src/plan/mod.rs
 cargo build
 
+cargo install mdbook
 mdbook build $project_root/docs/portingguide
 mdbook build $project_root/docs/tutorial
