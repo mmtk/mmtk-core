@@ -1,6 +1,6 @@
 # Summary
 
-[MMTk Porting Buide](./prefix.md)
+[MMTk Porting Guide](./prefix.md)
 
 - [MMTk’s Approach to Portability](./portability.md)
 - [Before Starting a Port](./before_start.md)

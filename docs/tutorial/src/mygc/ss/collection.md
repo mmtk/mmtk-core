@@ -20,6 +20,7 @@ In `gc_work.rs`, add the following import statements:
 Add a new structure, `MyGCCopyContext`, with the type parameter 
 `VM: VMBinding`. It should have the fields `plan: &'static MyGC<VM>`
 and `mygc: BumpAllocator`.
+
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:mygc_copy_context}}
 ```
@@ -30,6 +31,7 @@ Define the associate type `VM` for `CopyContext` as the VMBinding type
 given to the class as `VM`: `type VM: VM`. 
 
 Add the following skeleton functions (taken from `plan/global.rs`):
+
 ```rust
 fn constraints(&self) -> &'static PlanConstraints {
     unimplemented!()
@@ -66,6 +68,7 @@ fn post_copy(
 
 In `init()`, set the `tls` variable in the held instance of `mygc` to
 the one passed to the function. In `constraints()`, return a reference of `MYGC_CONSTRAINTS`.
+
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:copycontext_constraints_init}}
 ```
@@ -73,6 +76,7 @@ the one passed to the function. In `constraints()`, return a reference of `MYGC_
 We just leave the rest of the functions empty for now and will implement them later.
 
 Add a constructor to `MyGCCopyContext` and implement the `WorkerLocal` trait for `MyGCCopyContext`.
+
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:constructor_and_workerlocal}}
 ```
@@ -82,6 +86,7 @@ Add a constructor to `MyGCCopyContext` and implement the `WorkerLocal` trait for
 Add a new public structure, `MyGCProcessEdges`, with the type parameter 
 `<VM:VMBinding>`. It will hold an instance of `ProcessEdgesBase` and 
 `MyGC`. This is the core part for tracing objects in the `MyGC` plan.
+
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:mygc_process_edges}}
 ```
@@ -91,6 +96,7 @@ Add a new implementations block
 Similarly to before, set `ProcessEdgesWork`'s associate type `VM` to 
 the type parameter of `MyGCProcessEdges`, `VM`: `type VM:VM`.
 Add a new constructor, `new()`.
+
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:mygc_process_edges_new}}
 ```
@@ -102,6 +108,7 @@ Now that they've been added, you should import `MyGCCopyContext` and
 next few steps. 
 
 In `create_worker_local()` in `impl Plan for MyGC`, create an instance of `MyGCCopyContext`.
+
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:create_worker_local}}
 ```
@@ -116,6 +123,7 @@ it stops all mutators, runs the
 scheduler's prepare stage and resumes the mutators. The `StopMutators` work
 will invoke code from the bindings to scan threads and other roots, and those scanning work
 will further push work for a transitive closure.
+
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:schedule_collection}}
 ```
@@ -130,8 +138,10 @@ The collector has a number of steps it needs to perform before each collection.
 We'll add these now.
 
 ### Prepare plan
+
 In `global.rs`, find the method `prepare`. Delete the `unreachable!()` 
 call, and add the following code:
+
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:prepare}}
 ```
@@ -141,10 +151,12 @@ spaces in the common plan, flips the definitions for which space is 'to'
 and which is 'from', then prepares the copyspaces with the new definition.
 
 ### Prepare CopyContext
+
 First, fill in some more of the skeleton functions we added to the 
 `CopyContext` (in `gc_work.rs`) earlier.
 In `prepare()`, rebind the allocator to the tospace using the function
    `self.mygc.rebind(Some(self.plan.tospace()))`.
+
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:copycontext_prepare}}
 ```
@@ -174,6 +186,7 @@ Check if the object passed into the function is null
 Check if which space the object is in, and forward the call to the policy-specific
 object tracing code. If it is in neither space, forward the call to the common space and let the common space to handle
 object tracing in its spaces (e.g. immortal or large object space):
+
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:trace_object}}
 ```
@@ -181,15 +194,18 @@ object tracing in its spaces (e.g. immortal or large object space):
 Add two new implementation blocks, `Deref` and `DerefMut` for 
 `MyGCProcessEdges`. These allow `MyGCProcessEdges` to be dereferenced to 
 `ProcessEdgesBase`, and allows easy access to fields in `ProcessEdgesBase`.
+
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:deref}}
 ```
 
 ## Copying objects
+
 Go back to the `MyGCopyContext` in `gc_work.rs`. 
 In `alloc_copy()`, call the allocator's `alloc` function. Above the function, 
    use an inline attribute (`#[inline(always)]`) to tell the Rust compiler 
    to always inline the function.
+
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:copycontext_alloc_copy}}
 ```
@@ -197,6 +213,7 @@ In `alloc_copy()`, call the allocator's `alloc` function. Above the function,
 To `post_copy()`, in the `CopyContext` implementations block, add 
 `forwarding_word::clear_forwarding_bits::<VM>(obj);`. Also, add an 
 inline attribute.
+
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:copycontext_post_copy}}
 ```
@@ -210,6 +227,7 @@ run after each collection.
 
 Find the method `release()` in `global.rs`. Replace the 
 `unreachable!()` call with the following code.
+
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:release}}
 ```
@@ -229,7 +247,8 @@ inputs as the `prepare()` function above. This function will be called at the
 release stage of a collection (at the end of a collection) for each mutator. 
 It rebinds the allocator for the `Default` allocation semantics to the new 
 tospace. When the mutator threads resume, any new allocations for `Default` 
-will then go to the new tospace. 
+will then go to the new tospace.
+ 
 ```rust
 {{#include ../../../code/mygc_semispace/mutator.rs:release}}
 ```

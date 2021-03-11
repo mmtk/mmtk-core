@@ -14,6 +14,6 @@
     - [Building a semispace GC](./mygc/ss/prefix.md)
         - [Allocation](./mygc/ss/alloc.md)
         - [Collection](./mygc/ss/collection.md)
-        - [Excercise](./mygc/ss/excercise.md)
+        - [Exercise](./mygc/ss/exercise.md)
     - [Building a generational copying GC](./mygc/gencopy.md)
 - [Further Reading](./further_reading.md)

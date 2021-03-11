@@ -5,4 +5,7 @@ We recommend a highly incremental approach to implementing a port.   The broad i
  - Focus on simplicity and correctness.
  - Optimize the port later.
 
-In MMTk’s language, a plan is essentially a configuration which specifies a GC algorithm.   Plans can be selected at run time.   Not all plans will be suitable for all runtimes.   For example, a runtime that for some reason cannot support object movement won’t be able to use plans that use copying garbage collection.
+In MMTk’s language, a plan is essentially a configuration which specifies a GC algorithm.
+Plans can be selected at run time.
+Not all plans will be suitable for all runtimes.
+For example, a runtime that for some reason cannot support object movement won’t be able to use plans that use copying garbage collection.

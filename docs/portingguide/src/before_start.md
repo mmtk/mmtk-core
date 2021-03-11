@@ -1,8 +1,10 @@
 # Things to Consider Before Starting a Port
 
-In principle, a port to MMTk is not particularly difficult. MMTk can present itself as a standard library and the core of the API is relatively simple.
+In principle, a port to MMTk is not particularly difficult.
+MMTk can present itself as a standard library and the core of the API is relatively simple.
 
-However, porting a runtime to a different GC (any GC) can be difficult and time consuming. Key questions include: 
+However, porting a runtime to a different GC (any GC) can be difficult and time consuming.
+Key questions include: 
  - How well encapsulated is the runtime's existing collector? 
  - Does the runtime make tacit assumptions about the underlying collector's implementation?
  - How many places in the runtime codebase reference some part of the GC?

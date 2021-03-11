@@ -3,6 +3,7 @@
 A few benchmarks of varying size will be used throughout the tutorial. If you 
 haven't already, set them up now. All of the following commands should be 
 entered in `repos/openjdk`.
+
 1. **HelloWorld** (simplest, will never trigger GC): 
    1. Copy the following code into a new Java file titled "HelloWorld.java" 
    in `mmtk-openjdk/repos/openjdk`:
