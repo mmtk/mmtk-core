@@ -16,7 +16,7 @@ pub trait Work<C: Context>: 'static + Send + Sync {
     }
 }
 
-/// A special kind of work that will execute on the coorddinator (i.e. controller) thread
+/// A special kind of work that will execute on the coordinator (i.e. controller) thread
 ///
 /// The coordinator thread holds the global monitor lock when executing `CoordinatorWork`s.
 /// So, directly adding new work to any buckets will cause dead lock.

@@ -3,6 +3,7 @@ use crate::util::constants;
 use crate::util::constants::BYTES_IN_WORD;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use crate::util::side_metadata::address_to_meta_address;
 use crate::util::side_metadata::load_atomic;
 use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::side_metadata::store_atomic;
@@ -93,10 +94,10 @@ pub fn is_alloced_object(address: Address) -> bool {
         debug_assert_eq!(
             check,
             ret,
-            "is_alloced_object(): alloc bit does not match alloc map, address = {} (aligned to {}), meta_start = {}",
+            "is_alloced_object(): alloc bit does not match alloc map, address = {} (aligned to {}), meta address = {}",
             address,
             address.align_down(BYTES_IN_WORD),
-            ALLOC_METADATA_SPEC.meta_start(address)
+            address_to_meta_address(ALLOC_METADATA_SPEC, address)
         );
         return ret;
     }
@@ -113,10 +114,10 @@ pub fn is_marked(object: ObjectReference) -> bool {
         debug_assert_eq!(
             lock.contains(&unsafe { object.to_address().align_down(BYTES_IN_WORD).to_object_reference() }),
             ret,
-            "is_marked(): mark bit does not match mark map, address = {} (aligned to {}), meta_start = {}",
+            "is_marked(): mark bit does not match mark map, address = {} (aligned to {}), meta address = {}",
             object.to_address(),
             object.to_address().align_down(BYTES_IN_WORD),
-            MARKING_METADATA_SPEC.meta_start(object.to_address())
+            address_to_meta_address(MARKING_METADATA_SPEC, object.to_address())
         );
         return ret;
     }

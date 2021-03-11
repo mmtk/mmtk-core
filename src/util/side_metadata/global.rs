@@ -30,16 +30,6 @@ pub struct SideMetadataSpec {
     pub log_min_obj_size: usize,
 }
 
-impl SideMetadataSpec {
-    pub fn meta_start(&self, data_addr: Address) -> Address {
-        if self.scope.is_global() {
-            address_to_meta_chunk_addr(data_addr)
-        } else {
-            address_to_meta_chunk_addr(data_addr) + POLICY_SIDE_METADATA_OFFSET
-        }
-    }
-}
-
 /// Represents the mapping state of a metadata page.
 ///
 /// `NotMappable` indicates whether the page is mappable by MMTK.

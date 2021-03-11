@@ -252,8 +252,10 @@ pub fn is_mapped_object(object: ObjectReference) -> bool {
 /// Is the address in the mapped memory? The runtime can use this function to check
 /// if an address is mapped by MMTk. Note that this is different than is_mapped_object().
 /// For malloc spaces, MMTk does not map those addresses (malloc does the mmap), so
-/// this function will return false, but is_mapped_object will may return true if the address
-/// is actually a valid object in malloc spaces.
+/// this function will return false, but is_mapped_object will return true if the address
+/// is actually a valid object in malloc spaces. To check if an object is in our heap,
+/// the runtime should always use is_mapped_object(). This function is_mapped_address()
+/// may get removed at some point.
 ///
 /// Arguments:
 /// * `address`: The address to query.
