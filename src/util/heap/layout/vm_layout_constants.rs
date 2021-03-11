@@ -87,7 +87,7 @@ pub const AVAILABLE_END: Address = HEAP_END;
 pub const AVAILABLE_BYTES: usize = AVAILABLE_END.get_extent(AVAILABLE_START);
 
 /** Granularity at which we map and unmap virtual address space in the heap */
-pub const LOG_MMAP_CHUNK_BYTES: usize = 20;
+pub const LOG_MMAP_CHUNK_BYTES: usize = LOG_BYTES_IN_CHUNK;
 
 pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES;
 

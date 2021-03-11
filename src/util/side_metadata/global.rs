@@ -30,6 +30,12 @@ pub struct SideMetadataSpec {
     pub log_min_obj_size: usize,
 }
 
+impl SideMetadataSpec {
+    pub const fn meta_bytes_per_chunk(&self) -> usize {
+        super::meta_bytes_per_chunk(self.log_min_obj_size, self.log_num_of_bits)
+    }
+}
+
 /// Represents the mapping state of a metadata page.
 ///
 /// `NotMappable` indicates whether the page is mappable by MMTK.
@@ -312,7 +318,7 @@ pub fn compare_exchange_atomic(
 
         let real_old_byte = unsafe { meta_addr.atomic_load::<AtomicU8>(Ordering::SeqCst) };
         let expected_old_byte = (real_old_byte & !mask) | ((old_metadata as u8) << lshift);
-        let expected_new_byte = expected_old_byte | ((new_metadata as u8) << lshift);
+        let expected_new_byte = (expected_old_byte & !mask) | ((new_metadata as u8) << lshift);
 
         unsafe {
             meta_addr

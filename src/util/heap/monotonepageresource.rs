@@ -11,10 +11,9 @@ use crate::util::OpaquePointer;
 
 use super::layout::map::Map;
 use super::layout::Mmapper;
-
 use super::PageResource;
-
 use crate::util::heap::layout::heap_layout::VMMap;
+use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
 use libc::{c_void, memset};
 
@@ -157,12 +156,12 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
                 .unwrap()
                 .grow_space(old, bytes, new_chunk);
 
-            self.common()
-                .space
-                .unwrap()
-                .common()
-                .mmapper
-                .ensure_mapped(old, required_pages);
+            self.common().space.unwrap().common().mmapper.ensure_mapped(
+                old,
+                required_pages,
+                VM::VMActivePlan::global().global_side_metadata_per_chunk(),
+                self.common().space.unwrap().local_side_metadata_per_chunk(),
+            );
 
             // FIXME: concurrent zeroing
             if zeroed {
