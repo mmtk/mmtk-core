@@ -47,7 +47,7 @@
 <span class="doccomment">/// A value of 2 means the space required for global side metadata must be less than 1/4th of the source data.</span>
 <span class="doccomment">/// So, a value of `n` means this ratio must be less than $2^-n$.</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_WORST_CASE_RATIO_LOG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_WORST_CASE_RATIO_LOG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">3</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_WORST_CASE_RATIO_LOG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
 
@@ -55,7 +55,7 @@
 <span class="doccomment">/// A value of 1 means the space required for global+local side metadata must be less than 1/2nd of the source data.</span>
 <span class="doccomment">/// So, a value of `n` means this ratio must be less than $2^-n$.</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">SIDE_METADATA_WORST_CASE_RATIO_LOG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">SIDE_METADATA_WORST_CASE_RATIO_LOG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">SIDE_METADATA_WORST_CASE_RATIO_LOG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
 

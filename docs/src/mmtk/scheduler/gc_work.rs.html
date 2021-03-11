@@ -488,6 +488,7 @@
 <span id="485">485</span>
 <span id="486">486</span>
 <span id="487">487</span>
+<span id="488">488</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">work_bucket</span>::<span class="ident">WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -676,7 +677,7 @@
             <span class="kw">if</span> <span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span>::<span class="ident">VMScanning</span>::<span class="ident">SCAN_MUTATORS_IN_SAFEPOINT</span> {
                 <span class="comment">// Prepare mutators if necessary</span>
                 <span class="comment">// FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused</span>
-                <span class="kw">if</span> <span class="op">!</span><span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">common</span>().<span class="ident">stacks_prepared</span>() {
+                <span class="kw">if</span> <span class="op">!</span><span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">stacks_prepared</span>() {
                     <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span>::<span class="ident">VMActivePlan</span>::<span class="ident">mutators</span>() {
                         <span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span>::<span class="ident">VMCollection</span>::<span class="ident">prepare_mutator</span>(
                             <span class="ident">mutator</span>.<span class="ident">get_tls</span>(),
@@ -711,7 +712,8 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">EndOfGC</span> {
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">common</span>().<span class="ident">base</span>.<span class="ident">set_gc_status</span>(<span class="ident">GcStatus</span>::<span class="ident">NotInGC</span>);
+        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;End of GC&quot;</span>);
+        <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus</span>::<span class="ident">NotInGC</span>);
         <span class="op">&lt;</span><span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span>::<span class="ident">VMCollection</span>::<span class="ident">resume_mutators</span>(<span class="ident">worker</span>.<span class="ident">tls</span>);
     }
 }

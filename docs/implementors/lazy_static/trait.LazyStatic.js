@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["mmtk"] = [{"text":"impl LazyStatic for ALLOCATOR_MAPPING","synthetic":false,"types":[]},{"text":"impl LazyStatic for ACTIVE_CHUNKS","synthetic":false,"types":[]},{"text":"impl LazyStatic for ALLOC_MAP","synthetic":false,"types":[]},{"text":"impl LazyStatic for MARK_MAP","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

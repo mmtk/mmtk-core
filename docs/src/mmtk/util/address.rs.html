@@ -974,7 +974,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mapped</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span>).<span class="ident">is_mapped</span>()
+        <span class="ident">SFT_MAP</span>.<span class="ident">is_in_space</span>(<span class="self">self</span>)
     }
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>

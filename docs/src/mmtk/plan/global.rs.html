@@ -843,6 +843,12 @@
 <span id="840">840</span>
 <span id="841">841</span>
 <span id="842">842</span>
+<span id="843">843</span>
+<span id="844">844</span>
+<span id="845">845</span>
+<span id="846">846</span>
+<span id="847">847</span>
+<span id="848">848</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! The global part of a plan implementation.</span>
 
@@ -968,6 +974,9 @@
             <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">semispace</span>::<span class="ident">mutator</span>::<span class="ident">create_ss_mutator</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>)
         }
         <span class="ident">PlanSelector</span>::<span class="ident">GenCopy</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">gencopy</span>::<span class="ident">mutator</span>::<span class="ident">create_gencopy_mutator</span>(<span class="ident">tls</span>, <span class="ident">mmtk</span>),
+        <span class="ident">PlanSelector</span>::<span class="ident">MarkSweep</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">marksweep</span>::<span class="ident">mutator</span>::<span class="ident">create_ms_mutator</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>)
+        }
     })
 }
 
@@ -986,6 +995,9 @@
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
         )),
         <span class="ident">PlanSelector</span>::<span class="ident">GenCopy</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">gencopy</span>::<span class="ident">GenCopy</span>::<span class="ident">new</span>(
+            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
+        )),
+        <span class="ident">PlanSelector</span>::<span class="ident">MarkSweep</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">marksweep</span>::<span class="ident">MarkSweep</span>::<span class="ident">new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
         )),
     }

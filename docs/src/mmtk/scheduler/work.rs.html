@@ -56,9 +56,9 @@
     }
 }
 
-<span class="doccomment">/// A special kind of work that will execute on the coorddinator (i.e. controller) thread</span>
+<span class="doccomment">/// A special kind of work that will execute on the coordinator (i.e. controller) thread</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// The coorddinator thread holds the global monitor lock when executing `CoordinatorWork`s.</span>
+<span class="doccomment">/// The coordinator thread holds the global monitor lock when executing `CoordinatorWork`s.</span>
 <span class="doccomment">/// So, directly adding new work to any buckets will cause dead lock.</span>
 <span class="doccomment">/// For this case, use `WorkBucket::add_with_priority_unsync` instead.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Context</span><span class="op">&gt;</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Work</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {}

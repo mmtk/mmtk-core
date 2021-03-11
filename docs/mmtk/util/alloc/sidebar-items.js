@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["allocator",""],["allocators",""],["dump_linear_scan",""],["embedded_meta_data",""],["large_object_allocator",""],["linear_scan",""]],"struct":[["BumpAllocator",""]]});
+initSidebarItems({"mod":[["allocator",""],["allocators",""],["dump_linear_scan",""],["embedded_meta_data",""],["large_object_allocator",""],["linear_scan",""],["malloc_allocator",""]],"struct":[["BumpAllocator",""]]});

@@ -110,6 +110,10 @@
 <span id="107">107</span>
 <span id="108">108</span>
 <span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">embedded_meta_data</span>::<span class="ident">LOG_BYTES_IN_REGION</span>;
 
@@ -213,6 +217,10 @@
 
 <span class="comment">/* Assume byte-addressability */</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_ADDRESS_SPACE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">BITS_IN_ADDRESS</span> <span class="kw">as</span> <span class="ident">u8</span>;
+
+<span class="comment">// TODO: Should this be VM specific?</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_MIN_OBJECT_SIZE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_WORD</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MIN_OBJECT_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MIN_OBJECT_SIZE</span>;
 
 <span class="comment">/****************************************************************************
  *

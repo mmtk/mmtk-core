@@ -367,6 +367,14 @@
 <span id="364">364</span>
 <span id="365">365</span>
 <span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
@@ -610,7 +618,8 @@
     <span class="ident">object</span>.<span class="ident">is_live</span>()
 }
 
-<span class="doccomment">/// Is the object in the mapped memory?</span>
+<span class="doccomment">/// Is the object in the mapped memory? The runtime can use this function to check</span>
+<span class="doccomment">/// if an object is in MMTk heap.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `object`: The object reference to query.</span>
@@ -618,10 +627,17 @@
     <span class="ident">object</span>.<span class="ident">is_mapped</span>()
 }
 
-<span class="doccomment">/// Is the address in the mapped memory?</span>
+<span class="doccomment">/// Is the address in the mapped memory? The runtime can use this function to check</span>
+<span class="doccomment">/// if an address is mapped by MMTk. Note that this is different than is_mapped_object().</span>
+<span class="doccomment">/// For malloc spaces, MMTk does not map those addresses (malloc does the mmap), so</span>
+<span class="doccomment">/// this function will return false, but is_mapped_object will return true if the address</span>
+<span class="doccomment">/// is actually a valid object in malloc spaces. To check if an object is in our heap,</span>
+<span class="doccomment">/// the runtime should always use is_mapped_object(). This function is_mapped_address()</span>
+<span class="doccomment">/// may get removed at some point.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `address`: The address to query.</span>
+<span class="comment">// TODO: Do we really need this function? Can a runtime always use is_mapped_object()?</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mapped_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
     <span class="ident">address</span>.<span class="ident">is_mapped</span>()
 }
