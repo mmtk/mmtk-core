@@ -18,13 +18,11 @@ objects, is live/alive.
 This is the term that is traditionally used in the garbage collection literature 
 to describe the running program (because it 'mutates' the object graph).
 
-*plan*: A garbage collection algorithm expressed as a configuration of policies.
-
+*plan*: A garbage collection algorithm expressed as a configuration of policies. 
 See also [Plans and policies](#plans-and-policies) below.
 
 *policy*: A specific garbage collection algorithm, such as marksweep, copying, 
 immix, etc. Plans are made up of an arrangement of one or more policies. 
-
 See also [Plans and policies](#plans-and-policies) below.
 
 *scheduler*: Dynamically dispatches units of GC work to workers.
@@ -32,7 +30,7 @@ See also [Plans and policies](#plans-and-policies) below.
 *zeroing*, *zero initialization*: Initializing and resetting unused memory 
 bits to have a value of 0. Required by most memory-safe programming languages.
 
-See also: [Further Reading](#further-reading)
+See also: [Further Reading](../further_reading.md)
 
 
 ## Plans and Policies

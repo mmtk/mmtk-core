@@ -15,7 +15,7 @@ First, set up OpenJDK, MMTk, and the binding:
 dependencies by following the instructions in the
 [OpenJDK binding repository](https://github.com/mmtk/mmtk-openjdk/blob/master/README.md).
 2. Ensure you can build OpenJDK according to the instructions in the READMEs of 
-[the mmtk-core repository](/../master/README.md) and the 
+[the mmtk-core repository](https://github.com/mmtk/mmtk-core/blob/master/README.md) and the 
 [OpenJDK binding repository](https://github.com/mmtk/mmtk-openjdk/blob/master/README.md).
    * Use the `slowdebug` option when building the OpenJDK binding. This is the 
    fastest debug variant to build, and allows for easier debugging and better 

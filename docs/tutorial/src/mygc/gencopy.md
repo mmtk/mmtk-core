@@ -1,4 +1,5 @@
 # Building a generational copying collector
+> Note: This part is work in progress.
 
 ## What is a generational collector?
 The *weak generational hypothesis* states that most of the objects allocated
@@ -17,6 +18,7 @@ collections needed is greatly reduced.
 
 This section is currently incomplete. Instructions for building a
 generational copying (gencopy) collector will be added in future.
+
 
 ## Triplespace backup instructions
 

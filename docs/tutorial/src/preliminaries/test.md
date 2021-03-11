@@ -6,13 +6,13 @@ entered in `repos/openjdk`.
 1. **HelloWorld** (simplest, will never trigger GC): 
    1. Copy the following code into a new Java file titled "HelloWorld.java" 
    in `mmtk-openjdk/repos/openjdk`:
-   ```java
-   class HelloWorld {
-       public static void main(String[] args) {
-           System.out.println("Hello World!");
-       }
-   }
-   ```
+      ```java
+      class HelloWorld {
+         public static void main(String[] args) {
+            System.out.println("Hello World!");
+         }
+      }
+      ```
    2. Use the command 
    `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac HelloWorld.java`.
    3. Then, run 

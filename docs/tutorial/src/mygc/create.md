@@ -96,7 +96,7 @@ If you've got to this point, then congratulations! You have created your first w
 
 At this point, you should familiarise yourself with the MyGC plan if you 
 haven't already. Try answering the following questions by looking at the code 
-and [Further Reading](#further-reading): 
+and [Further Reading](../further_reading.md): 
    * Where is the allocator defined?
    * How many memory spaces are there?
    * What kind of memory space policy is used?

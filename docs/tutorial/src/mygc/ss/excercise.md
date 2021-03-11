@@ -13,11 +13,6 @@ following traits:
     tospace.
     * Garbage is still collected at the same time for all spaces.
 
-When you are finished, try running the benchmarks and seeing how the 
-performance of this collector compares to MyGC. Great work!
-
-***
-
 Triplespace is a sort of generational garbage collector. These collectors 
 separate out old objects and new objects into separate spaces. Newly 
 allocated objects should be scanned far more often than old objects, which 
@@ -28,3 +23,6 @@ generational collector, because the older objects are still being scanned
 every collection. It wouldn't be very useful in a real-life scenario. The 
 next thing to do is to make this collector into a more efficient proper 
 generational collector.
+
+When you are finished, try running the benchmarks and seeing how the 
+performance of this collector compares to MyGC. Great work!
