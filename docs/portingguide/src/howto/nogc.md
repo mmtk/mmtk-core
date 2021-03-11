@@ -1,4 +1,5 @@
-## NoGC
+# NoGC
+
 We always start a port with NoGC.  It is the simplest possible plan, simply allocates memory and never collects it.   Although this appears trivial, depending on the complexity of the runtime and how well factored (or not) its internal GC interfaces are, just getting this working may be a major undertaking.   In the case of V8, the refactoring within V8 required to get a simple NoGC plan working was substantial, touching over 100 files.   So it’s a good idea not to underestimate the difficulty of a NoGC port!
 
 In order to implement NoGC, we only need to handle MMTk initialisation (`gc_init`), mutator initialisation (`bind_mutator`), and memory allocation (`alloc`).

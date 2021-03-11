@@ -28,5 +28,3 @@ generational collector, because the older objects are still being scanned
 every collection. It wouldn't be very useful in a real-life scenario. The 
 next thing to do is to make this collector into a more efficient proper 
 generational collector.
-
-[**Back to table of contents**](#contents)
