@@ -339,7 +339,6 @@
 <span id="336">336</span>
 <span id="337">337</span>
 <span id="338">338</span>
-<span id="339">339</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">required_chunks</span>;
@@ -354,10 +353,9 @@
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">layout</span>::<span class="ident">map</span>::<span class="ident">Map</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">layout</span>::<span class="ident">Mmapper</span>;
-
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">PageResource</span>;
-
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::<span class="ident">VMMap</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">ActivePlan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 <span class="kw">use</span> <span class="ident">libc</span>::{<span class="ident">c_void</span>, <span class="ident">memset</span>};
 
@@ -500,12 +498,12 @@
                 .<span class="ident">unwrap</span>()
                 .<span class="ident">grow_space</span>(<span class="ident">old</span>, <span class="ident">bytes</span>, <span class="ident">new_chunk</span>);
 
-            <span class="self">self</span>.<span class="ident">common</span>()
-                .<span class="ident">space</span>
-                .<span class="ident">unwrap</span>()
-                .<span class="ident">common</span>()
-                .<span class="ident">mmapper</span>
-                .<span class="ident">ensure_mapped</span>(<span class="ident">old</span>, <span class="ident">required_pages</span>);
+            <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">space</span>.<span class="ident">unwrap</span>().<span class="ident">common</span>().<span class="ident">mmapper</span>.<span class="ident">ensure_mapped</span>(
+                <span class="ident">old</span>,
+                <span class="ident">required_pages</span>,
+                <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_per_chunk</span>(),
+                <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">space</span>.<span class="ident">unwrap</span>().<span class="ident">local_side_metadata_per_chunk</span>(),
+            );
 
             <span class="comment">// FIXME: concurrent zeroing</span>
             <span class="kw">if</span> <span class="ident">zeroed</span> {

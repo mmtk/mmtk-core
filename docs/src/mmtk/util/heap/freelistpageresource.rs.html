@@ -359,6 +359,7 @@
 <span id="356">356</span>
 <span id="357">357</span>
 <span id="358">358</span>
+<span id="359">359</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
@@ -377,7 +378,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">pageresource</span>::<span class="ident">CommonPageResource</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">generic_freelist</span>, <span class="ident">memory</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">MaybeUninit</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CommonFreeListPageResource</span> {
@@ -476,12 +477,13 @@
             .<span class="ident">space</span>
             .<span class="ident">unwrap</span>()
             .<span class="ident">grow_space</span>(<span class="ident">rtn</span>, <span class="ident">bytes</span>, <span class="ident">new_chunk</span>);
-        <span class="self">self</span>.<span class="ident">common</span>()
-            .<span class="ident">space</span>
-            .<span class="ident">unwrap</span>()
-            .<span class="ident">common</span>()
-            .<span class="ident">mmapper</span>
-            .<span class="ident">ensure_mapped</span>(<span class="ident">rtn</span>, <span class="ident">required_pages</span>);
+
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">space</span>.<span class="ident">unwrap</span>().<span class="ident">common</span>().<span class="ident">mmapper</span>.<span class="ident">ensure_mapped</span>(
+            <span class="ident">rtn</span>,
+            <span class="ident">required_pages</span>,
+            <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_per_chunk</span>(),
+            <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">space</span>.<span class="ident">unwrap</span>().<span class="ident">local_side_metadata_per_chunk</span>(),
+        );
         <span class="kw">if</span> <span class="ident">zeroed</span> {
             <span class="ident">memory</span>::<span class="ident">zero</span>(<span class="ident">rtn</span>, <span class="ident">bytes</span>);
         }

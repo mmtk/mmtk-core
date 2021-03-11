@@ -215,39 +215,16 @@
 <span id="212">212</span>
 <span id="213">213</span>
 <span id="214">214</span>
-<span id="215">215</span>
-<span id="216">216</span>
-<span id="217">217</span>
-<span id="218">218</span>
-<span id="219">219</span>
-<span id="220">220</span>
-<span id="221">221</span>
-<span id="222">222</span>
-<span id="223">223</span>
-<span id="224">224</span>
-<span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
-<span id="234">234</span>
-<span id="235">235</span>
-<span id="236">236</span>
-<span id="237">237</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">global</span>::<span class="ident">GenCopy</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">CopyContext</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">PlanConstraints</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">barriers</span>::<span class="ident">BarrierSelector</span>, <span class="ident">CopyContext</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">Space</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">gc_work</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">WorkerLocal</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::{<span class="ident">GCWork</span>, <span class="ident">GCWorker</span>, <span class="ident">WorkBucketStage</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::{<span class="ident">Allocator</span>, <span class="ident">BumpAllocator</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">forwarding_word</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>, <span class="ident">OpaquePointer</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">MMTK</span>;
@@ -294,6 +271,9 @@
         <span class="ident">_semantics</span>: <span class="kw">crate</span>::<span class="ident">AllocationSemantics</span>,
     ) {
         <span class="ident">forwarding_word</span>::<span class="ident">clear_forwarding_bits</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">obj</span>);
+        <span class="kw">if</span> <span class="op">!</span><span class="kw">super</span>::<span class="ident">NO_SLOW</span> <span class="op">&amp;&amp;</span> <span class="kw">super</span>::<span class="ident">ACTIVE_BARRIER</span> <span class="op">=</span><span class="op">=</span> <span class="ident">BarrierSelector</span>::<span class="ident">ObjectBarrier</span> {
+            <span class="ident">store_atomic</span>(<span class="kw">super</span>::<span class="ident">LOGGING_META</span>, <span class="ident">obj</span>.<span class="ident">to_address</span>(), <span class="number">0b1</span>);
+        }
     }
 }
 
@@ -448,32 +428,6 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">GenCopyMatureProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span>::<span class="ident">Target</span> {
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">base</span>
-    }
-}
-
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GenCopyProcessModBuf</span> {
-    <span class="kw">pub</span> <span class="ident">modified_nodes</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">modified_edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>,
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">GenCopyProcessModBuf</span> {
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="kw">if</span> <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">in_nursery</span>() {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">modified_nodes</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
-            ::<span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">swap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">modified_nodes</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">modified_nodes</span>);
-            <span class="kw">let</span> <span class="ident">work</span> <span class="op">=</span> <span class="ident">ScanObjects</span>::<span class="op">&lt;</span><span class="ident">GenCopyNurseryProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="ident">modified_nodes</span>, <span class="bool-val">false</span>);
-            <span class="ident">worker</span>.<span class="ident">scheduler</span>().<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Closure</span>].<span class="ident">add</span>(<span class="ident">work</span>);
-
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">modified_edges</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
-            ::<span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">swap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">modified_edges</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">modified_edges</span>);
-            <span class="ident">worker</span>.<span class="ident">scheduler</span>().<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Closure</span>].<span class="ident">add</span>(
-                <span class="ident">GenCopyNurseryProcessEdges</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="ident">modified_edges</span>, <span class="bool-val">true</span>, <span class="ident">mmtk</span>),
-            );
-        } <span class="kw">else</span> {
-            <span class="comment">// Do nothing</span>
-        }
     }
 }
 </pre></div>

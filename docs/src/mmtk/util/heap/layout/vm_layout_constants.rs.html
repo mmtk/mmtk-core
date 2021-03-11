@@ -235,7 +235,7 @@
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AVAILABLE_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">AVAILABLE_END</span>.<span class="ident">get_extent</span>(<span class="ident">AVAILABLE_START</span>);
 
 <span class="doccomment">/** Granularity at which we map and unmap virtual address space in the heap */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_MMAP_CHUNK_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">20</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_MMAP_CHUNK_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>;
 
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MMAP_CHUNK_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MMAP_CHUNK_BYTES</span>;
 

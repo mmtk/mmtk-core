@@ -247,9 +247,23 @@
 <span id="244">244</span>
 <span id="245">245</span>
 <span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">gc_work</span>::{<span class="ident">GenCopyCopyContext</span>, <span class="ident">GenCopyMatureProcessEdges</span>, <span class="ident">GenCopyNurseryProcessEdges</span>};
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">mutator</span>::<span class="ident">ALLOCATOR_MAPPING</span>;
+<span class="kw">use</span> <span class="kw">super</span>::{
+    <span class="ident">gc_work</span>::{<span class="ident">GenCopyCopyContext</span>, <span class="ident">GenCopyMatureProcessEdges</span>, <span class="ident">GenCopyNurseryProcessEdges</span>},
+    <span class="ident">LOGGING_META</span>,
+};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">global</span>::<span class="ident">BasePlan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">global</span>::<span class="ident">CommonPlan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">global</span>::<span class="ident">GcStatus</span>;
@@ -280,7 +294,7 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ALLOC_SS</span>: <span class="ident">AllocationSemantics</span> <span class="op">=</span> <span class="ident">AllocationSemantics</span>::<span class="ident">Default</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NURSERY_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">16</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NURSERY_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">32</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GenCopy</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">nursery</span>: <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
@@ -299,7 +313,7 @@
     <span class="ident">gc_header_bits</span>: <span class="number">2</span>,
     <span class="ident">gc_header_words</span>: <span class="number">0</span>,
     <span class="ident">num_specialized_scans</span>: <span class="number">1</span>,
-    <span class="ident">barrier</span>: <span class="ident">BarrierSelector</span>::<span class="ident">ObjectBarrier</span>,
+    <span class="ident">barrier</span>: <span class="kw">super</span>::<span class="ident">ACTIVE_BARRIER</span>,
     ..<span class="ident">PlanConstraints</span>::<span class="ident">default</span>()
 };
 
@@ -422,11 +436,15 @@
     }
 
     <span class="kw">fn</span> <span class="ident">global_side_metadata_per_chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">HAS_GC_BYTE</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">side_metadata_per_chunk</span> <span class="op">=</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">HAS_GC_BYTE</span> {
             <span class="ident">meta_bytes_per_chunk</span>(<span class="number">3</span>, <span class="number">1</span>)
         } <span class="kw">else</span> {
             <span class="number">0</span>
+        };
+        <span class="kw">if</span> <span class="kw">super</span>::<span class="ident">ACTIVE_BARRIER</span> <span class="op">=</span><span class="op">=</span> <span class="ident">BarrierSelector</span>::<span class="ident">ObjectBarrier</span> {
+            <span class="ident">side_metadata_per_chunk</span> <span class="op">+</span><span class="op">=</span> <span class="ident">LOGGING_META</span>.<span class="ident">meta_bytes_per_chunk</span>();
         }
+        <span class="ident">side_metadata_per_chunk</span>
     }
 }
 
@@ -475,6 +493,10 @@
     }
 
     <span class="kw">fn</span> <span class="ident">request_full_heap_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="comment">// For barrier overhead measurements, we always do full gc in nursery collections.</span>
+        <span class="kw">if</span> <span class="kw">super</span>::<span class="ident">FULL_NURSERY_GC</span> {
+            <span class="kw">return</span> <span class="bool-val">true</span>;
+        }
         <span class="self">self</span>.<span class="ident">get_total_pages</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">get_pages_reserved</span>()
     }
 

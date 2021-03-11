@@ -603,15 +603,6 @@
 <span id="600">600</span>
 <span id="601">601</span>
 <span id="602">602</span>
-<span id="603">603</span>
-<span id="604">604</span>
-<span id="605">605</span>
-<span id="606">606</span>
-<span id="607">607</span>
-<span id="608">608</span>
-<span id="609">609</span>
-<span id="610">610</span>
-<span id="611">611</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">try_map_metadata_space</span>;
@@ -1189,15 +1180,6 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="comment">// For contiguous space, we eagerly initialize SFT map based on its address range.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contiguous</span> {
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">try_map_metadata_space</span>(
-                <span class="self">self</span>.<span class="ident">start</span>,
-                <span class="self">self</span>.<span class="ident">extent</span>,
-                <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_per_chunk</span>(),
-                <span class="ident">space</span>.<span class="ident">local_side_metadata_per_chunk</span>(),
-            ) {
-                <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
-                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
-            }
             <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="ident">space</span>.<span class="ident">as_sft</span>(), <span class="self">self</span>.<span class="ident">start</span>, <span class="ident">bytes_to_chunks_up</span>(<span class="self">self</span>.<span class="ident">extent</span>));
         }
     }

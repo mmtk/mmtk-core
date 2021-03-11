@@ -855,6 +855,12 @@
 <span id="852">852</span>
 <span id="853">853</span>
 <span id="854">854</span>
+<span id="855">855</span>
+<span id="856">856</span>
+<span id="857">857</span>
+<span id="858">858</span>
+<span id="859">859</span>
+<span id="860">860</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">helpers</span>::<span class="kw-2">*</span>;
@@ -886,6 +892,12 @@
     <span class="kw">pub</span> <span class="ident">offset</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">log_num_of_bits</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">log_min_obj_size</span>: <span class="ident">usize</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">SideMetadataSpec</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">meta_bytes_per_chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+        <span class="kw">super</span>::<span class="ident">meta_bytes_per_chunk</span>(<span class="self">self</span>.<span class="ident">log_min_obj_size</span>, <span class="self">self</span>.<span class="ident">log_num_of_bits</span>)
+    }
 }
 
 <span class="doccomment">/// Represents the mapping state of a metadata page.</span>
@@ -1170,7 +1182,7 @@
 
         <span class="kw">let</span> <span class="ident">real_old_byte</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">meta_addr</span>.<span class="ident">atomic_load</span>::<span class="op">&lt;</span><span class="ident">AtomicU8</span><span class="op">&gt;</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) };
         <span class="kw">let</span> <span class="ident">expected_old_byte</span> <span class="op">=</span> (<span class="ident">real_old_byte</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">mask</span>) <span class="op">|</span> ((<span class="ident">old_metadata</span> <span class="kw">as</span> <span class="ident">u8</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">lshift</span>);
-        <span class="kw">let</span> <span class="ident">expected_new_byte</span> <span class="op">=</span> <span class="ident">expected_old_byte</span> <span class="op">|</span> ((<span class="ident">new_metadata</span> <span class="kw">as</span> <span class="ident">u8</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">lshift</span>);
+        <span class="kw">let</span> <span class="ident">expected_new_byte</span> <span class="op">=</span> (<span class="ident">expected_old_byte</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">mask</span>) <span class="op">|</span> ((<span class="ident">new_metadata</span> <span class="kw">as</span> <span class="ident">u8</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">lshift</span>);
 
         <span class="kw">unsafe</span> {
             <span class="ident">meta_addr</span>

@@ -123,9 +123,6 @@
 <span id="120">120</span>
 <span id="121">121</span>
 <span id="122">122</span>
-<span id="123">123</span>
-<span id="124">124</span>
-<span id="125">125</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Mutator context for each application thread.</span>
 
@@ -247,9 +244,6 @@
 
     <span class="kw">fn</span> <span class="ident">record_modified_node</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
         <span class="self">self</span>.<span class="ident">barrier</span>().<span class="ident">post_write_barrier</span>(<span class="ident">WriteTarget</span>::<span class="ident">Object</span>(<span class="ident">obj</span>));
-    }
-    <span class="kw">fn</span> <span class="ident">record_modified_edge</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">slot</span>: <span class="ident">Address</span>) {
-        <span class="self">self</span>.<span class="ident">barrier</span>().<span class="ident">post_write_barrier</span>(<span class="ident">WriteTarget</span>::<span class="ident">Slot</span>(<span class="ident">slot</span>));
     }
 }
 </pre></div>
