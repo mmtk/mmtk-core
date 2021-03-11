@@ -1,14 +1,8 @@
 name: Generate doc
 
 # Triggerred when a new commit is pushed to master
-# on:
-#   push:
-#     branches:
-#       - master
-
-# To test: triggered by pull request
 on:
-  pull_request:
+  push:
     branches:
       - master
 
