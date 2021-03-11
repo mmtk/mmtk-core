@@ -42,7 +42,6 @@ pub struct GenCopy<VM: VMBinding> {
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
     in_nursery: AtomicBool,
-    pub scheduler: &'static MMTkScheduler<VM>,
 }
 
 unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
@@ -192,7 +191,6 @@ impl<VM: VMBinding> GenCopy<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
@@ -227,7 +225,6 @@ impl<VM: VMBinding> GenCopy<VM> {
             ),
             common: CommonPlan::new(vm_map, mmapper, options, heap, &GENCOPY_CONSTRAINTS),
             in_nursery: AtomicBool::default(),
-            scheduler,
         }
     }
 

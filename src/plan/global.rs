@@ -133,20 +133,17 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
-    scheduler: &'static MMTkScheduler<VM>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
-        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(
-            vm_map, mmapper, options, scheduler,
-        )),
+        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
         PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options,
         )),
-        PlanSelector::GenCopy => Box::new(crate::plan::gencopy::GenCopy::new(
-            vm_map, mmapper, options, scheduler,
-        )),
+        PlanSelector::GenCopy => {
+            Box::new(crate::plan::gencopy::GenCopy::new(vm_map, mmapper, options))
+        }
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options,
         )),
     }
 }

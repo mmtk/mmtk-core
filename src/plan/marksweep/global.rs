@@ -123,7 +123,6 @@ impl<VM: VMBinding> MarkSweep<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
         MarkSweep {
