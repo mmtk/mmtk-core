@@ -23,7 +23,7 @@ generational copying (gencopy) collector will be added in future.
 ## Triplespace backup instructions
 
 First, rename all instances of `mygc` to `triplespace`, and add it as a
-module by following the instructions in [Create MyGC](#create-mygc).
+module by following the instructions in [Create MyGC](./create.md).
 
 In `global.rs`:
  1. Add a `youngspace` field to `pub struct TripleSpace`:
