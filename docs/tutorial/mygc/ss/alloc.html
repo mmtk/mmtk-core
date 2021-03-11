@@ -169,6 +169,7 @@ into one that implements the semispace algorithm. The first step of this
 is to add the two copyspaces, and allow collectors to allocate memory 
 into them. This involves adding two copyspaces, the code to properly initialise 
 and prepare the new spaces, and a copy context.</p>
+<h2 id="change-the-plan-constraints"><a class="header" href="#change-the-plan-constraints">Change the plan constraints</a></h2>
 <p>Firstly, change the plan constraints. Some of these constraints are not used 
 at the moment, but it's good to set them properly regardless.</p>
 <ol>
@@ -177,12 +178,20 @@ options for plan-specific constraints. At the moment, <code>MYGC_CONSTRAINTS</co
 the default value for <code>PlanConstraints</code>. We will make the following changes.</li>
 <li>Initialize <code>gc_header_bits</code> to 2. We reserve 2 bits in the header for GC use.</li>
 <li>Initialize <code>moves_objects</code> to <code>true</code>.</li>
-<li>Initialize <code>num_specialized_scans</code> to 1.
-<a href="/docs/tutorial/code/mygc_semispace/global.rs#L45-L51">[Finished code (step 1-4)]</a></li>
+<li>Initialize <code>num_specialized_scans</code> to 1.</li>
 </ol>
+<p>Finished Code (Step 1-4):</p>
+<pre><code>pub const MYGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    moves_objects: true,
+    gc_header_bits: 2,
+    gc_header_words: 0,
+    num_specialized_scans: 1,
+    ..PlanConstraints::default()
+};
+</code></pre>
+<h2 id="change-the-plan-implementation"><a class="header" href="#change-the-plan-implementation">Change the plan implementation</a></h2>
 <p>Next, in <code>global.rs</code>, replace the old immortal (nogc) space with two copyspaces.</p>
-<ol>
-<li>
+<h3 id="imports"><a class="header" href="#imports">Imports</a></h3>
 <p>To the import statement block:</p>
 <ol>
 <li>Replace <code>crate::plan::global::{BasePlan, NoCopy};</code> with 
@@ -195,9 +204,42 @@ than the base plan. Any garbage collected plan should use <code>CommonPlan</code
 to be used to store an indicator of which copyspace is the tospace.</li>
 <li>Delete <code>#[allow(unused_imports)]</code>.</li>
 </ol>
-<p><a href="/docs/tutorial/code/mygc_semispace/global.rs#L1">[Finished code (step 1)]</a></p>
-</li>
-<li>
+<p>Finished Code(Step 1):</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
+use crate::mmtk::MMTK;
+use crate::plan::global::BasePlan; //Modify
+use crate::plan::global::CommonPlan; // Add
+use crate::plan::global::GcStatus; // Add
+use crate::plan::mutator_context::Mutator;
+use crate::plan::mygc::mutator::create_mygc_mutator;
+use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::AllocationSemantics;
+use crate::plan::Plan;
+use crate::policy::copyspace::CopySpace; // Add
+use crate::policy::space::Space;
+use crate::scheduler::gc_work::*; // Add
+use crate::scheduler::*; // Modify
+use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
+use crate::util::heap::HeapMeta;
+use crate::util::heap::VMRequest;
+use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
+use crate::plan::PlanConstraints;
+use std::sync::atomic::{AtomicBool, Ordering}; // Add 
+use std::sync::Arc;
+use enum_map::EnumMap;
+// Remove #[allow(unused_imports)].
+// Remove handle_user_collection_request.
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="struct-mygc"><a class="header" href="#struct-mygc">Struct MyGC</a></h3>
 <p>Change <code>pub struct MyGC&lt;VM: VMBinding&gt;</code> to add new instance variables.</p>
 <ol>
 <li>Delete the existing fields in the constructor.</li>
@@ -208,98 +250,145 @@ and <code>pub copyspace1: CopySpace&lt;VM&gt;,</code>. These are the two copyspa
 <li>Add <code>pub common: CommonPlan&lt;VM&gt;,</code>.
 This holds an instance of the common plan.</li>
 </ol>
-<p><a href="/docs/tutorial/code/mygc_semispace/global.rs#L36-L41">[Finished code (step 2)]</a></p>
-</li>
-<li>
-<p>Change <code>impl&lt;VM: VMBinding&gt; Plan for MyGC&lt;VM&gt;</code>.
-This section initialises and prepares the objects in MyGC that you just defined.</p>
+<p>Finished code (step 2):</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct MyGC&lt;VM: VMBinding&gt; {
+    pub hi: AtomicBool, 
+    pub copyspace0: CopySpace&lt;VM&gt;,
+    pub copyspace1: CopySpace&lt;VM&gt;,
+    pub common: CommonPlan&lt;VM&gt;, 
+}
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="implement-the-plan-trait-for-mygc"><a class="header" href="#implement-the-plan-trait-for-mygc">Implement the Plan trait for MyGC</a></h3>
+<h4 id="cnstructor"><a class="header" href="#cnstructor">Cnstructor</a></h4>
+<p>Change <code>fn new()</code>. This section initialises and prepares the objects in MyGC that you just defined.</p>
 <ol>
 <li>Delete the definition of <code>mygc_space</code>. 
 Instead, we will define the two copyspaces here.</li>
-<li>Define one of the copyspaces by adding the following code: 
+<li>Define one of the copyspaces by adding the following code: </li>
+</ol>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span> let copyspace0 = CopySpace::new(
-      &quot;copyspace0&quot;,
-      false,
-      true,
-      VMRequest::discontiguous(),
-      vm_map,
-      mmapper,
-      &amp;mut heap,
-  );
+</span>            copyspace0: CopySpace::new(
+                &quot;copyspace0&quot;,
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &amp;mut heap,
+            ),
 <span class="boring">}
 </span></code></pre></pre>
-</li>
+<ol start="3">
 <li>Create another copyspace, called <code>copyspace1</code>, defining it as a fromspace 
 instead of a tospace. (Hint: the definitions for 
 copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
-<li>Finally, replace the old MyGC initializer with the following:
+<li>Finally, replace the old MyGC initializer.</li>
+</ol>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span> MyGC {
-     hi: AtomicBool::new(false),
-     copyspace0,
-     copyspace1,
-     common: CommonPlan::new(vm_map, mmapper, options, heap, &amp;MYGC_CONSTRAINTS),
- }
+</span>    fn new(
+        vm_map: &amp;'static VMMap,
+        mmapper: &amp;'static Mmapper,
+        options: Arc&lt;UnsafeOptionsWrapper&gt;,
+        _scheduler: &amp;'static MMTkScheduler&lt;VM&gt;,
+    ) -&gt; Self {
+        // Modify
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+
+        MyGC {
+            hi: AtomicBool::new(false),
+            copyspace0: CopySpace::new(
+                &quot;copyspace0&quot;,
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &amp;mut heap,
+            ),
+            copyspace1: CopySpace::new(
+                &quot;copyspace1&quot;,
+                true,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &amp;mut heap,
+            ),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &amp;MYGC_CONSTRAINTS),
+        }
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-</ol>
-<p><a href="/docs/tutorial/code/mygc_semispace/global.rs#L147-L168">[Finished code (step 3-4)]</a></p>
-</li>
-<li>
-<p>There are a few more functions to add to <code>Plan for MyGC</code> next.</p>
-<ol>
-<li>Find <code>gc_init()</code>. Change it to initialise the common plan and the two 
+<h4 id="initializer"><a class="header" href="#initializer">Initializer</a></h4>
+<p>Find <code>gc_init()</code>. Change it to initialise the common plan and the two 
 copyspaces, rather than the base plan and mygc_space. The contents of the 
-initializer calls are identical.</li>
-</ol>
-<p><a href="/docs/tutorial/code/mygc_semispace/global.rs#L71-L80">[Finished code (step 4 i)]</a></p>
-<ol start="2">
-<li>The trait <code>Plan</code> requires a <code>common()</code> method that should return a 
-reference to the common plan. Implement this method now.
+initializer calls are identical.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn common(&amp;self) -&gt; &amp;CommonPlan&lt;VM&gt; {
-  &amp;self.common
-}
+</span>    fn gc_init(
+        &amp;mut self, 
+        heap_size: usize,
+        vm_map: &amp;'static VMMap,
+        scheduler: &amp;Arc&lt;MMTkScheduler&lt;VM&gt;&gt;,
+    ) {
+        self.common.gc_init(heap_size, vm_map, scheduler);
+        self.copyspace0.init(&amp;vm_map);
+        self.copyspace1.init(&amp;vm_map);
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-<li>Find the helper method <code>base</code> and change it so that it calls the 
-base plan <em>through</em> the common plan.
+<h4 id="other-methods-in-the-plan-trait"><a class="header" href="#other-methods-in-the-plan-trait">Other methods in the Plan trait</a></h4>
+<p>The trait <code>Plan</code> requires a <code>common()</code> method that should return a 
+reference to the common plan. Implement this method now.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn base(&amp;self) -&gt; &amp;BasePlan&lt;VM&gt; {
-  &amp;self.common.base
-}
+</span>    fn common(&amp;self) -&gt; &amp;CommonPlan&lt;VM&gt; {
+        &amp;self.common
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-<li>Find the method <code>get_pages_used</code>. Replace the current body with 
+<p>Find the helper method <code>base</code> and change it so that it calls the 
+base plan <em>through</em> the common plan.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn base(&amp;self) -&gt; &amp;BasePlan&lt;VM&gt; {
+        &amp;self.common.base
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>Find the method <code>get_pages_used</code>. Replace the current body with 
 <code>self.tospace().reserved_pages() + self.common.get_pages_used()</code>, to 
 correctly count the pages contained in the tospace and the common plan 
-spaces (which will be explained later).</li>
-<li>Also add the following helper function:
+spaces (which will be explained later).</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn get_collection_reserve(&amp;self) -&gt; usize {
-    self.tospace().reserved_pages()
-}
+</span>    fn get_pages_used(&amp;self) -&gt; usize {
+        self.tospace().reserved_pages() + self.common.get_pages_used()
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-</ol>
-<p><a href="/docs/tutorial/code/mygc_semispace/global.rs#L115-L133">[Finished code (step 4 ii-iv)]</a></p>
-</li>
-<li>
+<p>Add and override the following helper function:</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn get_collection_reserve(&amp;self) -&gt; usize {
+        self.tospace().reserved_pages()
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="access-mygc-spaces"><a class="header" href="#access-mygc-spaces">Access MyGC spaces</a></h3>
 <p>Add a new section of methods for MyGC:</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
@@ -308,50 +397,60 @@ spaces (which will be explained later).</li>
 }
 <span class="boring">}
 </span></code></pre></pre>
-<ol>
-<li>To this, add two helper methods, <code>tospace(&amp;self)</code> 
+<p>To this, add two helper methods, <code>tospace(&amp;self)</code> 
 and <code>fromspace(&amp;self)</code>. They both have return type <code>&amp;CopySpace&lt;VM&gt;</code>, 
 and return a reference to the tospace and fromspace respectively. 
 <code>tospace()</code> (see below) returns a reference to the tospace, 
-and <code>fromspace()</code> returns a reference to the fromspace.
+and <code>fromspace()</code> returns a reference to the fromspace.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub fn tospace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
-  if self.hi.load(Ordering::SeqCst) {
-      &amp;self.copyspace1
-  } else {
-      &amp;self.copyspace0
-  }
-}
+</span>    pub fn tospace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
+        if self.hi.load(Ordering::SeqCst) {
+            &amp;self.copyspace1
+        } else {
+            &amp;self.copyspace0
+        }
+    }
 
- pub fn fromspace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
-     if self.hi.load(Ordering::SeqCst) {
-         &amp;self.copyspace0
-     } else {
-         &amp;self.copyspace1
-     }
- }
+    pub fn fromspace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
+        if self.hi.load(Ordering::SeqCst) {
+            &amp;self.copyspace0
+        } else {
+            &amp;self.copyspace1
+        }
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-</ol>
-<p><a href="/docs/tutorial/code/mygc_semispace/global.rs#L171-L185">[Finished code (step 5)]</a></p>
-</li>
-</ol>
+<h2 id="chagne-the-mutator-definition"><a class="header" href="#chagne-the-mutator-definition">Chagne the mutator definition</a></h2>
 <p>Next, we need to change the mutator, in <code>mutator.rs</code>, to allocate to the 
 tospace, and to the two spaces controlled by the common plan. </p>
-<ol>
-<li>
+<h3 id="imports-1"><a class="header" href="#imports-1">Imports</a></h3>
 <p>Change the following import statements:</p>
 <ol>
 <li>Add <code>use super::MyGC;</code>.</li>
 <li>Add <code>use crate::util::alloc::BumpAllocator;</code>.</li>
 <li>Delete <code>use crate::plan::mygc::MyGC;</code>.</li>
 </ol>
-<p><a href="/docs/tutorial/code/mygc_semispace/mutator.rs#L1">[Finished code (step 1)]</a></p>
-</li>
-<li>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use super::MyGC; // Add
+use crate::plan::barriers::NoBarrier;
+use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorConfig;
+use crate::plan::AllocationSemantics as AllocationType;
+use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::BumpAllocator;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
+use enum_map::enum_map;
+use enum_map::EnumMap;
+// Remove crate::plan::mygc::MyGC
+// Remove mygc_mutator_noop
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="allocator-mapping"><a class="header" href="#allocator-mapping">Allocator mapping</a></h3>
 <p>In <code>lazy_static!</code>, make the following changes to <code>ALLOCATOR_MAPPING</code>, 
 which maps the required allocation semantics to the corresponding allocators. 
 For example, for <code>Default</code>, we allocate using the first bump pointer allocator 
@@ -361,9 +460,19 @@ For example, for <code>Default</code>, we allocate using the first bump pointer 
 <li>Map <code>ReadOnly</code> to <code>BumpPointer(1)</code>.</li>
 <li>Map <code>Los</code> to <code>LargeObject(0)</code>. </li>
 </ol>
-<p><a href="/docs/tutorial/code/mygc_semispace/mutator.rs#L47-L51">[Finished code (step 2)]</a></p>
-</li>
-<li>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>lazy_static! {
+    pub static ref ALLOCATOR_MAPPING: EnumMap&lt;AllocationType, AllocatorSelector&gt; = enum_map! {
+        AllocationType::Default =&gt; AllocatorSelector::BumpPointer(0),
+        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly =&gt; AllocatorSelector::BumpPointer(1),
+        AllocationType::Los =&gt; AllocatorSelector::LargeObject(0),
+    };
+}
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="space-mapping"><a class="header" href="#space-mapping">Space mapping</a></h3>
 <p>Next, in <code>create_mygc_mutator</code>, change which allocator is allocated to what 
 space in <code>space_mapping</code>. Note that the space allocation is formatted as a list 
 of tuples. For example, the first bump pointer allocator (<code>BumpPointer(0)</code>) is 
@@ -375,9 +484,19 @@ bound with <code>tospace</code>. </p>
 <li>None of the above should be dereferenced (ie, they should not have 
 the <code>&amp;</code> prefix).</li>
 </ol>
-<p><a href="/docs/tutorial/code/mygc_semispace/mutator.rs#L54-L80">[Finished code (step 3)]</a></p>
-</li>
-</ol>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>        space_mapping: box vec![
+            (AllocatorSelector::BumpPointer(0), plan.tospace()),
+            (
+                AllocatorSelector::BumpPointer(1),
+                plan.common.get_immortal(),
+            ),
+            (AllocatorSelector::LargeObject(0), plan.common.get_los()),
+        ],
+<span class="boring">}
+</span></code></pre></pre>
 <p>There may seem to be 2 extraneous spaces and allocators that have appeared all 
 of a sudden in these past 2 steps. These are parts of the MMTk common plan 
 itself.</p>

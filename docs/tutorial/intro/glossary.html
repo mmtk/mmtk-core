@@ -175,15 +175,15 @@ objects, is live/alive.</p>
 <p><em>mutator</em>: Something that 'mutates', or changes, the objects stored in memory. 
 This is the term that is traditionally used in the garbage collection literature 
 to describe the running program (because it 'mutates' the object graph).</p>
-<p><em>plan</em>: A garbage collection algorithm expressed as a configuration of policies.</p>
-<p>See also <a href="#plans-and-policies">Plans and policies</a> below.</p>
+<p><em>plan</em>: A garbage collection algorithm expressed as a configuration of policies. 
+See also <a href="#plans-and-policies">Plans and policies</a> below.</p>
 <p><em>policy</em>: A specific garbage collection algorithm, such as marksweep, copying, 
-immix, etc. Plans are made up of an arrangement of one or more policies. </p>
-<p>See also <a href="#plans-and-policies">Plans and policies</a> below.</p>
+immix, etc. Plans are made up of an arrangement of one or more policies. 
+See also <a href="#plans-and-policies">Plans and policies</a> below.</p>
 <p><em>scheduler</em>: Dynamically dispatches units of GC work to workers.</p>
 <p><em>zeroing</em>, <em>zero initialization</em>: Initializing and resetting unused memory 
 bits to have a value of 0. Required by most memory-safe programming languages.</p>
-<p>See also: <a href="#further-reading">Further Reading</a></p>
+<p>See also: <a href="../further_reading.html">Further Reading</a></p>
 <h2 id="plans-and-policies"><a class="header" href="#plans-and-policies">Plans and Policies</a></h2>
 <p>In MMTk, collectors are instantiated as plans, which can be thought of as 
 configurations of collector policies. In practice, most production 

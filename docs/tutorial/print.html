@@ -174,7 +174,7 @@ generational copying garbage collector. </p>
 <p>This tutorial is aimed at GC implementors who would like to implement 
 new GC algorithms/plans with MMTk. If you are a language implementor 
 interested in <em>porting</em> your runtime to MMTk, you should refer to the 
-<a href="/docs/portingguide/Porting_Guide.html">porting guide</a> instead.</p>
+<a href="https://www.mmtk.io/mmtk-core/portingguide/">porting guide</a> instead.</p>
 <p>This tutorial is a work in progress. Some sections may be rough, and others may 
 be missing information (especially about import statements). If something is 
 missing or inaccurate, refer to the relevant completed garbage collector if
@@ -219,15 +219,15 @@ objects, is live/alive.</p>
 <p><em>mutator</em>: Something that 'mutates', or changes, the objects stored in memory. 
 This is the term that is traditionally used in the garbage collection literature 
 to describe the running program (because it 'mutates' the object graph).</p>
-<p><em>plan</em>: A garbage collection algorithm expressed as a configuration of policies.</p>
-<p>See also <a href="intro/glossary.html#plans-and-policies">Plans and policies</a> below.</p>
+<p><em>plan</em>: A garbage collection algorithm expressed as a configuration of policies. 
+See also <a href="intro/glossary.html#plans-and-policies">Plans and policies</a> below.</p>
 <p><em>policy</em>: A specific garbage collection algorithm, such as marksweep, copying, 
-immix, etc. Plans are made up of an arrangement of one or more policies. </p>
-<p>See also <a href="intro/glossary.html#plans-and-policies">Plans and policies</a> below.</p>
+immix, etc. Plans are made up of an arrangement of one or more policies. 
+See also <a href="intro/glossary.html#plans-and-policies">Plans and policies</a> below.</p>
 <p><em>scheduler</em>: Dynamically dispatches units of GC work to workers.</p>
 <p><em>zeroing</em>, <em>zero initialization</em>: Initializing and resetting unused memory 
 bits to have a value of 0. Required by most memory-safe programming languages.</p>
-<p>See also: <a href="intro/glossary.html#further-reading">Further Reading</a></p>
+<p>See also: <a href="intro/../further_reading.html">Further Reading</a></p>
 <h2 id="plans-and-policies"><a class="header" href="#plans-and-policies">Plans and Policies</a></h2>
 <p>In MMTk, collectors are instantiated as plans, which can be thought of as 
 configurations of collector policies. In practice, most production 
@@ -261,7 +261,7 @@ account, it is not required for this tutorial.</p>
 dependencies by following the instructions in the
 <a href="https://github.com/mmtk/mmtk-openjdk/blob/master/README.md">OpenJDK binding repository</a>.</li>
 <li>Ensure you can build OpenJDK according to the instructions in the READMEs of 
-<a href="preliminaries//../master/README.html">the mmtk-core repository</a> and the 
+<a href="https://github.com/mmtk/mmtk-core/blob/master/README.md">the mmtk-core repository</a> and the 
 <a href="https://github.com/mmtk/mmtk-openjdk/blob/master/README.md">OpenJDK binding repository</a>.
 <ul>
 <li>Use the <code>slowdebug</code> option when building the OpenJDK binding. This is the 
@@ -281,15 +281,14 @@ entered in <code>repos/openjdk</code>.</p>
 <p><strong>HelloWorld</strong> (simplest, will never trigger GC): </p>
 <ol>
 <li>Copy the following code into a new Java file titled &quot;HelloWorld.java&quot; 
-in <code>mmtk-openjdk/repos/openjdk</code>:</li>
-</ol>
+in <code>mmtk-openjdk/repos/openjdk</code>:
 <pre><code class="language-java">class HelloWorld {
-    public static void main(String[] args) {
-        System.out.println(&quot;Hello World!&quot;);
-    }
+   public static void main(String[] args) {
+      System.out.println(&quot;Hello World!&quot;);
+   }
 }
 </code></pre>
-<ol start="2">
+</li>
 <li>Use the command 
 <code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac HelloWorld.java</code>.</li>
 <li>Then, run 
@@ -515,7 +514,7 @@ with the each of the three benchmarks. It should work identically to NoGC.</p>
 <p>If you've got to this point, then congratulations! You have created your first working MMTk collector!</p>
 <p>At this point, you should familiarise yourself with the MyGC plan if you 
 haven't already. Try answering the following questions by looking at the code 
-and <a href="mygc/create.html#further-reading">Further Reading</a>: </p>
+and <a href="mygc/../further_reading.html">Further Reading</a>: </p>
 <ul>
 <li>Where is the allocator defined?</li>
 <li>How many memory spaces are there?</li>
@@ -539,6 +538,7 @@ into one that implements the semispace algorithm. The first step of this
 is to add the two copyspaces, and allow collectors to allocate memory 
 into them. This involves adding two copyspaces, the code to properly initialise 
 and prepare the new spaces, and a copy context.</p>
+<h2 id="change-the-plan-constraints"><a class="header" href="#change-the-plan-constraints">Change the plan constraints</a></h2>
 <p>Firstly, change the plan constraints. Some of these constraints are not used 
 at the moment, but it's good to set them properly regardless.</p>
 <ol>
@@ -547,12 +547,20 @@ options for plan-specific constraints. At the moment, <code>MYGC_CONSTRAINTS</co
 the default value for <code>PlanConstraints</code>. We will make the following changes.</li>
 <li>Initialize <code>gc_header_bits</code> to 2. We reserve 2 bits in the header for GC use.</li>
 <li>Initialize <code>moves_objects</code> to <code>true</code>.</li>
-<li>Initialize <code>num_specialized_scans</code> to 1.
-<a href="mygc/ss//docs/tutorial/code/mygc_semispace/global.rs#L45-L51">[Finished code (step 1-4)]</a></li>
+<li>Initialize <code>num_specialized_scans</code> to 1.</li>
 </ol>
+<p>Finished Code (Step 1-4):</p>
+<pre><code>pub const MYGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    moves_objects: true,
+    gc_header_bits: 2,
+    gc_header_words: 0,
+    num_specialized_scans: 1,
+    ..PlanConstraints::default()
+};
+</code></pre>
+<h2 id="change-the-plan-implementation"><a class="header" href="#change-the-plan-implementation">Change the plan implementation</a></h2>
 <p>Next, in <code>global.rs</code>, replace the old immortal (nogc) space with two copyspaces.</p>
-<ol>
-<li>
+<h3 id="imports"><a class="header" href="#imports">Imports</a></h3>
 <p>To the import statement block:</p>
 <ol>
 <li>Replace <code>crate::plan::global::{BasePlan, NoCopy};</code> with 
@@ -565,9 +573,42 @@ than the base plan. Any garbage collected plan should use <code>CommonPlan</code
 to be used to store an indicator of which copyspace is the tospace.</li>
 <li>Delete <code>#[allow(unused_imports)]</code>.</li>
 </ol>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/global.rs#L1">[Finished code (step 1)]</a></p>
-</li>
-<li>
+<p>Finished Code(Step 1):</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
+use crate::mmtk::MMTK;
+use crate::plan::global::BasePlan; //Modify
+use crate::plan::global::CommonPlan; // Add
+use crate::plan::global::GcStatus; // Add
+use crate::plan::mutator_context::Mutator;
+use crate::plan::mygc::mutator::create_mygc_mutator;
+use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::AllocationSemantics;
+use crate::plan::Plan;
+use crate::policy::copyspace::CopySpace; // Add
+use crate::policy::space::Space;
+use crate::scheduler::gc_work::*; // Add
+use crate::scheduler::*; // Modify
+use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
+use crate::util::heap::HeapMeta;
+use crate::util::heap::VMRequest;
+use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
+use crate::plan::PlanConstraints;
+use std::sync::atomic::{AtomicBool, Ordering}; // Add 
+use std::sync::Arc;
+use enum_map::EnumMap;
+// Remove #[allow(unused_imports)].
+// Remove handle_user_collection_request.
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="struct-mygc"><a class="header" href="#struct-mygc">Struct MyGC</a></h3>
 <p>Change <code>pub struct MyGC&lt;VM: VMBinding&gt;</code> to add new instance variables.</p>
 <ol>
 <li>Delete the existing fields in the constructor.</li>
@@ -578,98 +619,145 @@ and <code>pub copyspace1: CopySpace&lt;VM&gt;,</code>. These are the two copyspa
 <li>Add <code>pub common: CommonPlan&lt;VM&gt;,</code>.
 This holds an instance of the common plan.</li>
 </ol>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/global.rs#L36-L41">[Finished code (step 2)]</a></p>
-</li>
-<li>
-<p>Change <code>impl&lt;VM: VMBinding&gt; Plan for MyGC&lt;VM&gt;</code>.
-This section initialises and prepares the objects in MyGC that you just defined.</p>
+<p>Finished code (step 2):</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct MyGC&lt;VM: VMBinding&gt; {
+    pub hi: AtomicBool, 
+    pub copyspace0: CopySpace&lt;VM&gt;,
+    pub copyspace1: CopySpace&lt;VM&gt;,
+    pub common: CommonPlan&lt;VM&gt;, 
+}
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="implement-the-plan-trait-for-mygc"><a class="header" href="#implement-the-plan-trait-for-mygc">Implement the Plan trait for MyGC</a></h3>
+<h4 id="cnstructor"><a class="header" href="#cnstructor">Cnstructor</a></h4>
+<p>Change <code>fn new()</code>. This section initialises and prepares the objects in MyGC that you just defined.</p>
 <ol>
 <li>Delete the definition of <code>mygc_space</code>. 
 Instead, we will define the two copyspaces here.</li>
-<li>Define one of the copyspaces by adding the following code: 
+<li>Define one of the copyspaces by adding the following code: </li>
+</ol>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span> let copyspace0 = CopySpace::new(
-      &quot;copyspace0&quot;,
-      false,
-      true,
-      VMRequest::discontiguous(),
-      vm_map,
-      mmapper,
-      &amp;mut heap,
-  );
+</span>            copyspace0: CopySpace::new(
+                &quot;copyspace0&quot;,
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &amp;mut heap,
+            ),
 <span class="boring">}
 </span></code></pre></pre>
-</li>
+<ol start="3">
 <li>Create another copyspace, called <code>copyspace1</code>, defining it as a fromspace 
 instead of a tospace. (Hint: the definitions for 
 copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
-<li>Finally, replace the old MyGC initializer with the following:
+<li>Finally, replace the old MyGC initializer.</li>
+</ol>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span> MyGC {
-     hi: AtomicBool::new(false),
-     copyspace0,
-     copyspace1,
-     common: CommonPlan::new(vm_map, mmapper, options, heap, &amp;MYGC_CONSTRAINTS),
- }
+</span>    fn new(
+        vm_map: &amp;'static VMMap,
+        mmapper: &amp;'static Mmapper,
+        options: Arc&lt;UnsafeOptionsWrapper&gt;,
+        _scheduler: &amp;'static MMTkScheduler&lt;VM&gt;,
+    ) -&gt; Self {
+        // Modify
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+
+        MyGC {
+            hi: AtomicBool::new(false),
+            copyspace0: CopySpace::new(
+                &quot;copyspace0&quot;,
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &amp;mut heap,
+            ),
+            copyspace1: CopySpace::new(
+                &quot;copyspace1&quot;,
+                true,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &amp;mut heap,
+            ),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &amp;MYGC_CONSTRAINTS),
+        }
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-</ol>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/global.rs#L147-L168">[Finished code (step 3-4)]</a></p>
-</li>
-<li>
-<p>There are a few more functions to add to <code>Plan for MyGC</code> next.</p>
-<ol>
-<li>Find <code>gc_init()</code>. Change it to initialise the common plan and the two 
+<h4 id="initializer"><a class="header" href="#initializer">Initializer</a></h4>
+<p>Find <code>gc_init()</code>. Change it to initialise the common plan and the two 
 copyspaces, rather than the base plan and mygc_space. The contents of the 
-initializer calls are identical.</li>
-</ol>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/global.rs#L71-L80">[Finished code (step 4 i)]</a></p>
-<ol start="2">
-<li>The trait <code>Plan</code> requires a <code>common()</code> method that should return a 
-reference to the common plan. Implement this method now.
+initializer calls are identical.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn common(&amp;self) -&gt; &amp;CommonPlan&lt;VM&gt; {
-  &amp;self.common
-}
+</span>    fn gc_init(
+        &amp;mut self, 
+        heap_size: usize,
+        vm_map: &amp;'static VMMap,
+        scheduler: &amp;Arc&lt;MMTkScheduler&lt;VM&gt;&gt;,
+    ) {
+        self.common.gc_init(heap_size, vm_map, scheduler);
+        self.copyspace0.init(&amp;vm_map);
+        self.copyspace1.init(&amp;vm_map);
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-<li>Find the helper method <code>base</code> and change it so that it calls the 
-base plan <em>through</em> the common plan.
+<h4 id="other-methods-in-the-plan-trait"><a class="header" href="#other-methods-in-the-plan-trait">Other methods in the Plan trait</a></h4>
+<p>The trait <code>Plan</code> requires a <code>common()</code> method that should return a 
+reference to the common plan. Implement this method now.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn base(&amp;self) -&gt; &amp;BasePlan&lt;VM&gt; {
-  &amp;self.common.base
-}
+</span>    fn common(&amp;self) -&gt; &amp;CommonPlan&lt;VM&gt; {
+        &amp;self.common
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-<li>Find the method <code>get_pages_used</code>. Replace the current body with 
+<p>Find the helper method <code>base</code> and change it so that it calls the 
+base plan <em>through</em> the common plan.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn base(&amp;self) -&gt; &amp;BasePlan&lt;VM&gt; {
+        &amp;self.common.base
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>Find the method <code>get_pages_used</code>. Replace the current body with 
 <code>self.tospace().reserved_pages() + self.common.get_pages_used()</code>, to 
 correctly count the pages contained in the tospace and the common plan 
-spaces (which will be explained later).</li>
-<li>Also add the following helper function:
+spaces (which will be explained later).</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn get_collection_reserve(&amp;self) -&gt; usize {
-    self.tospace().reserved_pages()
-}
+</span>    fn get_pages_used(&amp;self) -&gt; usize {
+        self.tospace().reserved_pages() + self.common.get_pages_used()
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-</ol>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/global.rs#L115-L133">[Finished code (step 4 ii-iv)]</a></p>
-</li>
-<li>
+<p>Add and override the following helper function:</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn get_collection_reserve(&amp;self) -&gt; usize {
+        self.tospace().reserved_pages()
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="access-mygc-spaces"><a class="header" href="#access-mygc-spaces">Access MyGC spaces</a></h3>
 <p>Add a new section of methods for MyGC:</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
@@ -678,50 +766,60 @@ spaces (which will be explained later).</li>
 }
 <span class="boring">}
 </span></code></pre></pre>
-<ol>
-<li>To this, add two helper methods, <code>tospace(&amp;self)</code> 
+<p>To this, add two helper methods, <code>tospace(&amp;self)</code> 
 and <code>fromspace(&amp;self)</code>. They both have return type <code>&amp;CopySpace&lt;VM&gt;</code>, 
 and return a reference to the tospace and fromspace respectively. 
 <code>tospace()</code> (see below) returns a reference to the tospace, 
-and <code>fromspace()</code> returns a reference to the fromspace.
+and <code>fromspace()</code> returns a reference to the fromspace.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub fn tospace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
-  if self.hi.load(Ordering::SeqCst) {
-      &amp;self.copyspace1
-  } else {
-      &amp;self.copyspace0
-  }
-}
+</span>    pub fn tospace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
+        if self.hi.load(Ordering::SeqCst) {
+            &amp;self.copyspace1
+        } else {
+            &amp;self.copyspace0
+        }
+    }
 
- pub fn fromspace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
-     if self.hi.load(Ordering::SeqCst) {
-         &amp;self.copyspace0
-     } else {
-         &amp;self.copyspace1
-     }
- }
+    pub fn fromspace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
+        if self.hi.load(Ordering::SeqCst) {
+            &amp;self.copyspace0
+        } else {
+            &amp;self.copyspace1
+        }
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-</ol>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/global.rs#L171-L185">[Finished code (step 5)]</a></p>
-</li>
-</ol>
+<h2 id="chagne-the-mutator-definition"><a class="header" href="#chagne-the-mutator-definition">Chagne the mutator definition</a></h2>
 <p>Next, we need to change the mutator, in <code>mutator.rs</code>, to allocate to the 
 tospace, and to the two spaces controlled by the common plan. </p>
-<ol>
-<li>
+<h3 id="imports-1"><a class="header" href="#imports-1">Imports</a></h3>
 <p>Change the following import statements:</p>
 <ol>
 <li>Add <code>use super::MyGC;</code>.</li>
 <li>Add <code>use crate::util::alloc::BumpAllocator;</code>.</li>
 <li>Delete <code>use crate::plan::mygc::MyGC;</code>.</li>
 </ol>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/mutator.rs#L1">[Finished code (step 1)]</a></p>
-</li>
-<li>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use super::MyGC; // Add
+use crate::plan::barriers::NoBarrier;
+use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorConfig;
+use crate::plan::AllocationSemantics as AllocationType;
+use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::BumpAllocator;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
+use enum_map::enum_map;
+use enum_map::EnumMap;
+// Remove crate::plan::mygc::MyGC
+// Remove mygc_mutator_noop
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="allocator-mapping"><a class="header" href="#allocator-mapping">Allocator mapping</a></h3>
 <p>In <code>lazy_static!</code>, make the following changes to <code>ALLOCATOR_MAPPING</code>, 
 which maps the required allocation semantics to the corresponding allocators. 
 For example, for <code>Default</code>, we allocate using the first bump pointer allocator 
@@ -731,9 +829,19 @@ For example, for <code>Default</code>, we allocate using the first bump pointer 
 <li>Map <code>ReadOnly</code> to <code>BumpPointer(1)</code>.</li>
 <li>Map <code>Los</code> to <code>LargeObject(0)</code>. </li>
 </ol>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/mutator.rs#L47-L51">[Finished code (step 2)]</a></p>
-</li>
-<li>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>lazy_static! {
+    pub static ref ALLOCATOR_MAPPING: EnumMap&lt;AllocationType, AllocatorSelector&gt; = enum_map! {
+        AllocationType::Default =&gt; AllocatorSelector::BumpPointer(0),
+        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly =&gt; AllocatorSelector::BumpPointer(1),
+        AllocationType::Los =&gt; AllocatorSelector::LargeObject(0),
+    };
+}
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="space-mapping"><a class="header" href="#space-mapping">Space mapping</a></h3>
 <p>Next, in <code>create_mygc_mutator</code>, change which allocator is allocated to what 
 space in <code>space_mapping</code>. Note that the space allocation is formatted as a list 
 of tuples. For example, the first bump pointer allocator (<code>BumpPointer(0)</code>) is 
@@ -745,9 +853,19 @@ bound with <code>tospace</code>. </p>
 <li>None of the above should be dereferenced (ie, they should not have 
 the <code>&amp;</code> prefix).</li>
 </ol>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/mutator.rs#L54-L80">[Finished code (step 3)]</a></p>
-</li>
-</ol>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>        space_mapping: box vec![
+            (AllocatorSelector::BumpPointer(0), plan.tospace()),
+            (
+                AllocatorSelector::BumpPointer(1),
+                plan.common.get_immortal(),
+            ),
+            (AllocatorSelector::LargeObject(0), plan.common.get_los()),
+        ],
+<span class="boring">}
+</span></code></pre></pre>
 <p>There may seem to be 2 extraneous spaces and allocators that have appeared all 
 of a sudden in these past 2 steps. These are parts of the MMTk common plan 
 itself.</p>
@@ -763,36 +881,34 @@ allocator in the common plan to avoid having to copy them. </li>
 Try building again. If you run HelloWorld or Fannkunchredux, they should
 work. DaCapo's lusearch should fail, as it requires garbage to be collected. </p>
 <h1 id="collection-implement-garbage-collection"><a class="header" href="#collection-implement-garbage-collection">Collection: Implement garbage collection</a></h1>
-<h2 id="copycontext-and-scheduler"><a class="header" href="#copycontext-and-scheduler">CopyContext and Scheduler</a></h2>
 <p>We need to add a few more things to get garbage collection working. 
 Specifically, we need to add a <code>CopyContext</code>, which a GC worker uses for 
 copying objects, and GC work packets that will be scheduled for a collection.</p>
+<h2 id="copycontext"><a class="header" href="#copycontext">CopyContext</a></h2>
 <p>At the moment, none of the files in the plan are suited for garbage collection 
 operations. So, we need to add a new file to hold the <code>CopyContext</code> and other 
 structures and functions that will give the collector proper functionality.</p>
-<ol>
-<li>
-<p>Make a new file under <code>mygc</code>, called <code>gc_work.rs</code>.</p>
-</li>
-<li>
-<p>In <code>mod.rs</code>, import <code>gc_work</code> as a module by adding the line <code>mod gc_work</code>.</p>
-</li>
-<li>
-<p>In <code>gc_work.rs</code>, add the following import statements:</p>
+<p>Make a new file under <code>mygc</code>, called <code>gc_work.rs</code>. 
+In <code>mod.rs</code>, import <code>gc_work</code> as a module by adding the line <code>mod gc_work</code>.
+In <code>gc_work.rs</code>, add the following import statements:</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use super::global::MyGC;
+use crate::plan::CopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
+use crate::util::alloc::{Allocator, BumpAllocator};
+use crate::util::forwarding_word;
+use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::plan::PlanConstraints;
 use crate::scheduler::WorkerLocal;
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-<li>
 <p>Add a new structure, <code>MyGCCopyContext</code>, with the type parameter 
 <code>VM: VMBinding</code>. It should have the fields <code>plan: &amp;'static MyGC&lt;VM&gt;</code>
 and <code>mygc: BumpAllocator</code>.</p>
@@ -805,14 +921,11 @@ and <code>mygc: BumpAllocator</code>.</p>
 }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-<li>
 <p>Create an implementation block - 
-<code>impl&lt;VM: VMBinding&gt; CopyContext for MyGCCopyContext&lt;VM&gt;</code>.</p>
-<ol>
-<li>Define the associate type <code>VM</code> for <code>CopyContext</code> as the VMBinding type 
-given to the class as <code>VM</code>: <code>type VM: VM</code>. </li>
-<li>Add the following skeleton functions (taken from <code>plan/global.rs</code>):
+<code>impl&lt;VM: VMBinding&gt; CopyContext for MyGCCopyContext&lt;VM&gt;</code>.
+Define the associate type <code>VM</code> for <code>CopyContext</code> as the VMBinding type 
+given to the class as <code>VM</code>: <code>type VM: VM</code>. </p>
+<p>Add the following skeleton functions (taken from <code>plan/global.rs</code>):</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -849,108 +962,90 @@ fn post_copy(
 }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-<li>In <code>init()</code>, set the <code>tls</code> variable in the held instance of <code>mygc</code> to
-the one passed to the function.</li>
-<li>In <code>constraints()</code>, return a reference of <code>MYGC_CONSTRAINTS</code>.</li>
-<li>We just leave the rest of the functions empty for now and will implement them later.</li>
-<li>Add a constructor to <code>MyGCCopyContext</code>:
+<p>In <code>init()</code>, set the <code>tls</code> variable in the held instance of <code>mygc</code> to
+the one passed to the function. In <code>constraints()</code>, return a reference of <code>MYGC_CONSTRAINTS</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn constraints(&amp;self) -&gt; &amp;'static PlanConstraints {
+        &amp;super::global::MYGC_CONSTRAINTS
+    }
+    fn init(&amp;mut self, tls:OpaquePointer) {
+        self.mygc.tls = tls;
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>We just leave the rest of the functions empty for now and will implement them later.</p>
+<p>Add a constructor to <code>MyGCCopyContext</code> and implement the <code>WorkerLocal</code> trait for <code>MyGCCopyContext</code>.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>impl&lt;VM: VMBinding&gt; MyGCCopyContext&lt;VM&gt; {
-     pub fn new(mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
-         Self {
-             plan: &amp;mmtk.plan.downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap(),
-             mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &amp;*mmtk.plan),
-         }
-     }
- }
-<span class="boring">}
-</span></code></pre></pre>
-</li>
-<li>Implement the <code>WorkerLocal</code> trait for <code>MyGCCopyContext</code>:
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>impl&lt;VM: VMBinding&gt; WorkerLocal for MyGCCopyContext&lt;VM&gt; {
+    pub fn new(mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
+        Self {
+            plan: &amp;mmtk.plan.downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap(),
+            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &amp;*mmtk.plan),
+        }
+    }
+}
+
+impl&lt;VM: VMBinding&gt; WorkerLocal for MyGCCopyContext&lt;VM&gt; {
     fn init(&amp;mut self, tls: OpaquePointer) {
         CopyContext::init(self, tls);
     }
 }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-</ol>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/gc_work.rs#L20-L70">[Finished code]</a></p>
-</li>
-<li>
+<h2 id="mygcprocessedges"><a class="header" href="#mygcprocessedges">MyGCProcessEdges</a></h2>
 <p>Add a new public structure, <code>MyGCProcessEdges</code>, with the type parameter 
 <code>&lt;VM:VMBinding&gt;</code>. It will hold an instance of <code>ProcessEdgesBase</code> and 
-<code>MyGC</code>. This is the core part for tracing objects in the <code>MyGC</code> plan:</p>
+<code>MyGC</code>. This is the core part for tracing objects in the <code>MyGC</code> plan.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct MyGCProcessEdges&lt;VM: VMBinding&gt; {
-    // Holds a reference to the current plan (Note this will be used in the tracing fast path,
-    // and we should not use &amp;dyn Plan here for performance)
     plan: &amp;'static MyGC&lt;VM&gt;,
     base: ProcessEdgesBase&lt;MyGCProcessEdges&lt;VM&gt;&gt;,
 }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-<li>
 <p>Add a new implementations block 
-<code>impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt;</code>.</p>
-<ol>
-<li>Similarly to before, set <code>ProcessEdgesWork</code>'s associate type <code>VM</code> to 
-the type parameter of <code>MyGCProcessEdges</code>, <code>VM</code>: <code>type VM:VM</code>.</li>
-<li>Add a new method, <code>new</code>.
+<code>impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt;</code>.
+Similarly to before, set <code>ProcessEdgesWork</code>'s associate type <code>VM</code> to 
+the type parameter of <code>MyGCProcessEdges</code>, <code>VM</code>: <code>type VM:VM</code>.
+Add a new constructor, <code>new()</code>.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span> fn new(edges: Vec&lt;Address&gt;, _roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
-     let base = ProcessEdgesBase::new(edges, mmtk);
-     let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
-     Self { base, plan }
- }
+</span>    fn new(edges: Vec&lt;Address&gt;, _roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
+        let base = ProcessEdgesBase::new(edges, mmtk);
+        let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
+        Self { base, plan }
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-</ol>
-</li>
-<li>
+<h2 id="introduce-collection-to-mygc-plan"><a class="header" href="#introduce-collection-to-mygc-plan">Introduce collection to MyGC plan</a></h2>
 <p>Now that they've been added, you should import <code>MyGCCopyContext</code> and
 <code>MyGCProcessEdges</code> into <code>global.rs</code>, which we will be working in for the
-next few steps. <a href="mygc/ss//docs/tutorial/code/mygc_semispace/global.rs#L1">[Finished code]</a></p>
-</li>
-<li>
-<p>In <code>create_worker_local()</code> in <code>impl Plan for MyGC</code>, create an instance of <code>MyGCCopyContext</code>:</p>
+next few steps. </p>
+<p>In <code>create_worker_local()</code> in <code>impl Plan for MyGC</code>, create an instance of <code>MyGCCopyContext</code>.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn create_worker_local(
-    &amp;self,
-    tls: OpaquePointer,
-    mmtk: &amp;'static MMTK&lt;Self::VM&gt;,
-) -&gt; GCWorkerLocalPtr {
-    let mut c = MyGCCopyContext::new(mmtk);
-    c.init(tls);
-    GCWorkerLocalPtr::new(c)
-}
+</span>    fn create_worker_local(
+        &amp;self,
+        tls: OpaquePointer,
+        mmtk: &amp;'static MMTK&lt;Self::VM&gt;,
+    ) -&gt; GCWorkerLocalPtr {
+        let mut c = MyGCCopyContext::new(mmtk);
+        c.init(tls);
+        GCWorkerLocalPtr::new(c)
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-<li>
-<p><code>NoCopy</code> is now no longer needed. Remove it from the import statement block.</p>
-</li>
-<li>
-<p>For the next step, import <code>crate::scheduler::gc_work::*;</code>, and modify the
-line importing <code>MMTK</code> scheduler to read <code>use crate::scheduler::*;</code>.
-<a href="mygc/ss//docs/tutorial/code/mygc_semispace/global.rs#L13">[Finished code]</a></p>
-</li>
-<li>
+<p><code>NoCopy</code> is now no longer needed. Remove it from the import statement block. 
+For the next step, import <code>crate::scheduler::gc_work::*;</code>, and modify the
+line importing <code>MMTK</code> scheduler to read <code>use crate::scheduler::*;</code>.</p>
 <p>Add a new method to <code>Plan for MyGC</code>, <code>schedule_collection()</code>. This function 
 runs when a collection is triggered. It schedules GC work for the plan, i.e.,
 it stops all mutators, runs the
@@ -960,194 +1055,228 @@ will further push work for a transitive closure.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn schedule_collection(&amp;'static self, scheduler:&amp;MMTkScheduler&lt;VM&gt;) {
-    self.base().set_collection_kind();
-    self.base().set_gc_status(GcStatus::GcPrepare);
-    scheduler.work_buckets[WorkBucketStage::Unconstrained]
-        .add(StopMutators::&lt;MyGCProcessEdges&lt;VM&gt;&gt;::new());
-    scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;::new(self));
-    scheduler.work_buckets[WorkBucketStage::Release].add(Release::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;::new(self));
-    scheduler.set_finalizer(Some(EndOfGC));
-}
+</span>    fn schedule_collection(&amp;'static self, scheduler:&amp;MMTkScheduler&lt;VM&gt;) {
+        self.base().set_collection_kind();
+        self.base().set_gc_status(GcStatus::GcPrepare);
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::&lt;MyGCProcessEdges&lt;VM&gt;&gt;::new());
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release].add(Release::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;::new(self));
+        scheduler.set_finalizer(Some(EndOfGC));
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-</ol>
+<p>Delete <code>handle_user_collection_request()</code>. This function was an override of 
+a Common plan function to ignore user requested collection for NoGC. Now we 
+remove it and allow user requested collection.</p>
 <h2 id="prepare-for-collection"><a class="header" href="#prepare-for-collection">Prepare for collection</a></h2>
 <p>The collector has a number of steps it needs to perform before each collection.
 We'll add these now.</p>
-<ol>
-<li>First, fill in some more of the skeleton functions we added to the 
-<code>CopyContext</code> (in <code>gc_work.rs</code>) earlier:
-<ol>
-<li>In <code>prepare()</code>, rebind the allocator to the tospace using the function
-<code>self.mygc.rebind(Some(self.plan.tospace()))</code>.</li>
-<li>In <code>alloc_copy()</code>, call the allocator's <code>alloc</code> function. Above the function, 
-use an inline attribute (<code>#[inline(always)]</code>) to tell the Rust compiler 
-to always inline the function. 
-<a href="mygc/ss//docs/tutorial/code/mygc_semispace/gc_work.rs#L29-L44">[Finished code]</a></li>
-</ol>
-</li>
-<li>In <code>global.rs</code>, find the method <code>prepare</code>. Delete the <code>unreachable!()</code> 
-call, and add the following code:
+<h3 id="prepare-plan"><a class="header" href="#prepare-plan">Prepare plan</a></h3>
+<p>In <code>global.rs</code>, find the method <code>prepare</code>. Delete the <code>unreachable!()</code> 
+call, and add the following code:</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>self.common.prepare(tls, true);
-self.hi
-   .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
-let hi = self.hi.load(Ordering::SeqCst); 
-self.copyspace0.prepare(hi);
-self.copyspace1.prepare(!hi);
+</span>    fn prepare(&amp;self, tls: OpaquePointer) {
+        self.common.prepare(tls, true);
+
+        self.hi
+            .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
+        // Flips 'hi' to flip space definitions
+        let hi = self.hi.load(Ordering::SeqCst); 
+        self.copyspace0.prepare(hi);
+        self.copyspace1.prepare(!hi);
+    }
 <span class="boring">}
 </span></code></pre></pre>
-This function is called at the start of a collection. It prepares the two 
+<p>This function is called at the start of a collection. It prepares the two 
 spaces in the common plan, flips the definitions for which space is 'to' 
-and which is 'from', then prepares the copyspaces with the new definition.</li>
-<li>Going back to <code>mutator.rs</code>, create a new function called 
+and which is 'from', then prepares the copyspaces with the new definition.</p>
+<h3 id="prepare-copycontext"><a class="header" href="#prepare-copycontext">Prepare CopyContext</a></h3>
+<p>First, fill in some more of the skeleton functions we added to the 
+<code>CopyContext</code> (in <code>gc_work.rs</code>) earlier.
+In <code>prepare()</code>, rebind the allocator to the tospace using the function
+<code>self.mygc.rebind(Some(self.plan.tospace()))</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn prepare(&amp;mut self) {
+        self.mygc.rebind(Some(self.plan.tospace()));
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="prepare-mutator"><a class="header" href="#prepare-mutator">Prepare mutator</a></h3>
+<p>Going back to <code>mutator.rs</code>, create a new function called 
 <code>mygc_mutator_prepare(_mutator: &amp;mut Mutator &lt;MyGC&lt;VM&gt;&gt;, _tls: OpaquePointer,)</code>. 
 This function will be called at the preparation stage of a collection 
 (at the start of a collection) for each mutator. Its body can stay empty, as 
-there aren't any preparation steps for the mutator in this GC.</li>
-<li>In <code>create_mygc_mutator()</code>, find the field <code>prep_func</code> and change it from
-<code>mygc_mutator_noop()</code> to <code>mygc_mutator_prepare()</code>.</li>
-</ol>
+there aren't any preparation steps for the mutator in this GC.
+In <code>create_mygc_mutator()</code>, find the field <code>prep_func</code> and change it from
+<code>mygc_mutator_noop()</code> to <code>mygc_mutator_prepare()</code>.</p>
 <h2 id="scan-objects"><a class="header" href="#scan-objects">Scan objects</a></h2>
 <p>Next, we'll add the code to allow the plan to collect garbage - filling out 
 functions for work packets.</p>
-<ol>
-<li>
 <p>In <code>gc_work.rs</code>, add a new method to <code>ProcessEdgesWork for MyGCProcessEdges</code>,
-<code>trace_object(&amp;mut self, object: ObjectReference)</code>.</p>
-<ol>
-<li>This method should return an ObjectReference, and use the 
-inline attribute.</li>
-<li>Check if the object passed into the function is null 
-(<code>object.is_null()</code>). If it is, return the object.</li>
-<li>Check if the object is in the tospace 
-(<code>self.plan().tospace().in_space(object)</code>). If it is, call <code>trace_object</code> 
-through the tospace to check if the object is alive, and return the result:
+<code>trace_object(&amp;mut self, object: ObjectReference)</code>.
+This method should return an ObjectReference, and use the 
+inline attribute.
+Check if the object passed into the function is null 
+(<code>object.is_null()</code>). If it is, return the object.
+Check if which space the object is in, and forward the call to the policy-specific
+object tracing code. If it is in neither space, forward the call to the common space and let the common space to handle
+object tracing in its spaces (e.g. immortal or large object space):</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span> #[inline]
- fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
-     if object.is_null() {
-         return object;
-     }
-     if self.mygc().tospace().in_space(object) {
-         self.mygc().tospace().trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(
-             self,
-             object,
-             super::global::ALLOC_MyGC,
-             unsafe { self.worker().local::&lt;MyGCCopyContext&lt;VM&gt;&gt;() },
-         )
-     } else if self.mygc().fromspace().in_space(object) {
-         self.mygc().fromspace().trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(
-             self,
-             object,
-             super::global::ALLOC_MyGC,
-             unsafe { self.worker().local::&lt;MyGCCopyContext&lt;VM&gt;&gt;() },
-         )
-     } else {
-         self.mygc().common.trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(self, object)
-     }
- }
+</span>    #[inline]
+    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+        if self.mygc().tospace().in_space(object) {
+            self.mygc().tospace().trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(
+                self,
+                object,
+                super::global::ALLOC_MyGC,
+                unsafe { self.worker().local::&lt;MyGCCopyContext&lt;VM&gt;&gt;() },
+            )
+        } else if self.mygc().fromspace().in_space(object) {
+            self.mygc().fromspace().trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(
+                self,
+                object,
+                super::global::ALLOC_MyGC,
+                unsafe { self.worker().local::&lt;MyGCCopyContext&lt;VM&gt;&gt;() },
+            )
+        } else {
+            self.mygc().common.trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(self, object)
+        }
+    }
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-<li>If it is not in the tospace, check if the object is in the fromspace 
-and return the result of the fromspace's <code>trace_object</code> if it is.</li>
-<li>If it is in neither space, forward the call to the common space and let the common space to handle
-object tracing in its spaces (e.g. immortal or large object space):
-<code>self.mygc().common.trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(self, object)</code>.</li>
-</ol>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/gc_work.rs#L92-L113">[Finished code (step 1)]</a></p>
-</li>
-<li>
 <p>Add two new implementation blocks, <code>Deref</code> and <code>DerefMut</code> for 
 <code>MyGCProcessEdges</code>. These allow <code>MyGCProcessEdges</code> to be dereferenced to 
 <code>ProcessEdgesBase</code>, and allows easy access to fields in <code>ProcessEdgesBase</code>.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span> impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
-     type Target = ProcessEdgesBase&lt;Self&gt;;
-     #[inline]
-     fn deref(&amp;self) -&gt; &amp;Self::Target {
-         &amp;self.base
-     }
- }
+</span>impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
+    type Target = ProcessEdgesBase&lt;Self&gt;;
+    #[inline]
+    fn deref(&amp;self) -&gt; &amp;Self::Target {
+        &amp;self.base
+    }
+}
 
- impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
-     #[inline]
-     fn deref_mut(&amp;mut self) -&gt; &amp;mut Self::Target {
-         &amp;mut self.base
-     }
- }
+impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
+    #[inline]
+    fn deref_mut(&amp;mut self) -&gt; &amp;mut Self::Target {
+        &amp;mut self.base
+    }
+}
 <span class="boring">}
 </span></code></pre></pre>
-<p><a href="mygc/ss//docs/tutorial/code/mygc_semispace/gc_work.rs#L116-L124">[Finished code (step 2)]</a></p>
-</li>
-<li>
-<p>To <code>post_copy()</code>, in the <code>CopyContext</code> implementations block, add 
-<code>forwarding_word::clear_forwarding_bits::&lt;VM&gt;(obj);</code>. Also, add an 
-inline attribute.</p>
-</li>
-</ol>
-<h2 id="release-and-finalize"><a class="header" href="#release-and-finalize">Release and Finalize</a></h2>
-<p>Finally, we need to fill out the functions that are, roughly speaking, 
-run after each collection.</p>
-<ol>
-<li>Find the method <code>release()</code> in <code>global.rs</code>. Replace the 
-<code>unreachable!()</code> call with the following code:
+<h2 id="copying-objects"><a class="header" href="#copying-objects">Copying objects</a></h2>
+<p>Go back to the <code>MyGCopyContext</code> in <code>gc_work.rs</code>. 
+In <code>alloc_copy()</code>, call the allocator's <code>alloc</code> function. Above the function, 
+use an inline attribute (<code>#[inline(always)]</code>) to tell the Rust compiler 
+to always inline the function.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>self.common.release(tls, true);
-self.fromspace().release();
+</span>    #[inline(always)]
+    fn alloc_copy(
+        &amp;mut self,
+        _original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+        _semantics: crate::AllocationSemantics,
+    ) -&gt; Address {
+        self.mygc.alloc(bytes, align, offset)
+    }
 <span class="boring">}
 </span></code></pre></pre>
-This function is called at the end of a collection. It releases the common
-plan spaces and the fromspace.</li>
-<li>Go back to <code>mutator.rs</code>. In <code>create_mygc_mutator()</code>, replace 
-<code>mygc_mutator_noop()</code> in the <code>release_func</code> field with <code>mygc_mutator_release()</code>.</li>
-<li>Leave the <code>release()</code> function in the <code>CopyContext</code> empty. There are no 
-release steps for <code>CopyContext</code> in this collector.</li>
-<li>Create a new function called <code>mygc_mutator_release()</code> that takes the same 
+<p>To <code>post_copy()</code>, in the <code>CopyContext</code> implementations block, add 
+<code>forwarding_word::clear_forwarding_bits::&lt;VM&gt;(obj);</code>. Also, add an 
+inline attribute.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    #[inline(always)]
+    fn post_copy(
+        &amp;mut self,
+        obj: ObjectReference,
+        _tib: Address,
+        _bytes: usize,
+        _semantics: crate::AllocationSemantics,
+    ) {
+        forwarding_word::clear_forwarding_bits::&lt;VM&gt;(obj);
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="release"><a class="header" href="#release">Release</a></h2>
+<p>Finally, we need to fill out the functions that are, roughly speaking, 
+run after each collection.</p>
+<h3 id="release-in-plan"><a class="header" href="#release-in-plan">Release in plan</a></h3>
+<p>Find the method <code>release()</code> in <code>global.rs</code>. Replace the 
+<code>unreachable!()</code> call with the following code.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn release(&amp;self, tls: OpaquePointer) {
+        self.common.release(tls, true);
+        self.fromspace().release();
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>This function is called at the end of a collection. It calls the release routines for the common
+plan spaces and the fromspace.</p>
+<h3 id="release-in-mutator"><a class="header" href="#release-in-mutator">Release in mutator</a></h3>
+<p>Go back to <code>mutator.rs</code>. In <code>create_mygc_mutator()</code>, replace 
+<code>mygc_mutator_noop()</code> in the <code>release_func</code> field with <code>mygc_mutator_release()</code>.
+Leave the <code>release()</code> function in the <code>CopyContext</code> empty. There are no 
+release steps for <code>CopyContext</code> in this collector.</p>
+<p>Create a new function called <code>mygc_mutator_release()</code> that takes the same 
 inputs as the <code>prepare()</code> function above. This function will be called at the 
 release stage of a collection (at the end of a collection) for each mutator. 
 It rebinds the allocator for the <code>Default</code> allocation semantics to the new 
 tospace. When the mutator threads resume, any new allocations for <code>Default</code> 
-will then go to the new tospace. The function has the following body:
+will then go to the new tospace. </p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>let bump_allocator = unsafe {
-   mutator
-       .allocators
-       . get_allocator_mut(
-           mutator.config.allocator_mapping[AllocationType::Default]
-       )
-   }
-   .downcast_mut::&lt;BumpAllocator&lt;VM&gt;&gt;()
-   .unwrap();
-   bump_allocator.rebind(Some(mutator.plan.tospace()));
+</span>pub fn mygc_mutator_release&lt;VM: VMBinding&gt;(
+    mutator: &amp;mut Mutator&lt;VM&gt;,
+    _tls: OpaquePointer,
+) {
+    // rebind the allocation bump pointer to the appropriate semispace
+    let bump_allocator = unsafe {
+        mutator
+            .allocators
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
+    }
+    .downcast_mut::&lt;BumpAllocator&lt;VM&gt;&gt;()
+    .unwrap();
+    bump_allocator.rebind(Some(
+        mutator
+            .plan
+            .downcast_ref::&lt;MyGC&lt;VM&gt;&gt;()
+            .unwrap()
+            .tospace(),
+    ));
+}
 <span class="boring">}
 </span></code></pre></pre>
-</li>
-<li>Delete <code>mygc_mutator_noop()</code>. It was a placeholder for the prepare and 
-release functions that you have now added, so it is now dead code.</li>
-<li>Delete <code>handle_user_collection_request()</code>. This function was an override of 
-a Common plan function to ignore user requested collection for NoGC. Now we 
-remove it and allow user requested collection.</li>
-</ol>
+<p>Delete <code>mygc_mutator_noop()</code>. It was a placeholder for the prepare and 
+release functions that you have now added, so it is now dead code.</p>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
 <p>You should now have MyGC working and able to collect garbage. All three
 benchmarks should be able to pass now. </p>
 <p>If the benchmarks pass - good job! You have built a functional copying
 collector!</p>
-<p>If you get particularly stuck, instructions for how to complete this exercise
-are available <a href="mygc/ss/collection.html#triplespace-backup-instructions">here</a>.</p>
+<p>If you get particularly stuck, the code for the completed <code>MyGC</code> plan
+is available <a href="https://github.com/mmtk/mmtk-core/tree/master/docs/tutorial/code/mygc_semispace">here</a>.</p>
 <h1 id="exercise-adding-another-copyspace"><a class="header" href="#exercise-adding-another-copyspace">Exercise: Adding another copyspace</a></h1>
 <p>Now that you have a working semispace collector, you should be familiar 
 enough with the code to start writing some yourself. The intention of this 
@@ -1165,9 +1294,6 @@ tospace.</li>
 </ul>
 </li>
 </ol>
-<p>When you are finished, try running the benchmarks and seeing how the 
-performance of this collector compares to MyGC. Great work!</p>
-<hr />
 <p>Triplespace is a sort of generational garbage collector. These collectors 
 separate out old objects and new objects into separate spaces. Newly 
 allocated objects should be scanned far more often than old objects, which 
@@ -1177,7 +1303,12 @@ generational collector, because the older objects are still being scanned
 every collection. It wouldn't be very useful in a real-life scenario. The 
 next thing to do is to make this collector into a more efficient proper 
 generational collector.</p>
+<p>When you are finished, try running the benchmarks and seeing how the 
+performance of this collector compares to MyGC. Great work!</p>
 <h1 id="building-a-generational-copying-collector"><a class="header" href="#building-a-generational-copying-collector">Building a generational copying collector</a></h1>
+<blockquote>
+<p>Note: This part is work in progress.</p>
+</blockquote>
 <h2 id="what-is-a-generational-collector"><a class="header" href="#what-is-a-generational-collector">What is a generational collector?</a></h2>
 <p>The <em>weak generational hypothesis</em> states that most of the objects allocated
 to a heap after one collection will die before the next collection.

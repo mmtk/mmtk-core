@@ -172,15 +172,14 @@ entered in <code>repos/openjdk</code>.</p>
 <p><strong>HelloWorld</strong> (simplest, will never trigger GC): </p>
 <ol>
 <li>Copy the following code into a new Java file titled &quot;HelloWorld.java&quot; 
-in <code>mmtk-openjdk/repos/openjdk</code>:</li>
-</ol>
+in <code>mmtk-openjdk/repos/openjdk</code>:
 <pre><code class="language-java">class HelloWorld {
-    public static void main(String[] args) {
-        System.out.println(&quot;Hello World!&quot;);
-    }
+   public static void main(String[] args) {
+      System.out.println(&quot;Hello World!&quot;);
+   }
 }
 </code></pre>
-<ol start="2">
+</li>
 <li>Use the command 
 <code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac HelloWorld.java</code>.</li>
 <li>Then, run 
