@@ -11,7 +11,7 @@
     - [Test the build](./preliminaries/test.md)
 - [MyGC]()
     - [Create MyGC](./mygc/create.md)
-    - [Building a semispace GC](./mygc/ss/index.md)
+    - [Building a semispace GC](./mygc/ss/prefix.md)
         - [Allocation](./mygc/ss/alloc.md)
         - [Collection](./mygc/ss/collection.md)
         - [Excercise](./mygc/ss/excercise.md)
