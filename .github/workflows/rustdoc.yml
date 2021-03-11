@@ -1,8 +1,14 @@
 name: Generate doc
 
 # Triggerred when a new commit is pushed to master
+# on:
+#   push:
+#     branches:
+#       - master
+
+# To test: triggered by pull request
 on:
-  push:
+  pull_request:
     branches:
       - master
 
@@ -27,6 +33,8 @@ jobs:
         run: |
           mkdir -p to_publish/docs
           cp -r target/doc/* to_publish/docs/
+          cp -r docs/portingguide/book to_publish/docs/portingguide
+          cp -r docs/tutorial/book to_publish/docs/tutorial
       - name: Deploy to Github Page
         uses: peaceiris/actions-gh-pages@v3
         with:
