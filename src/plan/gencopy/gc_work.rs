@@ -1,12 +1,12 @@
 use super::global::GenCopy;
-use crate::plan::CopyContext;
 use crate::plan::PlanConstraints;
+use crate::plan::{barriers::BarrierSelector, CopyContext};
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkerLocal;
-use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::forwarding_word;
+use crate::util::side_metadata::*;
 use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::*;
 use crate::MMTK;
@@ -53,6 +53,9 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
         _semantics: crate::AllocationSemantics,
     ) {
         forwarding_word::clear_forwarding_bits::<VM>(obj);
+        if !super::NO_SLOW && super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+            store_atomic(super::LOGGING_META, obj.to_address(), 0b1);
+        }
     }
 }
 
@@ -207,31 +210,5 @@ impl<VM: VMBinding> Deref for GenCopyMatureProcessEdges<VM> {
 impl<VM: VMBinding> DerefMut for GenCopyMatureProcessEdges<VM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
-    }
-}
-
-#[derive(Default)]
-pub struct GenCopyProcessModBuf {
-    pub modified_nodes: Vec<ObjectReference>,
-    pub modified_edges: Vec<Address>,
-}
-
-impl<VM: VMBinding> GCWork<VM> for GenCopyProcessModBuf {
-    #[inline]
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        if mmtk.plan.in_nursery() {
-            let mut modified_nodes = vec![];
-            ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
-            let work = ScanObjects::<GenCopyNurseryProcessEdges<VM>>::new(modified_nodes, false);
-            worker.scheduler().work_buckets[WorkBucketStage::Closure].add(work);
-
-            let mut modified_edges = vec![];
-            ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
-            worker.scheduler().work_buckets[WorkBucketStage::Closure].add(
-                GenCopyNurseryProcessEdges::<VM>::new(modified_edges, true, mmtk),
-            );
-        } else {
-            // Do nothing
-        }
     }
 }

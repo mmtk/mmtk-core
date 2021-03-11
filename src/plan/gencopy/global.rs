@@ -1,5 +1,8 @@
-use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
 use super::mutator::ALLOCATOR_MAPPING;
+use super::{
+    gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges},
+    LOGGING_META,
+};
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -30,7 +33,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
-pub const NURSERY_SIZE: usize = 16 * 1024 * 1024;
+pub const NURSERY_SIZE: usize = 32 * 1024 * 1024;
 
 pub struct GenCopy<VM: VMBinding> {
     pub nursery: CopySpace<VM>,
@@ -49,7 +52,7 @@ pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
-    barrier: BarrierSelector::ObjectBarrier,
+    barrier: super::ACTIVE_BARRIER,
     ..PlanConstraints::default()
 };
 
@@ -172,11 +175,15 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn global_side_metadata_per_chunk(&self) -> usize {
-        if !VM::VMObjectModel::HAS_GC_BYTE {
+        let mut side_metadata_per_chunk = if !VM::VMObjectModel::HAS_GC_BYTE {
             meta_bytes_per_chunk(3, 1)
         } else {
             0
+        };
+        if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+            side_metadata_per_chunk += LOGGING_META.meta_bytes_per_chunk();
         }
+        side_metadata_per_chunk
     }
 }
 
@@ -225,6 +232,10 @@ impl<VM: VMBinding> GenCopy<VM> {
     }
 
     fn request_full_heap_collection(&self) -> bool {
+        // For barrier overhead measurements, we always do full gc in nursery collections.
+        if super::FULL_NURSERY_GC {
+            return true;
+        }
         self.get_total_pages() <= self.get_pages_reserved()
     }
 
