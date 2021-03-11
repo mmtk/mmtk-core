@@ -30,10 +30,17 @@ pub struct SideMetadataSpec {
     pub log_min_obj_size: usize,
 }
 
+impl SideMetadataSpec {
+    pub const fn meta_bytes_per_chunk(&self) -> usize {
+        super::meta_bytes_per_chunk(self.log_min_obj_size, self.log_num_of_bits)
+    }
+}
+
 /// Represents the mapping state of a metadata page.
 ///
 /// `NotMappable` indicates whether the page is mappable by MMTK.
 /// `IsMapped` indicates that the page is newly mapped by MMTK, and `WasMapped` means the page was already mapped.
+#[derive(Debug, Clone, Copy)]
 pub enum MappingState {
     NotMappable,
     IsMapped,
@@ -83,6 +90,10 @@ pub fn try_map_metadata_space(
 
     while aligned_start < aligned_end {
         let res = try_mmap_metadata_chunk(aligned_start, global_per_chunk, local_per_chunk);
+        debug!(
+            "try_mmap_metadata_chunk({}, {:X}, {:X}) = {:?}",
+            aligned_start, global_per_chunk, local_per_chunk, res
+        );
         if !res.is_mappable() {
             if munmap_first_chunk.is_some() {
                 let mut munmap_start = if munmap_first_chunk.unwrap() {
@@ -109,7 +120,7 @@ pub fn try_map_metadata_space(
 }
 
 // Try to map side metadata for the chunk starting at `start`
-pub fn try_mmap_metadata_chunk(
+fn try_mmap_metadata_chunk(
     start: Address,
     global_per_chunk: usize,
     local_per_chunk: usize,
@@ -149,7 +160,6 @@ pub fn try_mmap_metadata_chunk(
     }
 
     let policy_meta_start = global_meta_start + POLICY_SIDE_METADATA_OFFSET;
-
     if local_per_chunk != 0 {
         let result: *mut libc::c_void = unsafe {
             libc::mmap(
@@ -176,7 +186,7 @@ pub fn try_mmap_metadata_chunk(
 }
 
 // Used only for debugging
-// Panics in the required metadata for data_addr is not mapped
+// Panics if the required metadata for data_addr is not mapped
 pub fn ensure_metadata_chunk_is_mmaped(metadata_spec: SideMetadataSpec, data_addr: Address) {
     let meta_start = if metadata_spec.scope.is_global() {
         address_to_meta_chunk_addr(data_addr)
@@ -312,7 +322,7 @@ pub fn compare_exchange_atomic(
 
         let real_old_byte = unsafe { meta_addr.atomic_load::<AtomicU8>(Ordering::SeqCst) };
         let expected_old_byte = (real_old_byte & !mask) | ((old_metadata as u8) << lshift);
-        let expected_new_byte = expected_old_byte | ((new_metadata as u8) << lshift);
+        let expected_new_byte = (expected_old_byte & !mask) | ((new_metadata as u8) << lshift);
 
         unsafe {
             meta_addr
@@ -601,7 +611,7 @@ mod tests {
                 vm_layout_constants::HEAP_START,
                 1,
                 helpers::meta_bytes_per_chunk(0, 0),
-                helpers::meta_bytes_per_chunk(0, 1)
+                helpers::meta_bytes_per_chunk(1, 1)
             ));
 
             ensure_metadata_chunk_is_mmaped(gspec, vm_layout_constants::HEAP_START);
@@ -642,7 +652,7 @@ mod tests {
             ensure_munmap_metadata_chunk(
                 vm_layout_constants::HEAP_START,
                 helpers::meta_bytes_per_chunk(0, 0),
-                helpers::meta_bytes_per_chunk(0, 1),
+                helpers::meta_bytes_per_chunk(1, 1),
             );
 
             ensure_munmap_metadata_chunk(
@@ -668,7 +678,7 @@ mod tests {
                 scope: SideMetadataScope::Global,
                 offset: 0,
                 log_num_of_bits: 4,
-                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+                log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
             };
 
             let metadata_2_spec = SideMetadataSpec {
@@ -741,7 +751,7 @@ mod tests {
                 scope: SideMetadataScope::Global,
                 offset: 0,
                 log_num_of_bits: 1,
-                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+                log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
             };
 
             assert!(try_map_metadata_space(
@@ -787,7 +797,7 @@ mod tests {
                 scope: SideMetadataScope::PolicySpecific,
                 offset: 0,
                 log_num_of_bits: 4,
-                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+                log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
             };
 
             let metadata_2_spec = SideMetadataSpec {

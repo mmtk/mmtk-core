@@ -90,7 +90,7 @@
 //! For the local metadata bit-sets, each policy needs to follow the same pattern as the global metadata, with two differences:
 //!
 //! 1. scope should be `SideMetadataScope::PolicySpecific`,
-//! 2. each policy needs to override `fn local_side_metadata_per_chuck(&self) -> usize;
+//! 2. each policy needs to override `fn local_side_metadata_per_chunk(&self) -> usize;
 //!
 //! After mapping the metadata space, the following operations can be performed on the metadata:
 //!
