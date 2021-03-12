@@ -1,11 +1,11 @@
 use super::Mmapper;
-use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::Address;
+use crate::util::{conversions, side_metadata::SideMetadataSpec};
 use atomic::{Atomic, Ordering};
-use std::fmt;
 use std::mem::transmute;
 use std::sync::Mutex;
+use std::{fmt, sync::Arc};
 
 #[repr(u8)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -23,7 +23,7 @@ const LOG_MAPPABLE_BYTES: usize = 36; // 128GB - physical memory larger than thi
                                        * chunks per slab, ie a 1k slab map.  In a 64-bit address space, this
                                        * will require 1M of slab maps.
                                        */
-const LOG_MMAP_CHUNKS_PER_SLAB: usize = 10;
+const LOG_MMAP_CHUNKS_PER_SLAB: usize = 8;
 const LOG_MMAP_SLAB_BYTES: usize = LOG_MMAP_CHUNKS_PER_SLAB + LOG_MMAP_CHUNK_BYTES;
 const MMAP_SLAB_EXTENT: usize = 1 << LOG_MMAP_SLAB_BYTES;
 const MMAP_SLAB_MASK: usize = (1 << LOG_MMAP_SLAB_BYTES) - 1;
@@ -82,7 +82,13 @@ impl Mmapper for FragmentedMapper {
         }
     }
 
-    fn ensure_mapped(&self, mut start: Address, pages: usize) {
+    fn ensure_mapped(
+        &self,
+        mut start: Address,
+        pages: usize,
+        global_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+        local_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+    ) {
         let end = start + conversions::pages_to_bytes(pages);
         // Iterate over the slabs covered
         while start < end {
@@ -107,6 +113,12 @@ impl Mmapper for FragmentedMapper {
                         let mmap_start = Self::chunk_index_to_address(base, chunk);
                         let _guard = self.lock.lock().unwrap();
                         crate::util::memory::dzmmap(mmap_start, MMAP_CHUNK_BYTES).unwrap();
+                        self.map_metadata(
+                            mmap_start,
+                            global_metadata_spec_vec.clone(),
+                            local_metadata_spec_vec.clone(),
+                        )
+                        .expect("failed to map metadata memory");
                     }
                     MapState::Protected => {
                         let mmap_start = Self::chunk_index_to_address(base, chunk);
@@ -365,7 +377,8 @@ mod tests {
     fn ensure_mapped_1page() {
         let mmapper = FragmentedMapper::new();
         let pages = 1;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages);
+        let empty_vec = Arc::new(vec![]);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec.clone());
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -379,7 +392,8 @@ mod tests {
     fn ensure_mapped_1chunk() {
         let mmapper = FragmentedMapper::new();
         let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages);
+        let empty_vec = Arc::new(vec![]);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec.clone());
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -394,7 +408,8 @@ mod tests {
     fn ensure_mapped_more_than_1chunk() {
         let mmapper = FragmentedMapper::new();
         let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages);
+        let empty_vec = Arc::new(vec![]);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec.clone());
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -410,7 +425,13 @@ mod tests {
         // map 2 chunks
         let mmapper = FragmentedMapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2);
+        let empty_vec = Arc::new(vec![]);
+        mmapper.ensure_mapped(
+            FIXED_ADDRESS,
+            pages_per_chunk * 2,
+            empty_vec.clone(),
+            empty_vec.clone(),
+        );
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -430,7 +451,13 @@ mod tests {
         // map 2 chunks
         let mmapper = FragmentedMapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2);
+        let empty_vec = Arc::new(vec![]);
+        mmapper.ensure_mapped(
+            FIXED_ADDRESS,
+            pages_per_chunk * 2,
+            empty_vec.clone(),
+            empty_vec.clone(),
+        );
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -445,7 +472,12 @@ mod tests {
         );
 
         // ensure mapped - this will unprotect the previously protected chunk
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2);
+        mmapper.ensure_mapped(
+            FIXED_ADDRESS,
+            pages_per_chunk * 2,
+            empty_vec.clone(),
+            empty_vec.clone(),
+        );
         assert_eq!(
             get_chunk_map_state(&mmapper, FIXED_ADDRESS),
             Some(MapState::Mapped)

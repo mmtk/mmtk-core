@@ -1,5 +1,9 @@
-use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
 use super::mutator::ALLOCATOR_MAPPING;
+use super::{
+    gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges},
+    LOGGING_META,
+};
+use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
@@ -20,19 +24,16 @@ use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
+use crate::util::{gc_byte, side_metadata::SideMetadataSpec};
 use crate::vm::ObjectModel;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
-use crate::{
-    plan::global::BasePlan,
-    util::{gc_byte, side_metadata::SideMetadataSpec},
-};
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
-pub const NURSERY_SIZE: usize = 16 * 1024 * 1024;
+pub const NURSERY_SIZE: usize = 32 * 1024 * 1024;
 
 pub struct GenCopy<VM: VMBinding> {
     pub nursery: CopySpace<VM>,
@@ -52,7 +53,7 @@ pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
-    barrier: BarrierSelector::ObjectBarrier,
+    barrier: super::ACTIVE_BARRIER,
     ..PlanConstraints::default()
 };
 
@@ -187,11 +188,15 @@ impl<VM: VMBinding> GenCopy<VM> {
         scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let metadata_spec_vec = if VM::VMObjectModel::HAS_GC_BYTE {
-            Arc::new(vec![])
-        } else {
-            Arc::new(vec![gc_byte::SIDE_GC_BYTE_SPEC])
+        let mut metadata_spec_vec = vec![];
+        if !VM::VMObjectModel::HAS_GC_BYTE {
+            metadata_spec_vec.append(&mut vec![gc_byte::SIDE_GC_BYTE_SPEC]);
+        }
+        if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+            metadata_spec_vec.append(&mut vec![LOGGING_META]);
         };
+
+        let metadata_spec_vec = Arc::new(metadata_spec_vec);
 
         GenCopy {
             nursery: CopySpace::new(
@@ -230,6 +235,10 @@ impl<VM: VMBinding> GenCopy<VM> {
     }
 
     fn request_full_heap_collection(&self) -> bool {
+        // For barrier overhead measurements, we always do full gc in nursery collections.
+        if super::FULL_NURSERY_GC {
+            return true;
+        }
         self.get_total_pages() <= self.get_pages_reserved()
     }
 

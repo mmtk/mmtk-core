@@ -1,12 +1,12 @@
 //! Read/Write barrier implementations.
 
-use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
+use crate::util::side_metadata::*;
 use crate::util::*;
 use crate::MMTK;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BarrierSelector {
     NoBarrier,
     ObjectBarrier,
@@ -30,69 +30,56 @@ impl Barrier for NoBarrier {
     fn post_write_barrier(&mut self, _target: WriteTarget) {}
 }
 
-#[derive(Default)]
-pub struct ModBuffer {
-    modified_nodes: Vec<ObjectReference>,
-    modified_edges: Vec<Address>,
-}
-
-pub struct FieldRememberingBarrier<E: ProcessEdgesWork, S: Space<E::VM>> {
+pub struct ObjectRememberingBarrier<E: ProcessEdgesWork> {
     mmtk: &'static MMTK<E::VM>,
-    nursery: &'static S,
-    mod_buffer: ModBuffer,
+    modbuf: Vec<ObjectReference>,
+    meta: SideMetadataSpec,
 }
 
-impl<E: ProcessEdgesWork, S: Space<E::VM>> FieldRememberingBarrier<E, S> {
+impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     #[allow(unused)]
-    pub fn new(mmtk: &'static MMTK<E::VM>, nursery: &'static S) -> Self {
+    pub fn new(mmtk: &'static MMTK<E::VM>, meta: SideMetadataSpec) -> Self {
         Self {
             mmtk,
-            nursery,
-            mod_buffer: ModBuffer::default(),
+            modbuf: vec![],
+            meta,
         }
     }
 
+    #[inline(always)]
     fn enqueue_node(&mut self, obj: ObjectReference) {
-        self.mod_buffer.modified_nodes.push(obj);
-        if self.mod_buffer.modified_nodes.len() >= E::CAPACITY {
-            self.flush();
-        }
-    }
-
-    fn enqueue_edge(&mut self, slot: Address) {
-        self.mod_buffer.modified_edges.push(slot);
-        if self.mod_buffer.modified_edges.len() >= 512 {
-            self.flush();
+        if compare_exchange_atomic(self.meta, obj.to_address(), 0b1, 0b0) {
+            self.modbuf.push(obj);
+            if self.modbuf.len() >= E::CAPACITY {
+                self.flush();
+            }
         }
     }
 }
 
-impl<E: ProcessEdgesWork, S: Space<E::VM>> Barrier for FieldRememberingBarrier<E, S> {
+impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
+    #[cold]
     fn flush(&mut self) {
-        let mut modified_nodes = vec![];
-        std::mem::swap(&mut modified_nodes, &mut self.mod_buffer.modified_nodes);
-        let mut modified_edges = vec![];
-        std::mem::swap(&mut modified_edges, &mut self.mod_buffer.modified_edges);
+        let mut modbuf = vec![];
+        std::mem::swap(&mut modbuf, &mut self.modbuf);
         debug_assert!(
             !self.mmtk.scheduler.work_buckets[WorkBucketStage::Final].is_activated(),
             "{:?}",
             self as *const _
         );
-        self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
-            .add(ProcessModBuf::<E>::new(modified_nodes, modified_edges));
+        if !modbuf.is_empty() {
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
+                .add(ProcessModBuf::<E>::new(modbuf, self.meta));
+        }
     }
+
+    #[inline(always)]
     fn post_write_barrier(&mut self, target: WriteTarget) {
         match target {
             WriteTarget::Object(obj) => {
-                if !self.nursery.in_space(obj) {
-                    self.enqueue_node(obj);
-                }
+                self.enqueue_node(obj);
             }
-            WriteTarget::Slot(slot) => {
-                if !self.nursery.address_in_space(slot) {
-                    self.enqueue_edge(slot);
-                }
-            }
+            _ => unreachable!(),
         }
     }
 }

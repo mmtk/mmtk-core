@@ -1,6 +1,7 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::plan::global::GcStatus;
+use crate::util::side_metadata::*;
 use crate::util::*;
 use crate::vm::*;
 use crate::*;
@@ -184,7 +185,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
             if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
                 // Prepare mutators if necessary
                 // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
-                if !mmtk.plan.common().stacks_prepared() {
+                if !mmtk.plan.base().stacks_prepared() {
                     for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
                         <E::VM as VMBinding>::VMCollection::prepare_mutator(
                             mutator.get_tls(),
@@ -219,7 +220,8 @@ pub struct EndOfGC;
 
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        mmtk.plan.common().base.set_gc_status(GcStatus::NotInGC);
+        info!("End of GC");
+        mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
 }
@@ -240,6 +242,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
         trace!("ScanStackRoots");
         <E::VM as VMBinding>::VMScanning::scan_thread_roots::<E>();
         <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
+        for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+            mutator.flush();
+        }
         mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
     }
 }
@@ -248,9 +253,9 @@ pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Edges
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
         let base = &mmtk.plan.base();
         let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
-        trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
         <E::VM as VMBinding>::VMScanning::scan_thread_root::<E>(
             unsafe { &mut *(self.0 as *mut _) },
             worker.tls,
@@ -446,39 +451,36 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
     }
 }
 
-#[derive(Default)]
 pub struct ProcessModBuf<E: ProcessEdgesWork> {
-    modified_nodes: Vec<ObjectReference>,
-    modified_edges: Vec<Address>,
+    modbuf: Vec<ObjectReference>,
     phantom: PhantomData<E>,
+    meta: SideMetadataSpec,
 }
 
 impl<E: ProcessEdgesWork> ProcessModBuf<E> {
-    pub fn new(modified_nodes: Vec<ObjectReference>, modified_edges: Vec<Address>) -> Self {
+    pub fn new(modbuf: Vec<ObjectReference>, meta: SideMetadataSpec) -> Self {
         Self {
-            modified_nodes,
-            modified_edges,
+            modbuf,
+            meta,
             phantom: PhantomData,
         }
     }
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
-    #[inline]
+    #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        if !self.modbuf.is_empty() {
+            for obj in &self.modbuf {
+                compare_exchange_atomic(self.meta, obj.to_address(), 0b0, 0b1);
+            }
+        }
         if mmtk.plan.in_nursery() {
-            let mut modified_nodes = vec![];
-            ::std::mem::swap(&mut modified_nodes, &mut self.modified_nodes);
-            worker.scheduler().work_buckets[WorkBucketStage::Closure]
-                .add(ScanObjects::<E>::new(modified_nodes, false));
-
-            let mut modified_edges = vec![];
-            ::std::mem::swap(&mut modified_edges, &mut self.modified_edges);
-            worker.scheduler().work_buckets[WorkBucketStage::Closure].add(E::new(
-                modified_edges,
-                true,
-                mmtk,
-            ));
+            if !self.modbuf.is_empty() {
+                let mut modbuf = vec![];
+                ::std::mem::swap(&mut modbuf, &mut self.modbuf);
+                GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk)
+            }
         } else {
             // Do nothing
         }

@@ -15,7 +15,7 @@ use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::OpaquePointer;
 use crate::util::{generic_freelist, memory};
-use crate::vm::VMBinding;
+use crate::vm::*;
 use std::mem::MaybeUninit;
 
 pub struct CommonFreeListPageResource {
@@ -114,12 +114,13 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
             .space
             .unwrap()
             .grow_space(rtn, bytes, new_chunk);
-        self.common()
-            .space
-            .unwrap()
-            .common()
-            .mmapper
-            .ensure_mapped(rtn, required_pages);
+
+        self.common().space.unwrap().common().mmapper.ensure_mapped(
+            rtn,
+            required_pages,
+            VM::VMActivePlan::global().global_side_metadata_spec_vec(),
+            self.common().space.unwrap().local_side_metadata_spec_vec(),
+        );
         if zeroed {
             memory::zero(rtn, bytes);
         }
