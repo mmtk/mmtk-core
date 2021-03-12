@@ -40,8 +40,6 @@ pub struct SemiSpace<VM: VMBinding> {
     pub common: CommonPlan<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
-
 pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     gc_header_bits: 2,

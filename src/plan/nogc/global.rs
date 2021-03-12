@@ -31,8 +31,6 @@ pub struct NoGC<VM: VMBinding> {
     pub nogc_space: NoGCImmortalSpace<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
-
 pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
 
 impl<VM: VMBinding> Plan for NoGC<VM> {

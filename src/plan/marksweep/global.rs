@@ -31,8 +31,6 @@ pub struct MarkSweep<VM: VMBinding> {
     ms: MallocSpace<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
-
 pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: false,
     gc_header_bits: 2,

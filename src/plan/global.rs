@@ -716,6 +716,9 @@ pub struct CommonUnsync<VM: VMBinding> {
     pub los: LargeObjectSpace<VM>,
 }
 
+// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
+unsafe impl<VM: VMBinding> Sync for CommonPlan<VM> {}
+
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(
         vm_map: &'static VMMap,

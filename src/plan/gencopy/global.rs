@@ -44,8 +44,6 @@ pub struct GenCopy<VM: VMBinding> {
     in_nursery: AtomicBool,
 }
 
-unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
-
 pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     gc_header_bits: 2,
