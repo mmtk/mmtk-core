@@ -28,11 +28,12 @@ pub(crate) fn address_to_meta_address(
         unsafe {
             if rshift >= 0 {
                 Address::from_usize(
-                    metadata_spec.offset + ((data_addr.as_usize() >> log_bits_num) >> rshift),
+                    metadata_spec.offset + ((data_addr.as_usize() >> log_min_obj_size) >> rshift),
                 )
             } else {
                 Address::from_usize(
-                    metadata_spec.offset + ((data_addr.as_usize() >> log_bits_num) << (-rshift)),
+                    metadata_spec.offset
+                        + ((data_addr.as_usize() >> log_min_obj_size) << (-rshift)),
                 )
             }
         }
