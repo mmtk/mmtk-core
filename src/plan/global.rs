@@ -391,6 +391,9 @@ pub struct BasePlan<VM: VMBinding> {
     pub analysis_manager: AnalysisManager<VM>,
 }
 
+// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
+unsafe impl<VM: VMBinding> Sync for BasePlan<VM> {}
+
 #[cfg(feature = "base_spaces")]
 pub struct BaseUnsync<VM: VMBinding> {
     #[cfg(feature = "code_space")]

@@ -71,8 +71,6 @@ pub struct SanityPrepare<P: Plan, W: CopyContext + WorkerLocal> {
     _p: PhantomData<W>,
 }
 
-unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for SanityPrepare<P, W> {}
-
 impl<P: Plan, W: CopyContext + WorkerLocal> SanityPrepare<P, W> {
     pub fn new(plan: &'static P) -> Self {
         Self {
@@ -103,8 +101,6 @@ pub struct SanityRelease<P: Plan, W: CopyContext + WorkerLocal> {
     pub plan: &'static P,
     _p: PhantomData<W>,
 }
-
-unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for SanityRelease<P, W> {}
 
 impl<P: Plan, W: CopyContext + WorkerLocal> SanityRelease<P, W> {
     pub fn new(plan: &'static P) -> Self {

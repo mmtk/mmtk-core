@@ -12,8 +12,6 @@ use std::sync::atomic::Ordering;
 
 pub struct ScheduleCollection;
 
-unsafe impl Sync for ScheduleCollection {}
-
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         mmtk.plan.schedule_collection(worker.scheduler());
@@ -27,8 +25,6 @@ pub struct Prepare<P: Plan, W: CopyContext + WorkerLocal> {
     pub plan: &'static P,
     _p: PhantomData<W>,
 }
-
-unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for Prepare<P, W> {}
 
 impl<P: Plan, W: CopyContext + WorkerLocal> Prepare<P, W> {
     pub fn new(plan: &'static P) -> Self {
@@ -59,8 +55,6 @@ pub struct PrepareMutator<VM: VMBinding> {
     // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
     pub mutator: &'static mut Mutator<VM>,
 }
-
-unsafe impl<VM: VMBinding> Sync for PrepareMutator<VM> {}
 
 impl<VM: VMBinding> PrepareMutator<VM> {
     pub fn new(mutator: &'static mut Mutator<VM>) -> Self {
@@ -96,8 +90,6 @@ pub struct Release<P: Plan, W: CopyContext + WorkerLocal> {
     _p: PhantomData<W>,
 }
 
-unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for Release<P, W> {}
-
 impl<P: Plan, W: CopyContext + WorkerLocal> Release<P, W> {
     pub fn new(plan: &'static P) -> Self {
         Self {
@@ -128,8 +120,6 @@ pub struct ReleaseMutator<VM: VMBinding> {
     // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
     pub mutator: &'static mut Mutator<VM>,
 }
-
-unsafe impl<VM: VMBinding> Sync for ReleaseMutator<VM> {}
 
 impl<VM: VMBinding> ReleaseMutator<VM> {
     pub fn new(mutator: &'static mut Mutator<VM>) -> Self {
