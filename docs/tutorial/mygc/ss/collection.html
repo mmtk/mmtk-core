@@ -1,0 +1,631 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Collection - MMTk Tutorial</title>
+        
+        
+
+
+        <!-- Custom HTML head -->
+        
+
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        
+        <link rel="icon" href="../../favicon.svg">
+        
+        
+        <link rel="shortcut icon" href="../../favicon.png">
+        
+        <link rel="stylesheet" href="../../css/variables.css">
+        <link rel="stylesheet" href="../../css/general.css">
+        <link rel="stylesheet" href="../../css/chrome.css">
+        
+        <link rel="stylesheet" href="../../css/print.css" media="print">
+        
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../FontAwesome/css/font-awesome.css">
+        
+        <link rel="stylesheet" href="../../fonts/fonts.css">
+        
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../../highlight.css">
+        <link rel="stylesheet" href="../../tomorrow-night.css">
+        <link rel="stylesheet" href="../../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../../prefix.html">MMTk Tutorial</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">1.</strong> Introduction</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../intro/what_is_mmtk.html"><strong aria-hidden="true">1.1.</strong> What is MMTk?</a></li><li class="chapter-item expanded "><a href="../../intro/what_will_this_tutorial_cover.html"><strong aria-hidden="true">1.2.</strong> What will this tutorial cover?</a></li><li class="chapter-item expanded "><a href="../../intro/glossary.html"><strong aria-hidden="true">1.3.</strong> Glossary</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.</strong> Preliminaries</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../preliminaries/set_up.html"><strong aria-hidden="true">2.1.</strong> Set up MMTk and OpenJDK</a></li><li class="chapter-item expanded "><a href="../../preliminaries/test.html"><strong aria-hidden="true">2.2.</strong> Test the build</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> MyGC</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../mygc/create.html"><strong aria-hidden="true">3.1.</strong> Create MyGC</a></li><li class="chapter-item expanded "><a href="../../mygc/ss/prefix.html"><strong aria-hidden="true">3.2.</strong> Building a semispace GC</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../mygc/ss/alloc.html"><strong aria-hidden="true">3.2.1.</strong> Allocation</a></li><li class="chapter-item expanded "><a href="../../mygc/ss/collection.html" class="active"><strong aria-hidden="true">3.2.2.</strong> Collection</a></li><li class="chapter-item expanded "><a href="../../mygc/ss/exercise.html"><strong aria-hidden="true">3.2.3.</strong> Exercise</a></li></ol></li><li class="chapter-item expanded "><a href="../../mygc/gencopy.html"><strong aria-hidden="true">3.3.</strong> Building a generational copying GC</a></li></ol></li><li class="chapter-item expanded "><a href="../../further_reading.html"><strong aria-hidden="true">4.</strong> Further Reading</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        
+                    </div>
+
+                    <h1 class="menu-title">MMTk Tutorial</h1>
+
+                    <div class="right-buttons">
+                        
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        
+                        
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="collection-implement-garbage-collection"><a class="header" href="#collection-implement-garbage-collection">Collection: Implement garbage collection</a></h1>
+<p>We need to add a few more things to get garbage collection working. 
+Specifically, we need to add a <code>CopyContext</code>, which a GC worker uses for 
+copying objects, and GC work packets that will be scheduled for a collection.</p>
+<h2 id="copycontext"><a class="header" href="#copycontext">CopyContext</a></h2>
+<p>At the moment, none of the files in the plan are suited for garbage collection 
+operations. So, we need to add a new file to hold the <code>CopyContext</code> and other 
+structures and functions that will give the collector proper functionality.</p>
+<p>Make a new file under <code>mygc</code>, called <code>gc_work.rs</code>. 
+In <code>mod.rs</code>, import <code>gc_work</code> as a module by adding the line <code>mod gc_work</code>.
+In <code>gc_work.rs</code>, add the following import statements:</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use super::global::MyGC;
+use crate::plan::CopyContext;
+use crate::policy::space::Space;
+use crate::scheduler::gc_work::*;
+use crate::util::alloc::{Allocator, BumpAllocator};
+use crate::util::forwarding_word;
+use crate::util::{Address, ObjectReference, OpaquePointer};
+use crate::vm::VMBinding;
+use crate::MMTK;
+use crate::plan::PlanConstraints;
+use crate::scheduler::WorkerLocal;
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
+<span class="boring">}
+</span></code></pre></pre>
+<p>Add a new structure, <code>MyGCCopyContext</code>, with the type parameter 
+<code>VM: VMBinding</code>. It should have the fields <code>plan: &amp;'static MyGC&lt;VM&gt;</code>
+and <code>mygc: BumpAllocator</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct MyGCCopyContext&lt;VM: VMBinding&gt; {
+    plan:&amp;'static MyGC&lt;VM&gt;,
+    mygc: BumpAllocator&lt;VM&gt;,
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>Create an implementation block - 
+<code>impl&lt;VM: VMBinding&gt; CopyContext for MyGCCopyContext&lt;VM&gt;</code>.
+Define the associate type <code>VM</code> for <code>CopyContext</code> as the VMBinding type 
+given to the class as <code>VM</code>: <code>type VM: VM</code>. </p>
+<p>Add the following skeleton functions (taken from <code>plan/global.rs</code>):</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn constraints(&amp;self) -&gt; &amp;'static PlanConstraints {
+    unimplemented!()
+}
+fn init(&amp;mut self, tls: OpaquePointer) {
+    unimplemented!()
+}
+fn prepare(&amp;mut self) {
+    unimplemented!()
+}
+fn release(&amp;mut self) {
+    unimplemented!()
+}
+fn alloc_copy(`init
+    &amp;mut self,
+    original: ObjectReference,
+    bytes: usize,
+    align: usize,
+    offset: isize,
+    semantics: AllocationSemantics,
+) -&gt; Address {
+    unimplemented!()
+}
+fn post_copy(
+    &amp;mut self,
+    _obj: ObjectReference,
+    _tib: Address,
+    _bytes: usize,
+    _semantics: AllocationSemantics,
+) {
+    unimplemented!()
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>In <code>init()</code>, set the <code>tls</code> variable in the held instance of <code>mygc</code> to
+the one passed to the function. In <code>constraints()</code>, return a reference of <code>MYGC_CONSTRAINTS</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn constraints(&amp;self) -&gt; &amp;'static PlanConstraints {
+        &amp;super::global::MYGC_CONSTRAINTS
+    }
+    fn init(&amp;mut self, tls:OpaquePointer) {
+        self.mygc.tls = tls;
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>We just leave the rest of the functions empty for now and will implement them later.</p>
+<p>Add a constructor to <code>MyGCCopyContext</code> and implement the <code>WorkerLocal</code> trait for <code>MyGCCopyContext</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl&lt;VM: VMBinding&gt; MyGCCopyContext&lt;VM&gt; {
+    pub fn new(mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
+        Self {
+            plan: &amp;mmtk.plan.downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap(),
+            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &amp;*mmtk.plan),
+        }
+    }
+}
+
+impl&lt;VM: VMBinding&gt; WorkerLocal for MyGCCopyContext&lt;VM&gt; {
+    fn init(&amp;mut self, tls: OpaquePointer) {
+        CopyContext::init(self, tls);
+    }
+}
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="mygcprocessedges"><a class="header" href="#mygcprocessedges">MyGCProcessEdges</a></h2>
+<p>Add a new public structure, <code>MyGCProcessEdges</code>, with the type parameter 
+<code>&lt;VM:VMBinding&gt;</code>. It will hold an instance of <code>ProcessEdgesBase</code> and 
+<code>MyGC</code>. This is the core part for tracing objects in the <code>MyGC</code> plan.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct MyGCProcessEdges&lt;VM: VMBinding&gt; {
+    plan: &amp;'static MyGC&lt;VM&gt;,
+    base: ProcessEdgesBase&lt;MyGCProcessEdges&lt;VM&gt;&gt;,
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>Add a new implementations block 
+<code>impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt;</code>.
+Similarly to before, set <code>ProcessEdgesWork</code>'s associate type <code>VM</code> to 
+the type parameter of <code>MyGCProcessEdges</code>, <code>VM</code>: <code>type VM:VM</code>.
+Add a new constructor, <code>new()</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn new(edges: Vec&lt;Address&gt;, _roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
+        let base = ProcessEdgesBase::new(edges, mmtk);
+        let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
+        Self { base, plan }
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="introduce-collection-to-mygc-plan"><a class="header" href="#introduce-collection-to-mygc-plan">Introduce collection to MyGC plan</a></h2>
+<p>Now that they've been added, you should import <code>MyGCCopyContext</code> and
+<code>MyGCProcessEdges</code> into <code>global.rs</code>, which we will be working in for the
+next few steps. </p>
+<p>In <code>create_worker_local()</code> in <code>impl Plan for MyGC</code>, create an instance of <code>MyGCCopyContext</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn create_worker_local(
+        &amp;self,
+        tls: OpaquePointer,
+        mmtk: &amp;'static MMTK&lt;Self::VM&gt;,
+    ) -&gt; GCWorkerLocalPtr {
+        let mut c = MyGCCopyContext::new(mmtk);
+        c.init(tls);
+        GCWorkerLocalPtr::new(c)
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p><code>NoCopy</code> is now no longer needed. Remove it from the import statement block. 
+For the next step, import <code>crate::scheduler::gc_work::*;</code>, and modify the
+line importing <code>MMTK</code> scheduler to read <code>use crate::scheduler::*;</code>.</p>
+<p>Add a new method to <code>Plan for MyGC</code>, <code>schedule_collection()</code>. This function 
+runs when a collection is triggered. It schedules GC work for the plan, i.e.,
+it stops all mutators, runs the
+scheduler's prepare stage and resumes the mutators. The <code>StopMutators</code> work
+will invoke code from the bindings to scan threads and other roots, and those scanning work
+will further push work for a transitive closure.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn schedule_collection(&amp;'static self, scheduler:&amp;MMTkScheduler&lt;VM&gt;) {
+        self.base().set_collection_kind();
+        self.base().set_gc_status(GcStatus::GcPrepare);
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::&lt;MyGCProcessEdges&lt;VM&gt;&gt;::new());
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release].add(Release::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;::new(self));
+        scheduler.set_finalizer(Some(EndOfGC));
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>Delete <code>handle_user_collection_request()</code>. This function was an override of 
+a Common plan function to ignore user requested collection for NoGC. Now we 
+remove it and allow user requested collection.</p>
+<h2 id="prepare-for-collection"><a class="header" href="#prepare-for-collection">Prepare for collection</a></h2>
+<p>The collector has a number of steps it needs to perform before each collection.
+We'll add these now.</p>
+<h3 id="prepare-plan"><a class="header" href="#prepare-plan">Prepare plan</a></h3>
+<p>In <code>global.rs</code>, find the method <code>prepare</code>. Delete the <code>unreachable!()</code> 
+call, and add the following code:</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn prepare(&amp;self, tls: OpaquePointer) {
+        self.common.prepare(tls, true);
+
+        self.hi
+            .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
+        // Flips 'hi' to flip space definitions
+        let hi = self.hi.load(Ordering::SeqCst); 
+        self.copyspace0.prepare(hi);
+        self.copyspace1.prepare(!hi);
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>This function is called at the start of a collection. It prepares the two 
+spaces in the common plan, flips the definitions for which space is 'to' 
+and which is 'from', then prepares the copyspaces with the new definition.</p>
+<h3 id="prepare-copycontext"><a class="header" href="#prepare-copycontext">Prepare CopyContext</a></h3>
+<p>First, fill in some more of the skeleton functions we added to the 
+<code>CopyContext</code> (in <code>gc_work.rs</code>) earlier.
+In <code>prepare()</code>, rebind the allocator to the tospace using the function
+<code>self.mygc.rebind(Some(self.plan.tospace()))</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn prepare(&amp;mut self) {
+        self.mygc.rebind(Some(self.plan.tospace()));
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="prepare-mutator"><a class="header" href="#prepare-mutator">Prepare mutator</a></h3>
+<p>Going back to <code>mutator.rs</code>, create a new function called 
+<code>mygc_mutator_prepare(_mutator: &amp;mut Mutator &lt;MyGC&lt;VM&gt;&gt;, _tls: OpaquePointer,)</code>. 
+This function will be called at the preparation stage of a collection 
+(at the start of a collection) for each mutator. Its body can stay empty, as 
+there aren't any preparation steps for the mutator in this GC.
+In <code>create_mygc_mutator()</code>, find the field <code>prep_func</code> and change it from
+<code>mygc_mutator_noop()</code> to <code>mygc_mutator_prepare()</code>.</p>
+<h2 id="scan-objects"><a class="header" href="#scan-objects">Scan objects</a></h2>
+<p>Next, we'll add the code to allow the plan to collect garbage - filling out 
+functions for work packets.</p>
+<p>In <code>gc_work.rs</code>, add a new method to <code>ProcessEdgesWork for MyGCProcessEdges</code>,
+<code>trace_object(&amp;mut self, object: ObjectReference)</code>.
+This method should return an ObjectReference, and use the 
+inline attribute.
+Check if the object passed into the function is null 
+(<code>object.is_null()</code>). If it is, return the object.
+Check if which space the object is in, and forward the call to the policy-specific
+object tracing code. If it is in neither space, forward the call to the common space and let the common space to handle
+object tracing in its spaces (e.g. immortal or large object space):</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    #[inline]
+    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+        if self.mygc().tospace().in_space(object) {
+            self.mygc().tospace().trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(
+                self,
+                object,
+                super::global::ALLOC_MyGC,
+                unsafe { self.worker().local::&lt;MyGCCopyContext&lt;VM&gt;&gt;() },
+            )
+        } else if self.mygc().fromspace().in_space(object) {
+            self.mygc().fromspace().trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(
+                self,
+                object,
+                super::global::ALLOC_MyGC,
+                unsafe { self.worker().local::&lt;MyGCCopyContext&lt;VM&gt;&gt;() },
+            )
+        } else {
+            self.mygc().common.trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(self, object)
+        }
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>Add two new implementation blocks, <code>Deref</code> and <code>DerefMut</code> for 
+<code>MyGCProcessEdges</code>. These allow <code>MyGCProcessEdges</code> to be dereferenced to 
+<code>ProcessEdgesBase</code>, and allows easy access to fields in <code>ProcessEdgesBase</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
+    type Target = ProcessEdgesBase&lt;Self&gt;;
+    #[inline]
+    fn deref(&amp;self) -&gt; &amp;Self::Target {
+        &amp;self.base
+    }
+}
+
+impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
+    #[inline]
+    fn deref_mut(&amp;mut self) -&gt; &amp;mut Self::Target {
+        &amp;mut self.base
+    }
+}
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="copying-objects"><a class="header" href="#copying-objects">Copying objects</a></h2>
+<p>Go back to the <code>MyGCopyContext</code> in <code>gc_work.rs</code>. 
+In <code>alloc_copy()</code>, call the allocator's <code>alloc</code> function. Above the function, 
+use an inline attribute (<code>#[inline(always)]</code>) to tell the Rust compiler 
+to always inline the function.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    #[inline(always)]
+    fn alloc_copy(
+        &amp;mut self,
+        _original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+        _semantics: crate::AllocationSemantics,
+    ) -&gt; Address {
+        self.mygc.alloc(bytes, align, offset)
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>To <code>post_copy()</code>, in the <code>CopyContext</code> implementations block, add 
+<code>forwarding_word::clear_forwarding_bits::&lt;VM&gt;(obj);</code>. Also, add an 
+inline attribute.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    #[inline(always)]
+    fn post_copy(
+        &amp;mut self,
+        obj: ObjectReference,
+        _tib: Address,
+        _bytes: usize,
+        _semantics: crate::AllocationSemantics,
+    ) {
+        forwarding_word::clear_forwarding_bits::&lt;VM&gt;(obj);
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="release"><a class="header" href="#release">Release</a></h2>
+<p>Finally, we need to fill out the functions that are, roughly speaking, 
+run after each collection.</p>
+<h3 id="release-in-plan"><a class="header" href="#release-in-plan">Release in plan</a></h3>
+<p>Find the method <code>release()</code> in <code>global.rs</code>. Replace the 
+<code>unreachable!()</code> call with the following code.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn release(&amp;self, tls: OpaquePointer) {
+        self.common.release(tls, true);
+        self.fromspace().release();
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>This function is called at the end of a collection. It calls the release routines for the common
+plan spaces and the fromspace.</p>
+<h3 id="release-in-mutator"><a class="header" href="#release-in-mutator">Release in mutator</a></h3>
+<p>Go back to <code>mutator.rs</code>. In <code>create_mygc_mutator()</code>, replace 
+<code>mygc_mutator_noop()</code> in the <code>release_func</code> field with <code>mygc_mutator_release()</code>.
+Leave the <code>release()</code> function in the <code>CopyContext</code> empty. There are no 
+release steps for <code>CopyContext</code> in this collector.</p>
+<p>Create a new function called <code>mygc_mutator_release()</code> that takes the same 
+inputs as the <code>prepare()</code> function above. This function will be called at the 
+release stage of a collection (at the end of a collection) for each mutator. 
+It rebinds the allocator for the <code>Default</code> allocation semantics to the new 
+tospace. When the mutator threads resume, any new allocations for <code>Default</code> 
+will then go to the new tospace.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn mygc_mutator_release&lt;VM: VMBinding&gt;(
+    mutator: &amp;mut Mutator&lt;VM&gt;,
+    _tls: OpaquePointer,
+) {
+    // rebind the allocation bump pointer to the appropriate semispace
+    let bump_allocator = unsafe {
+        mutator
+            .allocators
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
+    }
+    .downcast_mut::&lt;BumpAllocator&lt;VM&gt;&gt;()
+    .unwrap();
+    bump_allocator.rebind(Some(
+        mutator
+            .plan
+            .downcast_ref::&lt;MyGC&lt;VM&gt;&gt;()
+            .unwrap()
+            .tospace(),
+    ));
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>Delete <code>mygc_mutator_noop()</code>. It was a placeholder for the prepare and 
+release functions that you have now added, so it is now dead code.</p>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<p>You should now have MyGC working and able to collect garbage. All three
+benchmarks should be able to pass now. </p>
+<p>If the benchmarks pass - good job! You have built a functional copying
+collector!</p>
+<p>If you get particularly stuck, the code for the completed <code>MyGC</code> plan
+is available <a href="https://github.com/mmtk/mmtk-core/tree/master/docs/tutorial/code/mygc_semispace">here</a>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="../../mygc/ss/alloc.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="../../mygc/ss/exercise.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a rel="prev" href="../../mygc/ss/alloc.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a rel="next" href="../../mygc/ss/exercise.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+
+        
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="../../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="../../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+
+    </body>
+</html>

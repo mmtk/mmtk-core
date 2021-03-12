@@ -1,0 +1,590 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Allocation - MMTk Tutorial</title>
+        
+        
+
+
+        <!-- Custom HTML head -->
+        
+
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        
+        <link rel="icon" href="../../favicon.svg">
+        
+        
+        <link rel="shortcut icon" href="../../favicon.png">
+        
+        <link rel="stylesheet" href="../../css/variables.css">
+        <link rel="stylesheet" href="../../css/general.css">
+        <link rel="stylesheet" href="../../css/chrome.css">
+        
+        <link rel="stylesheet" href="../../css/print.css" media="print">
+        
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../FontAwesome/css/font-awesome.css">
+        
+        <link rel="stylesheet" href="../../fonts/fonts.css">
+        
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../../highlight.css">
+        <link rel="stylesheet" href="../../tomorrow-night.css">
+        <link rel="stylesheet" href="../../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../../prefix.html">MMTk Tutorial</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">1.</strong> Introduction</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../intro/what_is_mmtk.html"><strong aria-hidden="true">1.1.</strong> What is MMTk?</a></li><li class="chapter-item expanded "><a href="../../intro/what_will_this_tutorial_cover.html"><strong aria-hidden="true">1.2.</strong> What will this tutorial cover?</a></li><li class="chapter-item expanded "><a href="../../intro/glossary.html"><strong aria-hidden="true">1.3.</strong> Glossary</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.</strong> Preliminaries</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../preliminaries/set_up.html"><strong aria-hidden="true">2.1.</strong> Set up MMTk and OpenJDK</a></li><li class="chapter-item expanded "><a href="../../preliminaries/test.html"><strong aria-hidden="true">2.2.</strong> Test the build</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> MyGC</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../mygc/create.html"><strong aria-hidden="true">3.1.</strong> Create MyGC</a></li><li class="chapter-item expanded "><a href="../../mygc/ss/prefix.html"><strong aria-hidden="true">3.2.</strong> Building a semispace GC</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../mygc/ss/alloc.html" class="active"><strong aria-hidden="true">3.2.1.</strong> Allocation</a></li><li class="chapter-item expanded "><a href="../../mygc/ss/collection.html"><strong aria-hidden="true">3.2.2.</strong> Collection</a></li><li class="chapter-item expanded "><a href="../../mygc/ss/exercise.html"><strong aria-hidden="true">3.2.3.</strong> Exercise</a></li></ol></li><li class="chapter-item expanded "><a href="../../mygc/gencopy.html"><strong aria-hidden="true">3.3.</strong> Building a generational copying GC</a></li></ol></li><li class="chapter-item expanded "><a href="../../further_reading.html"><strong aria-hidden="true">4.</strong> Further Reading</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        
+                    </div>
+
+                    <h1 class="menu-title">MMTk Tutorial</h1>
+
+                    <div class="right-buttons">
+                        
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        
+                        
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="allocation-add-copyspaces"><a class="header" href="#allocation-add-copyspaces">Allocation: Add copyspaces</a></h1>
+<p>We will now change your MyGC plan from one that cannot collect garbage
+into one that implements the semispace algorithm. The first step of this
+is to add the two copyspaces, and allow collectors to allocate memory 
+into them. This involves adding two copyspaces, the code to properly initialise 
+and prepare the new spaces, and a copy context.</p>
+<h2 id="change-the-plan-constraints"><a class="header" href="#change-the-plan-constraints">Change the plan constraints</a></h2>
+<p>Firstly, change the plan constraints. Some of these constraints are not used 
+at the moment, but it's good to set them properly regardless.</p>
+<ol>
+<li>
+<p>Look in <code>plan/plan_constraints.rs</code>. <code>PlanConstraints</code> lists all the possible
+options for plan-specific constraints. At the moment, <code>MYGC_CONSTRAINTS</code> in <code>mygc/global.rs</code> should be using
+the default value for <code>PlanConstraints</code>. We will make the following changes.</p>
+</li>
+<li>
+<p>Initialize <code>gc_header_bits</code> to 2. We reserve 2 bits in the header for GC use.</p>
+</li>
+<li>
+<p>Initialize <code>moves_objects</code> to <code>true</code>.</p>
+</li>
+<li>
+<p>Initialize <code>num_specialized_scans</code> to 1.</p>
+</li>
+</ol>
+<p>Finished Code (Step 1-4):</p>
+<pre><code>pub const MYGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    moves_objects: true,
+    gc_header_bits: 2,
+    gc_header_words: 0,
+    num_specialized_scans: 1,
+    ..PlanConstraints::default()
+};
+</code></pre>
+<h2 id="change-the-plan-implementation"><a class="header" href="#change-the-plan-implementation">Change the plan implementation</a></h2>
+<p>Next, in <code>global.rs</code>, replace the old immortal (nogc) space with two copyspaces.</p>
+<h3 id="imports"><a class="header" href="#imports">Imports</a></h3>
+<p>To the import statement block:</p>
+<ol>
+<li>Replace <code>crate::plan::global::{BasePlan, NoCopy};</code> with 
+<code>use crate::plan::global::BasePlan;</code>. This collector is going to use 
+copying, so there's no point to importing NoCopy any more.</li>
+<li>Add <code>use crate::plan::global::CommonPlan;</code>. Semispace uses the common
+plan, which includes an immortal space and a large object space, rather 
+than the base plan. Any garbage collected plan should use <code>CommonPlan</code>.</li>
+<li>Add <code>use std::sync::atomic::{AtomicBool, Ordering};</code>. These are going 
+to be used to store an indicator of which copyspace is the tospace.</li>
+<li>Delete <code>#[allow(unused_imports)]</code>.</li>
+</ol>
+<p>Finished Code(Step 1):</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
+use crate::mmtk::MMTK;
+use crate::plan::global::BasePlan; //Modify
+use crate::plan::global::CommonPlan; // Add
+use crate::plan::global::GcStatus; // Add
+use crate::plan::mutator_context::Mutator;
+use crate::plan::mygc::mutator::create_mygc_mutator;
+use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::AllocationSemantics;
+use crate::plan::Plan;
+use crate::policy::copyspace::CopySpace; // Add
+use crate::policy::space::Space;
+use crate::scheduler::gc_work::*; // Add
+use crate::scheduler::*; // Modify
+use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
+use crate::util::heap::HeapMeta;
+use crate::util::heap::VMRequest;
+use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
+use crate::plan::PlanConstraints;
+use std::sync::atomic::{AtomicBool, Ordering}; // Add 
+use std::sync::Arc;
+use enum_map::EnumMap;
+// Remove #[allow(unused_imports)].
+// Remove handle_user_collection_request.
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="struct-mygc"><a class="header" href="#struct-mygc">Struct MyGC</a></h3>
+<p>Change <code>pub struct MyGC&lt;VM: VMBinding&gt;</code> to add new instance variables.</p>
+<ol>
+<li>Delete the existing fields in the constructor.</li>
+<li>Add <code>pub hi: AtomicBool,</code>. This is a thread-safe bool, indicating which 
+copyspace is the tospace.</li>
+<li>Add <code>pub copyspace0: CopySpace&lt;VM&gt;,</code> 
+and <code>pub copyspace1: CopySpace&lt;VM&gt;,</code>. These are the two copyspaces.</li>
+<li>Add <code>pub common: CommonPlan&lt;VM&gt;,</code>.
+This holds an instance of the common plan.</li>
+</ol>
+<p>Finished code (step 2):</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct MyGC&lt;VM: VMBinding&gt; {
+    pub hi: AtomicBool, 
+    pub copyspace0: CopySpace&lt;VM&gt;,
+    pub copyspace1: CopySpace&lt;VM&gt;,
+    pub common: CommonPlan&lt;VM&gt;, 
+}
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="implement-the-plan-trait-for-mygc"><a class="header" href="#implement-the-plan-trait-for-mygc">Implement the Plan trait for MyGC</a></h3>
+<h4 id="constructor"><a class="header" href="#constructor">Constructor</a></h4>
+<p>Change <code>fn new()</code>. This section initialises and prepares the objects in MyGC that you just defined.</p>
+<ol>
+<li>Delete the definition of <code>mygc_space</code>. 
+Instead, we will define the two copyspaces here.</li>
+<li>Define one of the copyspaces by adding the following code: </li>
+</ol>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>            copyspace0: CopySpace::new(
+                &quot;copyspace0&quot;,
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &amp;mut heap,
+            ),
+<span class="boring">}
+</span></code></pre></pre>
+<ol start="3">
+<li>Create another copyspace, called <code>copyspace1</code>, defining it as a fromspace 
+instead of a tospace. (Hint: the definitions for 
+copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
+<li>Finally, replace the old MyGC initializer.</li>
+</ol>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn new(
+        vm_map: &amp;'static VMMap,
+        mmapper: &amp;'static Mmapper,
+        options: Arc&lt;UnsafeOptionsWrapper&gt;,
+        _scheduler: &amp;'static MMTkScheduler&lt;VM&gt;,
+    ) -&gt; Self {
+        // Modify
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+
+        MyGC {
+            hi: AtomicBool::new(false),
+            copyspace0: CopySpace::new(
+                &quot;copyspace0&quot;,
+                false,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &amp;mut heap,
+            ),
+            copyspace1: CopySpace::new(
+                &quot;copyspace1&quot;,
+                true,
+                true,
+                VMRequest::discontiguous(),
+                vm_map,
+                mmapper,
+                &amp;mut heap,
+            ),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &amp;MYGC_CONSTRAINTS),
+        }
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h4 id="initializer"><a class="header" href="#initializer">Initializer</a></h4>
+<p>Find <code>gc_init()</code>. Change it to initialise the common plan and the two 
+copyspaces, rather than the base plan and mygc_space. The contents of the 
+initializer calls are identical.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn gc_init(
+        &amp;mut self, 
+        heap_size: usize,
+        vm_map: &amp;'static VMMap,
+        scheduler: &amp;Arc&lt;MMTkScheduler&lt;VM&gt;&gt;,
+    ) {
+        self.common.gc_init(heap_size, vm_map, scheduler);
+        self.copyspace0.init(&amp;vm_map);
+        self.copyspace1.init(&amp;vm_map);
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h4 id="other-methods-in-the-plan-trait"><a class="header" href="#other-methods-in-the-plan-trait">Other methods in the Plan trait</a></h4>
+<p>The trait <code>Plan</code> requires a <code>common()</code> method that should return a 
+reference to the common plan. Implement this method now.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn common(&amp;self) -&gt; &amp;CommonPlan&lt;VM&gt; {
+        &amp;self.common
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>Find the helper method <code>base</code> and change it so that it calls the 
+base plan <em>through</em> the common plan.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn base(&amp;self) -&gt; &amp;BasePlan&lt;VM&gt; {
+        &amp;self.common.base
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>Find the method <code>get_pages_used</code>. Replace the current body with 
+<code>self.tospace().reserved_pages() + self.common.get_pages_used()</code>, to 
+correctly count the pages contained in the tospace and the common plan 
+spaces (which will be explained later).</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn get_pages_used(&amp;self) -&gt; usize {
+        self.tospace().reserved_pages() + self.common.get_pages_used()
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>Add and override the following helper function:</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn get_collection_reserve(&amp;self) -&gt; usize {
+        self.tospace().reserved_pages()
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="access-mygc-spaces"><a class="header" href="#access-mygc-spaces">Access MyGC spaces</a></h3>
+<p>Add a new section of methods for MyGC:</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl&lt;VM: VMBinding&gt; MyGC&lt;VM&gt; {
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>To this, add two helper methods, <code>tospace(&amp;self)</code> 
+and <code>fromspace(&amp;self)</code>. They both have return type <code>&amp;CopySpace&lt;VM&gt;</code>, 
+and return a reference to the tospace and fromspace respectively. 
+<code>tospace()</code> (see below) returns a reference to the tospace, 
+and <code>fromspace()</code> returns a reference to the fromspace.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    pub fn tospace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
+        if self.hi.load(Ordering::SeqCst) {
+            &amp;self.copyspace1
+        } else {
+            &amp;self.copyspace0
+        }
+    }
+
+    pub fn fromspace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
+        if self.hi.load(Ordering::SeqCst) {
+            &amp;self.copyspace0
+        } else {
+            &amp;self.copyspace1
+        }
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="change-the-mutator-definition"><a class="header" href="#change-the-mutator-definition">Change the mutator definition</a></h2>
+<p>Next, we need to change the mutator, in <code>mutator.rs</code>, to allocate to the 
+tospace, and to the two spaces controlled by the common plan. </p>
+<h3 id="imports-1"><a class="header" href="#imports-1">Imports</a></h3>
+<p>Change the following import statements:</p>
+<ol>
+<li>Add <code>use super::MyGC;</code>.</li>
+<li>Add <code>use crate::util::alloc::BumpAllocator;</code>.</li>
+<li>Delete <code>use crate::plan::mygc::MyGC;</code>.</li>
+</ol>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use super::MyGC; // Add
+use crate::plan::barriers::NoBarrier;
+use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorConfig;
+use crate::plan::AllocationSemantics as AllocationType;
+use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::BumpAllocator;
+use crate::util::OpaquePointer;
+use crate::vm::VMBinding;
+use enum_map::enum_map;
+use enum_map::EnumMap;
+// Remove crate::plan::mygc::MyGC
+// Remove mygc_mutator_noop
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="allocator-mapping"><a class="header" href="#allocator-mapping">Allocator mapping</a></h3>
+<p>In <code>lazy_static!</code>, make the following changes to <code>ALLOCATOR_MAPPING</code>, 
+which maps the required allocation semantics to the corresponding allocators. 
+For example, for <code>Default</code>, we allocate using the first bump pointer allocator 
+(<code>BumpPointer(0)</code>):</p>
+<ol>
+<li>Map <code>Default</code> to <code>BumpPointer(0)</code>.</li>
+<li>Map <code>ReadOnly</code> to <code>BumpPointer(1)</code>.</li>
+<li>Map <code>Los</code> to <code>LargeObject(0)</code>. </li>
+</ol>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>lazy_static! {
+    pub static ref ALLOCATOR_MAPPING: EnumMap&lt;AllocationType, AllocatorSelector&gt; = enum_map! {
+        AllocationType::Default =&gt; AllocatorSelector::BumpPointer(0),
+        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly =&gt; AllocatorSelector::BumpPointer(1),
+        AllocationType::Los =&gt; AllocatorSelector::LargeObject(0),
+    };
+}
+<span class="boring">}
+</span></code></pre></pre>
+<h3 id="space-mapping"><a class="header" href="#space-mapping">Space mapping</a></h3>
+<p>Next, in <code>create_mygc_mutator</code>, change which allocator is allocated to what 
+space in <code>space_mapping</code>. Note that the space allocation is formatted as a list 
+of tuples. For example, the first bump pointer allocator (<code>BumpPointer(0)</code>) is 
+bound with <code>tospace</code>.</p>
+<ol>
+<li><code>BumpPointer(0)</code> should map to the tospace.</li>
+<li><code>BumpPointer(1)</code> should map to <code>plan.common.get_immortal()</code>.</li>
+<li><code>LargeObject(0)</code> should map to <code>plan.common.get_los()</code>.</li>
+<li>None of the above should be dereferenced (ie, they should not have 
+the <code>&amp;</code> prefix).</li>
+</ol>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>        space_mapping: box vec![
+            (AllocatorSelector::BumpPointer(0), plan.tospace()),
+            (
+                AllocatorSelector::BumpPointer(1),
+                plan.common.get_immortal(),
+            ),
+            (AllocatorSelector::LargeObject(0), plan.common.get_los()),
+        ],
+<span class="boring">}
+</span></code></pre></pre>
+<p>There may seem to be 2 extraneous spaces and allocators that have appeared all 
+of a sudden in these past 2 steps. These are parts of the MMTk common plan 
+itself.</p>
+<ol>
+<li>The immortal space is used for objects that the virtual machine or a 
+library never expects to die.</li>
+<li>The large object space is needed because MMTk handles particularly large 
+objects differently to normal objects, as the space overhead of copying 
+large objects is very high. Instead, this space is used by a free list 
+allocator in the common plan to avoid having to copy them. </li>
+</ol>
+<p>With this, you should have the allocation working, but not garbage collection. 
+Try building again. If you run HelloWorld or Fannkunchredux, they should
+work. DaCapo's lusearch should fail, as it requires garbage to be collected. </p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="../../mygc/ss/prefix.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="../../mygc/ss/collection.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a rel="prev" href="../../mygc/ss/prefix.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a rel="next" href="../../mygc/ss/collection.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+
+        
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="../../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="../../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+
+    </body>
+</html>
