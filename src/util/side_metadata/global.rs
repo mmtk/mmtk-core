@@ -78,7 +78,7 @@ impl MappingState {
 ///
 /// * `global_metadata_spec_vec` - A vector of SideMetadataSpec objects containing all global side metadata.
 ///
-/// * `local_per_chunk` - A vector of SideMetadataSpec objects containing all local side metadata.
+/// * `local_metadata_spec_vec` - A vector of SideMetadataSpec objects containing all local side metadata.
 ///
 pub fn try_map_metadata_space(
     start: Address,
@@ -135,6 +135,57 @@ pub fn try_map_metadata_space(
     true
 }
 
+pub fn try_map_metadata_address_range(
+    start: Address,
+    size: usize,
+    global_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+    local_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+) -> bool {
+    info!("try_map_metadata_address_range({}, 0x{:x})", start, size);
+    debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
+    debug_assert!(size % BYTES_IN_CHUNK == 0);
+
+    for i in 0..global_metadata_spec_vec.len() {
+        let spec = global_metadata_spec_vec[i];
+        // nearest page-aligned starting address
+        let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+        // nearest page-aligned ending address
+        let mmap_size = address_to_meta_address(spec, start + size)
+            .align_up(BYTES_IN_PAGE)
+            .as_usize()
+            - mmap_start.as_usize();
+        if mmap_size > 0 && !try_mmap_metadata_address_range(mmap_start, mmap_size) {
+            return false;
+        }
+    }
+
+    let mut lsize: usize = 0;
+
+    for i in 0..local_metadata_spec_vec.len() {
+        let spec = local_metadata_spec_vec[i];
+        if cfg!(target_pointer_width = "64") {
+            // nearest page-aligned starting address
+            let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+            // nearest page-aligned ending address
+            let mmap_size = address_to_meta_address(spec, start + size)
+                .align_up(BYTES_IN_PAGE)
+                .as_usize()
+                - mmap_start.as_usize();
+            if mmap_size > 0 && !try_mmap_metadata_address_range(mmap_start, mmap_size) {
+                return false;
+            }
+        } else {
+            lsize += meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+        }
+    }
+
+    if cfg!(target_pointer_width = "32") {
+        return try_map_per_chunk_metadata_space(start, size, lsize);
+    }
+
+    true
+}
+
 // Try to map side metadata for the data starting at `start` and a size of `size`
 fn try_mmap_metadata(start: Address, size: usize) -> MappingState {
     trace!("try_mmap_metadata({}, 0x{:x})", start, size);
@@ -160,6 +211,20 @@ fn try_mmap_metadata(start: Address, size: usize) -> MappingState {
     }
 
     MappingState::IsMapped
+}
+
+fn try_mmap_metadata_address_range(start: Address, size: usize) -> bool {
+    trace!("try_mmap_metadata_address_range({}, 0x{:x})", start, size);
+
+    let prot = libc::PROT_READ | libc::PROT_WRITE;
+    // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
+    let flags =
+        libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE | libc::MAP_NORESERVE;
+
+    let result: *mut libc::c_void =
+        unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) };
+
+    result != libc::MAP_FAILED
 }
 
 /// Unmap the corresponding metadata space or panic.

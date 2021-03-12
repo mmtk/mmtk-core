@@ -1,12 +1,13 @@
 use crate::util::heap::layout::vm_layout_constants::{
-    BYTES_IN_CHUNK, HEAP_END, LOG_ADDRESS_SPACE, LOG_BYTES_IN_CHUNK,
+    BYTES_IN_CHUNK, LOG_ADDRESS_SPACE, LOG_BYTES_IN_CHUNK,
 };
 use crate::util::Address;
 
 #[cfg(target_pointer_width = "32")]
 pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address = unsafe { Address::from_usize(0) };
 #[cfg(target_pointer_width = "64")]
-pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address = unsafe { Address::from_usize(0x0000_0600_0000_0000usize) };
+pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
+    unsafe { Address::from_usize(0x0000_0600_0000_0000usize) };
 
 /// This constant represents the worst-case ratio of source data size to global side metadata.
 /// A value of 2 means the space required for global side metadata must be less than 1/4th of the source data.

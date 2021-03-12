@@ -9,7 +9,7 @@ pub(crate) fn address_to_meta_address(
 ) -> Address {
     let log_bits_num = metadata_spec.log_num_of_bits as i32;
     let log_min_obj_size = metadata_spec.log_min_obj_size as i32;
-    
+
     let rshift = (constants::LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
     // policy-specific side metadata is per chunk in 32-bit targets
@@ -55,6 +55,7 @@ const fn addr_rshift(metadata_spec: SideMetadataSpec) -> i32 {
         - metadata_spec.log_num_of_bits) as i32
 }
 
+#[allow(dead_code)]
 #[inline(always)]
 pub(crate) const fn metadata_address_range_size(metadata_spec: SideMetadataSpec) -> usize {
     1usize << (LOG_ADDRESS_SPACE - addr_rshift(metadata_spec) as usize)

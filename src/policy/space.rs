@@ -1,4 +1,4 @@
-use crate::util::side_metadata::try_map_metadata_space;
+use crate::util::side_metadata::{try_map_metadata_address_range, try_map_metadata_space};
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
@@ -338,15 +338,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
             SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
-            if !try_map_metadata_space(
-                start,
-                bytes,
-                VM::VMActivePlan::global().global_side_metadata_spec_vec(),
-                self.local_side_metadata_spec_vec(),
-            ) {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory");
-            }
         }
     }
 
@@ -587,7 +578,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn init(&self, space: &dyn Space<VM>) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            if !try_map_metadata_space(
+            if !try_map_metadata_address_range(
                 self.start,
                 self.extent,
                 VM::VMActivePlan::global().global_side_metadata_spec_vec(),

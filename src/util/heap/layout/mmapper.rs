@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::util::{Address, side_metadata::{SideMetadataSpec, try_map_metadata_space}};
+use crate::util::{
+    side_metadata::{try_map_metadata_space, SideMetadataSpec},
+    Address,
+};
 
 use super::vm_layout_constants::BYTES_IN_CHUNK;
 

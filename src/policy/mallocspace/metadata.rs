@@ -1,20 +1,20 @@
+use crate::util::constants;
 #[cfg(debug_assertions)]
 use crate::util::constants::BYTES_IN_WORD;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::side_metadata::address_to_meta_address;
 use crate::util::side_metadata::load_atomic;
+#[cfg(target_pointer_width = "32")]
 use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::side_metadata::store_atomic;
 use crate::util::side_metadata::try_map_metadata_space;
 use crate::util::side_metadata::SideMetadataScope;
 use crate::util::side_metadata::SideMetadataSpec;
+#[cfg(target_pointer_width = "64")]
+use crate::util::side_metadata::{metadata_address_range_size, LOCAL_SIDE_METADATA_BASE_ADDRESS};
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::{
-    constants,
-    side_metadata::{metadata_address_range_size, LOCAL_SIDE_METADATA_BASE_ADDRESS},
-};
 
 use std::sync::RwLock;
 use std::{collections::HashSet, sync::Arc};
@@ -84,7 +84,11 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
         Arc::new(vec![]),
         Arc::new(vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC]),
     );
-    debug_assert!(mmap_metadata_result, "mmap sidemetadata failed for chunk_start ({})", chunk_start);
+    debug_assert!(
+        mmap_metadata_result,
+        "mmap sidemetadata failed for chunk_start ({})",
+        chunk_start
+    );
 }
 
 // Check if a given object was allocated by malloc
