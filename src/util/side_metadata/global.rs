@@ -102,7 +102,7 @@ pub fn try_map_metadata_space(
             // FIXME - This assumes that we never mmap a metadata page twice.
             // While this never happens in our current use-cases where the minimum data mmap size is a chunk and the metadata ratio is larger than 1/64, it could happen if (min_data_mmap_size * metadata_ratio) is smaller than a page.
             // E.g. the current implementation detects such a case as an overlap and returns false.
-            if !try_mmap_metadata(mmap_start, mmap_size).is_mapped() {
+            if !try_mmap_metadata(mmap_start, mmap_size).is_mappable() {
                 return false;
             }
         }
@@ -120,7 +120,7 @@ pub fn try_map_metadata_space(
                 .align_up(BYTES_IN_PAGE)
                 .as_usize()
                 - mmap_start.as_usize();
-            if mmap_size > 0 && !try_mmap_metadata(mmap_start, mmap_size).is_mapped() {
+            if mmap_size > 0 && !try_mmap_metadata(mmap_start, mmap_size).is_mappable() {
                 return false;
             }
         } else {
@@ -151,8 +151,10 @@ fn try_mmap_metadata(start: Address, size: usize) -> MappingState {
     if result == libc::MAP_FAILED {
         let err = unsafe { *libc::__errno_location() };
         if err == libc::EEXIST {
+            println!("try_mmap_metadata({}, 0x{:x}) -> WasMapped", start, size);
             return MappingState::WasMapped;
         } else {
+            println!("try_mmap_metadata({}, 0x{:x}) -> NotMappable", start, size);
             return MappingState::NotMappable;
         }
     }

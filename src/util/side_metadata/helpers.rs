@@ -9,24 +9,33 @@ pub(crate) fn address_to_meta_address(
 ) -> Address {
     let log_bits_num = metadata_spec.log_num_of_bits as i32;
     let log_min_obj_size = metadata_spec.log_min_obj_size as i32;
-
-    debug_assert!(
-        data_addr.is_aligned_to(1 << log_min_obj_size),
-        "data_addr must be log_aligned to (0x{:x})",
-        log_min_obj_size
-    );
-
-    let rshift = (constants::LOG_BITS_IN_BYTE as i32) + log_min_obj_size - log_bits_num;
+    
+    let rshift = (constants::LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
     // policy-specific side metadata is per chunk in 32-bit targets
     let res = if cfg!(target_pointer_width = "32") && !metadata_spec.scope.is_global() {
         let meta_chunk_addr = address_to_meta_chunk_addr(data_addr);
         let internal_addr = data_addr.as_usize() & CHUNK_MASK;
-        let second_offset = internal_addr >> rshift;
+        let effective_addr = internal_addr >> log_min_obj_size;
+        let second_offset = if rshift >= 0 {
+            effective_addr >> rshift
+        } else {
+            effective_addr << (-rshift)
+        };
 
         meta_chunk_addr + metadata_spec.offset + second_offset
     } else {
-        unsafe { Address::from_usize(metadata_spec.offset + (data_addr.as_usize() >> rshift)) }
+        unsafe {
+            if rshift >= 0 {
+                Address::from_usize(
+                    metadata_spec.offset + ((data_addr.as_usize() >> log_bits_num) >> rshift),
+                )
+            } else {
+                Address::from_usize(
+                    metadata_spec.offset + ((data_addr.as_usize() >> log_bits_num) << (-rshift)),
+                )
+            }
+        }
     };
 
     trace!(

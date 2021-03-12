@@ -84,7 +84,7 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
         Arc::new(vec![]),
         Arc::new(vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC]),
     );
-    debug_assert!(mmap_metadata_result, "mmap sidemetadata failed");
+    debug_assert!(mmap_metadata_result, "mmap sidemetadata failed for chunk_start ({})", chunk_start);
 }
 
 // Check if a given object was allocated by malloc
