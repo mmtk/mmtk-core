@@ -3,14 +3,12 @@ use super::SideMetadataSpec;
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use crate::util::{constants, Address};
 
-#[inline(always)]
-pub(crate) fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
+pub(crate) const fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
     SIDE_METADATA_BASE_ADDRESS
         + ((data_addr.as_usize() & !CHUNK_MASK) >> SIDE_METADATA_WORST_CASE_RATIO_LOG)
 }
 
-#[inline(always)]
-pub(crate) fn address_to_meta_address(
+pub const fn address_to_meta_address(
     metadata_spec: SideMetadataSpec,
     data_addr: Address,
 ) -> Address {

@@ -22,7 +22,7 @@ pub type ByteOffset = isize;
 pub struct Address(usize);
 
 /// Address + ByteSize (positive)
-impl Add<ByteSize> for Address {
+impl const Add<ByteSize> for Address {
     type Output = Address;
     fn add(self, offset: ByteSize) -> Address {
         Address(self.0 + offset)

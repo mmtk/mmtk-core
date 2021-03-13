@@ -236,29 +236,32 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn get_next_available_lines(&self, start: Line) -> Option<Range<Line>> {
         debug_assert!(!super::BLOCK_ONLY);
-        let block = start.block();
-        let line_limit = block.lines().end;
-        let mut line_cursor = start;
         let unavail_state = self.line_unavail_state.load(Ordering::SeqCst);
         let current_state = self.line_mark_state.load(Ordering::SeqCst);
+        let line_limit = start.block().lines().end;
+        let mark_byte_start = start.mark_byte_address();
+        let mark_byte_end = Line::backward(line_limit, 1).mark_byte_address() + 1usize;
+        let mut mark_byte_cursor = mark_byte_start;
         // Find start
-        while line_cursor < line_limit {
-            if !line_cursor.is_marked(unavail_state) && !line_cursor.is_marked(current_state) {
+        while mark_byte_cursor < mark_byte_end {
+            let mark = unsafe { mark_byte_cursor.load::<u8>() };
+            if mark != unavail_state && mark != current_state {
                 break;
             }
-            line_cursor = Line::forward(line_cursor, 1);
+            mark_byte_cursor = mark_byte_cursor + 1usize;
         }
-        if line_cursor == line_limit { return None }
-        let start = line_cursor;
+        if mark_byte_cursor == mark_byte_end { return None }
+        let start = Line::forward(start, mark_byte_cursor - mark_byte_start);
         // Find limit
-        while line_cursor < line_limit {
-            if line_cursor.is_marked(unavail_state) || line_cursor.is_marked(current_state) {
+        while mark_byte_cursor < mark_byte_end {
+            let mark = unsafe { mark_byte_cursor.load::<u8>() };
+            if mark == unavail_state || mark == current_state {
                 break;
             }
-            line_cursor = Line::forward(line_cursor, 1);
+            mark_byte_cursor = mark_byte_cursor + 1usize;
         }
-        let end = line_cursor;
-        debug_assert!((start..end).all(|line| !line.is_marked(unavail_state) && !line_cursor.is_marked(current_state)));
+        let end = Line::forward(start, mark_byte_cursor - mark_byte_start);
+        debug_assert!((start..end).all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
         return Some(Range { start, end })
     }
 }

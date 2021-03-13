@@ -13,7 +13,7 @@ pub enum SideMetadataScope {
 }
 
 impl SideMetadataScope {
-    pub fn is_global(&self) -> bool {
+    pub const fn is_global(&self) -> bool {
         matches!(self, SideMetadataScope::Global)
     }
 }
