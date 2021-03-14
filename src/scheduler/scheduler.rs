@@ -29,7 +29,7 @@ pub struct Scheduler<C: Context> {
     context: Option<&'static C>,
     coordinator_worker: Option<RwLock<Worker<C>>>,
     /// A message channel to send new coordinator work and other actions to the coordinator thread
-    pub channel: (
+    channel: (
         Sender<CoordinatorMessage<C>>,
         Receiver<CoordinatorMessage<C>>,
     ),
@@ -37,7 +37,11 @@ pub struct Scheduler<C: Context> {
     finalizer: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
 }
 
-unsafe impl<C: Context> Send for Scheduler<C> {}
+// The 'channel' inside Scheduler disallows Sync for Scheduler. We have to make sure we use channel properly:
+// 1. We should never directly use Sender. We clone the sender and let each worker have their own copy.
+// 2. Only the coordinator can use Receiver.
+// TODO: We should remove channel from Scheduler, and directly send Sender/Receiver when creating the coordinator and
+// the workers.
 unsafe impl<C: Context> Sync for Scheduler<C> {}
 
 impl<C: Context> Scheduler<C> {
@@ -87,8 +91,8 @@ impl<C: Context> Scheduler<C> {
 
         self_mut.context = Some(context);
         self_mut.coordinator_worker =
-            Some(RwLock::new(Worker::new(0, Arc::downgrade(&self), true)));
-        self_mut.worker_group = Some(WorkerGroup::new(num_workers, Arc::downgrade(&self)));
+            Some(RwLock::new(Worker::new(0, Arc::downgrade(&self), true, self.channel.0.clone())));
+        self_mut.worker_group = Some(WorkerGroup::new(num_workers, Arc::downgrade(&self), self.channel.0.clone()));
         self.worker_group
             .as_ref()
             .unwrap()
@@ -163,7 +167,7 @@ impl<C: Context> Scheduler<C> {
         work.do_work_with_stat(&mut coordinator_worker, context);
     }
 
-    /// Drain the message queue and execute coordinator work
+    /// Drain the message queue and execute coordinator work. Only the coordinator should call this.
     pub fn wait_for_completion(&self) {
         // At the start of a GC, we probably already have received a `ScheduleCollection` work. Run it now.
         if let Some(initializer) = self.startup.lock().unwrap().take() {
