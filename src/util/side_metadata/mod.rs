@@ -32,7 +32,7 @@
 //!     |                             |                 metadata_address_range_size(global-1)
 //!     |        Global-2             |
 //!     |                             |
-//!     |_____________________________| <= global-3 = global-2 + 
+//!     |_____________________________| <= global-3 = global-2 +
 //!     |                             |                 metadata_address_range_size(global-2)
 //!     |        Not Mapped           |
 //!     |                             |
@@ -55,11 +55,11 @@
 //!     |                             |
 //!     |_____________________________| <= local-end = LOCAL_SIDE_METADATA_BASE_ADDRESS +
 //!                                             MAX_HEAP_SIZE * PolicySpecific_WCR
-//!‌ 
-//!‌ 
+//!‌
+//!‌
 //! In 32-bits targets, the global side metadata is organized the same way as 64-bits, but the policy-specific side metadata is organized per chunk of data (each chunk is managed exclusively by one policy).
 //! This means, when a new chunk is mapped, the policy-specific side metadata for the whole chunk is also mapped.
-//! 
+//!
 //! In this case, a schematic of the local and global side metadata looks like:
 //!
 //!     _______________________________ <= global-1 = GLOBAL_SIDE_METADATA_BASE_ADDRESS(e.g. 0x0)
@@ -69,7 +69,7 @@
 //!     |                             |                 metadata_address_range_size(global-1)
 //!     |        Global-2             |
 //!     |                             |
-//!     |_____________________________| <= global-3 = global-2 + 
+//!     |_____________________________| <= global-3 = global-2 +
 //!     |                             |                 metadata_address_range_size(global-2)
 //!     |        Not Mapped           |
 //!     |                             |
@@ -167,8 +167,8 @@
 //!
 //! So far, no metadata space is allocated.
 //!
-//! For this purpose, each plan should override `fn global_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>>` to return a vector of the global side metadata it needs. 
-//! 
+//! For this purpose, each plan should override `fn global_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>>` to return a vector of the global side metadata it needs.
+//!
 //! This function can be implemented like:
 //! ```
 //! return Arc::new(vec![GLOBAL_META_1, GLOBAL_META_2]);
