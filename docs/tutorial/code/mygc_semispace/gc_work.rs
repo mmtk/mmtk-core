@@ -1,3 +1,4 @@
+// ANCHOR: imports
 use super::global::MyGC;
 use crate::plan::CopyContext;
 use crate::policy::space::Space;
@@ -11,26 +12,34 @@ use crate::plan::PlanConstraints;
 use crate::scheduler::WorkerLocal;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+// ANCHOR_END: imports
 
+// ANCHOR: mygc_copy_context
 pub struct MyGCCopyContext<VM: VMBinding> {
     plan:&'static MyGC<VM>,
     mygc: BumpAllocator<VM>,
 }
+// ANCHOR_END: mygc_copy_context
 
 impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> {
     type VM = VM;
 
+    // ANCHOR: copycontext_constraints_init
     fn constraints(&self) -> &'static PlanConstraints {
         &super::global::MYGC_CONSTRAINTS
     }
     fn init(&mut self, tls:OpaquePointer) {
         self.mygc.tls = tls;
     }
+    // ANCHOR_END: copycontext_constraints_init
+    // ANCHOR: copycontext_prepare
     fn prepare(&mut self) {
         self.mygc.rebind(Some(self.plan.tospace()));
     }
+    // ANCHOR_END: copycontext_prepare
     fn release(&mut self) {
     }
+    // ANCHOR: copycontext_alloc_copy
     #[inline(always)]
     fn alloc_copy(
         &mut self,
@@ -42,6 +51,8 @@ impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> {
     ) -> Address {
         self.mygc.alloc(bytes, align, offset)
     }
+    // ANCHOR_END: copycontext_alloc_copy
+    // ANCHOR: copycontext_post_copy
     #[inline(always)]
     fn post_copy(
         &mut self,
@@ -52,8 +63,10 @@ impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> {
     ) {
         forwarding_word::clear_forwarding_bits::<VM>(obj);
     }
+    // ANCHOR_END: copycontext_post_copy
 }
 
+// ANCHOR: constructor_and_workerlocal
 impl<VM: VMBinding> MyGCCopyContext<VM> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
@@ -68,11 +81,14 @@ impl<VM: VMBinding> WorkerLocal for MyGCCopyContext<VM> {
         CopyContext::init(self, tls);
     }
 }
+// ANCHOR_END: constructor_and_workerlocal
 
+// ANCHOR: mygc_process_edges
 pub struct MyGCProcessEdges<VM: VMBinding> {
     plan: &'static MyGC<VM>,
     base: ProcessEdgesBase<MyGCProcessEdges<VM>>,
 }
+// ANCHOR_END: mygc_process_edges
 
 impl<VM: VMBinding> MyGCProcessEdges<VM> {
     fn mygc(&self) -> &'static MyGC<VM> {
@@ -82,12 +98,15 @@ impl<VM: VMBinding> MyGCProcessEdges<VM> {
 
 impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
     type VM = VM;
+    // ANCHOR: mygc_process_edges_new
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<MyGC<VM>>().unwrap();
         Self { base, plan }
     }
+    // ANCHOR_END: mygc_process_edges_new
 
+    // ANCHOR: trace_object
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
@@ -111,8 +130,10 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
             self.mygc().common.trace_object::<Self, MyGCCopyContext<VM>>(self, object)
         }
     }
+    // ANCHOR_END: trace_object
 }
 
+// ANCHOR: deref
 impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
     type Target = ProcessEdgesBase<Self>;
     #[inline]
@@ -127,3 +148,4 @@ impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
         &mut self.base
     }
 }
+// ANCHOR_END: deref

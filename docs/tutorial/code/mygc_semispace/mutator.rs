@@ -1,3 +1,4 @@
+// ANCHOR: imports
 use super::MyGC; // Add
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
@@ -11,6 +12,7 @@ use enum_map::enum_map;
 use enum_map::EnumMap;
 // Remove crate::plan::mygc::MyGC
 // Remove mygc_mutator_noop
+// ANCHOR_END: imports
 
 // Add
 pub fn mygc_mutator_prepare<VM: VMBinding>(
@@ -21,6 +23,7 @@ pub fn mygc_mutator_prepare<VM: VMBinding>(
 }
 
 // Add
+// ANCHOR: release
 pub fn mygc_mutator_release<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     _tls: OpaquePointer,
@@ -41,8 +44,10 @@ pub fn mygc_mutator_release<VM: VMBinding>(
             .tospace(),
     ));
 }
+// ANCHOR_END: release
 
 // Modify
+// ANCHOR: allocator_mapping
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::BumpPointer(0),
@@ -50,6 +55,7 @@ lazy_static! {
         AllocationType::Los => AllocatorSelector::LargeObject(0),
     };
 }
+// ANCHOR_END: allocator_mapping
 
 pub fn create_mygc_mutator<VM: VMBinding>(
     mutator_tls: OpaquePointer,
@@ -58,6 +64,7 @@ pub fn create_mygc_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         // Modify
+        // ANCHOR: space_mapping
         space_mapping: box vec![
             (AllocatorSelector::BumpPointer(0), plan.tospace()),
             (
@@ -66,6 +73,7 @@ pub fn create_mygc_mutator<VM: VMBinding>(
             ),
             (AllocatorSelector::LargeObject(0), plan.common.get_los()),
         ],
+        // ANCHOR_END: space_mapping
         prepare_func: &mygc_mutator_prepare, // Modify
         release_func: &mygc_mutator_release, // Modify
     };
