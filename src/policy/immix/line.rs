@@ -1,4 +1,4 @@
-use std::iter::Step;
+use std::{iter::Step, ops::Range};
 
 use crate::{util::{Address, ObjectReference}, vm::*};
 use crate::util::side_metadata::{self, *};
@@ -60,6 +60,11 @@ impl Line {
     pub const fn end(&self) -> Address {
         debug_assert!(!super::BLOCK_ONLY);
         unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
+    }
+
+    pub const fn get_index_within_block(&self) -> usize {
+        let addr = self.start();
+        (addr.as_usize() - Block::align(addr).as_usize()) >> Line::LOG_BYTES
     }
 
     #[inline]

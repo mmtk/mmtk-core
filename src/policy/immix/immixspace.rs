@@ -238,9 +238,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!super::BLOCK_ONLY);
         let unavail_state = self.line_unavail_state.load(Ordering::SeqCst);
         let current_state = self.line_mark_state.load(Ordering::SeqCst);
-        let line_limit = start.block().lines().end;
-        let mark_byte_start = start.mark_byte_address();
-        let mark_byte_end = Line::backward(line_limit, 1).mark_byte_address() + 1usize;
+        let mark_data = start.block().line_mark_table();
+        let mark_byte_start = mark_data.start + start.get_index_within_block();
+        let mark_byte_end = mark_data.end;
         let mut mark_byte_cursor = mark_byte_start;
         // Find start
         while mark_byte_cursor < mark_byte_end {

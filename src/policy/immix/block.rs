@@ -73,6 +73,13 @@ impl Block {
         self.set_mark_byte(BlockMarkState::Defrag as _);
     }
 
+    pub const fn line_mark_table(&self) -> Range<Address> {
+        debug_assert!(!super::BLOCK_ONLY);
+        let start = side_metadata::address_to_meta_address(Line::MARK_TABLE, self.start());
+        let end = start + Block::LINES;
+        Range { start, end }
+    }
+
     #[inline]
     pub fn mark(&self, line_counter_increment: Option<usize>) {
         let state = if super::LINE_COUNTER {
