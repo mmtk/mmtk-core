@@ -315,12 +315,7 @@ mod tests {
             let three = load_atomic(metadata_2_spec, data_addr);
             assert_eq!(three, 3);
 
-            ensure_unmap_metadata_space(
-                data_addr,
-                constants::BYTES_IN_PAGE,
-                gspec_arc,
-                empty_arc,
-            );
+            ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE, gspec_arc, empty_arc);
         })
     }
 
@@ -359,12 +354,7 @@ mod tests {
             let one = load_atomic(metadata_1_spec, data_addr);
             assert_eq!(one, 1);
 
-            ensure_unmap_metadata_space(
-                data_addr,
-                constants::BYTES_IN_PAGE,
-                gspec_arc,
-                empty_arc,
-            );
+            ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE, gspec_arc, empty_arc);
         })
     }
 
@@ -444,12 +434,7 @@ mod tests {
             let five = load_atomic(metadata_2_spec, data_addr);
             assert_eq!(five, 0);
 
-            ensure_unmap_metadata_space(
-                data_addr,
-                constants::BYTES_IN_PAGE,
-                empty_arc,
-                lspec_arc,
-            );
+            ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE, empty_arc, lspec_arc);
         })
     }
 }
