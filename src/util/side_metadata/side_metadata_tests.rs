@@ -217,8 +217,8 @@ mod tests {
             ensure_unmap_metadata_space(
                 vm_layout_constants::HEAP_START,
                 constants::BYTES_IN_PAGE,
-                gspec_arc.clone(),
-                lspec_arc.clone(),
+                gspec_arc,
+                lspec_arc,
             );
 
             gspec.log_min_obj_size = 3;
@@ -256,8 +256,8 @@ mod tests {
             ensure_unmap_metadata_space(
                 vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                 vm_layout_constants::BYTES_IN_CHUNK,
-                gspec_arc.clone(),
-                lspec_arc.clone(),
+                gspec_arc,
+                lspec_arc,
             );
         })
     }
@@ -318,8 +318,8 @@ mod tests {
             ensure_unmap_metadata_space(
                 data_addr,
                 constants::BYTES_IN_PAGE,
-                gspec_arc.clone(),
-                empty_arc.clone(),
+                gspec_arc,
+                empty_arc,
             );
         })
     }
@@ -362,8 +362,8 @@ mod tests {
             ensure_unmap_metadata_space(
                 data_addr,
                 constants::BYTES_IN_PAGE,
-                gspec_arc.clone(),
-                empty_arc.clone(),
+                gspec_arc,
+                empty_arc,
             );
         })
     }
@@ -447,8 +447,8 @@ mod tests {
             ensure_unmap_metadata_space(
                 data_addr,
                 constants::BYTES_IN_PAGE,
-                empty_arc.clone(),
-                lspec_arc.clone(),
+                empty_arc,
+                lspec_arc,
             );
         })
     }

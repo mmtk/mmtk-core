@@ -378,7 +378,7 @@ mod tests {
         let mmapper = FragmentedMapper::new();
         let pages = 1;
         let empty_vec = Arc::new(vec![]);
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec.clone());
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec);
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -393,7 +393,7 @@ mod tests {
         let mmapper = FragmentedMapper::new();
         let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
         let empty_vec = Arc::new(vec![]);
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec.clone());
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec);
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -409,7 +409,7 @@ mod tests {
         let mmapper = FragmentedMapper::new();
         let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
         let empty_vec = Arc::new(vec![]);
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec.clone());
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec);
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -430,7 +430,7 @@ mod tests {
             FIXED_ADDRESS,
             pages_per_chunk * 2,
             empty_vec.clone(),
-            empty_vec.clone(),
+            empty_vec,
         );
 
         // protect 1 chunk
@@ -476,7 +476,7 @@ mod tests {
             FIXED_ADDRESS,
             pages_per_chunk * 2,
             empty_vec.clone(),
-            empty_vec.clone(),
+            empty_vec,
         );
         assert_eq!(
             get_chunk_map_state(&mmapper, FIXED_ADDRESS),
