@@ -1,21 +1,24 @@
 use crate::util::{Address, ObjectReference};
 use crate::util::side_metadata::{self, *};
 use crate::util::constants::*;
-use std::{ops::Range, sync::{Mutex, MutexGuard, atomic::{AtomicPtr, Ordering}}};
+use std::{iter::Step, ops::Range, sync::{Mutex, MutexGuard, atomic::{AtomicPtr, Ordering}}};
 use super::line::Line;
+use super::chunk::Chunk;
 use crate::vm::*;
 
 
 
 #[repr(u8)]
-pub enum BlockMarkState {
-    Unmarked = 0,
-    Marked = 1,
-    Defrag = u8::MAX,
+#[derive(Debug, PartialEq)]
+pub enum BlockState {
+    Unallocated = 0,
+    Unmarked = 1,
+    Marked = 2,
+    Reused = 3,
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
 
 impl Block {
@@ -58,7 +61,7 @@ impl Block {
     }
 
     #[inline(always)]
-    pub fn mark_byte(&self) -> u8 {
+    fn mark_byte(&self) -> u8 {
         unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) as u8 }
     }
 
@@ -67,11 +70,15 @@ impl Block {
         unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), byte as usize) }
     }
 
-    #[inline]
-    pub fn mark_as_defrag(&self) {
-        debug_assert!(super::DEFRAG);
-        self.set_mark_byte(BlockMarkState::Defrag as _);
+    pub const fn chunk(&self) -> Chunk {
+        Chunk::from(Chunk::align(self.0))
     }
+
+    // #[inline]
+    // pub fn mark_as_defrag(&self) {
+    //     debug_assert!(super::DEFRAG);
+    //     self.set_mark_byte(BlockMarkState::Defrag as _);
+    // }
 
     pub const fn line_mark_table(&self) -> Range<Address> {
         debug_assert!(!super::BLOCK_ONLY);
@@ -80,43 +87,77 @@ impl Block {
         Range { start, end }
     }
 
-    #[inline]
-    pub fn mark(&self, line_counter_increment: Option<usize>) {
-        let state = if super::LINE_COUNTER {
-            self.mark_byte() + line_counter_increment.unwrap() as u8
-        } else {
-            BlockMarkState::Marked as u8
-        };
-        self.set_mark_byte(state)
-    }
+    // #[inline]
+    // pub fn mark(&self, line_counter_increment: Option<usize>) {
+    //     let state = if super::LINE_COUNTER {
+    //         self.mark_byte() + line_counter_increment.unwrap() as u8
+    //     } else {
+    //         BlockMarkState::Marked as u8
+    //     };
+    //     self.set_mark_byte(state)
+    // }
+
+    // #[inline]
+    // pub fn count_marked_lines(&self, line_mark_state: u8) -> usize {
+    //     if super::LINE_COUNTER {
+    //         self.mark_byte() as usize
+    //     } else {
+    //         self.lines().filter(|line| line.is_marked(line_mark_state)).count()
+    //     }
+    // }
 
     #[inline]
-    pub fn count_marked_lines(&self, line_mark_state: u8) -> usize {
-        if super::LINE_COUNTER {
-            self.mark_byte() as usize
-        } else {
-            self.lines().filter(|line| line.is_marked(line_mark_state)).count()
+    pub fn get_state(&self) -> BlockState {
+        unsafe {
+            std::mem::transmute(self.mark_byte())
         }
     }
 
     #[inline]
-    pub fn is_marked(&self) -> bool {
-        self.mark_byte() != BlockMarkState::Unmarked as _
+    pub fn set_state(&self, state: BlockState) {
+        self.set_mark_byte(state as _)
     }
 
-    #[inline]
-    pub fn is_defrag(&self) -> bool {
-        self.mark_byte() == BlockMarkState::Defrag as _
-    }
+    // #[inline]
+    // pub fn set_marked_lines(&self, value: u8) {
+    //     self.set_mark_byte(value + 4)
+    // }
 
-    #[inline]
-    pub fn clear_mark(&self) {
-        self.set_mark_byte(BlockMarkState::Unmarked as _)
-    }
+    // #[inline]
+    // pub fn get_marked_lines(&self) -> u8 {
+    //     self.set_mark_byte(value + 4)
+    // }
+
+    // #[inline]
+    // pub fn is_defrag(&self) -> bool {
+    //     self.mark_byte() == BlockMarkState::Defrag as _
+    // }
+
+    // #[inline]
+    // pub fn clear_mark(&self) {
+    //     self.set_mark_byte(BlockMarkState::Unmarked as _)
+    // }
 
     pub const fn lines(&self) -> Range<Line> {
         debug_assert!(!super::BLOCK_ONLY);
         Range { start: Line::from(self.start()), end: Line::from(self.end()) }
+    }
+}
+
+unsafe impl Step for Block {
+    #[inline(always)]
+    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+        debug_assert!(!super::BLOCK_ONLY);
+        if start < end { return None }
+        Some((end.start() - start.start()) >> Self::LOG_BYTES)
+    }
+    #[inline(always)]
+    fn forward_checked(start: Self, count: usize) -> Option<Self> {
+        Some(Self::from(start.start() + (count << Self::LOG_BYTES)))
+    }
+    #[inline(always)]
+    fn backward_checked(start: Self, count: usize) -> Option<Self> {
+        Some(Self::from(start.start() - (count << Self::LOG_BYTES)))
     }
 }
 

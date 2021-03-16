@@ -11,8 +11,8 @@ use crate::util::heap::PageResource;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::util::side_metadata::{self, *};
-use std::{cell::UnsafeCell, iter::Step, ops::Range, sync::atomic::{AtomicBool, AtomicU8}};
-use super::block::*;
+use std::{cell::UnsafeCell, iter::Step, ops::Range, sync::{Mutex, atomic::{AtomicBool, AtomicU8}}};
+use super::{block::*, chunk::{Chunk, ChunkMap}};
 use super::line::*;
 
 
@@ -20,11 +20,11 @@ use super::line::*;
 pub struct ImmixSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
     pr: FreeListPageResource<VM>,
-    block_list: BlockList,
-    line_mark_state: AtomicU8,
+    pub chunk_map: ChunkMap,
+    pub line_mark_state: AtomicU8,
     line_unavail_state: AtomicU8,
     in_collection: AtomicBool,
-    reusable_blocks: BlockList,
+    pub reusable_blocks: BlockList,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -97,6 +97,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mmapper,
             heap,
         );
+        let start = common.start;
         ImmixSpace {
             pr: if common.vmrequest.is_discontiguous() {
                 FreeListPageResource::new_discontiguous(0, vm_map)
@@ -104,7 +105,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common: UnsafeCell::new(common),
-            block_list: BlockList::new(),
+            chunk_map: ChunkMap::new(start),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
             in_collection: AtomicBool::new(false),
@@ -117,11 +118,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn prepare(&self) {
-        for block in &self.block_list {
-            if !block.is_defrag() {
-                block.clear_mark();
+        // for block in &self.block_list {
+        //     if !block.is_defrag() {
+        //         block.clear_mark();
+        //     }
+        //     side_metadata::bzero_metadata_for_range(Self::OBJECT_MARK_TABLE, Range { start: block.start(), end: block.end() });
+        // }
+        for chunk in self.chunk_map.allocated_chunks() {
+            // Clear object marking data
+            side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, chunk.start());
+            // Clear block marking data
+            for block in chunk.blocks() {
+                if block.get_state() != BlockState::Unallocated {
+                    block.set_state(BlockState::Unmarked);
+                }
             }
-            side_metadata::bzero_metadata_for_range(Self::OBJECT_MARK_TABLE, Range { start: block.start(), end: block.end() });
         }
         if !super::BLOCK_ONLY {
             self.line_mark_state.fetch_add(1, Ordering::SeqCst);
@@ -137,60 +148,72 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.line_unavail_state.store(self.line_mark_state.load(Ordering::SeqCst), Ordering::SeqCst);
         }
 
-        for block in self.block_list.drain_filter(|block| !block.is_marked() || block.is_defrag()) {
-            self.pr.release_pages(block.start());
-        }
-
         if !super::BLOCK_ONLY {
             self.reusable_blocks.reset();
-            let line_mark_state = self.line_mark_state.load(Ordering::SeqCst);
-            for block in &self.block_list {
-                debug_assert!(block.is_marked());
-                let marked_lines = block.count_marked_lines(line_mark_state);
-                debug_assert!(marked_lines > 0);
-                if super::DEFRAG && marked_lines <= super::DEFRAG_THRESHOLD {
-                    block.mark_as_defrag()
-                } else if marked_lines < Block::LINES {
-                    self.reusable_blocks.push(block);
-                }
-            }
+        }
+        for chunk in self.chunk_map.allocated_chunks() {
+            chunk.sweep(self)
         }
 
+        // if !super::BLOCK_ONLY {
+        //     unreachable!()
+            // self.reusable_blocks.reset();
+            // let line_mark_state = self.line_mark_state.load(Ordering::SeqCst);
+            // for block in &self.block_list {
+            //     debug_assert!(block.is_marked());
+            //     let marked_lines = block.count_marked_lines(line_mark_state);
+            //     debug_assert!(marked_lines > 0);
+            //     if s::DEFRAG && marked_lines <= super::DEFRAG_THRESHOLD {
+            //         block.mark_as_defrag()
+            //     } else if marked_lines < Block::LINES {
+            //         self.reusable_blocks.push(block);
+            //     }
+            // }
+        // }
+
         self.in_collection.store(false, Ordering::SeqCst);
+    }
+
+    pub fn release_block(&self, block: Block) {
+        block.set_state(BlockState::Unallocated);
+        self.pr.release_pages(block.start());
     }
 
     pub fn get_clean_block(&self, tls: OpaquePointer) -> Option<Block> {
         let block_address = self.acquire(tls, Block::PAGES);
         if block_address.is_zero() { return None }
         let block = Block::from(block_address);
-        block.clear_mark();
-        self.block_list.push(block);
+        block.set_state(BlockState::Unmarked);
+        self.chunk_map.set(block.chunk(), 1);
         Some(block)
     }
 
     pub fn get_reusable_block(&self) -> Option<Block> {
-        if !super::BLOCK_ONLY { return None }
+        if super::BLOCK_ONLY { return None }
         self.reusable_blocks.pop()
     }
 
     #[inline(always)]
     pub fn trace_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
-        if Block::containing::<VM>(object).is_defrag() {
-            self.trace_evacuate_object(trace, object, semantics, copy_context)
-        } else {
+        // if Block::containing::<VM>(object).is_defrag() {
+        //     self.trace_evacuate_object(trace, object, semantics, copy_context)
+        // } else {
             self.trace_mark_object(trace, object)
-        }
+        // }
     }
 
     #[inline(always)]
     pub fn trace_mark_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference) -> ObjectReference {
+        // println!("trace_mark_object {:?}", object);
         if Self::attempt_mark(object) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
-                let marked_lines = Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::SeqCst));
-                Block::containing::<VM>(object).mark(Some(marked_lines));
+                // unreachable!()
+                let _marked_lines = Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::SeqCst));
+                // Block::containing::<VM>(object).mark(Some(marked_lines));
+                Block::containing::<VM>(object).set_state(BlockState::Marked);
             } else {
-                Block::containing::<VM>(object).mark(None);
+                Block::containing::<VM>(object).set_state(BlockState::Marked);
             }
             // Visit node
             trace.process_node(object);
@@ -206,14 +229,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         } else {
             let new_object = ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context);
             trace.process_node(new_object);
-            trace!("{:?} => {:?} in block {:?} {}", object, new_object, Block::containing::<VM>(new_object), Block::containing::<VM>(new_object).mark_byte());
+            // trace!("{:?} => {:?} in block {:?} {}", object, new_object, Block::containing::<VM>(new_object), Block::containing::<VM>(new_object).mark_byte());
             // Mark block and lines
-            if !super::BLOCK_ONLY {
-                let marked_lines = Line::mark_lines_for_object::<VM>(new_object, self.line_mark_state.load(Ordering::SeqCst));
-                Block::containing::<VM>(new_object).mark(Some(marked_lines));
-            } else {
-                Block::containing::<VM>(new_object).mark(None);
-            }
+            // if !super::BLOCK_ONLY {
+            //     let marked_lines = Line::mark_lines_for_object::<VM>(new_object, self.line_mark_state.load(Ordering::SeqCst));
+            //     Block::containing::<VM>(new_object).mark(Some(marked_lines));
+            // } else {
+            //     Block::containing::<VM>(new_object).mark(None);
+            // }
+            unreachable!();
             new_object
         }
     }
@@ -234,12 +258,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /* Line searching */
 
-    pub fn get_next_available_lines(&self, start: Line) -> Option<Range<Line>> {
+    pub fn get_next_available_lines(&self, search_start: Line) -> Option<Range<Line>> {
         debug_assert!(!super::BLOCK_ONLY);
         let unavail_state = self.line_unavail_state.load(Ordering::SeqCst);
         let current_state = self.line_mark_state.load(Ordering::SeqCst);
-        let mark_data = start.block().line_mark_table();
-        let mark_byte_start = mark_data.start + start.get_index_within_block();
+        let mark_data = search_start.block().line_mark_table();
+        let mark_byte_start = mark_data.start + search_start.get_index_within_block();
         let mark_byte_end = mark_data.end;
         let mut mark_byte_cursor = mark_byte_start;
         // Find start
@@ -251,7 +275,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mark_byte_cursor = mark_byte_cursor + 1usize;
         }
         if mark_byte_cursor == mark_byte_end { return None }
-        let start = Line::forward(start, mark_byte_cursor - mark_byte_start);
+        let start = Line::forward(search_start, mark_byte_cursor - mark_byte_start);
         // Find limit
         while mark_byte_cursor < mark_byte_end {
             let mark = unsafe { mark_byte_cursor.load::<u8>() };
@@ -260,8 +284,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
             mark_byte_cursor = mark_byte_cursor + 1usize;
         }
-        let end = Line::forward(start, mark_byte_cursor - mark_byte_start);
+        let end = Line::forward(search_start, mark_byte_cursor - mark_byte_start);
         debug_assert!((start..end).all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
-        return Some(Range { start, end })
+        return Some(start..end)
     }
 }
