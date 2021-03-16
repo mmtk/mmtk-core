@@ -28,7 +28,7 @@ use crate::util::side_metadata::*;
 
 const LOGGING_META: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::Global,
-    offset: 0,
+    offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
     log_num_of_bits: 0,
     log_min_obj_size: 3,
 };
