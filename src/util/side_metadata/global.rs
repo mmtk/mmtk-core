@@ -202,10 +202,10 @@ fn try_mmap_metadata(start: Address, size: usize) -> MappingState {
     if result == libc::MAP_FAILED {
         let err = unsafe { *libc::__errno_location() };
         if err == libc::EEXIST {
-            println!("try_mmap_metadata({}, 0x{:x}) -> WasMapped", start, size);
+            debug!("try_mmap_metadata({}, 0x{:x}) -> WasMapped", start, size);
             return MappingState::WasMapped;
         } else {
-            println!("try_mmap_metadata({}, 0x{:x}) -> NotMappable", start, size);
+            debug!("try_mmap_metadata({}, 0x{:x}) -> NotMappable", start, size);
             return MappingState::NotMappable;
         }
     }
