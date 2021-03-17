@@ -72,7 +72,7 @@ impl Chunk {
             }
             // Remove this chunk if there are no live blocks
             if allocated_blocks == 0 {
-                space.chunk_map.set(*self, 0)
+                space.chunk_map.set(*self, ChunkState::Free)
             }
         } else {
             for block in self.blocks().filter(|block| block.get_state() != BlockState::Unallocated) {
@@ -108,6 +108,12 @@ unsafe impl Step for Chunk {
     }
 }
 
+#[repr(u8)]
+#[derive(Debug, PartialEq)]
+pub enum ChunkState {
+    Free = 0,
+    Allocated = 1,
+}
 
 pub struct ChunkMap {
     table: Vec<AtomicU8>,
@@ -127,14 +133,15 @@ impl ChunkMap {
         (chunk.start().as_usize() - self.start.as_usize()) >> Chunk::LOG_BYTES
     }
 
-    pub fn set(&self, chunk: Chunk, state: u8) {
+    pub fn set(&self, chunk: Chunk, state: ChunkState) {
         let index = self.get_index(chunk);
-        self.table[index].store(state, Ordering::SeqCst);
+        self.table[index].store(state as _, Ordering::SeqCst);
     }
 
-    pub fn get(&self, chunk: Chunk) -> u8 {
+    pub fn get(&self, chunk: Chunk) -> ChunkState {
         let index = self.get_index(chunk);
-        self.table[index].load(Ordering::SeqCst)
+        let byte = self.table[index].load(Ordering::SeqCst);
+        unsafe { std::mem::transmute(byte) }
     }
 
     pub fn all_chunks(&self) -> Range<Chunk> {

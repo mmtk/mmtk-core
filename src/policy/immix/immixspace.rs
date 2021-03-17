@@ -12,7 +12,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::util::side_metadata::{self, *};
 use std::{cell::UnsafeCell, iter::Step, ops::Range, sync::{Mutex, atomic::{AtomicBool, AtomicU8}}};
-use super::{block::*, chunk::{Chunk, ChunkMap}};
+use super::{block::*, chunk::{ChunkState, ChunkMap}};
 use super::line::*;
 
 
@@ -155,22 +155,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             chunk.sweep(self)
         }
 
-        // if !super::BLOCK_ONLY {
-        //     unreachable!()
-            // self.reusable_blocks.reset();
-            // let line_mark_state = self.line_mark_state.load(Ordering::SeqCst);
-            // for block in &self.block_list {
-            //     debug_assert!(block.is_marked());
-            //     let marked_lines = block.count_marked_lines(line_mark_state);
-            //     debug_assert!(marked_lines > 0);
-            //     if s::DEFRAG && marked_lines <= super::DEFRAG_THRESHOLD {
-            //         block.mark_as_defrag()
-            //     } else if marked_lines < Block::LINES {
-            //         self.reusable_blocks.push(block);
-            //     }
-            // }
-        // }
-
         self.in_collection.store(false, Ordering::SeqCst);
     }
 
@@ -184,7 +168,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if block_address.is_zero() { return None }
         let block = Block::from(block_address);
         block.set_state(BlockState::Unmarked);
-        self.chunk_map.set(block.chunk(), 1);
+        self.chunk_map.set(block.chunk(), ChunkState::Allocated);
         Some(block)
     }
 
