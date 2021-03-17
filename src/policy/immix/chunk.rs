@@ -1,6 +1,6 @@
 use std::{iter::Step, ops::Range, sync::atomic::AtomicU8};
 use std::sync::atomic::{Ordering, AtomicUsize};
-use crate::{util::{Address, ObjectReference, heap::layout::vm_layout_constants::{LOG_BYTES_IN_CHUNK, LOG_SPACE_EXTENT}}, vm::*};
+use crate::{MMTK, scheduler::*, util::{Address, ObjectReference, heap::layout::vm_layout_constants::{LOG_BYTES_IN_CHUNK, LOG_SPACE_EXTENT}}, vm::*};
 use crate::util::side_metadata::{self, *};
 
 use super::immixspace::ImmixSpace;
@@ -15,7 +15,6 @@ pub struct Chunk(Address);
 impl Chunk {
     pub const LOG_BYTES: usize = LOG_BYTES_IN_CHUNK;
     pub const BYTES: usize = 1 << Self::LOG_BYTES;
-    pub const CHUNKS_IN_SPACE: usize = 1 << (LOG_SPACE_EXTENT - Self::LOG_BYTES);
     pub const LOG_BLOCKS: usize = Self::LOG_BYTES - Block::LOG_BYTES;
     pub const BLOCKS: usize = 1 << Self::LOG_BLOCKS;
 
@@ -49,7 +48,7 @@ impl Chunk {
     pub const fn blocks(&self) -> Range<Block> {
         let start = Block::from(Block::align(self.0));
         let end = Block::from(start.start() + (Self::BLOCKS << Block::LOG_BYTES));
-        Range { start, end }
+        start..end
     }
 
     pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
@@ -121,9 +120,11 @@ pub struct ChunkMap {
 }
 
 impl ChunkMap {
+    pub const MAX_CHUNKS: usize = 1 << (LOG_SPACE_EXTENT - Chunk::LOG_BYTES);
+
     pub fn new(start: Address) -> Self {
         Self {
-            table: (0..Chunk::CHUNKS_IN_SPACE).map(|_| Default::default()).collect(),
+            table: (0..Self::MAX_CHUNKS).map(|_| Default::default()).collect(),
             start,
         }
     }
@@ -146,8 +147,8 @@ impl ChunkMap {
 
     pub fn all_chunks(&self) -> Range<Chunk> {
         let start = Chunk::from(self.start);
-        let end = Chunk::forward(start, Chunk::CHUNKS_IN_SPACE);
-        Range { start, end }
+        let end = Chunk::forward(start, Self::MAX_CHUNKS);
+        start..end
     }
 
     pub fn allocated_chunks<'a>(&'a self) -> impl Iterator<Item=Chunk> + 'a {
@@ -156,6 +157,21 @@ impl ChunkMap {
             start: self.start,
             cursor: 0,
         }
+    }
+
+    pub fn generate_sweep_tasks<VM: VMBinding>(&self, space: &'static ImmixSpace<VM>, mmtk: &'static MMTK<VM>) -> Vec<Box<dyn Work<MMTK<VM>>>> {
+        let Range { start: start_chunk, end: end_chunk } = self.all_chunks();
+        let workers = mmtk.scheduler.worker_group().worker_count() * 2;
+        let chunks_per_packet = (ChunkMap::MAX_CHUNKS + (workers - 1)) / workers;
+        let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
+        for start in (start_chunk..end_chunk).step_by(chunks_per_packet) {
+            let mut end = Chunk::forward(start, chunks_per_packet);
+            if end > end_chunk {
+                end = end_chunk;
+            }
+            work_packets.push(box SweepChunks(space, start..end));
+        }
+        work_packets
     }
 }
 
@@ -179,5 +195,18 @@ impl<'a> Iterator for AllocatedChunksIter<'a> {
             }
         }
         None
+    }
+}
+
+pub struct SweepChunks<VM: VMBinding>(pub &'static ImmixSpace<VM>, pub Range<Chunk>);
+
+impl<VM: VMBinding> GCWork<VM> for SweepChunks<VM> {
+    #[inline]
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        for chunk in self.1.start..self.1.end {
+            if self.0.chunk_map.get(chunk) == ChunkState::Allocated {
+                chunk.sweep(self.0);
+            }
+        }
     }
 }

@@ -84,7 +84,7 @@ impl Block {
         debug_assert!(!super::BLOCK_ONLY);
         let start = side_metadata::address_to_meta_address(Line::MARK_TABLE, self.start());
         let end = start + Block::LINES;
-        Range { start, end }
+        start..end
     }
 
     // #[inline]
@@ -140,7 +140,7 @@ impl Block {
 
     pub const fn lines(&self) -> Range<Line> {
         debug_assert!(!super::BLOCK_ONLY);
-        Range { start: Line::from(self.start()), end: Line::from(self.end()) }
+        Line::from(self.start()) .. Line::from(self.end())
     }
 }
 

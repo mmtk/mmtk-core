@@ -1,5 +1,5 @@
 use atomic::Ordering;
-use crate::{AllocationSemantics, CopyContext, plan::TransitiveClosure, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
+use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{WorkBucketStage, GCWorkBucket, Work}, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::forwarding_word as ForwardingWord;
@@ -12,7 +12,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::util::side_metadata::{self, *};
 use std::{cell::UnsafeCell, iter::Step, ops::Range, sync::{Mutex, atomic::{AtomicBool, AtomicU8}}};
-use super::{block::*, chunk::{ChunkState, ChunkMap}};
+use super::{block::*, chunk::{Chunk, ChunkMap, ChunkState, SweepChunks}};
 use super::line::*;
 
 
@@ -118,12 +118,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn prepare(&self) {
-        // for block in &self.block_list {
-        //     if !block.is_defrag() {
-        //         block.clear_mark();
-        //     }
-        //     side_metadata::bzero_metadata_for_range(Self::OBJECT_MARK_TABLE, Range { start: block.start(), end: block.end() });
-        // }
         for chunk in self.chunk_map.allocated_chunks() {
             // Clear object marking data
             side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, chunk.start());
@@ -143,7 +137,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.in_collection.store(true, Ordering::SeqCst);
     }
 
-    pub fn release(&self) {
+    pub fn release(&'static self, mmtk: &'static MMTK<VM>) {
         if !super::BLOCK_ONLY {
             self.line_unavail_state.store(self.line_mark_state.load(Ordering::SeqCst), Ordering::SeqCst);
         }
@@ -151,9 +145,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if !super::BLOCK_ONLY {
             self.reusable_blocks.reset();
         }
-        for chunk in self.chunk_map.allocated_chunks() {
-            chunk.sweep(self)
-        }
+
+        let work_packets = self.chunk_map.generate_sweep_tasks(self, mmtk);
+        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(GCWorkBucket::<VM>::DEFAULT_PRIORITY, work_packets);
 
         self.in_collection.store(false, Ordering::SeqCst);
     }

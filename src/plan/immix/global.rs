@@ -104,10 +104,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.immix_space.prepare();
     }
 
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<VM>) {
         self.common.release(tls, true);
         // release the collected region
-        self.immix_space.release();
+        self.immix_space.release(mmtk);
     }
 
     fn get_collection_reserve(&self) -> usize {

@@ -119,7 +119,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.copyspace1.prepare(!hi);
     }
 
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&self, tls: OpaquePointer, _mmtk: &'static MMTK<VM>) {
         self.common.release(tls, true);
         // release the collected region
         self.fromspace().release();

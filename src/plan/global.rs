@@ -209,7 +209,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
     }
 
     fn prepare(&self, tls: OpaquePointer);
-    fn release(&self, tls: OpaquePointer);
+    fn release(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>);
 
     fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
         if self.collection_required(space_full, space) {

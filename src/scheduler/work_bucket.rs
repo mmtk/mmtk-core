@@ -1,3 +1,5 @@
+use crate::MMTK;
+
 use super::work::Work;
 use super::*;
 use enum_map::Enum;
@@ -66,6 +68,7 @@ unsafe impl<C: Context> Send for WorkBucket<C> {}
 unsafe impl<C: Context> Sync for WorkBucket<C> {}
 
 impl<C: Context> WorkBucket<C> {
+    pub const DEFAULT_PRIORITY: usize = 1000;
     pub fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
         Self {
             active: AtomicBool::new(active),
@@ -113,7 +116,7 @@ impl<C: Context> WorkBucket<C> {
     }
     /// Add a work packet to this bucket, with a default priority (1000)
     pub fn add<W: Work<C>>(&self, work: W) {
-        self.add_with_priority(1000, box work);
+        self.add_with_priority(Self::DEFAULT_PRIORITY, box work);
     }
     pub fn bulk_add(&self, priority: usize, work_vec: Vec<Box<dyn Work<C>>>) {
         {
@@ -157,3 +160,5 @@ pub enum WorkBucketStage {
     Release,
     Final,
 }
+
+pub type GCWorkBucket<VM> = WorkBucket<MMTK<VM>>;
