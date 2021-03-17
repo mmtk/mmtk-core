@@ -328,8 +328,8 @@
             );
         }
         <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="ident">gc_byte</span>::<span class="ident">write_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">FORWARDED</span>);
             <span class="ident">write_forwarding_word</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">new_object</span>.<span class="ident">to_address</span>().<span class="ident">as_usize</span>());
+            <span class="ident">gc_byte</span>::<span class="ident">write_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">FORWARDED</span>);
         }
     };
     <span class="ident">new_object</span>
@@ -345,8 +345,8 @@
             );
         }
         <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="ident">gc_byte</span>::<span class="ident">write_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">FORWARDED</span>);
             <span class="ident">write_forwarding_word</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">ptr</span>.<span class="ident">to_address</span>().<span class="ident">as_usize</span>());
+            <span class="ident">gc_byte</span>::<span class="ident">write_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">FORWARDED</span>);
         }
     }
 }
