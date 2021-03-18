@@ -314,7 +314,6 @@ pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
     worker: *mut GCWorker<E::VM>,
 }
 
-unsafe impl<E: ProcessEdgesWork> Sync for ProcessEdgesBase<E> {}
 unsafe impl<E: ProcessEdgesWork> Send for ProcessEdgesBase<E> {}
 
 impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
@@ -347,7 +346,7 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
 
 /// Scan & update a list of object slots
 pub trait ProcessEdgesWork:
-    Send + Sync + 'static + Sized + DerefMut + Deref<Target = ProcessEdgesBase<Self>>
+    Send + 'static + Sized + DerefMut + Deref<Target = ProcessEdgesBase<Self>>
 {
     type VM: VMBinding;
     const CAPACITY: usize = 4096;
