@@ -38,7 +38,7 @@ pub struct SemiSpace<VM: VMBinding> {
     pub copyspace0: CopySpace<VM>,
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
-    pub metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+    pub metadata_spec_vec: Vec<SideMetadataSpec>,
 }
 
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
@@ -142,8 +142,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &self.common
     }
 
-    fn global_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>> {
-        self.metadata_spec_vec.clone()
+    fn global_side_metadata_spec_vec(&self) -> &Vec<SideMetadataSpec> {
+        &self.metadata_spec_vec
     }
 }
 
@@ -156,9 +156,9 @@ impl<VM: VMBinding> SemiSpace<VM> {
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let metadata_spec_vec = if VM::VMObjectModel::HAS_GC_BYTE {
-            Arc::new(vec![])
+            vec![]
         } else {
-            Arc::new(vec![gc_byte::SIDE_GC_BYTE_SPEC])
+            vec![gc_byte::SIDE_GC_BYTE_SPEC]
         };
 
         SemiSpace {

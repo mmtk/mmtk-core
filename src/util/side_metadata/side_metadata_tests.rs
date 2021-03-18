@@ -1,7 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use crate::util::constants;
     use crate::util::heap::layout::vm_layout_constants;
     use crate::util::side_metadata::*;
@@ -193,14 +191,14 @@ mod tests {
                 log_min_obj_size: 0,
             };
 
-            let gspec_arc = Arc::new(vec![gspec]);
-            let lspec_arc = Arc::new(vec![lspec]);
+            let gspec_vec = vec![gspec];
+            let lspec_vec = vec![lspec];
 
             assert!(try_map_metadata_space(
                 vm_layout_constants::HEAP_START,
                 constants::BYTES_IN_PAGE,
-                gspec_arc.clone(),
-                lspec_arc.clone()
+                &gspec_vec,
+                &lspec_vec
             ));
 
             ensure_metadata_is_mapped(gspec, vm_layout_constants::HEAP_START);
@@ -217,8 +215,8 @@ mod tests {
             ensure_unmap_metadata_space(
                 vm_layout_constants::HEAP_START,
                 constants::BYTES_IN_PAGE,
-                gspec_arc,
-                lspec_arc,
+                &gspec_vec,
+                &lspec_vec,
             );
 
             gspec.log_min_obj_size = 3;
@@ -226,14 +224,14 @@ mod tests {
             lspec.log_min_obj_size = 4;
             lspec.log_num_of_bits = 2;
 
-            let gspec_arc = Arc::new(vec![gspec]);
-            let lspec_arc = Arc::new(vec![lspec]);
+            let gspec_vec = vec![gspec];
+            let lspec_vec = vec![lspec];
 
             assert!(try_map_metadata_space(
                 vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                 vm_layout_constants::BYTES_IN_CHUNK,
-                gspec_arc.clone(),
-                lspec_arc.clone()
+                &gspec_vec,
+                &lspec_vec
             ));
 
             ensure_metadata_is_mapped(
@@ -256,8 +254,8 @@ mod tests {
             ensure_unmap_metadata_space(
                 vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                 vm_layout_constants::BYTES_IN_CHUNK,
-                gspec_arc,
-                lspec_arc,
+                &gspec_vec,
+                &lspec_vec,
             );
         })
     }
@@ -281,14 +279,14 @@ mod tests {
                 log_min_obj_size: 7,
             };
 
-            let gspec_arc = Arc::new(vec![metadata_1_spec, metadata_2_spec]);
-            let empty_arc = Arc::new(vec![]);
+            let gspec_vec = vec![metadata_1_spec, metadata_2_spec];
+            let empty_vec = vec![];
 
             assert!(try_map_metadata_space(
                 data_addr,
                 constants::BYTES_IN_PAGE,
-                gspec_arc.clone(),
-                empty_arc.clone()
+                &gspec_vec,
+                &empty_vec
             ));
 
             let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
@@ -315,7 +313,12 @@ mod tests {
             let three = load_atomic(metadata_2_spec, data_addr);
             assert_eq!(three, 3);
 
-            ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE, gspec_arc, empty_arc);
+            ensure_unmap_metadata_space(
+                data_addr,
+                constants::BYTES_IN_PAGE,
+                &gspec_vec,
+                &empty_vec,
+            );
         })
     }
 
@@ -332,14 +335,14 @@ mod tests {
                 log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
             };
 
-            let gspec_arc = Arc::new(vec![metadata_1_spec]);
-            let empty_arc = Arc::new(vec![]);
+            let gspec_vec = vec![metadata_1_spec];
+            let empty_vec = vec![];
 
             assert!(try_map_metadata_space(
                 data_addr,
                 constants::BYTES_IN_PAGE,
-                gspec_arc.clone(),
-                empty_arc.clone()
+                &gspec_vec,
+                &empty_vec
             ));
 
             let zero = fetch_add_atomic(metadata_1_spec, data_addr, 2);
@@ -354,7 +357,12 @@ mod tests {
             let one = load_atomic(metadata_1_spec, data_addr);
             assert_eq!(one, 1);
 
-            ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE, gspec_arc, empty_arc);
+            ensure_unmap_metadata_space(
+                data_addr,
+                constants::BYTES_IN_PAGE,
+                &gspec_vec,
+                &empty_vec,
+            );
         })
     }
 
@@ -398,14 +406,14 @@ mod tests {
                 log_min_obj_size: 7,
             };
 
-            let lspec_arc = Arc::new(vec![metadata_1_spec, metadata_2_spec]);
-            let empty_arc = Arc::new(vec![]);
+            let lspec_vec = vec![metadata_1_spec, metadata_2_spec];
+            let empty_vec = vec![];
 
             assert!(try_map_metadata_space(
                 data_addr,
                 constants::BYTES_IN_PAGE,
-                empty_arc.clone(),
-                lspec_arc.clone()
+                &empty_vec,
+                &lspec_vec
             ));
 
             let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
@@ -434,7 +442,12 @@ mod tests {
             let five = load_atomic(metadata_2_spec, data_addr);
             assert_eq!(five, 0);
 
-            ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE, empty_arc, lspec_arc);
+            ensure_unmap_metadata_space(
+                data_addr,
+                constants::BYTES_IN_PAGE,
+                &empty_vec,
+                &lspec_vec,
+            );
         })
     }
 }

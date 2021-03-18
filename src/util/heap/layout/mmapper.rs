@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::util::{
     side_metadata::{try_map_metadata_space, SideMetadataSpec},
     Address,
@@ -46,8 +44,8 @@ pub trait Mmapper {
         &self,
         start: Address,
         pages: usize,
-        global_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
-        local_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+        global_metadata_spec_vec: &[SideMetadataSpec],
+        local_metadata_spec_vec: &[SideMetadataSpec],
     );
 
     /// Map metadata memory for a given chunk
@@ -55,8 +53,8 @@ pub trait Mmapper {
     fn map_metadata(
         &self,
         chunk: Address,
-        global_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
-        local_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+        global_metadata_spec_vec: &[SideMetadataSpec],
+        local_metadata_spec_vec: &[SideMetadataSpec],
     ) -> Result<(), ()> {
         if !try_map_metadata_space(
             chunk,

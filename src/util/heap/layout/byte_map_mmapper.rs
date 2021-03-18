@@ -5,10 +5,10 @@ use crate::util::constants::*;
 use crate::util::conversions::pages_to_bytes;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::side_metadata::SideMetadataSpec;
+use std::fmt;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
-use std::{fmt, sync::Arc};
 
 use crate::util::memory::{dzmmap, mprotect, munprotect};
 use std::mem::transmute;
@@ -52,8 +52,8 @@ impl Mmapper for ByteMapMmapper {
         &self,
         start: Address,
         pages: usize,
-        global_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
-        local_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+        global_metadata_spec_vec: &[SideMetadataSpec],
+        local_metadata_spec_vec: &[SideMetadataSpec],
     ) {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
@@ -78,8 +78,8 @@ impl Mmapper for ByteMapMmapper {
                     Ok(_) => {
                         self.map_metadata(
                             mmap_start,
-                            global_metadata_spec_vec.clone(),
-                            local_metadata_spec_vec.clone(),
+                            global_metadata_spec_vec,
+                            local_metadata_spec_vec,
                         )
                         .expect("failed to map metadata memory");
                         if VERBOSE {
@@ -218,7 +218,6 @@ mod tests {
     use crate::util::heap::layout::byte_map_mmapper::{MAPPED, PROTECTED};
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use std::sync::atomic::Ordering;
-    use std::sync::Arc;
 
     const CHUNK_SIZE: usize = 1 << 22;
     #[cfg(target_os = "linux")]
@@ -269,8 +268,8 @@ mod tests {
     fn ensure_mapped_1page() {
         let mmapper = ByteMapMmapper::new();
         let pages = 1;
-        let empty_vec = Arc::new(vec![]);
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec.clone());
+        let empty_vec = vec![];
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &empty_vec, &empty_vec);
 
         let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
         let end_chunk =
@@ -284,8 +283,8 @@ mod tests {
     fn ensure_mapped_1chunk() {
         let mmapper = ByteMapMmapper::new();
         let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        let empty_vec = Arc::new(vec![]);
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec.clone());
+        let empty_vec = vec![];
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &empty_vec, &empty_vec);
 
         let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
         let end_chunk =
@@ -299,8 +298,8 @@ mod tests {
     fn ensure_mapped_more_than_1chunk() {
         let mmapper = ByteMapMmapper::new();
         let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
-        let empty_vec = Arc::new(vec![]);
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, empty_vec.clone(), empty_vec.clone());
+        let empty_vec = vec![];
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &empty_vec, &empty_vec);
 
         let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
         let end_chunk =
@@ -316,13 +315,8 @@ mod tests {
         // map 2 chunks
         let mmapper = ByteMapMmapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        let empty_vec = Arc::new(vec![]);
-        mmapper.ensure_mapped(
-            FIXED_ADDRESS,
-            pages_per_chunk * 2,
-            empty_vec.clone(),
-            empty_vec.clone(),
-        );
+        let empty_vec = vec![];
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &empty_vec, &empty_vec);
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -337,13 +331,8 @@ mod tests {
         // map 2 chunks
         let mmapper = ByteMapMmapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        let empty_vec = Arc::new(vec![]);
-        mmapper.ensure_mapped(
-            FIXED_ADDRESS,
-            pages_per_chunk * 2,
-            empty_vec.clone(),
-            empty_vec.clone(),
-        );
+        let empty_vec = vec![];
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &empty_vec, &empty_vec);
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -353,12 +342,7 @@ mod tests {
         assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MAPPED);
 
         // ensure mapped - this will unprotect the previously protected chunk
-        mmapper.ensure_mapped(
-            FIXED_ADDRESS,
-            pages_per_chunk * 2,
-            empty_vec.clone(),
-            empty_vec.clone(),
-        );
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &empty_vec, &empty_vec);
         assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MAPPED);
         assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MAPPED);
     }

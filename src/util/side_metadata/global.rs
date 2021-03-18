@@ -3,10 +3,7 @@ use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
 use crate::util::{constants, Address};
-use std::sync::{
-    atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering},
-    Arc,
-};
+use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 
 #[derive(Clone, Copy)]
 pub enum SideMetadataScope {
@@ -65,6 +62,10 @@ impl MappingState {
     }
 }
 
+lazy_static! {
+    pub static ref EMPTY_VEC: Vec<SideMetadataSpec> = vec![];
+}
+
 // ** NOTE: **
 //  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
 
@@ -83,18 +84,17 @@ impl MappingState {
 pub fn try_map_metadata_space(
     start: Address,
     size: usize,
-    global_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
-    local_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+    global_metadata_spec_vec: &[SideMetadataSpec],
+    local_metadata_spec_vec: &[SideMetadataSpec],
 ) -> bool {
     debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
     debug_assert!(size % BYTES_IN_PAGE == 0);
 
-    for i in 0..global_metadata_spec_vec.len() {
-        let spec = global_metadata_spec_vec[i];
+    for spec in global_metadata_spec_vec {
         // nearest page-aligned starting address
-        let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+        let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
         // nearest page-aligned ending address
-        let mmap_size = address_to_meta_address(spec, start + size)
+        let mmap_size = address_to_meta_address(*spec, start + size)
             .align_up(BYTES_IN_PAGE)
             .as_usize()
             - mmap_start.as_usize();
@@ -110,13 +110,12 @@ pub fn try_map_metadata_space(
 
     let mut lsize: usize = 0;
 
-    for i in 0..local_metadata_spec_vec.len() {
-        let spec = local_metadata_spec_vec[i];
+    for spec in local_metadata_spec_vec {
         if cfg!(target_pointer_width = "64") {
             // nearest page-aligned starting address
-            let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+            let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
             // nearest page-aligned ending address
-            let mmap_size = address_to_meta_address(spec, start + size)
+            let mmap_size = address_to_meta_address(*spec, start + size)
                 .align_up(BYTES_IN_PAGE)
                 .as_usize()
                 - mmap_start.as_usize();
@@ -138,19 +137,18 @@ pub fn try_map_metadata_space(
 pub fn try_map_metadata_address_range(
     start: Address,
     size: usize,
-    global_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
-    local_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+    global_metadata_spec_vec: &[SideMetadataSpec],
+    local_metadata_spec_vec: &[SideMetadataSpec],
 ) -> bool {
     info!("try_map_metadata_address_range({}, 0x{:x})", start, size);
     debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
     debug_assert!(size % BYTES_IN_CHUNK == 0);
 
-    for i in 0..global_metadata_spec_vec.len() {
-        let spec = global_metadata_spec_vec[i];
+    for spec in global_metadata_spec_vec {
         // nearest page-aligned starting address
-        let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+        let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
         // nearest page-aligned ending address
-        let mmap_size = address_to_meta_address(spec, start + size)
+        let mmap_size = address_to_meta_address(*spec, start + size)
             .align_up(BYTES_IN_PAGE)
             .as_usize()
             - mmap_start.as_usize();
@@ -161,13 +159,12 @@ pub fn try_map_metadata_address_range(
 
     let mut lsize: usize = 0;
 
-    for i in 0..local_metadata_spec_vec.len() {
-        let spec = local_metadata_spec_vec[i];
+    for spec in local_metadata_spec_vec {
         if cfg!(target_pointer_width = "64") {
             // nearest page-aligned starting address
-            let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+            let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
             // nearest page-aligned ending address
-            let mmap_size = address_to_meta_address(spec, start + size)
+            let mmap_size = address_to_meta_address(*spec, start + size)
                 .align_up(BYTES_IN_PAGE)
                 .as_usize()
                 - mmap_start.as_usize();
@@ -237,19 +234,18 @@ fn try_mmap_metadata_address_range(start: Address, size: usize) -> bool {
 pub fn ensure_unmap_metadata_space(
     start: Address,
     size: usize,
-    global_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
-    local_metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+    global_metadata_spec_vec: &[SideMetadataSpec],
+    local_metadata_spec_vec: &[SideMetadataSpec],
 ) {
     debug!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
     debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
     debug_assert!(size % BYTES_IN_PAGE == 0);
 
-    for i in 0..global_metadata_spec_vec.len() {
-        let spec = global_metadata_spec_vec[i];
+    for spec in global_metadata_spec_vec {
         // nearest page-aligned starting address
-        let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+        let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
         // nearest page-aligned ending address
-        let mmap_size = address_to_meta_address(spec, start + size)
+        let mmap_size = address_to_meta_address(*spec, start + size)
             .align_up(BYTES_IN_PAGE)
             .as_usize()
             - mmap_start.as_usize();
@@ -258,13 +254,12 @@ pub fn ensure_unmap_metadata_space(
         }
     }
 
-    for i in 0..local_metadata_spec_vec.len() {
-        let spec = local_metadata_spec_vec[i];
+    for spec in local_metadata_spec_vec {
         // nearest page-aligned starting address
-        let meta_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+        let meta_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
         if cfg!(target_pointer_width = "64") {
             // nearest page-aligned ending address
-            let meta_size = address_to_meta_address(spec, start + size)
+            let meta_size = address_to_meta_address(*spec, start + size)
                 .align_up(BYTES_IN_PAGE)
                 .as_usize()
                 - meta_start.as_usize();
@@ -279,27 +274,27 @@ pub fn ensure_unmap_metadata_space(
             if chunk_num == 0 {
                 ensure_munmap_metadata(
                     meta_start,
-                    address_to_meta_address(spec, start + size) - meta_start,
+                    address_to_meta_address(*spec, start + size) - meta_start,
                 );
             } else {
                 let second_data_chunk = (start + 1usize).align_up(BYTES_IN_CHUNK);
                 // unmap the first sub-chunk
                 ensure_munmap_metadata(
                     meta_start,
-                    address_to_meta_address(spec, second_data_chunk) - meta_start,
+                    address_to_meta_address(*spec, second_data_chunk) - meta_start,
                 );
                 let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
-                let last_meta_chunk = address_to_meta_address(spec, last_data_chunk);
+                let last_meta_chunk = address_to_meta_address(*spec, last_data_chunk);
                 // unmap the last sub-chunk
                 ensure_munmap_metadata(
                     last_meta_chunk,
-                    address_to_meta_address(spec, start + size) - last_meta_chunk,
+                    address_to_meta_address(*spec, start + size) - last_meta_chunk,
                 );
                 let mut next_data_chunk = second_data_chunk;
                 // unmap all chunks in the middle
                 while next_data_chunk != last_data_chunk {
                     ensure_munmap_metadata(
-                        address_to_meta_address(spec, next_data_chunk),
+                        address_to_meta_address(*spec, next_data_chunk),
                         meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits),
                     );
                     next_data_chunk += BYTES_IN_CHUNK;

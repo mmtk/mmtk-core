@@ -43,7 +43,7 @@ pub struct GenCopy<VM: VMBinding> {
     pub common: CommonPlan<VM>,
     in_nursery: AtomicBool,
     pub scheduler: &'static MMTkScheduler<VM>,
-    pub metadata_spec_vec: Arc<Vec<SideMetadataSpec>>,
+    pub metadata_spec_vec: Vec<SideMetadataSpec>,
 }
 
 unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
@@ -175,8 +175,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.in_nursery.load(Ordering::SeqCst)
     }
 
-    fn global_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>> {
-        self.metadata_spec_vec.clone()
+    fn global_side_metadata_spec_vec(&self) -> &Vec<SideMetadataSpec> {
+        &self.metadata_spec_vec
     }
 }
 
@@ -195,8 +195,6 @@ impl<VM: VMBinding> GenCopy<VM> {
         if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
             metadata_spec_vec.append(&mut vec![LOGGING_META]);
         };
-
-        let metadata_spec_vec = Arc::new(metadata_spec_vec);
 
         GenCopy {
             nursery: CopySpace::new(

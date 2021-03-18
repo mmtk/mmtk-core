@@ -10,14 +10,14 @@ use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::side_metadata::store_atomic;
 use crate::util::side_metadata::try_map_metadata_space;
 use crate::util::side_metadata::SideMetadataScope;
-use crate::util::side_metadata::SideMetadataSpec;
 #[cfg(target_pointer_width = "64")]
 use crate::util::side_metadata::{metadata_address_range_size, LOCAL_SIDE_METADATA_BASE_ADDRESS};
+use crate::util::side_metadata::{SideMetadataSpec, EMPTY_VEC};
 use crate::util::Address;
 use crate::util::ObjectReference;
 
+use std::collections::HashSet;
 use std::sync::RwLock;
-use std::{collections::HashSet, sync::Arc};
 
 lazy_static! {
     pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
@@ -67,6 +67,11 @@ pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
+lazy_static! {
+    static ref MS_LOCAL_META_VEC: Vec<SideMetadataSpec> =
+        vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC];
+}
+
 pub fn is_meta_space_mapped(address: Address) -> bool {
     let chunk_start = conversions::chunk_align_down(address);
     ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
@@ -78,12 +83,8 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
         return;
     }
     active_chunks.insert(chunk_start);
-    let mmap_metadata_result = try_map_metadata_space(
-        chunk_start,
-        BYTES_IN_CHUNK,
-        Arc::new(vec![]),
-        Arc::new(vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC]),
-    );
+    let mmap_metadata_result =
+        try_map_metadata_space(chunk_start, BYTES_IN_CHUNK, &EMPTY_VEC, &MS_LOCAL_META_VEC);
     debug_assert!(
         mmap_metadata_result,
         "mmap sidemetadata failed for chunk_start ({})",

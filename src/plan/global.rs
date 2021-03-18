@@ -24,7 +24,10 @@ use crate::util::statistics::stats::Stats;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
+use crate::{
+    mmtk::MMTK,
+    util::side_metadata::{SideMetadataSpec, EMPTY_VEC},
+};
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::cell::UnsafeCell;
@@ -341,8 +344,8 @@ pub trait Plan: 'static + Sync + Send + Downcast {
         }
     }
 
-    fn global_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>> {
-        Arc::new(vec![])
+    fn global_side_metadata_spec_vec(&self) -> &Vec<SideMetadataSpec> {
+        &EMPTY_VEC
     }
 }
 

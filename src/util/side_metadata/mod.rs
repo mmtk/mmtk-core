@@ -167,14 +167,14 @@
 //!
 //! So far, no metadata space is allocated.
 //!
-//! For this purpose, each plan should override `fn global_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>>` to return a vector of the global side metadata it needs.
+//! For this purpose, each plan should override `fn global_side_metadata_spec_vec(&self) -> &'static Vec<SideMetadataSpec>` to return a vector of the global side metadata it needs.
 //!
 //! This function can be implemented like:
 //! ```
 //! return Arc::new(vec![GLOBAL_META_1, GLOBAL_META_2]);
 //! ```
 //!
-//! For the local metadata bit-sets, each policy needs override `fn global_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>>`.
+//! For the local metadata bit-sets, each policy needs override `fn global_side_metadata_spec_vec(&self) -> &'static Vec<SideMetadataSpec>`.
 //!
 //! After mapping the metadata space, the following operations can be performed on the metadata:
 //!

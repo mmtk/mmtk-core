@@ -1,7 +1,10 @@
 use crate::util::side_metadata::{try_map_metadata_address_range, try_map_metadata_space};
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
+use crate::util::{
+    conversions::*,
+    side_metadata::{SideMetadataSpec, EMPTY_VEC},
+};
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
@@ -22,7 +25,7 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 
 use crate::vm::VMBinding;
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
 
 use downcast_rs::Downcast;
 
@@ -449,8 +452,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         println!();
     }
 
-    fn local_side_metadata_spec_vec(&self) -> Arc<Vec<SideMetadataSpec>> {
-        Arc::new(vec![])
+    fn local_side_metadata_spec_vec(&self) -> &Vec<SideMetadataSpec> {
+        &EMPTY_VEC
     }
 }
 
