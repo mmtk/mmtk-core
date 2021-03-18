@@ -33,8 +33,6 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for LockFreeImmortalSpace<VM> {}
-
 impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn name(&self) -> &str {
         self.get_name()

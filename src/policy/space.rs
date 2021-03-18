@@ -60,7 +60,6 @@ const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 
 #[derive(Debug)]
 struct EmptySpaceSFT {}
-unsafe impl Sync for EmptySpaceSFT {}
 
 const EMPTY_SFT_NAME: &str = "empty";
 
@@ -102,6 +101,8 @@ impl SFT for EmptySpaceSFT {
 pub struct SFTMap {
     sft: Vec<*const (dyn SFT + Sync)>,
 }
+
+// TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
 unsafe impl Sync for SFTMap {}
 
 static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
@@ -495,8 +496,6 @@ pub struct SpaceOptions {
 
 /// Print debug info for SFT. Should be false when committed.
 const DEBUG_SPACE: bool = cfg!(debug_assertions) && false;
-
-unsafe impl<VM: VMBinding> Sync for CommonSpace<VM> {}
 
 impl<VM: VMBinding> CommonSpace<VM> {
     pub fn new(
