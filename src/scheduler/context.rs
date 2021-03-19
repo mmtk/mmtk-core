@@ -5,7 +5,7 @@ use crate::util::OpaquePointer;
 /// This context is globally accessable for all work-packets, workers and the scheduler.
 ///
 /// For mmtk, the global context is `MMTK<VM>`.
-pub trait Context: 'static + Send + Sync + Sized {
+pub trait Context: 'static + Sync + Sized {
     fn spawn_worker(worker: &'static Worker<Self>, _tls: OpaquePointer, context: &'static Self) {
         let worker_ptr = worker as *const Worker<Self> as usize;
         std::thread::spawn(move || {

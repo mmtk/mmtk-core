@@ -93,7 +93,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
 
 // TODO: We should be able to remove this trait, as we removed per-plan mutator implementation, and there is no other type that implements this trait.
 // The Mutator struct above is the only type that implements this trait. We should be able to merge them.
-pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
+pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn prepare(&mut self, tls: OpaquePointer);
     fn release(&mut self, tls: OpaquePointer);
     fn alloc(
