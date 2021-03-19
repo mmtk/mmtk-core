@@ -57,6 +57,8 @@ code_space  = ["base_spaces"]
 sanity = []
 # Run analysis
 analysis = []
+# Use a HashSet of chunks for sweep
+chunk_hashset = []
 # Use lock free variant of NoGC
 nogc_lock_free = []
 # Use lock free with no zeroing NoGC
