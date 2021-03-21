@@ -118,6 +118,7 @@ pub struct ReferenceProcessor {
     semantics: Semantics,
 }
 
+// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
 unsafe impl Sync for ReferenceProcessor {}
 
 #[derive(Debug, PartialEq)]
