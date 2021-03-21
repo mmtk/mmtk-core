@@ -1,8 +1,6 @@
 use std::{iter::Step, ops::Range, sync::atomic::AtomicU8};
-use std::sync::atomic::{Ordering, AtomicUsize};
+use std::sync::atomic::{Ordering};
 use crate::{MMTK, scheduler::*, util::{Address, ObjectReference, heap::layout::vm_layout_constants::{LOG_BYTES_IN_CHUNK, LOG_SPACE_EXTENT}}, vm::*};
-use crate::util::side_metadata::{self, *};
-
 use super::immixspace::ImmixSpace;
 use super::block::{Block, BlockState};
 
@@ -84,6 +82,7 @@ impl Chunk {
                 if marked_lines == 0 {
                     space.release_block(block);
                 } else if marked_lines != Block::LINES {
+                    block.set_state(BlockState::Reusable);
                     space.reusable_blocks.push(block)
                 }
             }

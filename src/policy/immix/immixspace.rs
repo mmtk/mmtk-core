@@ -1,18 +1,17 @@
 use atomic::Ordering;
-use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{WorkBucketStage, GCWorkBucket, Work}, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
+use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{WorkBucketStage, GCWorkBucket}, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::forwarding_word as ForwardingWord;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-use crate::util::conversions;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::PageResource;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::util::side_metadata::{self, *};
-use std::{cell::UnsafeCell, iter::Step, ops::Range, sync::{Mutex, atomic::{AtomicBool, AtomicU8}}};
-use super::{block::*, chunk::{Chunk, ChunkMap, ChunkState, SweepChunks}};
+use std::{cell::UnsafeCell, iter::Step, ops::Range, sync::atomic::{AtomicBool, AtomicU8}};
+use super::{block::*, chunk::{ChunkMap, ChunkState}, defrag::Defrag};
 use super::line::*;
 
 
@@ -25,6 +24,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     line_unavail_state: AtomicU8,
     in_collection: AtomicBool,
     pub reusable_blocks: BlockList,
+    defrag: Defrag,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -110,14 +110,27 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
             in_collection: AtomicBool::new(false),
             reusable_blocks: BlockList::new(),
+            defrag: Defrag::new(),
         }
     }
 
     pub fn defrag_headroom_pages(&self) -> usize {
-        self.pr.reserved_pages() * 2 / 100
+        self.defrag.defrag_headroom_pages(self)
+    }
+
+    #[inline(always)]
+    pub fn in_defrag(&self) -> bool {
+        self.defrag.in_defrag()
+    }
+
+    pub fn decide_whether_to_defrag(&self, emergency_collection: bool, collection_attempts: usize) {
+        self.defrag.decide_whether_to_defrag(emergency_collection, collection_attempts, self.reusable_blocks.len() == 0)
     }
 
     pub fn prepare(&self) {
+        if !super::BLOCK_ONLY {
+            self.defrag.prepare(self);
+        }
         for chunk in self.chunk_map.allocated_chunks() {
             // Clear object marking data
             side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, chunk.start());
@@ -150,10 +163,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(GCWorkBucket::<VM>::DEFAULT_PRIORITY, work_packets);
 
         self.in_collection.store(false, Ordering::SeqCst);
+        if !super::BLOCK_ONLY {
+            self.defrag.release(self)
+        }
     }
 
     pub fn release_block(&self, block: Block) {
-        block.set_state(BlockState::Unallocated);
+        block.deinit();
         self.pr.release_pages(block.start());
     }
 
@@ -161,23 +177,32 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let block_address = self.acquire(tls, Block::PAGES);
         if block_address.is_zero() { return None }
         let block = Block::from(block_address);
-        block.set_state(BlockState::Unmarked);
+        block.init();
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
         Some(block)
     }
 
     pub fn get_reusable_block(&self) -> Option<Block> {
         if super::BLOCK_ONLY { return None }
-        self.reusable_blocks.pop()
+        let result = self.reusable_blocks.pop();
+        if let Some(block) = result {
+            block.init();
+        }
+        result
+    }
+
+    #[inline(always)]
+    pub fn fast_trace_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference) -> ObjectReference {
+        self.trace_mark_object(trace, object)
     }
 
     #[inline(always)]
     pub fn trace_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
-        // if Block::containing::<VM>(object).is_defrag() {
-        //     self.trace_evacuate_object(trace, object, semantics, copy_context)
-        // } else {
+        if Block::containing::<VM>(object).is_defrag_source() {
+            self.trace_evacuate_object(trace, object, semantics, copy_context)
+        } else {
             self.trace_mark_object(trace, object)
-        // }
+        }
     }
 
     #[inline(always)]
@@ -186,9 +211,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if Self::attempt_mark(object) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
-                // unreachable!()
                 let _marked_lines = Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::SeqCst));
-                // Block::containing::<VM>(object).mark(Some(marked_lines));
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
             } else {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
@@ -201,21 +224,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     #[inline]
     pub fn trace_evacuate_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
+        debug_assert_eq!(Block::containing::<VM>(object).get_state(), BlockState::Unmarked);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
         } else {
             let new_object = ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context);
             trace.process_node(new_object);
-            // trace!("{:?} => {:?} in block {:?} {}", object, new_object, Block::containing::<VM>(new_object), Block::containing::<VM>(new_object).mark_byte());
+            // trace!("{:?} => {:?} in block {:?}", object, new_object, Block::containing::<VM>(new_object));
             // Mark block and lines
-            // if !super::BLOCK_ONLY {
-            //     let marked_lines = Line::mark_lines_for_object::<VM>(new_object, self.line_mark_state.load(Ordering::SeqCst));
-            //     Block::containing::<VM>(new_object).mark(Some(marked_lines));
-            // } else {
-            //     Block::containing::<VM>(new_object).mark(None);
-            // }
-            unreachable!();
+            if !super::BLOCK_ONLY {
+                let _marked_lines = Line::mark_lines_for_object::<VM>(new_object, self.line_mark_state.load(Ordering::SeqCst));
+                Block::containing::<VM>(new_object).set_state(BlockState::Marked);
+            } else {
+                Block::containing::<VM>(new_object).set_state(BlockState::Marked);
+            }
             new_object
         }
     }

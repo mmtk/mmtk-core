@@ -1,4 +1,4 @@
-use crate::{policy::immix::ImmixSpace, util::memory};
+use crate::{policy::immix::ImmixSpace};
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
 use crate::util::Address;
 use crate::util::alloc::Allocator;
@@ -175,7 +175,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 self.cursor = lines.start.start();
                 self.limit = lines.end.start();
                 trace!("acquire_recycable_lines -> {:?} {:?} {:?}", self.line, lines, self.tls);
-                memory::zero(self.cursor, self.limit - self.cursor);
+                // crate::util::memory::zero(self.cursor, self.limit - self.cursor);
                 debug_assert!(align_allocation_no_fill::<VM>(self.cursor, align, offset) + size <= self.limit);
                 let block = line.block();
                 self.line = if lines.end == block.lines().end { None } else { Some(lines.end) };

@@ -12,7 +12,6 @@ use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
 pub struct ImmixCopyContext<VM: VMBinding> {
-    plan: &'static Immix<VM>,
     immix: ImmixAllocator<VM>,
 }
 
@@ -57,7 +56,6 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
 impl<VM: VMBinding> ImmixCopyContext<VM> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
-            plan: &mmtk.plan.downcast_ref::<Immix<VM>>().unwrap(),
             immix: ImmixAllocator::new(OpaquePointer::UNINITIALIZED, Some(&mmtk.plan.downcast_ref::<Immix<VM>>().unwrap().immix_space), &*mmtk.plan, true),
         }
     }
@@ -80,6 +78,26 @@ impl<VM: VMBinding> ImmixProcessEdges<VM> {
     fn immix(&self) -> &'static Immix<VM> {
         self.plan
     }
+
+    #[inline(always)]
+    fn fast_trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+        if self.immix().immix_space.in_space(object) {
+            self.immix().immix_space.fast_trace_object(self, object)
+        } else {
+            self.immix()
+                .common
+                .trace_object::<Self, ImmixCopyContext<VM>>(self, object)
+        }
+    }
+
+    #[inline(always)]
+    fn fast_process_edge(&mut self, slot: Address) {
+        let object = unsafe { slot.load::<ObjectReference>() };
+        self.fast_trace_object(object);
+    }
 }
 
 impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
@@ -89,7 +107,8 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
         let plan = base.plan().downcast_ref::<Immix<VM>>().unwrap();
         Self { base, plan }
     }
-    #[inline]
+
+    #[inline(always)]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
@@ -100,6 +119,28 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
             self.immix()
                 .common
                 .trace_object::<Self, ImmixCopyContext<VM>>(self, object)
+        }
+    }
+
+    #[inline(always)]
+    fn process_edge(&mut self, slot: Address) {
+        let object = unsafe { slot.load::<ObjectReference>() };
+        let new_object = self.trace_object(object);
+        if Self::OVERWRITE_REFERENCE {
+            unsafe { slot.store(new_object) };
+        }
+    }
+
+    #[inline]
+    fn process_edges(&mut self) {
+        if !self.plan.immix_space.in_defrag() {
+            for i in 0..self.edges.len() {
+                self.fast_process_edge(self.edges[i])
+            }
+        } else {
+            for i in 0..self.edges.len() {
+                self.process_edge(self.edges[i])
+            }
         }
     }
 }

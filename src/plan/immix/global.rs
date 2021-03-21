@@ -25,6 +25,7 @@ use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::Arc;
 
+use atomic::Ordering;
 use enum_map::EnumMap;
 
 pub const ALLOC_IMMIX: AllocationSemantics = AllocationSemantics::Default;
@@ -75,6 +76,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
+        self.immix_space.decide_whether_to_defrag(self.is_emergency_collection(), self.base().cur_collection_attempts.load(Ordering::SeqCst));
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<ImmixProcessEdges<VM>>::new());
