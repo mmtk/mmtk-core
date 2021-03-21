@@ -64,7 +64,12 @@ unsafe impl<C: Context> Send for Worker<C> {}
 pub type GCWorker<VM> = Worker<MMTK<VM>>;
 
 impl<C: Context> Worker<C> {
-    pub fn new(ordinal: usize, scheduler: Weak<Scheduler<C>>, is_coordinator: bool, sender: Sender<CoordinatorMessage<C>>) -> Self {
+    pub fn new(
+        ordinal: usize,
+        scheduler: Weak<Scheduler<C>>,
+        is_coordinator: bool,
+        sender: Sender<CoordinatorMessage<C>>,
+    ) -> Self {
         let scheduler = scheduler.upgrade().unwrap();
         Self {
             tls: OpaquePointer::UNINITIALIZED,
@@ -153,7 +158,11 @@ pub struct WorkerGroup<C: Context> {
 }
 
 impl<C: Context> WorkerGroup<C> {
-    pub fn new(workers: usize, scheduler: Weak<Scheduler<C>>, sender: Sender<CoordinatorMessage<C>>) -> Arc<Self> {
+    pub fn new(
+        workers: usize,
+        scheduler: Weak<Scheduler<C>>,
+        sender: Sender<CoordinatorMessage<C>>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             workers: (0..workers)
                 .map(|i| Worker::new(i, scheduler.clone(), false, sender.clone()))
