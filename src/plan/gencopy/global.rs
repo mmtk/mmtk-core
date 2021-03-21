@@ -121,7 +121,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new());
+            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
     }
 

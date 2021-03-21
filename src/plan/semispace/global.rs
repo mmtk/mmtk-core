@@ -98,7 +98,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new());
+            .add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
