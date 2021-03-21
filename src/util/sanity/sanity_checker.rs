@@ -31,7 +31,7 @@ impl SanityChecker {
 
 pub struct ScheduleSanityGC<P: Plan, W: CopyContext + WorkerLocal> {
     _plan: &'static P,
-    _p: PhantomData<W>
+    _p: PhantomData<W>,
 }
 
 impl<P: Plan, W: CopyContext + WorkerLocal> ScheduleSanityGC<P, W> {
@@ -43,9 +43,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> ScheduleSanityGC<P, W> {
     }
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM>
-    for ScheduleSanityGC<P, W>
-{
+impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for ScheduleSanityGC<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         let scheduler = worker.scheduler();
         let plan = &mmtk.plan;
