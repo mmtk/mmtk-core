@@ -97,7 +97,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="prefix.html">MMTk Tutorial</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">1.</strong> Introduction</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="intro/what_is_mmtk.html"><strong aria-hidden="true">1.1.</strong> What is MMTk?</a></li><li class="chapter-item expanded "><a href="intro/what_will_this_tutorial_cover.html"><strong aria-hidden="true">1.2.</strong> What will this tutorial cover?</a></li><li class="chapter-item expanded "><a href="intro/glossary.html"><strong aria-hidden="true">1.3.</strong> Glossary</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.</strong> Preliminaries</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="preliminaries/set_up.html"><strong aria-hidden="true">2.1.</strong> Set up MMTk and OpenJDK</a></li><li class="chapter-item expanded "><a href="preliminaries/test.html"><strong aria-hidden="true">2.2.</strong> Test the build</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> MyGC</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="mygc/create.html"><strong aria-hidden="true">3.1.</strong> Create MyGC</a></li><li class="chapter-item expanded "><a href="mygc/ss/prefix.html"><strong aria-hidden="true">3.2.</strong> Building a semispace GC</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="mygc/ss/alloc.html"><strong aria-hidden="true">3.2.1.</strong> Allocation</a></li><li class="chapter-item expanded "><a href="mygc/ss/collection.html"><strong aria-hidden="true">3.2.2.</strong> Collection</a></li><li class="chapter-item expanded "><a href="mygc/ss/exercise.html"><strong aria-hidden="true">3.2.3.</strong> Exercise</a></li></ol></li><li class="chapter-item expanded "><a href="mygc/gencopy.html"><strong aria-hidden="true">3.3.</strong> Building a generational copying GC</a></li></ol></li><li class="chapter-item expanded "><a href="further_reading.html"><strong aria-hidden="true">4.</strong> Further Reading</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="prefix.html">MMTk Tutorial</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">1.</strong> Introduction</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="intro/what_is_mmtk.html"><strong aria-hidden="true">1.1.</strong> What is MMTk?</a></li><li class="chapter-item expanded "><a href="intro/what_will_this_tutorial_cover.html"><strong aria-hidden="true">1.2.</strong> What will this tutorial cover?</a></li><li class="chapter-item expanded "><a href="intro/glossary.html"><strong aria-hidden="true">1.3.</strong> Glossary</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.</strong> Preliminaries</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="preliminaries/set_up.html"><strong aria-hidden="true">2.1.</strong> Set up MMTk and OpenJDK</a></li><li class="chapter-item expanded "><a href="preliminaries/test.html"><strong aria-hidden="true">2.2.</strong> Test the build</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> MyGC</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="mygc/create.html"><strong aria-hidden="true">3.1.</strong> Create MyGC</a></li><li class="chapter-item expanded "><a href="mygc/ss/prefix.html"><strong aria-hidden="true">3.2.</strong> Building a semispace GC</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="mygc/ss/alloc.html"><strong aria-hidden="true">3.2.1.</strong> Allocation</a></li><li class="chapter-item expanded "><a href="mygc/ss/collection.html"><strong aria-hidden="true">3.2.2.</strong> Collection</a></li><li class="chapter-item expanded "><a href="mygc/ss/exercise.html"><strong aria-hidden="true">3.2.3.</strong> Exercise</a></li><li class="chapter-item expanded "><a href="mygc/ss/exercise_solution.html"><strong aria-hidden="true">3.2.4.</strong> Exercise solution</a></li></ol></li><li class="chapter-item expanded "><a href="mygc/gencopy.html"><strong aria-hidden="true">3.3.</strong> Building a generational copying GC</a></li></ol></li><li class="chapter-item expanded "><a href="further_reading.html"><strong aria-hidden="true">4.</strong> Further Reading</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -1313,27 +1313,12 @@ next thing to do is to make this collector into a more efficient proper
 generational collector.</p>
 <p>When you are finished, try running the benchmarks and seeing how the 
 performance of this collector compares to MyGC. Great work!</p>
-<h1 id="building-a-generational-copying-collector"><a class="header" href="#building-a-generational-copying-collector">Building a generational copying collector</a></h1>
-<blockquote>
-<p>Note: This part is work in progress.</p>
-</blockquote>
-<h2 id="what-is-a-generational-collector"><a class="header" href="#what-is-a-generational-collector">What is a generational collector?</a></h2>
-<p>The <em>weak generational hypothesis</em> states that most of the objects allocated
-to a heap after one collection will die before the next collection.
-Therefore, it is worth separating out 'young' and 'old' objects and only
-scanning each as needed, to minimise the number of times old live objects are
-scanned. New objects are allocated to a 'nursery', and after one collection
-they move to the 'mature' space. In <code>triplespace</code>, <code>youngspace</code> is a
-proto-nursery, and the <code>tospace</code> and <code>fromspace</code> are the mature spaces.</p>
-<p>This collector fixes one of the major problems with semispace - namely, that
-any long-lived objects are repeatedly copied back and forth. By separating
-these objects into a separate 'mature' space, the number of full heap
-collections needed is greatly reduced.</p>
-<p>This section is currently incomplete. Instructions for building a
-generational copying (gencopy) collector will be added in future.</p>
-<h2 id="triplespace-backup-instructions"><a class="header" href="#triplespace-backup-instructions">Triplespace backup instructions</a></h2>
+<h1 id="triplespace-backup-instructions"><a class="header" href="#triplespace-backup-instructions">Triplespace backup instructions</a></h1>
+<p>This is <em>one</em> possible implementation of the Triplespace collector, provided
+in case you are stuck on the exercise. </p>
+<p><strong>Attempt the exercise yourself before reading this.</strong></p>
 <p>First, rename all instances of <code>mygc</code> to <code>triplespace</code>, and add it as a
-module by following the instructions in <a href="mygc/./create.html">Create MyGC</a>.</p>
+module by following the instructions in <a href="mygc/ss/./create.html">Create MyGC</a>.</p>
 <p>In <code>global.rs</code>:</p>
 <ol>
 <li>
@@ -1552,6 +1537,24 @@ the tospace and fromspace:
 </span></code></pre></pre>
 </li>
 </ol>
+<h1 id="building-a-generational-copying-collector"><a class="header" href="#building-a-generational-copying-collector">Building a generational copying collector</a></h1>
+<blockquote>
+<p>Note: This part is work in progress.</p>
+</blockquote>
+<h2 id="what-is-a-generational-collector"><a class="header" href="#what-is-a-generational-collector">What is a generational collector?</a></h2>
+<p>The <em>weak generational hypothesis</em> states that most of the objects allocated
+to a heap after one collection will die before the next collection.
+Therefore, it is worth separating out 'young' and 'old' objects and only
+scanning each as needed, to minimise the number of times old live objects are
+scanned. New objects are allocated to a 'nursery', and after one collection
+they move to the 'mature' space. In <code>triplespace</code>, <code>youngspace</code> is a
+proto-nursery, and the <code>tospace</code> and <code>fromspace</code> are the mature spaces.</p>
+<p>This collector fixes one of the major problems with semispace - namely, that
+any long-lived objects are repeatedly copied back and forth. By separating
+these objects into a separate 'mature' space, the number of full heap
+collections needed is greatly reduced.</p>
+<p>This section is currently incomplete. Instructions for building a
+generational copying (gencopy) collector will be added in future.</p>
 <h1 id="further-reading"><a class="header" href="#further-reading">Further Reading</a></h1>
 <ul>
 <li><a href="https://www.mmtk.io/mmtk-core/mmtk/index.html">MMTk Crate Documentation</a></li>
