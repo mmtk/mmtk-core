@@ -1,4 +1,4 @@
-## Triplespace backup instructions
+# Triplespace backup instructions
 
 This is *one* possible implementation of the Triplespace collector, provided
 in case you are stuck on the exercise. 
