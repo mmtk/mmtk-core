@@ -118,8 +118,8 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         self.common().space.unwrap().common().mmapper.ensure_mapped(
             rtn,
             required_pages,
-            VM::VMActivePlan::global().global_side_metadata_spec_vec(),
-            self.common().space.unwrap().local_side_metadata_spec_vec(),
+            VM::VMActivePlan::global().global_side_metadata_specs(),
+            self.common().space.unwrap().local_side_metadata_specs(),
         );
         if zeroed {
             memory::zero(rtn, bytes);

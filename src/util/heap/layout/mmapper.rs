@@ -56,12 +56,14 @@ pub trait Mmapper {
         global_metadata_spec_vec: &[SideMetadataSpec],
         local_metadata_spec_vec: &[SideMetadataSpec],
     ) -> Result<(), ()> {
-        if !try_map_metadata_space(
+        if try_map_metadata_space(
             chunk,
             BYTES_IN_CHUNK,
             global_metadata_spec_vec,
             local_metadata_spec_vec,
-        ) {
+        )
+        .is_err()
+        {
             Err(())
         } else {
             Ok(())

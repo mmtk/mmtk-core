@@ -43,7 +43,6 @@ pub struct GenCopy<VM: VMBinding> {
     pub common: CommonPlan<VM>,
     in_nursery: AtomicBool,
     pub scheduler: &'static MMTkScheduler<VM>,
-    pub metadata_spec_vec: Vec<SideMetadataSpec>,
 }
 
 unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
@@ -175,8 +174,18 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.in_nursery.load(Ordering::SeqCst)
     }
 
-    fn global_side_metadata_spec_vec(&self) -> &Vec<SideMetadataSpec> {
-        &self.metadata_spec_vec
+    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
+        if !VM::VMObjectModel::HAS_GC_BYTE
+            && super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier
+        {
+            &[gc_byte::SIDE_GC_BYTE_SPEC, LOGGING_META]
+        } else if !VM::VMObjectModel::HAS_GC_BYTE {
+            &[gc_byte::SIDE_GC_BYTE_SPEC]
+        } else if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+            &[LOGGING_META]
+        } else {
+            &[]
+        }
     }
 }
 
@@ -188,13 +197,6 @@ impl<VM: VMBinding> GenCopy<VM> {
         scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let mut metadata_spec_vec = vec![];
-        if !VM::VMObjectModel::HAS_GC_BYTE {
-            metadata_spec_vec.append(&mut vec![gc_byte::SIDE_GC_BYTE_SPEC]);
-        }
-        if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-            metadata_spec_vec.append(&mut vec![LOGGING_META]);
-        };
 
         GenCopy {
             nursery: CopySpace::new(
@@ -228,7 +230,6 @@ impl<VM: VMBinding> GenCopy<VM> {
             common: CommonPlan::new(vm_map, mmapper, options, heap, &GENCOPY_CONSTRAINTS),
             in_nursery: AtomicBool::default(),
             scheduler,
-            metadata_spec_vec,
         }
     }
 

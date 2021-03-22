@@ -6,19 +6,11 @@ use std::sync::atomic::{AtomicU8, Ordering};
 
 use super::constants;
 
-#[cfg(target_pointer_width = "32")]
-pub const SIDE_GC_BYTE_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::Global,
-    offset: 0,
-    log_num_of_bits: 1,
-    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
-};
-#[cfg(target_pointer_width = "64")]
 pub const SIDE_GC_BYTE_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::Global,
     offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
     log_num_of_bits: 1,
-    log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
 // TODO: we probably need to add non-atomic versions of the read and write methods

@@ -1,10 +1,7 @@
 use crate::util::side_metadata::{try_map_metadata_address_range, try_map_metadata_space};
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::{
-    conversions::*,
-    side_metadata::{SideMetadataSpec, EMPTY_VEC},
-};
+use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
@@ -350,12 +347,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        if !try_map_metadata_space(
+        if try_map_metadata_space(
             self.common().start,
             self.common().extent,
-            VM::VMActivePlan::global().global_side_metadata_spec_vec(),
-            self.local_side_metadata_spec_vec(),
-        ) {
+            VM::VMActivePlan::global().global_side_metadata_specs(),
+            self.local_side_metadata_specs(),
+        )
+        .is_err()
+        {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
@@ -452,8 +451,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         println!();
     }
 
-    fn local_side_metadata_spec_vec(&self) -> &Vec<SideMetadataSpec> {
-        &EMPTY_VEC
+    fn local_side_metadata_specs(&self) -> &[SideMetadataSpec] {
+        &[]
     }
 }
 
@@ -581,12 +580,14 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn init(&self, space: &dyn Space<VM>) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            if !try_map_metadata_address_range(
+            if try_map_metadata_address_range(
                 self.start,
                 self.extent,
-                VM::VMActivePlan::global().global_side_metadata_spec_vec(),
-                space.local_side_metadata_spec_vec(),
-            ) {
+                VM::VMActivePlan::global().global_side_metadata_specs(),
+                space.local_side_metadata_specs(),
+            )
+            .is_err()
+            {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
             }

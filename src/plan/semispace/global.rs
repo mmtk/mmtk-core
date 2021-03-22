@@ -38,7 +38,6 @@ pub struct SemiSpace<VM: VMBinding> {
     pub copyspace0: CopySpace<VM>,
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
-    pub metadata_spec_vec: Vec<SideMetadataSpec>,
 }
 
 unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
@@ -142,8 +141,12 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &self.common
     }
 
-    fn global_side_metadata_spec_vec(&self) -> &Vec<SideMetadataSpec> {
-        &self.metadata_spec_vec
+    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
+        if VM::VMObjectModel::HAS_GC_BYTE {
+            &[]
+        } else {
+            &[gc_byte::SIDE_GC_BYTE_SPEC]
+        }
     }
 }
 
@@ -155,11 +158,6 @@ impl<VM: VMBinding> SemiSpace<VM> {
         _scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let metadata_spec_vec = if VM::VMObjectModel::HAS_GC_BYTE {
-            vec![]
-        } else {
-            vec![gc_byte::SIDE_GC_BYTE_SPEC]
-        };
 
         SemiSpace {
             hi: AtomicBool::new(false),
@@ -182,7 +180,6 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 &mut heap,
             ),
             common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS),
-            metadata_spec_vec,
         }
     }
 

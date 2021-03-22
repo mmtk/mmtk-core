@@ -167,14 +167,14 @@
 //!
 //! So far, no metadata space is allocated.
 //!
-//! For this purpose, each plan should override `fn global_side_metadata_spec_vec(&self) -> &'static Vec<SideMetadataSpec>` to return a vector of the global side metadata it needs.
+//! For this purpose, each plan should override `fn global_side_metadata_specs(&self) -> &[SideMetadataSpec]` to return a vector of the global side metadata it needs.
 //!
 //! This function can be implemented like:
 //! ```
-//! return Arc::new(vec![GLOBAL_META_1, GLOBAL_META_2]);
+//! return &[GLOBAL_META_1, GLOBAL_META_2];
 //! ```
 //!
-//! For the local metadata bit-sets, each policy needs override `fn global_side_metadata_spec_vec(&self) -> &'static Vec<SideMetadataSpec>`.
+//! For the local metadata bit-sets, each policy needs override `fn local_side_metadata_specs(&self) -> &[SideMetadataSpec]`.
 //!
 //! After mapping the metadata space, the following operations can be performed on the metadata:
 //!
@@ -191,12 +191,12 @@
 mod constants;
 mod global;
 mod helpers;
-// #[cfg(target_pointer_width = "32")]
+#[cfg(target_pointer_width = "32")]
 mod helpers_32;
 mod side_metadata_tests;
 
 pub use constants::*;
 pub use global::*;
 pub(crate) use helpers::*;
-// #[cfg(target_pointer_width = "32")]
+#[cfg(target_pointer_width = "32")]
 pub(crate) use helpers_32::*;

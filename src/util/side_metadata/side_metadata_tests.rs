@@ -181,14 +181,14 @@ mod tests {
                 scope: SideMetadataScope::PolicySpecific,
                 offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
                 log_num_of_bits: 1,
-                log_min_obj_size: 0,
+                log_min_obj_size: 1,
             };
             #[cfg(target_pointer_width = "32")]
             let mut lspec = SideMetadataSpec {
                 scope: SideMetadataScope::PolicySpecific,
                 offset: 0,
                 log_num_of_bits: 1,
-                log_min_obj_size: 0,
+                log_min_obj_size: 1,
             };
 
             let gspec_vec = vec![gspec];
@@ -199,7 +199,8 @@ mod tests {
                 constants::BYTES_IN_PAGE,
                 &gspec_vec,
                 &lspec_vec
-            ));
+            )
+            .is_ok());
 
             ensure_metadata_is_mapped(gspec, vm_layout_constants::HEAP_START);
             ensure_metadata_is_mapped(lspec, vm_layout_constants::HEAP_START);
@@ -232,7 +233,8 @@ mod tests {
                 vm_layout_constants::BYTES_IN_CHUNK,
                 &gspec_vec,
                 &lspec_vec
-            ));
+            )
+            .is_ok());
 
             ensure_metadata_is_mapped(
                 gspec,
@@ -287,7 +289,8 @@ mod tests {
                 constants::BYTES_IN_PAGE,
                 &gspec_vec,
                 &empty_vec
-            ));
+            )
+            .is_ok());
 
             let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
             assert_eq!(zero, 0);
@@ -343,7 +346,8 @@ mod tests {
                 constants::BYTES_IN_PAGE,
                 &gspec_vec,
                 &empty_vec
-            ));
+            )
+            .is_ok());
 
             let zero = fetch_add_atomic(metadata_1_spec, data_addr, 2);
             assert_eq!(zero, 0);
@@ -377,7 +381,7 @@ mod tests {
                 scope: SideMetadataScope::PolicySpecific,
                 offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
                 log_num_of_bits: 4,
-                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+                log_min_obj_size: 9,
             };
             #[cfg(target_pointer_width = "64")]
             let metadata_2_spec = SideMetadataSpec {
@@ -392,7 +396,7 @@ mod tests {
                 scope: SideMetadataScope::PolicySpecific,
                 offset: 0,
                 log_num_of_bits: 4,
-                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+                log_min_obj_size: 9,
             };
             #[cfg(target_pointer_width = "32")]
             let metadata_2_spec = SideMetadataSpec {
@@ -414,7 +418,8 @@ mod tests {
                 constants::BYTES_IN_PAGE,
                 &empty_vec,
                 &lspec_vec
-            ));
+            )
+            .is_ok());
 
             let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
             assert_eq!(zero, 0);

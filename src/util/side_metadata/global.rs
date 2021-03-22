@@ -3,6 +3,7 @@ use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
 use crate::util::{constants, Address};
+use std::io::Result;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 
 #[derive(Clone, Copy)]
@@ -31,41 +32,6 @@ pub struct SideMetadataSpec {
     pub log_min_obj_size: usize,
 }
 
-impl SideMetadataSpec {
-    pub const fn meta_bytes_per_chunk(&self) -> usize {
-        super::meta_bytes_per_chunk(self.log_min_obj_size, self.log_num_of_bits)
-    }
-}
-
-/// Represents the mapping state of a metadata page.
-///
-/// `NotMappable` indicates whether the page is mappable by MMTK.
-/// `IsMapped` indicates that the page is newly mapped by MMTK, and `WasMapped` means the page was already mapped.
-#[derive(Debug, Clone, Copy)]
-pub enum MappingState {
-    NotMappable,
-    IsMapped,
-    WasMapped,
-}
-
-impl MappingState {
-    pub fn is_mapped(&self) -> bool {
-        matches!(self, MappingState::IsMapped)
-    }
-
-    pub fn is_mappable(&self) -> bool {
-        !matches!(self, MappingState::NotMappable)
-    }
-
-    pub fn was_mapped(&self) -> bool {
-        matches!(self, MappingState::WasMapped)
-    }
-}
-
-lazy_static! {
-    pub static ref EMPTY_VEC: Vec<SideMetadataSpec> = vec![];
-}
-
 // ** NOTE: **
 //  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
 
@@ -86,52 +52,56 @@ pub fn try_map_metadata_space(
     size: usize,
     global_metadata_spec_vec: &[SideMetadataSpec],
     local_metadata_spec_vec: &[SideMetadataSpec],
-) -> bool {
+) -> Result<()> {
     debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
     debug_assert!(size % BYTES_IN_PAGE == 0);
 
     for spec in global_metadata_spec_vec {
-        // nearest page-aligned starting address
-        let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
-        // nearest page-aligned ending address
-        let mmap_size = address_to_meta_address(*spec, start + size)
-            .align_up(BYTES_IN_PAGE)
-            .as_usize()
-            - mmap_start.as_usize();
-        if mmap_size > 0 {
-            // FIXME - This assumes that we never mmap a metadata page twice.
-            // While this never happens in our current use-cases where the minimum data mmap size is a chunk and the metadata ratio is larger than 1/64, it could happen if (min_data_mmap_size * metadata_ratio) is smaller than a page.
-            // E.g. the current implementation detects such a case as an overlap and returns false.
-            if !try_mmap_metadata(mmap_start, mmap_size).is_mappable() {
-                return false;
-            }
+        let res = try_mmap_contiguous_metadata_space(start, size, spec, false);
+        if res.is_err() {
+            return res;
         }
     }
 
+    #[cfg(target_pointer_width = "32")]
     let mut lsize: usize = 0;
 
     for spec in local_metadata_spec_vec {
-        if cfg!(target_pointer_width = "64") {
-            // nearest page-aligned starting address
-            let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
-            // nearest page-aligned ending address
-            let mmap_size = address_to_meta_address(*spec, start + size)
-                .align_up(BYTES_IN_PAGE)
-                .as_usize()
-                - mmap_start.as_usize();
-            if mmap_size > 0 && !try_mmap_metadata(mmap_start, mmap_size).is_mappable() {
-                return false;
+        // For local side metadata, we always have to reserve address space for all
+        // local metadata required by all policies in MMTk to be able to calculate a constant offset for each local metadata at compile-time
+        // (it's like assigning an ID to each policy).
+        // As the plan is chosen at run-time, we will never know which subset of policies will be used during run-time.
+        // We can't afford this much address space in 32-bits.
+        // So, we switch to the chunk-based approach for this specific case.
+        //
+        // The global metadata is different in that for each plan, we can calculate its constant base addresses at compile-time.
+        // Using the chunk-based approach will need the same address space size as the current not-chunked approach.
+        #[cfg(target_pointer_width = "64")]
+        {
+            let res = try_mmap_contiguous_metadata_space(start, size, spec, false);
+            if res.is_err() {
+                return res;
             }
-        } else {
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
             lsize += meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
         }
     }
 
-    if cfg!(target_pointer_width = "32") {
+    #[cfg(target_pointer_width = "32")]
+    if lsize > 0 {
+        let max = BYTES_IN_CHUNK >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
+        debug_assert!(
+            lsize <= max,
+            "local side metadata per chunk (0x{:x}) must be less than (0x{:x})",
+            lsize,
+            max
+        );
         return try_map_per_chunk_metadata_space(start, size, lsize);
     }
 
-    true
+    Ok(())
 }
 
 pub fn try_map_metadata_address_range(
@@ -139,89 +109,40 @@ pub fn try_map_metadata_address_range(
     size: usize,
     global_metadata_spec_vec: &[SideMetadataSpec],
     local_metadata_spec_vec: &[SideMetadataSpec],
-) -> bool {
+) -> Result<()> {
     info!("try_map_metadata_address_range({}, 0x{:x})", start, size);
     debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
     debug_assert!(size % BYTES_IN_CHUNK == 0);
 
     for spec in global_metadata_spec_vec {
-        // nearest page-aligned starting address
-        let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
-        // nearest page-aligned ending address
-        let mmap_size = address_to_meta_address(*spec, start + size)
-            .align_up(BYTES_IN_PAGE)
-            .as_usize()
-            - mmap_start.as_usize();
-        if mmap_size > 0 && !try_mmap_metadata_address_range(mmap_start, mmap_size) {
-            return false;
+        let res = try_mmap_contiguous_metadata_space(start, size, spec, true);
+        if res.is_err() {
+            return res;
         }
     }
 
+    #[cfg(target_pointer_width = "32")]
     let mut lsize: usize = 0;
 
     for spec in local_metadata_spec_vec {
-        if cfg!(target_pointer_width = "64") {
-            // nearest page-aligned starting address
-            let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
-            // nearest page-aligned ending address
-            let mmap_size = address_to_meta_address(*spec, start + size)
-                .align_up(BYTES_IN_PAGE)
-                .as_usize()
-                - mmap_start.as_usize();
-            if mmap_size > 0 && !try_mmap_metadata_address_range(mmap_start, mmap_size) {
-                return false;
+        #[cfg(target_pointer_width = "64")]
+        {
+            let res = try_mmap_contiguous_metadata_space(start, size, spec, true);
+            if res.is_err() {
+                return res;
             }
-        } else {
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
             lsize += meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
         }
     }
 
-    if cfg!(target_pointer_width = "32") {
-        return try_map_per_chunk_metadata_space(start, size, lsize);
-    }
+    #[cfg(target_pointer_width = "32")]
+    return try_map_per_chunk_metadata_space(start, size, lsize);
 
-    true
-}
-
-// Try to map side metadata for the data starting at `start` and a size of `size`
-fn try_mmap_metadata(start: Address, size: usize) -> MappingState {
-    trace!("try_mmap_metadata({}, 0x{:x})", start, size);
-
-    debug_assert!(size > 0 && size % BYTES_IN_PAGE == 0);
-
-    let prot = libc::PROT_READ | libc::PROT_WRITE;
-    // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
-    let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
-
-    let result: *mut libc::c_void =
-        unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) };
-
-    if result == libc::MAP_FAILED {
-        let err = unsafe { *libc::__errno_location() };
-        if err == libc::EEXIST {
-            debug!("try_mmap_metadata({}, 0x{:x}) -> WasMapped", start, size);
-            return MappingState::WasMapped;
-        } else {
-            debug!("try_mmap_metadata({}, 0x{:x}) -> NotMappable", start, size);
-            return MappingState::NotMappable;
-        }
-    }
-
-    MappingState::IsMapped
-}
-
-fn try_mmap_metadata_address_range(start: Address, size: usize) -> bool {
-    trace!("try_mmap_metadata_address_range({}, 0x{:x})", start, size);
-
-    let prot = libc::PROT_READ | libc::PROT_WRITE;
-    // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
-    let flags =
-        libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE | libc::MAP_NORESERVE;
-
-    let result: *mut libc::c_void =
-        unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) };
-
-    result != libc::MAP_FAILED
+    #[cfg(target_pointer_width = "64")]
+    return Ok(());
 }
 
 /// Unmap the corresponding metadata space or panic.
@@ -237,78 +158,24 @@ pub fn ensure_unmap_metadata_space(
     global_metadata_spec_vec: &[SideMetadataSpec],
     local_metadata_spec_vec: &[SideMetadataSpec],
 ) {
-    debug!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
+    trace!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
     debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
     debug_assert!(size % BYTES_IN_PAGE == 0);
 
     for spec in global_metadata_spec_vec {
-        // nearest page-aligned starting address
-        let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
-        // nearest page-aligned ending address
-        let mmap_size = address_to_meta_address(*spec, start + size)
-            .align_up(BYTES_IN_PAGE)
-            .as_usize()
-            - mmap_start.as_usize();
-        if mmap_size > 0 {
-            ensure_munmap_metadata(mmap_start, mmap_size);
-        }
+        ensure_munmap_contiguos_metadata_space(start, size, spec);
     }
 
     for spec in local_metadata_spec_vec {
-        // nearest page-aligned starting address
-        let meta_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
-        if cfg!(target_pointer_width = "64") {
-            // nearest page-aligned ending address
-            let meta_size = address_to_meta_address(*spec, start + size)
-                .align_up(BYTES_IN_PAGE)
-                .as_usize()
-                - meta_start.as_usize();
-            if meta_size > 0 {
-                ensure_munmap_metadata(meta_start, meta_size);
-            }
-        } else {
-            // per chunk policy-specific metadata for 32-bits targets
-            let chunk_num = ((start + size - 1usize).align_down(BYTES_IN_CHUNK)
-                - start.align_down(BYTES_IN_CHUNK))
-                / BYTES_IN_CHUNK;
-            if chunk_num == 0 {
-                ensure_munmap_metadata(
-                    meta_start,
-                    address_to_meta_address(*spec, start + size) - meta_start,
-                );
-            } else {
-                let second_data_chunk = (start + 1usize).align_up(BYTES_IN_CHUNK);
-                // unmap the first sub-chunk
-                ensure_munmap_metadata(
-                    meta_start,
-                    address_to_meta_address(*spec, second_data_chunk) - meta_start,
-                );
-                let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
-                let last_meta_chunk = address_to_meta_address(*spec, last_data_chunk);
-                // unmap the last sub-chunk
-                ensure_munmap_metadata(
-                    last_meta_chunk,
-                    address_to_meta_address(*spec, start + size) - last_meta_chunk,
-                );
-                let mut next_data_chunk = second_data_chunk;
-                // unmap all chunks in the middle
-                while next_data_chunk != last_data_chunk {
-                    ensure_munmap_metadata(
-                        address_to_meta_address(*spec, next_data_chunk),
-                        meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits),
-                    );
-                    next_data_chunk += BYTES_IN_CHUNK;
-                }
-            }
+        #[cfg(target_pointer_width = "64")]
+        {
+            ensure_munmap_contiguos_metadata_space(start, size, spec);
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
+            ensure_munmap_chunked_metadata_space(start, size, spec);
         }
     }
-}
-
-fn ensure_munmap_metadata(start: Address, size: usize) {
-    debug!("try_munmap_metadata({}, 0x{:x})", start, size);
-
-    debug_assert!(size > 0);
-    assert_eq!(unsafe { libc::munmap(start.to_mut_ptr(), size) }, 0);
 }
 
 // Used only for debugging
@@ -316,32 +183,12 @@ fn ensure_munmap_metadata(start: Address, size: usize) {
 pub fn ensure_metadata_is_mapped(metadata_spec: SideMetadataSpec, data_addr: Address) {
     let meta_start = address_to_meta_address(metadata_spec, data_addr).align_down(BYTES_IN_PAGE);
 
-    trace!(
+    println!(
         "ensure_metadata_is_mapped({}).meta_start({})",
-        data_addr,
-        meta_start
+        data_addr, meta_start
     );
 
-    let prot = libc::PROT_READ | libc::PROT_WRITE;
-    // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
-    let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
-
-    let result: *mut libc::c_void = unsafe {
-        libc::mmap(
-            meta_start.to_mut_ptr(),
-            constants::BYTES_IN_PAGE,
-            prot,
-            flags,
-            -1,
-            0,
-        )
-    };
-
-    assert!(
-        result == libc::MAP_FAILED && unsafe { *libc::__errno_location() } == libc::EEXIST,
-        "Metadata space is not mapped for data_addr({})",
-        data_addr
-    );
+    assert!(memory::check_is_mmapped(meta_start, BYTES_IN_PAGE).is_ok())
 }
 
 #[inline(always)]
@@ -692,7 +539,9 @@ pub fn bzero_metadata(metadata_spec: SideMetadataSpec, start: Address, size: usi
             meta_start,
             address_to_meta_address(metadata_spec, start + size) - meta_start,
         );
-    } else {
+    }
+    #[cfg(target_pointer_width = "32")]
+    if !metadata_spec.scope.is_global() {
         // per chunk policy-specific metadata for 32-bits targets
         let chunk_num = ((start + size).align_down(BYTES_IN_CHUNK)
             - start.align_down(BYTES_IN_CHUNK))

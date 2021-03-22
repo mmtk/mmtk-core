@@ -159,8 +159,8 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             self.common().space.unwrap().common().mmapper.ensure_mapped(
                 old,
                 required_pages,
-                VM::VMActivePlan::global().global_side_metadata_spec_vec(),
-                self.common().space.unwrap().local_side_metadata_spec_vec(),
+                VM::VMActivePlan::global().global_side_metadata_specs(),
+                self.common().space.unwrap().local_side_metadata_specs(),
             );
 
             // FIXME: concurrent zeroing
