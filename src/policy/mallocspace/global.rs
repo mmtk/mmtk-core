@@ -21,7 +21,7 @@ use std::marker::PhantomData;
 // only used for debugging
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
-#[cfg(debug_assertions)]
+#[cfg(any(debug_assertions, not(feature = "chunk_hashset")))]
 use std::sync::Mutex;
 
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it

@@ -70,18 +70,6 @@ pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 };
 
 #[cfg(target_pointer_width = "32")]
-pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
-    offset: ALLOC_METADATA_SPEC.offset
-        + meta_bytes_per_chunk(
-            ALLOC_METADATA_SPEC.log_min_obj_size,
-            ALLOC_METADATA_SPEC.log_num_of_bits,
-        ),
-    log_num_of_bits: 0,
-    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
-};
-
-#[cfg(target_pointer_width = "32")]
 pub(super) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::PolicySpecific,
     offset: MARKING_METADATA_SPEC.offset
@@ -142,8 +130,7 @@ pub fn is_meta_space_mapped(address: Address) -> bool {
     {
         // XXX: for debugging
         if FIRST_CHUNK.load(Ordering::SeqCst) {
-            first_chunk_map(chunk_start);
-            FIRST_CHUNK.store(false, Ordering::SeqCst);
+            return false;
         }
 
         ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
@@ -175,7 +162,11 @@ fn map_chunk_mark_space(chunk_start: Address) {
 
 #[cfg(feature = "chunk_hashset")]
 fn first_chunk_map(chunk_start: Address) {
-    info!("ACTIVE_CHUNKS.len() = {}, chunk_start = {}", ACTIVE_CHUNKS.read().unwrap().len(), chunk_start);
+    info!(
+        "ACTIVE_CHUNKS.len() = {}, chunk_start = {}",
+        ACTIVE_CHUNKS.read().unwrap().len(),
+        chunk_start
+    );
 }
 
 pub fn map_meta_space_for_chunk(chunk_start: Address) {
@@ -288,8 +279,7 @@ pub fn is_page_marked(page_address: Address) -> bool {
 #[cfg(not(feature = "chunk_hashset"))]
 pub fn is_chunk_marked(chunk_start: Address) -> bool {
     if FIRST_CHUNK.load(Ordering::SeqCst) {
-        map_chunk_mark_space(chunk_start);
-        FIRST_CHUNK.store(false, Ordering::SeqCst);
+        return false; // if first chunk has not been mapped, then no chunk is marked
     }
 
     load_atomic(ACTIVE_CHUNK_METADATA_SPEC, chunk_start) == 1
