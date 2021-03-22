@@ -15,6 +15,6 @@
         - [Allocation](./mygc/ss/alloc.md)
         - [Collection](./mygc/ss/collection.md)
         - [Exercise](./mygc/ss/exercise.md)
-        - [Exercise solution](.mygc/ss/exercise_solution.md)
+        - [Exercise solution](./mygc/ss/exercise_solution.md)
     - [Building a generational copying GC](./mygc/gencopy.md)
 - [Further Reading](./further_reading.md)
