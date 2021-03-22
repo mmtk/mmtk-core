@@ -9,8 +9,6 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::mallocspace::MallocSpace;
-#[cfg(not(feature = "chunk_hashset"))]
-use crate::policy::mallocspace::metadata::MS_ACTIVE_CHUNK_MAP;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
@@ -24,8 +22,6 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-#[cfg(not(feature = "chunk_hashset"))]
-use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::sync::Arc;
@@ -123,11 +119,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         let mut c = NoCopy::new(mmtk);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
-    }
-
-    #[cfg(not(feature = "chunk_hashset"))]
-    fn global_side_metadata_spec_vec(&self) -> &Vec<SideMetadataSpec> {
-        return &MS_ACTIVE_CHUNK_MAP;
     }
 }
 

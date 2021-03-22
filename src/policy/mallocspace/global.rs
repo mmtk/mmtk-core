@@ -7,13 +7,11 @@ use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
-use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
-use crate::policy::mallocspace::metadata::MS_LOCAL_META_VEC;
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -350,10 +348,6 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             debug!("Release malloc chunk {} to {}", *c, *c + BYTES_IN_CHUNK);
             !released_chunks.contains(&*c)
         });
-    }
-
-    fn local_side_metadata_spec_vec(&self) -> &Vec<SideMetadataSpec> {
-        return &MS_LOCAL_META_VEC;
     }
 }
 
