@@ -99,6 +99,7 @@ pub fn try_map_per_chunk_metadata_space(
     start: Address,
     size: usize,
     local_per_chunk: usize,
+    no_reserve: bool,
 ) -> Result<()> {
     let mut aligned_start = start.align_down(BYTES_IN_CHUNK);
     let aligned_end = (start + size).align_up(BYTES_IN_CHUNK);
@@ -107,7 +108,7 @@ pub fn try_map_per_chunk_metadata_space(
     let mut munmap_first_chunk: Option<bool> = None;
 
     while aligned_start < aligned_end {
-        let res = try_mmap_metadata_chunk(aligned_start, local_per_chunk);
+        let res = try_mmap_metadata_chunk(aligned_start, local_per_chunk, no_reserve);
         if res.is_err() {
             if munmap_first_chunk.is_some() {
                 let mut munmap_start = if munmap_first_chunk.unwrap() {
@@ -147,9 +148,17 @@ pub fn try_map_per_chunk_metadata_space(
 }
 
 // Try to map side metadata for the chunk starting at `start`
-pub fn try_mmap_metadata_chunk(start: Address, local_per_chunk: usize) -> Result<()> {
+pub fn try_mmap_metadata_chunk(
+    start: Address,
+    local_per_chunk: usize,
+    no_reserve: bool,
+) -> Result<()> {
     debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
 
     let policy_meta_start = address_to_meta_chunk_addr(start);
-    memory::dzmmap_noreplace(policy_meta_start, local_per_chunk)
+    if !no_reserve {
+        memory::dzmmap_noreplace(policy_meta_start, local_per_chunk)
+    } else {
+        memory::mmap_noreserve(policy_meta_start, local_per_chunk)
+    }
 }

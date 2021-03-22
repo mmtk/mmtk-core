@@ -98,7 +98,7 @@ pub fn try_map_metadata_space(
             lsize,
             max
         );
-        return try_map_per_chunk_metadata_space(start, size, lsize);
+        return try_map_per_chunk_metadata_space(start, size, lsize, false);
     }
 
     Ok(())
@@ -110,7 +110,13 @@ pub fn try_map_metadata_address_range(
     global_metadata_spec_vec: &[SideMetadataSpec],
     local_metadata_spec_vec: &[SideMetadataSpec],
 ) -> Result<()> {
-    info!("try_map_metadata_address_range({}, 0x{:x})", start, size);
+    info!(
+        "try_map_metadata_address_range({}, 0x{:x}, {}, {})",
+        start,
+        size,
+        global_metadata_spec_vec.len(),
+        local_metadata_spec_vec.len()
+    );
     debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
     debug_assert!(size % BYTES_IN_CHUNK == 0);
 
@@ -139,10 +145,18 @@ pub fn try_map_metadata_address_range(
     }
 
     #[cfg(target_pointer_width = "32")]
-    return try_map_per_chunk_metadata_space(start, size, lsize);
+    if lsize > 0 {
+        let max = BYTES_IN_CHUNK >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
+        debug_assert!(
+            lsize <= max,
+            "local side metadata per chunk (0x{:x}) must be less than (0x{:x})",
+            lsize,
+            max
+        );
+        return try_map_per_chunk_metadata_space(start, size, lsize, true);
+    }
 
-    #[cfg(target_pointer_width = "64")]
-    return Ok(());
+    Ok(())
 }
 
 /// Unmap the corresponding metadata space or panic.

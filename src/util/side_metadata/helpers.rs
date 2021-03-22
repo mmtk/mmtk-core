@@ -78,14 +78,23 @@ pub(super) fn try_mmap_contiguous_metadata_space(
 }
 
 pub(super) fn try_mmap_metadata_address_range(start: Address, size: usize) -> Result<()> {
-    memory::mmap_noreserve(start, size)
+    let res = memory::mmap_noreserve(start, size);
+    trace!(
+        "try_mmap_metadata_address_range({}, 0x{:x}) -> {:#?}",
+        start,
+        size,
+        res
+    );
+    res
 }
 
 // Try to map side metadata for the data starting at `start` and a size of `size`
 pub(super) fn try_mmap_metadata(start: Address, size: usize) -> Result<()> {
     debug_assert!(size > 0 && size % BYTES_IN_PAGE == 0);
 
-    memory::dzmmap_noreplace(start, size)
+    let res = memory::dzmmap(start, size);
+    trace!("try_mmap_metadata({}, 0x{:x}) -> {:#?}", start, size, res);
+    res
 }
 
 #[inline(always)]
