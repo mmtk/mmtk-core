@@ -7,6 +7,7 @@ use crate::util::{
 };
 use std::io::Result;
 
+/// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
 #[inline(always)]
 pub(crate) fn address_to_contiguous_meta_address(
     metadata_spec: SideMetadataSpec,
@@ -28,12 +29,14 @@ pub(crate) fn address_to_contiguous_meta_address(
     }
 }
 
+/// Unmaps the specified metadata range, or panics.
 pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
     assert!(memory::try_munmap(start, size).is_ok())
 }
 
+/// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
 pub(super) fn ensure_munmap_contiguos_metadata_space(
     start: Address,
     size: usize,
@@ -49,6 +52,8 @@ pub(super) fn ensure_munmap_contiguos_metadata_space(
     }
 }
 
+/// Tries to mmap the metadata space (`spec`) for the specified data address range (`start` and `size`).
+/// Setting `no_reserve` to true means the function will only map address range, without reserving swap-space/physical memory.
 pub(super) fn try_mmap_contiguous_metadata_space(
     start: Address,
     size: usize,
@@ -77,6 +82,7 @@ pub(super) fn try_mmap_contiguous_metadata_space(
     }
 }
 
+/// Tries to map the specified metadata address range (`start` and `size`), without reserving swap-space for it.
 pub(super) fn try_mmap_metadata_address_range(start: Address, size: usize) -> Result<()> {
     let res = memory::mmap_noreserve(start, size);
     trace!(
@@ -88,7 +94,7 @@ pub(super) fn try_mmap_metadata_address_range(start: Address, size: usize) -> Re
     res
 }
 
-// Try to map side metadata for the data starting at `start` and a size of `size`
+/// Tries to map the specified metadata space (`start` and `size`), including reservation of swap-space/physical memory.
 pub(super) fn try_mmap_metadata(start: Address, size: usize) -> Result<()> {
     debug_assert!(size > 0 && size % BYTES_IN_PAGE == 0);
 
@@ -97,6 +103,7 @@ pub(super) fn try_mmap_metadata(start: Address, size: usize) -> Result<()> {
     res
 }
 
+/// Performs the translation of data address (`data_addr`) to metadata address for the specified metadata (`metadata_spec`).
 #[inline(always)]
 pub(crate) fn address_to_meta_address(
     metadata_spec: SideMetadataSpec,

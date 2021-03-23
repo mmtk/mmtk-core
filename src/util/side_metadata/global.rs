@@ -104,6 +104,10 @@ pub fn try_map_metadata_space(
     Ok(())
 }
 
+/// Tries to map the required metadata address range, without reserving swap-space/physical memory for it.
+/// This will make sure the address range is exclusive to the caller.
+///
+/// NOTE: Accessing addresses in this range will produce a segmentation fault if swap-space is not mapped using the `try_map_metadata_space` function.
 pub fn try_map_metadata_address_range(
     start: Address,
     size: usize,
