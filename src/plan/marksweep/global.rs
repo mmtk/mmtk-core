@@ -127,7 +127,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
         MarkSweep {
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS, &[]),
             ms: MallocSpace::new(),
         }
     }

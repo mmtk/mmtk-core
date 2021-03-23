@@ -201,7 +201,7 @@ pub fn ensure_unmap_metadata_space(
 pub fn ensure_metadata_is_mapped(metadata_spec: SideMetadataSpec, data_addr: Address) {
     let meta_start = address_to_meta_address(metadata_spec, data_addr).align_down(BYTES_IN_PAGE);
 
-    println!(
+    debug!(
         "ensure_metadata_is_mapped({}).meta_start({})",
         data_addr, meta_start
     );

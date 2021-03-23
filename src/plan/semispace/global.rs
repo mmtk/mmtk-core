@@ -1,5 +1,4 @@
 use super::gc_work::{SSCopyContext, SSProcessEdges};
-use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
@@ -13,7 +12,6 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::GcHookWork;
-use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -23,9 +21,8 @@ use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
-use crate::vm::ObjectModel;
-use crate::vm::VMBinding;
 use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
+use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -142,11 +139,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        if VM::VMObjectModel::HAS_GC_BYTE {
-            &[]
-        } else {
-            &[gc_byte::SIDE_GC_BYTE_SPEC]
-        }
+        &self.common().global_metadata_specs
     }
 }
 
@@ -179,7 +172,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS, &[]),
         }
     }
 

@@ -13,6 +13,7 @@ use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
+use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -712,6 +713,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 pub struct CommonPlan<VM: VMBinding> {
     pub unsync: UnsafeCell<CommonUnsync<VM>>,
     pub base: BasePlan<VM>,
+    pub global_metadata_specs: Vec<SideMetadataSpec>,
 }
 
 pub struct CommonUnsync<VM: VMBinding> {
@@ -726,7 +728,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
+        global_side_metadata_specs: &[SideMetadataSpec],
     ) -> CommonPlan<VM> {
+        let mut specs = if cfg!(feature = "side_gc_header") {
+            vec![gc_byte::SIDE_GC_BYTE_SPEC]
+        } else {
+            vec![]
+        };
+        specs.extend_from_slice(global_side_metadata_specs);
         CommonPlan {
             unsync: UnsafeCell::new(CommonUnsync {
                 immortal: ImmortalSpace::new(
@@ -749,6 +758,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 ),
             }),
             base: BasePlan::new(vm_map, mmapper, options, heap, constraints),
+            global_metadata_specs: specs,
         }
     }
 

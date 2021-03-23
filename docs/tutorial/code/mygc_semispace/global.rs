@@ -191,7 +191,7 @@ impl<VM: VMBinding> MyGC<VM> {
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, &[]),
         }
     }
     // ANCHOR_END: plan_new
