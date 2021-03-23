@@ -181,6 +181,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     pub fn get_clean_block(&self, tls: OpaquePointer, copy: bool) -> Option<Block> {
         let block_address = self.acquire(tls, Block::PAGES);
         if block_address.is_zero() { return None }
+        self.defrag.notify_new_clean_block(copy);
         let block = Block::from(block_address);
         block.init(copy);
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
@@ -191,6 +192,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if super::BLOCK_ONLY { return None }
         let result = self.reusable_blocks.pop();
         if let Some(block) = result {
+            // println!("Reuse {:?}", block);
             block.init(copy);
         }
         result
@@ -198,20 +200,20 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     #[inline(always)]
     pub fn fast_trace_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference) -> ObjectReference {
-        self.trace_mark_object(trace, object)
+        self.trace_object_without_moving(trace, object)
     }
 
     #[inline(always)]
     pub fn trace_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
         if Block::containing::<VM>(object).is_defrag_source() {
-            self.trace_evacuate_object(trace, object, semantics, copy_context)
+            self.trace_object_with_opportunistic_copy(trace, object, semantics, copy_context)
         } else {
-            self.trace_mark_object(trace, object)
+            self.trace_object_without_moving(trace, object)
         }
     }
 
     #[inline(always)]
-    pub fn trace_mark_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference) -> ObjectReference {
+    pub fn trace_object_without_moving(&self, trace: &mut impl TransitiveClosure, object: ObjectReference) -> ObjectReference {
         // println!("trace_mark_object {:?}", object);
         if Self::attempt_mark(object) {
             // Mark block and lines
@@ -227,20 +229,29 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     #[inline]
-    pub fn trace_evacuate_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
+    pub fn trace_object_with_opportunistic_copy(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
         debug_assert!(!super::BLOCK_ONLY);
-        debug_assert_eq!(Block::containing::<VM>(object).get_state(), BlockState::Unmarked);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
         } else {
-            let new_object = ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context);
-            trace.process_node(new_object);
-            // trace!("{:?} => {:?} in block {:?}", object, new_object, Block::containing::<VM>(new_object));
-            // Mark lines
-            let _marked_lines = Line::mark_lines_for_object::<VM>(new_object, self.line_mark_state.load(Ordering::Acquire));
-            debug_assert_eq!(Block::containing::<VM>(new_object).get_state(), BlockState::Marked);
-            new_object
+            if Self::is_marked(object) {
+                ForwardingWord::clear_forwarding_bits::<VM>(object);
+                return object;
+            } else {
+                let new_object = if Self::is_pinned(object) || self.defrag.space_exhausted() {
+                    Self::attempt_mark(object);
+                    ForwardingWord::clear_forwarding_bits::<VM>(object);
+                    Block::containing::<VM>(object).set_state(BlockState::Marked);
+                    object
+                } else {
+                    ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context)
+                };
+                let _marked_lines = Line::mark_lines_for_object::<VM>(new_object, self.line_mark_state.load(Ordering::Acquire));
+                debug_assert_eq!(Block::containing::<VM>(new_object).get_state(), BlockState::Marked);
+                trace.process_node(new_object);
+                new_object
+            }
         }
     }
 
@@ -256,6 +267,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     fn attempt_mark(object: ObjectReference) -> bool {
         side_metadata::compare_exchange_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object), 0, 1)
+    }
+
+    #[inline(always)]
+    fn is_marked(object: ObjectReference) -> bool {
+        side_metadata::load_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object)) == 1
+    }
+
+    #[inline(always)]
+    fn is_pinned(_object: ObjectReference) -> bool {
+        // TODO(wenyuzhao): Object pinning not supported yet.
+        false
     }
 
     /* Line searching */
@@ -320,6 +342,8 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 } else {
                     block.set_as_defrag_source(false);
                 }
+                block.set_state(BlockState::Unmarked);
+                debug_assert!(!block.get_state().is_reusable());
                 debug_assert_ne!(block.get_state(), BlockState::Marked);
             }
         }

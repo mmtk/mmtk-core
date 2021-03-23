@@ -1,7 +1,7 @@
-use std::{ops::Range, sync::atomic::{AtomicBool, AtomicUsize, Ordering}};
-use crate::{MMTK, scheduler::{GCWork, GCWorker, GCWorkBucket, WorkBucketStage}, util::constants::LOG_BYTES_IN_PAGE, vm::*};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use crate::{MMTK, util::constants::LOG_BYTES_IN_PAGE, vm::*};
 use crate::policy::space::Space;
-use super::{ImmixSpace, block::{Block, BlockState}, chunk::{Chunk, ChunkState}, line::Line};
+use super::{ImmixSpace, block::{Block, BlockState}, line::Line};
 
 
 #[derive(Debug, Default)]
@@ -47,8 +47,27 @@ impl Defrag {
         space.get_page_resource().reserved_pages() * 2 / 100
     }
 
+    #[inline(always)]
+    pub fn space_exhausted(&self) -> bool {
+        self.defrag_space_exhausted.load(Ordering::Acquire)
+    }
+
+    pub fn notify_new_clean_block(&self, copy: bool) {
+        if copy {
+            let available_clean_pages_for_defrag = self.available_clean_pages_for_defrag.load(Ordering::Acquire);
+            if available_clean_pages_for_defrag <= Block::PAGES {
+                self.available_clean_pages_for_defrag.store(0, Ordering::Release);
+                self.defrag_space_exhausted.store(true, Ordering::Release);
+            } else {
+                self.available_clean_pages_for_defrag.store(available_clean_pages_for_defrag - Block::PAGES, Ordering::Release);
+            }
+        }
+    }
+
     pub fn prepare<VM: VMBinding>(&'static self, space: &'static ImmixSpace<VM>) {
         debug_assert!(!super::BLOCK_ONLY);
+        self.defrag_space_exhausted.store(false, Ordering::Release);
+
         let mut available_clean_pages_for_defrag = VM::VMActivePlan::global().get_total_pages() as isize - VM::VMActivePlan::global().get_pages_reserved() as isize + self.defrag_headroom_pages(space) as isize;
         if available_clean_pages_for_defrag < 0 { available_clean_pages_for_defrag = 0 };
 

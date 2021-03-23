@@ -57,12 +57,7 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
             }
         }
     } else {
-        panic!(
-            "Invalid header value 0x{:x} 0x{:x} for object{}",
-            gc_byte,
-            read_forwarding_word::<VM>(object),
-            object
-        )
+        object
     }
 }
 

@@ -163,13 +163,11 @@ impl Block {
     #[inline]
     pub fn init(&self, copy: bool) {
         self.set_state(if copy { BlockState::Marked } else { BlockState::Unmarked });
-        self.set_as_defrag_source(false);
     }
 
     #[inline]
     pub fn deinit(&self) {
         self.set_state(BlockState::Unallocated);
-        self.set_as_defrag_source(false);
     }
 
     pub const fn lines(&self) -> Range<Line> {
