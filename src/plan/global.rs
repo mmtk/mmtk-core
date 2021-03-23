@@ -342,6 +342,8 @@ pub trait Plan: 'static + Sync + Send + Downcast {
     fn global_side_metadata_per_chunk(&self) -> usize {
         0
     }
+
+    fn pre_worker_spawn(&self, _mmtk: &'static MMTK<Self::VM>) {}
 }
 
 impl_downcast!(Plan assoc VM);

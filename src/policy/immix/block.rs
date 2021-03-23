@@ -135,26 +135,6 @@ impl Block {
         }
     }
 
-    // #[inline]
-    // pub fn set_marked_lines(&self, value: u8) {
-    //     self.set_mark_byte(value + 4)
-    // }
-
-    // #[inline]
-    // pub fn get_marked_lines(&self) -> u8 {
-    //     self.set_mark_byte(value + 4)
-    // }
-
-    // #[inline]
-    // pub fn is_defrag(&self) -> bool {
-    //     self.mark_byte() == BlockMarkState::Defrag as _
-    // }
-
-    // #[inline]
-    // pub fn clear_mark(&self) {
-    //     self.set_mark_byte(BlockMarkState::Unmarked as _)
-    // }
-
     pub const fn lines(&self) -> Range<Line> {
         debug_assert!(!super::BLOCK_ONLY);
         Line::from(self.start()) .. Line::from(self.end())
@@ -175,25 +155,6 @@ impl Block {
             }
         }
         holes
-    }
-
-    #[inline]
-    pub fn count_holes_and_avail_lines(&self, line_mark_state: u8) -> (usize, usize) {
-        let mut holes = 0;
-        let mut lines = 0;
-        let mut prev_line_is_marked = true;
-        for line in self.lines() {
-            if !line.is_marked(line_mark_state) {
-                lines += 1;
-                if prev_line_is_marked {
-                    holes += 1;
-                }
-                prev_line_is_marked = false;
-            } else {
-                prev_line_is_marked = true;
-            }
-        }
-        (holes, lines)
     }
 }
 

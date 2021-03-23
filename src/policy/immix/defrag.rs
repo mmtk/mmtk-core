@@ -1,5 +1,5 @@
 use std::{sync::atomic::{AtomicBool, AtomicUsize, Ordering}};
-use crate::vm::*;
+use crate::{MMTK, vm::*};
 use crate::policy::space::Space;
 use super::{ImmixSpace, block::{Block, BlockState}};
 
@@ -8,19 +8,21 @@ use super::{ImmixSpace, block::{Block, BlockState}};
 pub struct Defrag {
     in_defrag_collection: AtomicBool,
     defrag_space_exhausted: AtomicBool,
-    // spill_mark_histograms: Vec<Vec<usize>>,
-    mark_histogram: Vec<AtomicUsize>,
+    pub spill_mark_histograms: Vec<Vec<AtomicUsize>>,
 }
 
 impl Defrag {
     const NUM_BINS: usize = (Block::LINES >> 1) + 1;
 
     pub fn new() -> Self {
-        let mark_histogram = (0..Self::NUM_BINS).map(|_| Default::default()).collect();
         Self {
-            mark_histogram,
             ..Default::default()
         }
+    }
+
+    pub fn prepare_histograms<VM: VMBinding>(&self, mmtk: &MMTK<VM>) {
+        let self_mut = unsafe { &mut *(self as *const _ as *mut Self) };
+        self_mut.spill_mark_histograms.resize_with(mmtk.options.threads, || (0..Self::NUM_BINS).map(|_| Default::default()).collect());
     }
 
     #[inline(always)]
@@ -67,7 +69,13 @@ impl Defrag {
             let mut lines_left = available_reusable_lines;
             loop {
                 if threshold == 0 { break }
-                let lines_to_evacuate = self.mark_histogram[threshold - 1].load(Ordering::SeqCst);
+                let lines_to_evacuate = {
+                    let mut lines_to_evacuate = 0;
+                    for table in &self.spill_mark_histograms {
+                        lines_to_evacuate += table[threshold - 1].load(Ordering::SeqCst)
+                    }
+                    lines_to_evacuate
+                };
                 if lines_to_evacuate > lines_left { break }
                 threshold -= 1;
                 lines_left -= lines_to_evacuate;
@@ -86,35 +94,8 @@ impl Defrag {
         }
     }
 
-    pub fn release<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
+    pub fn release<VM: VMBinding>(&self, _space: &ImmixSpace<VM>) {
         debug_assert!(!super::BLOCK_ONLY);
-        // Construct mark histogram
-        for entry in &self.mark_histogram {
-            entry.store(0, Ordering::SeqCst);
-        }
-        let line_mark_state = space.line_mark_state.load(Ordering::SeqCst);
-        let mut total_used_lines = 0;
-        for chunk in space.chunk_map.allocated_chunks() {
-            for block in chunk.blocks() {
-                if block.get_state() != BlockState::Unallocated && block.get_state() != BlockState::Unmarked {
-                    debug_assert!(!block.is_defrag_source());
-                    let marked_lines = {
-                        let mut marked_lines = 0;
-                        for line in block.lines() {
-                            if line.is_marked(space.line_mark_state.load(Ordering::SeqCst)) {
-                                marked_lines += 1;
-                            }
-                        }
-                        marked_lines
-                    };
-                    total_used_lines += marked_lines;
-                    let holes = block.count_holes(line_mark_state);
-                    let old_value = self.mark_histogram[holes].load(Ordering::SeqCst);
-                    self.mark_histogram[holes].store(old_value + marked_lines, Ordering::SeqCst);
-                }
-            }
-        }
-        // println!("mark_histogram: {:?}", self.mark_histogram.iter().map(|x| x.load(Ordering::SeqCst)).collect::<Vec<_>>());
-        // println!("total_used_lines: {:?}", total_used_lines);
+        self.in_defrag_collection.store(false, Ordering::SeqCst);
     }
 }

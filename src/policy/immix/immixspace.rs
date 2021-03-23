@@ -24,7 +24,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     line_unavail_state: AtomicU8,
     in_collection: AtomicBool,
     pub reusable_blocks: BlockList,
-    defrag: Defrag,
+    pub(super) defrag: Defrag,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -121,6 +121,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     pub fn in_defrag(&self) -> bool {
         self.defrag.in_defrag()
+    }
+
+    pub fn initialize_defrag(&self, mmtk: &MMTK<VM>) {
+        self.defrag.prepare_histograms(mmtk);
     }
 
     pub fn decide_whether_to_defrag(&self, emergency_collection: bool, collection_attempts: usize) {

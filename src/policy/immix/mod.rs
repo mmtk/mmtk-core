@@ -19,6 +19,5 @@ macro_rules! validate {
 }
 
 const fn validate_features() {
-    // validate!(LINE_COUNTER => !BLOCK_ONLY);
     validate!(DEFRAG => !BLOCK_ONLY);
 }

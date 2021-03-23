@@ -132,6 +132,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         debug_assert!(VM::VMObjectModel::HAS_GC_BYTE);
         0
     }
+
+    fn pre_worker_spawn(&self, mmtk: &MMTK<VM>) {
+        self.immix_space.initialize_defrag(mmtk)
+    }
 }
 
 impl<VM: VMBinding> Immix<VM> {

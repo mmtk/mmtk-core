@@ -1,5 +1,4 @@
-use std::{iter::Step, ops::Range, sync::atomic::AtomicU8};
-use std::sync::atomic::{Ordering};
+use std::{iter::Step, ops::Range, sync::atomic::{AtomicU8, AtomicUsize, Ordering}};
 use crate::{MMTK, scheduler::*, util::{Address, ObjectReference, heap::layout::vm_layout_constants::{LOG_BYTES_IN_CHUNK, LOG_SPACE_EXTENT}}, vm::*};
 use super::immixspace::ImmixSpace;
 use super::block::{Block, BlockState};
@@ -49,7 +48,7 @@ impl Chunk {
         start..end
     }
 
-    pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
+    pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>, mark_histogram: &[AtomicUsize]) {
         if super::BLOCK_ONLY {
             let mut allocated_blocks = 0;
             for block in self.blocks() {
@@ -72,18 +71,33 @@ impl Chunk {
                 space.chunk_map.set(*self, ChunkState::Free)
             }
         } else {
+            let line_mark_state = space.line_mark_state.load(Ordering::SeqCst);
             for block in self.blocks().filter(|block| block.get_state() != BlockState::Unallocated) {
                 let mut marked_lines = 0;
+                let mut holes = 0;
+                let mut prev_line_is_marked = true;
+
                 for line in block.lines() {
-                    if line.is_marked(space.line_mark_state.load(Ordering::SeqCst)) {
+                    if line.is_marked(line_mark_state) {
                         marked_lines += 1;
+                        prev_line_is_marked = true;
+                    } else {
+                        if prev_line_is_marked {
+                            holes += 1;
+                        }
+                        prev_line_is_marked = false;
                     }
                 }
+
                 if marked_lines == 0 {
                     space.release_block(block);
-                } else if marked_lines != Block::LINES {
-                    block.set_state(BlockState::Reusable);
-                    space.reusable_blocks.push(block)
+                } else {
+                    if marked_lines != Block::LINES {
+                        block.set_state(BlockState::Reusable);
+                        space.reusable_blocks.push(block)
+                    }
+                    let old_value = mark_histogram[holes].load(Ordering::SeqCst);
+                    mark_histogram[holes].store(old_value + marked_lines, Ordering::SeqCst);
                 }
             }
         }
@@ -116,6 +130,7 @@ pub enum ChunkState {
 pub struct ChunkMap {
     table: Vec<AtomicU8>,
     start: Address,
+    limit: AtomicUsize,
 }
 
 impl ChunkMap {
@@ -125,6 +140,7 @@ impl ChunkMap {
         Self {
             table: (0..Self::MAX_CHUNKS).map(|_| Default::default()).collect(),
             start,
+            limit: AtomicUsize::new(0),
         }
     }
 
@@ -135,6 +151,15 @@ impl ChunkMap {
 
     pub fn set(&self, chunk: Chunk, state: ChunkState) {
         let index = self.get_index(chunk);
+        if state == ChunkState::Allocated {
+            let _ = self.limit.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old| {
+                if index + 1 > old {
+                    Some(index + 1)
+                } else {
+                    None
+                }
+            });
+        }
         self.table[index].store(state as _, Ordering::SeqCst);
     }
 
@@ -146,7 +171,7 @@ impl ChunkMap {
 
     pub fn all_chunks(&self) -> Range<Chunk> {
         let start = Chunk::from(self.start);
-        let end = Chunk::forward(start, Self::MAX_CHUNKS);
+        let end = Chunk::forward(start, self.limit.load(Ordering::SeqCst));
         start..end
     }
 
@@ -159,6 +184,11 @@ impl ChunkMap {
     }
 
     pub fn generate_sweep_tasks<VM: VMBinding>(&self, space: &'static ImmixSpace<VM>, mmtk: &'static MMTK<VM>) -> Vec<Box<dyn Work<MMTK<VM>>>> {
+        for table in &space.defrag.spill_mark_histograms {
+            for entry in table {
+                entry.store(0, Ordering::SeqCst);
+            }
+        }
         let Range { start: start_chunk, end: end_chunk } = self.all_chunks();
         let workers = mmtk.scheduler.worker_group().worker_count() * 2;
         let chunks_per_packet = (ChunkMap::MAX_CHUNKS + (workers - 1)) / workers;
@@ -201,10 +231,10 @@ pub struct SweepChunks<VM: VMBinding>(pub &'static ImmixSpace<VM>, pub Range<Chu
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunks<VM> {
     #[inline]
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         for chunk in self.1.start..self.1.end {
             if self.0.chunk_map.get(chunk) == ChunkState::Allocated {
-                chunk.sweep(self.0);
+                chunk.sweep(self.0, &self.0.defrag.spill_mark_histograms[worker.ordinal]);
             }
         }
     }
