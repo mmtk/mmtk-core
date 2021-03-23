@@ -263,6 +263,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     #[inline]
     pub fn mark_lines(&self, object: ObjectReference) {
+        debug_assert!(!super::BLOCK_ONLY);
         Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::Acquire));
     }
 
@@ -348,7 +349,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             for block in chunk.blocks() {
                 let state = block.get_state();
                 if state == BlockState::Unallocated { continue; }
-                if defrag_threshold != 0 && !state.is_reusable() && block.get_holes() > defrag_threshold {
+                if super::DEFRAG && defrag_threshold != 0 && !state.is_reusable() && block.get_holes() > defrag_threshold {
                     block.set_as_defrag_source(true);
                 } else {
                     block.set_as_defrag_source(false);
@@ -414,7 +415,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
         let mut closure = ObjectsClosure::<E>(mmtk, vec![], worker);
         for object in &self.buffer {
             <E::VM as VMBinding>::VMScanning::scan_object(&mut closure, *object, OpaquePointer::UNINITIALIZED);
-            if super::MARK_LINE_AT_SCAN_TIME && self.immix_space.in_space(*object) {
+            if super::MARK_LINE_AT_SCAN_TIME && !super::BLOCK_ONLY && self.immix_space.in_space(*object) {
                 self.immix_space.mark_lines(*object);
             }
         }
