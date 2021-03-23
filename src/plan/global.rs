@@ -318,7 +318,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
 
     fn handle_user_collection_request(&self, tls: OpaquePointer, force: bool) {
         if force || !self.options().ignore_system_g_c {
-            info!("User triggerring collection");
+            info!("User triggering collection");
             self.base()
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);

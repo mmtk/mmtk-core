@@ -3,6 +3,7 @@ use crate::util::constants;
 use crate::util::constants::BYTES_IN_WORD;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
+#[cfg(debug_assertions)]
 use crate::util::side_metadata::address_to_meta_address;
 use crate::util::side_metadata::load_atomic;
 #[cfg(target_pointer_width = "32")]
@@ -21,6 +22,7 @@ use crate::util::ObjectReference;
 #[cfg(any(debug_assertions, feature = "chunk_hashset"))]
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(any(debug_assertions, feature = "chunk_hashset"))]
 use std::sync::RwLock;
 
 #[cfg(not(feature = "chunk_hashset"))]
