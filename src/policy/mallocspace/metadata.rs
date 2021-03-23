@@ -23,7 +23,7 @@ use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 
-// #[cfg(not(feature = "chunk_hashset"))]
+#[cfg(not(feature = "chunk_hashset"))]
 static FIRST_CHUNK: AtomicBool = AtomicBool::new(true);
 
 #[cfg(feature = "chunk_hashset")]
@@ -128,11 +128,6 @@ pub fn is_meta_space_mapped(address: Address) -> bool {
 
     #[cfg(feature = "chunk_hashset")]
     {
-        // XXX: for debugging
-        if FIRST_CHUNK.load(Ordering::SeqCst) {
-            return false;
-        }
-
         ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
     }
 
@@ -145,38 +140,24 @@ pub fn is_meta_space_mapped(address: Address) -> bool {
 #[cfg(not(feature = "chunk_hashset"))]
 fn map_chunk_mark_space(chunk_start: Address) {
     if !try_map_metadata_space(
-        chunk_start - 1024 * BYTES_IN_CHUNK,
-        2048 * BYTES_IN_CHUNK,
-        &[ACTIVE_CHUNK_METADATA_SPEC],
-        &[],
+        chunk_start - 2048 * BYTES_IN_CHUNK, // start
+        4096 * BYTES_IN_CHUNK,               // size
+        &[ACTIVE_CHUNK_METADATA_SPEC],       // global metadata
+        &[],                                 // local metadata
     ) {
         panic!("failed to mmap meta memory");
     }
     info!(
         "chunk_start = {} mapped space for {} -> {}",
         chunk_start,
-        chunk_start - 1024 * BYTES_IN_CHUNK,
-        chunk_start + 1024 * BYTES_IN_CHUNK
-    );
-}
-
-#[cfg(feature = "chunk_hashset")]
-fn first_chunk_map(chunk_start: Address) {
-    info!(
-        "ACTIVE_CHUNKS.len() = {}, chunk_start = {}",
-        ACTIVE_CHUNKS.read().unwrap().len(),
-        chunk_start
+        chunk_start - 2048 * BYTES_IN_CHUNK,
+        chunk_start + 2048 * BYTES_IN_CHUNK
     );
 }
 
 pub fn map_meta_space_for_chunk(chunk_start: Address) {
     #[cfg(feature = "chunk_hashset")]
     {
-        if FIRST_CHUNK.load(Ordering::SeqCst) {
-            first_chunk_map(chunk_start);
-            FIRST_CHUNK.store(false, Ordering::SeqCst);
-        }
-
         let mut active_chunks = ACTIVE_CHUNKS.write().unwrap();
         if active_chunks.contains(&chunk_start) {
             return;
@@ -214,7 +195,7 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
             &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
         );
         debug_assert!(
-            mmap_metadata_result,
+            mmap_metadata_result.is_ok(),
             "mmap sidemetadata failed for chunk_start ({})",
             chunk_start
         );

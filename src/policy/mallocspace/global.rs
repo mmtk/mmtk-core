@@ -257,7 +257,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             while address < end {
                 // we've crossed to the next page
                 if address - page >= BYTES_IN_PAGE {
-                    if page_is_empty {
+                    if is_chunk_marked(chunk) && page_is_empty {
                         unset_page_mark_bit(page);
                     }
                     page = conversions::page_align_down(address);
@@ -398,7 +398,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         #[cfg(not(feature = "chunk_hashset"))]
         {
             let mut min = self.alloc_addr_min.lock().unwrap();
-            let mut max = self.alloc_addr_min.lock().unwrap();
+            let mut max = self.alloc_addr_max.lock().unwrap();
 
             if address < *min {
                 *min = address;
