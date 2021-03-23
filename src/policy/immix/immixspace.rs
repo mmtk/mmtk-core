@@ -228,7 +228,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn trace_object_with_opportunistic_copy(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
         debug_assert!(!super::BLOCK_ONLY);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
