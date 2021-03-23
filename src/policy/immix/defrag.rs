@@ -34,13 +34,13 @@ impl Defrag {
 
     #[inline(always)]
     pub fn in_defrag(&self) -> bool {
-        self.in_defrag_collection.load(Ordering::SeqCst)
+        self.in_defrag_collection.load(Ordering::Acquire)
     }
 
     pub fn decide_whether_to_defrag(&self, emergency_collection: bool, collection_attempts: usize, exhausted_reusable_space: bool) {
         let in_defrag = super::DEFRAG && (emergency_collection || (collection_attempts > 1) || !exhausted_reusable_space || Self::DEFRAG_STRESS);
         println!("Defrag: {}", in_defrag);
-        self.in_defrag_collection.store(in_defrag, Ordering::SeqCst)
+        self.in_defrag_collection.store(in_defrag, Ordering::Release)
     }
 
     pub fn defrag_headroom_pages<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> usize {
@@ -104,6 +104,6 @@ impl Defrag {
 
     pub fn release<VM: VMBinding>(&self, _space: &ImmixSpace<VM>) {
         debug_assert!(!super::BLOCK_ONLY);
-        self.in_defrag_collection.store(false, Ordering::SeqCst);
+        self.in_defrag_collection.store(false, Ordering::Release);
     }
 }

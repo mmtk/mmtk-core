@@ -88,7 +88,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        match self.immix_space().get_clean_block(self.tls) {
+        match self.immix_space().get_clean_block(self.tls, self.copy) {
             None => {
                 self.line_use_count = 0;
                 Address::ZERO
@@ -188,7 +188,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     }
 
     fn acquire_recycable_block(&mut self) -> bool {
-        match self.immix_space().get_reusable_block() {
+        match self.immix_space().get_reusable_block(self.copy) {
             Some(block) => {
                 trace!("acquire_recycable_block -> {:?}", block);
                 self.line = Some(block.lines().start);

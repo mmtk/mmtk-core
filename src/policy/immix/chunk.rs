@@ -71,7 +71,7 @@ impl Chunk {
                 space.chunk_map.set(*self, ChunkState::Free)
             }
         } else {
-            let line_mark_state = space.line_mark_state.load(Ordering::SeqCst);
+            let line_mark_state = space.line_mark_state.load(Ordering::Acquire);
             for block in self.blocks().filter(|block| block.get_state() != BlockState::Unallocated) {
                 let mut marked_lines = 0;
                 let mut holes = 0;
@@ -95,9 +95,11 @@ impl Chunk {
                     if marked_lines != Block::LINES {
                         block.set_state(BlockState::Reusable { unavailable_lines: marked_lines as _ });
                         space.reusable_blocks.push(block)
+                    } else {
+                        block.set_state(BlockState::Unmarked);
                     }
-                    let old_value = mark_histogram[holes].load(Ordering::SeqCst);
-                    mark_histogram[holes].store(old_value + marked_lines, Ordering::SeqCst);
+                    let old_value = mark_histogram[holes].load(Ordering::Acquire);
+                    mark_histogram[holes].store(old_value + marked_lines, Ordering::Release);
                 }
                 block.set_holes(holes);
             }
@@ -153,7 +155,7 @@ impl ChunkMap {
     pub fn set(&self, chunk: Chunk, state: ChunkState) {
         let index = self.get_index(chunk);
         if state == ChunkState::Allocated {
-            let _ = self.limit.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old| {
+            let _ = self.limit.fetch_update(Ordering::Release, Ordering::Relaxed, |old| {
                 if index + 1 > old {
                     Some(index + 1)
                 } else {
@@ -161,18 +163,18 @@ impl ChunkMap {
                 }
             });
         }
-        self.table[index].store(state as _, Ordering::SeqCst);
+        self.table[index].store(state as _, Ordering::Release);
     }
 
     pub fn get(&self, chunk: Chunk) -> ChunkState {
         let index = self.get_index(chunk);
-        let byte = self.table[index].load(Ordering::SeqCst);
+        let byte = self.table[index].load(Ordering::Acquire);
         unsafe { std::mem::transmute(byte) }
     }
 
     pub fn all_chunks(&self) -> Range<Chunk> {
         let start = Chunk::from(self.start);
-        let end = Chunk::forward(start, self.limit.load(Ordering::SeqCst));
+        let end = Chunk::forward(start, self.limit.load(Ordering::Acquire));
         start..end
     }
 
@@ -201,7 +203,7 @@ impl ChunkMap {
     pub fn generate_sweep_tasks<VM: VMBinding>(&self, space: &'static ImmixSpace<VM>, mmtk: &'static MMTK<VM>) -> Vec<Box<dyn Work<MMTK<VM>>>> {
         for table in &space.defrag.spill_mark_histograms {
             for entry in table {
-                entry.store(0, Ordering::SeqCst);
+                entry.store(0, Ordering::Release);
             }
         }
         self.generate_tasks(mmtk.scheduler.worker_group().worker_count(), |chunks| {
@@ -222,7 +224,7 @@ impl<'a> Iterator for AllocatedChunksIter<'a> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         while self.cursor < self.table.len() {
-            let state = self.table[self.cursor].load(Ordering::SeqCst);
+            let state = self.table[self.cursor].load(Ordering::Acquire);
             let cursor = self.cursor;
             self.cursor += 1;
             if state == 1 {

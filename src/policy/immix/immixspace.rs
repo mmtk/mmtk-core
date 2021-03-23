@@ -147,17 +147,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(GCWorkBucket::<VM>::DEFAULT_PRIORITY, work_packets);
 
         if !super::BLOCK_ONLY {
-            self.line_mark_state.fetch_add(1, Ordering::SeqCst);
-            if self.line_mark_state.load(Ordering::SeqCst) > Line::MAX_MARK_STATE {
-                self.line_mark_state.store(Line::RESET_MARK_STATE, Ordering::SeqCst);
+            self.line_mark_state.fetch_add(1, Ordering::AcqRel);
+            if self.line_mark_state.load(Ordering::Acquire) > Line::MAX_MARK_STATE {
+                self.line_mark_state.store(Line::RESET_MARK_STATE, Ordering::Release);
             }
         }
-        self.in_collection.store(true, Ordering::SeqCst);
+        self.in_collection.store(true, Ordering::Release);
     }
 
     pub fn release(&'static self, mmtk: &'static MMTK<VM>) {
         if !super::BLOCK_ONLY {
-            self.line_unavail_state.store(self.line_mark_state.load(Ordering::SeqCst), Ordering::SeqCst);
+            self.line_unavail_state.store(self.line_mark_state.load(Ordering::Acquire), Ordering::Release);
         }
 
         if !super::BLOCK_ONLY {
@@ -167,7 +167,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let work_packets = self.chunk_map.generate_sweep_tasks(self, mmtk);
         mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(GCWorkBucket::<VM>::DEFAULT_PRIORITY, work_packets);
 
-        self.in_collection.store(false, Ordering::SeqCst);
+        self.in_collection.store(false, Ordering::Release);
         if !super::BLOCK_ONLY {
             self.defrag.release(self)
         }
@@ -178,20 +178,20 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.pr.release_pages(block.start());
     }
 
-    pub fn get_clean_block(&self, tls: OpaquePointer) -> Option<Block> {
+    pub fn get_clean_block(&self, tls: OpaquePointer, copy: bool) -> Option<Block> {
         let block_address = self.acquire(tls, Block::PAGES);
         if block_address.is_zero() { return None }
         let block = Block::from(block_address);
-        block.init();
+        block.init(copy);
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
         Some(block)
     }
 
-    pub fn get_reusable_block(&self) -> Option<Block> {
+    pub fn get_reusable_block(&self, copy: bool) -> Option<Block> {
         if super::BLOCK_ONLY { return None }
         let result = self.reusable_blocks.pop();
         if let Some(block) = result {
-            block.init();
+            block.init(copy);
         }
         result
     }
@@ -216,8 +216,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if Self::attempt_mark(object) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
-                let _marked_lines = Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::SeqCst));
-                Block::containing::<VM>(object).set_state(BlockState::Marked);
+                let _marked_lines = Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::Acquire));
             } else {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
             }
@@ -229,6 +228,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     #[inline]
     pub fn trace_evacuate_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
+        debug_assert!(!super::BLOCK_ONLY);
         debug_assert_eq!(Block::containing::<VM>(object).get_state(), BlockState::Unmarked);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
@@ -238,9 +238,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             trace.process_node(new_object);
             // trace!("{:?} => {:?} in block {:?}", object, new_object, Block::containing::<VM>(new_object));
             // Mark lines
-            if !super::BLOCK_ONLY {
-                let _marked_lines = Line::mark_lines_for_object::<VM>(new_object, self.line_mark_state.load(Ordering::SeqCst));
-            }
+            let _marked_lines = Line::mark_lines_for_object::<VM>(new_object, self.line_mark_state.load(Ordering::Acquire));
             debug_assert_eq!(Block::containing::<VM>(new_object).get_state(), BlockState::Marked);
             new_object
         }
@@ -264,8 +262,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn get_next_available_lines(&self, search_start: Line) -> Option<Range<Line>> {
         debug_assert!(!super::BLOCK_ONLY);
-        let unavail_state = self.line_unavail_state.load(Ordering::SeqCst);
-        let current_state = self.line_mark_state.load(Ordering::SeqCst);
+        let unavail_state = self.line_unavail_state.load(Ordering::Acquire);
+        let current_state = self.line_mark_state.load(Ordering::Acquire);
         let mark_data = search_start.block().line_mark_table();
         let mark_byte_start = mark_data.start + search_start.get_index_within_block();
         let mark_byte_end = mark_data.end;
@@ -322,9 +320,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 } else {
                     block.set_as_defrag_source(false);
                 }
-                if state != BlockState::Unmarked {
-                    block.set_state(BlockState::Unmarked);
-                }
+                debug_assert_ne!(block.get_state(), BlockState::Marked);
             }
         }
     }
