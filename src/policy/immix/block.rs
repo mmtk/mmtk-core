@@ -1,20 +1,28 @@
 use crate::util::{Address, ObjectReference};
 use crate::util::side_metadata::{self, *};
 use crate::util::constants::*;
-use std::{iter::Step, ops::Range, sync::{Mutex, MutexGuard, atomic::{AtomicPtr, AtomicUsize, Ordering}}};
+use std::{iter::Step, ops::Range, sync::{Mutex, MutexGuard, atomic::{AtomicPtr, AtomicU8, AtomicUsize, Ordering}}};
 use super::line::Line;
 use super::chunk::Chunk;
 use crate::vm::*;
 
 
 
-#[repr(u8)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BlockState {
-    Unallocated = 0,
-    Unmarked = 1,
-    Marked = 2,
-    Reusable = 3,
+    Unallocated,
+    Unmarked,
+    Marked,
+    Reusable { unavailable_lines: u8 },
+}
+
+impl BlockState {
+    pub const fn is_reusable(&self) -> bool {
+        match self {
+            BlockState::Reusable {..} => true,
+            _ => false,
+        }
+    }
 }
 
 #[repr(C)]
@@ -67,15 +75,15 @@ impl Block {
         unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
     }
 
-    #[inline(always)]
-    fn mark_byte(&self) -> u8 {
-        unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) as u8 }
-    }
+    // #[inline(always)]
+    // fn mark_byte(&self) -> u8 {
+    //     unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) as u8 }
+    // }
 
-    #[inline(always)]
-    fn set_mark_byte(&self, byte: u8) {
-        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), byte as usize) }
-    }
+    // #[inline(always)]
+    // fn set_mark_byte(&self, byte: u8) {
+    //     unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), byte as usize) }
+    // }
 
     pub const fn chunk(&self) -> Chunk {
         Chunk::from(Chunk::align(self.0))
@@ -88,51 +96,66 @@ impl Block {
         start..end
     }
 
-    #[inline]
+    const MARK_UNALLOCATED: u8 = 0;
+    const MARK_UNMARKED: u8 = u8::MAX;
+    const MARK_MARKED: u8 = u8::MAX - 1;
+
+    const fn mark_byte(&self) -> &AtomicU8 {
+        unsafe { &*side_metadata::address_to_meta_address(Self::MARK_TABLE, self.start()).to_mut_ptr::<AtomicU8>() }
+    }
+
+    #[inline(always)]
     pub fn get_state(&self) -> BlockState {
-        unsafe {
-            std::mem::transmute(self.mark_byte())
+        match self.mark_byte().load(Ordering::Acquire) {
+            Self::MARK_UNALLOCATED => BlockState::Unallocated,
+            Self::MARK_UNMARKED => BlockState::Unmarked,
+            Self::MARK_MARKED => BlockState::Marked,
+            unavailable_lines => BlockState::Reusable { unavailable_lines },
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn set_state(&self, state: BlockState) {
-        if cfg!(debug_assertions) {
-            if state == BlockState::Marked || state == BlockState::Reusable {
-                assert!(!self.is_defrag_source(), "{:?}", self)
-            }
-        }
-        self.set_mark_byte(state as _)
+        let v = match state {
+            BlockState::Unallocated => Self::MARK_UNALLOCATED,
+            BlockState::Unmarked => Self::MARK_UNMARKED,
+            BlockState::Marked => Self::MARK_MARKED,
+            BlockState::Reusable { unavailable_lines } => unavailable_lines,
+        };
+        self.mark_byte().store(v, Ordering::Release)
     }
 
     // Defrag byte
 
     const DEFRAG_SOURCE_STATE: u8 = u8::MAX;
 
-    const fn defrag_byte(&self) -> &mut u8 {
-        unsafe { &mut *side_metadata::address_to_meta_address(Self::DEFRAG_STATE_TABLE, self.start()).to_mut_ptr::<u8>() }
+    const fn defrag_byte(&self) -> &AtomicU8 {
+        unsafe { &*side_metadata::address_to_meta_address(Self::DEFRAG_STATE_TABLE, self.start()).to_mut_ptr::<AtomicU8>() }
     }
 
     #[inline(always)]
     pub fn is_defrag_source(&self) -> bool {
-        let byte = *self.defrag_byte();
+        let byte = self.defrag_byte().load(Ordering::Acquire);
         debug_assert!(byte == 0 || byte == Self::DEFRAG_SOURCE_STATE);
         byte == Self::DEFRAG_SOURCE_STATE
     }
 
     #[inline(always)]
     pub fn set_as_defrag_source(&self, defrag: bool) {
-        if cfg!(debug_assertions) {
-            if defrag {
-                assert_ne!(self.get_state(), BlockState::Reusable);
-            }
+        if cfg!(debug_assertions) && defrag {
+            debug_assert!(!self.get_state().is_reusable());
         }
-        *self.defrag_byte() = if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 };
+        self.defrag_byte().store(if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 }, Ordering::Release);
+    }
+
+    #[inline(always)]
+    pub fn set_holes(&self, holes: usize) {
+        self.defrag_byte().store(holes as _, Ordering::Release);
     }
 
     #[inline(always)]
     pub fn get_holes(&self) -> usize {
-        let byte = *self.defrag_byte();
+        let byte = self.defrag_byte().load(Ordering::Acquire);
         debug_assert_ne!(byte, Self::DEFRAG_SOURCE_STATE);
         byte as usize
     }
@@ -140,28 +163,18 @@ impl Block {
     #[inline]
     pub fn init(&self) {
         self.set_state(BlockState::Marked);
-        *self.defrag_byte() = 0;
+        self.set_as_defrag_source(false);
     }
 
     #[inline]
     pub fn deinit(&self) {
         self.set_state(BlockState::Unallocated);
-        *self.defrag_byte() = 0;
+        self.set_as_defrag_source(false);
     }
 
     pub const fn lines(&self) -> Range<Line> {
         debug_assert!(!super::BLOCK_ONLY);
         Line::from(self.start()) .. Line::from(self.end())
-    }
-
-    pub fn get_unavailable_lines(&self, line_mark_state: u8) -> usize {
-        let mut lines = 0;
-        for line in self.lines() {
-            if !line.is_marked(line_mark_state) {
-                lines += 1;
-            }
-        }
-        lines
     }
 }
 

@@ -317,12 +317,10 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             for block in chunk.blocks() {
                 let state = block.get_state();
                 if state == BlockState::Unallocated { continue; }
-                if defrag_threshold != 0 && state != BlockState::Reusable {
-                    if block.get_holes() > defrag_threshold {
-                        block.set_as_defrag_source(true);
-                    }
+                if defrag_threshold != 0 && !state.is_reusable() && block.get_holes() > defrag_threshold {
+                    block.set_as_defrag_source(true);
                 } else {
-                    debug_assert!(!block.is_defrag_source());
+                    block.set_as_defrag_source(false);
                 }
                 if state != BlockState::Unmarked {
                     block.set_state(BlockState::Unmarked);

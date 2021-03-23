@@ -93,12 +93,13 @@ impl Chunk {
                     space.release_block(block);
                 } else {
                     if marked_lines != Block::LINES {
-                        block.set_state(BlockState::Reusable);
+                        block.set_state(BlockState::Reusable { unavailable_lines: marked_lines as _ });
                         space.reusable_blocks.push(block)
                     }
                     let old_value = mark_histogram[holes].load(Ordering::SeqCst);
                     mark_histogram[holes].store(old_value + marked_lines, Ordering::SeqCst);
                 }
+                block.set_holes(holes);
             }
         }
     }

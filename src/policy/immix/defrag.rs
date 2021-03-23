@@ -68,7 +68,10 @@ impl Defrag {
         let mut total_available_lines = 0;
         for block in &space.reusable_blocks {
             let bucket = block.get_holes();
-            let unavailable_lines = block.get_unavailable_lines(space.line_mark_state.load(Ordering::SeqCst));
+            let unavailable_lines = match block.get_state() {
+                BlockState::Reusable { unavailable_lines } => unavailable_lines as usize,
+                _ => unreachable!(),
+            };
             let available_lines = Block::LINES - unavailable_lines;
             let old = self.spill_avail_histograms[bucket].load(Ordering::Relaxed);
             self.spill_avail_histograms[bucket].store(old + available_lines, Ordering::Relaxed);
