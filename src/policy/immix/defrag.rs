@@ -39,7 +39,7 @@ impl Defrag {
 
     pub fn decide_whether_to_defrag(&self, emergency_collection: bool, collection_attempts: usize, exhausted_reusable_space: bool) {
         let in_defrag = super::DEFRAG && (emergency_collection || (collection_attempts > 1) || !exhausted_reusable_space || Self::DEFRAG_STRESS);
-        println!("Defrag: {}", in_defrag);
+        // println!("Defrag: {}", in_defrag);
         self.in_defrag_collection.store(in_defrag, Ordering::Release)
     }
 
@@ -116,7 +116,7 @@ impl Defrag {
                 break
             }
         }
-        println!("threshold: {}", threshold);
+        // println!("threshold: {}", threshold);
         debug_assert!(threshold >= Self::MIN_SPILL_THRESHOLD);
         self.defrag_spill_threshold.store(threshold, Ordering::Release);
     }
