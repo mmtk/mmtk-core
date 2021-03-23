@@ -69,18 +69,6 @@ pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
-#[cfg(target_pointer_width = "32")]
-pub(super) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
-    offset: MARKING_METADATA_SPEC.offset
-        + meta_bytes_per_chunk(
-            MARKING_METADATA_SPEC.log_min_obj_size,
-            MARKING_METADATA_SPEC.log_num_of_bits,
-        ),
-    log_num_of_bits: 0,
-    log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
-};
-
 #[cfg(all(target_pointer_width = "64", not(feature = "chunk_hashset")))]
 pub(super) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::Global,
@@ -194,6 +182,7 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
             &[],
             &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
         );
+        trace!("set chunk mark bit for {}", chunk_start);
         debug_assert!(
             mmap_metadata_result.is_ok(),
             "mmap sidemetadata failed for chunk_start ({})",
@@ -253,10 +242,6 @@ pub fn is_marked(object: ObjectReference) -> bool {
     load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1
 }
 
-pub fn is_page_marked(page_address: Address) -> bool {
-    load_atomic(ACTIVE_PAGE_METADATA_SPEC, page_address) == 1
-}
-
 #[cfg(not(feature = "chunk_hashset"))]
 pub fn is_chunk_marked(chunk_start: Address) -> bool {
     if FIRST_CHUNK.load(Ordering::SeqCst) {
@@ -292,10 +277,6 @@ pub fn set_mark_bit(object: ObjectReference) {
     store_atomic(MARKING_METADATA_SPEC, object.to_address(), 1);
 }
 
-pub fn set_page_mark_bit(page_address: Address) {
-    store_atomic(ACTIVE_PAGE_METADATA_SPEC, page_address, 1);
-}
-
 #[cfg(not(feature = "chunk_hashset"))]
 pub fn set_chunk_mark_bit(chunk_start: Address) {
     store_atomic(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 1);
@@ -325,10 +306,6 @@ pub fn unset_mark_bit(object: ObjectReference) {
     }
 
     store_atomic(MARKING_METADATA_SPEC, object.to_address(), 0);
-}
-
-pub fn unset_page_mark_bit(page_address: Address) {
-    store_atomic(ACTIVE_PAGE_METADATA_SPEC, page_address, 0);
 }
 
 #[cfg(not(feature = "chunk_hashset"))]
