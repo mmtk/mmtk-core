@@ -108,7 +108,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&self, tls: OpaquePointer, _mmtk: &'static MMTK<VM>) {
         self.common.prepare(tls, true);
 
         self.hi

@@ -101,9 +101,9 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<VM>) {
         self.common.prepare(tls, true);
-        self.immix_space.prepare();
+        self.immix_space.prepare(mmtk);
     }
 
     fn release(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<VM>) {

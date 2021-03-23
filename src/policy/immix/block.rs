@@ -105,34 +105,48 @@ impl Block {
         self.set_mark_byte(state as _)
     }
 
-    #[inline]
-    pub fn is_defrag_source(&self) -> bool {
-        unsafe {
-            side_metadata::load(Self::DEFRAG_STATE_TABLE, self.start()) as u8 == 1
-        }
+    // Defrag byte
+
+    const DEFRAG_SOURCE_STATE: u8 = u8::MAX;
+
+    const fn defrag_byte(&self) -> &mut u8 {
+        unsafe { &mut *side_metadata::address_to_meta_address(Self::DEFRAG_STATE_TABLE, self.start()).to_mut_ptr::<u8>() }
     }
 
-    #[inline]
-    pub fn set_as_defrag_source(&self) {
-        unsafe {
-            side_metadata::store(Self::DEFRAG_STATE_TABLE, self.start(), 1)
+    #[inline(always)]
+    pub fn is_defrag_source(&self) -> bool {
+        let byte = *self.defrag_byte();
+        debug_assert!(byte == 0 || byte == Self::DEFRAG_SOURCE_STATE);
+        byte == Self::DEFRAG_SOURCE_STATE
+    }
+
+    #[inline(always)]
+    pub fn set_as_defrag_source(&self, defrag: bool) {
+        if cfg!(debug_assertions) {
+            if defrag {
+                assert_ne!(self.get_state(), BlockState::Reusable);
+            }
         }
+        *self.defrag_byte() = if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 };
+    }
+
+    #[inline(always)]
+    pub fn get_holes(&self) -> usize {
+        let byte = *self.defrag_byte();
+        debug_assert_ne!(byte, Self::DEFRAG_SOURCE_STATE);
+        byte as usize
     }
 
     #[inline]
     pub fn init(&self) {
         self.set_state(BlockState::Marked);
-        unsafe {
-            side_metadata::store(Self::DEFRAG_STATE_TABLE, self.start(), 0)
-        }
+        *self.defrag_byte() = 0;
     }
 
     #[inline]
     pub fn deinit(&self) {
         self.set_state(BlockState::Unallocated);
-        unsafe {
-            side_metadata::store(Self::DEFRAG_STATE_TABLE, self.start(), 0)
-        }
+        *self.defrag_byte() = 0;
     }
 
     pub const fn lines(&self) -> Range<Line> {
@@ -140,21 +154,14 @@ impl Block {
         Line::from(self.start()) .. Line::from(self.end())
     }
 
-    #[inline]
-    pub fn count_holes(&self, line_mark_state: u8) -> usize {
-        let mut holes = 0;
-        let mut prev_line_is_marked = true;
+    pub fn get_unavailable_lines(&self, line_mark_state: u8) -> usize {
+        let mut lines = 0;
         for line in self.lines() {
             if !line.is_marked(line_mark_state) {
-                if prev_line_is_marked {
-                    holes += 1;
-                }
-                prev_line_is_marked = false;
-            } else {
-                prev_line_is_marked = true;
+                lines += 1;
             }
         }
-        holes
+        lines
     }
 }
 

@@ -183,24 +183,29 @@ impl ChunkMap {
         }
     }
 
-    pub fn generate_sweep_tasks<VM: VMBinding>(&self, space: &'static ImmixSpace<VM>, mmtk: &'static MMTK<VM>) -> Vec<Box<dyn Work<MMTK<VM>>>> {
-        for table in &space.defrag.spill_mark_histograms {
-            for entry in table {
-                entry.store(0, Ordering::SeqCst);
-            }
-        }
+    pub fn generate_tasks<VM: VMBinding>(&self, workers: usize, func: impl Fn(Range<Chunk>) -> Box<dyn Work<MMTK<VM>>>) -> Vec<Box<dyn Work<MMTK<VM>>>> {
         let Range { start: start_chunk, end: end_chunk } = self.all_chunks();
-        let workers = mmtk.scheduler.worker_group().worker_count() * 2;
-        let chunks_per_packet = (ChunkMap::MAX_CHUNKS + (workers - 1)) / workers;
+        let chunks_per_packet = (ChunkMap::MAX_CHUNKS + (workers * 2 - 1)) / workers;
         let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
         for start in (start_chunk..end_chunk).step_by(chunks_per_packet) {
             let mut end = Chunk::forward(start, chunks_per_packet);
             if end > end_chunk {
                 end = end_chunk;
             }
-            work_packets.push(box SweepChunks(space, start..end));
+            work_packets.push(func(start..end));
         }
         work_packets
+    }
+
+    pub fn generate_sweep_tasks<VM: VMBinding>(&self, space: &'static ImmixSpace<VM>, mmtk: &'static MMTK<VM>) -> Vec<Box<dyn Work<MMTK<VM>>>> {
+        for table in &space.defrag.spill_mark_histograms {
+            for entry in table {
+                entry.store(0, Ordering::SeqCst);
+            }
+        }
+        self.generate_tasks(mmtk.scheduler.worker_group().worker_count(), |chunks| {
+            box SweepChunks(space, chunks)
+        })
     }
 }
 

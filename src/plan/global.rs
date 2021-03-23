@@ -208,7 +208,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
         self.base().initialized.load(Ordering::SeqCst)
     }
 
-    fn prepare(&self, tls: OpaquePointer);
+    fn prepare(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>);
     fn release(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>);
 
     fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {

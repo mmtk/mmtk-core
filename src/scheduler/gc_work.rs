@@ -41,7 +41,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> Prepare<P, W> {
 impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Prepare<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Prepare Global");
-        self.plan.prepare(worker.tls);
+        self.plan.prepare(worker.tls, mmtk);
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(PrepareMutator::<P::VM>::new(mutator));

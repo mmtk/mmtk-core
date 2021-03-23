@@ -290,13 +290,13 @@ impl Address {
 
     /// converts the Address to a pointer
     #[inline(always)]
-    pub fn to_ptr<T>(self) -> *const T {
+    pub const fn to_ptr<T>(self) -> *const T {
         self.0 as *const T
     }
 
     /// converts the Address to a mutable pointer
     #[inline(always)]
-    pub fn to_mut_ptr<T>(self) -> *mut T {
+    pub const fn to_mut_ptr<T>(self) -> *mut T {
         self.0 as *mut T
     }
 

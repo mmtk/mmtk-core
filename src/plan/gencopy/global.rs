@@ -129,7 +129,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&self, tls: OpaquePointer, _mmtk: &'static MMTK<VM>) {
         self.common.prepare(tls, true);
         self.nursery.prepare(true);
         if !self.in_nursery() {

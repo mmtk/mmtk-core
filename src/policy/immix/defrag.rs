@@ -1,7 +1,7 @@
-use std::{sync::atomic::{AtomicBool, AtomicUsize, Ordering}};
-use crate::{MMTK, vm::*};
+use std::{ops::Range, sync::atomic::{AtomicBool, AtomicUsize, Ordering}};
+use crate::{MMTK, scheduler::{GCWork, GCWorker, GCWorkBucket, WorkBucketStage}, util::constants::LOG_BYTES_IN_PAGE, vm::*};
 use crate::policy::space::Space;
-use super::{ImmixSpace, block::{Block, BlockState}};
+use super::{ImmixSpace, block::{Block, BlockState}, chunk::{Chunk, ChunkState}, line::Line};
 
 
 #[derive(Debug, Default)]
@@ -9,13 +9,20 @@ pub struct Defrag {
     in_defrag_collection: AtomicBool,
     defrag_space_exhausted: AtomicBool,
     pub spill_mark_histograms: Vec<Vec<AtomicUsize>>,
+    spill_avail_histograms: Vec<AtomicUsize>,
+    pub defrag_spill_threshold: AtomicUsize,
+    available_clean_pages_for_defrag: AtomicUsize,
 }
 
 impl Defrag {
     const NUM_BINS: usize = (Block::LINES >> 1) + 1;
+    const DEFRAG_LINE_REUSE_RATIO: f32 = 0.99;
+    const MIN_SPILL_THRESHOLD: usize = 2;
+    const DEFRAG_STRESS: bool = false;
 
     pub fn new() -> Self {
         Self {
+            spill_avail_histograms: (0..Self::NUM_BINS).map(|_| Default::default()).collect(),
             ..Default::default()
         }
     }
@@ -31,8 +38,8 @@ impl Defrag {
     }
 
     pub fn decide_whether_to_defrag(&self, emergency_collection: bool, collection_attempts: usize, exhausted_reusable_space: bool) {
-        let in_defrag = !super::DEFRAG && (emergency_collection || (collection_attempts > 1) || !exhausted_reusable_space);
-        // println!("Defrag: {}", in_defrag);
+        let in_defrag = super::DEFRAG && (emergency_collection || (collection_attempts > 1) || !exhausted_reusable_space || Self::DEFRAG_STRESS);
+        println!("Defrag: {}", in_defrag);
         self.in_defrag_collection.store(in_defrag, Ordering::SeqCst)
     }
 
@@ -40,58 +47,56 @@ impl Defrag {
         space.get_page_resource().reserved_pages() * 2 / 100
     }
 
-    pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
+    pub fn prepare<VM: VMBinding>(&'static self, space: &'static ImmixSpace<VM>) {
         debug_assert!(!super::BLOCK_ONLY);
-        // println!("reusable blocks: {}", space.reusable_blocks.len());
         let mut available_clean_pages_for_defrag = VM::VMActivePlan::global().get_total_pages() as isize - VM::VMActivePlan::global().get_pages_reserved() as isize + self.defrag_headroom_pages(space) as isize;
         if available_clean_pages_for_defrag < 0 { available_clean_pages_for_defrag = 0 };
-        // println!("available_clean_pages_for_defrag: {}", available_clean_pages_for_defrag);
-        let mut available_reusable_lines = {
-            let mut lines = 0usize;
-            for block in &space.reusable_blocks {
-                // println!("reusable block: {:?}", block);
-                for line in block.lines() {
-                    if !line.is_marked(space.line_mark_state.load(Ordering::SeqCst)) {
-                        lines += 1;
-                    }
-                }
-            }
-            lines
-        };
-        // println!("available_reusable_lines: {}", available_reusable_lines);
-        available_reusable_lines += (available_clean_pages_for_defrag as usize) << Block::LOG_LINES;
-        available_reusable_lines = available_reusable_lines >> 1;
-        // println!("total available_reusable_lines: {}", available_reusable_lines);
-        self.defrag_space_exhausted.store(false, Ordering::SeqCst);
+
+        self.available_clean_pages_for_defrag.store(available_clean_pages_for_defrag as usize, Ordering::Release);
 
         if self.in_defrag() {
-            let mut threshold = Self::NUM_BINS;
-            let mut lines_left = available_reusable_lines;
-            loop {
-                if threshold == 0 { break }
-                let lines_to_evacuate = {
-                    let mut lines_to_evacuate = 0;
-                    for table in &self.spill_mark_histograms {
-                        lines_to_evacuate += table[threshold - 1].load(Ordering::SeqCst)
-                    }
-                    lines_to_evacuate
-                };
-                if lines_to_evacuate > lines_left { break }
-                threshold -= 1;
-                lines_left -= lines_to_evacuate;
-            }
-            // println!("threshold = {}", threshold);
-            for chunk in space.chunk_map.allocated_chunks() {
-                for block in chunk.blocks() {
-                    if block.get_state() != BlockState::Unallocated && block.get_state() != BlockState::Reusable {
-                        let holes = block.count_holes(space.line_mark_state.load(Ordering::SeqCst));
-                        if holes >= threshold {
-                            block.set_as_defrag_source();
-                        }
-                    }
-                }
+            self.establish_defrag_spill_threshold(space)
+        }
+
+        self.available_clean_pages_for_defrag.store(available_clean_pages_for_defrag as usize + VM::VMActivePlan::global().get_collection_reserve(), Ordering::Release);
+    }
+
+    fn get_available_lines<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> usize {
+        for entry in &self.spill_avail_histograms {
+            entry.store(0, Ordering::Relaxed);
+        }
+        let mut total_available_lines = 0;
+        for block in &space.reusable_blocks {
+            let bucket = block.get_holes();
+            let unavailable_lines = block.get_unavailable_lines(space.line_mark_state.load(Ordering::SeqCst));
+            let available_lines = Block::LINES - unavailable_lines;
+            let old = self.spill_avail_histograms[bucket].load(Ordering::Relaxed);
+            self.spill_avail_histograms[bucket].store(old + available_lines, Ordering::Relaxed);
+            total_available_lines += available_lines;
+        }
+        total_available_lines
+    }
+
+    fn establish_defrag_spill_threshold<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
+        let clean_lines = self.get_available_lines(space);
+        let available_lines = clean_lines + (self.available_clean_pages_for_defrag.load(Ordering::Acquire) << (LOG_BYTES_IN_PAGE as usize - Line::LOG_BYTES));
+
+        let mut required_lines = 0isize;
+        let mut limit = (available_lines as f32 / Self::DEFRAG_LINE_REUSE_RATIO) as isize;
+        let mut threshold = Block::LINES >> 1;
+        for index in (Self::MIN_SPILL_THRESHOLD..Self::NUM_BINS).rev() {
+            threshold = index;
+            let this_bucket_mark = self.spill_mark_histograms.iter().map(|v| v[threshold].load(Ordering::Acquire) as isize).sum::<isize>();
+            let this_bucket_avail = self.spill_avail_histograms[threshold].load(Ordering::Acquire) as isize;
+            limit -= this_bucket_avail as isize;
+            required_lines += this_bucket_mark;
+            if limit < required_lines {
+                break
             }
         }
+        println!("threshold: {}", threshold);
+        debug_assert!(threshold >= Self::MIN_SPILL_THRESHOLD);
+        self.defrag_spill_threshold.store(threshold, Ordering::Release);
     }
 
     pub fn release<VM: VMBinding>(&self, _space: &ImmixSpace<VM>) {

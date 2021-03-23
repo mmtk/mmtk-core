@@ -1,5 +1,5 @@
 use atomic::Ordering;
-use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{WorkBucketStage, GCWorkBucket}, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
+use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorkBucket, GCWorker, WorkBucketStage}, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::forwarding_word as ForwardingWord;
@@ -11,7 +11,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::util::side_metadata::{self, *};
 use std::{cell::UnsafeCell, iter::Step, ops::Range, sync::atomic::{AtomicBool, AtomicU8}};
-use super::{block::*, chunk::{ChunkMap, ChunkState}, defrag::Defrag};
+use super::{block::*, chunk::{Chunk, ChunkMap, ChunkState}, defrag::Defrag};
 use super::line::*;
 
 
@@ -131,20 +131,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.defrag.decide_whether_to_defrag(emergency_collection, collection_attempts, self.reusable_blocks.len() == 0)
     }
 
-    pub fn prepare(&self) {
+    pub fn prepare(&'static self, mmtk: &'static MMTK<VM>) {
         if !super::BLOCK_ONLY {
             self.defrag.prepare(self);
         }
-        for chunk in self.chunk_map.allocated_chunks() {
-            // Clear object marking data
-            side_metadata::bzero_metadata_for_chunk(Self::OBJECT_MARK_TABLE, chunk.start());
-            // Clear block marking data
-            for block in chunk.blocks() {
-                if block.get_state() != BlockState::Unallocated {
-                    block.set_state(BlockState::Unmarked);
-                }
+
+        let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
+        let work_packets = self.chunk_map.generate_tasks(mmtk.scheduler.num_workers(), |chunks| {
+            box PrepareBlockState {
+                space: self,
+                chunks,
+                defrag_threshold: if self.in_defrag() { Some(threshold) } else { None },
             }
-        }
+        });
+        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(GCWorkBucket::<VM>::DEFAULT_PRIORITY, work_packets);
+
         if !super::BLOCK_ONLY {
             self.line_mark_state.fetch_add(1, Ordering::SeqCst);
             if self.line_mark_state.load(Ordering::SeqCst) > Line::MAX_MARK_STATE {
@@ -236,13 +237,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             let new_object = ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context);
             trace.process_node(new_object);
             // trace!("{:?} => {:?} in block {:?}", object, new_object, Block::containing::<VM>(new_object));
-            // Mark block and lines
+            // Mark lines
             if !super::BLOCK_ONLY {
                 let _marked_lines = Line::mark_lines_for_object::<VM>(new_object, self.line_mark_state.load(Ordering::SeqCst));
-                Block::containing::<VM>(new_object).set_state(BlockState::Marked);
-            } else {
-                Block::containing::<VM>(new_object).set_state(BlockState::Marked);
             }
+            debug_assert_eq!(Block::containing::<VM>(new_object).get_state(), BlockState::Marked);
             new_object
         }
     }
@@ -292,5 +291,43 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let end = Line::forward(search_start, mark_byte_cursor - mark_byte_start);
         debug_assert!((start..end).all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
         return Some(start..end)
+    }
+}
+
+
+pub struct PrepareBlockState<VM: VMBinding> {
+    pub space: &'static ImmixSpace<VM>,
+    pub chunks: Range<Chunk>,
+    pub defrag_threshold: Option<usize>,
+}
+
+impl<VM: VMBinding> PrepareBlockState<VM> {
+    #[inline(always)]
+    fn reset_object_mark(chunk: Chunk) {
+        side_metadata::bzero_metadata_for_chunk(ImmixSpace::<VM>::OBJECT_MARK_TABLE, chunk.start());
+    }
+}
+
+impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
+    #[inline]
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        let defrag_threshold = self.defrag_threshold.unwrap_or(0);
+        for chunk in self.chunks.clone().filter(|c| self.space.chunk_map.get(*c) == ChunkState::Allocated) {
+            Self::reset_object_mark(chunk);
+            for block in chunk.blocks() {
+                let state = block.get_state();
+                if state == BlockState::Unallocated { continue; }
+                if defrag_threshold != 0 && state != BlockState::Reusable {
+                    if block.get_holes() > defrag_threshold {
+                        block.set_as_defrag_source(true);
+                    }
+                } else {
+                    debug_assert!(!block.is_defrag_source());
+                }
+                if state != BlockState::Unmarked {
+                    block.set_state(BlockState::Unmarked);
+                }
+            }
+        }
     }
 }

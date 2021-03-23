@@ -68,7 +68,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &self.base
     }
 
-    fn prepare(&self, _tls: OpaquePointer) {
+    fn prepare(&self, tls: OpaquePointer, _mmtk: &'static MMTK<VM>) {
         unreachable!()
     }
 
