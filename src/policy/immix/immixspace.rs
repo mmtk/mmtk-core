@@ -1,5 +1,5 @@
 use atomic::Ordering;
-use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorkBucket, GCWorker, WorkBucketStage}, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
+use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorkBucket, GCWorker, WorkBucketStage, gc_work::ProcessEdgesWork}, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::forwarding_word as ForwardingWord;
@@ -10,7 +10,7 @@ use crate::util::heap::PageResource;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::util::side_metadata::{self, *};
-use std::{cell::UnsafeCell, iter::Step, ops::Range, sync::atomic::{AtomicBool, AtomicU8}};
+use std::{cell::UnsafeCell, iter::Step, mem, ops::Range, sync::atomic::{AtomicBool, AtomicU8}};
 use super::{block::*, chunk::{Chunk, ChunkMap, ChunkState}, defrag::Defrag};
 use super::line::*;
 
@@ -218,7 +218,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if Self::attempt_mark(object) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
-                let _marked_lines = Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::Acquire));
+                if !super::MARK_LINE_AT_SCAN_TIME {
+                    self.mark_lines(object);
+                }
             } else {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
             }
@@ -247,12 +249,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 } else {
                     ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context)
                 };
-                let _marked_lines = Line::mark_lines_for_object::<VM>(new_object, self.line_mark_state.load(Ordering::Acquire));
+                if !super::MARK_LINE_AT_SCAN_TIME {
+                    self.mark_lines(new_object);
+                }
                 debug_assert_eq!(Block::containing::<VM>(new_object).get_state(), BlockState::Marked);
                 trace.process_node(new_object);
                 new_object
             }
         }
+    }
+
+    /* Line marking */
+
+    #[inline]
+    pub fn mark_lines(&self, object: ObjectReference) {
+        Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::Acquire));
     }
 
     /* Object Marking */
@@ -345,6 +356,66 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 block.set_state(BlockState::Unmarked);
                 debug_assert!(!block.get_state().is_reusable());
                 debug_assert_ne!(block.get_state(), BlockState::Marked);
+            }
+        }
+    }
+}
+
+pub struct ObjectsClosure<'a, E: ProcessEdgesWork>(&'static MMTK<E::VM>, Vec<Address>, &'a mut GCWorker<E::VM>);
+
+impl<'a, E: ProcessEdgesWork> TransitiveClosure for ObjectsClosure<'a, E> {
+    #[inline(always)]
+    fn process_edge(&mut self, slot: Address) {
+        if self.1.len() == 0 {
+            self.1.reserve(E::CAPACITY);
+        }
+        self.1.push(slot);
+        if self.1.len() >= E::CAPACITY {
+            let mut new_edges = Vec::new();
+            mem::swap(&mut new_edges, &mut self.1);
+            self.2
+                .add_work(WorkBucketStage::Closure, E::new(new_edges, false, self.0));
+        }
+    }
+    fn process_node(&mut self, _object: ObjectReference) {
+        unreachable!()
+    }
+}
+
+impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
+    #[inline(always)]
+    fn drop(&mut self) {
+        let mut new_edges = Vec::new();
+        mem::swap(&mut new_edges, &mut self.1);
+        self.2.add_work(WorkBucketStage::Closure, E::new(new_edges, false, self.0));
+    }
+}
+
+pub struct ScanObjectsAndMarkLines<Edges: ProcessEdgesWork> {
+    buffer: Vec<ObjectReference>,
+    #[allow(unused)]
+    concurrent: bool,
+    immix_space: &'static ImmixSpace<Edges::VM>,
+}
+
+impl<Edges: ProcessEdgesWork> ScanObjectsAndMarkLines<Edges> {
+    pub fn new(buffer: Vec<ObjectReference>, concurrent: bool, immix_space: &'static ImmixSpace<Edges::VM>) -> Self {
+        Self {
+            buffer,
+            concurrent,
+            immix_space,
+        }
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        trace!("ScanObjectsAndMarkLines");
+        let mut closure = ObjectsClosure::<E>(mmtk, vec![], worker);
+        for object in &self.buffer {
+            <E::VM as VMBinding>::VMScanning::scan_object(&mut closure, *object, OpaquePointer::UNINITIALIZED);
+            if super::MARK_LINE_AT_SCAN_TIME && self.immix_space.in_space(*object) {
+                self.immix_space.mark_lines(*object);
             }
         }
     }

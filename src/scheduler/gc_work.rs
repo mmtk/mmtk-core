@@ -313,7 +313,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
 pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
     pub edges: Vec<Address>,
     pub nodes: Vec<ObjectReference>,
-    mmtk: &'static MMTK<E::VM>,
+    pub mmtk: &'static MMTK<E::VM>,
     // Use raw pointer for fast pointer dereferencing, instead of using `Option<&'static mut GCWorker<E::VM>>`.
     // Because a copying gc will dereference this pointer at least once for every object copy.
     worker: *mut GCWorker<E::VM>,

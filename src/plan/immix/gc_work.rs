@@ -2,14 +2,15 @@ use super::global::Immix;
 use crate::plan::CopyContext;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
+use crate::policy::immix::ScanObjectsAndMarkLines;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::WorkerLocal;
+use crate::scheduler::{WorkerLocal, WorkBucketStage};
 use crate::util::alloc::{Allocator, ImmixAllocator};
 use crate::util::forwarding_word;
 use crate::util::{Address, ObjectReference, OpaquePointer};
 use crate::vm::VMBinding;
 use crate::MMTK;
-use std::ops::{Deref, DerefMut};
+use std::{mem, ops::{Deref, DerefMut}};
 
 pub struct ImmixCopyContext<VM: VMBinding> {
     immix: ImmixAllocator<VM>,
@@ -106,6 +107,18 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<Immix<VM>>().unwrap();
         Self { base, plan }
+    }
+
+    #[cold]
+    fn flush(&mut self) {
+        let mut new_nodes = vec![];
+        mem::swap(&mut new_nodes, &mut self.nodes);
+        let scan_objects_work = ScanObjectsAndMarkLines::<Self>::new(new_nodes, false, &self.immix().immix_space);
+        if Self::SCAN_OBJECTS_IMMEDIATELY {
+            self.worker().do_work(scan_objects_work);
+        } else {
+            self.base.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);
+        }
     }
 
     #[inline(always)]
