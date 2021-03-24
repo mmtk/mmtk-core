@@ -73,21 +73,21 @@ impl<VM: VMBinding> Allocators<VM> {
                 AllocatorSelector::BumpPointer(index) => {
                     ret.bump_pointer[index as usize].write(BumpAllocator::new(
                         mutator_tls,
-                        Some(space),
+                        space,
                         plan,
                     ));
                 }
                 AllocatorSelector::LargeObject(index) => {
                     ret.large_object[index as usize].write(LargeObjectAllocator::new(
                         mutator_tls,
-                        Some(space.downcast_ref::<LargeObjectSpace<VM>>().unwrap()),
+                        space.downcast_ref::<LargeObjectSpace<VM>>().unwrap(),
                         plan,
                     ));
                 }
                 AllocatorSelector::Malloc(index) => {
                     ret.malloc[index as usize].write(MallocAllocator::new(
                         mutator_tls,
-                        Some(space.downcast_ref::<MallocSpace<VM>>().unwrap()),
+                        space.downcast_ref::<MallocSpace<VM>>().unwrap(),
                         plan,
                     ));
                 }

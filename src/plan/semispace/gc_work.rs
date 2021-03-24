@@ -26,7 +26,7 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
         self.ss.tls = tls;
     }
     fn prepare(&mut self) {
-        self.ss.rebind(Some(self.plan.tospace()));
+        self.ss.rebind(self.plan.tospace());
     }
     fn release(&mut self) {
         // self.ss.rebind(Some(self.plan.tospace()));
@@ -56,9 +56,11 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
 
 impl<VM: VMBinding> SSCopyContext<VM> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
+        let plan = &mmtk.plan.downcast_ref::<SemiSpace<VM>>().unwrap();
         Self {
-            plan: &mmtk.plan.downcast_ref::<SemiSpace<VM>>().unwrap(),
-            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
+            plan,
+            // it doesn't matter which space we bind with the copy allocator. We will rebind to a proper space in prepare().
+            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, plan.tospace(), &*mmtk.plan),
         }
     }
 }

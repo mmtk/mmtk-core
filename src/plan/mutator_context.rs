@@ -78,7 +78,6 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
         }
         .get_space()
-        .unwrap()
         .initialize_header(refer, true)
     }
 
