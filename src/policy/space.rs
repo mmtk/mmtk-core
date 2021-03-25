@@ -131,7 +131,7 @@ impl SFTMap {
                 unsafe { &(*res) }.name()
             );
         }
-        unsafe { &*res }
+        unsafe { &(*res) }
     }
 
     fn log_update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
@@ -220,6 +220,19 @@ impl SFTMap {
             );
         }
         self_mut.sft[chunk] = sft;
+    }
+
+    pub fn is_in_space(&self, object: ObjectReference) -> bool {
+        let not_in_space = object.to_address().chunk_index() >= self.sft.len()
+            || self.get(object.to_address()).name() == EMPTY_SPACE_SFT.name();
+
+        if not_in_space {
+            // special case - we do not yet have SFT entries for malloc space
+            use crate::policy::mallocspace::is_alloced_by_malloc;
+            is_alloced_by_malloc(object)
+        } else {
+            true
+        }
     }
 }
 
@@ -573,15 +586,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn init(&self, space: &dyn Space<VM>) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            // if !try_map_metadata_space(
-            //     self.start,
-            //     self.extent,
-            //     VM::VMActivePlan::global().global_side_metadata_per_chunk(),
-            //     space.local_side_metadata_per_chunk(),
-            // ) {
-            //     // TODO(Javad): handle meta space allocation failure
-            //     panic!("failed to mmap meta memory");
-            // }
             SFT_MAP.update(space.as_sft(), self.start, bytes_to_chunks_up(self.extent));
         }
     }

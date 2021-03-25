@@ -109,13 +109,13 @@ pub fn alloc<VM: VMBinding>(
     #[cfg(debug_assertions)]
     crate::util::forwarding_word::check_alloc_size::<VM>(size);
 
-    // if size > Block::BYTES {
-    //     let address = mutator.alloc(size, align, offset, AllocationSemantics::Los);
-    //     post_alloc(mutator, unsafe { address.to_object_reference() }, size, AllocationSemantics::Los);
-    //     address
-    // } else {
+    if size > Block::BYTES {
+        let address = mutator.alloc(size, align, offset, AllocationSemantics::Los);
+        post_alloc(mutator, unsafe { address.to_object_reference() }, size, AllocationSemantics::Los);
+        address
+    } else {
         mutator.alloc(size, align, offset, semantics)
-    // }
+    }
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are
@@ -249,7 +249,8 @@ pub fn is_live_object(object: ObjectReference) -> bool {
     object.is_live()
 }
 
-/// Is the object in the mapped memory?
+/// Is the object in the mapped memory? The runtime can use this function to check
+/// if an object is in MMTk heap.
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
@@ -257,10 +258,17 @@ pub fn is_mapped_object(object: ObjectReference) -> bool {
     object.is_mapped()
 }
 
-/// Is the address in the mapped memory?
+/// Is the address in the mapped memory? The runtime can use this function to check
+/// if an address is mapped by MMTk. Note that this is different than is_mapped_object().
+/// For malloc spaces, MMTk does not map those addresses (malloc does the mmap), so
+/// this function will return false, but is_mapped_object will return true if the address
+/// is actually a valid object in malloc spaces. To check if an object is in our heap,
+/// the runtime should always use is_mapped_object(). This function is_mapped_address()
+/// may get removed at some point.
 ///
 /// Arguments:
 /// * `address`: The address to query.
+// TODO: Do we really need this function? Can a runtime always use is_mapped_object()?
 pub fn is_mapped_address(address: Address) -> bool {
     address.is_mapped()
 }

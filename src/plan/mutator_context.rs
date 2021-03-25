@@ -119,7 +119,4 @@ pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
     fn record_modified_node(&mut self, obj: ObjectReference) {
         self.barrier().post_write_barrier(WriteTarget::Object(obj));
     }
-    fn record_modified_edge(&mut self, slot: Address) {
-        self.barrier().post_write_barrier(WriteTarget::Slot(slot));
-    }
 }
