@@ -109,13 +109,13 @@ pub fn alloc<VM: VMBinding>(
     #[cfg(debug_assertions)]
     crate::util::forwarding_word::check_alloc_size::<VM>(size);
 
-    if size > Block::BYTES {
-        let address = mutator.alloc(size, align, offset, AllocationSemantics::Los);
-        post_alloc(mutator, unsafe { address.to_object_reference() }, size, AllocationSemantics::Los);
-        address
-    } else {
+    // if size > Block::BYTES {
+    //     let address = mutator.alloc(size, align, offset, AllocationSemantics::Los);
+    //     post_alloc(mutator, unsafe { address.to_object_reference() }, size, AllocationSemantics::Los);
+    //     address
+    // } else {
         mutator.alloc(size, align, offset, semantics)
-    }
+    // }
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are

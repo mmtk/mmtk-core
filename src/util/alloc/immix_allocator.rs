@@ -17,7 +17,7 @@ pub struct ImmixAllocator<VM: VMBinding> {
     cursor: Address,
     /// limit for bump pointer
     limit: Address,
-    space: Option<&'static dyn Space<VM>>,
+    space: &'static ImmixSpace<VM>,
     plan: &'static dyn Plan<VM = VM>,
     hot: bool,
     copy: bool,
@@ -54,7 +54,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
 impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
     fn get_space(&self) -> Option<&'static dyn Space<VM>> {
-        self.space
+        Some(self.space as _)
     }
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
         self.plan
@@ -122,7 +122,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     ) -> Self {
         ImmixAllocator {
             tls,
-            space,
+            space: space.unwrap().downcast_ref::<ImmixSpace<VM>>().unwrap(),
             plan,
             cursor: Address::ZERO,
             limit: Address::ZERO,
@@ -140,8 +140,8 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         }
     }
 
-    fn immix_space(&self) -> &'static ImmixSpace<VM> {
-        self.space.unwrap().downcast_ref::<ImmixSpace<VM>>().unwrap()
+    const fn immix_space(&self) -> &'static ImmixSpace<VM> {
+        self.space
     }
 
     fn overflow_alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
