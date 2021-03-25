@@ -85,10 +85,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
-    fn init(&mut self, _vm_map: &'static VMMap) {
-        let me = unsafe { &*(self as *const Self) };
-        self.pr.bind_space(me);
-    }
+    fn init(&mut self, _vm_map: &'static VMMap) {}
 
     fn common(&self) -> &CommonSpace<VM> {
         unsafe { &*self.common.get() }
@@ -99,7 +96,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 
     fn release_multiple_pages(&mut self, start: Address) {
-        self.pr.release_pages(start);
+        self.pr.release_pages(start, self.as_space());
     }
 }
 
@@ -187,12 +184,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
-                self.pr.release_pages(get_super_page(cell));
+                self.pr.release_pages(get_super_page(cell), self.as_space());
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
-                self.pr.release_pages(get_super_page(cell));
+                self.pr.release_pages(get_super_page(cell), self.as_space());
             }
         }
     }

@@ -72,9 +72,6 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     }
 
     fn init(&mut self, _vm_map: &'static VMMap) {
-        // Borrow-checker fighting so that we can have a cyclic reference
-        let me = unsafe { &*(self as *const Self) };
-        self.pr.bind_space(me);
         self.common().init(self.as_space());
     }
     fn release_multiple_pages(&mut self, _start: Address) {

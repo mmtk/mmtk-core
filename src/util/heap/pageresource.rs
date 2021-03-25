@@ -19,8 +19,9 @@ pub trait PageResource<VM: VMBinding>: 'static {
         required_pages: usize,
         zeroed: bool,
         tls: OpaquePointer,
+        space: &dyn Space<VM>,
     ) -> Address {
-        self.alloc_pages(reserved_pages, required_pages, zeroed, tls)
+        self.alloc_pages(reserved_pages, required_pages, zeroed, tls, space)
     }
 
     // XXX: In the original code reserve_pages & clear_request explicitly
@@ -62,6 +63,7 @@ pub trait PageResource<VM: VMBinding>: 'static {
         required_pages: usize,
         zeroed: bool,
         tls: OpaquePointer,
+        space: &dyn Space<VM>,
     ) -> Address;
 
     fn adjust_for_metadata(&self, pages: usize) -> usize;
@@ -96,35 +98,32 @@ pub trait PageResource<VM: VMBinding>: 'static {
         self.common().committed.load(Ordering::Relaxed)
     }
 
-    fn bind_space(&mut self, space: &'static dyn Space<VM>) {
-        self.common_mut().space = Some(space);
-    }
-
-    fn common(&self) -> &CommonPageResource<VM>;
-    fn common_mut(&mut self) -> &mut CommonPageResource<VM>;
+    fn common(&self) -> &CommonPageResource;
+    fn common_mut(&mut self) -> &mut CommonPageResource;
     fn vm_map(&self) -> &'static VMMap {
-        self.common().space.unwrap().common().vm_map()
+        self.common().vm_map
     }
 }
 
-pub struct CommonPageResource<VM: VMBinding> {
+pub struct CommonPageResource {
     reserved: AtomicUsize,
     committed: AtomicUsize,
 
     pub contiguous: bool,
     pub growable: bool,
-    pub space: Option<&'static dyn Space<VM>>,
+    // pub space: Option<&'static dyn Space<VM>>,
+    vm_map: &'static VMMap,
 }
 
-impl<VM: VMBinding> CommonPageResource<VM> {
-    pub fn new(contiguous: bool, growable: bool) -> CommonPageResource<VM> {
+impl CommonPageResource {
+    pub fn new(contiguous: bool, growable: bool, vm_map: &'static VMMap) -> CommonPageResource {
         CommonPageResource {
             reserved: AtomicUsize::new(0),
             committed: AtomicUsize::new(0),
 
             contiguous,
             growable,
-            space: None,
+            vm_map,
         }
     }
 

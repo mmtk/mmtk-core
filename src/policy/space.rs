@@ -266,7 +266,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
-            let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, tls);
+            let rtn = pr.get_new_pages(
+                pages_reserved,
+                pages,
+                self.common().zeroed,
+                tls,
+                self.as_space(),
+            );
             if rtn.is_zero() {
                 // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
                 if !allow_poll {
