@@ -1,5 +1,5 @@
 use std::{iter::Step, ops::Range, sync::atomic::{AtomicU8, AtomicUsize, Ordering}};
-use crate::{MMTK, scheduler::*, util::{Address, ObjectReference, heap::layout::vm_layout_constants::{LOG_BYTES_IN_CHUNK, LOG_SPACE_EXTENT}}, vm::*};
+use crate::{MMTK, scheduler::*, util::{Address, ObjectReference, heap::layout::vm_layout_constants::{LOG_BYTES_IN_CHUNK, MAX_CHUNKS}}, vm::*};
 use super::immixspace::ImmixSpace;
 use super::block::{Block, BlockState};
 
@@ -110,7 +110,7 @@ impl Chunk {
 unsafe impl Step for Chunk {
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
-        if start < end { return None }
+        if start > end { return None }
         Some((end.start() - start.start()) >> Self::LOG_BYTES)
     }
     #[inline(always)]
@@ -137,11 +137,9 @@ pub struct ChunkMap {
 }
 
 impl ChunkMap {
-    pub const MAX_CHUNKS: usize = 1 << (LOG_SPACE_EXTENT - Chunk::LOG_BYTES);
-
     pub fn new(start: Address) -> Self {
         Self {
-            table: (0..Self::MAX_CHUNKS).map(|_| Default::default()).collect(),
+            table: (0..MAX_CHUNKS).map(|_| Default::default()).collect(),
             start,
             limit: AtomicUsize::new(0),
         }
@@ -188,7 +186,8 @@ impl ChunkMap {
 
     pub fn generate_tasks<VM: VMBinding>(&self, workers: usize, func: impl Fn(Range<Chunk>) -> Box<dyn Work<MMTK<VM>>>) -> Vec<Box<dyn Work<MMTK<VM>>>> {
         let Range { start: start_chunk, end: end_chunk } = self.all_chunks();
-        let chunks_per_packet = (ChunkMap::MAX_CHUNKS + (workers * 2 - 1)) / workers;
+        let chunks = Chunk::steps_between(&start_chunk, &end_chunk).unwrap();
+        let chunks_per_packet = (chunks + (workers * 2 - 1)) / workers;
         let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
         for start in (start_chunk..end_chunk).step_by(chunks_per_packet) {
             let mut end = Chunk::forward(start, chunks_per_packet);

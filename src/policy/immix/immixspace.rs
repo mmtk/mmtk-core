@@ -1,5 +1,5 @@
 use atomic::Ordering;
-use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorkBucket, GCWorker, WorkBucketStage, gc_work::ProcessEdgesWork}, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource}};
+use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorkBucket, GCWorker, WorkBucketStage, gc_work::ProcessEdgesWork}, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, gc_byte, heap::FreeListPageResource}};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::forwarding_word as ForwardingWord;
@@ -25,6 +25,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     in_collection: AtomicBool,
     pub reusable_blocks: BlockList,
     pub(super) defrag: Defrag,
+    mark_state: AtomicU8,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -41,9 +42,14 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
-        !self.from_space()
+        true
     }
-    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
+    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
+        debug_assert!(Self::HEADER_MARK_BITS);
+        let old_value = gc_byte::read_gc_byte::<VM>(object);
+        let new_value = (old_value & Self::GC_MARK_BIT_MASK) | self.mark_state.load(Ordering::Acquire);
+        gc_byte::write_gc_byte::<VM>(object, new_value);
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
@@ -74,11 +80,19 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
 
     fn local_side_metadata_per_chunk(&self) -> usize {
-        Self::OBJECT_MARK_TABLE.accumulated_size()
+        Self::LOCAL_SIDE_METADATA_PER_CHUNK
     }
 }
 
 impl<VM: VMBinding> ImmixSpace<VM> {
+    pub const LOCAL_SIDE_METADATA_PER_CHUNK: usize = {
+        if Self::HEADER_MARK_BITS {
+            Block::MARK_TABLE.accumulated_size()
+        } else {
+            Self::OBJECT_MARK_TABLE.accumulated_size()
+        }
+    };
+
     pub fn new(
         name: &'static str,
         vm_map: &'static VMMap,
@@ -97,7 +111,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mmapper,
             heap,
         );
+        #[cfg(target_pointer_width = "64")]
         let start = common.start;
+        #[cfg(target_pointer_width = "32")]
+        let start = crate::util::heap::layout::vm_layout_constants::HEAP_START;
         ImmixSpace {
             pr: if common.vmrequest.is_discontiguous() {
                 FreeListPageResource::new_discontiguous(0, vm_map)
@@ -111,6 +128,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             in_collection: AtomicBool::new(false),
             reusable_blocks: BlockList::new(),
             defrag: Defrag::new(),
+            mark_state: AtomicU8::new(0),
         }
     }
 
@@ -132,6 +150,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn prepare(&'static self, mmtk: &'static MMTK<VM>) {
+        if Self::HEADER_MARK_BITS {
+            self.mark_state.store(Self::GC_MARK_BIT_MASK - self.mark_state.load(Ordering::Acquire), Ordering::Release);
+        }
         if !super::BLOCK_ONLY {
             self.defrag.prepare(self);
         }
@@ -214,8 +235,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     #[inline(always)]
     pub fn trace_object_without_moving(&self, trace: &mut impl TransitiveClosure, object: ObjectReference) -> ObjectReference {
-        // println!("trace_mark_object {:?}", object);
-        if Self::attempt_mark(object) {
+        if self.attempt_mark(object) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
                 if !super::MARK_LINE_AT_SCAN_TIME {
@@ -237,12 +257,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
         } else {
-            if Self::is_marked(object) {
+            if self.is_marked(object) {
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
                 return object;
             } else {
                 let new_object = if Self::is_pinned(object) || self.defrag.space_exhausted() {
-                    Self::attempt_mark(object);
+                    self.attempt_mark(object);
                     ForwardingWord::clear_forwarding_bits::<VM>(object);
                     Block::containing::<VM>(object).set_state(BlockState::Marked);
                     object
@@ -269,6 +289,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /* Object Marking */
 
+    #[cfg(target_pointer_width = "64")]
+    const HEADER_MARK_BITS: bool = false;
+    #[cfg(target_pointer_width = "32")]
+    const HEADER_MARK_BITS: bool = false;
+
+    const GC_MARK_BIT_MASK: u8 = 1;
+
     const OBJECT_MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         scope: SideMetadataScope::PolicySpecific,
         offset: Block::MARK_TABLE.accumulated_size(),
@@ -277,13 +304,41 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     };
 
     #[inline(always)]
-    fn attempt_mark(object: ObjectReference) -> bool {
-        side_metadata::compare_exchange_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object), 0, 1)
+    fn attempt_mark(&self, object: ObjectReference) -> bool {
+        if Self::HEADER_MARK_BITS {
+            let mut old_value = gc_byte::read_gc_byte::<VM>(object);
+            let mut mark_bit = old_value & Self::GC_MARK_BIT_MASK;
+            let value = self.mark_state.load(Ordering::Acquire);
+            if mark_bit == value {
+                return false;
+            }
+            while !gc_byte::compare_exchange_gc_byte::<VM>(
+                object,
+                old_value,
+                old_value ^ Self::GC_MARK_BIT_MASK,
+            ) {
+                old_value = gc_byte::read_gc_byte::<VM>(object);
+                mark_bit = (old_value as u8) & Self::GC_MARK_BIT_MASK;
+                if mark_bit == value {
+                    return false;
+                }
+            }
+            true
+        } else {
+            side_metadata::compare_exchange_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object), 0, 1)
+        }
     }
 
     #[inline(always)]
-    fn is_marked(object: ObjectReference) -> bool {
-        side_metadata::load_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object)) == 1
+    fn is_marked(&self, object: ObjectReference) -> bool {
+        if Self::HEADER_MARK_BITS {
+            let value = self.mark_state.load(Ordering::Acquire);
+            let old_value = gc_byte::read_gc_byte::<VM>(object);
+            let mark_bit = old_value & Self::GC_MARK_BIT_MASK;
+            mark_bit == value
+        } else {
+            side_metadata::load_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object)) == 1
+        }
     }
 
     #[inline(always)]
@@ -336,7 +391,9 @@ pub struct PrepareBlockState<VM: VMBinding> {
 impl<VM: VMBinding> PrepareBlockState<VM> {
     #[inline(always)]
     fn reset_object_mark(chunk: Chunk) {
-        side_metadata::bzero_metadata_for_chunk(ImmixSpace::<VM>::OBJECT_MARK_TABLE, chunk.start());
+        if !ImmixSpace::<VM>::HEADER_MARK_BITS {
+            side_metadata::bzero_metadata_for_chunk(ImmixSpace::<VM>::OBJECT_MARK_TABLE, chunk.start());
+        }
     }
 }
 

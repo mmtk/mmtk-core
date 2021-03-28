@@ -17,7 +17,6 @@ use crate::util::OpaquePointer;
 use crate::util::{generic_freelist, memory};
 use crate::vm::*;
 use std::mem::MaybeUninit;
-use crate::util::side_metadata::*;
 use crate::vm::ActivePlan;
 
 pub struct CommonFreeListPageResource {
