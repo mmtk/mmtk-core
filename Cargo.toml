@@ -77,5 +77,7 @@ malloc_mimalloc = []
 malloc_jemalloc = []
 malloc_hoard = []
 
+immix_header_mark_bits = []
+
 # If there are more groups, they should be inserted above this line
 # Group:end

@@ -289,10 +289,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /* Object Marking */
 
-    #[cfg(target_pointer_width = "64")]
-    const HEADER_MARK_BITS: bool = false;
-    #[cfg(target_pointer_width = "32")]
-    const HEADER_MARK_BITS: bool = false;
+    const HEADER_MARK_BITS: bool = cfg!(feature = "immix_header_mark_bits");
 
     const GC_MARK_BIT_MASK: u8 = 1;
 
