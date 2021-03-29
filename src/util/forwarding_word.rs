@@ -19,17 +19,53 @@ const FORWARDING_MASK: u8 = 3;
 const FORWARDING_BITS: usize = 2;
 
 pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
-    let mut old_value = gc_byte::read_gc_byte::<VM>(object);
-    if old_value & FORWARDING_MASK != FORWARDING_NOT_TRIGGERED_YET {
-        return old_value;
-    }
-    while !gc_byte::compare_exchange_gc_byte::<VM>(object, old_value, old_value | BEING_FORWARDED) {
-        old_value = gc_byte::read_gc_byte::<VM>(object);
-        if old_value & FORWARDING_MASK != FORWARDING_NOT_TRIGGERED_YET {
-            return old_value;
+    match gc_byte_offset_in_forwarding_word::<VM>() {
+        Some(fw_offset) => {
+            let mut old_word = read_forwarding_word::<VM>(object);
+            let forwarding_mask =
+                (FORWARDING_MASK as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
+            let forwarding_not_triggered_yet = (FORWARDING_NOT_TRIGGERED_YET as usize)
+                << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
+            let being_forwarded =
+                (BEING_FORWARDED as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
+            if old_word & forwarding_mask != forwarding_not_triggered_yet {
+                return ((old_word & forwarding_mask)
+                    >> (-fw_offset * constants::BITS_IN_BYTE as isize))
+                    as u8;
+            }
+            while !compare_exchange_forwarding_word::<VM>(
+                object,
+                old_word,
+                old_word | being_forwarded,
+            ) {
+                old_word = read_forwarding_word::<VM>(object);
+                if old_word & forwarding_mask != forwarding_not_triggered_yet {
+                    return ((old_word & forwarding_mask)
+                        >> (-fw_offset * constants::BITS_IN_BYTE as isize))
+                        as u8;
+                }
+            }
+
+            ((old_word & forwarding_mask) >> (-fw_offset * constants::BITS_IN_BYTE as isize)) as u8
+        }
+        None => {
+            let mut old_value = gc_byte::read_gc_byte::<VM>(object);
+            if old_value & FORWARDING_MASK != FORWARDING_NOT_TRIGGERED_YET {
+                return old_value;
+            }
+            while !gc_byte::compare_exchange_gc_byte::<VM>(
+                object,
+                old_value,
+                old_value | BEING_FORWARDED,
+            ) {
+                old_value = gc_byte::read_gc_byte::<VM>(object);
+                if old_value & FORWARDING_MASK != FORWARDING_NOT_TRIGGERED_YET {
+                    return old_value;
+                }
+            }
+            old_value
         }
     }
-    old_value
 }
 
 pub fn spin_and_get_forwarded_object<VM: VMBinding>(
@@ -38,7 +74,15 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
 ) -> ObjectReference {
     let mut gc_byte = gc_byte;
     while gc_byte & FORWARDING_MASK == BEING_FORWARDED {
-        gc_byte = gc_byte::read_gc_byte::<VM>(object);
+        gc_byte = match gc_byte_offset_in_forwarding_word::<VM>() {
+            Some(fw_offset) => {
+                ((read_forwarding_word::<VM>(object)
+                    & ((FORWARDING_MASK as usize)
+                        << (-fw_offset * constants::BITS_IN_BYTE as isize)))
+                    >> (-fw_offset * constants::BITS_IN_BYTE as isize)) as u8
+            }
+            None => gc_byte::read_gc_byte::<VM>(object),
+        };
     }
     if gc_byte & FORWARDING_MASK == FORWARDED {
         let status_word = read_forwarding_word::<VM>(object);
@@ -105,11 +149,27 @@ pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: Objec
 }
 
 pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
-    gc_byte::read_gc_byte::<VM>(object) & FORWARDING_MASK == FORWARDED
+    let forwarding_stat = match gc_byte_offset_in_forwarding_word::<VM>() {
+        Some(fw_offset) => {
+            ((read_forwarding_word::<VM>(object)
+                & ((FORWARDING_MASK as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize)))
+                >> (-fw_offset * constants::BITS_IN_BYTE as isize)) as u8
+        }
+        None => gc_byte::read_gc_byte::<VM>(object),
+    };
+    (forwarding_stat & FORWARDING_MASK) == FORWARDED
 }
 
 pub fn is_forwarded_or_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
-    gc_byte::read_gc_byte::<VM>(object) & FORWARDING_MASK != 0
+    let forwarding_stat = match gc_byte_offset_in_forwarding_word::<VM>() {
+        Some(fw_offset) => {
+            ((read_forwarding_word::<VM>(object)
+                & ((FORWARDING_MASK as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize)))
+                >> (-fw_offset * constants::BITS_IN_BYTE as isize)) as u8
+        }
+        None => gc_byte::read_gc_byte::<VM>(object),
+    };
+    (forwarding_stat & FORWARDING_MASK) != 0
 }
 
 pub fn state_is_forwarded_or_being_forwarded(gc_byte: u8) -> bool {
@@ -121,9 +181,29 @@ pub fn state_is_being_forwarded(gc_byte: u8) -> bool {
 }
 
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
-    let mut old_val = gc_byte::read_gc_byte::<VM>(object);
-    while !gc_byte::compare_exchange_gc_byte::<VM>(object, old_val, old_val & !FORWARDING_MASK) {
-        old_val = gc_byte::read_gc_byte::<VM>(object);
+    match gc_byte_offset_in_forwarding_word::<VM>() {
+        Some(fw_offset) => {
+            let mut old_word = read_forwarding_word::<VM>(object);
+            let forwarding_mask =
+                (FORWARDING_MASK as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
+            while !compare_exchange_forwarding_word::<VM>(
+                object,
+                old_word,
+                old_word & !forwarding_mask,
+            ) {
+                old_word = read_forwarding_word::<VM>(object);
+            }
+        }
+        None => {
+            let mut old_val = gc_byte::read_gc_byte::<VM>(object);
+            while !gc_byte::compare_exchange_gc_byte::<VM>(
+                object,
+                old_val,
+                old_val & !FORWARDING_MASK,
+            ) {
+                old_val = gc_byte::read_gc_byte::<VM>(object);
+            }
+        }
     }
 }
 
@@ -203,7 +283,7 @@ pub fn compare_exchange_forwarding_word<VM: VMBinding>(
 // A return value of `Some(fw_offset)` implies that GC byte and forwarding word can be loaded/stored with a single instruction.
 //
 #[cfg(target_endian = "little")]
-pub(super) fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize> {
+pub(super) const fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize> {
     let gcbyte_lshift = VM::VMObjectModel::GC_BYTE_OFFSET % constants::BYTES_IN_WORD as isize;
     if VM::VMObjectModel::HAS_GC_BYTE {
         if gcbyte_lshift == 0 {
