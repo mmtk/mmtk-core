@@ -126,9 +126,8 @@ pub struct CommonPageResource {
 
     pub contiguous: bool,
     pub growable: bool,
-    // pub space: Option<&'static dyn Space<VM>>,
-    vm_map: &'static VMMap,
 
+    vm_map: &'static VMMap,
     head_discontiguous_region: Mutex<Address>,
 }
 
@@ -178,13 +177,16 @@ impl CommonPageResource {
         self.committed.store(0, Ordering::Relaxed);
     }
 
-    pub fn inform_grow_discontiguous_space(
+    /// Extend the virtual memory associated with a particular discontiguous
+    /// space.  This simply involves requesting a suitable number of chunks
+    /// from the pool of chunks available to discontiguous spaces.
+    pub fn grow_discontiguous_space(
         &self,
         space_descriptor: SpaceDescriptor,
         chunks: usize,
     ) -> Address {
         let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
-        // FIXME
+
         let new_head: Address = self.vm_map.allocate_contiguous_chunks(
             space_descriptor,
             chunks,
@@ -198,7 +200,9 @@ impl CommonPageResource {
         new_head
     }
 
-    pub fn inform_release_discontiguous_chunks(&self, chunk: Address) {
+    /// Release one or more contiguous chunks associated with a discontiguous
+    /// space.
+    pub fn release_discontiguous_chunks(&self, chunk: Address) {
         let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
         debug_assert!(chunk == conversions::chunk_align_down(chunk));
         if chunk == *head_discontiguous_region {
@@ -207,7 +211,7 @@ impl CommonPageResource {
         self.vm_map.free_contiguous_chunks(chunk);
     }
 
-    pub fn inform_release_all_chunks(&self) {
+    pub fn release_all_chunks(&self) {
         let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
         self.vm_map.free_all_chunks(*head_discontiguous_region);
         *head_discontiguous_region = Address::ZERO;

@@ -122,7 +122,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             let required_chunks = required_chunks(required_pages);
             sync.current_chunk = self
                 .common
-                .inform_grow_discontiguous_space(space_descriptor, required_chunks); // Returns zero on failure
+                .grow_discontiguous_space(space_descriptor, required_chunks); // Returns zero on failure
             sync.cursor = sync.current_chunk;
             sync.sentinel = sync.cursor
                 + if sync.current_chunk.is_zero() {
@@ -304,7 +304,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
             guard.current_chunk = Address::zero();
             guard.sentinel = Address::zero();
             guard.cursor = Address::zero();
-            self.common.inform_release_all_chunks();
+            self.common.release_all_chunks();
         }
     }
 

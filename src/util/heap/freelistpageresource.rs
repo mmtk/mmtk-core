@@ -218,7 +218,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         let required_chunks = crate::policy::space::required_chunks(pages);
         let region = self
             .common
-            .inform_grow_discontiguous_space(space_descriptor, required_chunks);
+            .grow_discontiguous_space(space_descriptor, required_chunks);
 
         if !region.is_zero() {
             let region_start = conversions::bytes_to_pages(region - self.start);
@@ -272,7 +272,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             }
         }
         /* now return the address space associated with the chunk for global reuse */
-        self.common.inform_release_discontiguous_chunks(chunk);
+        self.common.release_discontiguous_chunks(chunk);
     }
 
     fn reserve_metadata(&mut self, extent: usize) {
