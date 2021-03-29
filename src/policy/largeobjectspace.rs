@@ -96,7 +96,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 
     fn release_multiple_pages(&mut self, start: Address) {
-        self.pr.release_pages(start, self.as_space());
+        self.pr.release_pages(start);
     }
 }
 
@@ -184,12 +184,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
-                self.pr.release_pages(get_super_page(cell), self.as_space());
+                self.pr.release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
-                self.pr.release_pages(get_super_page(cell), self.as_space());
+                self.pr.release_pages(get_super_page(cell));
             }
         }
     }

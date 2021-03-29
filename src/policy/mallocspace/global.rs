@@ -127,8 +127,88 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn reserved_pages(&self) -> usize {
         conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst))
     }
+}
 
-    unsafe fn release_all_chunks(&self) {
+impl<VM: VMBinding> MallocSpace<VM> {
+    pub fn new() -> Self {
+        MallocSpace {
+            phantom: PhantomData,
+            active_bytes: AtomicUsize::new(0),
+            #[cfg(debug_assertions)]
+            active_mem: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub fn alloc(&self, tls: OpaquePointer, size: usize) -> Address {
+        // TODO: Should refactor this and Space.acquire()
+        if VM::VMActivePlan::global().poll(false, self) {
+            VM::VMCollection::block_for_gc(tls);
+            return unsafe { Address::zero() };
+        }
+
+        let raw = unsafe { calloc(1, size) };
+        let address = Address::from_mut_ptr(raw);
+
+        if !address.is_zero() {
+            let actual_size = unsafe { malloc_usable_size(raw) };
+            if !is_meta_space_mapped(address) {
+                let chunk_start = conversions::chunk_align_down(address);
+                debug!(
+                    "Add malloc chunk {} to {}",
+                    chunk_start,
+                    chunk_start + BYTES_IN_CHUNK
+                );
+                map_meta_space_for_chunk(chunk_start);
+            }
+            self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
+
+            #[cfg(debug_assertions)]
+            if ASSERT_ALLOCATION {
+                debug_assert!(actual_size != 0);
+                self.active_mem.lock().unwrap().insert(address, actual_size);
+            }
+        }
+        address
+    }
+
+    pub fn free(&self, addr: Address) {
+        let ptr = addr.to_mut_ptr();
+        let bytes = unsafe { malloc_usable_size(ptr) };
+        trace!("Free memory {:?}", ptr);
+        unsafe {
+            free(ptr);
+        }
+        self.active_bytes.fetch_sub(bytes, Ordering::SeqCst);
+
+        #[cfg(debug_assertions)]
+        if ASSERT_ALLOCATION {
+            self.active_mem.lock().unwrap().insert(addr, 0).unwrap();
+        }
+    }
+
+    #[inline]
+    pub fn trace_object<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+    ) -> ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+        let address = object.to_address();
+        assert!(
+            self.in_space(object),
+            "Cannot mark an object {} that was not alloced by malloc.",
+            address,
+        );
+        if !is_marked(object) {
+            set_mark_bit(object);
+            trace.process_node(object);
+        }
+        object
+    }
+
+    pub unsafe fn release_all_chunks(&self) {
         let mut released_chunks: HashSet<Address> = HashSet::new();
 
         // To sum up the total size of live objects. We check this against the active_bytes we maintain.
@@ -218,86 +298,6 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             debug!("Release malloc chunk {} to {}", *c, *c + BYTES_IN_CHUNK);
             !released_chunks.contains(&*c)
         });
-    }
-}
-
-impl<VM: VMBinding> MallocSpace<VM> {
-    pub fn new() -> Self {
-        MallocSpace {
-            phantom: PhantomData,
-            active_bytes: AtomicUsize::new(0),
-            #[cfg(debug_assertions)]
-            active_mem: Mutex::new(HashMap::new()),
-        }
-    }
-
-    pub fn alloc(&self, tls: OpaquePointer, size: usize) -> Address {
-        // TODO: Should refactor this and Space.acquire()
-        if VM::VMActivePlan::global().poll(false, self) {
-            VM::VMCollection::block_for_gc(tls);
-            return unsafe { Address::zero() };
-        }
-
-        let raw = unsafe { calloc(1, size) };
-        let address = Address::from_mut_ptr(raw);
-
-        if !address.is_zero() {
-            let actual_size = unsafe { malloc_usable_size(raw) };
-            if !is_meta_space_mapped(address) {
-                let chunk_start = conversions::chunk_align_down(address);
-                debug!(
-                    "Add malloc chunk {} to {}",
-                    chunk_start,
-                    chunk_start + BYTES_IN_CHUNK
-                );
-                map_meta_space_for_chunk(chunk_start);
-            }
-            self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
-
-            #[cfg(debug_assertions)]
-            if ASSERT_ALLOCATION {
-                debug_assert!(actual_size != 0);
-                self.active_mem.lock().unwrap().insert(address, actual_size);
-            }
-        }
-        address
-    }
-
-    pub fn free(&self, addr: Address) {
-        let ptr = addr.to_mut_ptr();
-        let bytes = unsafe { malloc_usable_size(ptr) };
-        trace!("Free memory {:?}", ptr);
-        unsafe {
-            free(ptr);
-        }
-        self.active_bytes.fetch_sub(bytes, Ordering::SeqCst);
-
-        #[cfg(debug_assertions)]
-        if ASSERT_ALLOCATION {
-            self.active_mem.lock().unwrap().insert(addr, 0).unwrap();
-        }
-    }
-
-    #[inline]
-    pub fn trace_object<T: TransitiveClosure>(
-        &self,
-        trace: &mut T,
-        object: ObjectReference,
-    ) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        let address = object.to_address();
-        assert!(
-            self.in_space(object),
-            "Cannot mark an object {} that was not alloced by malloc.",
-            address,
-        );
-        if !is_marked(object) {
-            set_mark_bit(object);
-            trace.process_node(object);
-        }
-        object
     }
 }
 

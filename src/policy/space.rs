@@ -15,6 +15,7 @@ use crate::util::OpaquePointer;
 use crate::mmtk::SFT_MAP;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::layout::map::Map;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
@@ -266,27 +267,32 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
-            let rtn = pr.get_new_pages(
+            match pr.get_new_pages(
+                self.common().descriptor,
                 pages_reserved,
                 pages,
                 self.common().zeroed,
                 tls,
-                self.as_space(),
-            );
-            if rtn.is_zero() {
-                // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
-                if !allow_poll {
-                    panic!("Physical allocation failed when polling not allowed!");
-                }
+            ) {
+                Ok(res) => {
+                    self.grow_space(res.start, conversions::pages_to_bytes(res.pages), res.new_chunk);
+                    self.common().mmapper.ensure_mapped(res.start, res.pages, VM::VMActivePlan::global().global_side_metadata_per_chunk(), self.local_side_metadata_per_chunk());
 
-                let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
-                debug_assert!(gc_performed, "GC not performed when forced.");
-                pr.clear_request(pages_reserved);
-                VM::VMCollection::block_for_gc(tls);
-                unsafe { Address::zero() }
-            } else {
-                debug!("Space.acquire(), returned = {}", rtn);
-                rtn
+                    debug!("Space.acquire(), returned = {}", res.start);
+                    res.start
+                }
+                Err(_) => {
+                    // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
+                    if !allow_poll {
+                        panic!("Physical allocation failed when polling not allowed!");
+                    }
+
+                    let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
+                    debug_assert!(gc_performed, "GC not performed when forced.");
+                    pr.clear_request(pages_reserved);
+                    VM::VMCollection::block_for_gc(tls);
+                    unsafe { Address::zero() }
+                }
             }
         }
     }
@@ -302,24 +308,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn in_space(&self, object: ObjectReference) -> bool {
         let start = VM::VMObjectModel::ref_to_address(object);
         self.address_in_space(start)
-    }
-
-    /// # Safety
-    /// potential data race as this mutates 'common'
-    /// FIXME: This does not sound like 'unsafe', it is more like 'incorrect'. Any allocator/mutator may do slowpath allocation, and call this.
-    unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
-        // FIXME
-        let new_head: Address = self.common().vm_map().allocate_contiguous_chunks(
-            self.common().descriptor,
-            chunks,
-            self.common().head_discontiguous_region,
-        );
-        if new_head.is_zero() {
-            return Address::zero();
-        }
-
-        self.unsafe_common_mut().head_discontiguous_region = new_head;
-        new_head
     }
 
     /**
@@ -403,25 +391,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     #[allow(clippy::mut_from_ref)]
     unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM>;
 
-    fn release_discontiguous_chunks(&mut self, chunk: Address) {
-        debug_assert!(chunk == conversions::chunk_align_down(chunk));
-        if chunk == self.common().head_discontiguous_region {
-            self.common_mut().head_discontiguous_region =
-                self.common().vm_map().get_next_contiguous_region(chunk);
-        }
-        self.common().vm_map().free_contiguous_chunks(chunk);
-    }
-
     fn release_multiple_pages(&mut self, start: Address);
-
-    /// # Safety
-    /// TODO: I am not sure why this is unsafe.
-    unsafe fn release_all_chunks(&self) {
-        self.common()
-            .vm_map()
-            .free_all_chunks(self.common().head_discontiguous_region);
-        self.unsafe_common_mut().head_discontiguous_region = Address::zero();
-    }
 
     fn print_vm_map(&self) {
         let common = self.common();
@@ -449,7 +419,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 _ => {}
             }
         } else {
-            let mut a = common.head_discontiguous_region;
+            let mut a = self.get_page_resource().common().get_head_discontiguous_region();
             while !a.is_zero() {
                 print!(
                     "{}->{}",

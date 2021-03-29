@@ -1,12 +1,13 @@
-use crate::policy::space::Space;
 use crate::util::address::Address;
 use crate::util::OpaquePointer;
 use crate::vm::ActivePlan;
-
+use crate::util::conversions;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 use super::layout::map::Map;
 use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::vm::VMBinding;
 
 pub trait PageResource<VM: VMBinding>: 'static {
@@ -15,13 +16,13 @@ pub trait PageResource<VM: VMBinding>: 'static {
     /// Return The start of the first page if successful, zero on failure.
     fn get_new_pages(
         &self,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
         zeroed: bool,
         tls: OpaquePointer,
-        space: &dyn Space<VM>,
-    ) -> Address {
-        self.alloc_pages(reserved_pages, required_pages, zeroed, tls, space)
+    ) -> Result<PRAllocResult, PRAllocFail> {
+        self.alloc_pages(space_descriptor, reserved_pages, required_pages, zeroed, tls)
     }
 
     // XXX: In the original code reserve_pages & clear_request explicitly
@@ -59,12 +60,12 @@ pub trait PageResource<VM: VMBinding>: 'static {
 
     fn alloc_pages(
         &self,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
         zeroed: bool,
         tls: OpaquePointer,
-        space: &dyn Space<VM>,
-    ) -> Address;
+    ) -> Result<PRAllocResult, PRAllocFail>;
 
     fn adjust_for_metadata(&self, pages: usize) -> usize;
 
@@ -105,6 +106,14 @@ pub trait PageResource<VM: VMBinding>: 'static {
     }
 }
 
+pub struct PRAllocResult {
+    pub start: Address,
+    pub pages: usize,
+    pub new_chunk: bool,
+}
+
+pub struct PRAllocFail;
+
 pub struct CommonPageResource {
     reserved: AtomicUsize,
     committed: AtomicUsize,
@@ -113,6 +122,8 @@ pub struct CommonPageResource {
     pub growable: bool,
     // pub space: Option<&'static dyn Space<VM>>,
     vm_map: &'static VMMap,
+
+    head_discontiguous_region: Mutex<Address>,
 }
 
 impl CommonPageResource {
@@ -124,6 +135,8 @@ impl CommonPageResource {
             contiguous,
             growable,
             vm_map,
+
+            head_discontiguous_region: Mutex::new(Address::ZERO),
         }
     }
 
@@ -157,5 +170,41 @@ impl CommonPageResource {
 
     pub fn reset_committed(&self) {
         self.committed.store(0, Ordering::Relaxed);
+    }
+
+    pub fn inform_grow_discontiguous_space(&self, space_descriptor: SpaceDescriptor, chunks: usize) -> Address {
+        let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
+        // FIXME
+        let new_head: Address = self.vm_map.allocate_contiguous_chunks(
+            space_descriptor,
+            chunks,
+            *head_discontiguous_region,
+        );
+        if new_head.is_zero() {
+            return Address::ZERO;
+        }
+
+        *head_discontiguous_region = new_head;
+        new_head
+    }
+
+    pub fn inform_release_discontiguous_chunks(&self, chunk: Address) {
+        let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
+        debug_assert!(chunk == conversions::chunk_align_down(chunk));
+        if chunk == *head_discontiguous_region {
+            *head_discontiguous_region =
+                self.vm_map.get_next_contiguous_region(chunk);
+        }
+        self.vm_map.free_contiguous_chunks(chunk);
+    }
+
+    pub fn inform_release_all_chunks(&self) {
+        let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
+        self.vm_map.free_all_chunks(*head_discontiguous_region);
+        *head_discontiguous_region = Address::ZERO;
+    }
+
+    pub fn get_head_discontiguous_region(&self) -> Address {
+        *self.head_discontiguous_region.lock().unwrap()
     }
 }

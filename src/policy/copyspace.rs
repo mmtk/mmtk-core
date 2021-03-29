@@ -112,7 +112,7 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn release(&self) {
         unsafe {
-            self.pr.reset(self.as_space());
+            self.pr.reset();
         }
         self.from_space.store(false, Ordering::SeqCst);
     }
