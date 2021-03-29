@@ -2,8 +2,8 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Mutex, MutexGuard};
 
 use super::layout::map::Map;
+use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
-use super::pageresource::{PRAllocResult, PRAllocFail};
 use crate::util::address::Address;
 use crate::util::alloc::embedded_meta_data::*;
 use crate::util::constants::*;
@@ -11,8 +11,8 @@ use crate::util::conversions;
 use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
-use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::pageresource::CommonPageResource;
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::OpaquePointer;
 use crate::util::{generic_freelist, memory};
 use crate::vm::*;
@@ -89,7 +89,8 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         let mut new_chunk = false;
         let mut page_offset = self_mut.free_list.alloc(required_pages as _);
         if page_offset == generic_freelist::FAILURE && self.common.growable {
-            page_offset = self_mut.allocate_contiguous_chunks(space_descriptor, required_pages, &mut sync);
+            page_offset =
+                self_mut.allocate_contiguous_chunks(space_descriptor, required_pages, &mut sync);
             new_chunk = true;
         }
 
@@ -120,7 +121,11 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
             memory::zero(rtn, bytes);
         }
 
-        Result::Ok(PRAllocResult { start: rtn, pages: required_pages, new_chunk })
+        Result::Ok(PRAllocResult {
+            start: rtn,
+            pages: required_pages,
+            new_chunk,
+        })
     }
 
     fn adjust_for_metadata(&self, pages: usize) -> usize {
@@ -211,7 +216,9 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         );
         let mut rtn = generic_freelist::FAILURE;
         let required_chunks = crate::policy::space::required_chunks(pages);
-        let region = self.common.inform_grow_discontiguous_space(space_descriptor, required_chunks);
+        let region = self
+            .common
+            .inform_grow_discontiguous_space(space_descriptor, required_chunks);
 
         if !region.is_zero() {
             let region_start = conversions::bytes_to_pages(region - self.start);
@@ -315,11 +322,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         }
     }
 
-    fn release_free_chunks(
-        &mut self,
-        freed_page: Address,
-        pages_freed: usize,
-    ) {
+    fn release_free_chunks(&mut self, freed_page: Address, pages_freed: usize) {
         let page_offset = conversions::bytes_to_pages(freed_page - self.start);
 
         if self.meta_data_pages_per_region > 0 {
@@ -347,9 +350,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 debug_assert!(next_region_start < generic_freelist::MAX_UNITS as usize);
                 if pages_freed == next_region_start - region_start {
                     let start = self.start;
-                    self.free_contiguous_chunk(
-                        start + conversions::pages_to_bytes(region_start)
-                    );
+                    self.free_contiguous_chunk(start + conversions::pages_to_bytes(region_start));
                 }
             }
         }

@@ -10,8 +10,8 @@ use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::OpaquePointer;
 
 use super::layout::map::Map;
+use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
-use super::pageresource::{PRAllocResult, PRAllocFail};
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::vm::VMBinding;
@@ -120,7 +120,9 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         if !self.common().contiguous && tmp > sync.sentinel {
             /* we're out of virtual memory within our discontiguous region, so ask for more */
             let required_chunks = required_chunks(required_pages);
-            sync.current_chunk = self.common.inform_grow_discontiguous_space(space_descriptor, required_chunks); // Returns zero on failure
+            sync.current_chunk = self
+                .common
+                .inform_grow_discontiguous_space(space_descriptor, required_chunks); // Returns zero on failure
             sync.cursor = sync.current_chunk;
             sync.sentinel = sync.cursor
                 + if sync.current_chunk.is_zero() {
@@ -166,7 +168,11 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             }
             VM.events.tracePageAcquired(space, rtn, requiredPages);
             */
-            Result::Ok(PRAllocResult { start: rtn, pages: required_pages, new_chunk })
+            Result::Ok(PRAllocResult {
+                start: rtn,
+                pages: required_pages,
+                new_chunk,
+            })
         }
     }
 
@@ -280,10 +286,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
      }*/
 
     #[inline]
-    unsafe fn release_pages(
-        &self,
-        guard: &mut MutexGuard<MonotonePageResourceSync>,
-    ) {
+    unsafe fn release_pages(&self, guard: &mut MutexGuard<MonotonePageResourceSync>) {
         // TODO: concurrent zeroing
         if self.common().contiguous {
             guard.cursor = match guard.conditional {

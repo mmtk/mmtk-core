@@ -15,10 +15,10 @@ use crate::util::OpaquePointer;
 use crate::mmtk::SFT_MAP;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::layout::map::Map;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
+use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 
@@ -275,8 +275,17 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 tls,
             ) {
                 Ok(res) => {
-                    self.grow_space(res.start, conversions::pages_to_bytes(res.pages), res.new_chunk);
-                    self.common().mmapper.ensure_mapped(res.start, res.pages, VM::VMActivePlan::global().global_side_metadata_per_chunk(), self.local_side_metadata_per_chunk());
+                    self.grow_space(
+                        res.start,
+                        conversions::pages_to_bytes(res.pages),
+                        res.new_chunk,
+                    );
+                    self.common().mmapper.ensure_mapped(
+                        res.start,
+                        res.pages,
+                        VM::VMActivePlan::global().global_side_metadata_per_chunk(),
+                        self.local_side_metadata_per_chunk(),
+                    );
 
                     debug!("Space.acquire(), returned = {}", res.start);
                     res.start
@@ -409,7 +418,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 _ => {}
             }
         } else {
-            let mut a = self.get_page_resource().common().get_head_discontiguous_region();
+            let mut a = self
+                .get_page_resource()
+                .common()
+                .get_head_discontiguous_region();
             while !a.is_zero() {
                 print!(
                     "{}->{}",

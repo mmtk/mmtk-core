@@ -1,7 +1,7 @@
 use crate::util::address::Address;
+use crate::util::conversions;
 use crate::util::OpaquePointer;
 use crate::vm::ActivePlan;
-use crate::util::conversions;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
@@ -22,7 +22,13 @@ pub trait PageResource<VM: VMBinding>: 'static {
         zeroed: bool,
         tls: OpaquePointer,
     ) -> Result<PRAllocResult, PRAllocFail> {
-        self.alloc_pages(space_descriptor, reserved_pages, required_pages, zeroed, tls)
+        self.alloc_pages(
+            space_descriptor,
+            reserved_pages,
+            required_pages,
+            zeroed,
+            tls,
+        )
     }
 
     // XXX: In the original code reserve_pages & clear_request explicitly
@@ -172,7 +178,11 @@ impl CommonPageResource {
         self.committed.store(0, Ordering::Relaxed);
     }
 
-    pub fn inform_grow_discontiguous_space(&self, space_descriptor: SpaceDescriptor, chunks: usize) -> Address {
+    pub fn inform_grow_discontiguous_space(
+        &self,
+        space_descriptor: SpaceDescriptor,
+        chunks: usize,
+    ) -> Address {
         let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
         // FIXME
         let new_head: Address = self.vm_map.allocate_contiguous_chunks(
@@ -192,8 +202,7 @@ impl CommonPageResource {
         let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
         debug_assert!(chunk == conversions::chunk_align_down(chunk));
         if chunk == *head_discontiguous_region {
-            *head_discontiguous_region =
-                self.vm_map.get_next_contiguous_region(chunk);
+            *head_discontiguous_region = self.vm_map.get_next_contiguous_region(chunk);
         }
         self.vm_map.free_contiguous_chunks(chunk);
     }

@@ -205,7 +205,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         object
     }
 
-    pub unsafe fn release_all_chunks(&self) {
+    pub fn release_all_chunks(&self) {
         let mut released_chunks: HashSet<Address> = HashSet::new();
 
         // To sum up the total size of live objects. We check this against the active_bytes we maintain.
@@ -228,9 +228,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 trace!("Check address {}", address);
                 if is_alloced_object(address) {
                     // We know it is an object
-                    let object = address.to_object_reference();
+                    let object = unsafe { address.to_object_reference() };
                     let obj_start = VM::VMObjectModel::object_start_ref(object);
-                    let bytes = malloc_usable_size(obj_start.to_mut_ptr());
+                    let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
 
                     #[cfg(debug_assertions)]
                     if ASSERT_ALLOCATION {
@@ -262,9 +262,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
                         #[cfg(debug_assertions)]
                         {
                             // Accumulate live bytes
-                            live_bytes += malloc_usable_size(
-                                VM::VMObjectModel::object_start_ref(object).to_mut_ptr(),
-                            );
+                            live_bytes += unsafe {
+                                malloc_usable_size(
+                                    VM::VMObjectModel::object_start_ref(object).to_mut_ptr(),
+                                )
+                            };
                         }
                     }
 
