@@ -380,16 +380,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn common(&self) -> &CommonSpace<VM>;
-    fn common_mut(&mut self) -> &mut CommonSpace<VM> {
-        // SAFE: Reference is exclusive
-        unsafe { self.unsafe_common_mut() }
-    }
-
-    /// # Safety
-    /// This get's a mutable reference from self.
-    /// (i.e. make sure their are no concurrent accesses through self when calling this)_
-    #[allow(clippy::mut_from_ref)]
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM>;
 
     fn release_multiple_pages(&mut self, start: Address);
 

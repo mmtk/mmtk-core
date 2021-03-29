@@ -11,16 +11,12 @@ use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
-use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicBool, Ordering};
-
-// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
-unsafe impl<VM: VMBinding> Sync for CopySpace<VM> {}
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 pub struct CopySpace<VM: VMBinding> {
-    common: UnsafeCell<CommonSpace<VM>>,
+    common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
     from_space: AtomicBool,
 }
@@ -53,10 +49,7 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         &self.pr
     }
     fn common(&self) -> &CommonSpace<VM> {
-        unsafe { &*self.common.get() }
-    }
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
-        &mut *self.common.get()
+        &self.common
     }
 
     fn init(&mut self, _vm_map: &'static VMMap) {
@@ -101,7 +94,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                     vm_map,
                 )
             },
-            common: UnsafeCell::new(common),
+            common,
             from_space: AtomicBool::new(from_space),
         }
     }

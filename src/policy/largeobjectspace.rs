@@ -1,5 +1,3 @@
-use std::cell::UnsafeCell;
-
 use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
@@ -27,16 +25,13 @@ const PRECEEDING_GC_HEADER_WORDS: usize = 1;
 const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTES_IN_WORD;
 
 pub struct LargeObjectSpace<VM: VMBinding> {
-    common: UnsafeCell<CommonSpace<VM>>,
+    common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
     mark_state: u8,
     in_nursery_gc: bool,
     treadmill: TreadMill,
     header_byte: HeaderByte,
 }
-
-// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
-unsafe impl<VM: VMBinding> Sync for LargeObjectSpace<VM> {}
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn name(&self) -> &str {
@@ -88,11 +83,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn init(&mut self, _vm_map: &'static VMMap) {}
 
     fn common(&self) -> &CommonSpace<VM> {
-        unsafe { &*self.common.get() }
-    }
-
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
-        &mut *self.common.get()
+        &self.common
     }
 
     fn release_multiple_pages(&mut self, start: Address) {
@@ -128,7 +119,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             } else {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
-            common: UnsafeCell::new(common),
+            common,
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new(),

@@ -69,9 +69,6 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn common(&self) -> &CommonSpace<VM> {
         unreachable!()
     }
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
-        unreachable!()
-    }
 
     fn init(&mut self, _vm_map: &'static VMMap) {
         // Do nothing
