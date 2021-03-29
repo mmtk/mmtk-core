@@ -15,7 +15,6 @@ use super::PageResource;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::vm::VMBinding;
-use libc::{c_void, memset};
 use std::marker::PhantomData;
 
 pub struct MonotonePageResource<VM: VMBinding> {
@@ -65,7 +64,6 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         immut_required_pages: usize,
-        zeroed: bool,
         tls: OpaquePointer,
     ) -> Result<PRAllocResult, PRAllocFail> {
         debug!(
@@ -142,7 +140,6 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             Result::Err(PRAllocFail)
         } else {
             //debug!("tmp={:?} <= sync.sentinel={:?}", tmp, sync.sentinel);
-            let old = sync.cursor;
             sync.cursor = tmp;
             debug!("update cursor = {}", tmp);
 
@@ -152,22 +149,6 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             }
             self.commit_pages(reserved_pages, required_pages, tls);
 
-            // FIXME: concurrent zeroing
-            if zeroed {
-                unsafe {
-                    memset(old.to_mut_ptr() as *mut c_void, 0, bytes);
-                }
-            }
-            /*
-            if zeroed {
-                if !self.zero_concurrent {
-                    VM.memory.zero(zeroNT, old, bytes);
-                } else {
-                    while (cursor.GT(zeroingCursor));
-                }
-            }
-            VM.events.tracePageAcquired(space, rtn, requiredPages);
-            */
             Result::Ok(PRAllocResult {
                 start: rtn,
                 pages: required_pages,

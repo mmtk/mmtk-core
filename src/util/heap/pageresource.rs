@@ -19,16 +19,9 @@ pub trait PageResource<VM: VMBinding>: 'static {
         space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
-        zeroed: bool,
         tls: OpaquePointer,
     ) -> Result<PRAllocResult, PRAllocFail> {
-        self.alloc_pages(
-            space_descriptor,
-            reserved_pages,
-            required_pages,
-            zeroed,
-            tls,
-        )
+        self.alloc_pages(space_descriptor, reserved_pages, required_pages, tls)
     }
 
     // XXX: In the original code reserve_pages & clear_request explicitly
@@ -69,7 +62,6 @@ pub trait PageResource<VM: VMBinding>: 'static {
         space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
-        zeroed: bool,
         tls: OpaquePointer,
     ) -> Result<PRAllocResult, PRAllocFail>;
 

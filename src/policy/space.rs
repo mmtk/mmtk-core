@@ -21,6 +21,7 @@ use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
+use crate::util::memory;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -267,25 +268,21 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
-            match pr.get_new_pages(
-                self.common().descriptor,
-                pages_reserved,
-                pages,
-                self.common().zeroed,
-                tls,
-            ) {
+            match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
                 Ok(res) => {
-                    self.grow_space(
-                        res.start,
-                        conversions::pages_to_bytes(res.pages),
-                        res.new_chunk,
-                    );
+                    let bytes = conversions::pages_to_bytes(res.pages);
+                    self.grow_space(res.start, bytes, res.new_chunk);
                     self.common().mmapper.ensure_mapped(
                         res.start,
                         res.pages,
                         VM::VMActivePlan::global().global_side_metadata_per_chunk(),
                         self.local_side_metadata_per_chunk(),
                     );
+
+                    // TODO: Concurrent zeroing
+                    if self.common().zeroed {
+                        memory::zero(res.start, bytes);
+                    }
 
                     debug!("Space.acquire(), returned = {}", res.start);
                     res.start

@@ -8,13 +8,13 @@ use crate::util::address::Address;
 use crate::util::alloc::embedded_meta_data::*;
 use crate::util::constants::*;
 use crate::util::conversions;
+use crate::util::generic_freelist;
 use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::OpaquePointer;
-use crate::util::{generic_freelist, memory};
 use crate::vm::*;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
@@ -75,7 +75,6 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
-        zeroed: bool,
         tls: OpaquePointer,
     ) -> Result<PRAllocResult, PRAllocFail> {
         debug_assert!(
@@ -113,13 +112,8 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         }
 
         let rtn = self.start + conversions::pages_to_bytes(page_offset as _);
-        let bytes = conversions::pages_to_bytes(required_pages);
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
-
-        if zeroed {
-            memory::zero(rtn, bytes);
-        }
 
         Result::Ok(PRAllocResult {
             start: rtn,
