@@ -25,6 +25,7 @@ use crate::util::memory;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
+use std::sync::Mutex;
 
 use downcast_rs::Downcast;
 
@@ -268,8 +269,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
+
             match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
                 Ok(res) => {
+                    // The following code is moved from alloc_pages() in PageResource, and was guarded by a lock.
+                    // We keep a lock here, otherwise we have data race in the call for ensure_mapped().
+                    // TODO: We should look at the implementation of the mmapper. ensure_mapped() should be thread safe unless there is a bug.
+                    let _lock = self.common().acquire_lock.lock().unwrap();
+
                     let bytes = conversions::pages_to_bytes(res.pages);
                     self.grow_space(res.start, bytes, res.new_chunk);
                     self.common().mmapper.ensure_mapped(
@@ -317,7 +324,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     /**
-     * This hook is called by page resources each time a space grows.  The space may
+     * This is called after we get result from page resources.  The space may
      * tap into the hook to monitor heap growth.  The call is made from within the
      * page resources' critical region, immediately before yielding the lock.
      *
@@ -458,6 +465,8 @@ pub struct CommonSpace<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
 
+    pub acquire_lock: Mutex<()>,
+
     p: PhantomData<VM>,
 }
 
@@ -492,6 +501,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             head_discontiguous_region: unsafe { Address::zero() },
             vm_map,
             mmapper,
+            acquire_lock: Mutex::new(()),
             p: PhantomData,
         };
 
