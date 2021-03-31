@@ -131,6 +131,13 @@ impl<VM: VMBinding> CopySpace<VM> {
         semantics: AllocationSemantics,
         copy_context: &mut C,
     ) -> ObjectReference {
+        // let addr = object.value() & 0xfffffffffffffff;
+        // if !((0x0000_0200_0000_0000usize <= addr && addr <= 0x0000_0201_0000_0000usize)
+        //     || (0x0000_0400_0000_0000usize <= addr && addr <= 0x0000_0401_0000_0000usize)) || (object.value() & 0xff00000000000000 > 0x0300000000000000)
+        // {
+        //     panic!("trace_object({})", object);
+        // }
+
         trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
         if !self.from_space() {
             return object;

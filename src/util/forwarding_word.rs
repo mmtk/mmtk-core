@@ -3,6 +3,7 @@ use crate::util::gc_byte;
 use crate::util::{constants, Address, ObjectReference};
 use crate::vm::ObjectModel;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{borrow::Borrow, cell::RefCell};
 
 use crate::plan::{AllocationSemantics, CopyContext};
 use crate::vm::VMBinding;
@@ -18,35 +19,151 @@ const FORWARDING_MASK: u8 = 3;
 #[allow(unused)]
 const FORWARDING_BITS: usize = 2;
 
+thread_local! {
+    pub(crate) static HEADER_WORD_BKP: RefCell<usize> = RefCell::new(0);
+}
+
 pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
     match gc_byte_offset_in_forwarding_word::<VM>() {
         Some(fw_offset) => {
-            let mut old_word = read_forwarding_word::<VM>(object);
-            let forwarding_mask =
-                (FORWARDING_MASK as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
-            let forwarding_not_triggered_yet = (FORWARDING_NOT_TRIGGERED_YET as usize)
-                << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
-            let being_forwarded =
-                (BEING_FORWARDED as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
-            if old_word & forwarding_mask != forwarding_not_triggered_yet {
-                return ((old_word & forwarding_mask)
-                    >> (-fw_offset * constants::BITS_IN_BYTE as isize))
-                    as u8;
+            // FAST-PATH
+            // The common case is that worker threads see FORWARDED.
+            // Check this non-atomically, as a fast path
+            let old_word = read_forwarding_word::<VM>(object);
+
+            // let forwarding_mask =
+            //     (FORWARDING_MASK as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
+            // let forwarded = (FORWARDED as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
+
+            let lock_inflation_mask = 0x7usize;
+            let forwarding_mask = 0x0300000000000007usize;
+            let forwarded = 0x0300000000000001usize;
+            let being_forwarded = 0x0200000000000001usize;
+            let forwarding_not_triggered_yet = 0x1usize;
+
+            if old_word & forwarding_mask == forwarded {
+                // println!("FORWARDED(0x{:x}).obj({})", old_word, object);
+                return FORWARDED;
             }
-            while !compare_exchange_forwarding_word::<VM>(
-                object,
-                old_word,
-                old_word | being_forwarded,
-            ) {
-                old_word = read_forwarding_word::<VM>(object);
+
+            // SLOW-PATH
+            // not already forwarded
+
+            // let forwarding_not_triggered_yet = (FORWARDING_NOT_TRIGGERED_YET as usize)
+            //     << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
+            // let being_forwarded =
+            //     (BEING_FORWARDED as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
+
+            let mut old_word = atomic_read_forwarding_word::<VM>(object);
+
+            // save the header word value and change it to normal object for now
+            if old_word & lock_inflation_mask != 1 {
+                // println!("IF(0x{:x}).obj({})", old_word, object);
+                HEADER_WORD_BKP.with(|hw| {
+                    // println!("IF({}).HEADER_WORD = (0x{:x})", object, old_word);
+                    *hw.borrow_mut() = old_word;
+                });
+
+                // atomic_write_forwarding_word::<VM>(object, 1);
+                while !atomic_compare_exchange_forwarding_word::<VM>(object, old_word, 1) {
+                    let cur_word = atomic_read_forwarding_word::<VM>(object);
+                    // println!("IF({}).cur(0x{:x}).old(0x{:x})", object, cur_word, old_word);
+                    if cur_word != old_word {
+                        // old_word = cur_word;
+                        break;
+                    }
+                }
+                old_word = atomic_read_forwarding_word::<VM>(object);
+
                 if old_word & forwarding_mask != forwarding_not_triggered_yet {
-                    return ((old_word & forwarding_mask)
+                    let forwarding_stat = ((old_word & forwarding_mask)
                         >> (-fw_offset * constants::BITS_IN_BYTE as isize))
                         as u8;
+                    assert!(
+                        forwarding_stat == BEING_FORWARDED || forwarding_stat == FORWARDED,
+                        "attempt_to_forward({}).old_word(0x{:x})",
+                        object,
+                        old_word
+                    );
+
+                    // only one worker succeeds, the rest clear their header word backup
+                    HEADER_WORD_BKP.with(|hw| {
+                        // println!("IF({}).HEADER_WORD = (CLEAR)", object);
+                        *hw.borrow_mut() = 0;
+                    });
+
+                    return forwarding_stat;
+                }
+                while !atomic_compare_exchange_forwarding_word::<VM>(
+                    object,
+                    old_word,
+                    old_word | being_forwarded,
+                ) {
+                    // println!("IF({}).old(0x{:x})", old_word, old_word);
+                    old_word = atomic_read_forwarding_word::<VM>(object);
+                    if old_word & forwarding_mask != forwarding_not_triggered_yet {
+                        let forwarding_stat = ((old_word & forwarding_mask)
+                            >> (-fw_offset * constants::BITS_IN_BYTE as isize))
+                            as u8;
+                        assert!(
+                            forwarding_stat == BEING_FORWARDED || forwarding_stat == FORWARDED,
+                            "attempt_to_forward({}).old_word(0x{:x})",
+                            object,
+                            old_word
+                        );
+
+                        // only one worker succeeds, the rest clear their header word backup
+                        HEADER_WORD_BKP.with(|hw| {
+                            // println!("IF({}).HEADER_WORD = (CLEAR)", object);
+                            *hw.borrow_mut() = 0;
+                        });
+
+                        return forwarding_stat;
+                    }
+                }
+            } else {
+                // println!("ELSE(0x{:x}).obj({})", old_word, object);
+                if old_word & forwarding_mask != forwarding_not_triggered_yet {
+                    let forwarding_stat = ((old_word & forwarding_mask)
+                        >> (-fw_offset * constants::BITS_IN_BYTE as isize))
+                        as u8;
+                    assert!(
+                        forwarding_stat == BEING_FORWARDED || forwarding_stat == FORWARDED,
+                        "attempt_to_forward({}).old_word(0x{:x})",
+                        object,
+                        old_word
+                    );
+
+                    return forwarding_stat;
+                }
+                while !atomic_compare_exchange_forwarding_word::<VM>(
+                    object,
+                    old_word,
+                    old_word | being_forwarded,
+                ) {
+                    // println!("ELSE({}).old(0x{:x})", object, old_word);
+                    old_word = atomic_read_forwarding_word::<VM>(object);
+                    if old_word & forwarding_mask != forwarding_not_triggered_yet {
+                        let forwarding_stat = ((old_word & forwarding_mask)
+                            >> (-fw_offset * constants::BITS_IN_BYTE as isize))
+                            as u8;
+                        assert!(
+                            forwarding_stat == BEING_FORWARDED || forwarding_stat == FORWARDED,
+                            "attempt_to_forward({}).old_word(0x{:x})",
+                            object,
+                            old_word
+                        );
+
+                        return forwarding_stat;
+                    }
                 }
             }
 
-            ((old_word & forwarding_mask) >> (-fw_offset * constants::BITS_IN_BYTE as isize)) as u8
+            let res = ((old_word & forwarding_mask)
+                >> (-fw_offset * constants::BITS_IN_BYTE as isize)) as u8;
+            assert!(res == FORWARDING_NOT_TRIGGERED_YET);
+
+            return res;
         }
         None => {
             let mut old_value = gc_byte::read_gc_byte::<VM>(object);
@@ -72,20 +189,33 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     object: ObjectReference,
     gc_byte: u8,
 ) -> ObjectReference {
+    assert!(
+        gc_byte == BEING_FORWARDED || gc_byte == FORWARDED,
+        "spin_and_get_forwarded_object({}, 0x{:x})",
+        object,
+        gc_byte
+    );
     let mut gc_byte = gc_byte;
     while gc_byte & FORWARDING_MASK == BEING_FORWARDED {
+        // println!("spin_and_get_forwarded_object({}, 0x{:x})", object, gc_byte);
         gc_byte = match gc_byte_offset_in_forwarding_word::<VM>() {
             Some(fw_offset) => {
-                ((read_forwarding_word::<VM>(object)
+                ((atomic_read_forwarding_word::<VM>(object)
                     & ((FORWARDING_MASK as usize)
                         << (-fw_offset * constants::BITS_IN_BYTE as isize)))
                     >> (-fw_offset * constants::BITS_IN_BYTE as isize)) as u8
             }
             None => gc_byte::read_gc_byte::<VM>(object),
         };
+        assert!(
+            gc_byte == BEING_FORWARDED || gc_byte == FORWARDED,
+            "spin_and_get_forwarded_object({}).gc_byte(0x{:x})",
+            object,
+            gc_byte
+        );
     }
     if gc_byte & FORWARDING_MASK == FORWARDED {
-        let status_word = read_forwarding_word::<VM>(object);
+        let status_word = atomic_read_forwarding_word::<VM>(object);
         unsafe {
             match gc_byte_offset_in_forwarding_word::<VM>() {
                 Some(fw_offset) => {
@@ -93,7 +223,8 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
                     Address::from_usize(
                         status_word
                             & !((FORWARDING_MASK as usize)
-                                << (-fw_offset * constants::BITS_IN_BYTE as isize)),
+                                << (-fw_offset * constants::BITS_IN_BYTE as isize))
+                            & !(0x1),
                     )
                     .to_object_reference()
                 }
@@ -118,14 +249,22 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
     match gc_byte_offset_in_forwarding_word::<VM>() {
         Some(fw_offset) => {
-            write_forwarding_word::<VM>(
+            atomic_write_forwarding_word::<VM>(
                 object,
                 new_object.to_address().as_usize()
-                    | (FORWARDED as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize),
+                    | (FORWARDED as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize)
+                    | 0x1,
             );
+            let val = HEADER_WORD_BKP.with(|hw| *hw.borrow());
+            // println!("forward_object({}).HEADER_WORD => (0x{:x})", object, val);
+            atomic_write_forwarding_word::<VM>(new_object, val);
+            HEADER_WORD_BKP.with(|hw| {
+                // println!("forward_object({}).HEADER_WORD = (CLEAR)", object);
+                *hw.borrow_mut() = 0;
+            })
         }
         None => {
-            write_forwarding_word::<VM>(object, new_object.to_address().as_usize());
+            atomic_write_forwarding_word::<VM>(object, new_object.to_address().as_usize());
             gc_byte::write_gc_byte::<VM>(object, FORWARDED);
         }
     };
@@ -135,14 +274,14 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
 pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: ObjectReference) {
     match gc_byte_offset_in_forwarding_word::<VM>() {
         Some(fw_offset) => {
-            write_forwarding_word::<VM>(
+            atomic_write_forwarding_word::<VM>(
                 object,
                 ptr.to_address().as_usize()
                     | (FORWARDED as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize),
             );
         }
         None => {
-            write_forwarding_word::<VM>(object, ptr.to_address().as_usize());
+            atomic_write_forwarding_word::<VM>(object, ptr.to_address().as_usize());
             gc_byte::write_gc_byte::<VM>(object, FORWARDED);
         }
     }
@@ -151,7 +290,7 @@ pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: Objec
 pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
     let forwarding_stat = match gc_byte_offset_in_forwarding_word::<VM>() {
         Some(fw_offset) => {
-            ((read_forwarding_word::<VM>(object)
+            ((atomic_read_forwarding_word::<VM>(object)
                 & ((FORWARDING_MASK as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize)))
                 >> (-fw_offset * constants::BITS_IN_BYTE as isize)) as u8
         }
@@ -163,7 +302,7 @@ pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
 pub fn is_forwarded_or_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
     let forwarding_stat = match gc_byte_offset_in_forwarding_word::<VM>() {
         Some(fw_offset) => {
-            ((read_forwarding_word::<VM>(object)
+            ((atomic_read_forwarding_word::<VM>(object)
                 & ((FORWARDING_MASK as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize)))
                 >> (-fw_offset * constants::BITS_IN_BYTE as isize)) as u8
         }
@@ -183,15 +322,15 @@ pub fn state_is_being_forwarded(gc_byte: u8) -> bool {
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
     match gc_byte_offset_in_forwarding_word::<VM>() {
         Some(fw_offset) => {
-            let mut old_word = read_forwarding_word::<VM>(object);
+            let mut old_word = atomic_read_forwarding_word::<VM>(object);
             let forwarding_mask =
                 (FORWARDING_MASK as usize) << (-fw_offset * constants::BITS_IN_BYTE as isize); // is constant
-            while !compare_exchange_forwarding_word::<VM>(
+            while !atomic_compare_exchange_forwarding_word::<VM>(
                 object,
                 old_word,
                 old_word & !forwarding_mask,
             ) {
-                old_word = read_forwarding_word::<VM>(object);
+                old_word = atomic_read_forwarding_word::<VM>(object);
             }
         }
         None => {
@@ -239,20 +378,42 @@ fn get_forwarding_word_address<VM: VMBinding>(object: ObjectReference) -> Addres
     }
 }
 
-pub fn read_forwarding_word<VM: VMBinding>(object: ObjectReference) -> usize {
-    unsafe {
+pub fn atomic_read_forwarding_word<VM: VMBinding>(object: ObjectReference) -> usize {
+    let res = unsafe {
         get_forwarding_word_address::<VM>(object).atomic_load::<AtomicUsize>(Ordering::SeqCst)
-    }
+    };
+    let gcb = (res & 0xff00000000000000) >> 56;
+    assert!(
+        gcb == 0 || gcb == 2 || gcb == 3 || res & 0x7 == 0x1,
+        "atomic_read_forwarding_word({}).fw(0x{:x})",
+        object,
+        res
+    );
+
+    res
 }
 
-pub fn write_forwarding_word<VM: VMBinding>(object: ObjectReference, val: usize) {
+pub fn atomic_write_forwarding_word<VM: VMBinding>(object: ObjectReference, val: usize) {
     trace!("GCForwardingWord::write({:#?}, {:x})\n", object, val);
     unsafe {
         get_forwarding_word_address::<VM>(object).atomic_store::<AtomicUsize>(val, Ordering::SeqCst)
     }
 }
 
-pub fn compare_exchange_forwarding_word<VM: VMBinding>(
+pub fn read_forwarding_word<VM: VMBinding>(object: ObjectReference) -> usize {
+    let res = unsafe { get_forwarding_word_address::<VM>(object).load::<usize>() };
+    // let gcb = (res & 0xff00000000000000) >> 56;
+    // assert!(
+    //     gcb == 0 || gcb == 2 || gcb == 3 || res & 0x7 == 0x1,
+    //     "read_forwarding_word({}).fw(0x{:x})",
+    //     object,
+    //     res
+    // );
+
+    res
+}
+
+pub fn atomic_compare_exchange_forwarding_word<VM: VMBinding>(
     object: ObjectReference,
     old: usize,
     new: usize,

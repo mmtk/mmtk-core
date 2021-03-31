@@ -368,6 +368,8 @@ pub trait ProcessEdgesWork:
 
     #[inline]
     fn process_node(&mut self, object: ObjectReference) {
+        let addr = object.value();
+        assert!((addr >= 0x0000_0200_0000_0000usize && addr < 0x0000_0201_0000_0000usize) || (addr >= 0x0000_0400_0000_0000usize && addr < 0x0000_0401_0000_0000usize), "process_node({})", object);
         if self.nodes.is_empty() {
             self.nodes.reserve(Self::CAPACITY);
         }
@@ -397,6 +399,8 @@ pub trait ProcessEdgesWork:
 
     #[inline]
     fn process_edge(&mut self, slot: Address) {
+        let addr = slot.as_usize();
+        assert!((addr >= 0x0000_0200_0000_0000usize && addr < 0x0000_0201_0000_0000usize) || (addr >= 0x0000_0400_0000_0000usize && addr < 0x0000_0401_0000_0000usize) || (addr >= 0x7f00_0000_0000usize && addr < 0x8000_0000_0000usize), "process_edge({})", slot);
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
         if Self::OVERWRITE_REFERENCE {
