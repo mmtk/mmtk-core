@@ -9,6 +9,7 @@ use crate::plan::mygc::mutator::create_mygc_mutator;
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
+use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace; // Add
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*; // Add
@@ -22,10 +23,9 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::plan::PlanConstraints;
-use std::sync::atomic::{AtomicBool, Ordering}; // Add 
-use std::sync::Arc;
 use enum_map::EnumMap;
+use std::sync::atomic::{AtomicBool, Ordering}; // Add
+use std::sync::Arc;
 // Remove #[allow(unused_imports)].
 // Remove handle_user_collection_request.
 // ANCHOR_END: imports
@@ -37,10 +37,10 @@ pub const ALLOC_MyGC: AllocationSemantics = AllocationSemantics::Default; // Add
 // Modify
 // ANCHOR: plan_def
 pub struct MyGC<VM: VMBinding> {
-    pub hi: AtomicBool, 
+    pub hi: AtomicBool,
     pub copyspace0: CopySpace<VM>,
     pub copyspace1: CopySpace<VM>,
-    pub common: CommonPlan<VM>, 
+    pub common: CommonPlan<VM>,
 }
 // ANCHOR_END: plan_def
 
@@ -78,7 +78,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // Modify
     // ANCHOR: gc_init
     fn gc_init(
-        &mut self, 
+        &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
@@ -91,13 +91,15 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // Modify
     // ANCHOR: schedule_collection
-    fn schedule_collection(&'static self, scheduler:&MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<MyGCProcessEdges<VM>>::new());
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<Self, MyGCCopyContext<VM>>::new(self));
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<Self, MyGCCopyContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<Self, MyGCCopyContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<Self, MyGCCopyContext<VM>>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
     }
     // ANCHOR_END: schedule_collection
@@ -114,7 +116,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         self.hi
             .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
         // Flips 'hi' to flip space definitions
-        let hi = self.hi.load(Ordering::SeqCst); 
+        let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
     }
@@ -134,7 +136,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         self.tospace().reserved_pages()
     }
     // ANCHOR_END: plan_get_collection_reserve
- 
+
     // Modify
     // ANCHOR: plan_get_pages_used
     fn get_pages_used(&self) -> usize {
@@ -191,11 +193,11 @@ impl<VM: VMBinding> MyGC<VM> {
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, &[]),
         }
     }
     // ANCHOR_END: plan_new
-    
+
     // ANCHOR: plan_space_access
     pub fn tospace(&self) -> &CopySpace<VM> {
         if self.hi.load(Ordering::SeqCst) {

@@ -5,11 +5,14 @@ use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::side_metadata::address_to_meta_address;
 use crate::util::side_metadata::load_atomic;
+#[cfg(target_pointer_width = "32")]
 use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::side_metadata::store_atomic;
 use crate::util::side_metadata::try_map_metadata_space;
 use crate::util::side_metadata::SideMetadataScope;
 use crate::util::side_metadata::SideMetadataSpec;
+#[cfg(target_pointer_width = "64")]
+use crate::util::side_metadata::{metadata_address_range_size, LOCAL_SIDE_METADATA_BASE_ADDRESS};
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -30,13 +33,14 @@ lazy_static! {
     pub static ref MARK_MAP: RwLock<HashSet<ObjectReference>> = RwLock::default();
 }
 
+#[cfg(target_pointer_width = "32")]
 pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::PolicySpecific,
     offset: 0,
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
-
+#[cfg(target_pointer_width = "32")]
 pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::PolicySpecific,
     offset: ALLOC_METADATA_SPEC.offset
@@ -44,6 +48,21 @@ pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
             ALLOC_METADATA_SPEC.log_min_obj_size,
             ALLOC_METADATA_SPEC.log_num_of_bits,
         ),
+    log_num_of_bits: 0,
+    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
+};
+
+#[cfg(target_pointer_width = "64")]
+pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    scope: SideMetadataScope::PolicySpecific,
+    offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+    log_num_of_bits: 0,
+    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
+};
+#[cfg(target_pointer_width = "64")]
+pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    scope: SideMetadataScope::PolicySpecific,
+    offset: ALLOC_METADATA_SPEC.offset + metadata_address_range_size(ALLOC_METADATA_SPEC),
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
@@ -62,16 +81,14 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
     let mmap_metadata_result = try_map_metadata_space(
         chunk_start,
         BYTES_IN_CHUNK,
-        0,
-        meta_bytes_per_chunk(
-            ALLOC_METADATA_SPEC.log_min_obj_size,
-            ALLOC_METADATA_SPEC.log_num_of_bits,
-        ) + meta_bytes_per_chunk(
-            MARKING_METADATA_SPEC.log_min_obj_size,
-            MARKING_METADATA_SPEC.log_num_of_bits,
-        ),
+        &[],
+        &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
     );
-    debug_assert!(mmap_metadata_result, "mmap sidemetadata failed");
+    debug_assert!(
+        mmap_metadata_result.is_ok(),
+        "mmap sidemetadata failed for chunk_start ({})",
+        chunk_start
+    );
 }
 
 // Check if a given object was allocated by malloc
