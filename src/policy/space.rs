@@ -25,7 +25,6 @@ use crate::util::memory;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
-use std::sync::Mutex;
 
 use downcast_rs::Downcast;
 
@@ -272,11 +271,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
             match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
                 Ok(res) => {
-                    // The following code is moved from alloc_pages() in PageResource, and was guarded by a lock.
-                    // We keep a lock here, otherwise we have data race in the call for ensure_mapped().
-                    // TODO: We should look at the implementation of the mmapper. ensure_mapped() should be thread safe unless there is a bug.
-                    let _lock = self.common().acquire_lock.lock().unwrap();
-
+                    // The following code was guarded by a page resource lock in Java MMTk.
+                    // I think they are thread safe and we do not need a lock. So they
+                    // are no longer guarded by a lock. If we see any issue here, considering
+                    // adding a space lock here.
                     let bytes = conversions::pages_to_bytes(res.pages);
                     self.grow_space(res.start, bytes, res.new_chunk);
                     self.common().mmapper.ensure_mapped(
@@ -465,8 +463,6 @@ pub struct CommonSpace<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
 
-    pub acquire_lock: Mutex<()>,
-
     p: PhantomData<VM>,
 }
 
@@ -501,7 +497,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
             head_discontiguous_region: unsafe { Address::zero() },
             vm_map,
             mmapper,
-            acquire_lock: Mutex::new(()),
             p: PhantomData,
         };
 
