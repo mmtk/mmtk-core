@@ -59,6 +59,10 @@ sanity = []
 analysis = []
 # Use a HashSet of chunks for sweep
 chunk_hashset = []
+# Only parallelize the release part of sweep phase
+sweep_parallel_release = []
+# Sequential sweep phase
+sweep_seq = []
 # Use lock free variant of NoGC
 nogc_lock_free = []
 # Use lock free with no zeroing NoGC
