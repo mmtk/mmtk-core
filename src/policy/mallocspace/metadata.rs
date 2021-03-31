@@ -51,7 +51,6 @@ pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
-
 #[cfg(target_pointer_width = "32")]
 pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::PolicySpecific,
@@ -91,7 +90,6 @@ pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
-
 #[cfg(target_pointer_width = "64")]
 pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::PolicySpecific,
