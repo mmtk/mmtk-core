@@ -226,6 +226,7 @@ use crate::plan::mygc::mutator::create_mygc_mutator;
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
+use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace; // Add
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*; // Add
@@ -239,10 +240,9 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
-use crate::plan::PlanConstraints;
-use std::sync::atomic::{AtomicBool, Ordering}; // Add 
-use std::sync::Arc;
 use enum_map::EnumMap;
+use std::sync::atomic::{AtomicBool, Ordering}; // Add
+use std::sync::Arc;
 // Remove #[allow(unused_imports)].
 // Remove handle_user_collection_request.
 <span class="boring">}
@@ -263,10 +263,10 @@ This holds an instance of the common plan.</li>
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct MyGC&lt;VM: VMBinding&gt; {
-    pub hi: AtomicBool, 
+    pub hi: AtomicBool,
     pub copyspace0: CopySpace&lt;VM&gt;,
     pub copyspace1: CopySpace&lt;VM&gt;,
-    pub common: CommonPlan&lt;VM&gt;, 
+    pub common: CommonPlan&lt;VM&gt;,
 }
 <span class="boring">}
 </span></code></pre></pre>
@@ -330,7 +330,7 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
                 mmapper,
                 &amp;mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &amp;MYGC_CONSTRAINTS),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &amp;MYGC_CONSTRAINTS, &amp;[]),
         }
     }
 <span class="boring">}
@@ -343,7 +343,7 @@ initializer calls are identical.</p>
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn gc_init(
-        &amp;mut self, 
+        &amp;mut self,
         heap_size: usize,
         vm_map: &amp;'static VMMap,
         scheduler: &amp;Arc&lt;MMTkScheduler&lt;VM&gt;&gt;,

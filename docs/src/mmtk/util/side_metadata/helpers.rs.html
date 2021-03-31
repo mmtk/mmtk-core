@@ -162,231 +162,167 @@
 <span id="159">159</span>
 <span id="160">160</span>
 <span id="161">161</span>
-<span id="162">162</span>
-<span id="163">163</span>
-<span id="164">164</span>
-<span id="165">165</span>
-<span id="166">166</span>
-<span id="167">167</span>
-<span id="168">168</span>
-<span id="169">169</span>
-<span id="170">170</span>
-<span id="171">171</span>
-<span id="172">172</span>
-<span id="173">173</span>
-<span id="174">174</span>
-<span id="175">175</span>
-<span id="176">176</span>
-<span id="177">177</span>
-<span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
-<span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">SideMetadataSpec</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">LOG_BYTES_IN_CHUNK</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">constants</span>, <span class="ident">Address</span>};
+<span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">memory</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{
+    <span class="ident">constants</span>::{<span class="ident">BITS_IN_WORD</span>, <span class="ident">BYTES_IN_PAGE</span>, <span class="ident">LOG_BITS_IN_BYTE</span>},
+    <span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">LOG_ADDRESS_SPACE</span>,
+};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="prelude-ty">Result</span>;
 
+<span class="doccomment">/// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">address_to_meta_chunk_addr</span>(<span class="ident">data_addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
-    <span class="ident">SIDE_METADATA_BASE_ADDRESS</span>
-        <span class="op">+</span> ((<span class="ident">data_addr</span>.<span class="ident">as_usize</span>() <span class="op">&amp;</span> <span class="op">!</span><span class="ident">CHUNK_MASK</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">SIDE_METADATA_WORST_CASE_RATIO_LOG</span>)
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">address_to_contiguous_meta_address</span>(
+    <span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>,
+    <span class="ident">data_addr</span>: <span class="ident">Address</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">let</span> <span class="ident">log_bits_num</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span> <span class="kw">as</span> <span class="ident">i32</span>;
+    <span class="kw">let</span> <span class="ident">log_min_obj_size</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_min_obj_size</span> <span class="kw">as</span> <span class="ident">usize</span>;
+
+    <span class="kw">let</span> <span class="ident">rshift</span> <span class="op">=</span> (<span class="ident">LOG_BITS_IN_BYTE</span> <span class="kw">as</span> <span class="ident">i32</span>) <span class="op">-</span> <span class="ident">log_bits_num</span>;
+
+    <span class="kw">unsafe</span> {
+        <span class="kw">if</span> <span class="ident">rshift</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">metadata_spec</span>.<span class="ident">offset</span> <span class="op">+</span> ((<span class="ident">data_addr</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">log_min_obj_size</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">rshift</span>))
+        } <span class="kw">else</span> {
+            <span class="ident">Address</span>::<span class="ident">from_usize</span>(
+                <span class="ident">metadata_spec</span>.<span class="ident">offset</span> <span class="op">+</span> ((<span class="ident">data_addr</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">log_min_obj_size</span>) <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="op">-</span><span class="ident">rshift</span>)),
+            )
+        }
+    }
 }
 
+<span class="doccomment">/// Unmaps the specified metadata range, or panics.</span>
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">ensure_munmap_metadata</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
+    <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;ensure_munmap_metadata({}, 0x{:x})&quot;</span>, <span class="ident">start</span>, <span class="ident">size</span>);
+
+    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">memory</span>::<span class="ident">try_munmap</span>(<span class="ident">start</span>, <span class="ident">size</span>).<span class="ident">is_ok</span>())
+}
+
+<span class="doccomment">/// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)</span>
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">ensure_munmap_contiguos_metadata_space</span>(
+    <span class="ident">start</span>: <span class="ident">Address</span>,
+    <span class="ident">size</span>: <span class="ident">usize</span>,
+    <span class="ident">spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>,
+) {
+    <span class="comment">// nearest page-aligned starting address</span>
+    <span class="kw">let</span> <span class="ident">mmap_start</span> <span class="op">=</span> <span class="ident">address_to_meta_address</span>(<span class="kw-2">*</span><span class="ident">spec</span>, <span class="ident">start</span>).<span class="ident">align_down</span>(<span class="ident">BYTES_IN_PAGE</span>);
+    <span class="comment">// nearest page-aligned ending address</span>
+    <span class="kw">let</span> <span class="ident">mmap_size</span> <span class="op">=</span>
+        <span class="ident">address_to_meta_address</span>(<span class="kw-2">*</span><span class="ident">spec</span>, <span class="ident">start</span> <span class="op">+</span> <span class="ident">size</span>).<span class="ident">align_up</span>(<span class="ident">BYTES_IN_PAGE</span>) <span class="op">-</span> <span class="ident">mmap_start</span>;
+    <span class="kw">if</span> <span class="ident">mmap_size</span> <span class="op">&gt;</span> <span class="number">0</span> {
+        <span class="ident">ensure_munmap_metadata</span>(<span class="ident">mmap_start</span>, <span class="ident">mmap_size</span>);
+    }
+}
+
+<span class="doccomment">/// Tries to mmap the metadata space (`spec`) for the specified data address range (`start` and `size`).</span>
+<span class="doccomment">/// Setting `no_reserve` to true means the function will only map address range, without reserving swap-space/physical memory.</span>
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">try_mmap_contiguous_metadata_space</span>(
+    <span class="ident">start</span>: <span class="ident">Address</span>,
+    <span class="ident">size</span>: <span class="ident">usize</span>,
+    <span class="ident">spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>,
+    <span class="ident">no_reserve</span>: <span class="ident">bool</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_PAGE</span>));
+    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">size</span> <span class="op">%</span> <span class="ident">BYTES_IN_PAGE</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
+
+    <span class="comment">// nearest page-aligned starting address</span>
+    <span class="kw">let</span> <span class="ident">mmap_start</span> <span class="op">=</span> <span class="ident">address_to_meta_address</span>(<span class="kw-2">*</span><span class="ident">spec</span>, <span class="ident">start</span>).<span class="ident">align_down</span>(<span class="ident">BYTES_IN_PAGE</span>);
+    <span class="comment">// nearest page-aligned ending address</span>
+    <span class="kw">let</span> <span class="ident">mmap_size</span> <span class="op">=</span>
+        <span class="ident">address_to_meta_address</span>(<span class="kw-2">*</span><span class="ident">spec</span>, <span class="ident">start</span> <span class="op">+</span> <span class="ident">size</span>).<span class="ident">align_up</span>(<span class="ident">BYTES_IN_PAGE</span>) <span class="op">-</span> <span class="ident">mmap_start</span>;
+    <span class="kw">if</span> <span class="ident">mmap_size</span> <span class="op">&gt;</span> <span class="number">0</span> {
+        <span class="comment">// FIXME - This assumes that we never mmap a metadata page twice.</span>
+        <span class="comment">// While this never happens in our current use-cases where the minimum data mmap size is a chunk and the metadata ratio is larger than 1/64, it could happen if (min_data_mmap_size * metadata_ratio) is smaller than a page.</span>
+        <span class="comment">// E.g. the current implementation detects such a case as an overlap and returns false.</span>
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">no_reserve</span> {
+            <span class="ident">try_mmap_metadata</span>(<span class="ident">mmap_start</span>, <span class="ident">mmap_size</span>)
+        } <span class="kw">else</span> {
+            <span class="ident">try_mmap_metadata_address_range</span>(<span class="ident">mmap_start</span>, <span class="ident">mmap_size</span>)
+        }
+    } <span class="kw">else</span> {
+        <span class="prelude-val">Ok</span>(())
+    }
+}
+
+<span class="doccomment">/// Tries to map the specified metadata address range (`start` and `size`), without reserving swap-space for it.</span>
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">try_mmap_metadata_address_range</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">memory</span>::<span class="ident">mmap_noreserve</span>(<span class="ident">start</span>, <span class="ident">size</span>);
+    <span class="macro">trace</span><span class="macro">!</span>(
+        <span class="string">&quot;try_mmap_metadata_address_range({}, 0x{:x}) -&gt; {:#?}&quot;</span>,
+        <span class="ident">start</span>,
+        <span class="ident">size</span>,
+        <span class="ident">res</span>
+    );
+    <span class="ident">res</span>
+}
+
+<span class="doccomment">/// Tries to map the specified metadata space (`start` and `size`), including reservation of swap-space/physical memory.</span>
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">try_mmap_metadata</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">size</span> <span class="op">&gt;</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">size</span> <span class="op">%</span> <span class="ident">BYTES_IN_PAGE</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
+
+    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">memory</span>::<span class="ident">dzmmap</span>(<span class="ident">start</span>, <span class="ident">size</span>);
+    <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;try_mmap_metadata({}, 0x{:x}) -&gt; {:#?}&quot;</span>, <span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">res</span>);
+    <span class="ident">res</span>
+}
+
+<span class="doccomment">/// Performs the translation of data address (`data_addr`) to metadata address for the specified metadata (`metadata_spec`).</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">address_to_meta_address</span>(
     <span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>,
     <span class="ident">data_addr</span>: <span class="ident">Address</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
-    <span class="kw">let</span> <span class="ident">bits_num_log</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span> <span class="kw">as</span> <span class="ident">i32</span>;
-    <span class="kw">let</span> <span class="ident">log_min_obj_size</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_min_obj_size</span> <span class="kw">as</span> <span class="ident">i32</span>;
-    <span class="kw">let</span> <span class="ident">first_offset</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">scope</span>.<span class="ident">is_global</span>() {
-        <span class="ident">metadata_spec</span>.<span class="ident">offset</span>
-    } <span class="kw">else</span> {
-        <span class="ident">metadata_spec</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="ident">POLICY_SIDE_METADATA_OFFSET</span>
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> {
+        <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">scope</span>.<span class="ident">is_global</span>() {
+            <span class="ident">address_to_contiguous_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>)
+        } <span class="kw">else</span> {
+            <span class="ident">address_to_chunked_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>)
+        }
     };
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> { <span class="ident">address_to_contiguous_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>) };
 
-    <span class="kw">let</span> <span class="ident">meta_chunk_addr</span> <span class="op">=</span> <span class="ident">address_to_meta_chunk_addr</span>(<span class="ident">data_addr</span>);
-    <span class="kw">let</span> <span class="ident">internal_addr</span> <span class="op">=</span> <span class="ident">data_addr</span>.<span class="ident">as_usize</span>() <span class="op">&amp;</span> <span class="ident">CHUNK_MASK</span>;
-    <span class="kw">let</span> <span class="ident">rshift</span> <span class="op">=</span> (<span class="ident">constants</span>::<span class="ident">LOG_BITS_IN_BYTE</span> <span class="kw">as</span> <span class="ident">i32</span>) <span class="op">+</span> <span class="ident">log_min_obj_size</span> <span class="op">-</span> <span class="ident">bits_num_log</span>;
-    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">rshift</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span>);
+    <span class="macro">trace</span><span class="macro">!</span>(
+        <span class="string">&quot;address_to_meta_address(addr: {}, off: 0x{:x}, lbits: {}, lmin: {}) -&gt; 0x{:x}&quot;</span>,
+        <span class="ident">data_addr</span>,
+        <span class="ident">metadata_spec</span>.<span class="ident">offset</span>,
+        <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>,
+        <span class="ident">metadata_spec</span>.<span class="ident">log_min_obj_size</span>,
+        <span class="ident">res</span>
+    );
 
-    <span class="kw">let</span> <span class="ident">second_offset</span> <span class="op">=</span> <span class="ident">internal_addr</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">rshift</span>;
+    <span class="ident">res</span>
+}
 
-    <span class="ident">meta_chunk_addr</span> <span class="op">+</span> <span class="ident">first_offset</span> <span class="op">+</span> <span class="ident">second_offset</span>
+<span class="kw">const</span> <span class="kw">fn</span> <span class="ident">addr_rshift</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">i32</span> {
+    ((<span class="ident">LOG_BITS_IN_BYTE</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">+</span> <span class="ident">metadata_spec</span>.<span class="ident">log_min_obj_size</span> <span class="op">-</span> <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>)
+        <span class="kw">as</span> <span class="ident">i32</span>
+}
+
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
+<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">metadata_address_range_size</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="number">1usize</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">LOG_ADDRESS_SPACE</span> <span class="op">-</span> <span class="ident">addr_rshift</span>(<span class="ident">metadata_spec</span>) <span class="kw">as</span> <span class="ident">usize</span>)
 }
 
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">meta_bytes_per_chunk</span>(<span class="ident">log_min_obj_size</span>: <span class="ident">usize</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-    <span class="number">1usize</span>
-        <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">LOG_BYTES_IN_CHUNK</span> <span class="op">-</span> (<span class="ident">constants</span>::<span class="ident">LOG_BITS_IN_BYTE</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">-</span> <span class="ident">log_min_obj_size</span>
-            <span class="op">+</span> <span class="ident">log_num_of_bits</span>)
-}
-
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">meta_byte_lshift</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
-    <span class="kw">let</span> <span class="ident">bits_num_log</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>;
-    <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">=</span><span class="op">=</span> <span class="number">3</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">meta_byte_lshift</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
+    <span class="kw">let</span> <span class="ident">bits_num_log</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span> <span class="kw">as</span> <span class="ident">i32</span>;
+    <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">3</span> {
         <span class="kw">return</span> <span class="number">0</span>;
     }
-    <span class="kw">let</span> <span class="ident">rem_shift</span> <span class="op">=</span>
-        <span class="ident">constants</span>::<span class="ident">BITS_IN_WORD</span> <span class="op">-</span> ((<span class="ident">constants</span>::<span class="ident">LOG_BITS_IN_BYTE</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">-</span> <span class="ident">bits_num_log</span>);
-    ((((<span class="ident">data_addr</span>.<span class="ident">as_usize</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">metadata_spec</span>.<span class="ident">log_min_obj_size</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">rem_shift</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">rem_shift</span>)
-        <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">bits_num_log</span>) <span class="kw">as</span> <span class="ident">u8</span>
+    <span class="kw">let</span> <span class="ident">rem_shift</span> <span class="op">=</span> <span class="ident">BITS_IN_WORD</span> <span class="kw">as</span> <span class="ident">i32</span> <span class="op">-</span> ((<span class="ident">LOG_BITS_IN_BYTE</span> <span class="kw">as</span> <span class="ident">i32</span>) <span class="op">-</span> <span class="ident">bits_num_log</span>);
+    ((((<span class="ident">data_addr</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">metadata_spec</span>.<span class="ident">log_min_obj_size</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">rem_shift</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">rem_shift</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">bits_num_log</span>)
+        <span class="kw">as</span> <span class="ident">u8</span>
 }
 
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">meta_byte_mask</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">meta_byte_mask</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
     <span class="kw">let</span> <span class="ident">bits_num_log</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>;
     ((<span class="number">1usize</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="number">1usize</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">bits_num_log</span>)) <span class="op">-</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">u8</span>
-}
-
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">address_to_meta_address</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">constants</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">global</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">helpers</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_address_to_meta_address</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
-            <span class="ident">offset</span>: <span class="number">0</span>,
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
-        };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">PolicySpecific</span>,
-            <span class="ident">offset</span>: <span class="number">0</span>,
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
-        };
-
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>()
-        );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0</span>) }).<span class="ident">as_usize</span>(),
-            (<span class="ident">SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="ident">POLICY_SIDE_METADATA_OFFSET</span>).<span class="ident">as_usize</span>()
-        );
-
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>) })
-                .<span class="ident">as_usize</span>(),
-            <span class="ident">SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> (<span class="ident">meta_bytes_per_chunk</span>(<span class="number">0</span>, <span class="number">0</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>)
-        );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>) })
-                .<span class="ident">as_usize</span>(),
-            (<span class="ident">SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="ident">POLICY_SIDE_METADATA_OFFSET</span>).<span class="ident">as_usize</span>()
-                <span class="op">+</span> (<span class="ident">meta_bytes_per_chunk</span>(<span class="number">0</span>, <span class="number">0</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>)
-        );
-
-        <span class="ident">gspec</span>.<span class="ident">log_min_obj_size</span> <span class="op">=</span> <span class="number">2</span>;
-        <span class="ident">lspec</span>.<span class="ident">log_min_obj_size</span> <span class="op">=</span> <span class="number">1</span>;
-
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>) })
-                .<span class="ident">as_usize</span>(),
-            <span class="ident">SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> (<span class="ident">meta_bytes_per_chunk</span>(<span class="number">2</span>, <span class="number">0</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>)
-        );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>) })
-                .<span class="ident">as_usize</span>(),
-            (<span class="ident">SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="ident">POLICY_SIDE_METADATA_OFFSET</span>).<span class="ident">as_usize</span>()
-                <span class="op">+</span> (<span class="ident">meta_bytes_per_chunk</span>(<span class="number">1</span>, <span class="number">0</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>)
-        );
-
-        <span class="ident">gspec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">1</span>;
-        <span class="ident">lspec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">3</span>;
-
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>) })
-                .<span class="ident">as_usize</span>(),
-            <span class="ident">SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> (<span class="ident">meta_bytes_per_chunk</span>(<span class="number">2</span>, <span class="number">1</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>)
-        );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>) })
-                .<span class="ident">as_usize</span>(),
-            (<span class="ident">SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="ident">POLICY_SIDE_METADATA_OFFSET</span>).<span class="ident">as_usize</span>()
-                <span class="op">+</span> (<span class="ident">meta_bytes_per_chunk</span>(<span class="number">1</span>, <span class="number">3</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>)
-        );
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_meta_byte_mask</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
-            <span class="ident">offset</span>: <span class="number">0</span>,
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
-        };
-
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">meta_byte_mask</span>(<span class="ident">spec</span>), <span class="number">1</span>);
-
-        <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">1</span>;
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">meta_byte_mask</span>(<span class="ident">spec</span>), <span class="number">3</span>);
-        <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">2</span>;
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">meta_byte_mask</span>(<span class="ident">spec</span>), <span class="number">15</span>);
-        <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">3</span>;
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">meta_byte_mask</span>(<span class="ident">spec</span>), <span class="number">255</span>);
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_meta_byte_lshift</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
-            <span class="ident">offset</span>: <span class="number">0</span>,
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
-        };
-
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">meta_byte_lshift</span>(<span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0</span>) }), <span class="number">0</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">meta_byte_lshift</span>(<span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">5</span>) }), <span class="number">5</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">meta_byte_lshift</span>(<span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">15</span>) }),
-            <span class="number">7</span>
-        );
-
-        <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">2</span>;
-
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">meta_byte_lshift</span>(<span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0</span>) }), <span class="number">0</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">meta_byte_lshift</span>(<span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">5</span>) }), <span class="number">4</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">meta_byte_lshift</span>(<span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">15</span>) }),
-            <span class="number">4</span>
-        );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">meta_byte_lshift</span>(<span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0x10010</span>) }),
-            <span class="number">0</span>
-        );
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_meta_bytes_per_chunk</span>() {
-        <span class="kw">let</span> <span class="ident">ch_sz</span> <span class="op">=</span> <span class="ident">BYTES_IN_CHUNK</span>;
-        <span class="kw">let</span> <span class="ident">bw</span> <span class="op">=</span> <span class="ident">constants</span>::<span class="ident">BITS_IN_BYTE</span>;
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">meta_bytes_per_chunk</span>(<span class="number">0</span>, <span class="number">0</span>), <span class="ident">ch_sz</span> <span class="op">/</span> <span class="ident">bw</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">meta_bytes_per_chunk</span>(<span class="number">3</span>, <span class="number">0</span>), (<span class="ident">ch_sz</span> <span class="op">/</span> <span class="ident">bw</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">3</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">meta_bytes_per_chunk</span>(<span class="number">0</span>, <span class="number">3</span>), (<span class="ident">ch_sz</span> <span class="op">/</span> <span class="ident">bw</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">3</span>);
-    }
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../../";window.currentCrate = "mmtk";</script><script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>

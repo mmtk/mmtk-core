@@ -92,11 +92,6 @@
 <span id="89">89</span>
 <span id="90">90</span>
 <span id="91">91</span>
-<span id="92">92</span>
-<span id="93">93</span>
-<span id="94">94</span>
-<span id="95">95</span>
-<span id="96">96</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">CopyContext</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
@@ -111,15 +106,10 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ObjectModel</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Whether an exclusive GC byte in each object&#39;s header word is available for MMTk.</span>
-    <span class="doccomment">/// If such a byte is not available in the VM, MMTk will handle it in its own memory.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Note: Currently only the `true` value is supported.</span>
-    <span class="kw">const</span> <span class="ident">HAS_GC_BYTE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
     <span class="doccomment">/// The offset of the GC byte from the object reference, in number of bytes.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Notes:</span>
-    <span class="doccomment">///  - This value is only effective when `HAS_GC_BYTE` is set to `true`.</span>
+    <span class="doccomment">///  - This value is only effective when the `side_gc_header` feature of `mmtk-core` is set.</span>
     <span class="doccomment">///  - It is recommanded that GC byte is the low-order byte of the word that contains it. \</span>
     <span class="doccomment">/// E.g. in a 64-bits little endian system, the recommanded offset is `8*K`.</span>
     <span class="doccomment">///</span>

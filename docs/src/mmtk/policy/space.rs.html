@@ -616,11 +616,15 @@
 <span id="613">613</span>
 <span id="614">614</span>
 <span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">try_map_metadata_space</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">try_map_metadata_address_range</span>, <span class="ident">try_map_metadata_space</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">conversions</span>::<span class="kw-2">*</span>, <span class="ident">side_metadata</span>::<span class="ident">SideMetadataSpec</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::{<span class="ident">AVAILABLE_BYTES</span>, <span class="ident">LOG_BYTES_IN_CHUNK</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::{<span class="ident">AVAILABLE_END</span>, <span class="ident">AVAILABLE_START</span>};
@@ -957,15 +961,6 @@
         <span class="kw">if</span> <span class="ident">new_chunk</span> {
             <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">conversions</span>::<span class="ident">bytes_to_chunks_up</span>(<span class="ident">bytes</span>);
             <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="self">self</span>.<span class="ident">as_sft</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> (<span class="ident">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span>), <span class="ident">start</span>, <span class="ident">chunks</span>);
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">try_map_metadata_space</span>(
-                <span class="ident">start</span>,
-                <span class="ident">bytes</span>,
-                <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_per_chunk</span>(),
-                <span class="self">self</span>.<span class="ident">local_side_metadata_per_chunk</span>(),
-            ) {
-                <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
-                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
-            }
         }
     }
 
@@ -975,12 +970,14 @@
      */</span>
     <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">conversions</span>::<span class="ident">bytes_to_chunks_up</span>(<span class="self">self</span>.<span class="ident">common</span>().<span class="ident">extent</span>);
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">try_map_metadata_space</span>(
+        <span class="kw">if</span> <span class="ident">try_map_metadata_space</span>(
             <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">start</span>,
             <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">extent</span>,
-            <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_per_chunk</span>(),
-            <span class="self">self</span>.<span class="ident">local_side_metadata_per_chunk</span>(),
-        ) {
+            <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_specs</span>(),
+            <span class="self">self</span>.<span class="ident">local_side_metadata_specs</span>(),
+        )
+        .<span class="ident">is_err</span>()
+        {
             <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
             <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
         }
@@ -1077,8 +1074,8 @@
         <span class="macro">println</span><span class="macro">!</span>();
     }
 
-    <span class="kw">fn</span> <span class="ident">local_side_metadata_per_chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="number">0</span>
+    <span class="kw">fn</span> <span class="ident">local_side_metadata_specs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>] {
+        <span class="kw-2">&amp;</span>[]
     }
 }
 
@@ -1206,6 +1203,17 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="comment">// For contiguous space, we eagerly initialize SFT map based on its address range.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contiguous</span> {
+            <span class="kw">if</span> <span class="ident">try_map_metadata_address_range</span>(
+                <span class="self">self</span>.<span class="ident">start</span>,
+                <span class="self">self</span>.<span class="ident">extent</span>,
+                <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_specs</span>(),
+                <span class="ident">space</span>.<span class="ident">local_side_metadata_specs</span>(),
+            )
+            .<span class="ident">is_err</span>()
+            {
+                <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
+                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
+            }
             <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="ident">space</span>.<span class="ident">as_sft</span>(), <span class="self">self</span>.<span class="ident">start</span>, <span class="ident">bytes_to_chunks_up</span>(<span class="self">self</span>.<span class="ident">extent</span>));
         }
     }

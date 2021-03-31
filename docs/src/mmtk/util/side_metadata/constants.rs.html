@@ -33,38 +33,62 @@
 <span id="30">30</span>
 <span id="31">31</span>
 <span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
 </pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">LOG_ADDRESS_SPACE</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::{<span class="ident">BYTES_IN_CHUNK</span>, <span class="ident">LOG_BYTES_IN_CHUNK</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0</span>) };
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0</span>) };
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
-    <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0x0000_0600_0000_0000</span>) };
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
+    <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="number">0x0000_0600_0000_0000usize</span>) };
 
 <span class="doccomment">/// This constant represents the worst-case ratio of source data size to global side metadata.</span>
 <span class="doccomment">/// A value of 2 means the space required for global side metadata must be less than 1/4th of the source data.</span>
 <span class="doccomment">/// So, a value of `n` means this ratio must be less than $2^-n$.</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_WORST_CASE_RATIO_LOG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">3</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">3</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_WORST_CASE_RATIO_LOG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
 
 <span class="doccomment">/// This constant represents the worst-case ratio of source data size to global+local side metadata.</span>
 <span class="doccomment">/// A value of 1 means the space required for global+local side metadata must be less than 1/2nd of the source data.</span>
 <span class="doccomment">/// So, a value of `n` means this ratio must be less than $2^-n$.</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">SIDE_METADATA_WORST_CASE_RATIO_LOG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">SIDE_METADATA_WORST_CASE_RATIO_LOG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">3</span>;
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">SIDE_METADATA_PER_CHUNK</span>: <span class="ident">usize</span> <span class="op">=</span>
-    <span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">SIDE_METADATA_WORST_CASE_RATIO_LOG</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">LOG_MAX_GLOBAL_SIDE_METADATA_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span>
+    <span class="ident">LOG_ADDRESS_SPACE</span> <span class="op">-</span> <span class="ident">LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO</span>;
+<span class="comment">// TODO - we should check this limit somewhere</span>
+<span class="comment">// pub(crate) const LOG_MAX_LOCAL_SIDE_METADATA_SIZE: usize =</span>
+<span class="comment">//     1 &lt;&lt; (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO);</span>
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">CHUNK_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>) <span class="op">-</span> <span class="number">1</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="kw">unsafe</span> {
+    <span class="ident">Address</span>::<span class="ident">from_usize</span>(
+        <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>()
+            <span class="op">+</span> (<span class="number">1usize</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MAX_GLOBAL_SIDE_METADATA_SIZE</span>),
+    )
+};
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">POLICY_SIDE_METADATA_OFFSET</span>: <span class="ident">usize</span> <span class="op">=</span>
-    <span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">GLOBAL_SIDE_METADATA_WORST_CASE_RATIO_LOG</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CHUNK_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>) <span class="op">-</span> <span class="number">1</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOCAL_SIDE_METADATA_PER_CHUNK</span>: <span class="ident">usize</span> <span class="op">=</span>
+    <span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO</span>;
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../../";window.currentCrate = "mmtk";</script><script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>

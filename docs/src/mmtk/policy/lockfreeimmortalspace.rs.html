@@ -140,6 +140,8 @@
 <span id="137">137</span>
 <span id="138">138</span>
 <span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">SFT_MAP</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
@@ -235,12 +237,14 @@
         <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">AVAILABLE_START</span> <span class="op">+</span> <span class="ident">total_bytes</span>;
         <span class="comment">// Eagerly memory map the entire heap (also zero all the memory)</span>
         <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">memory</span>::<span class="ident">dzmmap</span>(<span class="ident">AVAILABLE_START</span>, <span class="ident">total_bytes</span>).<span class="ident">unwrap</span>();
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">try_map_metadata_space</span>(
+        <span class="kw">if</span> <span class="ident">try_map_metadata_space</span>(
             <span class="ident">AVAILABLE_START</span>,
             <span class="ident">total_bytes</span>,
-            <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_per_chunk</span>(),
-            <span class="self">self</span>.<span class="ident">local_side_metadata_per_chunk</span>(),
-        ) {
+            <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_specs</span>(),
+            <span class="self">self</span>.<span class="ident">local_side_metadata_specs</span>(),
+        )
+        .<span class="ident">is_err</span>()
+        {
             <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
             <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
         }

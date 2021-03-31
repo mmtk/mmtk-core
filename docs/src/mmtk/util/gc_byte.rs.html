@@ -75,18 +75,31 @@
 <span id="72">72</span>
 <span id="73">73</span>
 <span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>))]</span>
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">ObjectModel</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>))]</span>
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicU8</span>, <span class="ident">Ordering</span>};
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">constants</span>;
 
-<span class="kw">const</span> <span class="ident">SIDE_GC_BYTE_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SIDE_GC_BYTE_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
     <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>::<span class="ident">Global</span>,
-    <span class="ident">offset</span>: <span class="number">0</span>,
+    <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>(),
     <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
     <span class="ident">log_min_obj_size</span>: <span class="ident">constants</span>::<span class="ident">LOG_MIN_OBJECT_SIZE</span> <span class="kw">as</span> <span class="ident">usize</span>,
 };
@@ -101,8 +114,8 @@
 <span class="doccomment">/// MMTk uses that byte as the per-object metadata.</span>
 <span class="doccomment">/// Otherwise, MMTk provides the metadata on its side.</span>
 <span class="doccomment">///</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>))]</span>
 <span class="kw">fn</span> <span class="ident">get_gc_byte</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicU8</span> {
-    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">HAS_GC_BYTE</span>);
     <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">GC_BYTE_OFFSET</span>).<span class="ident">to_ptr</span>::<span class="op">&lt;</span><span class="ident">AtomicU8</span><span class="op">&gt;</span>() }
 }
 
@@ -110,9 +123,12 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Returns an 8-bit unsigned integer</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_gc_byte</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
-    <span class="kw">if</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">HAS_GC_BYTE</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>))]</span>
+    {
         <span class="ident">get_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>).<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
-    } <span class="kw">else</span> {
+    }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>)]</span>
+    {
         <span class="comment">// is safe, because we only assign SIDE_GCBYTE_ID once</span>
         <span class="ident">load_atomic</span>(<span class="ident">SIDE_GC_BYTE_SPEC</span>, <span class="ident">object</span>.<span class="ident">to_address</span>()) <span class="kw">as</span> <span class="ident">u8</span>
     }
@@ -120,9 +136,12 @@
 
 <span class="doccomment">/// Atomically writes a new value to the GC byte of an object</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_gc_byte</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">val</span>: <span class="ident">u8</span>) {
-    <span class="kw">if</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">HAS_GC_BYTE</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>))]</span>
+    {
         <span class="ident">get_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>).<span class="ident">store</span>(<span class="ident">val</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-    } <span class="kw">else</span> {
+    }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>)]</span>
+    {
         <span class="comment">// is safe, because we only assign SIDE_GCBYTE_ID once</span>
         <span class="ident">store_atomic</span>(<span class="ident">SIDE_GC_BYTE_SPEC</span>, <span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span> <span class="kw">as</span> <span class="ident">usize</span>);
     }
@@ -136,11 +155,14 @@
     <span class="ident">old_val</span>: <span class="ident">u8</span>,
     <span class="ident">new_val</span>: <span class="ident">u8</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-    <span class="kw">if</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">HAS_GC_BYTE</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>))]</span>
+    {
         <span class="ident">get_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
             .<span class="ident">compare_exchange</span>(<span class="ident">old_val</span>, <span class="ident">new_val</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
             .<span class="ident">is_ok</span>()
-    } <span class="kw">else</span> {
+    }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>)]</span>
+    {
         <span class="comment">// is safe, because we only assign SIDE_GCBYTE_ID once</span>
         <span class="ident">compare_exchange_atomic</span>(
             <span class="ident">SIDE_GC_BYTE_SPEC</span>,

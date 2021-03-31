@@ -501,8 +501,8 @@
             <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">space</span>.<span class="ident">unwrap</span>().<span class="ident">common</span>().<span class="ident">mmapper</span>.<span class="ident">ensure_mapped</span>(
                 <span class="ident">old</span>,
                 <span class="ident">required_pages</span>,
-                <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_per_chunk</span>(),
-                <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">space</span>.<span class="ident">unwrap</span>().<span class="ident">local_side_metadata_per_chunk</span>(),
+                <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_specs</span>(),
+                <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">space</span>.<span class="ident">unwrap</span>().<span class="ident">local_side_metadata_specs</span>(),
             );
 
             <span class="comment">// FIXME: concurrent zeroing</span>

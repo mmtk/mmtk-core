@@ -82,8 +82,16 @@
 <span id="79">79</span>
 <span id="80">80</span>
 <span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">side_metadata</span>::<span class="ident">try_map_metadata_space</span>, <span class="ident">Address</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{
+    <span class="ident">side_metadata</span>::{<span class="ident">try_map_metadata_space</span>, <span class="ident">SideMetadataSpec</span>},
+    <span class="ident">Address</span>,
+};
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>;
 
@@ -126,8 +134,8 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">start</span>: <span class="ident">Address</span>,
         <span class="ident">pages</span>: <span class="ident">usize</span>,
-        <span class="ident">global_metadata_per_chunk</span>: <span class="ident">usize</span>,
-        <span class="ident">local_metadata_per_chunk</span>: <span class="ident">usize</span>,
+        <span class="ident">global_metadata_spec_vec</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>],
+        <span class="ident">local_metadata_spec_vec</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>],
     );
 
     <span class="doccomment">/// Map metadata memory for a given chunk</span>
@@ -135,15 +143,17 @@
     <span class="kw">fn</span> <span class="ident">map_metadata</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">chunk</span>: <span class="ident">Address</span>,
-        <span class="ident">global_metadata_per_chunk</span>: <span class="ident">usize</span>,
-        <span class="ident">local_metadata_per_chunk</span>: <span class="ident">usize</span>,
+        <span class="ident">global_metadata_spec_vec</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>],
+        <span class="ident">local_metadata_spec_vec</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>],
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), ()<span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">try_map_metadata_space</span>(
+        <span class="kw">if</span> <span class="ident">try_map_metadata_space</span>(
             <span class="ident">chunk</span>,
             <span class="ident">BYTES_IN_CHUNK</span>,
-            <span class="ident">global_metadata_per_chunk</span>,
-            <span class="ident">local_metadata_per_chunk</span>,
-        ) {
+            <span class="ident">global_metadata_spec_vec</span>,
+            <span class="ident">local_metadata_spec_vec</span>,
+        )
+        .<span class="ident">is_err</span>()
+        {
             <span class="prelude-val">Err</span>(())
         } <span class="kw">else</span> {
             <span class="prelude-val">Ok</span>(())

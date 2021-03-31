@@ -244,6 +244,12 @@
 <span id="241">241</span>
 <span id="242">242</span>
 <span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">gc_byte</span>;
 <span class="doccomment">/// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java</span>
@@ -390,7 +396,8 @@
         <span class="prelude-val">Some</span>(<span class="ident">fw_offset</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">GC_BYTE_OFFSET</span> <span class="op">+</span> <span class="ident">fw_offset</span>,
         <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
             <span class="kw">let</span> <span class="ident">obj_lowest_addr</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">object_start_ref</span>(<span class="ident">object</span>);
-            <span class="kw">if</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">HAS_GC_BYTE</span> {
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>))]</span>
+            {
                 <span class="kw">let</span> <span class="ident">abs_gc_byte_offset</span> <span class="op">=</span> (<span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">-</span> <span class="ident">obj_lowest_addr</span>) <span class="kw">as</span> <span class="ident">isize</span>
                     <span class="op">+</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">GC_BYTE_OFFSET</span>;
                 <span class="comment">// e.g. there is more than 8 bytes from lowest object address to gc byte</span>
@@ -399,7 +406,9 @@
                 } <span class="kw">else</span> {
                     <span class="ident">obj_lowest_addr</span> <span class="op">+</span> <span class="ident">constants</span>::<span class="ident">BYTES_IN_ADDRESS</span> <span class="comment">// forwarding word at the first word after the lowest address of the object storage</span>
                 }
-            } <span class="kw">else</span> {
+            }
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>)]</span>
+            {
                 <span class="ident">obj_lowest_addr</span> <span class="comment">// forwarding word at the lowest address of the object storage</span>
             }
         }
@@ -451,8 +460,9 @@
 <span class="comment">//</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_endian</span> <span class="op">=</span> <span class="string">&quot;little&quot;</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">gc_byte_offset_in_forwarding_word</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">isize</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">gcbyte_lshift</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">GC_BYTE_OFFSET</span> <span class="op">%</span> <span class="ident">constants</span>::<span class="ident">BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">isize</span>;
-    <span class="kw">if</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">HAS_GC_BYTE</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>))]</span>
+    {
+        <span class="kw">let</span> <span class="ident">gcbyte_lshift</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">GC_BYTE_OFFSET</span> <span class="op">%</span> <span class="ident">constants</span>::<span class="ident">BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">isize</span>;
         <span class="kw">if</span> <span class="ident">gcbyte_lshift</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
             <span class="comment">// e.g. JikesRVM</span>
             <span class="prelude-val">Some</span>(<span class="number">0</span>)
@@ -462,7 +472,9 @@
         } <span class="kw">else</span> {
             <span class="prelude-val">None</span>
         }
-    } <span class="kw">else</span> {
+    }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>)]</span>
+    {
         <span class="prelude-val">None</span>
     }
 }
@@ -475,7 +487,7 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">check_alloc_size</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">size</span>: <span class="ident">usize</span>) {
     <span class="macro">debug_assert</span><span class="macro">!</span>(
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">HAS_GC_BYTE</span> <span class="op">|</span><span class="op">|</span> <span class="ident">gc_byte_offset_in_forwarding_word</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>().<span class="ident">is_some</span>() {
+        <span class="kw">if</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>) <span class="op">|</span><span class="op">|</span> <span class="ident">gc_byte_offset_in_forwarding_word</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>().<span class="ident">is_some</span>() {
             <span class="comment">// If there is no gc byte, the min object size is 1 word. We save forwarding pointer in the word.</span>
             <span class="comment">// If the gc byte is low/high order byte, the min object size is 1 word. We save forwarding pointer</span>
             <span class="comment">// in the word that contains the gc byte.</span>
