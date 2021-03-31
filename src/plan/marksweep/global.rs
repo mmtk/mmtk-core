@@ -8,7 +8,7 @@ use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::mallocspace::MallocSpace;
+use crate::policy::mallocspace::{MallocSpace, MSSweepChunks};
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
@@ -64,6 +64,8 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, NoCopy<VM>>::new(self));
+        // scheduler.work_buckets[WorkBucketStage::Prepare]
+        //     .add(MSSweepChunks::<VM>::new(&self.ms));
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, NoCopy<VM>>::new(self));
@@ -85,9 +87,10 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         // Dont need to prepare for MallocSpace
     }
 
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&'static self, tls: OpaquePointer, _mmtk: &'static MMTK<VM>) {
         trace!("Marksweep: Release");
         self.common.release(tls, true);
+        // self.ms.release(mmtk);
         unsafe { self.ms.release_all_chunks() };
     }
 

@@ -72,7 +72,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!()
     }
 
-    fn release(&self, _tls: OpaquePointer) {
+    fn release(&self, _tls: OpaquePointer, _mmtk: &'static MMTK<VM>) {
         unreachable!()
     }
 

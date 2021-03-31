@@ -142,7 +142,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.copyspace1.prepare(!hi);
     }
 
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&self, tls: OpaquePointer, _mmtk: &'static MMTK<VM>) {
         self.common.release(tls, true);
         self.nursery.release();
         if !self.in_nursery() {

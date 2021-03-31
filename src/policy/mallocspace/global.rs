@@ -1,3 +1,4 @@
+use crate::MMTK;
 use super::metadata::*;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::CommonSpace;
@@ -6,6 +7,7 @@ use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
+use crate::scheduler::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
@@ -310,6 +312,57 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 }
 
+// Address is used for a chunk
+pub struct MSSweepChunk<VM: VMBinding>(pub &'static MallocSpace<VM>, pub Address);
+
+impl<VM: VMBinding> GCWork<VM> for MSSweepChunk<VM> {
+    #[inline]
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        &self.0.sweep_chunk(self.1);
+    }
+}
+
+pub struct MSSweepChunks<VM: VMBinding>(pub &'static MallocSpace<VM>);
+
+impl<VM: VMBinding> MSSweepChunks<VM> {
+    pub fn new(ms: &'static MallocSpace<VM>) -> Self {
+        Self(ms)
+    }
+}
+
+impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
+    #[inline]
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
+        #[cfg(feature = "chunk_hashset")]
+        {
+            for chunk_start in ACTIVE_CHUNKS.read().unwrap().iter() {
+                work_packets.push(box MSSweepChunk(self.0, *chunk_start));
+            }
+
+        }
+
+        #[cfg(not(feature = "chunk_hashset"))]
+        {
+            let mut address = conversions::chunk_align_down(*self.0.alloc_addr_min.lock().unwrap());
+            let end = conversions::chunk_align_up(*self.0.alloc_addr_max.lock().unwrap());
+            let mut chunk = address;
+
+            while address < end {
+                if is_chunk_marked(chunk) {
+                    work_packets.push(box MSSweepChunk(self.0, chunk));
+                }
+
+                address += BYTES_IN_CHUNK;
+                chunk = conversions::chunk_align_down(address);
+            }
+        }
+
+        info!("Generated {} work packets", work_packets.len());
+        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(GCWorkBucket::<VM>::DEFAULT_PRIORITY, work_packets);
+    }
+}
+
 impl<VM: VMBinding> MallocSpace<VM> {
     pub fn new() -> Self {
         MallocSpace {
@@ -322,6 +375,177 @@ impl<VM: VMBinding> MallocSpace<VM> {
             #[cfg(not(feature = "chunk_hashset"))]
             alloc_addr_max: Mutex::new(unsafe { Address::zero() }),
         }
+    }
+
+    pub fn release(&'static self, mmtk: &'static MMTK<VM>) {
+        let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
+        #[cfg(feature = "chunk_hashset")]
+        {
+            for chunk_start in ACTIVE_CHUNKS.read().unwrap().iter() {
+                work_packets.push(box MSSweepChunk(self, *chunk_start));
+            }
+
+        }
+
+        #[cfg(not(feature = "chunk_hashset"))]
+        {
+            let mut address = conversions::chunk_align_down(*self.alloc_addr_min.lock().unwrap());
+            let end = conversions::chunk_align_up(*self.alloc_addr_max.lock().unwrap());
+            let mut chunk = address;
+
+            while address < end {
+                if is_chunk_marked(chunk) {
+                    work_packets.push(box MSSweepChunk(self, chunk));
+                }
+
+                address += BYTES_IN_CHUNK;
+                chunk = conversions::chunk_align_down(address);
+            }
+        }
+
+        info!("Generated {} work packets", work_packets.len());
+        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(GCWorkBucket::<VM>::DEFAULT_PRIORITY, work_packets);
+    }
+
+    pub fn sweep_chunk(&self, chunk_start: Address) {
+        #[cfg(debug_assertions)]
+        let mut live_bytes = 0;
+
+        #[cfg(feature = "chunk_hashset")]
+        {
+            debug!("Check active chunk {:?}", chunk_start);
+            let mut chunk_is_empty = true;
+            let mut address = chunk_start;
+            let chunk_end = chunk_start.add(BYTES_IN_CHUNK);
+
+            // Linear scan through the chunk
+            while address < chunk_end {
+                trace!("Check address {}", address);
+                if is_alloced_object(address) {
+                    // We know it is an object
+                    let object = unsafe { address.to_object_reference() };
+                    let obj_start = VM::VMObjectModel::object_start_ref(object);
+                    let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
+
+                    #[cfg(debug_assertions)]
+                    if ASSERT_ALLOCATION {
+                        debug_assert!(
+                            self.active_mem.lock().unwrap().contains_key(&obj_start),
+                            "Address {} with alloc bit is not in active_mem",
+                            obj_start
+                        );
+                        debug_assert_eq!(
+                            self.active_mem.lock().unwrap().get(&obj_start),
+                            Some(&bytes),
+                            "Address {} size in active_mem does not match the size from malloc_usable_size",
+                            obj_start
+                        );
+                    }
+
+                    if !is_marked(object) {
+                        // Dead object
+                        trace!(
+                            "Object {} has alloc bit but no mark bit, it is dead. ",
+                            object
+                        );
+
+                        // Free object
+                        self.free(obj_start);
+                        trace!("free object {}", object);
+                        unset_alloc_bit(object);
+                    } else {
+                        // Live object. Unset mark bit
+                        unset_mark_bit(object);
+                        // This chunk is still active.
+                        chunk_is_empty = false;
+
+                        #[cfg(debug_assertions)]
+                        {
+                            // Accumulate live bytes
+                            live_bytes += bytes;
+                        }
+                    }
+
+                    // Skip to next object
+                    address += bytes;
+                } else { // not an object
+                    address += VM::MIN_ALIGNMENT;
+                }
+            }
+
+            if chunk_is_empty {
+                ACTIVE_CHUNKS.write().unwrap().remove(&chunk_start);
+            }
+        }
+
+        #[cfg(not(feature = "chunk_hashset"))]
+        {
+            let mut address = chunk_start;
+            let chunk_end = chunk_start + BYTES_IN_CHUNK;
+            let mut chunk_is_empty = true;
+
+            while address < chunk_end {
+                if is_alloced_object(address) {
+                    // We know it is an object
+                    let object = unsafe { address.to_object_reference() };
+                    let obj_start = VM::VMObjectModel::object_start_ref(object);
+                    let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
+
+                    #[cfg(debug_assertions)]
+                    if ASSERT_ALLOCATION {
+                        debug_assert!(
+                            self.active_mem.lock().unwrap().contains_key(&obj_start),
+                            "Address {} with alloc bit is not in active_mem",
+                            obj_start
+                        );
+                        debug_assert_eq!(
+                            self.active_mem.lock().unwrap().get(&obj_start),
+                            Some(&bytes),
+                            "Address {} size in active_mem does not match the size from malloc_usable_size",
+                            obj_start
+                        );
+                    }
+
+                    if !is_marked(object) {
+                        // Dead object
+                        trace!(
+                            "Object {} has alloc bit but no mark bit, it is dead. ",
+                            object
+                        );
+
+                        // Free object
+                        self.free(obj_start);
+                        trace!("free object {}", object);
+                        unset_alloc_bit(object);
+                    } else {
+                        // Live object. Unset mark bit
+                        unset_mark_bit(object);
+                        // This chunk is still active.
+                        chunk_is_empty = false;
+
+                        #[cfg(debug_assertions)]
+                        {
+                            // Accumulate live bytes
+                            live_bytes += bytes;
+                        }
+                    }
+
+                    // Skip to next object
+                    address += bytes;
+                } else { // not an object
+                    address += VM::MIN_ALIGNMENT;
+                }
+            }
+
+            if chunk_is_empty {
+                unset_chunk_mark_bit(chunk_start);
+            }
+        }
+
+        debug!(
+            "Used bytes after releasing: {}",
+            self.active_bytes.load(Ordering::SeqCst)
+        );
     }
 
     pub fn alloc(&self, tls: OpaquePointer, size: usize) -> Address {

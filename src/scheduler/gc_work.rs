@@ -110,7 +110,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> Release<P, W> {
 impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Release Global");
-        self.plan.release(worker.tls);
+        self.plan.release(worker.tls, mmtk);
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<P::VM>::new(mutator));
