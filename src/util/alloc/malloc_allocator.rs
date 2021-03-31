@@ -1,3 +1,4 @@
+#[cfg(feature = "analysis")]
 use std::sync::atomic::Ordering;
 use crate::plan::global::Plan;
 use crate::policy::mallocspace::MallocSpace;

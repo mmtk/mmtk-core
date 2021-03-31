@@ -227,7 +227,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                         address += VM::MIN_ALIGNMENT;
                     }
                 } else { // page is not marked; skip to next page
-                    address += page.add(BYTES_IN_PAGE);
+                    address = page.add(BYTES_IN_PAGE);
                 }
             }
 

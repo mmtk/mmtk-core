@@ -141,12 +141,14 @@ pub fn is_meta_space_mapped(address: Address) -> bool {
 
 #[cfg(not(feature = "chunk_hashset"))]
 fn map_chunk_mark_space(chunk_start: Address) {
-    if !try_map_metadata_space(
+    if try_map_metadata_space(
         chunk_start - 2048 * BYTES_IN_CHUNK, // start
         4096 * BYTES_IN_CHUNK,               // size
         &[ACTIVE_CHUNK_METADATA_SPEC],       // global metadata
         &[],                                 // local metadata
-    ) {
+    )
+    .is_err()
+    {
         panic!("failed to mmap meta memory");
     }
     info!(
@@ -169,7 +171,7 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
             chunk_start,
             BYTES_IN_CHUNK,
             &[],
-            &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
+            &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC, ACTIVE_PAGE_METADATA_SPEC],
         );
         debug_assert!(
             mmap_metadata_result.is_ok(),
@@ -180,9 +182,9 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
 
     #[cfg(not(feature = "chunk_hashset"))]
     {
-        if FIRST_CHUNK.load(Ordering::SeqCst) {
+        if FIRST_CHUNK.load(Ordering::Acquire) {
             map_chunk_mark_space(chunk_start);
-            FIRST_CHUNK.store(false, Ordering::SeqCst);
+            FIRST_CHUNK.store(false, Ordering::Release);
         }
 
         if is_chunk_marked(chunk_start) {
@@ -194,7 +196,7 @@ pub fn map_meta_space_for_chunk(chunk_start: Address) {
             chunk_start,
             BYTES_IN_CHUNK,
             &[],
-            &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
+            &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC, ACTIVE_PAGE_METADATA_SPEC],
         );
         trace!("set chunk mark bit for {}", chunk_start);
         debug_assert!(
@@ -262,7 +264,7 @@ pub fn is_page_marked(page_address: Address) -> bool {
 
 #[cfg(not(feature = "chunk_hashset"))]
 pub fn is_chunk_marked(chunk_start: Address) -> bool {
-    if FIRST_CHUNK.load(Ordering::SeqCst) {
+    if FIRST_CHUNK.load(Ordering::Relaxed) {
         return false; // if first chunk has not been mapped, then no chunk is marked
     }
 
