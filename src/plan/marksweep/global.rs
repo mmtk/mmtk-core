@@ -9,7 +9,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::mallocspace::MallocSpace;
-#[cfg(not(any(feature = "sweep_parallel_release", feature = "sweep_seq")))]
+#[cfg(not(feature = "sweep_seq"))]
 use crate::policy::mallocspace::MSSweepChunks;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
@@ -66,7 +66,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, NoCopy<VM>>::new(self));
-        #[cfg(not(any(feature = "sweep_parallel_release", feature = "sweep_seq")))]
+        #[cfg(not(feature = "sweep_seq"))]
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(MSSweepChunks::<VM>::new(&self.ms));
         // Release global/collectors/mutators
@@ -93,8 +93,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn release(&'static self, tls: OpaquePointer, _mmtk: &'static MMTK<VM>) {
         trace!("Marksweep: Release");
         self.common.release(tls, true);
-        #[cfg(feature = "sweep_parallel_release")]
-        self.ms.release(_mmtk);
+        // self.ms.release(_mmtk);
         #[cfg(feature = "sweep_seq")]
         unsafe { self.ms.release_all_chunks() };
     }
