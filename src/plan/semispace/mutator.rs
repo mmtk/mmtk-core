@@ -24,13 +24,13 @@ pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: Opaque
     }
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
-    bump_allocator.rebind(Some(
+    bump_allocator.rebind(
         mutator
             .plan
             .downcast_ref::<SemiSpace<VM>>()
             .unwrap()
             .tospace(),
-    ));
+    );
 }
 
 lazy_static! {
