@@ -1,14 +1,16 @@
 use crate::util::side_metadata::*;
 use crate::util::ObjectReference;
+#[cfg(not(feature = "side_gc_header"))]
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+#[cfg(not(feature = "side_gc_header"))]
 use std::sync::atomic::{AtomicU8, Ordering};
 
 use super::constants;
 
-const SIDE_GC_BYTE_SPEC: SideMetadataSpec = SideMetadataSpec {
+pub const SIDE_GC_BYTE_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::Global,
-    offset: 0,
+    offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
     log_num_of_bits: 1,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
@@ -23,8 +25,8 @@ const SIDE_GC_BYTE_SPEC: SideMetadataSpec = SideMetadataSpec {
 /// MMTk uses that byte as the per-object metadata.
 /// Otherwise, MMTk provides the metadata on its side.
 ///
+#[cfg(not(feature = "side_gc_header"))]
 fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 {
-    debug_assert!(VM::VMObjectModel::HAS_GC_BYTE);
     unsafe { &*(object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET).to_ptr::<AtomicU8>() }
 }
 
@@ -32,9 +34,12 @@ fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 {
 ///
 /// Returns an 8-bit unsigned integer
 pub fn read_gc_byte<VM: VMBinding>(object: ObjectReference) -> u8 {
-    if VM::VMObjectModel::HAS_GC_BYTE {
+    #[cfg(not(feature = "side_gc_header"))]
+    {
         get_gc_byte::<VM>(object).load(Ordering::SeqCst)
-    } else {
+    }
+    #[cfg(feature = "side_gc_header")]
+    {
         // is safe, because we only assign SIDE_GCBYTE_ID once
         load_atomic(SIDE_GC_BYTE_SPEC, object.to_address()) as u8
     }
@@ -42,9 +47,12 @@ pub fn read_gc_byte<VM: VMBinding>(object: ObjectReference) -> u8 {
 
 /// Atomically writes a new value to the GC byte of an object
 pub fn write_gc_byte<VM: VMBinding>(object: ObjectReference, val: u8) {
-    if VM::VMObjectModel::HAS_GC_BYTE {
+    #[cfg(not(feature = "side_gc_header"))]
+    {
         get_gc_byte::<VM>(object).store(val, Ordering::SeqCst);
-    } else {
+    }
+    #[cfg(feature = "side_gc_header")]
+    {
         // is safe, because we only assign SIDE_GCBYTE_ID once
         store_atomic(SIDE_GC_BYTE_SPEC, object.to_address(), val as usize);
     }
@@ -58,11 +66,14 @@ pub fn compare_exchange_gc_byte<VM: VMBinding>(
     old_val: u8,
     new_val: u8,
 ) -> bool {
-    if VM::VMObjectModel::HAS_GC_BYTE {
+    #[cfg(not(feature = "side_gc_header"))]
+    {
         get_gc_byte::<VM>(object)
             .compare_exchange(old_val, new_val, Ordering::SeqCst, Ordering::SeqCst)
             .is_ok()
-    } else {
+    }
+    #[cfg(feature = "side_gc_header")]
+    {
         // is safe, because we only assign SIDE_GCBYTE_ID once
         compare_exchange_atomic(
             SIDE_GC_BYTE_SPEC,

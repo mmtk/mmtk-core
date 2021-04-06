@@ -24,11 +24,17 @@ pub const NO_SLOW: bool = false;
 
 pub use self::global::GENCOPY_CONSTRAINTS;
 
+#[cfg(feature = "side_gc_header")]
+use crate::util::gc_byte;
 use crate::util::side_metadata::*;
 
 const LOGGING_META: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::Global,
-    offset: 0,
+    #[cfg(not(feature = "side_gc_header"))]
+    offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+    #[cfg(feature = "side_gc_header")]
+    offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
+        + metadata_address_range_size(gc_byte::SIDE_GC_BYTE_SPEC),
     log_num_of_bits: 0,
     log_min_obj_size: 3,
 };
