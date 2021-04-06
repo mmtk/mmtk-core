@@ -81,6 +81,8 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         unreachable!()
     }
 
+    // We have assertions in a debug build. We allow this pattern for the release build.
+    #[allow(clippy::let_and_return)]
     fn in_space(&self, object: ObjectReference) -> bool {
         let ret = is_alloced_by_malloc(object);
 
