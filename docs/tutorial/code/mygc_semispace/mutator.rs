@@ -36,13 +36,13 @@ pub fn mygc_mutator_release<VM: VMBinding>(
     }
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
-    bump_allocator.rebind(Some(
+    bump_allocator.rebind(
         mutator
             .plan
             .downcast_ref::<MyGC<VM>>()
             .unwrap()
             .tospace(),
-    ));
+    );
 }
 // ANCHOR_END: release
 
