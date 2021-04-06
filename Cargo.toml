@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.2.0"
+version = "0.3.1"
 authors = ["The MMTk Developers <>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -22,7 +22,7 @@ enum_derive = "0.1"
 libc = "0.2"
 jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"] }
 mimalloc-sys = "0.1.6"
-hoard-sys = { git = "https://git@github.com/paigereeves/hoard-sys.git", rev = "36989b877962f086267b1d21d5008c9df0fd0984" }
+hoard-sys = "0.1.0"
 lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
@@ -64,6 +64,9 @@ nogc_no_zeroing = ["nogc_lock_free"]
 # For using a single GC thread
 # Q: Why do we need this as a compile time flat? We can always set the number of GC threads through options.
 single_worker = []
+
+# To support VMs that do not provide in-header GC byte
+side_gc_header = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --

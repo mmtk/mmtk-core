@@ -107,7 +107,7 @@ pub fn get_maximum_aligned_size<VM: VMBinding>(
 pub trait Allocator<VM: VMBinding>: Downcast {
     fn get_tls(&self) -> OpaquePointer;
 
-    fn get_space(&self) -> Option<&'static dyn Space<VM>>;
+    fn get_space(&self) -> &'static dyn Space<VM>;
     fn get_plan(&self) -> &'static dyn Plan<VM = VM>;
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;

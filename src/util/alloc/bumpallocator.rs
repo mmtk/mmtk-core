@@ -21,7 +21,7 @@ pub struct BumpAllocator<VM: VMBinding> {
     pub tls: OpaquePointer,
     cursor: Address,
     limit: Address,
-    space: Option<&'static dyn Space<VM>>,
+    space: &'static dyn Space<VM>,
     plan: &'static dyn Plan<VM = VM>,
 }
 
@@ -36,14 +36,14 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         self.limit = unsafe { Address::zero() };
     }
 
-    pub fn rebind(&mut self, space: Option<&'static dyn Space<VM>>) {
+    pub fn rebind(&mut self, space: &'static dyn Space<VM>) {
         self.reset();
         self.space = space;
     }
 }
 
 impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
-    fn get_space(&self) -> Option<&'static dyn Space<VM>> {
+    fn get_space(&self) -> &'static dyn Space<VM> {
         self.space
     }
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
@@ -94,7 +94,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
 impl<VM: VMBinding> BumpAllocator<VM> {
     pub fn new(
         tls: OpaquePointer,
-        space: Option<&'static dyn Space<VM>>,
+        space: &'static dyn Space<VM>,
         plan: &'static dyn Plan<VM = VM>,
     ) -> Self {
         BumpAllocator {
@@ -175,10 +175,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         stress_test: bool,
     ) -> Address {
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start = self
-            .space
-            .unwrap()
-            .acquire(self.tls, bytes_to_pages(block_size));
+        let acquired_start = self.space.acquire(self.tls, bytes_to_pages(block_size));
         if acquired_start.is_zero() {
             trace!("Failed to acquire a new block");
             acquired_start
