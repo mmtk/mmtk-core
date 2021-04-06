@@ -1,3 +1,11 @@
+0.3.1 (2021-04-06)
+===
+
+Misc
+---
+* Changed the dependency of hoard-sys to v0.1 from crates.io.
+
+
 0.3.0 (2021-03-31)
 ===
 
