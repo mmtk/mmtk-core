@@ -50,6 +50,7 @@ The artefact produced produced by the build process can be found under
 MMTk does not run standalone. You would need to integrate MMTk with a language implementation.
 You can either try out one of the VM bindings we have been working on, or implement your own binding in your VM for MMTk.
 You can also implement your own GC algorithm in MMTk, and run it with supported VMs.
+You can find an up-to-date API document for mmtk-core here: https://www.mmtk.io/mmtk-core/mmtk.
 
 ### Try out our current bindings
 
