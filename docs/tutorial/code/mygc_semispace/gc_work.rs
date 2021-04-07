@@ -34,7 +34,7 @@ impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> {
     // ANCHOR_END: copycontext_constraints_init
     // ANCHOR: copycontext_prepare
     fn prepare(&mut self) {
-        self.mygc.rebind(Some(self.plan.tospace()));
+        self.mygc.rebind(self.plan.tospace());
     }
     // ANCHOR_END: copycontext_prepare
     fn release(&mut self) {
@@ -69,9 +69,10 @@ impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> {
 // ANCHOR: constructor_and_workerlocal
 impl<VM: VMBinding> MyGCCopyContext<VM> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
+        let plan = &mmtk.plan.downcast_ref::<MyGC<VM>>().unwrap();
         Self {
-            plan: &mmtk.plan.downcast_ref::<MyGC<VM>>().unwrap(),
-            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
+            plan,
+            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, plan.tospace(), &*mmtk.plan),
         }
     }
 }
