@@ -44,8 +44,6 @@ pub struct MyGC<VM: VMBinding> {
 }
 // ANCHOR_END: plan_def
 
-unsafe impl<VM: VMBinding> Sync for MyGC<VM> {}
-
 // ANCHOR: constraints
 pub const MYGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,

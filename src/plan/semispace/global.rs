@@ -37,8 +37,6 @@ pub struct SemiSpace<VM: VMBinding> {
     pub common: CommonPlan<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
-
 pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     gc_header_bits: 2,
@@ -97,7 +95,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new());
+            .add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
@@ -148,7 +146,6 @@ impl<VM: VMBinding> SemiSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 

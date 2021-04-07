@@ -40,10 +40,7 @@ pub struct GenCopy<VM: VMBinding> {
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
     in_nursery: AtomicBool,
-    pub scheduler: &'static MMTkScheduler<VM>,
 }
-
-unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
 
 pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
@@ -122,7 +119,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new());
+            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
@@ -182,7 +179,6 @@ impl<VM: VMBinding> GenCopy<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let global_metadata_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
@@ -229,7 +225,6 @@ impl<VM: VMBinding> GenCopy<VM> {
                 &&global_metadata_specs,
             ),
             in_nursery: AtomicBool::default(),
-            scheduler,
         }
     }
 

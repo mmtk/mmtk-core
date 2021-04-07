@@ -60,11 +60,8 @@ pub struct WorkBucket<C: Context> {
     /// A priority queue
     queue: RwLock<BinaryHeap<PrioritizedWork<C>>>,
     monitor: Arc<(Mutex<()>, Condvar)>,
-    can_open: Option<Box<dyn Fn() -> bool>>,
+    can_open: Option<Box<dyn (Fn() -> bool) + Send>>,
 }
-
-unsafe impl<C: Context> Send for WorkBucket<C> {}
-unsafe impl<C: Context> Sync for WorkBucket<C> {}
 
 impl<C: Context> WorkBucket<C> {
     pub const DEFAULT_PRIORITY: usize = 1000;
@@ -133,7 +130,7 @@ impl<C: Context> WorkBucket<C> {
         }
         self.queue.write().pop().map(|v| v.work)
     }
-    pub fn set_open_condition(&mut self, pred: impl Fn() -> bool + 'static) {
+    pub fn set_open_condition(&mut self, pred: impl Fn() -> bool + Send + 'static) {
         self.can_open = Some(box pred);
     }
     pub fn update(&self) -> bool {
