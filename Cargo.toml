@@ -20,9 +20,9 @@ doctest = false
 custom_derive = "0.1"
 enum_derive = "0.1"
 libc = "0.2"
-jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"] }
-mimalloc-sys = "0.1.6"
-hoard-sys = "0.1.0"
+jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"], optional = true }
+mimalloc-sys = {version = "0.1.6", optional = true }
+hoard-sys = {version = "0.1.0", optional = true }
 lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
@@ -80,9 +80,9 @@ side_gc_header = []
 # Group:malloc
 # only one of the following features should be enabled, or none to use the default malloc from libc
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
-malloc_mimalloc = []
-malloc_jemalloc = []
-malloc_hoard = []
+malloc_mimalloc = ["mimalloc-sys"]
+malloc_jemalloc = ["jemalloc-sys"]
+malloc_hoard = ["hoard-sys"]
 
 # If there are more groups, they should be inserted above this line
 # Group:end
