@@ -47,7 +47,9 @@ The artefact produced produced by the build process can be found under
 
 ## Usage
 
-MMTk does not run standalone. You would need to integrate MMTk with a language implementation. You can either try out one of the VM bindings we have been working on, or implement your own binding in your VM for MMTk.
+MMTk does not run standalone. You would need to integrate MMTk with a language implementation.
+You can either try out one of the VM bindings we have been working on, or implement your own binding in your VM for MMTk.
+You can also implement your own GC algorithm in MMTk, and run it with supported VMs.
 
 ### Try out our current bindings
 
@@ -68,6 +70,14 @@ MMTk provides a bi-directional interface with the language VM.
 
 To integrate MMTk with your language implementation, you need to provide an implementation of `VMBinding`, and
 you can optionally call MMTk's API for your needs.
+
+For more information, you can refer to our [porting guide](https://www.mmtk.io/mmtk-core/portingguide) for VM implementors.
+
+### Implement your GC
+
+MMTk is a suite of various GC algorithms (known as plans in MMTk). MMTk provides reusable components that make it easy
+to construct your own GC based on those components. For more information, you can refer to our [tutorial](https://www.mmtk.io/mmtk-core/tutorial)
+for GC implementors.
 
 ## Tests
 
