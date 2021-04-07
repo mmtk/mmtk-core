@@ -31,8 +31,6 @@ pub struct NoGC<VM: VMBinding> {
     pub nogc_space: NoGCImmortalSpace<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for NoGC<VM> {}
-
 pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
 
 impl<VM: VMBinding> Plan for NoGC<VM> {
@@ -98,7 +96,6 @@ impl<VM: VMBinding> NoGC<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         #[cfg(not(feature = "nogc_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);

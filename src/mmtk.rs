@@ -45,20 +45,12 @@ pub struct MMTK<VM: VMBinding> {
     inside_harness: AtomicBool,
 }
 
-unsafe impl<VM: VMBinding> Send for MMTK<VM> {}
-unsafe impl<VM: VMBinding> Sync for MMTK<VM> {}
-
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
         let scheduler = Scheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = crate::plan::global::create_plan(
-            options.plan,
-            &VM_MAP,
-            &MMAPPER,
-            options.clone(),
-            unsafe { &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>) },
-        );
+        let plan =
+            crate::plan::global::create_plan(options.plan, &VM_MAP, &MMAPPER, options.clone());
         MMTK {
             plan,
             vm_map: &VM_MAP,

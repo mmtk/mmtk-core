@@ -18,7 +18,7 @@ pub enum WriteTarget {
     Slot(Address),
 }
 
-pub trait Barrier: 'static + Send + Sync {
+pub trait Barrier: 'static + Send {
     fn flush(&mut self);
     fn post_write_barrier(&mut self, target: WriteTarget);
 }

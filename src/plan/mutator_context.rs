@@ -24,12 +24,9 @@ pub struct MutatorConfig<VM: VMBinding> {
     #[allow(clippy::box_vec)]
     pub space_mapping: Box<SpaceMapping<VM>>,
     // Plan-specific code for mutator prepare/release
-    pub prepare_func: &'static dyn Fn(&mut Mutator<VM>, OpaquePointer),
-    pub release_func: &'static dyn Fn(&mut Mutator<VM>, OpaquePointer),
+    pub prepare_func: &'static (dyn Fn(&mut Mutator<VM>, OpaquePointer) + Send + Sync),
+    pub release_func: &'static (dyn Fn(&mut Mutator<VM>, OpaquePointer) + Send + Sync),
 }
-
-unsafe impl<VM: VMBinding> Send for MutatorConfig<VM> {}
-unsafe impl<VM: VMBinding> Sync for MutatorConfig<VM> {}
 
 /// A mutator is a per-thread data structure that manages allocations and barriers. It is usually highly coupled with the language VM.
 /// It is recommended for MMTk users 1) to have a mutator struct of the same layout in the thread local storage that can be accessed efficiently,
@@ -78,7 +75,6 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
         }
         .get_space()
-        .unwrap()
         .initialize_header(refer, true)
     }
 
@@ -96,7 +92,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
 
 // TODO: We should be able to remove this trait, as we removed per-plan mutator implementation, and there is no other type that implements this trait.
 // The Mutator struct above is the only type that implements this trait. We should be able to merge them.
-pub trait MutatorContext<VM: VMBinding>: Send + Sync + 'static {
+pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn prepare(&mut self, tls: OpaquePointer);
     fn release(&mut self, tls: OpaquePointer);
     fn alloc(

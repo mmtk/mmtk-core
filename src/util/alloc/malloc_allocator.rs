@@ -9,13 +9,13 @@ use crate::vm::VMBinding;
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
     pub tls: OpaquePointer,
-    space: Option<&'static MallocSpace<VM>>,
+    space: &'static MallocSpace<VM>,
     plan: &'static dyn Plan<VM = VM>,
 }
 
 impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
-    fn get_space(&self) -> Option<&'static dyn Space<VM>> {
-        self.space.map(|s| s as &'static dyn Space<VM>)
+    fn get_space(&self) -> &'static dyn Space<VM> {
+        self.space as &'static dyn Space<VM>
     }
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
         self.plan
@@ -32,7 +32,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         // TODO: We currently ignore the offset field. This is wrong.
         // assert!(offset == 0);
         assert!(align <= 16);
-        let ret = self.space.unwrap().alloc(self.tls, size);
+        let ret = self.space.alloc(self.tls, size);
         trace!(
             "MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}",
             size,
@@ -47,7 +47,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
 impl<VM: VMBinding> MallocAllocator<VM> {
     pub fn new(
         tls: OpaquePointer,
-        space: Option<&'static MallocSpace<VM>>,
+        space: &'static MallocSpace<VM>,
         plan: &'static dyn Plan<VM = VM>,
     ) -> Self {
         MallocAllocator { tls, space, plan }
