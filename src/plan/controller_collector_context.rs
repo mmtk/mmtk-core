@@ -23,8 +23,6 @@ pub struct ControllerCollectorContext<VM: VMBinding> {
     phantom: PhantomData<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for ControllerCollectorContext<VM> {}
-
 // Clippy says we need this...
 impl<VM: VMBinding> Default for ControllerCollectorContext<VM> {
     fn default() -> Self {

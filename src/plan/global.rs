@@ -36,7 +36,7 @@ use std::sync::{Arc, Mutex};
 /// A GC worker's context for copying GCs.
 /// Each GC plan should provide their implementation of a CopyContext.
 /// For non-copying GC, NoCopy can be used.
-pub trait CopyContext: 'static + Sync + Send {
+pub trait CopyContext: 'static + Send {
     type VM: VMBinding;
     fn constraints(&self) -> &'static PlanConstraints;
     fn init(&mut self, tls: OpaquePointer);
@@ -134,20 +134,17 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
-    scheduler: &'static MMTkScheduler<VM>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
-        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(
-            vm_map, mmapper, options, scheduler,
-        )),
+        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
         PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options,
         )),
-        PlanSelector::GenCopy => Box::new(crate::plan::gencopy::GenCopy::new(
-            vm_map, mmapper, options, scheduler,
-        )),
+        PlanSelector::GenCopy => {
+            Box::new(crate::plan::gencopy::GenCopy::new(vm_map, mmapper, options))
+        }
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options,
         )),
     }
 }
@@ -157,7 +154,7 @@ pub fn create_plan<VM: VMBinding>(
 ///
 /// The global instance defines and manages static resources
 /// (such as memory and virtual memory resources).
-pub trait Plan: 'static + Sync + Send + Downcast {
+pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
     fn constraints(&self) -> &'static PlanConstraints;
@@ -394,6 +391,9 @@ pub struct BasePlan<VM: VMBinding> {
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
 }
+
+// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
+unsafe impl<VM: VMBinding> Sync for BasePlan<VM> {}
 
 #[cfg(feature = "base_spaces")]
 pub struct BaseUnsync<VM: VMBinding> {
@@ -720,6 +720,9 @@ pub struct CommonUnsync<VM: VMBinding> {
     pub immortal: ImmortalSpace<VM>,
     pub los: LargeObjectSpace<VM>,
 }
+
+// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
+unsafe impl<VM: VMBinding> Sync for CommonPlan<VM> {}
 
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(

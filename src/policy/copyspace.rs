@@ -14,6 +14,7 @@ use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
 unsafe impl<VM: VMBinding> Sync for CopySpace<VM> {}
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
