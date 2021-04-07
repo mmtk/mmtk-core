@@ -24,6 +24,7 @@ pub struct ImmortalSpace<VM: VMBinding> {
     header_byte: HeaderByte,
 }
 
+// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
 unsafe impl<VM: VMBinding> Sync for ImmortalSpace<VM> {}
 
 const GC_MARK_BIT_MASK: u8 = 1;

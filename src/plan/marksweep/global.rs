@@ -31,8 +31,6 @@ pub struct MarkSweep<VM: VMBinding> {
     ms: MallocSpace<VM>,
 }
 
-unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
-
 pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: false,
     gc_header_bits: 2,
@@ -68,7 +66,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, NoCopy<VM>>::new());
+            .add(ScheduleSanityGC::<Self, NoCopy<VM>>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
@@ -123,7 +121,6 @@ impl<VM: VMBinding> MarkSweep<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
         MarkSweep {
