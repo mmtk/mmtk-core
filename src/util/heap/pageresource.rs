@@ -3,7 +3,6 @@ use crate::util::conversions;
 use crate::util::OpaquePointer;
 use crate::vm::ActivePlan;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
 
 use super::layout::map::Map;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -120,7 +119,7 @@ pub struct CommonPageResource {
     pub growable: bool,
 
     vm_map: &'static VMMap,
-    head_discontiguous_region: Mutex<Address>,
+    head_discontiguous_region: Address,
 }
 
 impl CommonPageResource {
@@ -133,7 +132,7 @@ impl CommonPageResource {
             growable,
             vm_map,
 
-            head_discontiguous_region: Mutex::new(Address::ZERO),
+            head_discontiguous_region: Address::ZERO,
         }
     }
 
@@ -173,43 +172,39 @@ impl CommonPageResource {
     /// space.  This simply involves requesting a suitable number of chunks
     /// from the pool of chunks available to discontiguous spaces.
     pub fn grow_discontiguous_space(
-        &self,
+        &mut self,
         space_descriptor: SpaceDescriptor,
         chunks: usize,
     ) -> Address {
-        let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
-
         let new_head: Address = self.vm_map.allocate_contiguous_chunks(
             space_descriptor,
             chunks,
-            *head_discontiguous_region,
+            self.head_discontiguous_region,
         );
         if new_head.is_zero() {
             return Address::ZERO;
         }
 
-        *head_discontiguous_region = new_head;
+        self.head_discontiguous_region = new_head;
         new_head
     }
 
     /// Release one or more contiguous chunks associated with a discontiguous
     /// space.
-    pub fn release_discontiguous_chunks(&self, chunk: Address) {
-        let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
+    pub fn release_discontiguous_chunks(&mut self, chunk: Address) {
         debug_assert!(chunk == conversions::chunk_align_down(chunk));
-        if chunk == *head_discontiguous_region {
-            *head_discontiguous_region = self.vm_map.get_next_contiguous_region(chunk);
+        if chunk == self.head_discontiguous_region {
+            self.head_discontiguous_region = self.vm_map.get_next_contiguous_region(chunk);
         }
         self.vm_map.free_contiguous_chunks(chunk);
     }
 
-    pub fn release_all_chunks(&self) {
-        let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
-        self.vm_map.free_all_chunks(*head_discontiguous_region);
-        *head_discontiguous_region = Address::ZERO;
+    pub fn release_all_chunks(&mut self) {
+        self.vm_map.free_all_chunks(self.head_discontiguous_region);
+        self.head_discontiguous_region = Address::ZERO;
     }
 
     pub fn get_head_discontiguous_region(&self) -> Address {
-        *self.head_discontiguous_region.lock().unwrap()
+        self.head_discontiguous_region
     }
 }

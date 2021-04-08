@@ -118,9 +118,11 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         if !self.common().contiguous && tmp > sync.sentinel {
             /* we're out of virtual memory within our discontiguous region, so ask for more */
             let required_chunks = required_chunks(required_pages);
-            sync.current_chunk = self
-                .common
-                .grow_discontiguous_space(space_descriptor, required_chunks); // Returns zero on failure
+            #[allow(clippy::cast_ref_to_mut)]
+            let common_mut: &mut CommonPageResource =
+                unsafe { &mut *(&self.common as *const _ as *mut _) };
+            sync.current_chunk =
+                common_mut.grow_discontiguous_space(space_descriptor, required_chunks); // Returns zero on failure
             sync.cursor = sync.current_chunk;
             sync.sentinel = sync.cursor
                 + if sync.current_chunk.is_zero() {
@@ -285,7 +287,9 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
             guard.current_chunk = Address::zero();
             guard.sentinel = Address::zero();
             guard.cursor = Address::zero();
-            self.common.release_all_chunks();
+            #[allow(clippy::cast_ref_to_mut)]
+            let common_mut: &mut CommonPageResource = &mut *(&self.common as *const _ as *mut _);
+            common_mut.release_all_chunks();
         }
     }
 
