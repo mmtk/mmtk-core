@@ -3,6 +3,8 @@ use crate::util::constants;
 use crate::util::constants::BYTES_IN_WORD;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+#[cfg(debug_assertions)]
+use crate::util::side_metadata::address_to_meta_address;
 use crate::util::side_metadata::load_atomic;
 #[cfg(target_pointer_width = "32")]
 use crate::util::side_metadata::meta_bytes_per_chunk;
@@ -102,7 +104,6 @@ pub fn is_alloced(object: ObjectReference) -> bool {
 pub fn is_alloced_object(address: Address) -> bool {
     #[cfg(debug_assertions)]
     if ASSERT_METADATA {
-        use crate::util::side_metadata::address_to_meta_address;
         // Need to make sure we atomically access the side metadata and the map.
         let lock = ALLOC_MAP.read().unwrap();
         let check =
@@ -125,7 +126,6 @@ pub fn is_alloced_object(address: Address) -> bool {
 pub fn is_marked(object: ObjectReference) -> bool {
     #[cfg(debug_assertions)]
     if ASSERT_METADATA {
-        use crate::util::side_metadata::address_to_meta_address;
         // Need to make sure we atomically access the side metadata and the map.
         let lock = MARK_MAP.read().unwrap();
         let ret = load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1;
