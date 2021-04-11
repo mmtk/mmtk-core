@@ -44,7 +44,9 @@ jobs:
       - name: Test
         run: |
           cd mmtk-v8
-          V8_ROOT=$GITHUB_WORKSPACE/v8_deps .github/scripts/ci-test.sh
+          export V8_ROOT=$GITHUB_WORKSPACE/v8_deps
+          .github/scripts/ci-test.sh
+          .github/scripts/ci-style.sh
 
   # JikesRVM
   jikesrvm-binding-test:
@@ -85,6 +87,7 @@ jobs:
         run: |
           cd mmtk-jikesrvm
           ./.github/scripts/ci-test.sh
+          ./.github/scripts/ci-style.sh
   jikesrvm-perf-compare:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
@@ -213,6 +216,7 @@ jobs:
         run: |
           cd mmtk-openjdk
           ./.github/scripts/ci-test.sh
+          ./.github/scripts/ci-style.sh
   openjdk-perf-compare:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
