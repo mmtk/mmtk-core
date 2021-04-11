@@ -18,7 +18,7 @@ pub type ByteOffset = isize;
 /// (memory wise and time wise). The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq)]
 pub struct Address(usize);
 
 /// Address + ByteSize (positive)
