@@ -72,9 +72,13 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     where
         Self: Sized,
     {
+        let stress_force_gc = self.stress_test_gc_required();
         let nursery_full = self.nursery.reserved_pages() >= (NURSERY_SIZE >> LOG_BYTES_IN_PAGE);
         let heap_full = self.get_pages_reserved() > self.get_total_pages();
-        space_full || nursery_full || heap_full
+
+        // TODO: Basically this is (nursery_full || super.collection_required()).
+        // We need to figure out a way to reuse the super code.
+        space_full || nursery_full || heap_full || stress_force_gc
     }
 
     fn gc_init(
