@@ -9,6 +9,8 @@ pub mod alloc;
 #[cfg(feature = "analysis")]
 pub mod analysis;
 pub mod constants;
+#[cfg(feature = "extreme_assertions")]
+pub mod edge_logger;
 pub mod finalizable_processor;
 pub mod forwarding_word;
 pub mod gc_byte;
