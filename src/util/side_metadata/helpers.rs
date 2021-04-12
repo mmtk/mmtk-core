@@ -1,193 +1,161 @@
-use super::constants::*;
-use super::SideMetadataSpec;
-use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
-use crate::util::{constants, Address};
+use super::*;
+use crate::util::memory;
+use crate::util::Address;
+use crate::util::{
+    constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE},
+    heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE,
+};
+use std::io::Result;
 
+/// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
 #[inline(always)]
-pub(crate) fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
-    SIDE_METADATA_BASE_ADDRESS
-        + ((data_addr.as_usize() & !CHUNK_MASK) >> SIDE_METADATA_WORST_CASE_RATIO_LOG)
+pub(crate) fn address_to_contiguous_meta_address(
+    metadata_spec: SideMetadataSpec,
+    data_addr: Address,
+) -> Address {
+    let log_bits_num = metadata_spec.log_num_of_bits as i32;
+    let log_min_obj_size = metadata_spec.log_min_obj_size as usize;
+
+    let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
+
+    unsafe {
+        if rshift >= 0 {
+            Address::from_usize(metadata_spec.offset + ((data_addr >> log_min_obj_size) >> rshift))
+        } else {
+            Address::from_usize(
+                metadata_spec.offset + ((data_addr >> log_min_obj_size) << (-rshift)),
+            )
+        }
+    }
 }
 
+/// Unmaps the specified metadata range, or panics.
+pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
+    trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
+
+    assert!(memory::try_munmap(start, size).is_ok())
+}
+
+/// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
+pub(super) fn ensure_munmap_contiguos_metadata_space(
+    start: Address,
+    size: usize,
+    spec: &SideMetadataSpec,
+) {
+    // nearest page-aligned starting address
+    let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
+    // nearest page-aligned ending address
+    let mmap_size =
+        address_to_meta_address(*spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
+    if mmap_size > 0 {
+        ensure_munmap_metadata(mmap_start, mmap_size);
+    }
+}
+
+/// Tries to mmap the metadata space (`spec`) for the specified data address range (`start` and `size`).
+/// Setting `no_reserve` to true means the function will only map address range, without reserving swap-space/physical memory.
+pub(super) fn try_mmap_contiguous_metadata_space(
+    start: Address,
+    size: usize,
+    spec: &SideMetadataSpec,
+    no_reserve: bool,
+) -> Result<()> {
+    debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
+    debug_assert!(size % BYTES_IN_PAGE == 0);
+
+    // nearest page-aligned starting address
+    let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
+    // nearest page-aligned ending address
+    let mmap_size =
+        address_to_meta_address(*spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
+    if mmap_size > 0 {
+        // FIXME - This assumes that we never mmap a metadata page twice.
+        // While this never happens in our current use-cases where the minimum data mmap size is a chunk and the metadata ratio is larger than 1/64, it could happen if (min_data_mmap_size * metadata_ratio) is smaller than a page.
+        // E.g. the current implementation detects such a case as an overlap and returns false.
+        if !no_reserve {
+            try_mmap_metadata(mmap_start, mmap_size)
+        } else {
+            try_mmap_metadata_address_range(mmap_start, mmap_size)
+        }
+    } else {
+        Ok(())
+    }
+}
+
+/// Tries to map the specified metadata address range (`start` and `size`), without reserving swap-space for it.
+pub(super) fn try_mmap_metadata_address_range(start: Address, size: usize) -> Result<()> {
+    let res = memory::mmap_noreserve(start, size);
+    trace!(
+        "try_mmap_metadata_address_range({}, 0x{:x}) -> {:#?}",
+        start,
+        size,
+        res
+    );
+    res
+}
+
+/// Tries to map the specified metadata space (`start` and `size`), including reservation of swap-space/physical memory.
+pub(super) fn try_mmap_metadata(start: Address, size: usize) -> Result<()> {
+    debug_assert!(size > 0 && size % BYTES_IN_PAGE == 0);
+
+    let res = memory::dzmmap(start, size);
+    trace!("try_mmap_metadata({}, 0x{:x}) -> {:#?}", start, size, res);
+    res
+}
+
+/// Performs the translation of data address (`data_addr`) to metadata address for the specified metadata (`metadata_spec`).
 #[inline(always)]
 pub(crate) fn address_to_meta_address(
     metadata_spec: SideMetadataSpec,
     data_addr: Address,
 ) -> Address {
-    let bits_num_log = metadata_spec.log_num_of_bits as i32;
-    let log_min_obj_size = metadata_spec.log_min_obj_size as i32;
-    let first_offset = if metadata_spec.scope.is_global() {
-        metadata_spec.offset
-    } else {
-        metadata_spec.offset + POLICY_SIDE_METADATA_OFFSET
+    #[cfg(target_pointer_width = "32")]
+    let res = {
+        if metadata_spec.scope.is_global() {
+            address_to_contiguous_meta_address(metadata_spec, data_addr)
+        } else {
+            address_to_chunked_meta_address(metadata_spec, data_addr)
+        }
     };
+    #[cfg(target_pointer_width = "64")]
+    let res = { address_to_contiguous_meta_address(metadata_spec, data_addr) };
 
-    let meta_chunk_addr = address_to_meta_chunk_addr(data_addr);
-    let internal_addr = data_addr.as_usize() & CHUNK_MASK;
-    let rshift = (constants::LOG_BITS_IN_BYTE as i32) + log_min_obj_size - bits_num_log;
-    debug_assert!(rshift >= 0);
+    trace!(
+        "address_to_meta_address(addr: {}, off: 0x{:x}, lbits: {}, lmin: {}) -> 0x{:x}",
+        data_addr,
+        metadata_spec.offset,
+        metadata_spec.log_num_of_bits,
+        metadata_spec.log_min_obj_size,
+        res
+    );
 
-    let second_offset = internal_addr >> rshift;
+    res
+}
 
-    meta_chunk_addr + first_offset + second_offset
+const fn addr_rshift(metadata_spec: SideMetadataSpec) -> i32 {
+    ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_min_obj_size - metadata_spec.log_num_of_bits)
+        as i32
+}
+
+#[allow(dead_code)]
+#[inline(always)]
+pub(crate) const fn metadata_address_range_size(metadata_spec: SideMetadataSpec) -> usize {
+    1usize << (LOG_ADDRESS_SPACE - addr_rshift(metadata_spec) as usize)
 }
 
 #[inline(always)]
-pub(crate) const fn meta_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bits: usize) -> usize {
-    1usize
-        << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) - log_min_obj_size
-            + log_num_of_bits)
-}
-
-#[inline(always)]
-pub(super) fn meta_byte_lshift(metadata_spec: SideMetadataSpec, data_addr: Address) -> u8 {
-    let bits_num_log = metadata_spec.log_num_of_bits;
-    if bits_num_log == 3 {
+pub(crate) fn meta_byte_lshift(metadata_spec: SideMetadataSpec, data_addr: Address) -> u8 {
+    let bits_num_log = metadata_spec.log_num_of_bits as i32;
+    if bits_num_log >= 3 {
         return 0;
     }
-    let rem_shift =
-        constants::BITS_IN_WORD - ((constants::LOG_BITS_IN_BYTE as usize) - bits_num_log);
-    ((((data_addr.as_usize() >> metadata_spec.log_min_obj_size) << rem_shift) >> rem_shift)
-        << bits_num_log) as u8
+    let rem_shift = BITS_IN_WORD as i32 - ((LOG_BITS_IN_BYTE as i32) - bits_num_log);
+    ((((data_addr >> metadata_spec.log_min_obj_size) << rem_shift) >> rem_shift) << bits_num_log)
+        as u8
 }
 
 #[inline(always)]
-pub(super) fn meta_byte_mask(metadata_spec: SideMetadataSpec) -> u8 {
+pub(crate) fn meta_byte_mask(metadata_spec: SideMetadataSpec) -> u8 {
     let bits_num_log = metadata_spec.log_num_of_bits;
     ((1usize << (1usize << bits_num_log)) - 1) as u8
-}
-
-#[cfg(test)]
-mod tests {
-    use super::address_to_meta_address;
-    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-    use crate::util::side_metadata::constants::*;
-    use crate::util::side_metadata::global::*;
-    use crate::util::side_metadata::helpers::*;
-    use crate::util::Address;
-
-    #[test]
-    fn test_side_metadata_address_to_meta_address() {
-        let mut gspec = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
-            offset: 0,
-            log_num_of_bits: 0,
-            log_min_obj_size: 0,
-        };
-        let mut lspec = SideMetadataSpec {
-            scope: SideMetadataScope::PolicySpecific,
-            offset: 0,
-            log_num_of_bits: 0,
-            log_min_obj_size: 0,
-        };
-
-        assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(0) }).as_usize(),
-            SIDE_METADATA_BASE_ADDRESS.as_usize()
-        );
-        assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(0) }).as_usize(),
-            (SIDE_METADATA_BASE_ADDRESS + POLICY_SIDE_METADATA_OFFSET).as_usize()
-        );
-
-        assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(BYTES_IN_CHUNK >> 1) })
-                .as_usize(),
-            SIDE_METADATA_BASE_ADDRESS.as_usize() + (meta_bytes_per_chunk(0, 0) >> 1)
-        );
-        assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(BYTES_IN_CHUNK >> 1) })
-                .as_usize(),
-            (SIDE_METADATA_BASE_ADDRESS + POLICY_SIDE_METADATA_OFFSET).as_usize()
-                + (meta_bytes_per_chunk(0, 0) >> 1)
-        );
-
-        gspec.log_min_obj_size = 2;
-        lspec.log_min_obj_size = 1;
-
-        assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(BYTES_IN_CHUNK >> 1) })
-                .as_usize(),
-            SIDE_METADATA_BASE_ADDRESS.as_usize() + (meta_bytes_per_chunk(2, 0) >> 1)
-        );
-        assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(BYTES_IN_CHUNK >> 1) })
-                .as_usize(),
-            (SIDE_METADATA_BASE_ADDRESS + POLICY_SIDE_METADATA_OFFSET).as_usize()
-                + (meta_bytes_per_chunk(1, 0) >> 1)
-        );
-
-        gspec.log_num_of_bits = 1;
-        lspec.log_num_of_bits = 3;
-
-        assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(BYTES_IN_CHUNK >> 1) })
-                .as_usize(),
-            SIDE_METADATA_BASE_ADDRESS.as_usize() + (meta_bytes_per_chunk(2, 1) >> 1)
-        );
-        assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(BYTES_IN_CHUNK >> 1) })
-                .as_usize(),
-            (SIDE_METADATA_BASE_ADDRESS + POLICY_SIDE_METADATA_OFFSET).as_usize()
-                + (meta_bytes_per_chunk(1, 3) >> 1)
-        );
-    }
-
-    #[test]
-    fn test_side_metadata_meta_byte_mask() {
-        let mut spec = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
-            offset: 0,
-            log_num_of_bits: 0,
-            log_min_obj_size: 0,
-        };
-
-        assert_eq!(meta_byte_mask(spec), 1);
-
-        spec.log_num_of_bits = 1;
-        assert_eq!(meta_byte_mask(spec), 3);
-        spec.log_num_of_bits = 2;
-        assert_eq!(meta_byte_mask(spec), 15);
-        spec.log_num_of_bits = 3;
-        assert_eq!(meta_byte_mask(spec), 255);
-    }
-
-    #[test]
-    fn test_side_metadata_meta_byte_lshift() {
-        let mut spec = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
-            offset: 0,
-            log_num_of_bits: 0,
-            log_min_obj_size: 0,
-        };
-
-        assert_eq!(meta_byte_lshift(spec, unsafe { Address::from_usize(0) }), 0);
-        assert_eq!(meta_byte_lshift(spec, unsafe { Address::from_usize(5) }), 5);
-        assert_eq!(
-            meta_byte_lshift(spec, unsafe { Address::from_usize(15) }),
-            7
-        );
-
-        spec.log_num_of_bits = 2;
-
-        assert_eq!(meta_byte_lshift(spec, unsafe { Address::from_usize(0) }), 0);
-        assert_eq!(meta_byte_lshift(spec, unsafe { Address::from_usize(5) }), 4);
-        assert_eq!(
-            meta_byte_lshift(spec, unsafe { Address::from_usize(15) }),
-            4
-        );
-        assert_eq!(
-            meta_byte_lshift(spec, unsafe { Address::from_usize(0x10010) }),
-            0
-        );
-    }
-
-    #[test]
-    fn test_side_metadata_meta_bytes_per_chunk() {
-        let ch_sz = BYTES_IN_CHUNK;
-        let bw = constants::BITS_IN_BYTE;
-        assert_eq!(meta_bytes_per_chunk(0, 0), ch_sz / bw);
-        assert_eq!(meta_bytes_per_chunk(3, 0), (ch_sz / bw) >> 3);
-        assert_eq!(meta_bytes_per_chunk(0, 3), (ch_sz / bw) << 3);
-    }
 }

@@ -65,7 +65,7 @@ In `global.rs`:
                  mmapper,
                  &mut heap,
              ),
-             common: CommonPlan::new(vm_map, mmapper, options, heap, &TRIPLESPACE_CONSTRAINTS),
+             common: CommonPlan::new(vm_map, mmapper, options, heap, &TRIPLESPACE_CONSTRAINTS, &[]),
          }
      }
       ```

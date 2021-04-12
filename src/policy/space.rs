@@ -1,7 +1,7 @@
-use crate::util::conversions::*;
-use crate::util::side_metadata::try_map_metadata_space;
+use crate::util::side_metadata::{try_map_metadata_address_range, try_map_metadata_space};
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
@@ -60,7 +60,6 @@ const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 
 #[derive(Debug)]
 struct EmptySpaceSFT {}
-unsafe impl Sync for EmptySpaceSFT {}
 
 const EMPTY_SFT_NAME: &str = "empty";
 
@@ -102,6 +101,8 @@ impl SFT for EmptySpaceSFT {
 pub struct SFTMap {
     sft: Vec<*const (dyn SFT + Sync)>,
 }
+
+// TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
 unsafe impl Sync for SFTMap {}
 
 static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
@@ -338,15 +339,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
             SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
-            if !try_map_metadata_space(
-                start,
-                bytes,
-                VM::VMActivePlan::global().global_side_metadata_per_chunk(),
-                self.local_side_metadata_per_chunk(),
-            ) {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory");
-            }
         }
     }
 
@@ -356,12 +348,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        if !try_map_metadata_space(
+        if try_map_metadata_space(
             self.common().start,
             self.common().extent,
-            VM::VMActivePlan::global().global_side_metadata_per_chunk(),
-            self.local_side_metadata_per_chunk(),
-        ) {
+            VM::VMActivePlan::global().global_side_metadata_specs(),
+            self.local_side_metadata_specs(),
+        )
+        .is_err()
+        {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
@@ -458,8 +452,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         println!();
     }
 
-    fn local_side_metadata_per_chunk(&self) -> usize {
-        0
+    fn local_side_metadata_specs(&self) -> &[SideMetadataSpec] {
+        &[]
     }
 }
 
@@ -495,8 +489,6 @@ pub struct SpaceOptions {
 
 /// Print debug info for SFT. Should be false when committed.
 const DEBUG_SPACE: bool = cfg!(debug_assertions) && false;
-
-unsafe impl<VM: VMBinding> Sync for CommonSpace<VM> {}
 
 impl<VM: VMBinding> CommonSpace<VM> {
     pub fn new(
@@ -587,6 +579,17 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn init(&self, space: &dyn Space<VM>) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
+            if try_map_metadata_address_range(
+                self.start,
+                self.extent,
+                VM::VMActivePlan::global().global_side_metadata_specs(),
+                space.local_side_metadata_specs(),
+            )
+            .is_err()
+            {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory");
+            }
             SFT_MAP.update(space.as_sft(), self.start, bytes_to_chunks_up(self.extent));
         }
     }

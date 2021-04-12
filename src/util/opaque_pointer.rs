@@ -10,6 +10,7 @@ use libc::c_void;
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct OpaquePointer(*mut c_void);
 
+// We never really dereference an opaque pointer in mmtk-core.
 unsafe impl Sync for OpaquePointer {}
 unsafe impl Send for OpaquePointer {}
 

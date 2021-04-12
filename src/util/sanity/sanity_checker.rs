@@ -29,19 +29,22 @@ impl SanityChecker {
     }
 }
 
-#[derive(Default)]
-pub struct ScheduleSanityGC<P: Plan, W: CopyContext + WorkerLocal>(PhantomData<(P, W)>);
+pub struct ScheduleSanityGC<P: Plan, W: CopyContext + WorkerLocal> {
+    _plan: &'static P,
+    _p: PhantomData<W>,
+}
 
 impl<P: Plan, W: CopyContext + WorkerLocal> ScheduleSanityGC<P, W> {
-    pub fn new() -> Self {
-        ScheduleSanityGC(PhantomData)
+    pub fn new(plan: &'static P) -> Self {
+        ScheduleSanityGC {
+            _plan: plan,
+            _p: PhantomData,
+        }
     }
 }
 
-impl<VM: VMBinding, P: Plan<VM = VM>, W: CopyContext + WorkerLocal> GCWork<VM>
-    for ScheduleSanityGC<P, W>
-{
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for ScheduleSanityGC<P, W> {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         let scheduler = worker.scheduler();
         let plan = &mmtk.plan;
 
@@ -49,12 +52,12 @@ impl<VM: VMBinding, P: Plan<VM = VM>, W: CopyContext + WorkerLocal> GCWork<VM>
 
         plan.base().inside_sanity.store(true, Ordering::SeqCst);
         // Stop & scan mutators (mutator scanning can happen before STW)
-        for mutator in VM::VMActivePlan::mutators() {
+        for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
             scheduler.work_buckets[WorkBucketStage::Prepare]
-                .add(ScanStackRoot::<SanityGCProcessEdges<VM>>(mutator));
+                .add(ScanStackRoot::<SanityGCProcessEdges<P::VM>>(mutator));
         }
         scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(ScanVMSpecificRoots::<SanityGCProcessEdges<VM>>::new());
+            .add(ScanVMSpecificRoots::<SanityGCProcessEdges<P::VM>>::new());
         // Prepare global/collectors/mutators
         worker.scheduler().work_buckets[WorkBucketStage::Prepare].add(SanityPrepare::<P, W>::new(
             plan.downcast_ref::<P>().unwrap(),
@@ -70,8 +73,6 @@ pub struct SanityPrepare<P: Plan, W: CopyContext + WorkerLocal> {
     pub plan: &'static P,
     _p: PhantomData<W>,
 }
-
-unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for SanityPrepare<P, W> {}
 
 impl<P: Plan, W: CopyContext + WorkerLocal> SanityPrepare<P, W> {
     pub fn new(plan: &'static P) -> Self {
@@ -103,8 +104,6 @@ pub struct SanityRelease<P: Plan, W: CopyContext + WorkerLocal> {
     pub plan: &'static P,
     _p: PhantomData<W>,
 }
-
-unsafe impl<P: Plan, W: CopyContext + WorkerLocal> Sync for SanityRelease<P, W> {}
 
 impl<P: Plan, W: CopyContext + WorkerLocal> SanityRelease<P, W> {
     pub fn new(plan: &'static P) -> Self {

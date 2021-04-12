@@ -1,6 +1,4 @@
 use super::gc_work::{SSCopyContext, SSProcessEdges};
-use crate::mmtk::MMTK;
-use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
@@ -22,10 +20,9 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::OpaquePointer;
-use crate::vm::ObjectModel;
-use crate::vm::VMBinding;
+use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
+use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -39,8 +36,6 @@ pub struct SemiSpace<VM: VMBinding> {
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
 }
-
-unsafe impl<VM: VMBinding> Sync for SemiSpace<VM> {}
 
 pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
@@ -100,7 +95,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new());
+            .add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
@@ -141,12 +136,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &self.common
     }
 
-    fn global_side_metadata_per_chunk(&self) -> usize {
-        if !VM::VMObjectModel::HAS_GC_BYTE {
-            meta_bytes_per_chunk(3, 1)
-        } else {
-            0
-        }
+    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
+        &self.common().global_metadata_specs
     }
 }
 
@@ -155,7 +146,6 @@ impl<VM: VMBinding> SemiSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
@@ -179,7 +169,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS, &[]),
         }
     }
 

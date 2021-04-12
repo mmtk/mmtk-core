@@ -2,7 +2,6 @@
 
 use super::controller_collector_context::ControllerCollectorContext;
 use super::PlanConstraints;
-use crate::mmtk::MMTK;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -14,6 +13,7 @@ use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
+use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -25,6 +25,7 @@ use crate::util::statistics::stats::Stats;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
+use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::cell::UnsafeCell;
@@ -35,7 +36,7 @@ use std::sync::{Arc, Mutex};
 /// A GC worker's context for copying GCs.
 /// Each GC plan should provide their implementation of a CopyContext.
 /// For non-copying GC, NoCopy can be used.
-pub trait CopyContext: 'static + Sync + Send {
+pub trait CopyContext: 'static + Send {
     type VM: VMBinding;
     fn constraints(&self) -> &'static PlanConstraints;
     fn init(&mut self, tls: OpaquePointer);
@@ -133,20 +134,17 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
-    scheduler: &'static MMTkScheduler<VM>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
-        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(
-            vm_map, mmapper, options, scheduler,
-        )),
+        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
         PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options,
         )),
-        PlanSelector::GenCopy => Box::new(crate::plan::gencopy::GenCopy::new(
-            vm_map, mmapper, options, scheduler,
-        )),
+        PlanSelector::GenCopy => {
+            Box::new(crate::plan::gencopy::GenCopy::new(vm_map, mmapper, options))
+        }
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options,
         )),
     }
 }
@@ -156,7 +154,7 @@ pub fn create_plan<VM: VMBinding>(
 ///
 /// The global instance defines and manages static resources
 /// (such as memory and virtual memory resources).
-pub trait Plan: 'static + Sync + Send + Downcast {
+pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
     fn constraints(&self) -> &'static PlanConstraints;
@@ -341,8 +339,8 @@ pub trait Plan: 'static + Sync + Send + Downcast {
         }
     }
 
-    fn global_side_metadata_per_chunk(&self) -> usize {
-        0
+    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
+        &[]
     }
 }
 
@@ -393,6 +391,9 @@ pub struct BasePlan<VM: VMBinding> {
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
 }
+
+// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
+unsafe impl<VM: VMBinding> Sync for BasePlan<VM> {}
 
 #[cfg(feature = "base_spaces")]
 pub struct BaseUnsync<VM: VMBinding> {
@@ -534,8 +535,12 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
+    // Depends on what base spaces we use, unsync may be unused.
+    #[allow(unused_variables)]
     #[cfg(feature = "base_spaces")]
     pub fn get_pages_used(&self) -> usize {
+        // Depends on what base spaces we use, pages may be unchanged.
+        #[allow(unused_mut)]
         let mut pages = 0;
         let unsync = unsafe { &mut *self.unsync.get() };
 
@@ -712,12 +717,16 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 pub struct CommonPlan<VM: VMBinding> {
     pub unsync: UnsafeCell<CommonUnsync<VM>>,
     pub base: BasePlan<VM>,
+    pub global_metadata_specs: Vec<SideMetadataSpec>,
 }
 
 pub struct CommonUnsync<VM: VMBinding> {
     pub immortal: ImmortalSpace<VM>,
     pub los: LargeObjectSpace<VM>,
 }
+
+// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
+unsafe impl<VM: VMBinding> Sync for CommonPlan<VM> {}
 
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(
@@ -726,7 +735,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
+        global_side_metadata_specs: &[SideMetadataSpec],
     ) -> CommonPlan<VM> {
+        let mut specs = if cfg!(feature = "side_gc_header") {
+            vec![gc_byte::SIDE_GC_BYTE_SPEC]
+        } else {
+            vec![]
+        };
+        specs.extend_from_slice(global_side_metadata_specs);
         CommonPlan {
             unsync: UnsafeCell::new(CommonUnsync {
                 immortal: ImmortalSpace::new(
@@ -749,6 +765,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 ),
             }),
             base: BasePlan::new(vm_map, mmapper, options, heap, constraints),
+            global_metadata_specs: specs,
         }
     }
 
