@@ -95,13 +95,13 @@
     }
     .<span class="ident">downcast_mut</span>::<span class="op">&lt;</span><span class="ident">BumpAllocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>()
     .<span class="ident">unwrap</span>();
-    <span class="ident">bump_allocator</span>.<span class="ident">rebind</span>(<span class="prelude-val">Some</span>(
+    <span class="ident">bump_allocator</span>.<span class="ident">rebind</span>(
         <span class="ident">mutator</span>
             .<span class="ident">plan</span>
             .<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">SemiSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>()
             .<span class="ident">unwrap</span>()
             .<span class="ident">tospace</span>(),
-    ));
+    );
 }
 
 <span class="macro">lazy_static</span><span class="macro">!</span> {

@@ -265,9 +265,10 @@ the one passed to the function. In <code>constraints()</code>, return a referenc
 </span><span class="boring">fn main() {
 </span>impl&lt;VM: VMBinding&gt; MyGCCopyContext&lt;VM&gt; {
     pub fn new(mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
+        let plan = &amp;mmtk.plan.downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
         Self {
-            plan: &amp;mmtk.plan.downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap(),
-            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &amp;*mmtk.plan),
+            plan,
+            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, plan.tospace(), &amp;*mmtk.plan),
         }
     }
 }
@@ -387,7 +388,7 @@ In <code>prepare()</code>, rebind the allocator to the tospace using the functio
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn prepare(&amp;mut self) {
-        self.mygc.rebind(Some(self.plan.tospace()));
+        self.mygc.rebind(self.plan.tospace());
     }
 <span class="boring">}
 </span></code></pre></pre>
@@ -543,13 +544,13 @@ will then go to the new tospace.</p>
     }
     .downcast_mut::&lt;BumpAllocator&lt;VM&gt;&gt;()
     .unwrap();
-    bump_allocator.rebind(Some(
+    bump_allocator.rebind(
         mutator
             .plan
             .downcast_ref::&lt;MyGC&lt;VM&gt;&gt;()
             .unwrap()
             .tospace(),
-    ));
+    );
 }
 <span class="boring">}
 </span></code></pre></pre>

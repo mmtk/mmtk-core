@@ -619,7 +619,6 @@
 <span id="616">616</span>
 <span id="617">617</span>
 <span id="618">618</span>
-<span id="619">619</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">try_map_metadata_address_range</span>, <span class="ident">try_map_metadata_space</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
@@ -683,7 +682,6 @@
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">struct</span> <span class="ident">EmptySpaceSFT</span> {}
-<span class="kw">unsafe</span> <span class="kw">impl</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">EmptySpaceSFT</span> {}
 
 <span class="kw">const</span> <span class="ident">EMPTY_SFT_NAME</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;empty&quot;</span>;
 
@@ -725,6 +723,8 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SFTMap</span> {
     <span class="ident">sft</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">*</span><span class="kw">const</span> (<span class="ident">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span>)<span class="op">&gt;</span>,
 }
+
+<span class="comment">// TODO: MMTK&lt;VM&gt; holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.</span>
 <span class="kw">unsafe</span> <span class="kw">impl</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">SFTMap</span> {}
 
 <span class="kw">static</span> <span class="ident">EMPTY_SPACE_SFT</span>: <span class="ident">EmptySpaceSFT</span> <span class="op">=</span> <span class="ident">EmptySpaceSFT</span> {};
@@ -1111,8 +1111,6 @@
 
 <span class="doccomment">/// Print debug info for SFT. Should be false when committed.</span>
 <span class="kw">const</span> <span class="ident">DEBUG_SPACE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">debug_assertions</span>) <span class="op">&amp;&amp;</span> <span class="bool-val">false</span>;
-
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(

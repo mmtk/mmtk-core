@@ -192,9 +192,6 @@
 <span id="189">189</span>
 <span id="190">190</span>
 <span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">gc_work</span>::{<span class="ident">SSCopyContext</span>, <span class="ident">SSProcessEdges</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">global</span>::<span class="ident">CommonPlan</span>;
@@ -234,8 +231,6 @@
     <span class="kw">pub</span> <span class="ident">copyspace1</span>: <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">common</span>: <span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
-
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">SemiSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
 
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SS_CONSTRAINTS</span>: <span class="ident">PlanConstraints</span> <span class="op">=</span> <span class="ident">PlanConstraints</span> {
     <span class="ident">moves_objects</span>: <span class="bool-val">true</span>,
@@ -295,7 +290,7 @@
         <span class="comment">// Resume mutators</span>
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Final</span>]
-            .<span class="ident">add</span>(<span class="ident">ScheduleSanityGC</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">SSCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>::<span class="ident">new</span>());
+            .<span class="ident">add</span>(<span class="ident">ScheduleSanityGC</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">SSCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="self">self</span>));
         <span class="ident">scheduler</span>.<span class="ident">set_finalizer</span>(<span class="prelude-val">Some</span>(<span class="ident">EndOfGC</span>));
     }
 
@@ -346,7 +341,6 @@
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
         <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
-        <span class="ident">_scheduler</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta</span>::<span class="ident">new</span>(<span class="ident">HEAP_START</span>, <span class="ident">HEAP_END</span>);
 

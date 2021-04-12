@@ -229,6 +229,8 @@
 <span id="226">226</span>
 <span id="227">227</span>
 <span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">UnsafeCell</span>;
@@ -256,6 +258,8 @@
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnsafeOptionsWrapper</span>(<span class="ident">UnsafeCell</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>);
+
+<span class="comment">// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.</span>
 <span class="kw">unsafe</span> <span class="kw">impl</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">UnsafeOptionsWrapper</span> {}
 
 <span class="kw">impl</span> <span class="ident">UnsafeOptionsWrapper</span> {

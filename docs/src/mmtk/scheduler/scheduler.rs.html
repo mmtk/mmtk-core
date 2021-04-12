@@ -324,6 +324,18 @@
 <span id="321">321</span>
 <span id="322">322</span>
 <span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">stat</span>::<span class="ident">SchedulerStat</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">work</span>::<span class="ident">Work</span>;
@@ -356,7 +368,7 @@
     <span class="ident">context</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">C</span><span class="op">&gt;</span>,
     <span class="ident">coordinator_worker</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// A message channel to send new coordinator work and other actions to the coordinator thread</span>
-    <span class="kw">pub</span> <span class="ident">channel</span>: (
+    <span class="ident">channel</span>: (
         <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ),
@@ -364,7 +376,11 @@
     <span class="ident">finalizer</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Context</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {}
+<span class="comment">// The &#39;channel&#39; inside Scheduler disallows Sync for Scheduler. We have to make sure we use channel properly:</span>
+<span class="comment">// 1. We should never directly use Sender. We clone the sender and let each worker have their own copy.</span>
+<span class="comment">// 2. Only the coordinator can use Receiver.</span>
+<span class="comment">// TODO: We should remove channel from Scheduler, and directly send Sender/Receiver when creating the coordinator and</span>
+<span class="comment">// the workers.</span>
 <span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Context</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {}
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Context</span><span class="op">&gt;</span> <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
@@ -413,9 +429,17 @@
         <span class="kw">let</span> <span class="ident">self_mut</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Arc</span>::<span class="ident">get_mut_unchecked</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">self_mut</span>) };
 
         <span class="ident">self_mut</span>.<span class="ident">context</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">context</span>);
-        <span class="ident">self_mut</span>.<span class="ident">coordinator_worker</span> <span class="op">=</span>
-            <span class="prelude-val">Some</span>(<span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="ident">Worker</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="ident">Arc</span>::<span class="ident">downgrade</span>(<span class="kw-2">&amp;</span><span class="self">self</span>), <span class="bool-val">true</span>)));
-        <span class="ident">self_mut</span>.<span class="ident">worker_group</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">WorkerGroup</span>::<span class="ident">new</span>(<span class="ident">num_workers</span>, <span class="ident">Arc</span>::<span class="ident">downgrade</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)));
+        <span class="ident">self_mut</span>.<span class="ident">coordinator_worker</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="ident">Worker</span>::<span class="ident">new</span>(
+            <span class="number">0</span>,
+            <span class="ident">Arc</span>::<span class="ident">downgrade</span>(<span class="kw-2">&amp;</span><span class="self">self</span>),
+            <span class="bool-val">true</span>,
+            <span class="self">self</span>.<span class="ident">channel</span>.<span class="number">0</span>.<span class="ident">clone</span>(),
+        )));
+        <span class="ident">self_mut</span>.<span class="ident">worker_group</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">WorkerGroup</span>::<span class="ident">new</span>(
+            <span class="ident">num_workers</span>,
+            <span class="ident">Arc</span>::<span class="ident">downgrade</span>(<span class="kw-2">&amp;</span><span class="self">self</span>),
+            <span class="self">self</span>.<span class="ident">channel</span>.<span class="number">0</span>.<span class="ident">clone</span>(),
+        ));
         <span class="self">self</span>.<span class="ident">worker_group</span>
             .<span class="ident">as_ref</span>()
             .<span class="ident">unwrap</span>()
@@ -490,7 +514,7 @@
         <span class="ident">work</span>.<span class="ident">do_work_with_stat</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">coordinator_worker</span>, <span class="ident">context</span>);
     }
 
-    <span class="doccomment">/// Drain the message queue and execute coordinator work</span>
+    <span class="doccomment">/// Drain the message queue and execute coordinator work. Only the coordinator should call this.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">wait_for_completion</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="comment">// At the start of a GC, we probably already have received a `ScheduleCollection` work. Run it now.</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">initializer</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">startup</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">take</span>() {
