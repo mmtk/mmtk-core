@@ -535,8 +535,12 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
+    // Depends on what base spaces we use, unsync may be unused.
+    #[allow(unused_variables)]
     #[cfg(feature = "base_spaces")]
     pub fn get_pages_used(&self) -> usize {
+        // Depends on what base spaces we use, pages may be unchanged.
+        #[allow(unused_mut)]
         let mut pages = 0;
         let unsync = unsafe { &mut *self.unsync.get() };
 
