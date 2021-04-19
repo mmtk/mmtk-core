@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CommonPageResource",""]],"trait":[["PageResource",""]]});
+initSidebarItems({"struct":[["CommonPageResource",""],["PRAllocFail",""],["PRAllocResult",""]],"trait":[["PageResource",""]]});

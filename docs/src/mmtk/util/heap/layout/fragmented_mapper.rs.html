@@ -476,6 +476,11 @@
 <span id="473">473</span>
 <span id="474">474</span>
 <span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">Mmapper</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="kw-2">*</span>;
@@ -586,11 +591,14 @@
 
             <span class="comment">/* Iterate over the chunks within the slab */</span>
             <span class="kw">for</span> (<span class="ident">chunk</span>, <span class="ident">entry</span>) <span class="kw">in</span> <span class="ident">mapped</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>().<span class="ident">take</span>(<span class="ident">end_chunk</span>).<span class="ident">skip</span>(<span class="ident">start_chunk</span>) {
+                <span class="kw">if</span> <span class="macro">matches</span><span class="macro">!</span>(<span class="ident">entry</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>), <span class="ident">MapState</span>::<span class="ident">Mapped</span>) {
+                    <span class="kw">continue</span>;
+                }
+
+                <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
                 <span class="kw">match</span> <span class="ident">entry</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>) {
-                    <span class="ident">MapState</span>::<span class="ident">Mapped</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">continue</span>,
                     <span class="ident">MapState</span>::<span class="ident">Unmapped</span> <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="kw">let</span> <span class="ident">mmap_start</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">chunk_index_to_address</span>(<span class="ident">base</span>, <span class="ident">chunk</span>);
-                        <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
                         <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">memory</span>::<span class="ident">dzmmap</span>(<span class="ident">mmap_start</span>, <span class="ident">MMAP_CHUNK_BYTES</span>).<span class="ident">unwrap</span>();
                         <span class="self">self</span>.<span class="ident">map_metadata</span>(
                             <span class="ident">mmap_start</span>,
@@ -601,10 +609,12 @@
                     }
                     <span class="ident">MapState</span>::<span class="ident">Protected</span> <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="kw">let</span> <span class="ident">mmap_start</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">chunk_index_to_address</span>(<span class="ident">base</span>, <span class="ident">chunk</span>);
-                        <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
                         <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">memory</span>::<span class="ident">munprotect</span>(<span class="ident">mmap_start</span>, <span class="ident">MMAP_CHUNK_BYTES</span>).<span class="ident">unwrap</span>();
                     }
+                    <span class="comment">// might have become MAPPED here</span>
+                    <span class="ident">MapState</span>::<span class="ident">Mapped</span> <span class="op">=</span><span class="op">&gt;</span> {}
                 }
+
                 <span class="ident">entry</span>.<span class="ident">store</span>(<span class="ident">MapState</span>::<span class="ident">Mapped</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
             }
             <span class="ident">start</span> <span class="op">=</span> <span class="ident">high</span>;

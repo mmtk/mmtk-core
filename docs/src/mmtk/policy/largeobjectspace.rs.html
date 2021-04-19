@@ -237,21 +237,7 @@
 <span id="234">234</span>
 <span id="235">235</span>
 <span id="236">236</span>
-<span id="237">237</span>
-<span id="238">238</span>
-<span id="239">239</span>
-<span id="240">240</span>
-<span id="241">241</span>
-<span id="242">242</span>
-<span id="243">243</span>
-<span id="244">244</span>
-<span id="245">245</span>
-<span id="246">246</span>
-<span id="247">247</span>
-<span id="248">248</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">UnsafeCell</span>;
-
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">PlanConstraints</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">TransitiveClosure</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">SpaceOptions</span>;
@@ -279,16 +265,13 @@
 <span class="kw">const</span> <span class="ident">PRECEEDING_GC_HEADER_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">PRECEEDING_GC_HEADER_WORDS</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_WORD</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LargeObjectSpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="ident">common</span>: <span class="ident">UnsafeCell</span><span class="op">&lt;</span><span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">common</span>: <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">pr</span>: <span class="ident">FreeListPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">mark_state</span>: <span class="ident">u8</span>,
     <span class="ident">in_nursery_gc</span>: <span class="ident">bool</span>,
     <span class="ident">treadmill</span>: <span class="ident">TreadMill</span>,
     <span class="ident">header_byte</span>: <span class="ident">HeaderByte</span>,
 }
-
-<span class="comment">// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.</span>
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">LargeObjectSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">SFT</span> <span class="kw">for</span> <span class="ident">LargeObjectSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
@@ -337,17 +320,10 @@
     <span class="kw">fn</span> <span class="ident">get_page_resource</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pr</span>
     }
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
-        <span class="kw">let</span> <span class="ident">me</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="self">Self</span>) };
-        <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">bind_space</span>(<span class="ident">me</span>);
-    }
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {}
 
     <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get</span>() }
-    }
-
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unsafe_common_mut</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get</span>()
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>
     }
 
     <span class="kw">fn</span> <span class="ident">release_multiple_pages</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>) {
@@ -383,7 +359,7 @@
             } <span class="kw">else</span> {
                 <span class="ident">FreeListPageResource</span>::<span class="ident">new_contiguous</span>(<span class="ident">common</span>.<span class="ident">start</span>, <span class="ident">common</span>.<span class="ident">extent</span>, <span class="number">0</span>, <span class="ident">vm_map</span>)
             },
-            <span class="ident">common</span>: <span class="ident">UnsafeCell</span>::<span class="ident">new</span>(<span class="ident">common</span>),
+            <span class="ident">common</span>,
             <span class="ident">mark_state</span>: <span class="number">0</span>,
             <span class="ident">in_nursery_gc</span>: <span class="bool-val">false</span>,
             <span class="ident">treadmill</span>: <span class="ident">TreadMill</span>::<span class="ident">new</span>(),

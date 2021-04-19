@@ -181,16 +181,6 @@
 <span id="178">178</span>
 <span id="179">179</span>
 <span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
-<span id="190">190</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">TransitiveClosure</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">AllocationSemantics</span>, <span class="ident">CopyContext</span>};
@@ -205,16 +195,12 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">libc</span>::{<span class="ident">mprotect</span>, <span class="ident">PROT_EXEC</span>, <span class="ident">PROT_NONE</span>, <span class="ident">PROT_READ</span>, <span class="ident">PROT_WRITE</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">UnsafeCell</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
-
-<span class="comment">// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.</span>
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
 
 <span class="kw">const</span> <span class="ident">META_DATA_PAGES_PER_REGION</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">CARD_META_PAGES_PER_REGION</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="ident">common</span>: <span class="ident">UnsafeCell</span><span class="op">&lt;</span><span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">common</span>: <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">pr</span>: <span class="ident">MonotonePageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">from_space</span>: <span class="ident">AtomicBool</span>,
 }
@@ -247,16 +233,10 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pr</span>
     }
     <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get</span>() }
-    }
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unsafe_common_mut</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get</span>()
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>
     }
 
     <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
-        <span class="comment">// Borrow-checker fighting so that we can have a cyclic reference</span>
-        <span class="kw">let</span> <span class="ident">me</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="self">Self</span>) };
-        <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">bind_space</span>(<span class="ident">me</span>);
         <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">init</span>(<span class="self">self</span>.<span class="ident">as_space</span>());
     }
 
@@ -298,7 +278,7 @@
                     <span class="ident">vm_map</span>,
                 )
             },
-            <span class="ident">common</span>: <span class="ident">UnsafeCell</span>::<span class="ident">new</span>(<span class="ident">common</span>),
+            <span class="ident">common</span>,
             <span class="ident">from_space</span>: <span class="ident">AtomicBool</span>::<span class="ident">new</span>(<span class="ident">from_space</span>),
         }
     }
