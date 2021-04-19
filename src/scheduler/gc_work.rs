@@ -398,6 +398,8 @@ pub trait ProcessEdgesWork:
 
     #[inline]
     fn process_edge(&mut self, slot: Address) {
+        #[cfg(feature = "extreme_assertions")]
+        assert!(crate::edge_logger::is_logged_edge(slot), "Unknown edge detected: ({})", slot);
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
         if Self::OVERWRITE_REFERENCE {
