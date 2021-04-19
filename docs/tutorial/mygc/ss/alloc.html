@@ -375,6 +375,17 @@ base plan <em>through</em> the common plan.</p>
     }
 <span class="boring">}
 </span></code></pre></pre>
+<p>The trait <code>Plan</code> requires <code>collection_required()</code> method to know when
+we should trigger a collection. We can just use the implementation
+in the <code>BasePlan</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn collection_required(&amp;self, space_full: bool, space: &amp;dyn Space&lt;Self::VM&gt;) -&gt; bool {
+        self.base().collection_required(self, space_full, space)
+    }
+<span class="boring">}
+</span></code></pre></pre>
 <p>Find the method <code>get_pages_used</code>. Replace the current body with 
 <code>self.tospace().reserved_pages() + self.common.get_pages_used()</code>, to 
 correctly count the pages contained in the tospace and the common plan 

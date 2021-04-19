@@ -136,6 +136,10 @@
 <span id="133">133</span>
 <span id="134">134</span>
 <span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">MMTK</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">global</span>::<span class="ident">BasePlan</span>;
@@ -222,6 +226,10 @@
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Marksweep: Release&quot;</span>);
         <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">release</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
         <span class="self">self</span>.<span class="ident">ms</span>.<span class="ident">release_all_chunks</span>();
+    }
+
+    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">collection_required</span>(<span class="self">self</span>, <span class="ident">space_full</span>, <span class="ident">space</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">get_collection_reserve</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {

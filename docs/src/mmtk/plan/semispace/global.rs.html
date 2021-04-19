@@ -192,6 +192,10 @@
 <span id="189">189</span>
 <span id="190">190</span>
 <span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">gc_work</span>::{<span class="ident">SSCopyContext</span>, <span class="ident">SSProcessEdges</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">global</span>::<span class="ident">CommonPlan</span>;
@@ -313,6 +317,10 @@
         <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">release</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
         <span class="comment">// release the collected region</span>
         <span class="self">self</span>.<span class="ident">fromspace</span>().<span class="ident">release</span>();
+    }
+
+    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">collection_required</span>(<span class="self">self</span>, <span class="ident">space_full</span>, <span class="ident">space</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">get_collection_reserve</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {

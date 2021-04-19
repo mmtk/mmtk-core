@@ -866,6 +866,13 @@
 <span id="863">863</span>
 <span id="864">864</span>
 <span id="865">865</span>
+<span id="866">866</span>
+<span id="867">867</span>
+<span id="868">868</span>
+<span id="869">869</span>
+<span id="870">870</span>
+<span id="871">871</span>
+<span id="872">872</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! The global part of a plan implementation.</span>
 
@@ -1125,17 +1132,7 @@
      * @param space TODO
      * @return &lt;code&gt;true&lt;/code&gt; if a collection is requested by the plan.
      */</span>
-    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">_space</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">stress_force_gc</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">stress_test_gc_required</span>();
-        <span class="macro">debug</span><span class="macro">!</span>(
-            <span class="string">&quot;self.get_pages_reserved()={}, self.get_total_pages()={}&quot;</span>,
-            <span class="self">self</span>.<span class="ident">get_pages_reserved</span>(),
-            <span class="self">self</span>.<span class="ident">get_total_pages</span>()
-        );
-        <span class="kw">let</span> <span class="ident">heap_full</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_pages_reserved</span>() <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">get_total_pages</span>();
-
-        <span class="ident">space_full</span> <span class="op">|</span><span class="op">|</span> <span class="ident">stress_force_gc</span> <span class="op">|</span><span class="op">|</span> <span class="ident">heap_full</span>
-    }
+    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">_space</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
 
     <span class="kw">fn</span> <span class="ident">get_pages_reserved</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">get_pages_used</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">get_collection_reserve</span>()
@@ -1161,25 +1158,6 @@
 
     <span class="kw">fn</span> <span class="ident">get_free_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">get_total_pages</span>() <span class="op">-</span> <span class="self">self</span>.<span class="ident">get_pages_used</span>()
-    }
-
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">stress_test_gc_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">stress_factor</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">stress_factor</span>;
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_initialized</span>()
-            <span class="op">&amp;&amp;</span> (<span class="self">self</span>.<span class="ident">base</span>().<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) <span class="op">&gt;</span> <span class="ident">stress_factor</span>)
-        {
-            <span class="macro">trace</span><span class="macro">!</span>(
-                <span class="string">&quot;Stress GC: allocation_bytes = {}, stress_factor = {}&quot;</span>,
-                <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>),
-                <span class="ident">stress_factor</span>
-            );
-            <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Doing stress GC&quot;</span>);
-            <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">allocation_bytes</span>.<span class="ident">store</span>(<span class="number">0</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="bool-val">true</span>
-        } <span class="kw">else</span> {
-            <span class="bool-val">false</span>
-        }
     }
 
     <span class="kw">fn</span> <span class="ident">handle_user_collection_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>, <span class="ident">force</span>: <span class="ident">bool</span>) {
@@ -1577,6 +1555,42 @@ BasePlan should contain all plan-related state and functions that are _fundament
             <span class="ident">size</span>,
             <span class="self">self</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>),
         );
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">stress_test_gc_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="kw">let</span> <span class="ident">stress_factor</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span>;
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">initialized</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
+            <span class="op">&amp;&amp;</span> (<span class="self">self</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) <span class="op">&gt;</span> <span class="ident">stress_factor</span>)
+        {
+            <span class="macro">trace</span><span class="macro">!</span>(
+                <span class="string">&quot;Stress GC: allocation_bytes = {}, stress_factor = {}&quot;</span>,
+                <span class="self">self</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>),
+                <span class="ident">stress_factor</span>
+            );
+            <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Doing stress GC&quot;</span>);
+            <span class="self">self</span>.<span class="ident">allocation_bytes</span>.<span class="ident">store</span>(<span class="number">0</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="bool-val">true</span>
+        } <span class="kw">else</span> {
+            <span class="bool-val">false</span>
+        }
+    }
+
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">collection_required</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="ident">P</span>,
+        <span class="ident">space_full</span>: <span class="ident">bool</span>,
+        <span class="ident">_space</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="kw">let</span> <span class="ident">stress_force_gc</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">stress_test_gc_required</span>();
+        <span class="macro">debug</span><span class="macro">!</span>(
+            <span class="string">&quot;self.get_pages_reserved()={}, self.get_total_pages()={}&quot;</span>,
+            <span class="ident">plan</span>.<span class="ident">get_pages_reserved</span>(),
+            <span class="ident">plan</span>.<span class="ident">get_total_pages</span>()
+        );
+        <span class="kw">let</span> <span class="ident">heap_full</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">get_pages_reserved</span>() <span class="op">&gt;</span> <span class="ident">plan</span>.<span class="ident">get_total_pages</span>();
+
+        <span class="ident">space_full</span> <span class="op">|</span><span class="op">|</span> <span class="ident">stress_force_gc</span> <span class="op">|</span><span class="op">|</span> <span class="ident">heap_full</span>
     }
 }
 
