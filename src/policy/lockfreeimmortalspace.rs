@@ -65,9 +65,6 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn common(&self) -> &CommonSpace<VM> {
         unimplemented!()
     }
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
-        unimplemented!()
-    }
 
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")

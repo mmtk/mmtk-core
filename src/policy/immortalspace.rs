@@ -14,18 +14,14 @@ use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::vm::VMBinding;
-use std::cell::UnsafeCell;
 
 pub struct ImmortalSpace<VM: VMBinding> {
     mark_state: u8,
-    common: UnsafeCell<CommonSpace<VM>>,
+    common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
 
     header_byte: HeaderByte,
 }
-
-// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
-unsafe impl<VM: VMBinding> Sync for ImmortalSpace<VM> {}
 
 const GC_MARK_BIT_MASK: u8 = 1;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
@@ -65,16 +61,10 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
         &self.pr
     }
     fn common(&self) -> &CommonSpace<VM> {
-        unsafe { &*self.common.get() }
-    }
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
-        &mut *self.common.get()
+        &self.common
     }
 
     fn init(&mut self, _vm_map: &'static VMMap) {
-        // Borrow-checker fighting so that we can have a cyclic reference
-        let me = unsafe { &*(self as *const Self) };
-        self.pr.bind_space(me);
         self.common().init(self.as_space());
     }
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -116,7 +106,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                     vm_map,
                 )
             },
-            common: UnsafeCell::new(common),
+            common,
             header_byte: HeaderByte::new(constraints),
         }
     }
