@@ -1,12 +1,13 @@
-use crate::policy::space::Space;
 use crate::util::address::Address;
+use crate::util::conversions;
 use crate::util::OpaquePointer;
 use crate::vm::ActivePlan;
-
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 use super::layout::map::Map;
 use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::vm::VMBinding;
 
 pub trait PageResource<VM: VMBinding>: 'static {
@@ -15,12 +16,12 @@ pub trait PageResource<VM: VMBinding>: 'static {
     /// Return The start of the first page if successful, zero on failure.
     fn get_new_pages(
         &self,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
-        zeroed: bool,
         tls: OpaquePointer,
-    ) -> Address {
-        self.alloc_pages(reserved_pages, required_pages, zeroed, tls)
+    ) -> Result<PRAllocResult, PRAllocFail> {
+        self.alloc_pages(space_descriptor, reserved_pages, required_pages, tls)
     }
 
     // XXX: In the original code reserve_pages & clear_request explicitly
@@ -58,11 +59,11 @@ pub trait PageResource<VM: VMBinding>: 'static {
 
     fn alloc_pages(
         &self,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
-        zeroed: bool,
         tls: OpaquePointer,
-    ) -> Address;
+    ) -> Result<PRAllocResult, PRAllocFail>;
 
     fn adjust_for_metadata(&self, pages: usize) -> usize;
 
@@ -96,35 +97,43 @@ pub trait PageResource<VM: VMBinding>: 'static {
         self.common().committed.load(Ordering::Relaxed)
     }
 
-    fn bind_space(&mut self, space: &'static dyn Space<VM>) {
-        self.common_mut().space = Some(space);
-    }
-
-    fn common(&self) -> &CommonPageResource<VM>;
-    fn common_mut(&mut self) -> &mut CommonPageResource<VM>;
+    fn common(&self) -> &CommonPageResource;
+    fn common_mut(&mut self) -> &mut CommonPageResource;
     fn vm_map(&self) -> &'static VMMap {
-        self.common().space.unwrap().common().vm_map()
+        self.common().vm_map
     }
 }
 
-pub struct CommonPageResource<VM: VMBinding> {
+pub struct PRAllocResult {
+    pub start: Address,
+    pub pages: usize,
+    pub new_chunk: bool,
+}
+
+pub struct PRAllocFail;
+
+pub struct CommonPageResource {
     reserved: AtomicUsize,
     committed: AtomicUsize,
 
     pub contiguous: bool,
     pub growable: bool,
-    pub space: Option<&'static dyn Space<VM>>,
+
+    vm_map: &'static VMMap,
+    head_discontiguous_region: Mutex<Address>,
 }
 
-impl<VM: VMBinding> CommonPageResource<VM> {
-    pub fn new(contiguous: bool, growable: bool) -> CommonPageResource<VM> {
+impl CommonPageResource {
+    pub fn new(contiguous: bool, growable: bool, vm_map: &'static VMMap) -> CommonPageResource {
         CommonPageResource {
             reserved: AtomicUsize::new(0),
             committed: AtomicUsize::new(0),
 
             contiguous,
             growable,
-            space: None,
+            vm_map,
+
+            head_discontiguous_region: Mutex::new(Address::ZERO),
         }
     }
 
@@ -158,5 +167,49 @@ impl<VM: VMBinding> CommonPageResource<VM> {
 
     pub fn reset_committed(&self) {
         self.committed.store(0, Ordering::Relaxed);
+    }
+
+    /// Extend the virtual memory associated with a particular discontiguous
+    /// space.  This simply involves requesting a suitable number of chunks
+    /// from the pool of chunks available to discontiguous spaces.
+    pub fn grow_discontiguous_space(
+        &self,
+        space_descriptor: SpaceDescriptor,
+        chunks: usize,
+    ) -> Address {
+        let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
+
+        let new_head: Address = self.vm_map.allocate_contiguous_chunks(
+            space_descriptor,
+            chunks,
+            *head_discontiguous_region,
+        );
+        if new_head.is_zero() {
+            return Address::ZERO;
+        }
+
+        *head_discontiguous_region = new_head;
+        new_head
+    }
+
+    /// Release one or more contiguous chunks associated with a discontiguous
+    /// space.
+    pub fn release_discontiguous_chunks(&self, chunk: Address) {
+        let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
+        debug_assert!(chunk == conversions::chunk_align_down(chunk));
+        if chunk == *head_discontiguous_region {
+            *head_discontiguous_region = self.vm_map.get_next_contiguous_region(chunk);
+        }
+        self.vm_map.free_contiguous_chunks(chunk);
+    }
+
+    pub fn release_all_chunks(&self) {
+        let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
+        self.vm_map.free_all_chunks(*head_discontiguous_region);
+        *head_discontiguous_region = Address::ZERO;
+    }
+
+    pub fn get_head_discontiguous_region(&self) -> Address {
+        *self.head_discontiguous_region.lock().unwrap()
     }
 }
