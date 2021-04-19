@@ -256,17 +256,7 @@ pub trait Plan: 'static + Sync + Downcast {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool {
-        let stress_force_gc = self.stress_test_gc_required();
-        debug!(
-            "self.get_pages_reserved()={}, self.get_total_pages()={}",
-            self.get_pages_reserved(),
-            self.get_total_pages()
-        );
-        let heap_full = self.get_pages_reserved() > self.get_total_pages();
-
-        space_full || stress_force_gc || heap_full
-    }
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool;
 
     fn get_pages_reserved(&self) -> usize {
         self.get_pages_used() + self.get_collection_reserve()
@@ -292,25 +282,6 @@ pub trait Plan: 'static + Sync + Downcast {
 
     fn get_free_pages(&self) -> usize {
         self.get_total_pages() - self.get_pages_used()
-    }
-
-    #[inline]
-    fn stress_test_gc_required(&self) -> bool {
-        let stress_factor = self.base().options.stress_factor;
-        if self.is_initialized()
-            && (self.base().allocation_bytes.load(Ordering::SeqCst) > stress_factor)
-        {
-            trace!(
-                "Stress GC: allocation_bytes = {}, stress_factor = {}",
-                self.base().allocation_bytes.load(Ordering::Relaxed),
-                stress_factor
-            );
-            trace!("Doing stress GC");
-            self.base().allocation_bytes.store(0, Ordering::SeqCst);
-            true
-        } else {
-            false
-        }
     }
 
     fn handle_user_collection_request(&self, tls: OpaquePointer, force: bool) {
@@ -708,6 +679,42 @@ impl<VM: VMBinding> BasePlan<VM> {
             size,
             self.allocation_bytes.load(Ordering::Relaxed),
         );
+    }
+
+    #[inline]
+    pub(super) fn stress_test_gc_required(&self) -> bool {
+        let stress_factor = self.options.stress_factor;
+        if self.initialized.load(Ordering::SeqCst)
+            && (self.allocation_bytes.load(Ordering::SeqCst) > stress_factor)
+        {
+            trace!(
+                "Stress GC: allocation_bytes = {}, stress_factor = {}",
+                self.allocation_bytes.load(Ordering::Relaxed),
+                stress_factor
+            );
+            trace!("Doing stress GC");
+            self.allocation_bytes.store(0, Ordering::SeqCst);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub(super) fn collection_required<P: Plan>(
+        &self,
+        plan: &P,
+        space_full: bool,
+        _space: &dyn Space<VM>,
+    ) -> bool {
+        let stress_force_gc = self.stress_test_gc_required();
+        debug!(
+            "self.get_pages_reserved()={}, self.get_total_pages()={}",
+            plan.get_pages_reserved(),
+            plan.get_total_pages()
+        );
+        let heap_full = plan.get_pages_reserved() > plan.get_total_pages();
+
+        space_full || stress_force_gc || heap_full
     }
 }
 
