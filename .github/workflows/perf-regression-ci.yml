@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - master
+  # For testing
+  pull_request:
 
 jobs:
   # JikesRVM
@@ -28,7 +30,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.5.2"
+          ref: "perf-graph-baseline"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -50,7 +52,7 @@ jobs:
       - name: Performance Run
         run: |
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=self-hosted
+          export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
           JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${{ steps.branch.outputs.branch_name }}
@@ -85,7 +87,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.5.2"
+          ref: "perf-graph-baseline"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -112,7 +114,7 @@ jobs:
       - name: Performance Run
         run: |
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=self-hosted
+          export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
           ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
@@ -146,7 +148,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "0.5.2"
+          ref: "perf-graph-baseline"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -173,7 +175,7 @@ jobs:
       - name: Performance Run
         run: |
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=self-hosted
+          export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-08-03
           export JAVA_HOME=/usr/lib/jvm/java-1.6.0-openjdk-amd64
