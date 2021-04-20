@@ -9,10 +9,6 @@ jobs:
   jikesrvm-baseline:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core
       - name: Checkout JikesRVM Binding
         uses: actions/checkout@v2
         with:
@@ -30,10 +26,6 @@ jobs:
           path: ci-perf-kit
           submodules: true
       # setup
-      - name: Overwrite MMTk core in JikesRVM binding
-        run: cp -r mmtk-core mmtk-jikesrvm/repos/
-      - name: Setup Rust Toolchain
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
