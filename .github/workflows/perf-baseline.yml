@@ -1,0 +1,49 @@
+name: Binding Performance Baseline
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  jikesrvm-baseline:
+    runs-on: [self-hosted, Linux, freq-scaling-off]
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout JikesRVM Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-jikesrvm
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          path: mmtk-jikesrvm
+          submodules: true
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/ci-perf-kit
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          ref: "perf-graph-baseline"
+          path: ci-perf-kit
+          submodules: true
+      # setup
+      - name: Overwrite MMTk core in JikesRVM binding
+        run: cp -r mmtk-core mmtk-jikesrvm/repos/
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
+      - name: Setup
+        run: |
+          ./ci-perf-kit/scripts/history-run-setup.sh
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-jikesrvm/mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-jikesrvm/mmtk/Cargo.toml
+      # run
+      - name: Performance Run
+        run: |
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=test
+          export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+          export FROM_DATE=2020-07-10
+          JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-stock.sh ./mmtk-jikesrvm/repos/jikesrvm
