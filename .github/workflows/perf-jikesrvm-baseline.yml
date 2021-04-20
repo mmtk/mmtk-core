@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   # Or on every sunday 1200am UTC
   schedule:
-    - cron: '0 0 0 ? * SUN *'
+    - cron: '0 0 * * SUN'
 
 jobs:
   jikesrvm-baseline:
