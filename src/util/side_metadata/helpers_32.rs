@@ -91,7 +91,7 @@ pub(crate) const fn meta_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bit
 pub fn ensure_munmap_metadata_chunk(start: Address, local_per_chunk: usize) {
     if local_per_chunk != 0 {
         let policy_meta_start = address_to_meta_chunk_addr(start);
-        assert!(memory::try_munmap(policy_meta_start, local_per_chunk).is_ok())
+        assert!(memory::munmap(policy_meta_start, local_per_chunk).is_ok())
     }
 }
 

@@ -33,7 +33,7 @@ pub(crate) fn address_to_contiguous_meta_address(
 pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
-    assert!(memory::try_munmap(start, size).is_ok())
+    assert!(memory::munmap(start, size).is_ok())
 }
 
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
