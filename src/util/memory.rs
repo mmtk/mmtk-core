@@ -122,16 +122,21 @@ mod tests {
     use crate::util::heap::layout::vm_layout_constants::HEAP_START;
     use crate::util::test_util::{serial_test, with_cleanup};
 
+    // In the tests, we will mmap this address. This address should not be in our heap (in case we mess up with other tests)
+    const START: Address = unsafe { Address::from_usize(HEAP_START.as_usize() - MAX_TEST_SIZE) };
+    // At max we can use 5 pages in the tests.
+    const MAX_TEST_SIZE: usize = BYTES_IN_PAGE * 5;
+
     #[test]
     fn test_mmap() {
         serial_test(|| {
-            let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+            let res = dzmmap(START, BYTES_IN_PAGE);
             assert!(res.is_ok());
             // We can overwrite with dzmmap
-            let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+            let res = dzmmap(START, BYTES_IN_PAGE);
             assert!(res.is_ok());
 
-            assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+            assert!(munmap(START, BYTES_IN_PAGE).is_ok());
         });
     }
 
@@ -140,13 +145,13 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+                    let res = dzmmap(START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
-                    let res = munmap(HEAP_START, BYTES_IN_PAGE);
+                    let res = munmap(START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
                 },
                 || {
-                    assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -158,15 +163,15 @@ mod tests {
             with_cleanup(
                 || {
                     // Make sure we mmapped the memory
-                    let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+                    let res = dzmmap(START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
                     // Use dzmmap_noreplace will fail
-                    let res = dzmmap_noreplace(HEAP_START, BYTES_IN_PAGE);
+                    let res = dzmmap_noreplace(START, BYTES_IN_PAGE);
                     println!("{:?}", res);
                     assert!(res.is_err());
                 },
                 || {
-                    assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         });
@@ -177,17 +182,17 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = mmap_noreserve(HEAP_START, BYTES_IN_PAGE);
+                    let res = mmap_noreserve(START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
                     unsafe {
-                        HEAP_START.store(42usize);
+                        START.store(42usize);
                     }
                     // Try reserve it
-                    let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+                    let res = dzmmap(START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
                 },
                 || {
-                    assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -200,10 +205,10 @@ mod tests {
             with_cleanup(
                 || {
                     // We expect this call to panic
-                    panic_if_unmapped(HEAP_START, BYTES_IN_PAGE);
+                    panic_if_unmapped(START, BYTES_IN_PAGE);
                 },
                 || {
-                    assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -214,11 +219,11 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    assert!(dzmmap(HEAP_START, BYTES_IN_PAGE).is_ok());
-                    panic_if_unmapped(HEAP_START, BYTES_IN_PAGE);
+                    assert!(dzmmap(START, BYTES_IN_PAGE).is_ok());
+                    panic_if_unmapped(START, BYTES_IN_PAGE);
                 },
                 || {
-                    assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -230,14 +235,14 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    // map 1 page from HEAP_START
-                    assert!(dzmmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                    // map 1 page from START
+                    assert!(dzmmap(START, BYTES_IN_PAGE).is_ok());
 
                     // check if the next page is mapped - which should panic
-                    panic_if_unmapped(HEAP_START + BYTES_IN_PAGE, BYTES_IN_PAGE);
+                    panic_if_unmapped(START + BYTES_IN_PAGE, BYTES_IN_PAGE);
                 },
                 || {
-                    assert!(munmap(HEAP_START, BYTES_IN_PAGE * 2).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE * 2).is_ok());
                 },
             )
         })
@@ -252,14 +257,14 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    // map 1 page from HEAP_START
-                    assert!(dzmmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                    // map 1 page from START
+                    assert!(dzmmap(START, BYTES_IN_PAGE).is_ok());
 
-                    // check if the 2 pages from HEAP_START are mapped. The second page is unmapped, so it should panic.
-                    panic_if_unmapped(HEAP_START, BYTES_IN_PAGE * 2);
+                    // check if the 2 pages from START are mapped. The second page is unmapped, so it should panic.
+                    panic_if_unmapped(START, BYTES_IN_PAGE * 2);
                 },
                 || {
-                    assert!(munmap(HEAP_START, BYTES_IN_PAGE * 2).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE * 2).is_ok());
                 },
             )
         })
