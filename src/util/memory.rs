@@ -82,7 +82,6 @@ pub fn panic_if_unmapped(start: Address, size: usize) {
     match mmap_fixed(start, size, prot, flags) {
         Ok(_) => panic!("{} of size {} is not mapped", start, size),
         Err(e) => {
-            println!("{:?}", e);
             assert!(
                 e.kind() == std::io::ErrorKind::AlreadyExists,
                 "Failed to check mapped: {:?}",
@@ -167,7 +166,6 @@ mod tests {
                     assert!(res.is_ok());
                     // Use dzmmap_noreplace will fail
                     let res = dzmmap_noreplace(START, BYTES_IN_PAGE);
-                    println!("{:?}", res);
                     assert!(res.is_err());
                 },
                 || {
