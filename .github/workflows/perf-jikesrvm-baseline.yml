@@ -12,6 +12,8 @@ on:
 jobs:
   jikesrvm-baseline:
     runs-on: [self-hosted, Linux, freq-scaling-off]
+    # Allow 1 day to run
+    timeout-minutes: 1440
     steps:
       - name: Checkout JikesRVM Binding
         uses: actions/checkout@v2
@@ -35,6 +37,7 @@ jobs:
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-jikesrvm/mmtk/Cargo.toml
       # run
       - name: Performance Run
+        timeout-minutes: 1440
         run: |
           export RESULT_REPO=mmtk/ci-perf-result
           export RESULT_REPO_BRANCH=test
