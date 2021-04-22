@@ -10,7 +10,7 @@ use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
-use crate::util::memory::{dzmmap, mprotect, munprotect};
+use crate::util::memory::{dzmmap_noreplace, mprotect, munprotect};
 use std::mem::transmute;
 
 const UNMAPPED: u8 = 0;
