@@ -10,9 +10,8 @@ pub fn result_is_mapped(result: Result<()>) -> bool {
 }
 
 pub fn zero(start: Address, len: usize) {
-    unsafe {
-        libc::memset(start.to_mut_ptr() as *mut libc::c_void, 0, len);
-    }
+    let ptr = start.to_mut_ptr();
+    wrap_libc_call(&|| unsafe { libc::memset(ptr, 0, len) }, ptr).unwrap()
 }
 
 /// Demand-zero mmap:
@@ -20,24 +19,12 @@ pub fn zero(start: Address, len: usize) {
 pub fn dzmmap(start: Address, size: usize) -> Result<()> {
     let prot = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
-    let result: *mut c_void = unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) };
-    let addr = Address::from_mut_ptr(result);
-    if addr == start {
-        // On linux, we don't need to zero the memory. This is achieved by using the `MAP_ANON` mmap flag.
+    let ret = mmap_fixed(start, size, prot, flags);
+    if ret.is_ok() {
         #[cfg(not(target_os = "linux"))]
-        {
-            zero(addr, size);
-        }
-        Ok(())
-    } else {
-        // assert!(result as usize <= 127,
-        //         "mmap with MAP_FIXED has unexpected behavior: demand zero mmap with MAP_FIXED on {:?} returned some other address {:?}",
-        //         start, result
-        // );
-        Err(Error::from_raw_os_error(
-            unsafe { *libc::__errno_location() } as _,
-        ))
+        zero(start, size)
     }
+    ret
 }
 
 /// Demand-zero mmap:
@@ -47,43 +34,12 @@ pub fn dzmmap(start: Address, size: usize) -> Result<()> {
 pub fn dzmmap_noreplace(start: Address, size: usize) -> Result<()> {
     let prot = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
-    let result: *mut c_void = unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) };
-    let addr = Address::from_mut_ptr(result);
-    if addr == start {
-        // On linux, we don't need to zero the memory. This is achieved by using the `MAP_ANON` mmap flag.
+    let ret = mmap_fixed(start, size, prot, flags);
+    if ret.is_ok() {
         #[cfg(not(target_os = "linux"))]
-        {
-            zero(addr, size);
-        }
-        Ok(())
-    } else {
-        // assert!(result as usize <= 127,
-        //         "mmap with MAP_FIXED has unexpected behavior: demand zero mmap with MAP_FIXED on {:?} returned some other address {:?}",
-        //         start, result
-        // );
-        Err(Error::from_raw_os_error(
-            unsafe { *libc::__errno_location() } as _,
-        ))
+        zero(start, size)
     }
-}
-
-pub fn munprotect(start: Address, size: usize) -> Result<()> {
-    let result =
-        unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_READ | PROT_WRITE | PROT_EXEC) };
-    if result == 0 {
-        Ok(())
-    } else {
-        Err(Error::from_raw_os_error(result))
-    }
-}
-
-pub fn mprotect(start: Address, size: usize) -> Result<()> {
-    let result = unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_NONE) };
-    if result == 0 {
-        Ok(())
-    } else {
-        Err(Error::from_raw_os_error(result))
-    }
+    ret
 }
 
 /// mmap with no swap space reserve:
@@ -96,17 +52,31 @@ pub fn mmap_noreserve(start: Address, size: usize) -> Result<()> {
     // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
     let flags =
         libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE | libc::MAP_NORESERVE;
+    mmap_fixed(start, size, prot, flags)
+}
 
-    let result: *mut libc::c_void =
-        unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) };
+fn mmap_fixed(start: Address, size: usize, prot: libc::c_int, flags: libc::c_int) -> Result<()> {
+    let ptr = start.to_mut_ptr();
+    wrap_libc_call(&|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) }, ptr)
+}
 
-    if result == libc::MAP_FAILED {
-        let err = unsafe { *libc::__errno_location() };
-        Err(Error::from_raw_os_error(err as _))
-    } else {
+pub fn munprotect(start: Address, size: usize) -> Result<()> {
+    wrap_libc_call(&|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_READ | PROT_WRITE | PROT_EXEC) }, 0)
+}
+
+pub fn mprotect(start: Address, size: usize) -> Result<()> {
+    wrap_libc_call(&|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_NONE) }, 0)
+}
+
+fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> {
+    let ret = f();
+    if ret == expect {
         Ok(())
+    } else {
+        Err(std::io::Error::last_os_error())
     }
 }
+
 
 pub fn try_munmap(start: Address, size: usize) -> Result<()> {
     let result = unsafe { libc::munmap(start.to_mut_ptr(), size) };
@@ -136,5 +106,67 @@ pub fn check_is_mmapped(start: Address, size: usize) -> Result<()> {
         Ok(())
     } else {
         Err(Error::from_raw_os_error(err as _))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util::heap::layout::vm_layout_constants::HEAP_START;
+    use crate::util::constants::BYTES_IN_PAGE;
+    use crate::util::test_util::serial_test;
+
+    #[test]
+    fn test_mmap() {
+        serial_test(|| {
+            let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+            assert!(res.is_ok());
+            // We can overwrite with dzmmap
+            let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+            assert!(res.is_ok());
+
+            assert!(try_munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+        });
+    }
+
+    #[test]
+    fn test_try_munmap() {
+        serial_test(|| {
+            let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+            assert!(res.is_ok());
+            let res = try_munmap(HEAP_START, BYTES_IN_PAGE);
+            assert!(res.is_ok());
+
+            assert!(try_munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+        })
+    }
+
+    #[test]
+    fn test_mmap_noreplace() {
+        serial_test(|| {
+            // Make sure we mmapped the memory
+            let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+            assert!(res.is_ok());
+            // Use dzmmap_noreplace will fail
+            let res = dzmmap_noreplace(HEAP_START, BYTES_IN_PAGE);
+            println!("{:?}", res);
+            assert!(res.is_err());
+
+            assert!(try_munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+        });
+    }
+
+    #[test]
+    fn test_mmap_noreserve() {
+        serial_test(|| {
+            let res = mmap_noreserve(HEAP_START, BYTES_IN_PAGE);
+            assert!(res.is_ok());
+            unsafe { HEAP_START.store(42usize); }
+            // Try reserve it
+            let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+            assert!(res.is_ok());
+
+            assert!(try_munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+        })
     }
 }
