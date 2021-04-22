@@ -30,7 +30,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "perf-graph-baseline"
+          ref: "0.6.0"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -87,7 +87,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "perf-graph-baseline"
+          ref: "0.6.0"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -148,7 +148,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
-          ref: "perf-graph-baseline"
+          ref: "0.6.0"
           path: ci-perf-kit
           submodules: true
       # setup

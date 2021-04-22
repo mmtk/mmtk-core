@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mmtk/ci-perf-kit
-          ref: "perf-graph-baseline"
+          ref: "0.6.0"
           path: ci-perf-kit
           submodules: true
       # setup
