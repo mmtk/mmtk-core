@@ -55,9 +55,17 @@ pub fn mmap_noreserve(start: Address, size: usize) -> Result<()> {
     mmap_fixed(start, size, prot, flags)
 }
 
-pub fn mmap_fixed(start: Address, size: usize, prot: libc::c_int, flags: libc::c_int) -> Result<()> {
+pub fn mmap_fixed(
+    start: Address,
+    size: usize,
+    prot: libc::c_int,
+    flags: libc::c_int,
+) -> Result<()> {
     let ptr = start.to_mut_ptr();
-    wrap_libc_call(&|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) }, ptr)
+    wrap_libc_call(
+        &|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) },
+        ptr,
+    )
 }
 
 pub fn munmap(start: Address, size: usize) -> Result<()> {
@@ -75,17 +83,27 @@ pub fn panic_if_unmapped(start: Address, size: usize) {
         Ok(_) => panic!("{} of size {} is not mapped", start, size),
         Err(e) => {
             println!("{:?}", e);
-            assert!(e.kind() == std::io::ErrorKind::AlreadyExists, "Failed to check mapped: {:?}", e);
+            assert!(
+                e.kind() == std::io::ErrorKind::AlreadyExists,
+                "Failed to check mapped: {:?}",
+                e
+            );
         }
     }
 }
 
 pub fn munprotect(start: Address, size: usize) -> Result<()> {
-    wrap_libc_call(&|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_READ | PROT_WRITE | PROT_EXEC) }, 0)
+    wrap_libc_call(
+        &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_READ | PROT_WRITE | PROT_EXEC) },
+        0,
+    )
 }
 
 pub fn mprotect(start: Address, size: usize) -> Result<()> {
-    wrap_libc_call(&|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_NONE) }, 0)
+    wrap_libc_call(
+        &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_NONE) },
+        0,
+    )
 }
 
 fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> {
@@ -100,8 +118,8 @@ fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::heap::layout::vm_layout_constants::HEAP_START;
     use crate::util::constants::BYTES_IN_PAGE;
+    use crate::util::heap::layout::vm_layout_constants::HEAP_START;
     use crate::util::test_util::{serial_test, with_cleanup};
 
     #[test]
@@ -120,47 +138,58 @@ mod tests {
     #[test]
     fn test_munmap() {
         serial_test(|| {
-            with_cleanup(|| {
-                let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
-                assert!(res.is_ok());
-                let res = munmap(HEAP_START, BYTES_IN_PAGE);
-                assert!(res.is_ok());
-            }, || {
-                assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
-            })
+            with_cleanup(
+                || {
+                    let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+                    assert!(res.is_ok());
+                    let res = munmap(HEAP_START, BYTES_IN_PAGE);
+                    assert!(res.is_ok());
+                },
+                || {
+                    assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                },
+            )
         })
     }
 
     #[test]
     fn test_mmap_noreplace() {
         serial_test(|| {
-            with_cleanup(|| {
-                // Make sure we mmapped the memory
-                let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
-                assert!(res.is_ok());
-                // Use dzmmap_noreplace will fail
-                let res = dzmmap_noreplace(HEAP_START, BYTES_IN_PAGE);
-                println!("{:?}", res);
-                assert!(res.is_err());
-            }, || {
-                assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
-            })
+            with_cleanup(
+                || {
+                    // Make sure we mmapped the memory
+                    let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+                    assert!(res.is_ok());
+                    // Use dzmmap_noreplace will fail
+                    let res = dzmmap_noreplace(HEAP_START, BYTES_IN_PAGE);
+                    println!("{:?}", res);
+                    assert!(res.is_err());
+                },
+                || {
+                    assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                },
+            )
         });
     }
 
     #[test]
     fn test_mmap_noreserve() {
         serial_test(|| {
-            with_cleanup(|| {
-                let res = mmap_noreserve(HEAP_START, BYTES_IN_PAGE);
-                assert!(res.is_ok());
-                unsafe { HEAP_START.store(42usize); }
-                // Try reserve it
-                let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
-                assert!(res.is_ok());
-            }, || {
-                assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
-            })
+            with_cleanup(
+                || {
+                    let res = mmap_noreserve(HEAP_START, BYTES_IN_PAGE);
+                    assert!(res.is_ok());
+                    unsafe {
+                        HEAP_START.store(42usize);
+                    }
+                    // Try reserve it
+                    let res = dzmmap(HEAP_START, BYTES_IN_PAGE);
+                    assert!(res.is_ok());
+                },
+                || {
+                    assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                },
+            )
         })
     }
 
@@ -168,24 +197,30 @@ mod tests {
     #[should_panic]
     fn test_check_is_mmapped_for_unmapped() {
         serial_test(|| {
-            with_cleanup(|| {
-                // We expect this call to panic
-                panic_if_unmapped(HEAP_START, BYTES_IN_PAGE);
-            }, || {
-                assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
-            })
+            with_cleanup(
+                || {
+                    // We expect this call to panic
+                    panic_if_unmapped(HEAP_START, BYTES_IN_PAGE);
+                },
+                || {
+                    assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                },
+            )
         })
     }
 
     #[test]
     fn test_check_is_mmapped_for_mapped() {
         serial_test(|| {
-            with_cleanup(|| {
-                assert!(dzmmap(HEAP_START, BYTES_IN_PAGE).is_ok());
-                panic_if_unmapped(HEAP_START, BYTES_IN_PAGE);
-            }, || {
-                assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
-            })
+            with_cleanup(
+                || {
+                    assert!(dzmmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                    panic_if_unmapped(HEAP_START, BYTES_IN_PAGE);
+                },
+                || {
+                    assert!(munmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+                },
+            )
         })
     }
 
@@ -193,15 +228,18 @@ mod tests {
     #[should_panic]
     fn test_check_is_mmapped_for_unmapped_next_to_mapped() {
         serial_test(|| {
-            with_cleanup(|| {
-                // map 1 page from HEAP_START
-                assert!(dzmmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+            with_cleanup(
+                || {
+                    // map 1 page from HEAP_START
+                    assert!(dzmmap(HEAP_START, BYTES_IN_PAGE).is_ok());
 
-                // check if the next page is mapped - which should panic
-                panic_if_unmapped(HEAP_START + BYTES_IN_PAGE, BYTES_IN_PAGE);
-            }, || {
-                assert!(munmap(HEAP_START, BYTES_IN_PAGE * 2).is_ok());
-            })
+                    // check if the next page is mapped - which should panic
+                    panic_if_unmapped(HEAP_START + BYTES_IN_PAGE, BYTES_IN_PAGE);
+                },
+                || {
+                    assert!(munmap(HEAP_START, BYTES_IN_PAGE * 2).is_ok());
+                },
+            )
         })
     }
 
@@ -212,15 +250,18 @@ mod tests {
     #[ignore]
     fn test_check_is_mmapped_for_partial_mapped() {
         serial_test(|| {
-            with_cleanup(|| {
-                // map 1 page from HEAP_START
-                assert!(dzmmap(HEAP_START, BYTES_IN_PAGE).is_ok());
+            with_cleanup(
+                || {
+                    // map 1 page from HEAP_START
+                    assert!(dzmmap(HEAP_START, BYTES_IN_PAGE).is_ok());
 
-                // check if the 2 pages from HEAP_START are mapped. The second page is unmapped, so it should panic.
-                panic_if_unmapped(HEAP_START, BYTES_IN_PAGE * 2);
-            }, || {
-                assert!(munmap(HEAP_START, BYTES_IN_PAGE * 2).is_ok());
-            })
+                    // check if the 2 pages from HEAP_START are mapped. The second page is unmapped, so it should panic.
+                    panic_if_unmapped(HEAP_START, BYTES_IN_PAGE * 2);
+                },
+                || {
+                    assert!(munmap(HEAP_START, BYTES_IN_PAGE * 2).is_ok());
+                },
+            )
         })
     }
 }

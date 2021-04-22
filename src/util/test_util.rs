@@ -1,8 +1,8 @@
+use std::panic;
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
-use std::panic;
 
 // https://github.com/rust-lang/rfcs/issues/2798#issuecomment-552949300
 pub fn panic_after<T, F>(millis: u64, f: F) -> T
@@ -40,7 +40,8 @@ where
 // Always execute a cleanup closure no matter the test panics or not.
 pub fn with_cleanup<T, C>(test: T, cleanup: C)
 where
-    T: FnOnce() + panic::UnwindSafe, C: FnOnce()
+    T: FnOnce() + panic::UnwindSafe,
+    C: FnOnce(),
 {
     let res = panic::catch_unwind(test);
     cleanup();
