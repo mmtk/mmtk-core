@@ -6,6 +6,8 @@ on:
   # Or on every sunday 1200am UTC
   schedule:
     - cron: '0 0 * * SUN'
+# Test only
+  pull_request:
 
 jobs:
   jikesrvm-baseline:
