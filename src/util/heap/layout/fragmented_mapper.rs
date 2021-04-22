@@ -115,7 +115,7 @@ impl Mmapper for FragmentedMapper {
                 match entry.load(Ordering::Relaxed) {
                     MapState::Unmapped => {
                         let mmap_start = Self::chunk_index_to_address(base, chunk);
-                        crate::util::memory::dzmmap(mmap_start, MMAP_CHUNK_BYTES).unwrap();
+                        crate::util::memory::dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES).unwrap();
                         self.map_metadata(
                             mmap_start,
                             global_metadata_spec_vec,

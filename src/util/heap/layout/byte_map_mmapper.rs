@@ -74,7 +74,7 @@ impl Mmapper for ByteMapMmapper {
             let guard = self.lock.lock().unwrap();
             // might have become MAPPED here
             if self.mapped[chunk].load(Ordering::Relaxed) == UNMAPPED {
-                match dzmmap(mmap_start, MMAP_CHUNK_BYTES) {
+                match dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES) {
                     Ok(_) => {
                         self.map_metadata(
                             mmap_start,
