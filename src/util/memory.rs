@@ -15,41 +15,47 @@ pub fn zero(start: Address, len: usize) {
 }
 
 /// Demand-zero mmap:
-/// This function guarantees to zero all mapped memory.
-pub fn dzmmap(start: Address, size: usize) -> Result<()> {
+/// This function mmaps the memory and guarantees to zero all mapped memory.
+/// This function WILL overwrite existing memory mapping. The user of this function
+/// needs to be aware of this, and use it cautiously.
+///
+/// # Safety
+/// This function WILL overwrite existing memory mapping if there is any. So only use this function if you know
+/// the memory has been reserved by mmtk (e.g. after the use of mmap_noreserve()). Otherwise using this function
+/// may corrupt others' data.
+pub unsafe fn dzmmap(start: Address, size: usize) -> Result<()> {
     let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
     let ret = mmap_fixed(start, size, prot, flags);
+    // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
+    #[cfg(not(target_os = "linux"))]
     if ret.is_ok() {
-        #[cfg(not(target_os = "linux"))]
         zero(start, size)
     }
     ret
 }
 
-/// Demand-zero mmap:
-/// This function guarantees to zero all mapped memory.
-/// FIXME - this function should replace dzmmap.
-/// Currently, the replacement causes some of the concurrent tests to fail
+/// Demand-zero mmap (no replace):
+/// This function mmaps the memory and guarantees to zero all mapped memory.
+/// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.
 pub fn dzmmap_noreplace(start: Address, size: usize) -> Result<()> {
     let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
     let ret = mmap_fixed(start, size, prot, flags);
+    // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
+    #[cfg(not(target_os = "linux"))]
     if ret.is_ok() {
-        #[cfg(not(target_os = "linux"))]
         zero(start, size)
     }
     ret
 }
 
 /// mmap with no swap space reserve:
-/// This function only maps the address range, but doesn't occupy any physical memory.
-///
-/// Before using any part of the address range, dzmmap must be called.
-///
+/// This function does not reserve swap space for this mapping, which means there is no guarantee that writes to the
+/// mapping can always be successful. In case of out of physical memory, one may get a segfault for writing to the mapping.
+/// We can use this to reserve the address range, and then later overwrites the mapping with dzmmap().
 pub fn mmap_noreserve(start: Address, size: usize) -> Result<()> {
     let prot = PROT_READ | PROT_WRITE;
-    // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
     let flags =
         libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE | libc::MAP_NORESERVE;
     mmap_fixed(start, size, prot, flags)
