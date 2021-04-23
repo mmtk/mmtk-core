@@ -217,15 +217,11 @@ mod tests {
     use crate::util::conversions::pages_to_bytes;
     use crate::util::heap::layout::byte_map_mmapper::{MAPPED, PROTECTED};
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
+    use crate::util::test_util::BYTE_MAP_MMAPPER_TEST_REGION;
     use std::sync::atomic::Ordering;
 
     const CHUNK_SIZE: usize = 1 << 22;
-    #[cfg(target_os = "linux")]
-    const FIXED_ADDRESS: Address =
-        unsafe { conversions::chunk_align_down(Address::from_usize(0x6000_0000)) };
-    #[cfg(target_os = "macos")]
-    const FIXED_ADDRESS: Address =
-        unsafe { conversions::chunk_align_down(Address::from_usize(0x0001_3500_0000)) };
+    const FIXED_ADDRESS: Address = BYTE_MAP_MMAPPER_TEST_REGION.start;
 
     #[test]
     fn address_to_mmap_chunks() {

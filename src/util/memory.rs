@@ -119,12 +119,11 @@ mod tests {
     use super::*;
     use crate::util::constants::BYTES_IN_PAGE;
     use crate::util::heap::layout::vm_layout_constants::HEAP_START;
+    use crate::util::test_util::MEMORY_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
 
     // In the tests, we will mmap this address. This address should not be in our heap (in case we mess up with other tests)
-    const START: Address = unsafe { Address::from_usize(HEAP_START.as_usize() - MAX_TEST_SIZE) };
-    // At max we can use 5 pages in the tests.
-    const MAX_TEST_SIZE: usize = BYTES_IN_PAGE * 5;
+    const START: Address = MEMORY_TEST_REGION.start;
 
     #[test]
     fn test_mmap() {

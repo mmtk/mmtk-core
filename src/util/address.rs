@@ -204,6 +204,15 @@ impl Address {
         Address(self.0 + size)
     }
 
+    // We implemented the Sub trait but we still keep this sub function.
+    // The sub() function is const fn, and we can use it to declare Address constants.
+    // The Sub trait function cannot be const.
+    #[allow(clippy::should_implement_trait)]
+    #[inline(always)]
+    pub const fn sub(self, size: usize) -> Address {
+        Address(self.0 - size)
+    }
+
     /// loads a value of type T from the address
     /// # Safety
     /// This could throw a segment fault if the address is invalid

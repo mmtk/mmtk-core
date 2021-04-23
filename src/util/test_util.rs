@@ -1,8 +1,40 @@
+use crate::util::address::{Address, ByteSize};
+use crate::util::heap::layout::vm_layout_constants::*;
 use std::panic;
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
+
+// Sometimes we need to mmap for tests. We want to ensure that the mmapped addresses do not overlap
+// for different tests, so we organize them here.
+
+pub(crate) struct MmapTestRegion {
+    pub start: Address,
+    // in bytes
+    pub size: ByteSize,
+}
+impl MmapTestRegion {
+    pub const fn reserve_before(prev: MmapTestRegion, size: ByteSize) -> MmapTestRegion {
+        Self::reserve_before_address(prev.start, size)
+    }
+    pub const fn reserve_before_address(addr: Address, size: ByteSize) -> MmapTestRegion {
+        MmapTestRegion {
+            start: addr.sub(size),
+            size,
+        }
+    }
+}
+
+// util::heap::layout::fragmented_mmapper
+pub(crate) const FRAGMENTED_MMAPPER_TEST_REGION: MmapTestRegion =
+    MmapTestRegion::reserve_before_address(HEAP_START, MMAP_CHUNK_BYTES * 2);
+// util::heap::layout::byte_map_mmaper
+pub(crate) const BYTE_MAP_MMAPPER_TEST_REGION: MmapTestRegion =
+    MmapTestRegion::reserve_before(FRAGMENTED_MMAPPER_TEST_REGION, MMAP_CHUNK_BYTES * 2);
+// util::memory
+pub(crate) const MEMORY_TEST_REGION: MmapTestRegion =
+    MmapTestRegion::reserve_before(BYTE_MAP_MMAPPER_TEST_REGION, MMAP_CHUNK_BYTES);
 
 // https://github.com/rust-lang/rfcs/issues/2798#issuecomment-552949300
 pub fn panic_after<T, F>(millis: u64, f: F) -> T
