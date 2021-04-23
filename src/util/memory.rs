@@ -23,6 +23,7 @@ pub fn zero(start: Address, len: usize) {
 /// This function WILL overwrite existing memory mapping if there is any. So only use this function if you know
 /// the memory has been reserved by mmtk (e.g. after the use of mmap_noreserve()). Otherwise using this function
 /// may corrupt others' data.
+#[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
 pub unsafe fn dzmmap(start: Address, size: usize) -> Result<()> {
     let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
@@ -38,6 +39,7 @@ pub unsafe fn dzmmap(start: Address, size: usize) -> Result<()> {
 /// Demand-zero mmap (no replace):
 /// This function mmaps the memory and guarantees to zero all mapped memory.
 /// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.
+#[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
 pub fn dzmmap_noreplace(start: Address, size: usize) -> Result<()> {
     let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
