@@ -11,7 +11,6 @@ use std::time::Duration;
 
 pub(crate) struct MmapTestRegion {
     pub start: Address,
-    // in bytes
     pub size: ByteSize,
 }
 impl MmapTestRegion {
@@ -57,6 +56,8 @@ where
 }
 
 lazy_static! {
+    // A global lock to make tests serial.
+    // If we do want more parallelism, we can allow each set of tests to have their own locks. But it seems unnecessary for now.
     static ref SERIAL_TEST_LOCK: Mutex<()> = Mutex::default();
 }
 

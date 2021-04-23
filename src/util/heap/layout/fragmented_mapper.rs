@@ -332,8 +332,7 @@ impl Default for FragmentedMapper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_PAGE};
-    use crate::util::heap::layout::vm_layout_constants::*;
+    use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::memory;
     use crate::util::test_util::FRAGMENTED_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
@@ -469,12 +468,11 @@ mod tests {
     #[test]
     fn protect() {
         serial_test(|| {
-            let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-            let total_pages = pages_per_chunk * 2;
             with_cleanup(
                 || {
                     // map 2 chunks
                     let mmapper = FragmentedMapper::new();
+                    let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     let empty_vec = vec![];
                     mmapper.ensure_mapped(
                         FIXED_ADDRESS,
@@ -505,12 +503,11 @@ mod tests {
     #[test]
     fn ensure_mapped_on_protected_chunks() {
         serial_test(|| {
-            let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-            let total_pages = pages_per_chunk * 2;
             with_cleanup(
                 || {
                     // map 2 chunks
                     let mmapper = FragmentedMapper::new();
+                    let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     let empty_vec = vec![];
                     mmapper.ensure_mapped(
                         FIXED_ADDRESS,

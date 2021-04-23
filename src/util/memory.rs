@@ -118,7 +118,6 @@ fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> {
 mod tests {
     use super::*;
     use crate::util::constants::BYTES_IN_PAGE;
-    use crate::util::heap::layout::vm_layout_constants::HEAP_START;
     use crate::util::test_util::MEMORY_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
 
