@@ -57,7 +57,7 @@ pub fn dzmmap_noreplace(start: Address, size: usize) -> Result<()> {
 /// mapping can always be successful. In case of out of physical memory, one may get a segfault for writing to the mapping.
 /// We can use this to reserve the address range, and then later overwrites the mapping with dzmmap().
 pub fn mmap_noreserve(start: Address, size: usize) -> Result<()> {
-    let prot = PROT_READ | PROT_WRITE;
+    let prot = PROT_NONE;
     let flags =
         libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE | libc::MAP_NORESERVE;
     mmap_fixed(start, size, prot, flags)

@@ -211,7 +211,7 @@ impl Default for ByteMapMmapper {
 #[cfg(test)]
 mod tests {
     use crate::util::heap::layout::{ByteMapMmapper, Mmapper};
-    use crate::util::{conversions, Address};
+    use crate::util::Address;
 
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::conversions::pages_to_bytes;

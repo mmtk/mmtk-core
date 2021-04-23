@@ -157,7 +157,8 @@ pub fn try_mmap_metadata_chunk(
 
     let policy_meta_start = address_to_meta_chunk_addr(start);
     if !no_reserve {
-        memory::dzmmap_noreplace(policy_meta_start, local_per_chunk)
+        // We have reserved the memory
+        unsafe { memory::dzmmap(policy_meta_start, local_per_chunk) }
     } else {
         memory::mmap_noreserve(policy_meta_start, local_per_chunk)
     }
