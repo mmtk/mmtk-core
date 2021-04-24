@@ -13,7 +13,7 @@ jobs:
   openjdk-baseline:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     # Allow 1 day to run
-    timeout-minutes: 1440
+    timeout-minutes: 2880
     steps:
       - name: Checkout OpenJDK Binding
         uses: actions/checkout@v2
