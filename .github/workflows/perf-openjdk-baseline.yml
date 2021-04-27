@@ -6,13 +6,11 @@ on:
   # Or on every sunday 1200am UTC
   schedule:
     - cron: '0 0 * * SUN'
-  # Test only
-  pull_request:
 
 jobs:
   openjdk-baseline:
     runs-on: [self-hosted, Linux, freq-scaling-off]
-    # Allow 1 day to run
+    # Allow 2 days to run (it currently takes slightly more than 1 day to finish)
     timeout-minutes: 2880
     steps:
       - name: Checkout OpenJDK Binding
