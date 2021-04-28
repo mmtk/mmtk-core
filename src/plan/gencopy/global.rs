@@ -25,7 +25,7 @@ use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
-use crate::{plan::global::BasePlan, util::side_metadata::SideMetadataSpec};
+use crate::plan::global::BasePlan;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -168,10 +168,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     fn in_nursery(&self) -> bool {
         self.in_nursery.load(Ordering::SeqCst)
     }
-
-    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &self.common().global_metadata_specs
-    }
 }
 
 impl<VM: VMBinding> GenCopy<VM> {
@@ -226,7 +222,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 options,
                 heap,
                 &GENCOPY_CONSTRAINTS,
-                &&global_metadata_specs,
+                global_metadata_specs,
             ),
             in_nursery: AtomicBool::default(),
         }

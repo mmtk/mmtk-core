@@ -132,7 +132,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
 
         MarkSweep {
             ms: MallocSpace::new(specs.clone()),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS, &specs),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS, specs.clone()),
         }
     }
 

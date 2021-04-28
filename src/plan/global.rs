@@ -309,10 +309,6 @@ pub trait Plan: 'static + Sync + Downcast {
             );
         }
     }
-
-    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &[]
-    }
 }
 
 impl_downcast!(Plan assoc VM);
@@ -414,7 +410,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
-        global_side_metadata_specs: &[SideMetadataSpec],
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> BasePlan<VM> {
         let stats = Stats::new();
         // Initializing the analysis manager and routines
@@ -428,7 +424,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     "code_space",
                     true,
                     VMRequest::discontiguous(),
-                    global_side_metadata_specs.to_vec(),
+                    global_side_metadata_specs.clone(),
                     vm_map,
                     mmapper,
                     &mut heap,
@@ -439,7 +435,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     "ro_space",
                     true,
                     VMRequest::discontiguous(),
-                    global_side_metadata_specs.to_vec(),
+                    global_side_metadata_specs.clone(),
                     vm_map,
                     mmapper,
                     &mut heap,
@@ -452,7 +448,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     &mut heap,
                     options.vm_space_size,
                     constraints,
-                    global_side_metadata_specs.to_vec(),
+                    global_side_metadata_specs.clone(),
                 ),
             }),
             initialized: AtomicBool::new(false),
@@ -734,7 +730,6 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 pub struct CommonPlan<VM: VMBinding> {
     pub unsync: UnsafeCell<CommonUnsync<VM>>,
     pub base: BasePlan<VM>,
-    pub global_metadata_specs: Vec<SideMetadataSpec>,
 }
 
 pub struct CommonUnsync<VM: VMBinding> {
@@ -752,20 +747,15 @@ impl<VM: VMBinding> CommonPlan<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
-        global_side_metadata_specs: &[SideMetadataSpec],
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> CommonPlan<VM> {
-        // global specs
-        let mut specs = vec![];
-        specs.extend_from_slice(global_side_metadata_specs);
-        CommonPlan::<VM>::append_side_metadata(&mut specs);
-
         CommonPlan {
             unsync: UnsafeCell::new(CommonUnsync {
                 immortal: ImmortalSpace::new(
                     "immortal",
                     true,
                     VMRequest::discontiguous(),
-                    specs.clone(),
+                    global_side_metadata_specs.clone(),
                     vm_map,
                     mmapper,
                     &mut heap,
@@ -775,15 +765,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     "los",
                     true,
                     VMRequest::discontiguous(),
-                    specs.clone(),
+                    global_side_metadata_specs.clone(),
                     vm_map,
                     mmapper,
                     &mut heap,
                     constraints,
                 ),
             }),
-            base: BasePlan::new(vm_map, mmapper, options, heap, constraints, &specs),
-            global_metadata_specs: specs,
+            base: BasePlan::new(vm_map, mmapper, options, heap, constraints, global_side_metadata_specs),
         }
     }
 

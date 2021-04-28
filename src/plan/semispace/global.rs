@@ -21,7 +21,7 @@ use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::util::OpaquePointer;
-use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
+use crate::mmtk::MMTK;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -139,10 +139,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
-
-    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &self.common().global_metadata_specs
-    }
 }
 
 impl<VM: VMBinding> SemiSpace<VM> {
@@ -177,7 +173,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS, &[]),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS, global_metadata_specs),
         }
     }
 

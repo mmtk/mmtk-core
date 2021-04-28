@@ -126,7 +126,7 @@ impl<VM: VMBinding> NoGC<VM> {
 
         NoGC {
             nogc_space,
-            base: BasePlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS, &global_specs),
+            base: BasePlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS, global_specs),
         }
     }
 }
