@@ -127,9 +127,12 @@ impl<VM: VMBinding> MarkSweep<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut specs = vec![];
+        CommonPlan::<VM>::append_side_metadata(&mut specs);
+
         MarkSweep {
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS, &[]),
-            ms: MallocSpace::new(),
+            ms: MallocSpace::new(specs.clone()),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS, &specs),
         }
     }
 

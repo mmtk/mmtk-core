@@ -1,4 +1,3 @@
-use crate::util::side_metadata::{try_map_metadata_address_range, try_map_metadata_space};
 use crate::util::side_metadata::{SideMetadataContext, SideMetadata};
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -281,8 +280,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     self.common().mmapper.ensure_mapped(
                         res.start,
                         res.pages,
-                        VM::VMActivePlan::global().global_side_metadata_specs(),
-                        self.local_side_metadata_specs(),
+                        &self.common().metadata
                     );
 
                     // TODO: Concurrent zeroing
@@ -354,11 +352,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        if try_map_metadata_space(
+        if self.common().metadata.try_map_metadata_space(
             self.common().start,
             self.common().extent,
-            VM::VMActivePlan::global().global_side_metadata_specs(),
-            self.local_side_metadata_specs(),
         )
         .is_err()
         {
@@ -564,11 +560,9 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn init(&self, space: &dyn Space<VM>) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            if try_map_metadata_address_range(
+            if self.metadata.try_map_metadata_address_range(
                 self.start,
                 self.extent,
-                VM::VMActivePlan::global().global_side_metadata_specs(),
-                space.local_side_metadata_specs(),
             )
             .is_err()
             {

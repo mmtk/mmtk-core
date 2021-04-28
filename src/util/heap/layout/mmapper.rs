@@ -1,5 +1,5 @@
 use crate::util::{
-    side_metadata::{try_map_metadata_space, SideMetadataSpec},
+    side_metadata::SideMetadata,
     Address,
 };
 
@@ -44,8 +44,7 @@ pub trait Mmapper {
         &self,
         start: Address,
         pages: usize,
-        global_metadata_spec_vec: &[SideMetadataSpec],
-        local_metadata_spec_vec: &[SideMetadataSpec],
+        metadata: &SideMetadata,
     );
 
     /// Map metadata memory for a given chunk
@@ -53,14 +52,11 @@ pub trait Mmapper {
     fn map_metadata(
         &self,
         chunk: Address,
-        global_metadata_spec_vec: &[SideMetadataSpec],
-        local_metadata_spec_vec: &[SideMetadataSpec],
+        metadata: &SideMetadata,
     ) -> Result<(), ()> {
-        if try_map_metadata_space(
+        if metadata.try_map_metadata_space(
             chunk,
             BYTES_IN_CHUNK,
-            global_metadata_spec_vec,
-            local_metadata_spec_vec,
         )
         .is_err()
         {

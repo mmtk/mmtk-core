@@ -1,7 +1,7 @@
 use super::Mmapper;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::Address;
-use crate::util::{conversions, side_metadata::SideMetadataSpec};
+use crate::util::{conversions, side_metadata::SideMetadata};
 use atomic::{Atomic, Ordering};
 use std::fmt;
 use std::mem::transmute;
@@ -86,8 +86,7 @@ impl Mmapper for FragmentedMapper {
         &self,
         mut start: Address,
         pages: usize,
-        global_metadata_spec_vec: &[SideMetadataSpec],
-        local_metadata_spec_vec: &[SideMetadataSpec],
+        metadata: &SideMetadata,
     ) {
         let end = start + conversions::pages_to_bytes(pages);
         // Iterate over the slabs covered
@@ -118,8 +117,7 @@ impl Mmapper for FragmentedMapper {
                         crate::util::memory::dzmmap(mmap_start, MMAP_CHUNK_BYTES).unwrap();
                         self.map_metadata(
                             mmap_start,
-                            global_metadata_spec_vec,
-                            local_metadata_spec_vec,
+                            metadata,
                         )
                         .expect("failed to map metadata memory");
                     }

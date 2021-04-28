@@ -3,7 +3,6 @@ use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
 use crate::util::conversions::bytes_to_chunks_up;
 use crate::util::heap::PageResource;
-use crate::util::side_metadata::try_map_metadata_space;
 use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 
 use crate::util::ObjectReference;
@@ -89,11 +88,9 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         self.limit = AVAILABLE_START + total_bytes;
         // Eagerly memory map the entire heap (also zero all the memory)
         crate::util::memory::dzmmap(AVAILABLE_START, total_bytes).unwrap();
-        if try_map_metadata_space(
+        if self.metadata.try_map_metadata_space(
             AVAILABLE_START,
             total_bytes,
-            VM::VMActivePlan::global().global_side_metadata_specs(),
-            self.local_side_metadata_specs(),
         )
         .is_err()
         {

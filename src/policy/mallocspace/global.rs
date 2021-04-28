@@ -9,6 +9,7 @@ use crate::util::malloc::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
@@ -29,6 +30,7 @@ const ASSERT_ALLOCATION: bool = false;
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
+    metadata: SideMetadata,
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
@@ -129,10 +131,11 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 }
 
 impl<VM: VMBinding> MallocSpace<VM> {
-    pub fn new() -> Self {
+    pub fn new(global_side_metadata_specs: Vec<SideMetadataSpec>) -> Self {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
+            metadata: SideMetadata::new(SideMetadataContext { global: global_side_metadata_specs, local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC] }),
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
         }
@@ -157,7 +160,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     chunk_start,
                     chunk_start + BYTES_IN_CHUNK
                 );
-                map_meta_space_for_chunk(chunk_start);
+                map_meta_space_for_chunk(&self.metadata, chunk_start);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
@@ -299,11 +302,5 @@ impl<VM: VMBinding> MallocSpace<VM> {
             debug!("Release malloc chunk {} to {}", *c, *c + BYTES_IN_CHUNK);
             !released_chunks.contains(&*c)
         });
-    }
-}
-
-impl<VM: VMBinding> Default for MallocSpace<VM> {
-    fn default() -> Self {
-        Self::new()
     }
 }
