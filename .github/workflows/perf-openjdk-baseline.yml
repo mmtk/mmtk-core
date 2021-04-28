@@ -41,4 +41,4 @@ jobs:
           export RESULT_REPO_BRANCH=self-hosted
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
-          JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/openjdk-stock.sh ./mmtk-openjdk/repos/openjdk
+          ./ci-perf-kit/scripts/openjdk-stock.sh ./mmtk-openjdk/repos/openjdk
