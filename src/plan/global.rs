@@ -403,6 +403,7 @@ pub fn create_vm_space<VM: VMBinding>(
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'heap' only needs to be mutable for certain features
     #[allow(unused_variables)] // 'constraints' is only needed for certain features
+    #[allow(clippy::redundant_clone)] // depends on features, the last clone of side metadata specs is not necessary.
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
