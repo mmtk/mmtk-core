@@ -111,13 +111,13 @@ impl<VM: VMBinding> NoGC<VM> {
 
         #[cfg(feature = "nogc_lock_free")]
         let nogc_space =
-            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")), global_specs);
+            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")), global_specs.clone());
         #[cfg(not(feature = "nogc_lock_free"))]
         let nogc_space = NoGCImmortalSpace::new(
             "nogc_space",
             true,
             VMRequest::discontiguous(),
-            global_specs,
+            global_specs.clone(),
             vm_map,
             mmapper,
             &mut heap,
@@ -126,7 +126,7 @@ impl<VM: VMBinding> NoGC<VM> {
 
         NoGC {
             nogc_space,
-            base: BasePlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS),
+            base: BasePlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS, &global_specs),
         }
     }
 }

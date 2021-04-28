@@ -4,7 +4,7 @@ use crate::util::Address;
 use crate::util::constants::*;
 use crate::util::conversions::pages_to_bytes;
 use crate::util::heap::layout::vm_layout_constants::*;
-use crate::util::side_metadata::SideMetadataSpec;
+use crate::util::side_metadata::SideMetadata;
 use std::fmt;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
@@ -52,8 +52,7 @@ impl Mmapper for ByteMapMmapper {
         &self,
         start: Address,
         pages: usize,
-        global_metadata_spec_vec: &[SideMetadataSpec],
-        local_metadata_spec_vec: &[SideMetadataSpec],
+        metadata: &SideMetadata,
     ) {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
@@ -78,8 +77,7 @@ impl Mmapper for ByteMapMmapper {
                     Ok(_) => {
                         self.map_metadata(
                             mmap_start,
-                            global_metadata_spec_vec,
-                            local_metadata_spec_vec,
+                            metadata,
                         )
                         .expect("failed to map metadata memory");
                         if VERBOSE {

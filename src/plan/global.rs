@@ -383,6 +383,7 @@ pub fn create_vm_space<VM: VMBinding>(
     heap: &mut HeapMeta,
     boot_segment_bytes: usize,
     constraints: &'static PlanConstraints,
+    global_side_metadata_specs: Vec<SideMetadataSpec>,
 ) -> ImmortalSpace<VM> {
     use crate::util::constants::LOG_BYTES_IN_MBYTE;
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
@@ -396,6 +397,7 @@ pub fn create_vm_space<VM: VMBinding>(
         "boot",
         false,
         VMRequest::fixed_size(boot_segment_mb),
+        global_side_metadata_specs,
         vm_map,
         mmapper,
         heap,
@@ -412,6 +414,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
+        global_side_metadata_specs: &[SideMetadataSpec],
     ) -> BasePlan<VM> {
         let stats = Stats::new();
         // Initializing the analysis manager and routines
@@ -425,6 +428,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     "code_space",
                     true,
                     VMRequest::discontiguous(),
+                    global_side_metadata_specs.to_vec(),
                     vm_map,
                     mmapper,
                     &mut heap,
@@ -435,6 +439,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     "ro_space",
                     true,
                     VMRequest::discontiguous(),
+                    global_side_metadata_specs.to_vec(),
                     vm_map,
                     mmapper,
                     &mut heap,
@@ -447,6 +452,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     &mut heap,
                     options.vm_space_size,
                     constraints,
+                    global_side_metadata_specs.to_vec(),
                 ),
             }),
             initialized: AtomicBool::new(false),
@@ -749,12 +755,9 @@ impl<VM: VMBinding> CommonPlan<VM> {
         global_side_metadata_specs: &[SideMetadataSpec],
     ) -> CommonPlan<VM> {
         // global specs
-        let mut specs = if cfg!(feature = "side_gc_header") {
-            vec![gc_byte::SIDE_GC_BYTE_SPEC]
-        } else {
-            vec![]
-        };
+        let mut specs = vec![];
         specs.extend_from_slice(global_side_metadata_specs);
+        CommonPlan::<VM>::append_side_metadata(&mut specs);
 
         CommonPlan {
             unsync: UnsafeCell::new(CommonUnsync {
@@ -779,7 +782,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     constraints,
                 ),
             }),
-            base: BasePlan::new(vm_map, mmapper, options, heap, constraints),
+            base: BasePlan::new(vm_map, mmapper, options, heap, constraints, &specs),
             global_metadata_specs: specs,
         }
     }
