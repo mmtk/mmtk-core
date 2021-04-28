@@ -6,10 +6,10 @@ use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
-use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
@@ -135,7 +135,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
-            metadata: SideMetadata::new(SideMetadataContext { global: global_side_metadata_specs, local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC] }),
+            metadata: SideMetadata::new(SideMetadataContext {
+                global: global_side_metadata_specs,
+                local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
+            }),
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
         }

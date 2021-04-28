@@ -3,6 +3,7 @@ use super::{
     gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges},
     LOGGING_META,
 };
+use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
@@ -26,7 +27,6 @@ use crate::util::side_metadata::SideMetadataContext;
 use crate::util::OpaquePointer;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
-use crate::plan::global::BasePlan;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

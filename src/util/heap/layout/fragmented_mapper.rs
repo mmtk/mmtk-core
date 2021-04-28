@@ -82,12 +82,7 @@ impl Mmapper for FragmentedMapper {
         }
     }
 
-    fn ensure_mapped(
-        &self,
-        mut start: Address,
-        pages: usize,
-        metadata: &SideMetadata,
-    ) {
+    fn ensure_mapped(&self, mut start: Address, pages: usize, metadata: &SideMetadata) {
         let end = start + conversions::pages_to_bytes(pages);
         // Iterate over the slabs covered
         while start < end {
@@ -115,11 +110,8 @@ impl Mmapper for FragmentedMapper {
                     MapState::Unmapped => {
                         let mmap_start = Self::chunk_index_to_address(base, chunk);
                         crate::util::memory::dzmmap(mmap_start, MMAP_CHUNK_BYTES).unwrap();
-                        self.map_metadata(
-                            mmap_start,
-                            metadata,
-                        )
-                        .expect("failed to map metadata memory");
+                        self.map_metadata(mmap_start, metadata)
+                            .expect("failed to map metadata memory");
                     }
                     MapState::Protected => {
                         let mmap_start = Self::chunk_index_to_address(base, chunk);
@@ -331,13 +323,16 @@ mod tests {
     use super::*;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_START, MMAP_CHUNK_BYTES};
-    use crate::util::{conversions, Address};
     use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
+    use crate::util::{conversions, Address};
 
     const FIXED_ADDRESS: Address = AVAILABLE_START;
 
-    lazy_static!{
-        static ref NO_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext { global: vec![], local: vec![] });
+    lazy_static! {
+        static ref NO_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext {
+            global: vec![],
+            local: vec![]
+        });
     }
 
     fn pages_to_chunks_up(pages: usize) -> usize {

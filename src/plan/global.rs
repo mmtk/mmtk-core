@@ -447,7 +447,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     &mut heap,
                     options.vm_space_size,
                     constraints,
-                    global_side_metadata_specs.clone(),
+                    global_side_metadata_specs,
                 ),
             }),
             initialized: AtomicBool::new(false),
@@ -767,7 +767,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     constraints,
                 ),
             }),
-            base: BasePlan::new(vm_map, mmapper, options, heap, constraints, global_side_metadata_specs),
+            base: BasePlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                constraints,
+                global_side_metadata_specs,
+            ),
         }
     }
 

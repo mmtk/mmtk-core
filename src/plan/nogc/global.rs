@@ -15,8 +15,8 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
-use crate::util::side_metadata::SideMetadataContext;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::side_metadata::SideMetadataContext;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -107,11 +107,14 @@ impl<VM: VMBinding> NoGC<VM> {
         #[cfg(feature = "nogc_lock_free")]
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
 
-        let global_specs = SideMetadataContext::new_global_specs(&vec![]);
+        let global_specs = SideMetadataContext::new_global_specs(&[]);
 
         #[cfg(feature = "nogc_lock_free")]
-        let nogc_space =
-            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")), global_specs.clone());
+        let nogc_space = NoGCImmortalSpace::new(
+            "nogc_space",
+            cfg!(not(feature = "nogc_no_zeroing")),
+            global_specs.clone(),
+        );
         #[cfg(not(feature = "nogc_lock_free"))]
         let nogc_space = NoGCImmortalSpace::new(
             "nogc_space",
@@ -126,7 +129,14 @@ impl<VM: VMBinding> NoGC<VM> {
 
         NoGC {
             nogc_space,
-            base: BasePlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS, global_specs),
+            base: BasePlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                &NOGC_CONSTRAINTS,
+                global_specs,
+            ),
         }
     }
 }

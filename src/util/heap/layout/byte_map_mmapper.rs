@@ -48,12 +48,7 @@ impl Mmapper for ByteMapMmapper {
         }
     }
 
-    fn ensure_mapped(
-        &self,
-        start: Address,
-        pages: usize,
-        metadata: &SideMetadata,
-    ) {
+    fn ensure_mapped(&self, start: Address, pages: usize, metadata: &SideMetadata) {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         trace!(
@@ -75,11 +70,8 @@ impl Mmapper for ByteMapMmapper {
             if self.mapped[chunk].load(Ordering::Relaxed) == UNMAPPED {
                 match dzmmap(mmap_start, MMAP_CHUNK_BYTES) {
                     Ok(_) => {
-                        self.map_metadata(
-                            mmap_start,
-                            metadata,
-                        )
-                        .expect("failed to map metadata memory");
+                        self.map_metadata(mmap_start, metadata)
+                            .expect("failed to map metadata memory");
                         if VERBOSE {
                             trace!(
                                 "mmap succeeded at chunk {}  {} with len = {}",
@@ -226,8 +218,11 @@ mod tests {
     const FIXED_ADDRESS: Address =
         unsafe { conversions::chunk_align_down(Address::from_usize(0x0001_3500_0000)) };
 
-    lazy_static!{
-        static ref NO_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext { global: vec![], local: vec![] });
+    lazy_static! {
+        static ref NO_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext {
+            global: vec![],
+            local: vec![]
+        });
     }
 
     #[test]

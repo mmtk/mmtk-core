@@ -76,11 +76,7 @@ impl SideMetadata {
     ///
     /// * `local_metadata_spec_vec` - A vector of SideMetadataSpec objects containing all local side metadata.
     ///
-    pub fn try_map_metadata_space(
-        &self,
-        start: Address,
-        size: usize,
-    ) -> Result<()> {
+    pub fn try_map_metadata_space(&self, start: Address, size: usize) -> Result<()> {
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
         debug_assert!(size % BYTES_IN_PAGE == 0);
 
@@ -136,11 +132,7 @@ impl SideMetadata {
     /// This will make sure the address range is exclusive to the caller.
     ///
     /// NOTE: Accessing addresses in this range will produce a segmentation fault if swap-space is not mapped using the `try_map_metadata_space` function.
-    pub fn try_map_metadata_address_range(
-        &self,
-        start: Address,
-        size: usize,
-    ) -> Result<()> {
+    pub fn try_map_metadata_address_range(&self, start: Address, size: usize) -> Result<()> {
         info!(
             "try_map_metadata_address_range({}, 0x{:x}, {}, {})",
             start,
@@ -197,11 +189,7 @@ impl SideMetadata {
     /// Note-2: This function uses munmap() which works at page granularity.
     ///     If the corresponding metadata space's size is not a multiple of page size,
     ///     the actual unmapped space will be bigger than what you specify.
-    pub fn ensure_unmap_metadata_space(
-        &self,
-        start: Address,
-        size: usize,
-    ) {
+    pub fn ensure_unmap_metadata_space(&self, start: Address, size: usize) {
         trace!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
         debug_assert!(size % BYTES_IN_PAGE == 0);

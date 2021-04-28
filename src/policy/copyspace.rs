@@ -8,7 +8,7 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::side_metadata::{SideMetadataSpec, SideMetadataContext};
+use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
@@ -63,6 +63,7 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 }
 
 impl<VM: VMBinding> CopySpace<VM> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &'static str,
         from_space: bool,
@@ -80,7 +81,10 @@ impl<VM: VMBinding> CopySpace<VM> {
                 immortal: false,
                 zeroed,
                 vmrequest,
-                side_metadata_specs: SideMetadataContext{ global: global_side_metadata_specs, local: vec![] },
+                side_metadata_specs: SideMetadataContext {
+                    global: global_side_metadata_specs,
+                    local: vec![],
+                },
             },
             vm_map,
             mmapper,

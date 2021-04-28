@@ -9,9 +9,9 @@ use crate::util::side_metadata::load_atomic;
 #[cfg(target_pointer_width = "32")]
 use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::side_metadata::store_atomic;
-use crate::util::side_metadata::{SideMetadata, SideMetadataScope, SideMetadataSpec};
 #[cfg(target_pointer_width = "64")]
 use crate::util::side_metadata::{metadata_address_range_size, LOCAL_SIDE_METADATA_BASE_ADDRESS};
+use crate::util::side_metadata::{SideMetadata, SideMetadataScope, SideMetadataSpec};
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -77,10 +77,7 @@ pub fn map_meta_space_for_chunk(metadata: &SideMetadata, chunk_start: Address) {
         return;
     }
     active_chunks.insert(chunk_start);
-    let mmap_metadata_result = metadata.try_map_metadata_space(
-        chunk_start,
-        BYTES_IN_CHUNK,
-    );
+    let mmap_metadata_result = metadata.try_map_metadata_space(chunk_start, BYTES_IN_CHUNK);
     debug_assert!(
         mmap_metadata_result.is_ok(),
         "mmap sidemetadata failed for chunk_start ({})",

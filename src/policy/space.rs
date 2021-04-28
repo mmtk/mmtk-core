@@ -1,4 +1,4 @@
-use crate::util::side_metadata::{SideMetadataContext, SideMetadata};
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
@@ -280,7 +280,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     self.common().mmapper.ensure_mapped(
                         res.start,
                         res.pages,
-                        &self.common().metadata
+                        &self.common().metadata,
                     );
 
                     // TODO: Concurrent zeroing
@@ -352,11 +352,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        if self.common().metadata.try_map_metadata_space(
-            self.common().start,
-            self.common().extent,
-        )
-        .is_err()
+        if self
+            .common()
+            .metadata
+            .try_map_metadata_space(self.common().start, self.common().extent)
+            .is_err()
         {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
@@ -560,11 +560,10 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn init(&self, space: &dyn Space<VM>) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            if self.metadata.try_map_metadata_address_range(
-                self.start,
-                self.extent,
-            )
-            .is_err()
+            if self
+                .metadata
+                .try_map_metadata_address_range(self.start, self.extent)
+                .is_err()
             {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");

@@ -88,11 +88,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         self.limit = AVAILABLE_START + total_bytes;
         // Eagerly memory map the entire heap (also zero all the memory)
         crate::util::memory::dzmmap(AVAILABLE_START, total_bytes).unwrap();
-        if self.metadata.try_map_metadata_space(
-            AVAILABLE_START,
-            total_bytes,
-        )
-        .is_err()
+        if self
+            .metadata
+            .try_map_metadata_space(AVAILABLE_START, total_bytes)
+            .is_err()
         {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
@@ -123,13 +122,20 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
-    pub fn new(name: &'static str, slow_path_zeroing: bool, global_side_metadata_specs: Vec<SideMetadataSpec>) -> Self {
+    pub fn new(
+        name: &'static str,
+        slow_path_zeroing: bool,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
+    ) -> Self {
         Self {
             name,
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
             limit: AVAILABLE_END,
             slow_path_zeroing,
-            metadata: SideMetadata::new(SideMetadataContext { global: global_side_metadata_specs, local: vec![] }),
+            metadata: SideMetadata::new(SideMetadataContext {
+                global: global_side_metadata_specs,
+                local: vec![],
+            }),
             phantom: PhantomData,
         }
     }

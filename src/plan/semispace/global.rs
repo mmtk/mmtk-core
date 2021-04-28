@@ -1,4 +1,5 @@
 use super::gc_work::{SSCopyContext, SSProcessEdges};
+use crate::mmtk::MMTK;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
@@ -22,7 +23,6 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::sanity::sanity_checker::*;
 use crate::util::side_metadata::SideMetadataContext;
 use crate::util::OpaquePointer;
-use crate::mmtk::MMTK;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -149,7 +149,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&vec![]);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
         SemiSpace {
             hi: AtomicBool::new(false),
@@ -173,7 +173,14 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS, global_metadata_specs),
+            common: CommonPlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                &SS_CONSTRAINTS,
+                global_metadata_specs,
+            ),
         }
     }
 

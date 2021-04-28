@@ -12,8 +12,8 @@ use crate::plan::PlanConstraints;
 use crate::policy::space::SpaceOptions;
 use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-use crate::util::side_metadata::{SideMetadataSpec, SideMetadataContext};
 use crate::util::heap::HeapMeta;
+use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::vm::VMBinding;
 
 pub struct ImmortalSpace<VM: VMBinding> {
@@ -74,6 +74,7 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> ImmortalSpace<VM> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &'static str,
         zeroed: bool,
@@ -91,7 +92,10 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 immortal: true,
                 zeroed,
                 vmrequest,
-                side_metadata_specs: SideMetadataContext{ global: global_side_metadata_specs, local: vec![] },
+                side_metadata_specs: SideMetadataContext {
+                    global: global_side_metadata_specs,
+                    local: vec![],
+                },
             },
             vm_map,
             mmapper,
