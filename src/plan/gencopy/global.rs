@@ -181,11 +181,12 @@ impl<VM: VMBinding> GenCopy<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let global_metadata_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+        let mut global_metadata_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
             vec![LOGGING_META]
         } else {
             vec![]
         };
+        CommonPlan::<VM>::append_side_metadata(&mut global_metadata_specs);
 
         GenCopy {
             nursery: CopySpace::new(
@@ -193,6 +194,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 false,
                 true,
                 VMRequest::fixed_extent(NURSERY_SIZE, false),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -203,6 +205,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 false,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -212,6 +215,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 true,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,

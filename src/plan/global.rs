@@ -475,6 +475,10 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
+    pub fn append_side_metadata(_specs: &mut Vec<SideMetadataSpec>) {
+        // no global side metadata from BasePlan
+    }
+
     pub fn gc_init(
         &mut self,
         heap_size: usize,
@@ -744,18 +748,21 @@ impl<VM: VMBinding> CommonPlan<VM> {
         constraints: &'static PlanConstraints,
         global_side_metadata_specs: &[SideMetadataSpec],
     ) -> CommonPlan<VM> {
+        // global specs
         let mut specs = if cfg!(feature = "side_gc_header") {
             vec![gc_byte::SIDE_GC_BYTE_SPEC]
         } else {
             vec![]
         };
         specs.extend_from_slice(global_side_metadata_specs);
+
         CommonPlan {
             unsync: UnsafeCell::new(CommonUnsync {
                 immortal: ImmortalSpace::new(
                     "immortal",
                     true,
                     VMRequest::discontiguous(),
+                    specs.clone(),
                     vm_map,
                     mmapper,
                     &mut heap,
@@ -765,6 +772,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     "los",
                     true,
                     VMRequest::discontiguous(),
+                    specs.clone(),
                     vm_map,
                     mmapper,
                     &mut heap,
@@ -774,6 +782,13 @@ impl<VM: VMBinding> CommonPlan<VM> {
             base: BasePlan::new(vm_map, mmapper, options, heap, constraints),
             global_metadata_specs: specs,
         }
+    }
+
+    pub fn append_side_metadata(specs: &mut Vec<SideMetadataSpec>) {
+        if cfg!(feature = "side_gc_header") {
+            specs.push(gc_byte::SIDE_GC_BYTE_SPEC);
+        }
+        BasePlan::<VM>::append_side_metadata(specs);
     }
 
     pub fn gc_init(

@@ -1,4 +1,5 @@
 use crate::util::side_metadata::{try_map_metadata_address_range, try_map_metadata_space};
+use crate::util::side_metadata::{SideMetadataContext, SideMetadata};
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
@@ -456,6 +457,8 @@ pub struct CommonSpace<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
 
+    pub metadata: SideMetadata,
+
     p: PhantomData<VM>,
 }
 
@@ -465,6 +468,7 @@ pub struct SpaceOptions {
     pub immortal: bool,
     pub zeroed: bool,
     pub vmrequest: VMRequest,
+    pub side_metadata_specs: SideMetadataContext,
 }
 
 /// Print debug info for SFT. Should be false when committed.
@@ -490,6 +494,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             head_discontiguous_region: unsafe { Address::zero() },
             vm_map,
             mmapper,
+            metadata: SideMetadata::new(opt.side_metadata_specs),
             p: PhantomData,
         };
 

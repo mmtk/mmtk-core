@@ -32,6 +32,25 @@ pub struct SideMetadataSpec {
     pub log_min_obj_size: usize,
 }
 
+/// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own
+/// side metadata spec as well as the plan's specs.
+pub struct SideMetadataContext {
+    // For plans
+    pub global: Vec<SideMetadataSpec>,
+    // For policies
+    pub local: Vec<SideMetadataSpec>,
+}
+
+pub struct SideMetadata {
+    context: SideMetadataContext,
+}
+
+impl SideMetadata {
+    pub fn new(context: SideMetadataContext) -> SideMetadata {
+        Self { context }
+    }
+}
+
 // ** NOTE: **
 //  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
 

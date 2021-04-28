@@ -114,6 +114,7 @@ impl<VM: VMBinding> NoGC<VM> {
             "nogc_space",
             true,
             VMRequest::discontiguous(),
+            vec![],
             vm_map,
             mmapper,
             &mut heap,

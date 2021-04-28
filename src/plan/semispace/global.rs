@@ -152,6 +152,8 @@ impl<VM: VMBinding> SemiSpace<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut global_metadata_specs = vec![];
+        CommonPlan::<VM>::append_side_metadata(&mut global_metadata_specs);
 
         SemiSpace {
             hi: AtomicBool::new(false),
@@ -160,6 +162,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 false,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -169,6 +172,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 true,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
