@@ -20,6 +20,7 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
+use crate::util::side_metadata::SideMetadataContext;
 use crate::util::OpaquePointer;
 use crate::mmtk::MMTK;
 use crate::{plan::global::BasePlan, vm::VMBinding};
@@ -148,8 +149,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let mut global_metadata_specs = vec![];
-        CommonPlan::<VM>::append_side_metadata(&mut global_metadata_specs);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&vec![]);
 
         SemiSpace {
             hi: AtomicBool::new(false),

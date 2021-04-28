@@ -13,7 +13,6 @@ use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
-use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -477,10 +476,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
-    pub fn append_side_metadata(_specs: &mut Vec<SideMetadataSpec>) {
-        // no global side metadata from BasePlan
-    }
-
     pub fn gc_init(
         &mut self,
         heap_size: usize,
@@ -774,13 +769,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
             }),
             base: BasePlan::new(vm_map, mmapper, options, heap, constraints, global_side_metadata_specs),
         }
-    }
-
-    pub fn append_side_metadata(specs: &mut Vec<SideMetadataSpec>) {
-        if cfg!(feature = "side_gc_header") {
-            specs.push(gc_byte::SIDE_GC_BYTE_SPEC);
-        }
-        BasePlan::<VM>::append_side_metadata(specs);
     }
 
     pub fn gc_init(

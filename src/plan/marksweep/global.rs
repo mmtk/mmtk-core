@@ -20,6 +20,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
+use crate::util::side_metadata::SideMetadataContext;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::sync::Arc;
@@ -127,8 +128,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let mut specs = vec![];
-        CommonPlan::<VM>::append_side_metadata(&mut specs);
+        let specs = SideMetadataContext::new_global_specs(&vec![]);
 
         MarkSweep {
             ms: MallocSpace::new(specs.clone()),

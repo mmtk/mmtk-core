@@ -15,6 +15,7 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
+use crate::util::side_metadata::SideMetadataContext;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
@@ -106,8 +107,7 @@ impl<VM: VMBinding> NoGC<VM> {
         #[cfg(feature = "nogc_lock_free")]
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
 
-        let mut global_specs = vec![];
-        BasePlan::<VM>::append_side_metadata(&mut global_specs);
+        let global_specs = SideMetadataContext::new_global_specs(&vec![]);
 
         #[cfg(feature = "nogc_lock_free")]
         let nogc_space =

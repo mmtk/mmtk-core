@@ -22,6 +22,7 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
+use crate::util::side_metadata::SideMetadataContext;
 use crate::util::OpaquePointer;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
@@ -177,12 +178,12 @@ impl<VM: VMBinding> GenCopy<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let mut global_metadata_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+        let gencopy_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
             vec![LOGGING_META]
         } else {
             vec![]
         };
-        CommonPlan::<VM>::append_side_metadata(&mut global_metadata_specs);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&gencopy_specs);
 
         GenCopy {
             nursery: CopySpace::new(

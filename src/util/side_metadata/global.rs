@@ -41,6 +41,17 @@ pub struct SideMetadataContext {
     pub local: Vec<SideMetadataSpec>,
 }
 
+impl SideMetadataContext {
+    pub fn new_global_specs(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
+        let mut ret = vec![];
+        ret.extend_from_slice(specs);
+        if cfg!(feature = "side_gc_header") {
+            ret.push(crate::util::gc_byte::SIDE_GC_BYTE_SPEC);
+        }
+        ret
+    }
+}
+
 pub struct SideMetadata {
     context: SideMetadataContext,
 }
