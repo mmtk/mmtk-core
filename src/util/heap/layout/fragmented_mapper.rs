@@ -332,8 +332,13 @@ mod tests {
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_START, MMAP_CHUNK_BYTES};
     use crate::util::{conversions, Address};
+    use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
 
     const FIXED_ADDRESS: Address = AVAILABLE_START;
+
+    lazy_static!{
+        static ref NO_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext { global: vec![], local: vec![] });
+    }
 
     fn pages_to_chunks_up(pages: usize) -> usize {
         conversions::raw_align_up(pages, MMAP_CHUNK_BYTES) / MMAP_CHUNK_BYTES
@@ -380,8 +385,7 @@ mod tests {
     fn ensure_mapped_1page() {
         let mmapper = FragmentedMapper::new();
         let pages = 1;
-        let empty_vec = vec![];
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &empty_vec, &empty_vec);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -395,8 +399,7 @@ mod tests {
     fn ensure_mapped_1chunk() {
         let mmapper = FragmentedMapper::new();
         let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        let empty_vec = vec![];
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &empty_vec, &empty_vec);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -411,8 +414,7 @@ mod tests {
     fn ensure_mapped_more_than_1chunk() {
         let mmapper = FragmentedMapper::new();
         let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
-        let empty_vec = vec![];
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &empty_vec, &empty_vec);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
 
         let chunks = pages_to_chunks_up(pages);
         for i in 0..chunks {
@@ -428,8 +430,7 @@ mod tests {
         // map 2 chunks
         let mmapper = FragmentedMapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        let empty_vec = vec![];
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &empty_vec, &empty_vec);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -449,8 +450,7 @@ mod tests {
         // map 2 chunks
         let mmapper = FragmentedMapper::new();
         let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        let empty_vec = vec![];
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &empty_vec, &empty_vec);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
 
         // protect 1 chunk
         mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -465,7 +465,7 @@ mod tests {
         );
 
         // ensure mapped - this will unprotect the previously protected chunk
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &empty_vec, &empty_vec);
+        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
         assert_eq!(
             get_chunk_map_state(&mmapper, FIXED_ADDRESS),
             Some(MapState::Mapped)
