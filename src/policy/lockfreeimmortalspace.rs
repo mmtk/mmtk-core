@@ -4,6 +4,7 @@ use crate::util::address::Address;
 use crate::util::conversions::bytes_to_chunks_up;
 use crate::util::heap::PageResource;
 use crate::util::side_metadata::try_map_metadata_space;
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 
 use crate::util::ObjectReference;
 
@@ -30,6 +31,7 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     limit: Address,
     /// Zero memory after slow-path allocation
     slow_path_zeroing: bool,
+    metadata: SideMetadata,
     phantom: PhantomData<VM>,
 }
 
@@ -124,12 +126,13 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
-    pub fn new(name: &'static str, slow_path_zeroing: bool) -> Self {
+    pub fn new(name: &'static str, slow_path_zeroing: bool, global_side_metadata_specs: Vec<SideMetadataSpec>) -> Self {
         Self {
             name,
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
             limit: AVAILABLE_END,
             slow_path_zeroing,
+            metadata: SideMetadata::new(SideMetadataContext { global: global_side_metadata_specs, local: vec![] }),
             phantom: PhantomData,
         }
     }

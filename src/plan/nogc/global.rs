@@ -106,15 +106,18 @@ impl<VM: VMBinding> NoGC<VM> {
         #[cfg(feature = "nogc_lock_free")]
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
 
+        let mut global_specs = vec![];
+        BasePlan::<VM>::append_side_metadata(&mut global_specs);
+
         #[cfg(feature = "nogc_lock_free")]
         let nogc_space =
-            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")));
+            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")), global_specs);
         #[cfg(not(feature = "nogc_lock_free"))]
         let nogc_space = NoGCImmortalSpace::new(
             "nogc_space",
             true,
             VMRequest::discontiguous(),
-            vec![],
+            global_specs,
             vm_map,
             mmapper,
             &mut heap,
