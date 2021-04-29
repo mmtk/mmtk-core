@@ -2,12 +2,12 @@ use crate::util::address::Address;
 use crate::util::conversions;
 use crate::util::OpaquePointer;
 use crate::vm::ActivePlan;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use super::layout::map::Map;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::heap::PageAccounting;
 use crate::vm::VMBinding;
 
 pub trait PageResource<VM: VMBinding>: 'static {
@@ -28,16 +28,12 @@ pub trait PageResource<VM: VMBinding>: 'static {
     //      acquired a lock.
     fn reserve_pages(&self, pages: usize) -> usize {
         let adj_pages = self.adjust_for_metadata(pages);
-        self.common()
-            .reserved
-            .fetch_add(adj_pages, Ordering::Relaxed);
+        self.common().accounting.reserve(adj_pages);
         adj_pages
     }
 
     fn clear_request(&self, reserved_pages: usize) {
-        self.common()
-            .reserved
-            .fetch_sub(reserved_pages, Ordering::Relaxed);
+        self.common().accounting.clear_reserved(reserved_pages);
     }
 
     fn update_zeroing_approach(&self, _nontemporal: bool, concurrent: bool) {
@@ -79,10 +75,8 @@ pub trait PageResource<VM: VMBinding>: 'static {
      */
     fn commit_pages(&self, reserved_pages: usize, actual_pages: usize, tls: OpaquePointer) {
         let delta = actual_pages - reserved_pages;
-        self.common().reserved.fetch_add(delta, Ordering::Relaxed);
-        self.common()
-            .committed
-            .fetch_add(actual_pages, Ordering::Relaxed);
+        self.common().accounting.reserve(delta);
+        self.common().accounting.commit(actual_pages);
         if unsafe { VM::VMActivePlan::is_mutator(tls) } {
             self.vm_map()
                 .add_to_cumulative_committed_pages(actual_pages);
@@ -90,11 +84,11 @@ pub trait PageResource<VM: VMBinding>: 'static {
     }
 
     fn reserved_pages(&self) -> usize {
-        self.common().reserved.load(Ordering::Relaxed)
+        self.common().accounting.get_reserved_pages()
     }
 
     fn committed_pages(&self) -> usize {
-        self.common().committed.load(Ordering::Relaxed)
+        self.common().accounting.get_committed_pages()
     }
 
     fn common(&self) -> &CommonPageResource;
@@ -113,8 +107,9 @@ pub struct PRAllocResult {
 pub struct PRAllocFail;
 
 pub struct CommonPageResource {
-    reserved: AtomicUsize,
-    committed: AtomicUsize,
+    pub accounting: PageAccounting,
+    // reserved: AtomicUsize,
+    // committed: AtomicUsize,
 
     pub contiguous: bool,
     pub growable: bool,
@@ -126,8 +121,7 @@ pub struct CommonPageResource {
 impl CommonPageResource {
     pub fn new(contiguous: bool, growable: bool, vm_map: &'static VMMap) -> CommonPageResource {
         CommonPageResource {
-            reserved: AtomicUsize::new(0),
-            committed: AtomicUsize::new(0),
+            accounting: PageAccounting::new(),
 
             contiguous,
             growable,
@@ -137,37 +131,37 @@ impl CommonPageResource {
         }
     }
 
-    pub fn reserve(&self, pages: usize) {
-        self.reserved.fetch_add(pages, Ordering::Relaxed);
-    }
+    // pub fn reserve(&self, pages: usize) {
+    //     self.reserved.fetch_add(pages, Ordering::Relaxed);
+    // }
 
-    pub fn release_reserved(&self, pages: usize) {
-        self.reserved.fetch_sub(pages, Ordering::Relaxed);
-    }
+    // pub fn release_reserved(&self, pages: usize) {
+    //     self.reserved.fetch_sub(pages, Ordering::Relaxed);
+    // }
 
-    pub fn get_reserved(&self) -> usize {
-        self.reserved.load(Ordering::Relaxed)
-    }
+    // pub fn get_reserved(&self) -> usize {
+    //     self.reserved.load(Ordering::Relaxed)
+    // }
 
-    pub fn reset_reserved(&self) {
-        self.reserved.store(0, Ordering::Relaxed);
-    }
+    // pub fn reset_reserved(&self) {
+    //     self.reserved.store(0, Ordering::Relaxed);
+    // }
 
-    pub fn commit(&self, pages: usize) {
-        self.committed.fetch_add(pages, Ordering::Relaxed);
-    }
+    // pub fn commit(&self, pages: usize) {
+    //     self.committed.fetch_add(pages, Ordering::Relaxed);
+    // }
 
-    pub fn release_committed(&self, pages: usize) {
-        self.committed.fetch_sub(pages, Ordering::Relaxed);
-    }
+    // pub fn release_committed(&self, pages: usize) {
+    //     self.committed.fetch_sub(pages, Ordering::Relaxed);
+    // }
 
-    pub fn get_committed(&self) -> usize {
-        self.committed.load(Ordering::Relaxed)
-    }
+    // pub fn get_committed(&self) -> usize {
+    //     self.committed.load(Ordering::Relaxed)
+    // }
 
-    pub fn reset_committed(&self) {
-        self.committed.store(0, Ordering::Relaxed);
-    }
+    // pub fn reset_committed(&self) {
+    //     self.committed.store(0, Ordering::Relaxed);
+    // }
 
     /// Extend the virtual memory associated with a particular discontiguous
     /// space.  This simply involves requesting a suitable number of chunks
