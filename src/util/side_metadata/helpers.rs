@@ -54,12 +54,13 @@ pub(super) fn ensure_munmap_contiguos_metadata_space(
 
 /// Tries to mmap the metadata space (`spec`) for the specified data address range (`start` and `size`).
 /// Setting `no_reserve` to true means the function will only map address range, without reserving swap-space/physical memory.
+/// Returns the size in bytes that gets mmapped in the function if success.
 pub(super) fn try_mmap_contiguous_metadata_space(
     start: Address,
     size: usize,
     spec: &SideMetadataSpec,
     no_reserve: bool,
-) -> Result<()> {
+) -> Result<usize> {
     debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
     debug_assert!(size % BYTES_IN_PAGE == 0);
 
@@ -76,9 +77,9 @@ pub(super) fn try_mmap_contiguous_metadata_space(
             try_mmap_metadata(mmap_start, mmap_size)
         } else {
             try_mmap_metadata_address_range(mmap_start, mmap_size)
-        }
+        }.map(|_| mmap_size)
     } else {
-        Ok(())
+        Ok(0)
     }
 }
 

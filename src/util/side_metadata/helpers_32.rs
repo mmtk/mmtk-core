@@ -95,17 +95,20 @@ pub fn ensure_munmap_metadata_chunk(start: Address, local_per_chunk: usize) {
     }
 }
 
+/// Returns the size in bytes that gets mmapped in the function if success.
 pub fn try_map_per_chunk_metadata_space(
     start: Address,
     size: usize,
     local_per_chunk: usize,
     no_reserve: bool,
-) -> Result<()> {
+) -> Result<usize> {
     let mut aligned_start = start.align_down(BYTES_IN_CHUNK);
     let aligned_end = (start + size).align_up(BYTES_IN_CHUNK);
 
     // first chunk is special, as it might already be mapped, so it shouldn't be unmapped on failure
     let mut munmap_first_chunk: Option<bool> = None;
+    // count the total bytes we mmapped
+    let mut total_mapped = 0;
 
     while aligned_start < aligned_end {
         let res = try_mmap_metadata_chunk(aligned_start, local_per_chunk, no_reserve);
@@ -129,13 +132,14 @@ pub fn try_map_per_chunk_metadata_space(
                 local_per_chunk,
                 res
             );
-            return res;
+            return Result::Err(res.err().unwrap());
         }
         if munmap_first_chunk.is_none() {
             // if first chunk is newly mapped, it needs munmap on failure
             munmap_first_chunk = Some(memory::result_is_mapped(res));
         }
         aligned_start += BYTES_IN_CHUNK;
+        total_mapped += local_per_chunk;
     }
 
     trace!(
@@ -144,7 +148,7 @@ pub fn try_map_per_chunk_metadata_space(
         size,
         local_per_chunk
     );
-    Ok(())
+    Ok(total_mapped)
 }
 
 // Try to map side metadata for the chunk starting at `start`
