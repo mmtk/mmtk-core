@@ -126,7 +126,8 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     fn reserved_pages(&self) -> usize {
-        conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst)) + self.metadata.reserved_pages()
+        conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst))
+            + self.metadata.reserved_pages()
     }
 }
 

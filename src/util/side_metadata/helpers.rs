@@ -79,7 +79,8 @@ pub(super) fn try_mmap_contiguous_metadata_space(
             try_mmap_metadata(mmap_start, mmap_size)
         } else {
             try_mmap_metadata_address_range(mmap_start, mmap_size)
-        }.map(|_| mmap_size)
+        }
+        .map(|_| mmap_size)
     } else {
         Ok(0)
     }

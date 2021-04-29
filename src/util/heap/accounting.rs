@@ -55,3 +55,9 @@ impl PageAccounting {
         self.committed.load(Ordering::Relaxed)
     }
 }
+
+impl Default for PageAccounting {
+    fn default() -> Self {
+        Self::new()
+    }
+}

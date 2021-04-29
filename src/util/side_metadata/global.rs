@@ -75,10 +75,6 @@ impl SideMetadata {
 
     /// Tries to map the required metadata space and returns `true` is successful.
     /// This can be called at page granularity.
-    ///
-    /// # Arguments
-    /// * `start` - The starting address of the source data.
-    /// * `size` - The size of the source data (in bytes).
     pub fn try_map_metadata_space(&self, start: Address, size: usize) -> Result<()> {
         debug!(
             "try_map_metadata_space({}, 0x{:x}, {}, {})",
@@ -111,13 +107,20 @@ impl SideMetadata {
         self.map_metadata_internal(start, size, true)
     }
 
+    /// The internal function to mmap metadata
+    ///
+    /// # Arguments
+    /// * `start` - The starting address of the source data.
+    /// * `size` - The size of the source data (in bytes).
+    /// * `no_reserve` - whether to invoke mmap with a noreserve flag (we use this flag to quanrantine address range)
     fn map_metadata_internal(&self, start: Address, size: usize, no_reserve: bool) -> Result<()> {
         for spec in self.context.global.iter() {
             match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
                 Ok(mapped) => {
                     // We actually reserved memory
                     if !no_reserve {
-                        self.accounting.reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
+                        self.accounting
+                            .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
                     }
                 }
                 Err(e) => return Result::Err(e),
@@ -143,7 +146,8 @@ impl SideMetadata {
                     Ok(mapped) => {
                         // We actually reserved memory
                         if !no_reserve {
-                            self.accounting.reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
+                            self.accounting
+                                .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
                         }
                     }
                     Err(e) => return Result::Err(e),
@@ -168,7 +172,8 @@ impl SideMetadata {
                 Ok(mapped) => {
                     // We actually reserved memory
                     if !no_reserve {
-                        self.accounting.reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
+                        self.accounting
+                            .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
                     }
                 }
                 Err(e) => return Result::Err(e),

@@ -110,7 +110,6 @@ pub struct CommonPageResource {
     pub accounting: PageAccounting,
     // reserved: AtomicUsize,
     // committed: AtomicUsize,
-
     pub contiguous: bool,
     pub growable: bool,
 
