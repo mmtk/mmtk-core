@@ -37,11 +37,12 @@ pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
 }
 
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
+/// Returns the size in bytes that get munmapped.
 pub(super) fn ensure_munmap_contiguos_metadata_space(
     start: Address,
     size: usize,
     spec: &SideMetadataSpec,
-) {
+) -> usize {
     // nearest page-aligned starting address
     let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
@@ -50,6 +51,7 @@ pub(super) fn ensure_munmap_contiguos_metadata_space(
     if mmap_size > 0 {
         ensure_munmap_metadata(mmap_start, mmap_size);
     }
+    mmap_size
 }
 
 /// Tries to mmap the metadata space (`spec`) for the specified data address range (`start` and `size`).

@@ -33,44 +33,59 @@ pub(super) fn address_to_chunked_meta_address(
     meta_chunk_addr + metadata_spec.offset + second_offset
 }
 
+/// Returns the size in bytes that gets munmapped.
 pub(super) fn ensure_munmap_chunked_metadata_space(
     start: Address,
     size: usize,
     spec: &SideMetadataSpec,
-) {
+) -> usize {
     let meta_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
     // per chunk policy-specific metadata for 32-bits targets
     let chunk_num = ((start + size - 1usize).align_down(BYTES_IN_CHUNK)
         - start.align_down(BYTES_IN_CHUNK))
         / BYTES_IN_CHUNK;
     if chunk_num == 0 {
+        let size_to_unmap = address_to_meta_address(*spec, start + size) - meta_start;
         ensure_munmap_metadata(
             meta_start,
-            address_to_meta_address(*spec, start + size) - meta_start,
+            size_to_unmap,
         );
+
+        size_to_unmap
     } else {
+        let mut total_unmapped = 0;
         let second_data_chunk = (start + 1usize).align_up(BYTES_IN_CHUNK);
         // unmap the first sub-chunk
+        let first_sub_chunk_size = address_to_meta_address(*spec, second_data_chunk) - meta_start;
         ensure_munmap_metadata(
             meta_start,
-            address_to_meta_address(*spec, second_data_chunk) - meta_start,
+            first_sub_chunk_size,
         );
+        total_unmapped += first_sub_chunk_size;
+
         let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
         let last_meta_chunk = address_to_meta_address(*spec, last_data_chunk);
+        let last_sub_chunk_size = address_to_meta_address(*spec, start + size) - last_meta_chunk;
         // unmap the last sub-chunk
         ensure_munmap_metadata(
             last_meta_chunk,
-            address_to_meta_address(*spec, start + size) - last_meta_chunk,
+            last_sub_chunk_size,
         );
+        total_unmapped += last_sub_chunk_size;
+
         let mut next_data_chunk = second_data_chunk;
         // unmap all chunks in the middle
         while next_data_chunk != last_data_chunk {
+            let to_unmap = meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
             ensure_munmap_metadata(
                 address_to_meta_address(*spec, next_data_chunk),
-                meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits),
+                to_unmap,
             );
+            total_unmapped += to_unmap;
             next_data_chunk += BYTES_IN_CHUNK;
         }
+
+        total_unmapped
     }
 }
 

@@ -187,17 +187,20 @@ impl SideMetadata {
         debug_assert!(size % BYTES_IN_PAGE == 0);
 
         for spec in self.context.global.iter() {
-            ensure_munmap_contiguos_metadata_space(start, size, spec);
+            let size = ensure_munmap_contiguos_metadata_space(start, size, spec);
+            self.accounting.release(size >> LOG_BYTES_IN_PAGE);
         }
 
         for spec in self.context.local.iter() {
             #[cfg(target_pointer_width = "64")]
             {
-                ensure_munmap_contiguos_metadata_space(start, size, spec);
+                let size = ensure_munmap_contiguos_metadata_space(start, size, spec);
+                self.accounting.release(size >> LOG_BYTES_IN_PAGE);
             }
             #[cfg(target_pointer_width = "32")]
             {
-                ensure_munmap_chunked_metadata_space(start, size, spec);
+                let size = ensure_munmap_chunked_metadata_space(start, size, spec);
+                self.accounting.release(size >> LOG_BYTES_IN_PAGE);
             }
         }
     }
