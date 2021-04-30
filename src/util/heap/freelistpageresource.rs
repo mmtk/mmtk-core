@@ -299,11 +299,11 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
         debug_assert!(pages as usize <= self.common.accounting.get_committed_pages());
 
-        let mut sync = self.sync.lock().unwrap();
         // FIXME
         #[allow(clippy::cast_ref_to_mut)]
         let me = unsafe { &mut *(self as *const _ as *mut Self) };
         let freed = {
+            let mut sync = self.sync.lock().unwrap();
             self.common.accounting.release(pages as _);
             let freed = me.free_list.free(page_offset as _, true);
             sync.pages_currently_on_freelist += pages as usize;
