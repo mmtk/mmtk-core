@@ -20,7 +20,7 @@ const MARK_BIT: u8 = 0b01;
 const NURSERY_BIT: u8 = 0b10;
 const LOS_BIT_MASK: u8 = 0b11;
 
-const USE_PRECEEDING_GC_HEADER: bool = true;
+const USE_PRECEEDING_GC_HEADER: bool = false;
 const PRECEEDING_GC_HEADER_WORDS: usize = 1;
 const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTES_IN_WORD;
 

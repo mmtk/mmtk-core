@@ -19,7 +19,8 @@ custom_derive! {
         NoGC,
         SemiSpace,
         GenCopy,
-        MarkSweep
+        MarkSweep,
+        Page,
     }
 }
 

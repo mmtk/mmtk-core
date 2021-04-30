@@ -34,3 +34,4 @@ pub mod gencopy;
 pub mod marksweep;
 pub mod nogc;
 pub mod semispace;
+pub mod page;

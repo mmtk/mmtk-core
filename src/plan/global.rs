@@ -125,7 +125,8 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::GenCopy => crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
-        }
+        },
+        PlanSelector::Page => crate::plan::page::mutator::create_page_mutator(tls, &*mmtk.plan),
     })
 }
 
@@ -144,6 +145,9 @@ pub fn create_plan<VM: VMBinding>(
             Box::new(crate::plan::gencopy::GenCopy::new(vm_map, mmapper, options))
         }
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
+            vm_map, mmapper, options,
+        )),
+        PlanSelector::Page => Box::new(crate::plan::page::Page::new(
             vm_map, mmapper, options,
         )),
     }
