@@ -65,9 +65,6 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn common(&self) -> &CommonSpace<VM> {
         unimplemented!()
     }
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
-        unimplemented!()
-    }
 
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")
@@ -89,7 +86,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         );
         self.limit = AVAILABLE_START + total_bytes;
         // Eagerly memory map the entire heap (also zero all the memory)
-        crate::util::memory::dzmmap(AVAILABLE_START, total_bytes).unwrap();
+        crate::util::memory::dzmmap_noreplace(AVAILABLE_START, total_bytes).unwrap();
         if try_map_metadata_space(
             AVAILABLE_START,
             total_bytes,

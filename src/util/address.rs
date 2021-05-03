@@ -18,7 +18,7 @@ pub type ByteOffset = isize;
 /// (memory wise and time wise). The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq)]
 pub struct Address(usize);
 
 /// Address + ByteSize (positive)
@@ -202,6 +202,15 @@ impl Address {
     #[inline(always)]
     pub const fn add(self, size: usize) -> Address {
         Address(self.0 + size)
+    }
+
+    // We implemented the Sub trait but we still keep this sub function.
+    // The sub() function is const fn, and we can use it to declare Address constants.
+    // The Sub trait function cannot be const.
+    #[allow(clippy::should_implement_trait)]
+    #[inline(always)]
+    pub const fn sub(self, size: usize) -> Address {
+        Address(self.0 - size)
     }
 
     /// loads a value of type T from the address
