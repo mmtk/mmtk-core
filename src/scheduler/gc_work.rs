@@ -401,7 +401,7 @@ pub trait ProcessEdgesWork:
     fn process_edge(&mut self, slot: Address) {
         #[cfg(feature = "extreme_assertions")]
         assert!(
-            crate::edge_logger::is_logged_edge(slot),
+            crate::util::edge_logger::is_logged_edge(slot),
             "Unknown edge detected: ({})",
             slot
         );
