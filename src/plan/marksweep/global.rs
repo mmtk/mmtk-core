@@ -82,7 +82,11 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn release(&self, tls: OpaquePointer) {
         trace!("Marksweep: Release");
         self.common.release(tls, true);
-        unsafe { self.ms.release_all_chunks() };
+        self.ms.release_all_chunks();
+    }
+
+    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
+        self.base().collection_required(self, space_full, space)
     }
 
     fn get_collection_reserve(&self) -> usize {
