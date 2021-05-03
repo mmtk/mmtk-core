@@ -72,7 +72,9 @@ impl Sub<Address> for Address {
     fn sub(self, other: Address) -> ByteSize {
         debug_assert!(
             self.0 >= other.0,
-            "for (addr_a - addr_b), a needs to be larger than b"
+            "for (addr_a - addr_b), a({}) needs to be larger than b({})",
+            self,
+            other
         );
         self.0 - other.0
     }
