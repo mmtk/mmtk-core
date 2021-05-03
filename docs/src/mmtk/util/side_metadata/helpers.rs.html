@@ -162,6 +162,8 @@
 <span id="159">159</span>
 <span id="160">160</span>
 <span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">memory</span>;
@@ -198,7 +200,7 @@
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">ensure_munmap_metadata</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
     <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;ensure_munmap_metadata({}, 0x{:x})&quot;</span>, <span class="ident">start</span>, <span class="ident">size</span>);
 
-    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">memory</span>::<span class="ident">try_munmap</span>(<span class="ident">start</span>, <span class="ident">size</span>).<span class="ident">is_ok</span>())
+    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">memory</span>::<span class="ident">munmap</span>(<span class="ident">start</span>, <span class="ident">size</span>).<span class="ident">is_ok</span>())
 }
 
 <span class="doccomment">/// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)</span>
@@ -260,10 +262,12 @@
 }
 
 <span class="doccomment">/// Tries to map the specified metadata space (`start` and `size`), including reservation of swap-space/physical memory.</span>
+<span class="doccomment">/// This function should only be called if we have called try_mmap_metadata_address_range() first.</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">try_mmap_metadata</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">size</span> <span class="op">&gt;</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">size</span> <span class="op">%</span> <span class="ident">BYTES_IN_PAGE</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
 
-    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">memory</span>::<span class="ident">dzmmap</span>(<span class="ident">start</span>, <span class="ident">size</span>);
+    <span class="comment">// It is safe to call dzmmap here as we have reserved the address range.</span>
+    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">memory</span>::<span class="ident">dzmmap</span>(<span class="ident">start</span>, <span class="ident">size</span>) };
     <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;try_mmap_metadata({}, 0x{:x}) -&gt; {:#?}&quot;</span>, <span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">res</span>);
     <span class="ident">res</span>
 }

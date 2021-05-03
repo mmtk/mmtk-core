@@ -810,7 +810,7 @@
         <span class="ident">data_addr</span>, <span class="ident">meta_start</span>
     );
 
-    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">memory</span>::<span class="ident">check_is_mmapped</span>(<span class="ident">meta_start</span>, <span class="ident">BYTES_IN_PAGE</span>).<span class="ident">is_ok</span>())
+    <span class="ident">memory</span>::<span class="ident">panic_if_unmapped</span>(<span class="ident">meta_start</span>, <span class="ident">BYTES_IN_PAGE</span>);
 }
 
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>

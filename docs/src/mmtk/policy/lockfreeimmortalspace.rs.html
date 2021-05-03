@@ -226,7 +226,7 @@
         );
         <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">AVAILABLE_START</span> <span class="op">+</span> <span class="ident">total_bytes</span>;
         <span class="comment">// Eagerly memory map the entire heap (also zero all the memory)</span>
-        <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">memory</span>::<span class="ident">dzmmap</span>(<span class="ident">AVAILABLE_START</span>, <span class="ident">total_bytes</span>).<span class="ident">unwrap</span>();
+        <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">memory</span>::<span class="ident">dzmmap_noreplace</span>(<span class="ident">AVAILABLE_START</span>, <span class="ident">total_bytes</span>).<span class="ident">unwrap</span>();
         <span class="kw">if</span> <span class="ident">try_map_metadata_space</span>(
             <span class="ident">AVAILABLE_START</span>,
             <span class="ident">total_bytes</span>,
