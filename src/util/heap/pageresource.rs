@@ -108,8 +108,6 @@ pub struct PRAllocFail;
 
 pub struct CommonPageResource {
     pub accounting: PageAccounting,
-    // reserved: AtomicUsize,
-    // committed: AtomicUsize,
     pub contiguous: bool,
     pub growable: bool,
 
@@ -129,38 +127,6 @@ impl CommonPageResource {
             head_discontiguous_region: Mutex::new(Address::ZERO),
         }
     }
-
-    // pub fn reserve(&self, pages: usize) {
-    //     self.reserved.fetch_add(pages, Ordering::Relaxed);
-    // }
-
-    // pub fn release_reserved(&self, pages: usize) {
-    //     self.reserved.fetch_sub(pages, Ordering::Relaxed);
-    // }
-
-    // pub fn get_reserved(&self) -> usize {
-    //     self.reserved.load(Ordering::Relaxed)
-    // }
-
-    // pub fn reset_reserved(&self) {
-    //     self.reserved.store(0, Ordering::Relaxed);
-    // }
-
-    // pub fn commit(&self, pages: usize) {
-    //     self.committed.fetch_add(pages, Ordering::Relaxed);
-    // }
-
-    // pub fn release_committed(&self, pages: usize) {
-    //     self.committed.fetch_sub(pages, Ordering::Relaxed);
-    // }
-
-    // pub fn get_committed(&self) -> usize {
-    //     self.committed.load(Ordering::Relaxed)
-    // }
-
-    // pub fn reset_committed(&self) {
-    //     self.committed.store(0, Ordering::Relaxed);
-    // }
 
     /// Extend the virtual memory associated with a particular discontiguous
     /// space.  This simply involves requesting a suitable number of chunks
