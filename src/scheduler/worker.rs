@@ -7,6 +7,7 @@ use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Weak};
+use super::affinity::Affinity;
 
 /// This struct will be accessed during trace_object(), which is performance critical.
 /// However, we do not know its concrete type as the plan and its copy context is dynamically selected.
@@ -56,6 +57,7 @@ pub struct Worker<C: Context> {
     context: Option<&'static C>,
     is_coordinator: bool,
     local_work_buffer: Vec<(WorkBucketStage, Box<dyn Work<C>>)>,
+    affinity: Affinity
 }
 
 unsafe impl<C: Context> Sync for Worker<C> {}
@@ -83,6 +85,7 @@ impl<C: Context> Worker<C> {
             context: None,
             is_coordinator,
             local_work_buffer: Vec::with_capacity(LOCALLY_CACHED_WORKS),
+            affinity: Affinity::OsDefault
         }
     }
 
