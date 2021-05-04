@@ -214,6 +214,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         info!("End of GC");
 
         #[cfg(feature = "extreme_assertions")]
+        // reset the logging info at the end of each GC
         crate::util::edge_logger::reset();
 
         mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
@@ -327,11 +328,8 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
     pub fn new(edges: Vec<Address>, mmtk: &'static MMTK<E::VM>) -> Self {
         #[cfg(feature = "extreme_assertions")]
         for edge in &edges {
-            assert!(
-                edge_logger::is_logged_edge(*edge),
-                "Adding unknown edge: {}",
-                *edge
-            );
+            // log edge, panic if already logged
+            crate::util::edge_logger::log_edge(*edge);
         }
         Self {
             edges,
@@ -399,12 +397,6 @@ pub trait ProcessEdgesWork:
 
     #[inline]
     fn process_edge(&mut self, slot: Address) {
-        #[cfg(feature = "extreme_assertions")]
-        assert!(
-            crate::util::edge_logger::is_logged_edge(slot),
-            "Unknown edge detected: ({})",
-            slot
-        );
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
         if Self::OVERWRITE_REFERENCE {
