@@ -142,6 +142,7 @@ impl<C: Context> Worker<C> {
     }
 
     pub fn run(&mut self, context: &'static C) {
+        self.affinity.resolve_affinity(self.ordinal);
         self.context = Some(context);
         self.parked.store(false, Ordering::SeqCst);
         loop {
