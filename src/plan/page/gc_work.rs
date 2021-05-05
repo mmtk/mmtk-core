@@ -25,7 +25,7 @@ impl<VM: VMBinding> ProcessEdgesWork for PageProcessEdges<VM> {
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         let object = unsafe {
-            let untagged_word = object.to_address().as_usize() & !0b1usize;
+            let untagged_word = object.to_address().as_usize() & !0b11usize;
             Address::from_usize(untagged_word).to_object_reference()
         };
         if object.is_null() {

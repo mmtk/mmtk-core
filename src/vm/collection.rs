@@ -1,7 +1,7 @@
 use crate::plan::MutatorContext;
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
-use crate::util::OpaquePointer;
+use crate::util::{OpaquePointer, Address};
 use crate::vm::VMBinding;
 
 /// VM-specific methods for garbage collection.
@@ -62,4 +62,6 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The thread pointer for the current GC thread.
     fn schedule_finalization(_tls: OpaquePointer) {}
+
+    fn sweep(addr: Address) {}
 }

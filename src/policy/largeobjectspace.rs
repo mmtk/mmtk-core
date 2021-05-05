@@ -67,6 +67,8 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 gc_byte::read_gc_byte::<VM>(object) | self.header_byte.unlogged_bit,
             );
         }
+        self.test_and_mark(object, self.mark_state);
+        debug_assert!(object.is_live());
     }
 }
 
@@ -128,6 +130,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn prepare(&mut self, full_heap: bool) {
+        println!("LOS Prepare");
         if full_heap {
             debug_assert!(self.treadmill.from_space_empty());
             self.mark_state = MARK_BIT - self.mark_state;
@@ -175,14 +178,20 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
-                self.pr.release_pages(get_super_page(cell));
+                self.release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
-                self.pr.release_pages(get_super_page(cell));
+                self.release_pages(get_super_page(cell));
             }
         }
+    }
+
+    fn release_pages(&mut self, start: Address) {
+        use crate::vm::Collection;
+        VM::VMCollection::sweep(start);
+        self.pr.release_and_zap_pages(start);
     }
 
     pub fn allocate_pages(&self, tls: OpaquePointer, pages: usize) -> Address {
