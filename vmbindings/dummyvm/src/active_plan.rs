@@ -1,7 +1,6 @@
 use mmtk::Plan;
 use mmtk::vm::ActivePlan;
 use mmtk::util::OpaquePointer;
-use mmtk::scheduler::*;
 use mmtk::Mutator;
 use DummyVM;
 use SINGLETON;
