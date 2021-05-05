@@ -26,18 +26,6 @@ pub fn log_edge(edge: Address) {
     assert!(edge_log.insert(edge), "duplicate edge ({}) detected", edge);
 }
 
-/// Checks whether an edge is already logged.
-/// Returns `true` if the edge is logged and `false` otherwise.
-///
-/// # Arguments
-///
-/// * `edge` - The edge to check.
-///
-pub fn is_logged_edge(edge: Address) -> bool {
-    let edge_log = EDGE_LOG.read().unwrap();
-    edge_log.contains(&edge)
-}
-
 /// Reset the edge logger by clearing the hash-set of edges.
 /// This function is called at the end of each GC iteration.
 ///
