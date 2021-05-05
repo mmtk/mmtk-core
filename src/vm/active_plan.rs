@@ -1,6 +1,5 @@
 use crate::plan::Mutator;
 use crate::plan::Plan;
-use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;

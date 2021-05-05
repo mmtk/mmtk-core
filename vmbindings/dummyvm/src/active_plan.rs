@@ -13,10 +13,6 @@ impl ActivePlan<DummyVM> for VMActivePlan {
         &*SINGLETON.plan
     }
 
-    unsafe fn worker(_tls: OpaquePointer) -> &'static mut GCWorker<DummyVM> {
-        unimplemented!()
-    }
-
     fn number_of_mutators() -> usize {
         unimplemented!()
     }
