@@ -25,7 +25,7 @@ impl Collection<DummyVM> for VMCollection {
         unimplemented!();
     }
 
-    fn prepare_mutator<T: MutatorContext<DummyVM>>(_tls: OpaquePointer, _mutator: &T) {
+    fn prepare_mutator<T: MutatorContext<DummyVM>>(_tls_w: OpaquePointer, _tls_m: OpaquePointer, _mutator: &T) {
         unimplemented!()
     }
 }

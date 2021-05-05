@@ -178,6 +178,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
                 if !mmtk.plan.base().stacks_prepared() {
                     for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
                         <E::VM as VMBinding>::VMCollection::prepare_mutator(
+                            worker.tls,
                             mutator.get_tls(),
                             mutator,
                         );
@@ -211,6 +212,11 @@ pub struct EndOfGC;
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         info!("End of GC");
+
+        #[cfg(feature = "extreme_assertions")]
+        // reset the logging info at the end of each GC
+        crate::util::edge_logger::reset();
+
         mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
@@ -320,6 +326,11 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
     // Requires an MMTk reference. Each plan-specific type that uses ProcessEdgesBase can get a static plan reference
     // at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.
     pub fn new(edges: Vec<Address>, mmtk: &'static MMTK<E::VM>) -> Self {
+        #[cfg(feature = "extreme_assertions")]
+        for edge in &edges {
+            // log edge, panic if already logged
+            crate::util::edge_logger::log_edge(*edge);
+        }
         Self {
             edges,
             nodes: vec![],
