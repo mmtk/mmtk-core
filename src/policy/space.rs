@@ -101,7 +101,7 @@ impl SFT for EmptySpaceSFT {
 
 #[derive(Default)]
 pub struct SFTMap {
-    sft: Vec<*const (dyn SFT + Sync)>,
+    sft: Vec<&'static (dyn SFT + Sync + 'static)>,
 }
 
 // TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
@@ -131,21 +131,16 @@ impl SFTMap {
                 "Get SFT for {} #{} = {}",
                 address,
                 address.chunk_index(),
-                unsafe { &(*res) }.name()
+                res.name()
             );
         }
-        unsafe { &(*res) }
+        res
     }
 
-    fn log_update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+    fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, chunks: usize) {
         let first = start.chunk_index();
         let end = start + (chunks << LOG_BYTES_IN_CHUNK);
-        debug!(
-            "Update SFT for [{}, {}) as {}",
-            start,
-            end,
-            unsafe { &(*space) }.name()
-        );
+        debug!("Update SFT for [{}, {}) as {}", start, end, space.name());
         let start_chunk = chunk_index_to_address(first);
         let end_chunk = chunk_index_to_address(first + chunks);
         debug!(
@@ -170,10 +165,7 @@ impl SFTMap {
                     i + SPACE_PER_LINE
                 };
                 let chunks: Vec<usize> = (i..max).collect();
-                let space_names: Vec<&str> = chunks
-                    .iter()
-                    .map(|&x| unsafe { &*self.sft[x] }.name())
-                    .collect();
+                let space_names: Vec<&str> = chunks.iter().map(|&x| self.sft[x].name()).collect();
                 trace!("Chunk {}: {}", i, space_names.join(","));
             }
         }
@@ -181,7 +173,7 @@ impl SFTMap {
 
     /// Update SFT map for the given address range.
     /// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-    pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+    pub fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, chunks: usize) {
         if DEBUG_SFT {
             self.log_update(space, start, chunks);
         }
@@ -198,7 +190,7 @@ impl SFTMap {
         self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
 
-    fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
+    fn set(&self, chunk: usize, sft: &(dyn SFT + Sync + 'static)) {
         /*
          * This is safe (only) because a) this is only called during the
          * allocation and deallocation of chunks, which happens under a global
@@ -211,8 +203,8 @@ impl SFTMap {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         // It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
         if cfg!(debug_assertions) {
-            let old = unsafe { self_mut.sft[chunk].as_ref() }.unwrap().name();
-            let new = unsafe { sft.as_ref() }.unwrap().name();
+            let old = self_mut.sft[chunk].name();
+            let new = sft.name();
             // Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,
             // in which case, we still set SFT map again.
             debug_assert!(
@@ -222,7 +214,9 @@ impl SFTMap {
                 new
             );
         }
-        self_mut.sft[chunk] = sft;
+        // We have an assumption that a Space is static that we never drop a space. Under this assumption, the following cast is correct.
+        let static_sft = unsafe { (sft as *const (dyn SFT + Sync + 'static)).as_ref().unwrap() };
+        self_mut.sft[chunk] = static_sft;
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
@@ -343,7 +337,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         );
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
-            SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
+            SFT_MAP.update(self.as_sft(), start, chunks);
         }
     }
 
@@ -364,11 +358,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(
-            self.as_sft() as *const (dyn SFT + Sync),
-            self.common().start,
-            chunks,
-        );
+        SFT_MAP.update(self.as_sft(), self.common().start, chunks);
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
