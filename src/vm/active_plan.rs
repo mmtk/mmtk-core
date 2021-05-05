@@ -39,7 +39,7 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// # Safety
     /// The caller needs to make sure that the thread is a GC worker thread.
-    unsafe fn worker(tls: VMWorkerThread) -> &'static mut GCWorker<VM>;
+    fn worker(tls: VMWorkerThread) -> &'static mut GCWorker<VM>;
 
     /// Return whether there is a mutator created and associated with the thread.
     ///
@@ -48,7 +48,7 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// # Safety
     /// The caller needs to make sure that the thread is valid (a value passed in by the VM binding through API).
-    unsafe fn is_mutator(tls: VMThread) -> bool;
+    fn is_mutator(tls: VMThread) -> bool;
 
     /// Return a `Mutator` reference for the thread.
     ///
@@ -57,7 +57,7 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// # Safety
     /// The caller needs to make sure that the thread is a mutator thread.
-    unsafe fn mutator(tls: VMMutatorThread) -> &'static mut Mutator<VM>;
+    fn mutator(tls: VMMutatorThread) -> &'static mut Mutator<VM>;
 
     /// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.
     fn reset_mutator_iterator();

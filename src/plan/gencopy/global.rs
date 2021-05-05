@@ -22,7 +22,7 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::{OpaquePointer, VMWorkerThread};
+use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
 use crate::{plan::global::BasePlan, util::side_metadata::SideMetadataSpec};

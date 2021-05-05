@@ -141,7 +141,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     pub fn alloc(&self, tls: VMThread, size: usize) -> Address {
         // TODO: Should refactor this and Space.acquire()
         if VM::VMActivePlan::global().poll(false, self) {
-            assert!(unsafe { VM::VMActivePlan::is_mutator(tls) }, "Polling in GC worker");
+            assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
             VM::VMCollection::block_for_gc(VMMutatorThread(tls));
             return unsafe { Address::zero() };
         }

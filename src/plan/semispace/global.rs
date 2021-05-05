@@ -20,7 +20,7 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::{OpaquePointer, VMWorkerThread};
+use crate::util::VMWorkerThread;
 use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};

@@ -131,7 +131,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             // Try to allocate using the slow path
             let result = self.alloc_slow_once(size, align, offset);
 
-            if !unsafe { VM::VMActivePlan::is_mutator(tls) } {
+            if !VM::VMActivePlan::is_mutator(tls) {
                 debug_assert!(!result.is_zero());
                 return result;
             }

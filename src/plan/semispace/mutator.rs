@@ -6,7 +6,7 @@ use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
-use crate::util::{OpaquePointer, VMMutatorThread, VMWorkerThread};
+use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;

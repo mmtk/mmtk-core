@@ -22,7 +22,7 @@ use crate::util::heap::VMRequest;
 use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
-use crate::util::{OpaquePointer, VMMutatorThread, VMWorkerThread};
+use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};

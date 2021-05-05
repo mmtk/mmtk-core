@@ -123,8 +123,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
             self.acquire_block(size, align, offset, true)
         } else {
             let base = &self.plan.base();
-            let is_mutator =
-                unsafe { VM::VMActivePlan::is_mutator(self.tls) } && self.plan.is_initialized();
+            let is_mutator = VM::VMActivePlan::is_mutator(self.tls) && self.plan.is_initialized();
 
             if is_mutator
                 && base.allocation_bytes.load(Ordering::SeqCst) > base.options.stress_factor

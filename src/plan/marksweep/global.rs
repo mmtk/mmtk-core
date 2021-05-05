@@ -20,7 +20,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::{OpaquePointer, VMWorkerThread};
+use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use std::sync::Arc;
 

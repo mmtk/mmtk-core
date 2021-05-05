@@ -1,6 +1,6 @@
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWork, GCWorker};
-use crate::util::{ObjectReference, OpaquePointer, VMWorkerThread};
+use crate::util::{ObjectReference, VMWorkerThread};
 use crate::vm::{Collection, VMBinding};
 use crate::MMTK;
 use std::marker::PhantomData;

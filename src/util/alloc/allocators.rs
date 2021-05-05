@@ -7,7 +7,7 @@ use crate::policy::space::Space;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::{Allocator, BumpAllocator};
-use crate::util::{OpaquePointer, VMMutatorThread};
+use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 
 const MAX_BUMP_ALLOCATORS: usize = 5;
