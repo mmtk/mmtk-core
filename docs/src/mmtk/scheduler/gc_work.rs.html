@@ -478,6 +478,17 @@
 <span id="475">475</span>
 <span id="476">476</span>
 <span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">work_bucket</span>::<span class="ident">WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -659,6 +670,7 @@
                 <span class="kw">if</span> <span class="op">!</span><span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">stacks_prepared</span>() {
                     <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span>::<span class="ident">VMActivePlan</span>::<span class="ident">mutators</span>() {
                         <span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span>::<span class="ident">VMCollection</span>::<span class="ident">prepare_mutator</span>(
+                            <span class="ident">worker</span>.<span class="ident">tls</span>,
                             <span class="ident">mutator</span>.<span class="ident">get_tls</span>(),
                             <span class="ident">mutator</span>,
                         );
@@ -692,6 +704,11 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">EndOfGC</span> {
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;End of GC&quot;</span>);
+
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+        <span class="comment">// reset the logging info at the end of each GC</span>
+        <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">edge_logger</span>::<span class="ident">reset</span>();
+
         <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus</span>::<span class="ident">NotInGC</span>);
         <span class="op">&lt;</span><span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span>::<span class="ident">VMCollection</span>::<span class="ident">resume_mutators</span>(<span class="ident">worker</span>.<span class="ident">tls</span>);
     }
@@ -801,6 +818,11 @@
     <span class="comment">// Requires an MMTk reference. Each plan-specific type that uses ProcessEdgesBase can get a static plan reference</span>
     <span class="comment">// at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+        <span class="kw">for</span> <span class="ident">edge</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">edges</span> {
+            <span class="comment">// log edge, panic if already logged</span>
+            <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">edge_logger</span>::<span class="ident">log_edge</span>(<span class="kw-2">*</span><span class="ident">edge</span>);
+        }
         <span class="self">Self</span> {
             <span class="ident">edges</span>,
             <span class="ident">nodes</span>: <span class="macro">vec</span><span class="macro">!</span>[],

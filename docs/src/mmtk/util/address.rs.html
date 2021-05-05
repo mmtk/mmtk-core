@@ -514,6 +514,8 @@
 <span id="511">511</span>
 <span id="512">512</span>
 <span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">atomic_traits</span>::<span class="ident">Atomic</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>;
@@ -589,7 +591,9 @@
     <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ByteSize</span> {
         <span class="macro">debug_assert</span><span class="macro">!</span>(
             <span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">other</span>.<span class="number">0</span>,
-            <span class="string">&quot;for (addr_a - addr_b), a needs to be larger than b&quot;</span>
+            <span class="string">&quot;for (addr_a - addr_b), a({}) needs to be larger than b({})&quot;</span>,
+            <span class="self">self</span>,
+            <span class="ident">other</span>
         );
         <span class="self">self</span>.<span class="number">0</span> <span class="op">-</span> <span class="ident">other</span>.<span class="number">0</span>
     }
