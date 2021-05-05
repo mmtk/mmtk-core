@@ -870,9 +870,6 @@
 <span id="867">867</span>
 <span id="868">868</span>
 <span id="869">869</span>
-<span id="870">870</span>
-<span id="871">871</span>
-<span id="872">872</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! The global part of a plan implementation.</span>
 
@@ -1217,8 +1214,6 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub</span> <span class="ident">max_collection_attempts</span>: <span class="ident">AtomicUsize</span>,
     <span class="comment">// Current collection attempt</span>
     <span class="kw">pub</span> <span class="ident">cur_collection_attempts</span>: <span class="ident">AtomicUsize</span>,
-    <span class="comment">// Lock used for out of memory handling</span>
-    <span class="kw">pub</span> <span class="ident">oom_lock</span>: <span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">control_collector_context</span>: <span class="ident">ControllerCollectorContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">stats</span>: <span class="ident">Stats</span>,
     <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
@@ -1334,7 +1329,6 @@ BasePlan should contain all plan-related state and functions that are _fundament
             <span class="ident">allocation_success</span>: <span class="ident">AtomicBool</span>::<span class="ident">new</span>(<span class="bool-val">false</span>),
             <span class="ident">max_collection_attempts</span>: <span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>),
             <span class="ident">cur_collection_attempts</span>: <span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>),
-            <span class="ident">oom_lock</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(()),
             <span class="ident">control_collector_context</span>: <span class="ident">ControllerCollectorContext</span>::<span class="ident">new</span>(),
             <span class="ident">stats</span>,
             <span class="ident">mmapper</span>,

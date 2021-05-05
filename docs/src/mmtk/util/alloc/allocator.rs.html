@@ -203,18 +203,6 @@
 <span id="200">200</span>
 <span id="201">201</span>
 <span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
-<span id="209">209</span>
-<span id="210">210</span>
-<span id="211">211</span>
-<span id="212">212</span>
-<span id="213">213</span>
-<span id="214">214</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">address</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">DEFAULT_STRESS_FACTOR</span>;
@@ -355,18 +343,9 @@
             }
 
             <span class="kw">if</span> <span class="op">!</span><span class="ident">result</span>.<span class="ident">is_zero</span>() {
-                <span class="comment">// TODO: Check if we need oom lock.</span>
-                <span class="comment">// It seems the lock only protects access to the atomic boolean. We could possibly do</span>
-                <span class="comment">// so with compare and swap</span>
-
                 <span class="comment">// Report allocation success to assist OutOfMemory handling.</span>
                 <span class="kw">if</span> <span class="op">!</span><span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>) {
-                    <span class="comment">// XXX: Can we replace this with:</span>
-                    <span class="comment">// ALLOCATION_SUCCESS.store(1, Ordering::SeqCst);</span>
-                    <span class="comment">// (and get rid of the lock)</span>
-                    <span class="kw">let</span> <span class="ident">guard</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">oom_lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-                    <span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
-                    <span class="ident">drop</span>(<span class="ident">guard</span>);
+                    <span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
                 }
 
                 <span class="comment">// When a GC occurs, the resultant address provided by `acquire()` is 0x0.</span>
@@ -393,11 +372,8 @@
             <span class="kw">if</span> <span class="ident">emergency_collection</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">is_emergency_collection</span>() {
                 <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Emergency collection&quot;</span>);
                 <span class="comment">// Report allocation success to assist OutOfMemory handling.</span>
-                <span class="kw">let</span> <span class="ident">guard</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">oom_lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">fail_with_oom</span> <span class="op">=</span> <span class="op">!</span><span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
                 <span class="comment">// This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)</span>
-                <span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
-                <span class="ident">drop</span>(<span class="ident">guard</span>);
+                <span class="kw">let</span> <span class="ident">fail_with_oom</span> <span class="op">=</span> <span class="op">!</span><span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">swap</span>(<span class="bool-val">true</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
                 <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;fail with oom={}&quot;</span>, <span class="ident">fail_with_oom</span>);
                 <span class="kw">if</span> <span class="ident">fail_with_oom</span> {
                     <span class="ident">VM</span>::<span class="ident">VMCollection</span>::<span class="ident">out_of_memory</span>(<span class="ident">tls</span>);
