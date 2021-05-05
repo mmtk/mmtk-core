@@ -32,15 +32,6 @@ pub trait ActivePlan<VM: VMBinding> {
     // Possibly we should remove the use of this function, and remove this function?
     fn global() -> &'static dyn Plan<VM = VM>;
 
-    /// Return a `GCWorker` reference for the thread.
-    ///
-    /// Arguments:
-    /// * `tls`: The thread to query.
-    ///
-    /// # Safety
-    /// The caller needs to make sure that the thread is a GC worker thread.
-    unsafe fn worker(tls: OpaquePointer) -> &'static mut GCWorker<VM>;
-
     /// Return whether there is a mutator created and associated with the thread.
     ///
     /// Arguments:
