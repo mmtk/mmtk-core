@@ -177,7 +177,7 @@ pub trait Plan: 'static + Sync + Downcast {
 
     // unsafe because this can only be called once by the init thread
     fn gc_init(
-        &mut self,
+        &'static mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<Self::VM>>,
@@ -476,7 +476,7 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     pub fn gc_init(
-        &mut self,
+        &'static mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
@@ -493,14 +493,16 @@ impl<VM: VMBinding> BasePlan<VM> {
 
         #[cfg(feature = "base_spaces")]
         {
-            let unsync = unsafe { &mut *self.unsync.get() };
+            // let unsync = unsafe { &mut *self.unsync.get() };
+            let unsync = self.unsync.get_mut();
             #[cfg(feature = "code_space")]
             unsync.code_space.init(vm_map);
             #[cfg(feature = "ro_space")]
             unsync.ro_space.init(vm_map);
             #[cfg(feature = "vm_space")]
             {
-                unsync.vm_space.init(vm_map);
+                // borrow checker doesn't allow calling vm_space.init directly
+                unsync.vm_space.common().init(unsync.vm_space.as_space());
                 unsync.vm_space.ensure_mapped();
             }
         }
@@ -777,7 +779,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     pub fn gc_init(
-        &mut self,
+        &'static mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,

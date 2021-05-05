@@ -43,7 +43,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     type VM = VM;
 
     fn gc_init(
-        &mut self,
+        &'static mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,

@@ -70,7 +70,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         unreachable!()
     }
 
-    fn init(&mut self, _vm_map: &'static VMMap) {
+    fn init(&'static mut self, _vm_map: &'static VMMap) {
         // Do nothing
     }
 

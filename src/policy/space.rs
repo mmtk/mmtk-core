@@ -173,7 +173,12 @@ impl SFTMap {
 
     /// Update SFT map for the given address range.
     /// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-    pub fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, chunks: usize) {
+    pub fn update(
+        &self,
+        space: &'static (dyn SFT + Sync + 'static),
+        start: Address,
+        chunks: usize,
+    ) {
         if DEBUG_SFT {
             self.log_update(space, start, chunks);
         }
@@ -190,7 +195,7 @@ impl SFTMap {
         self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
 
-    fn set(&self, chunk: usize, sft: &(dyn SFT + Sync + 'static)) {
+    fn set(&self, chunk: usize, sft: &'static (dyn SFT + Sync + 'static)) {
         /*
          * This is safe (only) because a) this is only called during the
          * allocation and deallocation of chunks, which happens under a global
@@ -215,8 +220,8 @@ impl SFTMap {
             );
         }
         // We have an assumption that a Space is static that we never drop a space. Under this assumption, the following cast is correct.
-        let static_sft = unsafe { (sft as *const (dyn SFT + Sync + 'static)).as_ref().unwrap() };
-        self_mut.sft[chunk] = static_sft;
+        // let static_sft = unsafe { (sft as *const (dyn SFT + Sync + 'static)).as_ref().unwrap() };
+        self_mut.sft[chunk] = sft;
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
@@ -237,9 +242,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
-    fn init(&mut self, vm_map: &'static VMMap);
+    fn init(&'static mut self, vm_map: &'static VMMap);
 
-    fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
+    fn acquire(&'static self, tls: OpaquePointer, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
         // Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.
         let should_poll = unsafe { VM::VMActivePlan::is_mutator(tls) };
@@ -324,7 +329,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      * @param bytes The size of the newly allocated space
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */
-    fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
+    fn grow_space(&'static self, start: Address, bytes: usize, new_chunk: bool) {
         trace!(
             "Grow space from {} for {} bytes (new chunk = {})",
             start,
@@ -345,7 +350,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      *  Ensure this space is marked as mapped -- used when the space is already
      *  mapped (e.g. for a vm image which is externally mmapped.)
      */
-    fn ensure_mapped(&self) {
+    fn ensure_mapped(&'static self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
         if try_map_metadata_space(
             self.common().start,
@@ -546,7 +551,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
         rtn
     }
 
-    pub fn init(&self, space: &dyn Space<VM>) {
+    pub fn init(&self, space: &'static dyn Space<VM>) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
             if try_map_metadata_address_range(

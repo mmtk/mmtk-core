@@ -80,7 +80,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
-    fn init(&mut self, _vm_map: &'static VMMap) {}
+    fn init(&'static mut self, _vm_map: &'static VMMap) {}
 
     fn common(&self) -> &CommonSpace<VM> {
         &self.common
@@ -185,7 +185,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    pub fn allocate_pages(&self, tls: OpaquePointer, pages: usize) -> Address {
+    pub fn allocate_pages(&'static self, tls: OpaquePointer, pages: usize) -> Address {
         let start = self.acquire(tls, pages);
         if start.is_zero() {
             return start;

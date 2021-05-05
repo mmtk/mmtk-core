@@ -64,7 +64,7 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
         &self.common
     }
 
-    fn init(&mut self, _vm_map: &'static VMMap) {
+    fn init(&'static mut self, _vm_map: &'static VMMap) {
         self.common().init(self.as_space());
     }
     fn release_multiple_pages(&mut self, _start: Address) {
