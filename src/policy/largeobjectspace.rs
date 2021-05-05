@@ -9,7 +9,7 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use crate::util::treadmill::TreadMill;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
@@ -185,7 +185,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    pub fn allocate_pages(&self, tls: OpaquePointer, pages: usize) -> Address {
+    pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Address {
         let start = self.acquire(tls, pages);
         if start.is_zero() {
             return start;

@@ -7,7 +7,7 @@ use crate::policy::space::Space;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::{Allocator, BumpAllocator};
-use crate::util::OpaquePointer;
+use crate::util::{OpaquePointer, VMMutatorThread};
 use crate::vm::VMBinding;
 
 const MAX_BUMP_ALLOCATORS: usize = 5;
@@ -58,7 +58,7 @@ impl<VM: VMBinding> Allocators<VM> {
     }
 
     pub fn new(
-        mutator_tls: OpaquePointer,
+        mutator_tls: VMMutatorThread,
         plan: &'static dyn Plan<VM = VM>,
         space_mapping: &[(AllocatorSelector, &'static dyn Space<VM>)],
     ) -> Self {
@@ -72,21 +72,21 @@ impl<VM: VMBinding> Allocators<VM> {
             match selector {
                 AllocatorSelector::BumpPointer(index) => {
                     ret.bump_pointer[index as usize].write(BumpAllocator::new(
-                        mutator_tls,
+                        mutator_tls.0,
                         space,
                         plan,
                     ));
                 }
                 AllocatorSelector::LargeObject(index) => {
                     ret.large_object[index as usize].write(LargeObjectAllocator::new(
-                        mutator_tls,
+                        mutator_tls.0,
                         space.downcast_ref::<LargeObjectSpace<VM>>().unwrap(),
                         plan,
                     ));
                 }
                 AllocatorSelector::Malloc(index) => {
                     ret.malloc[index as usize].write(MallocAllocator::new(
-                        mutator_tls,
+                        mutator_tls.0,
                         space.downcast_ref::<MallocSpace<VM>>().unwrap(),
                         plan,
                     ));

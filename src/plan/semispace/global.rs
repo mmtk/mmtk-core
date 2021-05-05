@@ -20,7 +20,7 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::OpaquePointer;
+use crate::util::{OpaquePointer, VMWorkerThread};
 use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,7 +54,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = SSCopyContext::new(mmtk);
@@ -103,7 +103,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
 
         self.hi
@@ -114,7 +114,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.copyspace1.prepare(!hi);
     }
 
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         // release the collected region
         self.fromspace().release();

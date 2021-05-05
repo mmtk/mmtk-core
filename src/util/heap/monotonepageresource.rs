@@ -7,7 +7,7 @@ use std::sync::{Mutex, MutexGuard};
 use crate::util::alloc::embedded_meta_data::*;
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use crate::util::heap::pageresource::CommonPageResource;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 
 use super::layout::map::Map;
 use super::pageresource::{PRAllocFail, PRAllocResult};
@@ -64,7 +64,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         immut_required_pages: usize,
-        tls: OpaquePointer,
+        tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
         debug!(
             "In MonotonePageResource, reserved_pages = {}, required_pages = {}",

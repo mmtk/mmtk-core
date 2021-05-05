@@ -20,7 +20,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::OpaquePointer;
+use crate::util::{OpaquePointer, VMWorkerThread};
 use crate::vm::VMBinding;
 use std::sync::Arc;
 
@@ -74,12 +74,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
         // Dont need to prepare for MallocSpace
     }
 
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&self, tls: VMWorkerThread) {
         trace!("Marksweep: Release");
         self.common.release(tls, true);
         self.ms.release_all_chunks();
@@ -111,7 +111,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = NoCopy::new(mmtk);

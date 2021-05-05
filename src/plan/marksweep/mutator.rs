@@ -5,17 +5,17 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::allocators::Allocators;
-use crate::util::OpaquePointer;
+use crate::util::{OpaquePointer, VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::Plan;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn ms_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
+pub fn ms_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // Do nothing
 }
 
-pub fn ms_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
+pub fn ms_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // Do nothing
 }
 
@@ -28,7 +28,7 @@ lazy_static! {
 }
 
 pub fn create_ms_mutator<VM: VMBinding>(
-    mutator_tls: OpaquePointer,
+    mutator_tls: VMMutatorThread,
     plan: &'static dyn Plan<VM = VM>,
 ) -> Mutator<VM> {
     let ms = plan.downcast_ref::<MarkSweep<VM>>().unwrap();

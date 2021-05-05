@@ -5,7 +5,7 @@ use crate::plan::global::Plan;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::policy::space::Space;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::OpaquePointer;
+use crate::util::{OpaquePointer, VMMutatorThread, VMWorkerThread};
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
@@ -24,8 +24,8 @@ pub struct MutatorConfig<VM: VMBinding> {
     #[allow(clippy::box_vec)]
     pub space_mapping: Box<SpaceMapping<VM>>,
     // Plan-specific code for mutator prepare/release
-    pub prepare_func: &'static (dyn Fn(&mut Mutator<VM>, OpaquePointer) + Send + Sync),
-    pub release_func: &'static (dyn Fn(&mut Mutator<VM>, OpaquePointer) + Send + Sync),
+    pub prepare_func: &'static (dyn Fn(&mut Mutator<VM>, VMWorkerThread) + Send + Sync),
+    pub release_func: &'static (dyn Fn(&mut Mutator<VM>, VMWorkerThread) + Send + Sync),
 }
 
 /// A mutator is a per-thread data structure that manages allocations and barriers. It is usually highly coupled with the language VM.
@@ -40,16 +40,16 @@ pub struct MutatorConfig<VM: VMBinding> {
 pub struct Mutator<VM: VMBinding> {
     pub allocators: Allocators<VM>,
     pub barrier: Box<dyn Barrier>,
-    pub mutator_tls: OpaquePointer,
+    pub mutator_tls: VMMutatorThread,
     pub plan: &'static dyn Plan<VM = VM>,
     pub config: MutatorConfig<VM>,
 }
 
 impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
-    fn prepare(&mut self, tls: OpaquePointer) {
+    fn prepare(&mut self, tls: VMWorkerThread) {
         (*self.config.prepare_func)(self, tls)
     }
-    fn release(&mut self, tls: OpaquePointer) {
+    fn release(&mut self, tls: VMWorkerThread) {
         (*self.config.release_func)(self, tls)
     }
 
@@ -78,7 +78,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         .initialize_header(refer, true)
     }
 
-    fn get_tls(&self) -> OpaquePointer {
+    fn get_tls(&self) -> VMMutatorThread {
         self.mutator_tls
     }
 
@@ -93,8 +93,8 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
 // TODO: We should be able to remove this trait, as we removed per-plan mutator implementation, and there is no other type that implements this trait.
 // The Mutator struct above is the only type that implements this trait. We should be able to merge them.
 pub trait MutatorContext<VM: VMBinding>: Send + 'static {
-    fn prepare(&mut self, tls: OpaquePointer);
-    fn release(&mut self, tls: OpaquePointer);
+    fn prepare(&mut self, tls: VMWorkerThread);
+    fn release(&mut self, tls: VMWorkerThread);
     fn alloc(
         &mut self,
         size: usize,
@@ -109,7 +109,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn flush(&mut self) {
         self.flush_remembered_sets();
     }
-    fn get_tls(&self) -> OpaquePointer;
+    fn get_tls(&self) -> VMMutatorThread;
     fn barrier(&mut self) -> &mut dyn Barrier;
 
     fn record_modified_node(&mut self, obj: ObjectReference) {

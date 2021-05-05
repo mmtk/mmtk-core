@@ -22,7 +22,7 @@ use crate::util::heap::VMRequest;
 use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
-use crate::util::OpaquePointer;
+use crate::util::{OpaquePointer, VMMutatorThread, VMWorkerThread};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
@@ -39,7 +39,7 @@ use std::sync::{Arc, Mutex};
 pub trait CopyContext: 'static + Send {
     type VM: VMBinding;
     fn constraints(&self) -> &'static PlanConstraints;
-    fn init(&mut self, tls: OpaquePointer);
+    fn init(&mut self, tls: VMWorkerThread);
     fn prepare(&mut self);
     fn release(&mut self);
     fn alloc_copy(
@@ -83,7 +83,7 @@ pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     type VM = VM;
 
-    fn init(&mut self, _tls: OpaquePointer) {}
+    fn init(&mut self, _tls: VMWorkerThread) {}
     fn constraints(&self) -> &'static PlanConstraints {
         unreachable!()
     }
@@ -108,13 +108,13 @@ impl<VM: VMBinding> NoCopy<VM> {
 }
 
 impl<VM: VMBinding> WorkerLocal for NoCopy<VM> {
-    fn init(&mut self, tls: OpaquePointer) {
+    fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
 }
 
 pub fn create_mutator<VM: VMBinding>(
-    tls: OpaquePointer,
+    tls: VMMutatorThread,
     mmtk: &'static MMTK<VM>,
 ) -> Box<Mutator<VM>> {
     Box::new(match mmtk.options.plan {
@@ -160,7 +160,7 @@ pub trait Plan: 'static + Sync + Downcast {
     fn constraints(&self) -> &'static PlanConstraints;
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr;
     fn base(&self) -> &BasePlan<Self::VM>;
@@ -208,8 +208,8 @@ pub trait Plan: 'static + Sync + Downcast {
         self.base().initialized.load(Ordering::SeqCst)
     }
 
-    fn prepare(&self, tls: OpaquePointer);
-    fn release(&self, tls: OpaquePointer);
+    fn prepare(&self, tls: VMWorkerThread);
+    fn release(&self, tls: VMWorkerThread);
 
     fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
         if self.collection_required(space_full, space) {
@@ -284,7 +284,7 @@ pub trait Plan: 'static + Sync + Downcast {
         self.get_total_pages() - self.get_pages_used()
     }
 
-    fn handle_user_collection_request(&self, tls: OpaquePointer, force: bool) {
+    fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
         if force || !self.options().ignore_system_g_c {
             info!("User triggerring collection");
             self.base()
@@ -574,7 +574,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         panic!("No special case for space in trace_object({:?})", _object);
     }
 
-    pub fn prepare(&self, _tls: OpaquePointer, _primary: bool) {
+    pub fn prepare(&self, _tls: VMWorkerThread, _primary: bool) {
         #[cfg(feature = "base_spaces")]
         let unsync = unsafe { &mut *self.unsync.get() };
         #[cfg(feature = "code_space")]
@@ -585,7 +585,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         unsync.vm_space.prepare();
     }
 
-    pub fn release(&self, _tls: OpaquePointer, _primary: bool) {
+    pub fn release(&self, _tls: VMWorkerThread, _primary: bool) {
         #[cfg(feature = "base_spaces")]
         let unsync = unsafe { &mut *self.unsync.get() };
         #[cfg(feature = "code_space")]
@@ -811,14 +811,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.trace_object::<T, C>(trace, object)
     }
 
-    pub fn prepare(&self, tls: OpaquePointer, primary: bool) {
+    pub fn prepare(&self, tls: VMWorkerThread, primary: bool) {
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.immortal.prepare();
         unsync.los.prepare(primary);
         self.base.prepare(tls, primary)
     }
 
-    pub fn release(&self, tls: OpaquePointer, primary: bool) {
+    pub fn release(&self, tls: VMWorkerThread, primary: bool) {
         let unsync = unsafe { &mut *self.unsync.get() };
         unsync.immortal.release();
         unsync.los.release(primary);

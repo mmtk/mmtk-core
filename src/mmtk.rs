@@ -9,7 +9,7 @@ use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -66,7 +66,7 @@ impl<VM: VMBinding> MMTK<VM> {
         }
     }
 
-    pub fn harness_begin(&self, tls: OpaquePointer) {
+    pub fn harness_begin(&self, tls: VMMutatorThread) {
         // FIXME Do a full heap GC if we have generational GC
         self.plan.handle_user_collection_request(tls, true);
         self.inside_harness.store(true, Ordering::SeqCst);

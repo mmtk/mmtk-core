@@ -31,3 +31,19 @@ impl OpaquePointer {
         self.0.is_null()
     }
 }
+
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct VMThread(pub OpaquePointer);
+
+impl VMThread {
+    pub const UNINITIALIZED: Self = Self(OpaquePointer::UNINITIALIZED);
+}
+
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct VMMutatorThread(pub VMThread);
+
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct VMWorkerThread(pub VMThread);

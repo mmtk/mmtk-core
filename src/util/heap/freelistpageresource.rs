@@ -14,7 +14,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::*;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
@@ -75,7 +75,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
-        tls: OpaquePointer,
+        tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
         debug_assert!(
             self.meta_data_pages_per_region == 0

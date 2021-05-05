@@ -10,7 +10,7 @@ use crate::vm::{ActivePlan, Collection, ObjectModel};
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 
 use crate::mmtk::SFT_MAP;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -245,7 +245,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
     fn init(&mut self, vm_map: &'static VMMap);
 
-    fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
+    fn acquire(&self, tls: VMThread, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
         // Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.
         let should_poll = unsafe { VM::VMActivePlan::is_mutator(tls) };
@@ -264,7 +264,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 panic!("Collection is not enabled.");
             }
             pr.clear_request(pages_reserved);
-            VM::VMCollection::block_for_gc(tls);
+            VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
@@ -301,7 +301,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
                     debug_assert!(gc_performed, "GC not performed when forced.");
                     pr.clear_request(pages_reserved);
-                    VM::VMCollection::block_for_gc(tls);
+                    VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
                     unsafe { Address::zero() }
                 }
             }

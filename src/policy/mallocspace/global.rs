@@ -8,7 +8,7 @@ use crate::util::heap::PageResource;
 use crate::util::malloc::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
@@ -138,10 +138,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    pub fn alloc(&self, tls: OpaquePointer, size: usize) -> Address {
+    pub fn alloc(&self, tls: VMThread, size: usize) -> Address {
         // TODO: Should refactor this and Space.acquire()
         if VM::VMActivePlan::global().poll(false, self) {
-            VM::VMCollection::block_for_gc(tls);
+            assert!(unsafe { VM::VMActivePlan::is_mutator(tls) }, "Polling in GC worker");
+            VM::VMCollection::block_for_gc(VMMutatorThread(tls));
             return unsafe { Address::zero() };
         }
 

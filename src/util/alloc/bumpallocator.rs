@@ -9,7 +9,7 @@ use crate::util::alloc::Allocator;
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::{ActivePlan, VMBinding};
 
 const BYTES_IN_PAGE: usize = 1 << 12;
@@ -18,7 +18,7 @@ const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 #[repr(C)]
 pub struct BumpAllocator<VM: VMBinding> {
-    pub tls: OpaquePointer,
+    pub tls: VMThread,
     cursor: Address,
     limit: Address,
     space: &'static dyn Space<VM>,
@@ -86,14 +86,14 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         }
     }
 
-    fn get_tls(&self) -> OpaquePointer {
+    fn get_tls(&self) -> VMThread {
         self.tls
     }
 }
 
 impl<VM: VMBinding> BumpAllocator<VM> {
     pub fn new(
-        tls: OpaquePointer,
+        tls: VMThread,
         space: &'static dyn Space<VM>,
         plan: &'static dyn Plan<VM = VM>,
     ) -> Self {

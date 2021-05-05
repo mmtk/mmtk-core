@@ -6,7 +6,7 @@ use std::sync::atomic::Ordering;
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::constants::*;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection};
 use downcast_rs::Downcast;
@@ -105,7 +105,7 @@ pub fn get_maximum_aligned_size<VM: VMBinding>(
 }
 
 pub trait Allocator<VM: VMBinding>: Downcast {
-    fn get_tls(&self) -> OpaquePointer;
+    fn get_tls(&self) -> VMThread;
 
     fn get_space(&self) -> &'static dyn Space<VM>;
     fn get_plan(&self) -> &'static dyn Plan<VM = VM>;

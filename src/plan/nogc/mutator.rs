@@ -5,7 +5,7 @@ use crate::plan::nogc::NoGC;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::OpaquePointer;
+use crate::util::{OpaquePointer, VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
@@ -16,12 +16,12 @@ lazy_static! {
     };
 }
 
-pub fn nogc_mutator_noop<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
+pub fn nogc_mutator_noop<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     unreachable!();
 }
 
 pub fn create_nogc_mutator<VM: VMBinding>(
-    mutator_tls: OpaquePointer,
+    mutator_tls: VMMutatorThread,
     plan: &'static dyn Plan<VM = VM>,
 ) -> Mutator<VM> {
     let config = MutatorConfig {

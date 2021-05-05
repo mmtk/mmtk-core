@@ -1,6 +1,6 @@
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWork, GCWorker};
-use crate::util::{ObjectReference, OpaquePointer};
+use crate::util::{ObjectReference, OpaquePointer, VMWorkerThread};
 use crate::vm::{Collection, VMBinding};
 use crate::MMTK;
 use std::marker::PhantomData;
@@ -47,7 +47,7 @@ impl FinalizableProcessor {
         e.trace_object(object)
     }
 
-    pub fn scan<E: ProcessEdgesWork>(&mut self, tls: OpaquePointer, e: &mut E, nursery: bool) {
+    pub fn scan<E: ProcessEdgesWork>(&mut self, tls: VMWorkerThread, e: &mut E, nursery: bool) {
         let start = if nursery { self.nursery_index } else { 0 };
 
         // We should go through ready_for_finalize objects and keep them alive.
