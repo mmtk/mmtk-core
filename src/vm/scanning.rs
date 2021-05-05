@@ -2,7 +2,7 @@ use crate::plan::{Mutator, TransitiveClosure};
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::GCWorker;
 use crate::util::ObjectReference;
-use crate::util::{OpaquePointer, VMWorkerThread};
+use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 
 /// VM-specific methods for scanning roots/objects.
@@ -26,7 +26,7 @@ pub trait Scanning<VM: VMBinding> {
     fn scan_object<T: TransitiveClosure>(
         trace: &mut T,
         object: ObjectReference,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
     );
 
     /// MMTk calls this method at the first time during a collection that thread's stacks

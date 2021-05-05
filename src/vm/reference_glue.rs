@@ -1,7 +1,7 @@
 use crate::plan::TraceLocal;
+use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
 /// VM-specific methods for reference processing.

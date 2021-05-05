@@ -5,8 +5,8 @@ use crate::plan::global::Plan;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::policy::space::Space;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::util::{Address, ObjectReference};
+use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 
 use enum_map::EnumMap;

@@ -1,6 +1,6 @@
 use mmtk::Plan;
 use mmtk::vm::ActivePlan;
-use mmtk::util::OpaquePointer;
+use mmtk::util::opaque_pointer::*;
 use mmtk::scheduler::*;
 use mmtk::Mutator;
 use DummyVM;
@@ -13,7 +13,7 @@ impl ActivePlan<DummyVM> for VMActivePlan {
         &*SINGLETON.plan
     }
 
-    unsafe fn worker(_tls: OpaquePointer) -> &'static mut GCWorker<DummyVM> {
+    fn worker(_tls: VMWorkerThread) -> &'static mut GCWorker<DummyVM> {
         unimplemented!()
     }
 
@@ -21,12 +21,12 @@ impl ActivePlan<DummyVM> for VMActivePlan {
         unimplemented!()
     }
 
-    unsafe fn is_mutator(_tls: OpaquePointer) -> bool {
+    fn is_mutator(_tls: VMThread) -> bool {
         // FIXME
         true
     }
 
-    unsafe fn mutator(_tls: OpaquePointer) -> &'static mut Mutator<DummyVM> {
+    fn mutator(_tls: VMMutatorThread) -> &'static mut Mutator<DummyVM> {
         unimplemented!()
     }
 

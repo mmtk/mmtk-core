@@ -5,8 +5,8 @@ use std::vec::Vec;
 use crate::plan::TraceLocal;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
-use crate::vm::VMBinding;
 use crate::vm::ReferenceGlue;
+use crate::vm::VMBinding;
 
 pub struct ReferenceProcessors {
     soft: ReferenceProcessor,
