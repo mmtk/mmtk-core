@@ -8,7 +8,7 @@ pub struct PageAccounting {
     /// Note this is different than quarantining address range. We do not count for quarantined
     /// memory.
     reserved: AtomicUsize,
-    /// The committed pages. This should be incremented when we succesfully allocate pages from the OS.
+    /// The committed pages. This should be incremented when we successfully allocate pages from the OS.
     committed: AtomicUsize,
 }
 
@@ -20,28 +20,39 @@ impl PageAccounting {
         }
     }
 
+    /// Inform of both reserving and committing a certain number of pages.
     pub fn reserve_and_commit(&self, pages: usize) {
         self.reserved.fetch_add(pages, Ordering::Relaxed);
         self.committed.fetch_add(pages, Ordering::Relaxed);
     }
 
+    /// Inform of reserving a certain number of pages. Usually this is called before attempting
+    /// to allocate memory.
     pub fn reserve(&self, pages: usize) {
         self.reserved.fetch_add(pages, Ordering::Relaxed);
     }
 
+    /// Inform of clearing some reserved pages. This is used when we have reserved some pages but
+    /// the allocation cannot be satisfied. We can call this to clear the number of reserved pages,
+    /// so later we can reserve and attempt again.
     pub fn clear_reserved(&self, pages: usize) {
         self.reserved.fetch_sub(pages, Ordering::Relaxed);
     }
 
+    /// Inform of successfully committing a certain number of pages. This is used after we have reserved
+    /// pages and successfully allocated those memory.
     pub fn commit(&self, pages: usize) {
         self.committed.fetch_add(pages, Ordering::Relaxed);
     }
 
+    /// Inform of releasing a certain number of pages. The number of pages will be deducted from
+    /// both reserved and committed pages.
     pub fn release(&self, pages: usize) {
         self.reserved.fetch_sub(pages, Ordering::Relaxed);
         self.committed.fetch_sub(pages, Ordering::Relaxed);
     }
 
+    /// Set both reserved and committed pages to zero. This is only used when we completely clear a space.
     pub fn reset(&self) {
         self.reserved.store(0, Ordering::Relaxed);
         self.committed.store(0, Ordering::Relaxed);
