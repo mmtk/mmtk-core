@@ -70,7 +70,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         panic!("immortalspace only releases pages enmasse")
     }
 
-    fn init(&'static mut self, _vm_map: &'static VMMap) {
+    fn init(&mut self, _vm_map: &'static VMMap) {
         let total_pages = VM::VMActivePlan::global()
             .base()
             .heap

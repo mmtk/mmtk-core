@@ -52,7 +52,7 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         &self.common
     }
 
-    fn init(&'static mut self, _vm_map: &'static VMMap) {
+    fn init(&mut self, _vm_map: &'static VMMap) {
         self.common().init(self.as_space());
     }
 

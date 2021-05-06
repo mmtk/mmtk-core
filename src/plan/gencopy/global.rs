@@ -78,7 +78,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn gc_init(
-        &'static mut self,
+        &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
