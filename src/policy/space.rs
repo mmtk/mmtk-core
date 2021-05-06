@@ -100,16 +100,16 @@ impl SFT for EmptySpaceSFT {
 }
 
 #[derive(Default)]
-pub struct SFTMap {
-    sft: Vec<&'static (dyn SFT + Sync + 'static)>,
+pub struct SFTMap<'a> {
+    sft: Vec<&'a (dyn SFT + Sync + 'static)>,
 }
 
 // TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
-unsafe impl Sync for SFTMap {}
+unsafe impl<'a> Sync for SFTMap<'a> {}
 
 static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
-impl SFTMap {
+impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
         SFTMap {
             sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
@@ -124,7 +124,7 @@ impl SFTMap {
         &mut *(self as *const _ as *mut _)
     }
 
-    pub fn get(&self, address: Address) -> &'static dyn SFT {
+    pub fn get(&self, address: Address) -> &'a dyn SFT {
         let res = self.sft[address.chunk_index()];
         if DEBUG_SFT {
             trace!(
@@ -200,7 +200,7 @@ impl SFTMap {
          * which are reasonable), and in the other case it would either see the
          * old (valid) space or an empty space, both of which are valid.
          */
-        let self_mut: &mut Self = unsafe { self.mut_self() };
+        let self_mut = unsafe { self.mut_self() };
         // It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
         if cfg!(debug_assertions) {
             let old = self_mut.sft[chunk].name();
@@ -214,9 +214,7 @@ impl SFTMap {
                 new
             );
         }
-        // We have an assumption that a Space is static that we never drop a space. Under this assumption, the following cast is correct.
-        let static_sft = unsafe { (sft as *const (dyn SFT + Sync + 'static)).as_ref().unwrap() };
-        self_mut.sft[chunk] = static_sft;
+        self_mut.sft[chunk] = sft;
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
