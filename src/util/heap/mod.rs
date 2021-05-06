@@ -1,3 +1,4 @@
+mod accounting;
 #[macro_use]
 pub mod layout;
 pub mod freelistpageresource;
@@ -7,6 +8,7 @@ pub mod pageresource;
 pub mod space_descriptor;
 mod vmrequest;
 
+pub use self::accounting::PageAccounting;
 pub use self::freelistpageresource::FreeListPageResource;
 pub use self::heap_meta::HeapMeta;
 pub use self::monotonepageresource::MonotonePageResource;

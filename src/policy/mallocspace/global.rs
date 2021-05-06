@@ -11,6 +11,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
 use crate::scheduler::*;
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
@@ -37,6 +38,7 @@ pub struct MallocSpace<VM: VMBinding> {
     active_bytes: AtomicUsize,
     chunk_addr_min: AtomicUsize, // XXX: have to use AtomicUsize to represent an Address
     chunk_addr_max: AtomicUsize,
+    metadata: SideMetadata,
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
@@ -147,6 +149,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
     fn reserved_pages(&self) -> usize {
         conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst))
+            + self.metadata.reserved_pages()
     }
 }
 
@@ -204,12 +207,16 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
 }
 
 impl<VM: VMBinding> MallocSpace<VM> {
-    pub fn new() -> Self {
+    pub fn new(global_side_metadata_specs: Vec<SideMetadataSpec>) -> Self {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
             chunk_addr_min: AtomicUsize::new(usize::max_value()), // XXX: have to use AtomicUsize to represent an Address
             chunk_addr_max: AtomicUsize::new(0),
+            metadata: SideMetadata::new(SideMetadataContext {
+                global: global_side_metadata_specs,
+                local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
+            }),
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
             #[cfg(debug_assertions)]
@@ -303,7 +310,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     #[inline]
     fn map_meta_space_for_chunk(&self, chunk_start: Address) {
         // Map the metadata space for chunk
-        map_chunk_meta_space(chunk_start);
+        map_chunk_meta_space(&self.metadata, chunk_start);
 
         // Update the bounds of the max and min chunk addresses seen -- this is used later in the sweep
         // Lockless compare-and-swap loops perform better than a locking variant
@@ -445,11 +452,5 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 );
             }
         }
-    }
-}
-
-impl<VM: VMBinding> Default for MallocSpace<VM> {
-    fn default() -> Self {
-        Self::new()
     }
 }

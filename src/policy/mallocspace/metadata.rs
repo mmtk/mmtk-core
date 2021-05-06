@@ -10,8 +10,7 @@ use crate::util::side_metadata::{load, load_atomic};
 use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::side_metadata::{store, store_atomic};
 use crate::util::side_metadata::try_map_metadata_space;
-use crate::util::side_metadata::SideMetadataScope;
-use crate::util::side_metadata::SideMetadataSpec;
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataScope, SideMetadataSpec};
 #[cfg(target_pointer_width = "64")]
 use crate::util::side_metadata::{metadata_address_range_size, LOCAL_SIDE_METADATA_BASE_ADDRESS};
 use crate::util::side_metadata::GLOBAL_SIDE_METADATA_BASE_ADDRESS;
@@ -25,6 +24,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 
 static FIRST_CHUNK: AtomicBool = AtomicBool::new(true);
+static CHUNK_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext {
+                global: vec![ACTIVE_CHUNK_METADATA_SPEC],
+                local: vec![],
+            });
 
 // We use the following hashset to assert if bits are set/unset properly in side metadata.
 #[cfg(debug_assertions)]
@@ -112,11 +115,9 @@ pub fn is_meta_space_mapped(address: Address) -> bool {
 }
 
 fn map_chunk_mark_space(chunk_start: Address) {
-    if try_map_metadata_space(
+    if CHUNK_METADATA.try_map_metadata_space(
         chunk_start - 2048 * BYTES_IN_CHUNK, // start
-        4096 * BYTES_IN_CHUNK,               // size
-        &[ACTIVE_CHUNK_METADATA_SPEC],       // global metadata
-        &[],                                 // local metadata
+        4096 * BYTES_IN_CHUNK                // size
     )
     .is_err()
     {
@@ -130,7 +131,7 @@ fn map_chunk_mark_space(chunk_start: Address) {
     );
 }
 
-pub fn map_chunk_meta_space(chunk_start: Address) {
+pub fn map_chunk_meta_space(metadata: &SideMetadata, chunk_start: Address) {
     if FIRST_CHUNK.load(Ordering::Acquire) {
         map_chunk_mark_space(chunk_start);
         FIRST_CHUNK.store(false, Ordering::Release);
@@ -141,13 +142,7 @@ pub fn map_chunk_meta_space(chunk_start: Address) {
     }
 
     set_chunk_mark_bit(chunk_start);
-    let mmap_metadata_result = try_map_metadata_space(
-        chunk_start,
-        BYTES_IN_CHUNK,
-        &[],
-        // &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC]
-        &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC, ACTIVE_PAGE_METADATA_SPEC] // XXX: page-bit diff
-    );
+    let mmap_metadata_result = metadata.try_map_metadata_space(chunk_start, BYTES_IN_CHUNK);
     trace!("set chunk mark bit for {}", chunk_start);
     debug_assert!(
         mmap_metadata_result.is_ok(),

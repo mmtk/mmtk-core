@@ -191,16 +191,14 @@ mod tests {
                 log_min_obj_size: 1,
             };
 
-            let gspec_vec = vec![gspec];
-            let lspec_vec = vec![lspec];
+            let metadata = SideMetadata::new(SideMetadataContext {
+                global: vec![gspec],
+                local: vec![lspec],
+            });
 
-            assert!(try_map_metadata_space(
-                vm_layout_constants::HEAP_START,
-                constants::BYTES_IN_PAGE,
-                &gspec_vec,
-                &lspec_vec
-            )
-            .is_ok());
+            assert!(metadata
+                .try_map_metadata_space(vm_layout_constants::HEAP_START, constants::BYTES_IN_PAGE,)
+                .is_ok());
 
             ensure_metadata_is_mapped(gspec, vm_layout_constants::HEAP_START);
             ensure_metadata_is_mapped(lspec, vm_layout_constants::HEAP_START);
@@ -213,11 +211,9 @@ mod tests {
                 vm_layout_constants::HEAP_START + constants::BYTES_IN_PAGE - 1,
             );
 
-            ensure_unmap_metadata_space(
+            metadata.ensure_unmap_metadata_space(
                 vm_layout_constants::HEAP_START,
                 constants::BYTES_IN_PAGE,
-                &gspec_vec,
-                &lspec_vec,
             );
 
             gspec.log_min_obj_size = 3;
@@ -225,16 +221,17 @@ mod tests {
             lspec.log_min_obj_size = 4;
             lspec.log_num_of_bits = 2;
 
-            let gspec_vec = vec![gspec];
-            let lspec_vec = vec![lspec];
+            let metadata = SideMetadata::new(SideMetadataContext {
+                global: vec![gspec],
+                local: vec![lspec],
+            });
 
-            assert!(try_map_metadata_space(
-                vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
-                vm_layout_constants::BYTES_IN_CHUNK,
-                &gspec_vec,
-                &lspec_vec
-            )
-            .is_ok());
+            assert!(metadata
+                .try_map_metadata_space(
+                    vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
+                    vm_layout_constants::BYTES_IN_CHUNK,
+                )
+                .is_ok());
 
             ensure_metadata_is_mapped(
                 gspec,
@@ -253,11 +250,9 @@ mod tests {
                 vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * 2 - 16,
             );
 
-            ensure_unmap_metadata_space(
+            metadata.ensure_unmap_metadata_space(
                 vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                 vm_layout_constants::BYTES_IN_CHUNK,
-                &gspec_vec,
-                &lspec_vec,
             );
         })
     }
@@ -281,16 +276,14 @@ mod tests {
                 log_min_obj_size: 7,
             };
 
-            let gspec_vec = vec![metadata_1_spec, metadata_2_spec];
-            let empty_vec = vec![];
+            let metadata = SideMetadata::new(SideMetadataContext {
+                global: vec![metadata_1_spec, metadata_2_spec],
+                local: vec![],
+            });
 
-            assert!(try_map_metadata_space(
-                data_addr,
-                constants::BYTES_IN_PAGE,
-                &gspec_vec,
-                &empty_vec
-            )
-            .is_ok());
+            assert!(metadata
+                .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                .is_ok());
 
             let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
             assert_eq!(zero, 0);
@@ -316,12 +309,7 @@ mod tests {
             let three = load_atomic(metadata_2_spec, data_addr);
             assert_eq!(three, 3);
 
-            ensure_unmap_metadata_space(
-                data_addr,
-                constants::BYTES_IN_PAGE,
-                &gspec_vec,
-                &empty_vec,
-            );
+            metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
         })
     }
 
@@ -338,16 +326,14 @@ mod tests {
                 log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
             };
 
-            let gspec_vec = vec![metadata_1_spec];
-            let empty_vec = vec![];
+            let metadata = SideMetadata::new(SideMetadataContext {
+                global: vec![metadata_1_spec],
+                local: vec![],
+            });
 
-            assert!(try_map_metadata_space(
-                data_addr,
-                constants::BYTES_IN_PAGE,
-                &gspec_vec,
-                &empty_vec
-            )
-            .is_ok());
+            assert!(metadata
+                .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                .is_ok());
 
             let zero = fetch_add_atomic(metadata_1_spec, data_addr, 2);
             assert_eq!(zero, 0);
@@ -361,12 +347,7 @@ mod tests {
             let one = load_atomic(metadata_1_spec, data_addr);
             assert_eq!(one, 1);
 
-            ensure_unmap_metadata_space(
-                data_addr,
-                constants::BYTES_IN_PAGE,
-                &gspec_vec,
-                &empty_vec,
-            );
+            metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
         })
     }
 
@@ -410,16 +391,14 @@ mod tests {
                 log_min_obj_size: 7,
             };
 
-            let lspec_vec = vec![metadata_1_spec, metadata_2_spec];
-            let empty_vec = vec![];
+            let metadata = SideMetadata::new(SideMetadataContext {
+                global: vec![],
+                local: vec![metadata_1_spec, metadata_2_spec],
+            });
 
-            assert!(try_map_metadata_space(
-                data_addr,
-                constants::BYTES_IN_PAGE,
-                &empty_vec,
-                &lspec_vec
-            )
-            .is_ok());
+            assert!(metadata
+                .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                .is_ok());
 
             let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5);
             assert_eq!(zero, 0);
@@ -447,12 +426,7 @@ mod tests {
             let five = load_atomic(metadata_2_spec, data_addr);
             assert_eq!(five, 0);
 
-            ensure_unmap_metadata_space(
-                data_addr,
-                constants::BYTES_IN_PAGE,
-                &empty_vec,
-                &lspec_vec,
-            );
+            metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
         })
     }
 }
