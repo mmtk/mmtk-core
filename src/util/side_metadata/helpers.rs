@@ -33,7 +33,7 @@ pub(crate) fn address_to_contiguous_meta_address(
 pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
-    assert!(memory::try_munmap(start, size).is_ok())
+    assert!(memory::munmap(start, size).is_ok())
 }
 
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
@@ -99,10 +99,12 @@ pub(super) fn try_mmap_metadata_address_range(start: Address, size: usize) -> Re
 }
 
 /// Tries to map the specified metadata space (`start` and `size`), including reservation of swap-space/physical memory.
+/// This function should only be called if we have called try_mmap_metadata_address_range() first.
 pub(super) fn try_mmap_metadata(start: Address, size: usize) -> Result<()> {
     debug_assert!(size > 0 && size % BYTES_IN_PAGE == 0);
 
-    let res = memory::dzmmap(start, size);
+    // It is safe to call dzmmap here as we have reserved the address range.
+    let res = unsafe { memory::dzmmap(start, size) };
     trace!("try_mmap_metadata({}, 0x{:x}) -> {:#?}", start, size, res);
     res
 }

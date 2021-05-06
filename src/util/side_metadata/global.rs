@@ -225,7 +225,7 @@ pub fn ensure_metadata_is_mapped(metadata_spec: SideMetadataSpec, data_addr: Add
         data_addr, meta_start
     );
 
-    assert!(memory::check_is_mmapped(meta_start, BYTES_IN_PAGE).is_ok())
+    memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
 }
 
 #[inline(always)]

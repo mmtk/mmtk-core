@@ -109,7 +109,8 @@ impl Mmapper for FragmentedMapper {
                 match entry.load(Ordering::Relaxed) {
                     MapState::Unmapped => {
                         let mmap_start = Self::chunk_index_to_address(base, chunk);
-                        crate::util::memory::dzmmap(mmap_start, MMAP_CHUNK_BYTES).unwrap();
+                        crate::util::memory::dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES)
+                            .unwrap();
                         self.map_metadata(mmap_start, metadata)
                             .expect("failed to map metadata memory");
                     }
@@ -322,11 +323,15 @@ impl Default for FragmentedMapper {
 mod tests {
     use super::*;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
-    use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_START, MMAP_CHUNK_BYTES};
+    use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
+    use crate::util::memory;
     use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
+    use crate::util::test_util::FRAGMENTED_MMAPPER_TEST_REGION;
+    use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::{conversions, Address};
 
-    const FIXED_ADDRESS: Address = AVAILABLE_START;
+    const FIXED_ADDRESS: Address = FRAGMENTED_MMAPPER_TEST_REGION.start;
+    const MAX_BYTES: usize = FRAGMENTED_MMAPPER_TEST_REGION.size;
 
     lazy_static! {
         static ref NO_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext {
@@ -378,96 +383,150 @@ mod tests {
 
     #[test]
     fn ensure_mapped_1page() {
-        let mmapper = FragmentedMapper::new();
-        let pages = 1;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
+        serial_test(|| {
+            let pages = 1;
+            with_cleanup(
+                || {
+                    let mmapper = FragmentedMapper::new();
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
 
-        let chunks = pages_to_chunks_up(pages);
-        for i in 0..chunks {
-            assert_eq!(
-                get_chunk_map_state(&mmapper, FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)),
-                Some(MapState::Mapped)
-            );
-        }
+                    let chunks = pages_to_chunks_up(pages);
+                    for i in 0..chunks {
+                        assert_eq!(
+                            get_chunk_map_state(
+                                &mmapper,
+                                FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)
+                            ),
+                            Some(MapState::Mapped)
+                        );
+                    }
+                },
+                || {
+                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                },
+            )
+        })
     }
     #[test]
     fn ensure_mapped_1chunk() {
-        let mmapper = FragmentedMapper::new();
-        let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
+        serial_test(|| {
+            let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
+            with_cleanup(
+                || {
+                    let mmapper = FragmentedMapper::new();
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
 
-        let chunks = pages_to_chunks_up(pages);
-        for i in 0..chunks {
-            assert_eq!(
-                get_chunk_map_state(&mmapper, FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)),
-                Some(MapState::Mapped)
-            );
-        }
+                    let chunks = pages_to_chunks_up(pages);
+                    for i in 0..chunks {
+                        assert_eq!(
+                            get_chunk_map_state(
+                                &mmapper,
+                                FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)
+                            ),
+                            Some(MapState::Mapped)
+                        );
+                    }
+                },
+                || {
+                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                },
+            )
+        })
     }
 
     #[test]
     fn ensure_mapped_more_than_1chunk() {
-        let mmapper = FragmentedMapper::new();
-        let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
+        serial_test(|| {
+            let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
+            with_cleanup(
+                || {
+                    let mmapper = FragmentedMapper::new();
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
 
-        let chunks = pages_to_chunks_up(pages);
-        for i in 0..chunks {
-            assert_eq!(
-                get_chunk_map_state(&mmapper, FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)),
-                Some(MapState::Mapped)
-            );
-        }
+                    let chunks = pages_to_chunks_up(pages);
+                    for i in 0..chunks {
+                        assert_eq!(
+                            get_chunk_map_state(
+                                &mmapper,
+                                FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)
+                            ),
+                            Some(MapState::Mapped)
+                        );
+                    }
+                },
+                || {
+                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                },
+            )
+        })
     }
 
     #[test]
     fn protect() {
-        // map 2 chunks
-        let mmapper = FragmentedMapper::new();
-        let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    // map 2 chunks
+                    let mmapper = FragmentedMapper::new();
+                    let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
 
-        // protect 1 chunk
-        mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
+                    // protect 1 chunk
+                    mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
 
-        assert_eq!(
-            get_chunk_map_state(&mmapper, FIXED_ADDRESS),
-            Some(MapState::Protected)
-        );
-        assert_eq!(
-            get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
-            Some(MapState::Mapped)
-        );
+                    assert_eq!(
+                        get_chunk_map_state(&mmapper, FIXED_ADDRESS),
+                        Some(MapState::Protected)
+                    );
+                    assert_eq!(
+                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
+                        Some(MapState::Mapped)
+                    );
+                },
+                || {
+                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                },
+            )
+        })
     }
 
     #[test]
     fn ensure_mapped_on_protected_chunks() {
-        // map 2 chunks
-        let mmapper = FragmentedMapper::new();
-        let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    // map 2 chunks
+                    let mmapper = FragmentedMapper::new();
+                    let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
 
-        // protect 1 chunk
-        mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
+                    // protect 1 chunk
+                    mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
 
-        assert_eq!(
-            get_chunk_map_state(&mmapper, FIXED_ADDRESS),
-            Some(MapState::Protected)
-        );
-        assert_eq!(
-            get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
-            Some(MapState::Mapped)
-        );
+                    assert_eq!(
+                        get_chunk_map_state(&mmapper, FIXED_ADDRESS),
+                        Some(MapState::Protected)
+                    );
+                    assert_eq!(
+                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
+                        Some(MapState::Mapped)
+                    );
 
-        // ensure mapped - this will unprotect the previously protected chunk
-        mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
-        assert_eq!(
-            get_chunk_map_state(&mmapper, FIXED_ADDRESS),
-            Some(MapState::Mapped)
-        );
-        assert_eq!(
-            get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
-            Some(MapState::Mapped)
-        );
+                    // ensure mapped - this will unprotect the previously protected chunk
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
+                    assert_eq!(
+                        get_chunk_map_state(&mmapper, FIXED_ADDRESS),
+                        Some(MapState::Mapped)
+                    );
+                    assert_eq!(
+                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
+                        Some(MapState::Mapped)
+                    );
+                },
+                || {
+                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                },
+            )
+        })
     }
 }
