@@ -175,58 +175,17 @@
 <span id="172">172</span>
 <span id="173">173</span>
 <span id="174">174</span>
-<span id="175">175</span>
-<span id="176">176</span>
-<span id="177">177</span>
-<span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
-<span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
-<span id="199">199</span>
-<span id="200">200</span>
-<span id="201">201</span>
-<span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
-<span id="209">209</span>
-<span id="210">210</span>
-<span id="211">211</span>
-<span id="212">212</span>
-<span id="213">213</span>
-<span id="214">214</span>
-<span id="215">215</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">address</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">ActivePlan</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Mutex</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">layout</span>::<span class="ident">map</span>::<span class="ident">Map</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::<span class="ident">VMMap</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">space_descriptor</span>::<span class="ident">SpaceDescriptor</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">PageAccounting</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="lifetime">&#39;static</span> {
@@ -247,16 +206,12 @@
     <span class="comment">//      acquired a lock.</span>
     <span class="kw">fn</span> <span class="ident">reserve_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="kw">let</span> <span class="ident">adj_pages</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">adjust_for_metadata</span>(<span class="ident">pages</span>);
-        <span class="self">self</span>.<span class="ident">common</span>()
-            .<span class="ident">reserved</span>
-            .<span class="ident">fetch_add</span>(<span class="ident">adj_pages</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">reserve</span>(<span class="ident">adj_pages</span>);
         <span class="ident">adj_pages</span>
     }
 
     <span class="kw">fn</span> <span class="ident">clear_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">reserved_pages</span>: <span class="ident">usize</span>) {
-        <span class="self">self</span>.<span class="ident">common</span>()
-            .<span class="ident">reserved</span>
-            .<span class="ident">fetch_sub</span>(<span class="ident">reserved_pages</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">clear_reserved</span>(<span class="ident">reserved_pages</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">update_zeroing_approach</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_nontemporal</span>: <span class="ident">bool</span>, <span class="ident">concurrent</span>: <span class="ident">bool</span>) {
@@ -298,10 +253,8 @@
      */</span>
     <span class="kw">fn</span> <span class="ident">commit_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">reserved_pages</span>: <span class="ident">usize</span>, <span class="ident">actual_pages</span>: <span class="ident">usize</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
         <span class="kw">let</span> <span class="ident">delta</span> <span class="op">=</span> <span class="ident">actual_pages</span> <span class="op">-</span> <span class="ident">reserved_pages</span>;
-        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">reserved</span>.<span class="ident">fetch_add</span>(<span class="ident">delta</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
-        <span class="self">self</span>.<span class="ident">common</span>()
-            .<span class="ident">committed</span>
-            .<span class="ident">fetch_add</span>(<span class="ident">actual_pages</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">reserve</span>(<span class="ident">delta</span>);
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">commit</span>(<span class="ident">actual_pages</span>);
         <span class="kw">if</span> <span class="kw">unsafe</span> { <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="ident">tls</span>) } {
             <span class="self">self</span>.<span class="ident">vm_map</span>()
                 .<span class="ident">add_to_cumulative_committed_pages</span>(<span class="ident">actual_pages</span>);
@@ -309,11 +262,11 @@
     }
 
     <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">reserved</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>)
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">get_reserved_pages</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">committed_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">committed</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>)
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">get_committed_pages</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">CommonPageResource</span>;
@@ -332,9 +285,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PRAllocFail</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CommonPageResource</span> {
-    <span class="ident">reserved</span>: <span class="ident">AtomicUsize</span>,
-    <span class="ident">committed</span>: <span class="ident">AtomicUsize</span>,
-
+    <span class="kw">pub</span> <span class="ident">accounting</span>: <span class="ident">PageAccounting</span>,
     <span class="kw">pub</span> <span class="ident">contiguous</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">growable</span>: <span class="ident">bool</span>,
 
@@ -345,8 +296,7 @@
 <span class="kw">impl</span> <span class="ident">CommonPageResource</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">contiguous</span>: <span class="ident">bool</span>, <span class="ident">growable</span>: <span class="ident">bool</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">CommonPageResource</span> {
         <span class="ident">CommonPageResource</span> {
-            <span class="ident">reserved</span>: <span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>),
-            <span class="ident">committed</span>: <span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>),
+            <span class="ident">accounting</span>: <span class="ident">PageAccounting</span>::<span class="ident">new</span>(),
 
             <span class="ident">contiguous</span>,
             <span class="ident">growable</span>,
@@ -354,38 +304,6 @@
 
             <span class="ident">head_discontiguous_region</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">Address</span>::<span class="ident">ZERO</span>),
         }
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reserve</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) {
-        <span class="self">self</span>.<span class="ident">reserved</span>.<span class="ident">fetch_add</span>(<span class="ident">pages</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release_reserved</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) {
-        <span class="self">self</span>.<span class="ident">reserved</span>.<span class="ident">fetch_sub</span>(<span class="ident">pages</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_reserved</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">reserved</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>)
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_reserved</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">reserved</span>.<span class="ident">store</span>(<span class="number">0</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">commit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) {
-        <span class="self">self</span>.<span class="ident">committed</span>.<span class="ident">fetch_add</span>(<span class="ident">pages</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release_committed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) {
-        <span class="self">self</span>.<span class="ident">committed</span>.<span class="ident">fetch_sub</span>(<span class="ident">pages</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_committed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">committed</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>)
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_committed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">committed</span>.<span class="ident">store</span>(<span class="number">0</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
     }
 
     <span class="doccomment">/// Extend the virtual memory associated with a particular discontiguous</span>

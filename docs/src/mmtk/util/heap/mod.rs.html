@@ -15,7 +15,10 @@
 <span id="12">12</span>
 <span id="13">13</span>
 <span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
 </pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">mod</span> <span class="ident">accounting</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">layout</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">freelistpageresource</span>;
@@ -25,6 +28,7 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">space_descriptor</span>;
 <span class="kw">mod</span> <span class="ident">vmrequest</span>;
 
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">accounting</span>::<span class="ident">PageAccounting</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">freelistpageresource</span>::<span class="ident">FreeListPageResource</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">heap_meta</span>::<span class="ident">HeapMeta</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">monotonepageresource</span>::<span class="ident">MonotonePageResource</span>;

@@ -137,13 +137,19 @@
 <span id="134">134</span>
 <span id="135">135</span>
 <span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">SFT_MAP</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">address</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>::<span class="ident">bytes_to_chunks_up</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">PageResource</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">try_map_metadata_space</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
 
@@ -170,6 +176,7 @@
     <span class="ident">limit</span>: <span class="ident">Address</span>,
     <span class="doccomment">/// Zero memory after slow-path allocation</span>
     <span class="ident">slow_path_zeroing</span>: <span class="ident">bool</span>,
+    <span class="ident">metadata</span>: <span class="ident">SideMetadata</span>,
     <span class="ident">phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
 
@@ -227,13 +234,10 @@
         <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">AVAILABLE_START</span> <span class="op">+</span> <span class="ident">total_bytes</span>;
         <span class="comment">// Eagerly memory map the entire heap (also zero all the memory)</span>
         <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">memory</span>::<span class="ident">dzmmap_noreplace</span>(<span class="ident">AVAILABLE_START</span>, <span class="ident">total_bytes</span>).<span class="ident">unwrap</span>();
-        <span class="kw">if</span> <span class="ident">try_map_metadata_space</span>(
-            <span class="ident">AVAILABLE_START</span>,
-            <span class="ident">total_bytes</span>,
-            <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_specs</span>(),
-            <span class="self">self</span>.<span class="ident">local_side_metadata_specs</span>(),
-        )
-        .<span class="ident">is_err</span>()
+        <span class="kw">if</span> <span class="self">self</span>
+            .<span class="ident">metadata</span>
+            .<span class="ident">try_map_metadata_space</span>(<span class="ident">AVAILABLE_START</span>, <span class="ident">total_bytes</span>)
+            .<span class="ident">is_err</span>()
         {
             <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
             <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
@@ -247,7 +251,7 @@
 
     <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="kw">let</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>)) };
-        <span class="ident">conversions</span>::<span class="ident">bytes_to_pages_up</span>(<span class="self">self</span>.<span class="ident">limit</span> <span class="op">-</span> <span class="ident">cursor</span>)
+        <span class="ident">conversions</span>::<span class="ident">bytes_to_pages_up</span>(<span class="self">self</span>.<span class="ident">limit</span> <span class="op">-</span> <span class="ident">cursor</span>) <span class="op">+</span> <span class="self">self</span>.<span class="ident">metadata</span>.<span class="ident">reserved_pages</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">acquire</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
@@ -264,12 +268,20 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">LockFreeImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>, <span class="ident">slow_path_zeroing</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
+        <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
+        <span class="ident">slow_path_zeroing</span>: <span class="ident">bool</span>,
+        <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">name</span>,
             <span class="ident">cursor</span>: <span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="ident">AVAILABLE_START</span>.<span class="ident">as_usize</span>()),
             <span class="ident">limit</span>: <span class="ident">AVAILABLE_END</span>,
             <span class="ident">slow_path_zeroing</span>,
+            <span class="ident">metadata</span>: <span class="ident">SideMetadata</span>::<span class="ident">new</span>(<span class="ident">SideMetadataContext</span> {
+                <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
+                <span class="ident">local</span>: <span class="macro">vec</span><span class="macro">!</span>[],
+            }),
             <span class="ident">phantom</span>: <span class="ident">PhantomData</span>,
         }
     }

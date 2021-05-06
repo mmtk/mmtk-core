@@ -606,6 +606,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::side_metadata::SideMetadataContext;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
@@ -655,6 +656,7 @@ Instead, we will define the two copyspaces here.</li>
                 false,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &amp;mut heap,
@@ -678,6 +680,7 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
     ) -&gt; Self {
         // Modify
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&amp;[]);
 
         MyGC {
             hi: AtomicBool::new(false),
@@ -686,6 +689,7 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
                 false,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &amp;mut heap,
@@ -695,11 +699,12 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
                 true,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &amp;mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &amp;MYGC_CONSTRAINTS, &amp;[]),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &amp;MYGC_CONSTRAINTS, global_metadata_specs),
         }
     }
 <span class="boring">}

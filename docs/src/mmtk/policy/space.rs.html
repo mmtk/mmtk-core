@@ -597,10 +597,8 @@
 <span id="594">594</span>
 <span id="595">595</span>
 <span id="596">596</span>
-<span id="597">597</span>
-<span id="598">598</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">try_map_metadata_address_range</span>, <span class="ident">try_map_metadata_space</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">conversions</span>::<span class="kw-2">*</span>, <span class="ident">side_metadata</span>::<span class="ident">SideMetadataSpec</span>};
@@ -882,8 +880,7 @@
                     <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">mmapper</span>.<span class="ident">ensure_mapped</span>(
                         <span class="ident">res</span>.<span class="ident">start</span>,
                         <span class="ident">res</span>.<span class="ident">pages</span>,
-                        <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_specs</span>(),
-                        <span class="self">self</span>.<span class="ident">local_side_metadata_specs</span>(),
+                        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>().<span class="ident">metadata</span>,
                     );
 
                     <span class="comment">// TODO: Concurrent zeroing</span>
@@ -955,13 +952,11 @@
      */</span>
     <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">conversions</span>::<span class="ident">bytes_to_chunks_up</span>(<span class="self">self</span>.<span class="ident">common</span>().<span class="ident">extent</span>);
-        <span class="kw">if</span> <span class="ident">try_map_metadata_space</span>(
-            <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">start</span>,
-            <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">extent</span>,
-            <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_specs</span>(),
-            <span class="self">self</span>.<span class="ident">local_side_metadata_specs</span>(),
-        )
-        .<span class="ident">is_err</span>()
+        <span class="kw">if</span> <span class="self">self</span>
+            .<span class="ident">common</span>()
+            .<span class="ident">metadata</span>
+            .<span class="ident">try_map_metadata_space</span>(<span class="self">self</span>.<span class="ident">common</span>().<span class="ident">start</span>, <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">extent</span>)
+            .<span class="ident">is_err</span>()
         {
             <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
             <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
@@ -978,7 +973,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">get_page_resource</span>().<span class="ident">reserved_pages</span>()
+        <span class="self">self</span>.<span class="ident">get_page_resource</span>().<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">metadata</span>.<span class="ident">reserved_pages</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
@@ -1058,6 +1053,8 @@
     <span class="kw">pub</span> <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
     <span class="kw">pub</span> <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
 
+    <span class="kw">pub</span> <span class="ident">metadata</span>: <span class="ident">SideMetadata</span>,
+
     <span class="ident">p</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
 
@@ -1067,6 +1064,7 @@
     <span class="kw">pub</span> <span class="ident">immortal</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">zeroed</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">vmrequest</span>: <span class="ident">VMRequest</span>,
+    <span class="kw">pub</span> <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span>,
 }
 
 <span class="doccomment">/// Print debug info for SFT. Should be false when committed.</span>
@@ -1092,6 +1090,7 @@
             <span class="ident">head_discontiguous_region</span>: <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">zero</span>() },
             <span class="ident">vm_map</span>,
             <span class="ident">mmapper</span>,
+            <span class="ident">metadata</span>: <span class="ident">SideMetadata</span>::<span class="ident">new</span>(<span class="ident">opt</span>.<span class="ident">side_metadata_specs</span>),
             <span class="ident">p</span>: <span class="ident">PhantomData</span>,
         };
 
@@ -1161,13 +1160,10 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="comment">// For contiguous space, we eagerly initialize SFT map based on its address range.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contiguous</span> {
-            <span class="kw">if</span> <span class="ident">try_map_metadata_address_range</span>(
-                <span class="self">self</span>.<span class="ident">start</span>,
-                <span class="self">self</span>.<span class="ident">extent</span>,
-                <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">global_side_metadata_specs</span>(),
-                <span class="ident">space</span>.<span class="ident">local_side_metadata_specs</span>(),
-            )
-            .<span class="ident">is_err</span>()
+            <span class="kw">if</span> <span class="self">self</span>
+                .<span class="ident">metadata</span>
+                .<span class="ident">try_map_metadata_address_range</span>(<span class="self">self</span>.<span class="ident">start</span>, <span class="self">self</span>.<span class="ident">extent</span>)
+                .<span class="ident">is_err</span>()
             {
                 <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
                 <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);

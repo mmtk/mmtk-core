@@ -190,13 +190,6 @@
 <span id="187">187</span>
 <span id="188">188</span>
 <span id="189">189</span>
-<span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
@@ -209,11 +202,9 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">meta_bytes_per_chunk</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">store_atomic</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">try_map_metadata_space</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">SideMetadataScope</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">SideMetadataSpec</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">metadata_address_range_size</span>, <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataScope</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
 
@@ -273,18 +264,13 @@
     <span class="ident">ACTIVE_CHUNKS</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>().<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">chunk_start</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">map_meta_space_for_chunk</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">map_meta_space_for_chunk</span>(<span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadata</span>, <span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">active_chunks</span> <span class="op">=</span> <span class="ident">ACTIVE_CHUNKS</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
     <span class="kw">if</span> <span class="ident">active_chunks</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">chunk_start</span>) {
         <span class="kw">return</span>;
     }
     <span class="ident">active_chunks</span>.<span class="ident">insert</span>(<span class="ident">chunk_start</span>);
-    <span class="kw">let</span> <span class="ident">mmap_metadata_result</span> <span class="op">=</span> <span class="ident">try_map_metadata_space</span>(
-        <span class="ident">chunk_start</span>,
-        <span class="ident">BYTES_IN_CHUNK</span>,
-        <span class="kw-2">&amp;</span>[],
-        <span class="kw-2">&amp;</span>[<span class="ident">ALLOC_METADATA_SPEC</span>, <span class="ident">MARKING_METADATA_SPEC</span>],
-    );
+    <span class="kw">let</span> <span class="ident">mmap_metadata_result</span> <span class="op">=</span> <span class="ident">metadata</span>.<span class="ident">try_map_metadata_space</span>(<span class="ident">chunk_start</span>, <span class="ident">BYTES_IN_CHUNK</span>);
     <span class="macro">debug_assert</span><span class="macro">!</span>(
         <span class="ident">mmap_metadata_result</span>.<span class="ident">is_ok</span>(),
         <span class="string">&quot;mmap sidemetadata failed for chunk_start ({})&quot;</span>,

@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["VMRequest",""]],"mod":[["freelistpageresource",""],["layout",""],["monotonepageresource",""],["pageresource",""],["space_descriptor",""]],"struct":[["HeapMeta",""]]});
+initSidebarItems({"enum":[["VMRequest",""]],"mod":[["freelistpageresource",""],["layout",""],["monotonepageresource",""],["pageresource",""],["space_descriptor",""]],"struct":[["HeapMeta",""],["PageAccounting","The struct is used for page usage. Both page resource and side metadata uses this struct to do page accounting."]]});

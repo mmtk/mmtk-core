@@ -314,7 +314,6 @@
 <span id="311">311</span>
 <span id="312">312</span>
 <span id="313">313</span>
-<span id="314">314</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">required_chunks</span>;
@@ -373,7 +372,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">reserve_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">reserve</span>(<span class="ident">pages</span>);
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">reserve</span>(<span class="ident">pages</span>);
         <span class="ident">pages</span>
     }
 
@@ -544,8 +543,7 @@
     <span class="doccomment">/// TODO: I am not sure why this is unsafe.</span>
     <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">reset_reserved</span>();
-        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">reset_committed</span>();
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">reset</span>();
         <span class="self">self</span>.<span class="ident">release_pages</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">guard</span>);
         <span class="ident">drop</span>(<span class="ident">guard</span>);
     }

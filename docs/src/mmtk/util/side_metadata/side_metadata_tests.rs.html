@@ -433,32 +433,6 @@
 <span id="430">430</span>
 <span id="431">431</span>
 <span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-<span id="438">438</span>
-<span id="439">439</span>
-<span id="440">440</span>
-<span id="441">441</span>
-<span id="442">442</span>
-<span id="443">443</span>
-<span id="444">444</span>
-<span id="445">445</span>
-<span id="446">446</span>
-<span id="447">447</span>
-<span id="448">448</span>
-<span id="449">449</span>
-<span id="450">450</span>
-<span id="451">451</span>
-<span id="452">452</span>
-<span id="453">453</span>
-<span id="454">454</span>
-<span id="455">455</span>
-<span id="456">456</span>
-<span id="457">457</span>
-<span id="458">458</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
@@ -653,16 +627,14 @@
                 <span class="ident">log_min_obj_size</span>: <span class="number">1</span>,
             };
 
-            <span class="kw">let</span> <span class="ident">gspec_vec</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">gspec</span>];
-            <span class="kw">let</span> <span class="ident">lspec_vec</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">lspec</span>];
+            <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadata</span>::<span class="ident">new</span>(<span class="ident">SideMetadataContext</span> {
+                <span class="ident">global</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">gspec</span>],
+                <span class="ident">local</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">lspec</span>],
+            });
 
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
-                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>,
-                <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
-                <span class="kw-2">&amp;</span><span class="ident">gspec_vec</span>,
-                <span class="kw-2">&amp;</span><span class="ident">lspec_vec</span>
-            )
-            .<span class="ident">is_ok</span>());
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">metadata</span>
+                .<span class="ident">try_map_metadata_space</span>(<span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>, <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,)
+                .<span class="ident">is_ok</span>());
 
             <span class="ident">ensure_metadata_is_mapped</span>(<span class="ident">gspec</span>, <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>);
             <span class="ident">ensure_metadata_is_mapped</span>(<span class="ident">lspec</span>, <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>);
@@ -675,11 +647,9 @@
                 <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span> <span class="op">-</span> <span class="number">1</span>,
             );
 
-            <span class="ident">ensure_unmap_metadata_space</span>(
+            <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(
                 <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>,
                 <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
-                <span class="kw-2">&amp;</span><span class="ident">gspec_vec</span>,
-                <span class="kw-2">&amp;</span><span class="ident">lspec_vec</span>,
             );
 
             <span class="ident">gspec</span>.<span class="ident">log_min_obj_size</span> <span class="op">=</span> <span class="number">3</span>;
@@ -687,16 +657,17 @@
             <span class="ident">lspec</span>.<span class="ident">log_min_obj_size</span> <span class="op">=</span> <span class="number">4</span>;
             <span class="ident">lspec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">2</span>;
 
-            <span class="kw">let</span> <span class="ident">gspec_vec</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">gspec</span>];
-            <span class="kw">let</span> <span class="ident">lspec_vec</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">lspec</span>];
+            <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadata</span>::<span class="ident">new</span>(<span class="ident">SideMetadataContext</span> {
+                <span class="ident">global</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">gspec</span>],
+                <span class="ident">local</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">lspec</span>],
+            });
 
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
-                <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>,
-                <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>,
-                <span class="kw-2">&amp;</span><span class="ident">gspec_vec</span>,
-                <span class="kw-2">&amp;</span><span class="ident">lspec_vec</span>
-            )
-            .<span class="ident">is_ok</span>());
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">metadata</span>
+                .<span class="ident">try_map_metadata_space</span>(
+                    <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>,
+                    <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>,
+                )
+                .<span class="ident">is_ok</span>());
 
             <span class="ident">ensure_metadata_is_mapped</span>(
                 <span class="ident">gspec</span>,
@@ -715,11 +686,9 @@
                 <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span> <span class="op">*</span> <span class="number">2</span> <span class="op">-</span> <span class="number">16</span>,
             );
 
-            <span class="ident">ensure_unmap_metadata_space</span>(
+            <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(
                 <span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>,
                 <span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>,
-                <span class="kw-2">&amp;</span><span class="ident">gspec_vec</span>,
-                <span class="kw-2">&amp;</span><span class="ident">lspec_vec</span>,
             );
         })
     }
@@ -743,16 +712,14 @@
                 <span class="ident">log_min_obj_size</span>: <span class="number">7</span>,
             };
 
-            <span class="kw">let</span> <span class="ident">gspec_vec</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">metadata_1_spec</span>, <span class="ident">metadata_2_spec</span>];
-            <span class="kw">let</span> <span class="ident">empty_vec</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+            <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadata</span>::<span class="ident">new</span>(<span class="ident">SideMetadataContext</span> {
+                <span class="ident">global</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">metadata_1_spec</span>, <span class="ident">metadata_2_spec</span>],
+                <span class="ident">local</span>: <span class="macro">vec</span><span class="macro">!</span>[],
+            });
 
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
-                <span class="ident">data_addr</span>,
-                <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
-                <span class="kw-2">&amp;</span><span class="ident">gspec_vec</span>,
-                <span class="kw-2">&amp;</span><span class="ident">empty_vec</span>
-            )
-            .<span class="ident">is_ok</span>());
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">metadata</span>
+                .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,)
+                .<span class="ident">is_ok</span>());
 
             <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>);
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
@@ -778,12 +745,7 @@
             <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">three</span>, <span class="number">3</span>);
 
-            <span class="ident">ensure_unmap_metadata_space</span>(
-                <span class="ident">data_addr</span>,
-                <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
-                <span class="kw-2">&amp;</span><span class="ident">gspec_vec</span>,
-                <span class="kw-2">&amp;</span><span class="ident">empty_vec</span>,
-            );
+            <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>);
         })
     }
 
@@ -800,16 +762,14 @@
                 <span class="ident">log_min_obj_size</span>: <span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">usize</span>,
             };
 
-            <span class="kw">let</span> <span class="ident">gspec_vec</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">metadata_1_spec</span>];
-            <span class="kw">let</span> <span class="ident">empty_vec</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+            <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadata</span>::<span class="ident">new</span>(<span class="ident">SideMetadataContext</span> {
+                <span class="ident">global</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">metadata_1_spec</span>],
+                <span class="ident">local</span>: <span class="macro">vec</span><span class="macro">!</span>[],
+            });
 
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
-                <span class="ident">data_addr</span>,
-                <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
-                <span class="kw-2">&amp;</span><span class="ident">gspec_vec</span>,
-                <span class="kw-2">&amp;</span><span class="ident">empty_vec</span>
-            )
-            .<span class="ident">is_ok</span>());
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">metadata</span>
+                .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,)
+                .<span class="ident">is_ok</span>());
 
             <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">2</span>);
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
@@ -823,12 +783,7 @@
             <span class="kw">let</span> <span class="ident">one</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>);
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">one</span>, <span class="number">1</span>);
 
-            <span class="ident">ensure_unmap_metadata_space</span>(
-                <span class="ident">data_addr</span>,
-                <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
-                <span class="kw-2">&amp;</span><span class="ident">gspec_vec</span>,
-                <span class="kw-2">&amp;</span><span class="ident">empty_vec</span>,
-            );
+            <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>);
         })
     }
 
@@ -872,16 +827,14 @@
                 <span class="ident">log_min_obj_size</span>: <span class="number">7</span>,
             };
 
-            <span class="kw">let</span> <span class="ident">lspec_vec</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">metadata_1_spec</span>, <span class="ident">metadata_2_spec</span>];
-            <span class="kw">let</span> <span class="ident">empty_vec</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+            <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadata</span>::<span class="ident">new</span>(<span class="ident">SideMetadataContext</span> {
+                <span class="ident">global</span>: <span class="macro">vec</span><span class="macro">!</span>[],
+                <span class="ident">local</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">metadata_1_spec</span>, <span class="ident">metadata_2_spec</span>],
+            });
 
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">try_map_metadata_space</span>(
-                <span class="ident">data_addr</span>,
-                <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
-                <span class="kw-2">&amp;</span><span class="ident">empty_vec</span>,
-                <span class="kw-2">&amp;</span><span class="ident">lspec_vec</span>
-            )
-            .<span class="ident">is_ok</span>());
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">metadata</span>
+                .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,)
+                .<span class="ident">is_ok</span>());
 
             <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>);
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
@@ -909,12 +862,7 @@
             <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>);
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">five</span>, <span class="number">0</span>);
 
-            <span class="ident">ensure_unmap_metadata_space</span>(
-                <span class="ident">data_addr</span>,
-                <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>,
-                <span class="kw-2">&amp;</span><span class="ident">empty_vec</span>,
-                <span class="kw-2">&amp;</span><span class="ident">lspec_vec</span>,
-            );
+            <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>);
         })
     }
 }

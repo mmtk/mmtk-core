@@ -601,10 +601,30 @@
 <span id="598">598</span>
 <span id="599">599</span>
 <span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">BYTES_IN_PAGE</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::{<span class="ident">BYTES_IN_PAGE</span>, <span class="ident">LOG_BYTES_IN_PAGE</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">PageAccounting</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">memory</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">constants</span>, <span class="ident">Address</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="prelude-ty">Result</span>;
@@ -636,166 +656,184 @@
     <span class="kw">pub</span> <span class="ident">log_min_obj_size</span>: <span class="ident">usize</span>,
 }
 
-<span class="comment">// ** NOTE: **</span>
-<span class="comment">//  Regardless of the number of bits in a metadata unit, we always represent its content as a word.</span>
-
-<span class="doccomment">/// Tries to map the required metadata space and returns `true` is successful.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// * `start` - The starting address of the source data.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// * `size` - The size of the source data (in bytes).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// * `global_metadata_spec_vec` - A vector of SideMetadataSpec objects containing all global side metadata.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// * `local_metadata_spec_vec` - A vector of SideMetadataSpec objects containing all local side metadata.</span>
-<span class="doccomment">///</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_map_metadata_space</span>(
-    <span class="ident">start</span>: <span class="ident">Address</span>,
-    <span class="ident">size</span>: <span class="ident">usize</span>,
-    <span class="ident">global_metadata_spec_vec</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>],
-    <span class="ident">local_metadata_spec_vec</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>],
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_PAGE</span>));
-    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">size</span> <span class="op">%</span> <span class="ident">BYTES_IN_PAGE</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
-
-    <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="ident">global_metadata_spec_vec</span> {
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">try_mmap_contiguous_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>, <span class="bool-val">false</span>);
-        <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_err</span>() {
-            <span class="kw">return</span> <span class="ident">res</span>;
-        }
-    }
-
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lsize</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
-
-    <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="ident">local_metadata_spec_vec</span> {
-        <span class="comment">// For local side metadata, we always have to reserve address space for all</span>
-        <span class="comment">// local metadata required by all policies in MMTk to be able to calculate a constant offset for each local metadata at compile-time</span>
-        <span class="comment">// (it&#39;s like assigning an ID to each policy).</span>
-        <span class="comment">// As the plan is chosen at run-time, we will never know which subset of policies will be used during run-time.</span>
-        <span class="comment">// We can&#39;t afford this much address space in 32-bits.</span>
-        <span class="comment">// So, we switch to the chunk-based approach for this specific case.</span>
-        <span class="comment">//</span>
-        <span class="comment">// The global metadata is different in that for each plan, we can calculate its constant base addresses at compile-time.</span>
-        <span class="comment">// Using the chunk-based approach will need the same address space size as the current not-chunked approach.</span>
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-        {
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">try_mmap_contiguous_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>, <span class="bool-val">false</span>);
-            <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_err</span>() {
-                <span class="kw">return</span> <span class="ident">res</span>;
-            }
-        }
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-        {
-            <span class="ident">lsize</span> <span class="op">+</span><span class="op">=</span> <span class="ident">meta_bytes_per_chunk</span>(<span class="ident">spec</span>.<span class="ident">log_min_obj_size</span>, <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span>);
-        }
-    }
-
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="kw">if</span> <span class="ident">lsize</span> <span class="op">&gt;</span> <span class="number">0</span> {
-        <span class="kw">let</span> <span class="ident">max</span> <span class="op">=</span> <span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO</span>;
-        <span class="macro">debug_assert</span><span class="macro">!</span>(
-            <span class="ident">lsize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">max</span>,
-            <span class="string">&quot;local side metadata per chunk (0x{:x}) must be less than (0x{:x})&quot;</span>,
-            <span class="ident">lsize</span>,
-            <span class="ident">max</span>
-        );
-        <span class="kw">return</span> <span class="ident">try_map_per_chunk_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">lsize</span>, <span class="bool-val">false</span>);
-    }
-
-    <span class="prelude-val">Ok</span>(())
+<span class="doccomment">/// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own</span>
+<span class="doccomment">/// side metadata spec as well as the plan&#39;s specs.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SideMetadataContext</span> {
+    <span class="comment">// For plans</span>
+    <span class="kw">pub</span> <span class="ident">global</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
+    <span class="comment">// For policies</span>
+    <span class="kw">pub</span> <span class="ident">local</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
 }
 
-<span class="doccomment">/// Tries to map the required metadata address range, without reserving swap-space/physical memory for it.</span>
-<span class="doccomment">/// This will make sure the address range is exclusive to the caller.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// NOTE: Accessing addresses in this range will produce a segmentation fault if swap-space is not mapped using the `try_map_metadata_space` function.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_map_metadata_address_range</span>(
-    <span class="ident">start</span>: <span class="ident">Address</span>,
-    <span class="ident">size</span>: <span class="ident">usize</span>,
-    <span class="ident">global_metadata_spec_vec</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>],
-    <span class="ident">local_metadata_spec_vec</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>],
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="macro">info</span><span class="macro">!</span>(
-        <span class="string">&quot;try_map_metadata_address_range({}, 0x{:x}, {}, {})&quot;</span>,
-        <span class="ident">start</span>,
-        <span class="ident">size</span>,
-        <span class="ident">global_metadata_spec_vec</span>.<span class="ident">len</span>(),
-        <span class="ident">local_metadata_spec_vec</span>.<span class="ident">len</span>()
-    );
-    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_CHUNK</span>));
-    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">size</span> <span class="op">%</span> <span class="ident">BYTES_IN_CHUNK</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
-
-    <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="ident">global_metadata_spec_vec</span> {
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">try_mmap_contiguous_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>, <span class="bool-val">true</span>);
-        <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_err</span>() {
-            <span class="kw">return</span> <span class="ident">res</span>;
+<span class="kw">impl</span> <span class="ident">SideMetadataContext</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_global_specs</span>(<span class="ident">specs</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+        <span class="ident">ret</span>.<span class="ident">extend_from_slice</span>(<span class="ident">specs</span>);
+        <span class="kw">if</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;side_gc_header&quot;</span>) {
+            <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">gc_byte</span>::<span class="ident">SIDE_GC_BYTE_SPEC</span>);
         }
+        <span class="ident">ret</span>
     }
-
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lsize</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
-
-    <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="ident">local_metadata_spec_vec</span> {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-        {
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">try_mmap_contiguous_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>, <span class="bool-val">true</span>);
-            <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_err</span>() {
-                <span class="kw">return</span> <span class="ident">res</span>;
-            }
-        }
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-        {
-            <span class="ident">lsize</span> <span class="op">+</span><span class="op">=</span> <span class="ident">meta_bytes_per_chunk</span>(<span class="ident">spec</span>.<span class="ident">log_min_obj_size</span>, <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span>);
-        }
-    }
-
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="kw">if</span> <span class="ident">lsize</span> <span class="op">&gt;</span> <span class="number">0</span> {
-        <span class="kw">let</span> <span class="ident">max</span> <span class="op">=</span> <span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO</span>;
-        <span class="macro">debug_assert</span><span class="macro">!</span>(
-            <span class="ident">lsize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">max</span>,
-            <span class="string">&quot;local side metadata per chunk (0x{:x}) must be less than (0x{:x})&quot;</span>,
-            <span class="ident">lsize</span>,
-            <span class="ident">max</span>
-        );
-        <span class="kw">return</span> <span class="ident">try_map_per_chunk_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">lsize</span>, <span class="bool-val">true</span>);
-    }
-
-    <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// Unmap the corresponding metadata space or panic.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Note-1: This function is only used for test and debug right now.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Note-2: This function uses munmap() which works at page granularity.</span>
-<span class="doccomment">///     If the corresponding metadata space&#39;s size is not a multiple of page size,</span>
-<span class="doccomment">///     the actual unmapped space will be bigger than what you specify.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ensure_unmap_metadata_space</span>(
-    <span class="ident">start</span>: <span class="ident">Address</span>,
-    <span class="ident">size</span>: <span class="ident">usize</span>,
-    <span class="ident">global_metadata_spec_vec</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>],
-    <span class="ident">local_metadata_spec_vec</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>],
-) {
-    <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;ensure_unmap_metadata_space({}, 0x{:x})&quot;</span>, <span class="ident">start</span>, <span class="ident">size</span>);
-    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_PAGE</span>));
-    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">size</span> <span class="op">%</span> <span class="ident">BYTES_IN_PAGE</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SideMetadata</span> {
+    <span class="ident">context</span>: <span class="ident">SideMetadataContext</span>,
+    <span class="ident">accounting</span>: <span class="ident">PageAccounting</span>,
+}
 
-    <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="ident">global_metadata_spec_vec</span> {
-        <span class="ident">ensure_munmap_contiguos_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>);
+<span class="kw">impl</span> <span class="ident">SideMetadata</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">context</span>: <span class="ident">SideMetadataContext</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SideMetadata</span> {
+        <span class="self">Self</span> {
+            <span class="ident">context</span>,
+            <span class="ident">accounting</span>: <span class="ident">PageAccounting</span>::<span class="ident">new</span>(),
+        }
     }
 
-    <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="ident">local_metadata_spec_vec</span> {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-        {
-            <span class="ident">ensure_munmap_contiguos_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">accounting</span>.<span class="ident">get_reserved_pages</span>()
+    }
+
+    <span class="comment">// ** NOTE: **</span>
+    <span class="comment">//  Regardless of the number of bits in a metadata unit, we always represent its content as a word.</span>
+
+    <span class="doccomment">/// Tries to map the required metadata space and returns `true` is successful.</span>
+    <span class="doccomment">/// This can be called at page granularity.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_map_metadata_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="macro">debug</span><span class="macro">!</span>(
+            <span class="string">&quot;try_map_metadata_space({}, 0x{:x}, {}, {})&quot;</span>,
+            <span class="ident">start</span>,
+            <span class="ident">size</span>,
+            <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">global</span>.<span class="ident">len</span>(),
+            <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">local</span>.<span class="ident">len</span>()
+        );
+        <span class="comment">// Page aligned</span>
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_PAGE</span>));
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">size</span> <span class="op">%</span> <span class="ident">BYTES_IN_PAGE</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
+        <span class="self">self</span>.<span class="ident">map_metadata_internal</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="bool-val">false</span>)
+    }
+
+    <span class="doccomment">/// Tries to map the required metadata address range, without reserving swap-space/physical memory for it.</span>
+    <span class="doccomment">/// This will make sure the address range is exclusive to the caller. This should be called at chunk granularity.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// NOTE: Accessing addresses in this range will produce a segmentation fault if swap-space is not mapped using the `try_map_metadata_space` function.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_map_metadata_address_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="macro">debug</span><span class="macro">!</span>(
+            <span class="string">&quot;try_map_metadata_address_range({}, 0x{:x}, {}, {})&quot;</span>,
+            <span class="ident">start</span>,
+            <span class="ident">size</span>,
+            <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">global</span>.<span class="ident">len</span>(),
+            <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">local</span>.<span class="ident">len</span>()
+        );
+        <span class="comment">// Chunk aligned</span>
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_CHUNK</span>));
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">size</span> <span class="op">%</span> <span class="ident">BYTES_IN_CHUNK</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
+        <span class="self">self</span>.<span class="ident">map_metadata_internal</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="bool-val">true</span>)
+    }
+
+    <span class="doccomment">/// The internal function to mmap metadata</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments</span>
+    <span class="doccomment">/// * `start` - The starting address of the source data.</span>
+    <span class="doccomment">/// * `size` - The size of the source data (in bytes).</span>
+    <span class="doccomment">/// * `no_reserve` - whether to invoke mmap with a noreserve flag (we use this flag to quanrantine address range)</span>
+    <span class="kw">fn</span> <span class="ident">map_metadata_internal</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">no_reserve</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">global</span>.<span class="ident">iter</span>() {
+            <span class="kw">match</span> <span class="ident">try_mmap_contiguous_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>, <span class="ident">no_reserve</span>) {
+                <span class="prelude-val">Ok</span>(<span class="ident">mapped</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="comment">// We actually reserved memory</span>
+                    <span class="kw">if</span> <span class="op">!</span><span class="ident">no_reserve</span> {
+                        <span class="self">self</span>.<span class="ident">accounting</span>
+                            .<span class="ident">reserve_and_commit</span>(<span class="ident">mapped</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>);
+                    }
+                }
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-ty">Result</span>::<span class="prelude-val">Err</span>(<span class="ident">e</span>),
+            }
         }
+
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-        {
-            <span class="ident">ensure_munmap_chunked_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lsize</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
+
+        <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">local</span>.<span class="ident">iter</span>() {
+            <span class="comment">// For local side metadata, we always have to reserve address space for all</span>
+            <span class="comment">// local metadata required by all policies in MMTk to be able to calculate a constant offset for each local metadata at compile-time</span>
+            <span class="comment">// (it&#39;s like assigning an ID to each policy).</span>
+            <span class="comment">// As the plan is chosen at run-time, we will never know which subset of policies will be used during run-time.</span>
+            <span class="comment">// We can&#39;t afford this much address space in 32-bits.</span>
+            <span class="comment">// So, we switch to the chunk-based approach for this specific case.</span>
+            <span class="comment">//</span>
+            <span class="comment">// The global metadata is different in that for each plan, we can calculate its constant base addresses at compile-time.</span>
+            <span class="comment">// Using the chunk-based approach will need the same address space size as the current not-chunked approach.</span>
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+            {
+                <span class="kw">match</span> <span class="ident">try_mmap_contiguous_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>, <span class="ident">no_reserve</span>) {
+                    <span class="prelude-val">Ok</span>(<span class="ident">mapped</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="comment">// We actually reserved memory</span>
+                        <span class="kw">if</span> <span class="op">!</span><span class="ident">no_reserve</span> {
+                            <span class="self">self</span>.<span class="ident">accounting</span>
+                                .<span class="ident">reserve_and_commit</span>(<span class="ident">mapped</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>);
+                        }
+                    }
+                    <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-ty">Result</span>::<span class="prelude-val">Err</span>(<span class="ident">e</span>),
+                }
+            }
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+            {
+                <span class="ident">lsize</span> <span class="op">+</span><span class="op">=</span> <span class="ident">meta_bytes_per_chunk</span>(<span class="ident">spec</span>.<span class="ident">log_min_obj_size</span>, <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span>);
+            }
+        }
+
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+        <span class="kw">if</span> <span class="ident">lsize</span> <span class="op">&gt;</span> <span class="number">0</span> {
+            <span class="kw">let</span> <span class="ident">max</span> <span class="op">=</span> <span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO</span>;
+            <span class="macro">debug_assert</span><span class="macro">!</span>(
+                <span class="ident">lsize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">max</span>,
+                <span class="string">&quot;local side metadata per chunk (0x{:x}) must be less than (0x{:x})&quot;</span>,
+                <span class="ident">lsize</span>,
+                <span class="ident">max</span>
+            );
+            <span class="kw">match</span> <span class="ident">try_map_per_chunk_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">lsize</span>, <span class="ident">no_reserve</span>) {
+                <span class="prelude-val">Ok</span>(<span class="ident">mapped</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="comment">// We actually reserved memory</span>
+                    <span class="kw">if</span> <span class="op">!</span><span class="ident">no_reserve</span> {
+                        <span class="self">self</span>.<span class="ident">accounting</span>
+                            .<span class="ident">reserve_and_commit</span>(<span class="ident">mapped</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>);
+                    }
+                }
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-ty">Result</span>::<span class="prelude-val">Err</span>(<span class="ident">e</span>),
+            }
+        }
+
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Unmap the corresponding metadata space or panic.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note-1: This function is only used for test and debug right now.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note-2: This function uses munmap() which works at page granularity.</span>
+    <span class="doccomment">///     If the corresponding metadata space&#39;s size is not a multiple of page size,</span>
+    <span class="doccomment">///     the actual unmapped space will be bigger than what you specify.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ensure_unmap_metadata_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
+        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;ensure_unmap_metadata_space({}, 0x{:x})&quot;</span>, <span class="ident">start</span>, <span class="ident">size</span>);
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_PAGE</span>));
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">size</span> <span class="op">%</span> <span class="ident">BYTES_IN_PAGE</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
+
+        <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">global</span>.<span class="ident">iter</span>() {
+            <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">ensure_munmap_contiguos_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>);
+            <span class="self">self</span>.<span class="ident">accounting</span>.<span class="ident">release</span>(<span class="ident">size</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>);
+        }
+
+        <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">local</span>.<span class="ident">iter</span>() {
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+            {
+                <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">ensure_munmap_contiguos_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>);
+                <span class="self">self</span>.<span class="ident">accounting</span>.<span class="ident">release</span>(<span class="ident">size</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>);
+            }
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+            {
+                <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">ensure_munmap_chunked_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">spec</span>);
+                <span class="self">self</span>.<span class="ident">accounting</span>.<span class="ident">release</span>(<span class="ident">size</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>);
+            }
         }
     }
 }

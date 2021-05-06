@@ -310,6 +310,7 @@
 <span id="307">307</span>
 <span id="308">308</span>
 <span id="309">309</span>
+<span id="310">310</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">TransitiveClosure</span>;
@@ -319,6 +320,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::<span class="ident">VMMap</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">PageResource</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">malloc</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
@@ -342,6 +344,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MallocSpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">active_bytes</span>: <span class="ident">AtomicUsize</span>,
+    <span class="ident">metadata</span>: <span class="ident">SideMetadata</span>,
     <span class="comment">// Mapping between allocated address and its size - this is used to check correctness.</span>
     <span class="comment">// Size will be set to zero when the memory is freed.</span>
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
@@ -438,14 +441,19 @@
 
     <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="ident">conversions</span>::<span class="ident">bytes_to_pages_up</span>(<span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>))
+            <span class="op">+</span> <span class="self">self</span>.<span class="ident">metadata</span>.<span class="ident">reserved_pages</span>()
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MallocSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">MallocSpace</span> {
             <span class="ident">phantom</span>: <span class="ident">PhantomData</span>,
             <span class="ident">active_bytes</span>: <span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>),
+            <span class="ident">metadata</span>: <span class="ident">SideMetadata</span>::<span class="ident">new</span>(<span class="ident">SideMetadataContext</span> {
+                <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
+                <span class="ident">local</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">ALLOC_METADATA_SPEC</span>, <span class="ident">MARKING_METADATA_SPEC</span>],
+            }),
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
             <span class="ident">active_mem</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">HashMap</span>::<span class="ident">new</span>()),
         }
@@ -470,7 +478,7 @@
                     <span class="ident">chunk_start</span>,
                     <span class="ident">chunk_start</span> <span class="op">+</span> <span class="ident">BYTES_IN_CHUNK</span>
                 );
-                <span class="ident">map_meta_space_for_chunk</span>(<span class="ident">chunk_start</span>);
+                <span class="ident">map_meta_space_for_chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">metadata</span>, <span class="ident">chunk_start</span>);
             }
             <span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">fetch_add</span>(<span class="ident">actual_size</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
 
@@ -612,12 +620,6 @@
             <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;Release malloc chunk {} to {}&quot;</span>, <span class="kw-2">*</span><span class="ident">c</span>, <span class="kw-2">*</span><span class="ident">c</span> <span class="op">+</span> <span class="ident">BYTES_IN_CHUNK</span>);
             <span class="op">!</span><span class="ident">released_chunks</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">c</span>)
         });
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">MallocSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span>::<span class="ident">new</span>()
     }
 }
 </pre></div>
