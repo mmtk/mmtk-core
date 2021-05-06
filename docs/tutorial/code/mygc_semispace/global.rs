@@ -20,6 +20,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::side_metadata::SideMetadataContext;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
@@ -174,6 +175,7 @@ impl<VM: VMBinding> MyGC<VM> {
     ) -> Self {
         // Modify
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
         MyGC {
             hi: AtomicBool::new(false),
@@ -183,6 +185,7 @@ impl<VM: VMBinding> MyGC<VM> {
                 false,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -193,11 +196,12 @@ impl<VM: VMBinding> MyGC<VM> {
                 true,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, &[]),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs),
         }
     }
     // ANCHOR_END: plan_new
