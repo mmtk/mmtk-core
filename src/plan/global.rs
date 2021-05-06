@@ -341,8 +341,6 @@ pub struct BasePlan<VM: VMBinding> {
     pub max_collection_attempts: AtomicUsize,
     // Current collection attempt
     pub cur_collection_attempts: AtomicUsize,
-    // Lock used for out of memory handling
-    pub oom_lock: Mutex<()>,
     pub control_collector_context: ControllerCollectorContext<VM>,
     pub stats: Stats,
     mmapper: &'static Mmapper,
@@ -458,7 +456,6 @@ impl<VM: VMBinding> BasePlan<VM> {
             allocation_success: AtomicBool::new(false),
             max_collection_attempts: AtomicUsize::new(0),
             cur_collection_attempts: AtomicUsize::new(0),
-            oom_lock: Mutex::new(()),
             control_collector_context: ControllerCollectorContext::new(),
             stats,
             mmapper,
