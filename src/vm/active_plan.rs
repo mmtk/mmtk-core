@@ -1,6 +1,5 @@
 use crate::plan::Mutator;
 use crate::plan::Plan;
-use crate::scheduler::*;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -31,15 +30,6 @@ pub trait ActivePlan<VM: VMBinding> {
     // This function is used by space and phase to refer to the current plan.
     // Possibly we should remove the use of this function, and remove this function?
     fn global() -> &'static dyn Plan<VM = VM>;
-
-    /// Return a `GCWorker` reference for the thread.
-    ///
-    /// Arguments:
-    /// * `tls`: The thread to query.
-    ///
-    /// # Safety
-    /// The caller needs to make sure that the thread is a GC worker thread.
-    unsafe fn worker(tls: OpaquePointer) -> &'static mut GCWorker<VM>;
 
     /// Return whether there is a mutator created and associated with the thread.
     ///
