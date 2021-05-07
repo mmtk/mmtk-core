@@ -117,7 +117,7 @@
     <span class="comment">// TODO: We should refactor this when we know more about how multiple MMTK instances work.</span>
     <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">VM_MAP</span>: <span class="ident">VMMap</span> <span class="op">=</span> <span class="ident">VMMap</span>::<span class="ident">new</span>();
     <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">MMAPPER</span>: <span class="ident">Mmapper</span> <span class="op">=</span> <span class="ident">Mmapper</span>::<span class="ident">new</span>();
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">SFT_MAP</span>: <span class="ident">SFTMap</span> <span class="op">=</span> <span class="ident">SFTMap</span>::<span class="ident">new</span>();
+    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">SFT_MAP</span>: <span class="ident">SFTMap</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">SFTMap</span>::<span class="ident">new</span>();
 }
 
 <span class="doccomment">/// An MMTk instance. MMTk allows mutiple instances to run independently, and each instance gives users a separate heap.</span>
@@ -126,7 +126,7 @@
     <span class="kw">pub</span> <span class="ident">plan</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
     <span class="kw">pub</span> <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-    <span class="kw">pub</span> <span class="ident">sftmap</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">SFTMap</span>,
+    <span class="kw">pub</span> <span class="ident">sftmap</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">SFTMap</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">reference_processors</span>: <span class="ident">ReferenceProcessors</span>,
     <span class="kw">pub</span> <span class="ident">finalizable_processor</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FinalizableProcessor</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
