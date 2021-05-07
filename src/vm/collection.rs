@@ -55,6 +55,7 @@ pub trait Collection<VM: VMBinding> {
     );
 
     /// Inform the VM for an out-of-memory error. The VM can implement its own error routine for OOM.
+    /// Note the VM needs to fail in this call. We do not expect the VM to resume in any way.
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the mutator which failed the allocation and triggered the OOM.
