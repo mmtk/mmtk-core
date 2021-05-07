@@ -55,7 +55,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
     }
 
     fn reserve_pages(&self, pages: usize) -> usize {
-        self.common().reserve(pages);
+        self.common().accounting.reserve(pages);
         pages
     }
 
@@ -226,8 +226,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
     /// TODO: I am not sure why this is unsafe.
     pub unsafe fn reset(&self) {
         let mut guard = self.sync.lock().unwrap();
-        self.common().reset_reserved();
-        self.common().reset_committed();
+        self.common().accounting.reset();
         self.release_pages(&mut guard);
         drop(guard);
     }

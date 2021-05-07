@@ -3,7 +3,7 @@ use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
 use crate::util::conversions::bytes_to_chunks_up;
 use crate::util::heap::PageResource;
-use crate::util::side_metadata::try_map_metadata_space;
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 
 use crate::util::ObjectReference;
 
@@ -30,6 +30,7 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     limit: Address,
     /// Zero memory after slow-path allocation
     slow_path_zeroing: bool,
+    metadata: SideMetadata,
     phantom: PhantomData<VM>,
 }
 
@@ -87,13 +88,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         self.limit = AVAILABLE_START + total_bytes;
         // Eagerly memory map the entire heap (also zero all the memory)
         crate::util::memory::dzmmap_noreplace(AVAILABLE_START, total_bytes).unwrap();
-        if try_map_metadata_space(
-            AVAILABLE_START,
-            total_bytes,
-            VM::VMActivePlan::global().global_side_metadata_specs(),
-            self.local_side_metadata_specs(),
-        )
-        .is_err()
+        if self
+            .metadata
+            .try_map_metadata_space(AVAILABLE_START, total_bytes)
+            .is_err()
         {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
@@ -107,7 +105,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 
     fn reserved_pages(&self) -> usize {
         let cursor = unsafe { Address::from_usize(self.cursor.load(Ordering::Relaxed)) };
-        conversions::bytes_to_pages_up(self.limit - cursor)
+        conversions::bytes_to_pages_up(self.limit - cursor) + self.metadata.reserved_pages()
     }
 
     fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
@@ -124,12 +122,20 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
-    pub fn new(name: &'static str, slow_path_zeroing: bool) -> Self {
+    pub fn new(
+        name: &'static str,
+        slow_path_zeroing: bool,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
+    ) -> Self {
         Self {
             name,
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
             limit: AVAILABLE_END,
             slow_path_zeroing,
+            metadata: SideMetadata::new(SideMetadataContext {
+                global: global_side_metadata_specs,
+                local: vec![],
+            }),
             phantom: PhantomData,
         }
     }

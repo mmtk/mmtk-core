@@ -107,6 +107,8 @@
 //!
 //! # How to Use
 //!
+//! ## Declare side metadata specs
+//!
 //! For each global side metadata bit-set, a constant object of the `SideMetadataSpec` struct should be created.
 //!
 //! For the first global side metadata bit-set:
@@ -165,18 +167,22 @@
 //! };
 //! ```
 //!
-//! So far, no metadata space is allocated.
+//! So far, we declared each side metadata specs, but no metadata space is allocated.
 //!
-//! For this purpose, each plan should override `fn global_side_metadata_specs(&self) -> &[SideMetadataSpec]` to return a vector of the global side metadata it needs.
+//! ## Create and allocate side metadata for spaces
 //!
-//! This function can be implemented like:
-//! ```
-//! return &[GLOBAL_META_1, GLOBAL_META_2];
-//! ```
+//! A space would need know all the global metadata specs and its own policy-specific/local metadata specs in order to calculate and allocate metadata space.
+//! When a space is created by a plan (e.g. SemiSpace::new), the plan can create its global specs by `SideMetadataContext::new_global_specs(&[GLOBAL_META_1, GLOBAL_META_2])`. Then,
+//! the global specs are passed to each space that the plan creates.
 //!
-//! For the local metadata bit-sets, each policy needs override `fn local_side_metadata_specs(&self) -> &[SideMetadataSpec]`.
+//! Each space will then combine the global specs and its own local specs to create a [SideMetadata](util::side_metadata::SideMetadata).
+//! Allocating side metadata space and accounting its memory usage is done by `SideMetadata`. If a space uses `CommonSpace`, `CommonSpace` will create `SideMetadata` and manage
+//! reserving and allocating metadata space when necessary. If a space does not use `CommonSpace`, it should create `SideMetadata` itself and manage allocating metadata space
+//! as its own responsibility.
 //!
-//! After mapping the metadata space, the following operations can be performed on the metadata:
+//! ## Access side metadata
+//!
+//! After mapping the metadata space, the following operations can be performed with a specific metadata spec:
 //!
 //! 1. atomic load
 //! 2. atomic store

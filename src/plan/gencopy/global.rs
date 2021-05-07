@@ -3,6 +3,7 @@ use super::{
     gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges},
     LOGGING_META,
 };
+use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
@@ -22,10 +23,10 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
+use crate::util::side_metadata::SideMetadataContext;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
-use crate::{plan::global::BasePlan, util::side_metadata::SideMetadataSpec};
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -168,10 +169,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     fn in_nursery(&self) -> bool {
         self.in_nursery.load(Ordering::SeqCst)
     }
-
-    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &self.common().global_metadata_specs
-    }
 }
 
 impl<VM: VMBinding> GenCopy<VM> {
@@ -181,11 +178,12 @@ impl<VM: VMBinding> GenCopy<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let global_metadata_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+        let gencopy_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
             vec![LOGGING_META]
         } else {
             vec![]
         };
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&gencopy_specs);
 
         GenCopy {
             nursery: CopySpace::new(
@@ -193,6 +191,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 false,
                 true,
                 VMRequest::fixed_extent(NURSERY_SIZE, false),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -203,6 +202,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 false,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -212,6 +212,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 true,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -222,7 +223,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 options,
                 heap,
                 &GENCOPY_CONSTRAINTS,
-                &&global_metadata_specs,
+                global_metadata_specs,
             ),
             in_nursery: AtomicBool::default(),
         }

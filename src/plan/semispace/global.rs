@@ -1,4 +1,5 @@
 use super::gc_work::{SSCopyContext, SSProcessEdges};
+use crate::mmtk::MMTK;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
@@ -17,11 +18,11 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::VMWorkerThread;
-use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
+use crate::util::side_metadata::SideMetadataContext;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -139,10 +140,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
-
-    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &self.common().global_metadata_specs
-    }
 }
 
 impl<VM: VMBinding> SemiSpace<VM> {
@@ -152,6 +149,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
         SemiSpace {
             hi: AtomicBool::new(false),
@@ -160,6 +158,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 false,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -169,11 +168,19 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 true,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &SS_CONSTRAINTS, &[]),
+            common: CommonPlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                &SS_CONSTRAINTS,
+                global_metadata_specs,
+            ),
         }
     }
 

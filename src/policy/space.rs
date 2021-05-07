@@ -1,4 +1,4 @@
-use crate::util::side_metadata::{try_map_metadata_address_range, try_map_metadata_space};
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
@@ -280,8 +280,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     self.common().mmapper.ensure_mapped(
                         res.start,
                         res.pages,
-                        VM::VMActivePlan::global().global_side_metadata_specs(),
-                        self.local_side_metadata_specs(),
+                        &self.common().metadata,
                     );
 
                     // TODO: Concurrent zeroing
@@ -353,13 +352,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        if try_map_metadata_space(
-            self.common().start,
-            self.common().extent,
-            VM::VMActivePlan::global().global_side_metadata_specs(),
-            self.local_side_metadata_specs(),
-        )
-        .is_err()
+        if self
+            .common()
+            .metadata
+            .try_map_metadata_space(self.common().start, self.common().extent)
+            .is_err()
         {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
@@ -376,7 +373,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn reserved_pages(&self) -> usize {
-        self.get_page_resource().reserved_pages()
+        self.get_page_resource().reserved_pages() + self.common().metadata.reserved_pages()
     }
 
     fn get_name(&self) -> &'static str {
@@ -456,6 +453,8 @@ pub struct CommonSpace<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
 
+    pub metadata: SideMetadata,
+
     p: PhantomData<VM>,
 }
 
@@ -465,6 +464,7 @@ pub struct SpaceOptions {
     pub immortal: bool,
     pub zeroed: bool,
     pub vmrequest: VMRequest,
+    pub side_metadata_specs: SideMetadataContext,
 }
 
 /// Print debug info for SFT. Should be false when committed.
@@ -490,6 +490,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             head_discontiguous_region: unsafe { Address::zero() },
             vm_map,
             mmapper,
+            metadata: SideMetadata::new(opt.side_metadata_specs),
             p: PhantomData,
         };
 
@@ -559,13 +560,10 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn init(&self, space: &dyn Space<VM>) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            if try_map_metadata_address_range(
-                self.start,
-                self.extent,
-                VM::VMActivePlan::global().global_side_metadata_specs(),
-                space.local_side_metadata_specs(),
-            )
-            .is_err()
+            if self
+                .metadata
+                .try_map_metadata_address_range(self.start, self.extent)
+                .is_err()
             {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
