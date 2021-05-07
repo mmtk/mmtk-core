@@ -1,7 +1,4 @@
-use crate::util::{
-    side_metadata::{try_map_metadata_space, SideMetadataSpec},
-    Address,
-};
+use crate::util::{side_metadata::SideMetadata, Address};
 
 use super::vm_layout_constants::BYTES_IN_CHUNK;
 
@@ -40,29 +37,14 @@ pub trait Mmapper {
      * @param start The start of the range to be mapped.
      * @param pages The size of the range to be mapped, in pages
      */
-    fn ensure_mapped(
-        &self,
-        start: Address,
-        pages: usize,
-        global_metadata_spec_vec: &[SideMetadataSpec],
-        local_metadata_spec_vec: &[SideMetadataSpec],
-    );
+    fn ensure_mapped(&self, start: Address, pages: usize, metadata: &SideMetadata);
 
     /// Map metadata memory for a given chunk
     #[allow(clippy::result_unit_err)]
-    fn map_metadata(
-        &self,
-        chunk: Address,
-        global_metadata_spec_vec: &[SideMetadataSpec],
-        local_metadata_spec_vec: &[SideMetadataSpec],
-    ) -> Result<(), ()> {
-        if try_map_metadata_space(
-            chunk,
-            BYTES_IN_CHUNK,
-            global_metadata_spec_vec,
-            local_metadata_spec_vec,
-        )
-        .is_err()
+    fn map_metadata(&self, chunk: Address, metadata: &SideMetadata) -> Result<(), ()> {
+        if metadata
+            .try_map_metadata_space(chunk, BYTES_IN_CHUNK)
+            .is_err()
         {
             Err(())
         } else {

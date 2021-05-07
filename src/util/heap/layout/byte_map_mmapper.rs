@@ -4,7 +4,7 @@ use crate::util::Address;
 use crate::util::constants::*;
 use crate::util::conversions::pages_to_bytes;
 use crate::util::heap::layout::vm_layout_constants::*;
-use crate::util::side_metadata::SideMetadataSpec;
+use crate::util::side_metadata::SideMetadata;
 use std::fmt;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
@@ -48,13 +48,7 @@ impl Mmapper for ByteMapMmapper {
         }
     }
 
-    fn ensure_mapped(
-        &self,
-        start: Address,
-        pages: usize,
-        global_metadata_spec_vec: &[SideMetadataSpec],
-        local_metadata_spec_vec: &[SideMetadataSpec],
-    ) {
+    fn ensure_mapped(&self, start: Address, pages: usize, metadata: &SideMetadata) {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         trace!(
@@ -76,12 +70,8 @@ impl Mmapper for ByteMapMmapper {
             if self.mapped[chunk].load(Ordering::Relaxed) == UNMAPPED {
                 match dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES) {
                     Ok(_) => {
-                        self.map_metadata(
-                            mmap_start,
-                            global_metadata_spec_vec,
-                            local_metadata_spec_vec,
-                        )
-                        .expect("failed to map metadata memory");
+                        self.map_metadata(mmap_start, metadata)
+                            .expect("failed to map metadata memory");
                         if VERBOSE {
                             trace!(
                                 "mmap succeeded at chunk {}  {} with len = {}",
@@ -218,6 +208,7 @@ mod tests {
     use crate::util::heap::layout::byte_map_mmapper::{MAPPED, PROTECTED};
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use crate::util::memory;
+    use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
     use crate::util::test_util::BYTE_MAP_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
     use std::sync::atomic::Ordering;
@@ -225,6 +216,13 @@ mod tests {
     const CHUNK_SIZE: usize = 1 << 22;
     const FIXED_ADDRESS: Address = BYTE_MAP_MMAPPER_TEST_REGION.start;
     const MAX_SIZE: usize = BYTE_MAP_MMAPPER_TEST_REGION.size;
+
+    lazy_static! {
+        static ref NO_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext {
+            global: vec![],
+            local: vec![]
+        });
+    }
 
     #[test]
     fn address_to_mmap_chunks() {
@@ -270,8 +268,7 @@ mod tests {
                 || {
                     let mmapper = ByteMapMmapper::new();
                     let pages = 1;
-                    let empty_vec = vec![];
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages, &empty_vec, &empty_vec);
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
 
                     let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
                     let end_chunk = ByteMapMmapper::address_to_mmap_chunks_up(
@@ -295,8 +292,7 @@ mod tests {
                 || {
                     let mmapper = ByteMapMmapper::new();
                     let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-                    let empty_vec = vec![];
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages, &empty_vec, &empty_vec);
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
 
                     let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
                     let end_chunk = ByteMapMmapper::address_to_mmap_chunks_up(
@@ -321,8 +317,7 @@ mod tests {
                     let mmapper = ByteMapMmapper::new();
                     let pages =
                         (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
-                    let empty_vec = vec![];
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages, &empty_vec, &empty_vec);
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages, &NO_METADATA);
 
                     let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
                     let end_chunk = ByteMapMmapper::address_to_mmap_chunks_up(
@@ -348,13 +343,7 @@ mod tests {
                     // map 2 chunks
                     let mmapper = ByteMapMmapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-                    let empty_vec = vec![];
-                    mmapper.ensure_mapped(
-                        FIXED_ADDRESS,
-                        pages_per_chunk * 2,
-                        &empty_vec,
-                        &empty_vec,
-                    );
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
 
                     // protect 1 chunk
                     mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -378,13 +367,7 @@ mod tests {
                     // map 2 chunks
                     let mmapper = ByteMapMmapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-                    let empty_vec = vec![];
-                    mmapper.ensure_mapped(
-                        FIXED_ADDRESS,
-                        pages_per_chunk * 2,
-                        &empty_vec,
-                        &empty_vec,
-                    );
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
 
                     // protect 1 chunk
                     mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
@@ -394,12 +377,7 @@ mod tests {
                     assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MAPPED);
 
                     // ensure mapped - this will unprotect the previously protected chunk
-                    mmapper.ensure_mapped(
-                        FIXED_ADDRESS,
-                        pages_per_chunk * 2,
-                        &empty_vec,
-                        &empty_vec,
-                    );
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &NO_METADATA);
                     assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MAPPED);
                     assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MAPPED);
                 },
