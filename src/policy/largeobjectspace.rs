@@ -130,7 +130,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn prepare(&mut self, full_heap: bool) {
-        println!("LOS Prepare");
         if full_heap {
             debug_assert!(self.treadmill.from_space_empty());
             self.mark_state = MARK_BIT - self.mark_state;

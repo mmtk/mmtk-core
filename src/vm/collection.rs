@@ -63,5 +63,5 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls`: The thread pointer for the current GC thread.
     fn schedule_finalization(_tls: OpaquePointer) {}
 
-    fn sweep(addr: Address) {}
+    fn sweep(_addr: Address) {}
 }
