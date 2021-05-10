@@ -115,7 +115,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // Modify
     // ANCHOR: prepare
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&mut self, tls: OpaquePointer) {
         self.common.prepare(tls, true);
 
         self.hi
@@ -129,7 +129,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // Modify
     // ANCHOR: release
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&mut self, tls: OpaquePointer) {
         self.common.release(tls, true);
         self.fromspace().release();
     }
