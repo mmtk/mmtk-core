@@ -128,7 +128,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&mut self, tls: OpaquePointer) {
         self.common.prepare(tls, true);
         self.nursery.prepare(true);
         if !self.in_nursery() {
@@ -140,7 +140,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.copyspace1.prepare(!hi);
     }
 
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&mut self, tls: OpaquePointer) {
         self.common.release(tls, true);
         self.nursery.release();
         if !self.in_nursery() {

@@ -75,12 +75,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&mut self, tls: OpaquePointer) {
         self.common.prepare(tls, true);
         // Dont need to prepare for MallocSpace
     }
 
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&mut self, tls: OpaquePointer) {
         trace!("Marksweep: Release");
         self.common.release(tls, true);
         self.ms.release_all_chunks();

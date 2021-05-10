@@ -71,11 +71,11 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &self.base
     }
 
-    fn prepare(&self, _tls: OpaquePointer) {
+    fn prepare(&mut self, _tls: OpaquePointer) {
         unreachable!()
     }
 
-    fn release(&self, _tls: OpaquePointer) {
+    fn release(&mut self, _tls: OpaquePointer) {
         unreachable!()
     }
 

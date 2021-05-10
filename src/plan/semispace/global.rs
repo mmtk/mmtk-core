@@ -104,7 +104,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&mut self, tls: OpaquePointer) {
         self.common.prepare(tls, true);
 
         self.hi
@@ -115,7 +115,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.copyspace1.prepare(!hi);
     }
 
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&mut self, tls: OpaquePointer) {
         self.common.release(tls, true);
         // release the collected region
         self.fromspace().release();
