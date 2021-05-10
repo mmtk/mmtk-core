@@ -585,6 +585,10 @@
 <span id="582">582</span>
 <span id="583">583</span>
 <span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
@@ -857,11 +861,15 @@
                     <span class="comment">// adding a space lock here.</span>
                     <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">conversions</span>::<span class="ident">pages_to_bytes</span>(<span class="ident">res</span>.<span class="ident">pages</span>);
                     <span class="self">self</span>.<span class="ident">grow_space</span>(<span class="ident">res</span>.<span class="ident">start</span>, <span class="ident">bytes</span>, <span class="ident">res</span>.<span class="ident">new_chunk</span>);
-                    <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">mmapper</span>.<span class="ident">ensure_mapped</span>(
+                    <span class="comment">// Mmap the pages and handle error. In case of any error,</span>
+                    <span class="comment">// we will either call back to the VM for OOM, or simply panic.</span>
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">mmap_error</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">mmapper</span>.<span class="ident">ensure_mapped</span>(
                         <span class="ident">res</span>.<span class="ident">start</span>,
                         <span class="ident">res</span>.<span class="ident">pages</span>,
                         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>().<span class="ident">metadata</span>,
-                    );
+                    ) {
+                        <span class="ident">memory</span>::<span class="ident">handle_mmap_error</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">mmap_error</span>, <span class="ident">tls</span>);
+                    }
 
                     <span class="comment">// TODO: Concurrent zeroing</span>
                     <span class="kw">if</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">zeroed</span> {

@@ -71,6 +71,7 @@
 <span id="68">68</span>
 <span id="69">69</span>
 <span id="70">70</span>
+<span id="71">71</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">MutatorContext</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">gc_work</span>::<span class="ident">ProcessEdgesWork</span>;
@@ -129,6 +130,7 @@
     );
 
     <span class="doccomment">/// Inform the VM for an out-of-memory error. The VM can implement its own error routine for OOM.</span>
+    <span class="doccomment">/// Note the VM needs to fail in this call. We do not expect the VM to resume in any way.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `tls`: The thread pointer for the mutator which failed the allocation and triggered the OOM.</span>

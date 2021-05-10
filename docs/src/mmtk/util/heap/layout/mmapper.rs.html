@@ -62,17 +62,10 @@
 <span id="59">59</span>
 <span id="60">60</span>
 <span id="61">61</span>
-<span id="62">62</span>
-<span id="63">63</span>
-<span id="64">64</span>
-<span id="65">65</span>
-<span id="66">66</span>
-<span id="67">67</span>
-<span id="68">68</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">side_metadata</span>::<span class="ident">SideMetadata</span>, <span class="ident">Address</span>};
-
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">side_metadata</span>::<span class="ident">SideMetadata</span>, <span class="ident">Address</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="prelude-ty">Result</span>;
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Mmapper</span> {
     <span class="comment">/****************************************************************************
@@ -109,19 +102,12 @@
      * @param start The start of the range to be mapped.
      * @param pages The size of the range to be mapped, in pages
      */</span>
-    <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>, <span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadata</span>);
+    <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>, <span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadata</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
 
     <span class="doccomment">/// Map metadata memory for a given chunk</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">result_unit_err</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">map_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">Address</span>, <span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadata</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), ()<span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">metadata</span>
-            .<span class="ident">try_map_metadata_space</span>(<span class="ident">chunk</span>, <span class="ident">BYTES_IN_CHUNK</span>)
-            .<span class="ident">is_err</span>()
-        {
-            <span class="prelude-val">Err</span>(())
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Ok</span>(())
-        }
+    <span class="kw">fn</span> <span class="ident">map_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">Address</span>, <span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadata</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="ident">metadata</span>.<span class="ident">try_map_metadata_space</span>(<span class="ident">chunk</span>, <span class="ident">BYTES_IN_CHUNK</span>)
     }
 
     <span class="doccomment">/**
