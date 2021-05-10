@@ -508,10 +508,6 @@ impl<VM: VMBinding> BasePlan<VM> {
 
         // The VM space may be used as an immutable boot image, in which case, we should not count
         // it as part of the heap size.
-        // #[cfg(feature = "vm_space")]
-        // {
-        //     pages += unsync.vm_space.reserved_pages();
-        // }
         pages
     }
 
