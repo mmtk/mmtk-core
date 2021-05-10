@@ -269,11 +269,15 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     // adding a space lock here.
                     let bytes = conversions::pages_to_bytes(res.pages);
                     self.grow_space(res.start, bytes, res.new_chunk);
-                    self.common().mmapper.ensure_mapped(
+                    // Mmap the pages and handle error. In case of any error,
+                    // we will either call back to the VM for OOM, or simply panic.
+                    if let Err(mmap_error) = self.common().mmapper.ensure_mapped(
                         res.start,
                         res.pages,
                         &self.common().metadata,
-                    );
+                    ) {
+                        memory::handle_mmap_error::<VM>(mmap_error, tls);
+                    }
 
                     // TODO: Concurrent zeroing
                     if self.common().zeroed {

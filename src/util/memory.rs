@@ -1,6 +1,8 @@
+use crate::util::opaque_pointer::*;
 use crate::util::Address;
+use crate::vm::{Collection, VMBinding};
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
-use std::io::Result;
+use std::io::{Error, Result};
 
 pub fn result_is_mapped(result: Result<()>) -> bool {
     match result {
@@ -78,6 +80,27 @@ pub fn mmap_fixed(
 
 pub fn munmap(start: Address, size: usize) -> Result<()> {
     wrap_libc_call(&|| unsafe { libc::munmap(start.to_mut_ptr(), size) }, 0)
+}
+
+/// Properly handle errors from a mmap Result, including invoking the binding code for an OOM error.
+pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: OpaquePointer) -> ! {
+    use std::io::ErrorKind;
+
+    match error.kind() {
+        ErrorKind::Other => {
+            // further check the error
+            if let Some(os_errno) = error.raw_os_error() {
+                // If it is OOM, we invoke out_of_memory() through the VM interface.
+                if os_errno == libc::ENOMEM {
+                    VM::VMCollection::out_of_memory(tls);
+                    unreachable!()
+                }
+            }
+        }
+        ErrorKind::AlreadyExists => panic!("Failed to mmap, the address is already mapped. Should MMTk quanrantine the address range first?"),
+        _ => {}
+    }
+    panic!("Unexpected mmap failure: {:?}", error)
 }
 
 /// Checks if the memory has already been mapped. If not, we panic.
