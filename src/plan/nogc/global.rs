@@ -1,4 +1,4 @@
-use crate::mmtk::MMTK;
+use crate::{mmtk::MMTK, plan::global::CommonPlan, util::side_metadata::SideMetadataSpec};
 use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -27,7 +27,7 @@ use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
 use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
 
 pub struct NoGC<VM: VMBinding> {
-    pub base: BasePlan<VM>,
+    pub common: CommonPlan<VM>,
     pub nogc_space: NoGCImmortalSpace<VM>,
 }
 
@@ -56,18 +56,22 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
-        self.base.gc_init(heap_size, vm_map, scheduler);
+        self.common.gc_init(heap_size, vm_map, scheduler);
 
         // FIXME correctly initialize spaces based on options
         self.nogc_space.init(&vm_map);
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        self.base.collection_required(self, space_full, space)
+        self.base().collection_required(self, space_full, space)
     }
 
     fn base(&self) -> &BasePlan<VM> {
-        &self.base
+        &self.common.base
+    }
+
+    fn common(&self) -> &CommonPlan<VM> {
+        &self.common
     }
 
     fn prepare(&self, _tls: OpaquePointer) {
@@ -92,6 +96,10 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn handle_user_collection_request(&self, _tls: OpaquePointer, _force: bool) {
         println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
+    }
+
+    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
+        &self.common().global_metadata_specs
     }
 }
 
@@ -122,7 +130,7 @@ impl<VM: VMBinding> NoGC<VM> {
 
         NoGC {
             nogc_space,
-            base: BasePlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS, &[]),
         }
     }
 }
