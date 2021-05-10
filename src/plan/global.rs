@@ -361,9 +361,6 @@ pub struct BasePlan<VM: VMBinding> {
     pub vm_space: ImmortalSpace<VM>,
 }
 
-// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
-unsafe impl<VM: VMBinding> Sync for BasePlan<VM> {}
-
 #[cfg(feature = "vm_space")]
 pub fn create_vm_space<VM: VMBinding>(
     vm_map: &'static VMMap,
@@ -691,9 +688,6 @@ pub struct CommonPlan<VM: VMBinding> {
     pub los: LargeObjectSpace<VM>,
     pub base: BasePlan<VM>,
 }
-
-// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
-unsafe impl<VM: VMBinding> Sync for CommonPlan<VM> {}
 
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(
