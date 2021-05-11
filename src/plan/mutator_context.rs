@@ -17,14 +17,15 @@ type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
 #[repr(C)]
 pub struct MutatorConfig<VM: VMBinding> {
-    // Mapping between allocation semantics and allocator selector
+    /// Mapping between allocation semantics and allocator selector
     pub allocator_mapping: &'static EnumMap<AllocationType, AllocatorSelector>,
-    // Mapping between allocator selector and spaces. Each pair represents a mapping.
-    // Put this behind a box, so it is a pointer-sized field.
+    /// Mapping between allocator selector and spaces. Each pair represents a mapping.
+    /// Put this behind a box, so it is a pointer-sized field.
     #[allow(clippy::box_vec)]
     pub space_mapping: Box<SpaceMapping<VM>>,
-    // Plan-specific code for mutator prepare/release
+    /// Plan-specific code for mutator prepare. The VMWorkerThread is the worker thread that executes this prepare function.
     pub prepare_func: &'static (dyn Fn(&mut Mutator<VM>, VMWorkerThread) + Send + Sync),
+    /// Plan-specific code for mutator release. The VMWorkerThread is the worker thread that executes this release function.
     pub release_func: &'static (dyn Fn(&mut Mutator<VM>, VMWorkerThread) + Send + Sync),
 }
 
@@ -40,6 +41,7 @@ pub struct MutatorConfig<VM: VMBinding> {
 pub struct Mutator<VM: VMBinding> {
     pub allocators: Allocators<VM>,
     pub barrier: Box<dyn Barrier>,
+    /// The mutator thread that is bound with this Mutator struct.
     pub mutator_tls: VMMutatorThread,
     pub plan: &'static dyn Plan<VM = VM>,
     pub config: MutatorConfig<VM>,
