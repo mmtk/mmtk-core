@@ -1,5 +1,5 @@
 use super::gc_work::{ImmixCopyContext, ImmixProcessEdges};
-use crate::{mmtk::MMTK, policy::immix::ImmixSpace};
+use crate::{mmtk::MMTK, policy::immix::{ImmixSpace, block::Block}};
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -42,6 +42,7 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
+    max_non_los_default_alloc_bytes: Block::BYTES,
     ..PlanConstraints::default()
 };
 
