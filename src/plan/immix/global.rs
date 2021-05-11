@@ -129,11 +129,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         &self.common
     }
 
-    fn global_side_metadata_per_chunk(&self) -> usize {
-        debug_assert!(VM::VMObjectModel::HAS_GC_BYTE);
-        0
-    }
-
     fn pre_worker_spawn(&self, mmtk: &MMTK<VM>) {
         self.immix_space.initialize_defrag(mmtk)
     }
@@ -150,7 +145,7 @@ impl<VM: VMBinding> Immix<VM> {
 
         Immix {
             immix_space: ImmixSpace::new("immix", vm_map, mmapper, &mut heap),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &IMMIX_CONSTRAINTS),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &IMMIX_CONSTRAINTS, &[]),
         }
     }
 }

@@ -71,7 +71,8 @@ impl Line {
         unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), state as _); }
     }
 
-    pub const fn mark_byte_address(&self) -> Address {
+    #[inline(always)]
+    pub fn mark_byte_address(&self) -> Address {
         debug_assert!(!super::BLOCK_ONLY);
         side_metadata::address_to_meta_address(Self::MARK_TABLE, self.start())
     }

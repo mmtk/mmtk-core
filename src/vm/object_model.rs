@@ -11,15 +11,10 @@ use crate::AllocationSemantics;
 ///
 /// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.
 pub trait ObjectModel<VM: VMBinding> {
-    /// Whether an exclusive GC byte in each object's header word is available for MMTk.
-    /// If such a byte is not available in the VM, MMTk will handle it in its own memory.
-    ///
-    /// Note: Currently only the `true` value is supported.
-    const HAS_GC_BYTE: bool = true;
     /// The offset of the GC byte from the object reference, in number of bytes.
     ///
     /// Notes:
-    ///  - This value is only effective when `HAS_GC_BYTE` is set to `true`.
+    ///  - This value is only effective when the `side_gc_header` feature of `mmtk-core` is set.
     ///  - It is recommanded that GC byte is the low-order byte of the word that contains it. \
     /// E.g. in a 64-bits little endian system, the recommanded offset is `8*K`.
     ///

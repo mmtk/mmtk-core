@@ -248,7 +248,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             Some(fw_offset) => object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET + fw_offset,
             None => {
                 let obj_lowest_addr = VM::VMObjectModel::object_start_ref(object);
-                if VM::VMObjectModel::HAS_GC_BYTE {
+                debug_assert!(!cfg!(feature = "side_gc_header"));
+                // if VM::VMObjectModel::HAS_GC_BYTE {
                     let abs_gc_byte_offset = (object.to_address() - obj_lowest_addr) as isize
                         + VM::VMObjectModel::GC_BYTE_OFFSET;
                     // e.g. there is more than 8 bytes from lowest object address to gc byte
@@ -257,9 +258,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                     } else {
                         obj_lowest_addr + BYTES_IN_ADDRESS // forwarding word at the first word after the lowest address of the object storage
                     }
-                } else {
-                    obj_lowest_addr // forwarding word at the lowest address of the object storage
-                }
+                // } else {
+                //     obj_lowest_addr // forwarding word at the lowest address of the object storage
+                // }
             }
         }
     }

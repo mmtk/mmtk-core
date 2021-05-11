@@ -146,7 +146,8 @@ fn get_forwarding_word_address<VM: VMBinding>(object: ObjectReference) -> Addres
         Some(fw_offset) => object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET + fw_offset,
         None => {
             let obj_lowest_addr = VM::VMObjectModel::object_start_ref(object);
-            if VM::VMObjectModel::HAS_GC_BYTE {
+            #[cfg(not(feature = "side_gc_header"))]
+            {
                 let abs_gc_byte_offset = (object.to_address() - obj_lowest_addr) as isize
                     + VM::VMObjectModel::GC_BYTE_OFFSET;
                 // e.g. there is more than 8 bytes from lowest object address to gc byte
@@ -155,7 +156,9 @@ fn get_forwarding_word_address<VM: VMBinding>(object: ObjectReference) -> Addres
                 } else {
                     obj_lowest_addr + constants::BYTES_IN_ADDRESS // forwarding word at the first word after the lowest address of the object storage
                 }
-            } else {
+            }
+            #[cfg(feature = "side_gc_header")]
+            {
                 obj_lowest_addr // forwarding word at the lowest address of the object storage
             }
         }
@@ -211,8 +214,9 @@ pub fn compare_exchange_forwarding_word<VM: VMBinding>(
 #[cfg(target_endian = "little")]
 #[inline(always)]
 pub fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize> {
-    let gcbyte_lshift = VM::VMObjectModel::GC_BYTE_OFFSET % constants::BYTES_IN_WORD as isize;
-    if VM::VMObjectModel::HAS_GC_BYTE {
+    #[cfg(not(feature = "side_gc_header"))]
+    {
+        let gcbyte_lshift = VM::VMObjectModel::GC_BYTE_OFFSET % constants::BYTES_IN_WORD as isize;
         if gcbyte_lshift == 0 {
             // e.g. JikesRVM
             Some(0)
@@ -222,7 +226,9 @@ pub fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize> {
         } else {
             None
         }
-    } else {
+    }
+    #[cfg(feature = "side_gc_header")]
+    {
         None
     }
 }
@@ -237,7 +243,7 @@ pub(super) fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize
 #[inline(always)]
 pub(crate) fn check_alloc_size<VM: VMBinding>(size: usize) {
     debug_assert!(
-        if !VM::VMObjectModel::HAS_GC_BYTE || gc_byte_offset_in_forwarding_word::<VM>().is_some() {
+        if cfg!(feature = "side_gc_header") || gc_byte_offset_in_forwarding_word::<VM>().is_some() {
             // If there is no gc byte, the min object size is 1 word. We save forwarding pointer in the word.
             // If the gc byte is low/high order byte, the min object size is 1 word. We save forwarding pointer
             // in the word that contains the gc byte.

@@ -3,7 +3,6 @@ use super::{
     gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges},
     LOGGING_META,
 };
-use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
@@ -23,11 +22,10 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::OpaquePointer;
-use crate::vm::ObjectModel;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
+use crate::{plan::global::BasePlan, util::side_metadata::SideMetadataSpec};
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -174,16 +172,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.in_nursery.load(Ordering::SeqCst)
     }
 
-    fn global_side_metadata_per_chunk(&self) -> usize {
-        let mut side_metadata_per_chunk = if !VM::VMObjectModel::HAS_GC_BYTE {
-            meta_bytes_per_chunk(3, 1)
-        } else {
-            0
-        };
-        if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-            side_metadata_per_chunk += LOGGING_META.meta_bytes_per_chunk();
-        }
-        side_metadata_per_chunk
+    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
+        &self.common().global_metadata_specs
     }
 }
 
@@ -195,6 +185,11 @@ impl<VM: VMBinding> GenCopy<VM> {
         scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let global_metadata_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+            vec![LOGGING_META]
+        } else {
+            vec![]
+        };
 
         GenCopy {
             nursery: CopySpace::new(
@@ -225,7 +220,14 @@ impl<VM: VMBinding> GenCopy<VM> {
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &GENCOPY_CONSTRAINTS),
+            common: CommonPlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                &GENCOPY_CONSTRAINTS,
+                &&global_metadata_specs,
+            ),
             in_nursery: AtomicBool::default(),
             scheduler,
         }

@@ -74,8 +74,11 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
         panic!("immixspace only releases pages enmasse")
     }
 
-    fn local_side_metadata_per_chunk(&self) -> usize {
-        Self::LOCAL_SIDE_METADATA_PER_CHUNK
+    fn local_side_metadata_specs(&self) -> &[SideMetadataSpec] {
+        debug_assert!(!Self::HEADER_MARK_BITS);
+        &[
+            Self::OBJECT_MARK_TABLE, Block::MARK_TABLE, Block::DEFRAG_STATE_TABLE, Line::MARK_TABLE
+        ]
     }
 }
 
@@ -387,7 +390,7 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
     #[inline(always)]
     fn reset_object_mark(chunk: Chunk) {
         if !ImmixSpace::<VM>::HEADER_MARK_BITS {
-            side_metadata::bzero_metadata_for_chunk(ImmixSpace::<VM>::OBJECT_MARK_TABLE, chunk.start());
+            side_metadata::bzero_metadata(ImmixSpace::<VM>::OBJECT_MARK_TABLE, chunk.start(), Chunk::BYTES);
         }
     }
 }

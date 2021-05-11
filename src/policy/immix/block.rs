@@ -89,7 +89,8 @@ impl Block {
         Chunk::from(Chunk::align(self.0))
     }
 
-    pub const fn line_mark_table(&self) -> Range<Address> {
+    #[inline(always)]
+    pub fn line_mark_table(&self) -> Range<Address> {
         debug_assert!(!super::BLOCK_ONLY);
         let start = side_metadata::address_to_meta_address(Line::MARK_TABLE, self.start());
         let end = start + Block::LINES;
@@ -100,7 +101,8 @@ impl Block {
     const MARK_UNMARKED: u8 = u8::MAX;
     const MARK_MARKED: u8 = u8::MAX - 1;
 
-    const fn mark_byte(&self) -> &AtomicU8 {
+    #[inline(always)]
+    fn mark_byte(&self) -> &AtomicU8 {
         unsafe { &*side_metadata::address_to_meta_address(Self::MARK_TABLE, self.start()).to_mut_ptr::<AtomicU8>() }
     }
 
@@ -129,7 +131,8 @@ impl Block {
 
     const DEFRAG_SOURCE_STATE: u8 = u8::MAX;
 
-    const fn defrag_byte(&self) -> &AtomicU8 {
+    #[inline(always)]
+    fn defrag_byte(&self) -> &AtomicU8 {
         unsafe { &*side_metadata::address_to_meta_address(Self::DEFRAG_STATE_TABLE, self.start()).to_mut_ptr::<AtomicU8>() }
     }
 

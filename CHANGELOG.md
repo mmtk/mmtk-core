@@ -1,3 +1,36 @@
+0.3.0 (2021-03-31)
+===
+
+GC Plans
+---
+* Added a marksweep implementation.
+* GC plans are now selected at run-time.
+
+Allocators
+---
+* Added MallocAllocator that can be used as a freelist allocator.
+* Added a few implementations of malloc/free that can be chosen as build-time features.
+
+Policies
+---
+* Added MallocSpace.
+
+API
+---
+* Added support for finalization.
+* HAS_GC_BYTE in the ObjectModel trait is superseded by a feature 'side_gc_byte`.
+
+Misc
+---
+* Added a general side metadata implementation.
+* Added a framework for collecting analysis data.
+* Added a framework that allows triggering analysis or sanity GC at byte-granularity.
+* Added a tutorial for GC implementors.
+* Added a porting guide for MMTk users (language implementors).
+* GC workers now cache work locally.
+* Fixed concurrency bugs in stack scanning and pointer forwarding.
+
+
 0.2.0 (2020-12-18)
 ===
 
