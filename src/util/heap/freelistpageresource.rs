@@ -198,10 +198,10 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     }
 
     fn mprotect(&self, start: Address, pages: usize) {
-        crate::util::memory::mprotect(start, pages << 12).unwrap();
+        // crate::util::memory::mprotect(start, pages << 12).unwrap();
     }
     fn munprotect(&self, start: Address, pages: usize) {
-        crate::util::memory::munprotect(start, pages << 12).unwrap();
+        // crate::util::memory::munprotect(start, pages << 12).unwrap();
     }
 
     fn allocate_contiguous_chunks(
