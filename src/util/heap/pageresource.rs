@@ -1,6 +1,6 @@
 use crate::util::address::Address;
 use crate::util::conversions;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::ActivePlan;
 use std::sync::Mutex;
 
@@ -19,7 +19,7 @@ pub trait PageResource<VM: VMBinding>: 'static {
         space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
-        tls: OpaquePointer,
+        tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
         self.alloc_pages(space_descriptor, reserved_pages, required_pages, tls)
     }
@@ -58,7 +58,7 @@ pub trait PageResource<VM: VMBinding>: 'static {
         space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
-        tls: OpaquePointer,
+        tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail>;
 
     fn adjust_for_metadata(&self, pages: usize) -> usize;
@@ -73,11 +73,11 @@ pub trait PageResource<VM: VMBinding>: 'static {
      * This *MUST* be called by each PageResource during the
      * allocPages, and the caller must hold the lock.
      */
-    fn commit_pages(&self, reserved_pages: usize, actual_pages: usize, tls: OpaquePointer) {
+    fn commit_pages(&self, reserved_pages: usize, actual_pages: usize, tls: VMThread) {
         let delta = actual_pages - reserved_pages;
         self.common().accounting.reserve(delta);
         self.common().accounting.commit(actual_pages);
-        if unsafe { VM::VMActivePlan::is_mutator(tls) } {
+        if VM::VMActivePlan::is_mutator(tls) {
             self.vm_map()
                 .add_to_cumulative_committed_pages(actual_pages);
         }

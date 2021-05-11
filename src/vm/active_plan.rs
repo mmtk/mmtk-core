@@ -1,6 +1,6 @@
 use crate::plan::Mutator;
 use crate::plan::Plan;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 use std::sync::MutexGuard;
@@ -38,7 +38,7 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// # Safety
     /// The caller needs to make sure that the thread is valid (a value passed in by the VM binding through API).
-    unsafe fn is_mutator(tls: OpaquePointer) -> bool;
+    fn is_mutator(tls: VMThread) -> bool;
 
     /// Return a `Mutator` reference for the thread.
     ///
@@ -47,7 +47,7 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// # Safety
     /// The caller needs to make sure that the thread is a mutator thread.
-    unsafe fn mutator(tls: OpaquePointer) -> &'static mut Mutator<VM>;
+    fn mutator(tls: VMMutatorThread) -> &'static mut Mutator<VM>;
 
     /// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.
     fn reset_mutator_iterator();

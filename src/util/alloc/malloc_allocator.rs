@@ -4,15 +4,15 @@ use crate::plan::global::Plan;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
+use crate::util::opaque_pointer::*;
 use crate::util::Address;
-use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 #[cfg(feature = "analysis")]
 use crate::vm::ActivePlan;
 
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
-    pub tls: OpaquePointer,
+    pub tls: VMThread,
     space: &'static MallocSpace<VM>,
     plan: &'static dyn Plan<VM = VM>,
 }
@@ -28,7 +28,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         self.alloc_slow(size, align, offset)
     }
 
-    fn get_tls(&self) -> OpaquePointer {
+    fn get_tls(&self) -> VMThread {
         self.tls
     }
 
@@ -71,7 +71,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
 
 impl<VM: VMBinding> MallocAllocator<VM> {
     pub fn new(
-        tls: OpaquePointer,
+        tls: VMThread,
         space: &'static MallocSpace<VM>,
         plan: &'static dyn Plan<VM = VM>,
     ) -> Self {

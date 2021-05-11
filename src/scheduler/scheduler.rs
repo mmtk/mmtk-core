@@ -4,7 +4,7 @@ use super::work_bucket::*;
 use super::worker::{Worker, WorkerGroup};
 use super::*;
 use crate::mmtk::MMTK;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
@@ -77,7 +77,7 @@ impl<C: Context> Scheduler<C> {
         self: &'static Arc<Self>,
         num_workers: usize,
         context: &'static C,
-        tls: OpaquePointer,
+        tls: VMThread,
     ) {
         use crate::scheduler::work_bucket::WorkBucketStage::*;
         let num_workers = if cfg!(feature = "single_worker") {
@@ -131,7 +131,7 @@ impl<C: Context> Scheduler<C> {
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
     }
 
-    pub fn initialize_worker(self: &Arc<Self>, tls: OpaquePointer) {
+    pub fn initialize_worker(self: &Arc<Self>, tls: VMWorkerThread) {
         let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
         coordinator_worker.init(tls);
     }

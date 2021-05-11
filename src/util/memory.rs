@@ -83,7 +83,7 @@ pub fn munmap(start: Address, size: usize) -> Result<()> {
 }
 
 /// Properly handle errors from a mmap Result, including invoking the binding code for an OOM error.
-pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: OpaquePointer) -> ! {
+pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
     use std::io::ErrorKind;
 
     match error.kind() {
