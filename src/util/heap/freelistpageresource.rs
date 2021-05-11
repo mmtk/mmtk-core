@@ -113,7 +113,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         let rtn = self.start + conversions::pages_to_bytes(page_offset as _);
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
-
+        if !new_chunk { self.munprotect(rtn, self.free_list.size(page_offset as _) as _) };
         Result::Ok(PRAllocResult {
             start: rtn,
             pages: required_pages,
@@ -195,6 +195,13 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             }),
             _p: PhantomData,
         }
+    }
+
+    fn mprotect(&self, start: Address, pages: usize) {
+        crate::util::memory::mprotect(start, pages << 12).unwrap();
+    }
+    fn munprotect(&self, start: Address, pages: usize) {
+        crate::util::memory::munprotect(start, pages << 12).unwrap();
     }
 
     fn allocate_contiguous_chunks(
@@ -299,6 +306,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         for i in (0..bytes).step_by(8) {
             unsafe { (first + i).store(0xdeadbeefdeadbeefusize) }
         }
+        self.mprotect(first, pages as _);
         self.release_pages(first)
     }
 
