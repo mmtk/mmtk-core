@@ -1,11 +1,11 @@
 use crate::api::*;
-use mmtk::util::OpaquePointer;
+use mmtk::util::opaque_pointer::*;
 use mmtk::AllocationSemantics;
 
 #[test]
 pub fn issue139_alloc_non_multiple_of_min_alignment() {
     gc_init(200*1024*1024);
-    let handle = bind_mutator(OpaquePointer::UNINITIALIZED);
+    let handle = bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
 
     // Allocate 6 bytes with 8 bytes ailgnment required
     let addr = alloc(handle, 14, 8, 0, AllocationSemantics::Default);
