@@ -163,6 +163,7 @@ impl Block {
     #[inline]
     pub fn init(&self, copy: bool) {
         self.set_state(if copy { BlockState::Marked } else { BlockState::Unmarked });
+        self.defrag_byte().store(0, Ordering::Release);
     }
 
     #[inline]

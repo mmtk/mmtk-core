@@ -44,12 +44,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
-        debug_assert!(Self::HEADER_MARK_BITS);
-        let old_value = gc_byte::read_gc_byte::<VM>(object);
-        let new_value = (old_value & Self::GC_MARK_BIT_MASK) | self.mark_state.load(Ordering::Acquire);
-        gc_byte::write_gc_byte::<VM>(object, new_value);
-    }
+    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
 }
 
 impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
@@ -128,7 +123,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             in_collection: AtomicBool::new(false),
             reusable_blocks: BlockList::new(),
             defrag: Defrag::new(),
-            mark_state: AtomicU8::new(0),
+            mark_state: AtomicU8::new(Self::MARK_BASE_VALUE),
         }
     }
 
@@ -149,9 +144,29 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.defrag.decide_whether_to_defrag(emergency_collection, collection_attempts, self.reusable_blocks.len() == 0)
     }
 
+    const AVAILABLE_LOCAL_BITS: usize = 7;
+    const MARK_BASE: usize = 4;
+    const MARK_INCREMENT: u8 = 1 << Self::MARK_BASE;
+    const MAX_MARKCOUNT_BITS: usize = Self::AVAILABLE_LOCAL_BITS - Self::MARK_BASE;
+    const MARK_MASK: u8 = ((1 << Self::MAX_MARKCOUNT_BITS) - 1) << Self::MARK_BASE;
+    const MARK_BASE_VALUE: u8 = Self::MARK_INCREMENT;
+
+    pub fn delta_mark_state(state: u8) -> u8 {
+        debug_assert!(Self::HEADER_MARK_BITS);
+        let mut rtn = state;
+        loop {
+            rtn = (rtn + Self::MARK_INCREMENT) & Self::MARK_MASK;
+            if rtn >= Self::MARK_BASE_VALUE {
+                break;
+            }
+        }
+        debug_assert_ne!(rtn, state);
+        return rtn;
+    }
+
     pub fn prepare(&'static self, mmtk: &'static MMTK<VM>) {
         if Self::HEADER_MARK_BITS {
-            self.mark_state.store(Self::GC_MARK_BIT_MASK - self.mark_state.load(Ordering::Acquire), Ordering::Release);
+            self.mark_state.store(Self::delta_mark_state(self.mark_state.load(Ordering::Acquire)), Ordering::Release);
         }
         if !super::BLOCK_ONLY {
             self.defrag.prepare(self);
@@ -291,8 +306,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     const HEADER_MARK_BITS: bool = cfg!(feature = "immix_header_mark_bits");
 
-    const GC_MARK_BIT_MASK: u8 = 1;
-
     const OBJECT_MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         scope: SideMetadataScope::PolicySpecific,
         offset: Block::MARK_TABLE.accumulated_size(),
@@ -303,24 +316,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     fn attempt_mark(&self, object: ObjectReference) -> bool {
         if Self::HEADER_MARK_BITS {
-            let mut old_value = gc_byte::read_gc_byte::<VM>(object);
-            let mut mark_bit = old_value & Self::GC_MARK_BIT_MASK;
-            let value = self.mark_state.load(Ordering::Acquire);
-            if mark_bit == value {
-                return false;
+            if !self.is_marked(object) {
+                gc_byte::write_gc_byte::<VM>(object, self.mark_state.load(Ordering::Relaxed));
+                true
+            } else {
+                false
             }
-            while !gc_byte::compare_exchange_gc_byte::<VM>(
-                object,
-                old_value,
-                old_value ^ Self::GC_MARK_BIT_MASK,
-            ) {
-                old_value = gc_byte::read_gc_byte::<VM>(object);
-                mark_bit = (old_value as u8) & Self::GC_MARK_BIT_MASK;
-                if mark_bit == value {
-                    return false;
-                }
-            }
-            true
         } else {
             side_metadata::compare_exchange_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object), 0, 1)
         }
@@ -329,12 +330,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     fn is_marked(&self, object: ObjectReference) -> bool {
         if Self::HEADER_MARK_BITS {
-            let value = self.mark_state.load(Ordering::Acquire);
-            let old_value = gc_byte::read_gc_byte::<VM>(object);
-            let mark_bit = old_value & Self::GC_MARK_BIT_MASK;
-            mark_bit == value
+            gc_byte::read_gc_byte::<VM>(object) & Self::MARK_MASK == self.mark_state.load(Ordering::Relaxed)
         } else {
-            side_metadata::load_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object)) == 1
+            unsafe { side_metadata::load(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object)) == 1 }
         }
     }
 
