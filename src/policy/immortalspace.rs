@@ -48,6 +48,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
             new_value |= self.header_byte.unlogged_bit;
         }
         gc_byte::write_gc_byte::<VM>(object, new_value);
+        debug_assert!(self.is_live(object));
     }
 }
 
