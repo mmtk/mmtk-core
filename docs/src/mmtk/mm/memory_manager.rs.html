@@ -397,7 +397,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_PAGE</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_END</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">HEAP_START</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">Collection</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
@@ -408,7 +408,7 @@
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `tls`: The thread that will be used as the GC controller.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_control_collector</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_control_collector</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">control_collector_context</span>.<span class="ident">run</span>(<span class="ident">tls</span>);
 }
 
@@ -439,7 +439,7 @@
 <span class="doccomment">/// * `tls`: The thread that will be associated with the mutator.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bind_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+    <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">global</span>::<span class="ident">create_mutator</span>(<span class="ident">tls</span>, <span class="ident">mmtk</span>)
 }
@@ -526,7 +526,7 @@
 <span class="doccomment">/// * `worker`: A reference to the GC worker.</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_worker</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+    <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
     <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 ) {
@@ -543,7 +543,7 @@
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in</span>
 <span class="doccomment">///   Collection::spawn_worker_thread() so that the VM knows the context.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_collection</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_collection</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>) {
     <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">initialize</span>(<span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">threads</span>, <span class="ident">mmtk</span>, <span class="ident">tls</span>);
     <span class="ident">VM</span>::<span class="ident">VMCollection</span>::<span class="ident">spawn_worker_thread</span>(<span class="ident">tls</span>, <span class="prelude-val">None</span>); <span class="comment">// spawn controller thread</span>
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">initialized</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
@@ -606,7 +606,7 @@
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `tls`: The thread that triggers this collection request.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_user_collection_request</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_user_collection_request</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>) {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">handle_user_collection_request</span>(<span class="ident">tls</span>, <span class="bool-val">false</span>);
 }
 
@@ -704,7 +704,7 @@
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `tls`: The thread that calls the function (and triggers a collection).</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">harness_begin</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">harness_begin</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>) {
     <span class="ident">mmtk</span>.<span class="ident">harness_begin</span>(<span class="ident">tls</span>);
 }
 

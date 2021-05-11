@@ -78,17 +78,17 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">AllocationSemantics</span> <span class="kw">as</span> <span class="ident">AllocationType</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">allocators</span>::{<span class="ident">AllocatorSelector</span>, <span class="ident">Allocators</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">BumpAllocator</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">VMMutatorThread</span>, <span class="ident">VMWorkerThread</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">MMTK</span>;
 <span class="kw">use</span> <span class="ident">enum_map</span>::<span class="ident">enum_map</span>;
 <span class="kw">use</span> <span class="ident">enum_map</span>::<span class="ident">EnumMap</span>;
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gencopy_mutator_prepare</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">_mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gencopy_mutator_prepare</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">_mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
     <span class="comment">// Do nothing</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gencopy_mutator_release</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gencopy_mutator_release</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
     <span class="comment">// reset nursery allocator</span>
     <span class="kw">let</span> <span class="ident">bump_allocator</span> <span class="op">=</span> <span class="kw">unsafe</span> {
         <span class="ident">mutator</span>
@@ -109,7 +109,7 @@
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_gencopy_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">mutator_tls</span>: <span class="ident">OpaquePointer</span>,
+    <span class="ident">mutator_tls</span>: <span class="ident">VMMutatorThread</span>,
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">gencopy</span> <span class="op">=</span> <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">GenCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();

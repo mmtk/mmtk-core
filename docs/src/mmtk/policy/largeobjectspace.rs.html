@@ -255,9 +255,9 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">HeapMeta</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::{<span class="ident">FreeListPageResource</span>, <span class="ident">PageResource</span>, <span class="ident">VMRequest</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">treadmill</span>::<span class="ident">TreadMill</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">ObjectModel</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
@@ -439,7 +439,7 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">acquire</span>(<span class="ident">tls</span>, <span class="ident">pages</span>);
         <span class="kw">if</span> <span class="ident">start</span>.<span class="ident">is_zero</span>() {
             <span class="kw">return</span> <span class="ident">start</span>;

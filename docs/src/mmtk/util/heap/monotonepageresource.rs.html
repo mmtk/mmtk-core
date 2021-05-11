@@ -324,7 +324,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">embedded_meta_data</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">LOG_BYTES_IN_CHUNK</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">pageresource</span>::<span class="ident">CommonPageResource</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">layout</span>::<span class="ident">map</span>::<span class="ident">Map</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">pageresource</span>::{<span class="ident">PRAllocFail</span>, <span class="ident">PRAllocResult</span>};
@@ -381,7 +381,7 @@
         <span class="ident">space_descriptor</span>: <span class="ident">SpaceDescriptor</span>,
         <span class="ident">reserved_pages</span>: <span class="ident">usize</span>,
         <span class="ident">immut_required_pages</span>: <span class="ident">usize</span>,
-        <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+        <span class="ident">tls</span>: <span class="ident">VMThread</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span> {
         <span class="macro">debug</span><span class="macro">!</span>(
             <span class="string">&quot;In MonotonePageResource, reserved_pages = {}, required_pages = {}&quot;</span>,

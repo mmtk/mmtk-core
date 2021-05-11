@@ -200,7 +200,6 @@
 <span id="197">197</span>
 <span id="198">198</span>
 <span id="199">199</span>
-<span id="200">200</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">Ordering</span>;
@@ -213,7 +212,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">Plan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">Space</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>::<span class="ident">bytes_to_pages</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">VMBinding</span>};
 
 <span class="kw">const</span> <span class="ident">BYTES_IN_PAGE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>;
@@ -222,7 +221,7 @@
 
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BumpAllocator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+    <span class="kw">pub</span> <span class="ident">tls</span>: <span class="ident">VMThread</span>,
     <span class="ident">cursor</span>: <span class="ident">Address</span>,
     <span class="ident">limit</span>: <span class="ident">Address</span>,
     <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
@@ -290,14 +289,14 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">OpaquePointer</span> {
+    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">VMThread</span> {
         <span class="self">self</span>.<span class="ident">tls</span>
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">BumpAllocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+        <span class="ident">tls</span>: <span class="ident">VMThread</span>,
         <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
         <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
@@ -327,8 +326,7 @@
             <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">true</span>)
         } <span class="kw">else</span> {
             <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">base</span>();
-            <span class="kw">let</span> <span class="ident">is_mutator</span> <span class="op">=</span>
-                <span class="kw">unsafe</span> { <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="self">self</span>.<span class="ident">tls</span>) } <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">is_initialized</span>();
+            <span class="kw">let</span> <span class="ident">is_mutator</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="self">self</span>.<span class="ident">tls</span>) <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">is_initialized</span>();
 
             <span class="kw">if</span> <span class="ident">is_mutator</span>
                 <span class="op">&amp;&amp;</span> <span class="ident">base</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) <span class="op">&gt;</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span>

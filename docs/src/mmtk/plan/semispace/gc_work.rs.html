@@ -137,6 +137,7 @@
 <span id="134">134</span>
 <span id="135">135</span>
 <span id="136">136</span>
+<span id="137">137</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">global</span>::<span class="ident">SemiSpace</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">CopyContext</span>;
@@ -146,7 +147,8 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">WorkerLocal</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::{<span class="ident">Allocator</span>, <span class="ident">BumpAllocator</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">forwarding_word</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>, <span class="ident">OpaquePointer</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">MMTK</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
@@ -162,8 +164,8 @@
     <span class="kw">fn</span> <span class="ident">constraints</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span> {
         <span class="kw-2">&amp;</span><span class="kw">super</span>::<span class="ident">global</span>::<span class="ident">SS_CONSTRAINTS</span>
     }
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
-        <span class="self">self</span>.<span class="ident">ss</span>.<span class="ident">tls</span> <span class="op">=</span> <span class="ident">tls</span>;
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
+        <span class="self">self</span>.<span class="ident">ss</span>.<span class="ident">tls</span> <span class="op">=</span> <span class="ident">tls</span>.<span class="number">0</span>;
     }
     <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">ss</span>.<span class="ident">rebind</span>(<span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">tospace</span>());
@@ -200,13 +202,13 @@
         <span class="self">Self</span> {
             <span class="ident">plan</span>,
             <span class="comment">// it doesn&#39;t matter which space we bind with the copy allocator. We will rebind to a proper space in prepare().</span>
-            <span class="ident">ss</span>: <span class="ident">BumpAllocator</span>::<span class="ident">new</span>(<span class="ident">OpaquePointer</span>::<span class="ident">UNINITIALIZED</span>, <span class="ident">plan</span>.<span class="ident">tospace</span>(), <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>),
+            <span class="ident">ss</span>: <span class="ident">BumpAllocator</span>::<span class="ident">new</span>(<span class="ident">VMThread</span>::<span class="ident">UNINITIALIZED</span>, <span class="ident">plan</span>.<span class="ident">tospace</span>(), <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>),
         }
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">WorkerLocal</span> <span class="kw">for</span> <span class="ident">SSCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="ident">CopyContext</span>::<span class="ident">init</span>(<span class="self">self</span>, <span class="ident">tls</span>);
     }
 }

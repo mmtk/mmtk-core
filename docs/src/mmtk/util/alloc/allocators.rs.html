@@ -130,7 +130,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">LargeObjectAllocator</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">MallocAllocator</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::{<span class="ident">Allocator</span>, <span class="ident">BumpAllocator</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">VMMutatorThread</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 
 <span class="kw">const</span> <span class="ident">MAX_BUMP_ALLOCATORS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">5</span>;
@@ -181,7 +181,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">mutator_tls</span>: <span class="ident">OpaquePointer</span>,
+        <span class="ident">mutator_tls</span>: <span class="ident">VMMutatorThread</span>,
         <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
         <span class="ident">space_mapping</span>: <span class="kw-2">&amp;</span>[(<span class="ident">AllocatorSelector</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>)],
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
@@ -195,21 +195,21 @@
             <span class="kw">match</span> <span class="ident">selector</span> {
                 <span class="ident">AllocatorSelector</span>::<span class="ident">BumpPointer</span>(<span class="ident">index</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="ident">ret</span>.<span class="ident">bump_pointer</span>[<span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">write</span>(<span class="ident">BumpAllocator</span>::<span class="ident">new</span>(
-                        <span class="ident">mutator_tls</span>,
+                        <span class="ident">mutator_tls</span>.<span class="number">0</span>,
                         <span class="ident">space</span>,
                         <span class="ident">plan</span>,
                     ));
                 }
                 <span class="ident">AllocatorSelector</span>::<span class="ident">LargeObject</span>(<span class="ident">index</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="ident">ret</span>.<span class="ident">large_object</span>[<span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">write</span>(<span class="ident">LargeObjectAllocator</span>::<span class="ident">new</span>(
-                        <span class="ident">mutator_tls</span>,
+                        <span class="ident">mutator_tls</span>.<span class="number">0</span>,
                         <span class="ident">space</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">LargeObjectSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>(),
                         <span class="ident">plan</span>,
                     ));
                 }
                 <span class="ident">AllocatorSelector</span>::<span class="ident">Malloc</span>(<span class="ident">index</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="ident">ret</span>.<span class="ident">malloc</span>[<span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">write</span>(<span class="ident">MallocAllocator</span>::<span class="ident">new</span>(
-                        <span class="ident">mutator_tls</span>,
+                        <span class="ident">mutator_tls</span>.<span class="number">0</span>,
                         <span class="ident">space</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">MallocSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>(),
                         <span class="ident">plan</span>,
                     ));

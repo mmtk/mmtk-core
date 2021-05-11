@@ -48,9 +48,9 @@
 <span id="45">45</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">TraceLocal</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 
 <span class="doccomment">/// VM-specific methods for reference processing.</span>
@@ -89,7 +89,7 @@
     <span class="kw">fn</span> <span class="ident">process_reference</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TraceLocal</span><span class="op">&gt;</span>(
         <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>,
         <span class="ident">reference</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span>;
 }
 </pre></div>

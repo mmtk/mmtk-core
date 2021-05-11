@@ -311,6 +311,7 @@
 <span id="308">308</span>
 <span id="309">309</span>
 <span id="310">310</span>
+<span id="311">311</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">TransitiveClosure</span>;
@@ -320,10 +321,10 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::<span class="ident">VMMap</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">PageResource</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">malloc</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">Collection</span>, <span class="ident">ObjectModel</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">Space</span>, <span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>};
@@ -459,10 +460,11 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
         <span class="comment">// TODO: Should refactor this and Space.acquire()</span>
         <span class="kw">if</span> <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">poll</span>(<span class="bool-val">false</span>, <span class="self">self</span>) {
-            <span class="ident">VM</span>::<span class="ident">VMCollection</span>::<span class="ident">block_for_gc</span>(<span class="ident">tls</span>);
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="ident">tls</span>), <span class="string">&quot;Polling in GC worker&quot;</span>);
+            <span class="ident">VM</span>::<span class="ident">VMCollection</span>::<span class="ident">block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>));
             <span class="kw">return</span> <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">zero</span>() };
         }
 

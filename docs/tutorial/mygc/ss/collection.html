@@ -136,13 +136,15 @@
                         </a>
                         
                         
+                        
+
                     </div>
                 </div>
 
                 
                 <div id="search-wrapper" class="hidden">
                     <form id="searchbar-outer" class="searchbar-outer">
-                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
                     </form>
                     <div id="searchresults-outer" class="searchresults-outer hidden">
                         <div id="searchresults-header" class="searchresults-header"></div>
@@ -183,7 +185,8 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::forwarding_word;
-use crate::util::{Address, ObjectReference, OpaquePointer};
+use crate::util::{Address, ObjectReference};
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::plan::PlanConstraints;
@@ -253,8 +256,8 @@ the one passed to the function. In <code>constraints()</code>, return a referenc
 </span>    fn constraints(&amp;self) -&gt; &amp;'static PlanConstraints {
         &amp;super::global::MYGC_CONSTRAINTS
     }
-    fn init(&amp;mut self, tls:OpaquePointer) {
-        self.mygc.tls = tls;
+    fn init(&amp;mut self, tls: VMWorkerThread) {
+        self.mygc.tls = tls.0;
     }
 <span class="boring">}
 </span></code></pre></pre>
@@ -268,13 +271,13 @@ the one passed to the function. In <code>constraints()</code>, return a referenc
         let plan = &amp;mmtk.plan.downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
         Self {
             plan,
-            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, plan.tospace(), &amp;*mmtk.plan),
+            mygc: BumpAllocator::new(VMThread::UNINITIALIZED, plan.tospace(), &amp;*mmtk.plan),
         }
     }
 }
 
 impl&lt;VM: VMBinding&gt; WorkerLocal for MyGCCopyContext&lt;VM&gt; {
-    fn init(&amp;mut self, tls: OpaquePointer) {
+    fn init(&amp;mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
 }
@@ -318,7 +321,7 @@ next few steps. </p>
 </span><span class="boring">fn main() {
 </span>    fn create_worker_local(
         &amp;self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &amp;'static MMTK&lt;Self::VM&gt;,
     ) -&gt; GCWorkerLocalPtr {
         let mut c = MyGCCopyContext::new(mmtk);
@@ -364,7 +367,7 @@ call, and add the following code:</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn prepare(&amp;self, tls: OpaquePointer) {
+</span>    fn prepare(&amp;self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
 
         self.hi
@@ -510,7 +513,7 @@ run after each collection.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn release(&amp;self, tls: OpaquePointer) {
+</span>    fn release(&amp;self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         self.fromspace().release();
     }
@@ -534,7 +537,7 @@ will then go to the new tospace.</p>
 </span><span class="boring">fn main() {
 </span>pub fn mygc_mutator_release&lt;VM: VMBinding&gt;(
     mutator: &amp;mut Mutator&lt;VM&gt;,
-    _tls: OpaquePointer,
+    _tls: VMWorkerThread,
 ) {
     // rebind the allocation bump pointer to the appropriate semispace
     let bump_allocator = unsafe {

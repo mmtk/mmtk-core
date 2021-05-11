@@ -333,16 +333,19 @@
 <span id="330">330</span>
 <span id="331">331</span>
 <span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">UnsafeCell</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Mutex</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">vec</span>::<span class="ident">Vec</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">MutatorContext</span>, <span class="ident">TraceLocal</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">TraceLocal</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">ReferenceGlue</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">ReferenceGlue</span>};
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ReferenceProcessors</span> {
     <span class="ident">soft</span>: <span class="ident">ReferenceProcessor</span>,
@@ -403,19 +406,19 @@
         <span class="self">self</span>.<span class="ident">phantom</span>.<span class="ident">forward</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="bool-val">false</span>);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan_weak_refs</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">TraceLocal</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan_weak_refs</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">TraceLocal</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="self">self</span>.<span class="ident">soft</span>.<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="ident">tls</span>);
         <span class="self">self</span>.<span class="ident">weak</span>.<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="ident">tls</span>);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan_soft_refs</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">TraceLocal</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan_soft_refs</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">TraceLocal</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="self">self</span>.<span class="ident">soft</span>.<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="ident">tls</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan_phantom_refs</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">TraceLocal</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>,
-        <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
     ) {
         <span class="self">self</span>.<span class="ident">phantom</span>.<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="ident">tls</span>);
     }
@@ -570,7 +573,7 @@
         <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>,
         <span class="ident">nursery</span>: <span class="ident">bool</span>,
         <span class="ident">retain</span>: <span class="ident">bool</span>,
-        <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
     ) {
         <span class="kw">let</span> <span class="ident">sync</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">sync_mut</span>() };
         <span class="ident">sync</span>.<span class="ident">unforwarded_references</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">sync</span>.<span class="ident">references</span>.<span class="ident">clone</span>());
@@ -621,10 +624,13 @@
         }
 
         <span class="comment">/* flush out any remset entries generated during the above activities */</span>
-        <span class="kw">unsafe</span> { <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">mutator</span>(<span class="ident">tls</span>) }.<span class="ident">flush_remembered_sets</span>();
-        <span class="kw">if</span> <span class="ident">TRACE</span> {
-            <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Ending ReferenceProcessor.scan({:?})&quot;</span>, <span class="self">self</span>.<span class="ident">semantics</span>);
-        }
+
+        <span class="comment">// FIXME: We are calling mutator() for a worker thread</span>
+        <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;We are calling mutator() for a worker tls. We need to fix this.&quot;</span>);
+        <span class="comment">// unsafe { VM::VMActivePlan::mutator(tls)) }.flush_remembered_sets();</span>
+        <span class="comment">// if TRACE {</span>
+        <span class="comment">//     trace!(&quot;Ending ReferenceProcessor.scan({:?})&quot;, self.semantics);</span>
+        <span class="comment">// }</span>
     }
 
     <span class="doccomment">/**

@@ -178,7 +178,7 @@
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">address</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">ActivePlan</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Mutex</span>;
 
@@ -197,7 +197,7 @@
         <span class="ident">space_descriptor</span>: <span class="ident">SpaceDescriptor</span>,
         <span class="ident">reserved_pages</span>: <span class="ident">usize</span>,
         <span class="ident">required_pages</span>: <span class="ident">usize</span>,
-        <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+        <span class="ident">tls</span>: <span class="ident">VMThread</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">alloc_pages</span>(<span class="ident">space_descriptor</span>, <span class="ident">reserved_pages</span>, <span class="ident">required_pages</span>, <span class="ident">tls</span>)
     }
@@ -236,7 +236,7 @@
         <span class="ident">space_descriptor</span>: <span class="ident">SpaceDescriptor</span>,
         <span class="ident">reserved_pages</span>: <span class="ident">usize</span>,
         <span class="ident">required_pages</span>: <span class="ident">usize</span>,
-        <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+        <span class="ident">tls</span>: <span class="ident">VMThread</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span>;
 
     <span class="kw">fn</span> <span class="ident">adjust_for_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
@@ -251,11 +251,11 @@
      * This *MUST* be called by each PageResource during the
      * allocPages, and the caller must hold the lock.
      */</span>
-    <span class="kw">fn</span> <span class="ident">commit_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">reserved_pages</span>: <span class="ident">usize</span>, <span class="ident">actual_pages</span>: <span class="ident">usize</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
+    <span class="kw">fn</span> <span class="ident">commit_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">reserved_pages</span>: <span class="ident">usize</span>, <span class="ident">actual_pages</span>: <span class="ident">usize</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>) {
         <span class="kw">let</span> <span class="ident">delta</span> <span class="op">=</span> <span class="ident">actual_pages</span> <span class="op">-</span> <span class="ident">reserved_pages</span>;
         <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">reserve</span>(<span class="ident">delta</span>);
         <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">commit</span>(<span class="ident">actual_pages</span>);
-        <span class="kw">if</span> <span class="kw">unsafe</span> { <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="ident">tls</span>) } {
+        <span class="kw">if</span> <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="ident">tls</span>) {
             <span class="self">self</span>.<span class="ident">vm_map</span>()
                 .<span class="ident">add_to_cumulative_committed_pages</span>(<span class="ident">actual_pages</span>);
         }

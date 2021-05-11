@@ -138,13 +138,15 @@
                         </a>
                         
                         
+                        
+
                     </div>
                 </div>
 
                 
                 <div id="search-wrapper" class="hidden">
                     <form id="searchbar-outer" class="searchbar-outer">
-                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
                     </form>
                     <div id="searchresults-outer" class="searchresults-outer hidden">
                         <div id="searchresults-header" class="searchresults-header"></div>
@@ -173,7 +175,7 @@
 We start with an overview of the MMTk approach to porting and then step through recommended strategies for implementing a port.</p>
 <p>There’s no fixed way to implement a new port.
 What we outline here is a distillation of best practices that have emerged from community as it has worked through six ports (JikesRVM, OpenJDK, V8, Mu, Ruby, and .NET, which are at various levels of maturity).</p>
-<h1 id="overview-of-mmtks-approach-to-portability"><a class="header" href="#overview-of-mmtks-approach-to-portability">Overview of MMTk’s Approach to Portability</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="overview-of-mmtks-approach-to-portability"><a class="header" href="#overview-of-mmtks-approach-to-portability">Overview of MMTk’s Approach to Portability</a></h1>
 <p>MMTk is designed from the outset to be both high performance and portable.
 The core of MMTk is entirely runtime-neutral, and is written in Rust.
 Runtimes that wish to use MMTk may be written in any language so long as they have a means to call into MMTk’s API, which presents itself as a shared library.</p>
@@ -200,7 +202,7 @@ The leftmost box should be entirely free of any MMTk-specific code.</p>
 <p>Note: we do currently maintain a fork of OpenJDK which includes some necessary changes to their code base, but this is not MMTk-specific and ideally this will be upstreamed.  Our port to V8 is a cleaner example, where we’ve managed to work closely with the V8 team to upstream all of the refactoring of the V8 code base that was necessary for it to support a third party heap.</p>
 </blockquote>
 <p>We structure the code into three repos.  The <a href="https://github.com/mmtk/mmtk-core">MMTk core</a>, the <a href="https://github.com/mmtk/mmtk-openjdk">binding repo</a> containing both parts of the binding, and the OpenJDK repo, which is currently <a href="https://github.com/mmtk/openjdk">a fork</a> we maintain.</p>
-<h1 id="things-to-consider-before-starting-a-port"><a class="header" href="#things-to-consider-before-starting-a-port">Things to Consider Before Starting a Port</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="things-to-consider-before-starting-a-port"><a class="header" href="#things-to-consider-before-starting-a-port">Things to Consider Before Starting a Port</a></h1>
 <p>In principle, a port to MMTk is not particularly difficult.
 MMTk can present itself as a standard library and the core of the API is relatively simple.</p>
 <p>However, porting a runtime to a different GC (any GC) can be difficult and time consuming.
@@ -214,7 +216,7 @@ Key questions include: </p>
 <li>etc.</li>
 </ul>
 <p>Thinking through these questions should give you a sense for how big a task a GC port will be.</p>
-<h1 id="how-to-undertake-a-port"><a class="header" href="#how-to-undertake-a-port">How to Undertake a Port</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="how-to-undertake-a-port"><a class="header" href="#how-to-undertake-a-port">How to Undertake a Port</a></h1>
 <p>We recommend a highly incremental approach to implementing a port.   The broad idea is:</p>
 <ul>
 <li>Start with the NoGC plan and gradually move to more advanced collectors</li>
@@ -225,7 +227,7 @@ Key questions include: </p>
 Plans can be selected at run time.
 Not all plans will be suitable for all runtimes.
 For example, a runtime that for some reason cannot support object movement won’t be able to use plans that use copying garbage collection.</p>
-<h1 id="nogc"><a class="header" href="#nogc">NoGC</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="nogc"><a class="header" href="#nogc">NoGC</a></h1>
 <p>We always start a port with NoGC.
 It is the simplest possible plan, simply allocates memory and never collects it.
 Although this appears trivial, depending on the complexity of the runtime and how well factored (or not) its internal GC interfaces are, just getting this working may be a major undertaking.
@@ -285,7 +287,7 @@ So it’s a good idea not to underestimate the difficulty of a NoGC port!</p>
 </ol>
 </li>
 </ol>
-<h1 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h1>
 <p>Your choice of the next GC plan to implement depends on your situation.
 If you’re developing a new VM from scratch, or if you are intimately familiar with the internals of your target VM, then implementing a SemiSpace collector is probably the best course of action.
 Although the GC itself is rather simplistic, it stresses many of the key components of the MMTk &lt;-&gt; VM binding that will be required for later (and more powerful) GCs.

@@ -197,7 +197,7 @@
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">work_bucket</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">MMTK</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ffi</span>::<span class="ident">c_void</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">Sender</span>;
@@ -240,7 +240,7 @@
 <span class="kw">const</span> <span class="ident">LOCALLY_CACHED_WORKS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Context</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+    <span class="kw">pub</span> <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
     <span class="kw">pub</span> <span class="ident">ordinal</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">parked</span>: <span class="ident">AtomicBool</span>,
     <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -267,7 +267,7 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">upgrade</span>().<span class="ident">unwrap</span>();
         <span class="self">Self</span> {
-            <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>::<span class="ident">UNINITIALIZED</span>,
+            <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>(<span class="ident">VMThread</span>::<span class="ident">UNINITIALIZED</span>),
             <span class="ident">ordinal</span>,
             <span class="ident">parked</span>: <span class="ident">AtomicBool</span>::<span class="ident">new</span>(<span class="bool-val">true</span>),
             <span class="ident">local</span>: <span class="ident">WorkerLocalPtr</span>::<span class="ident">UNINITIALIZED</span>,
@@ -325,7 +325,7 @@
         <span class="self">self</span>.<span class="ident">local</span> <span class="op">=</span> <span class="ident">local</span>;
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="self">self</span>.<span class="ident">tls</span> <span class="op">=</span> <span class="ident">tls</span>;
     }
 
@@ -377,7 +377,7 @@
         <span class="self">self</span>.<span class="ident">parked_workers</span>() <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_count</span>()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spawn_workers</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>, <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">C</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spawn_workers</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">C</span>) {
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="self">self</span>.<span class="ident">worker_count</span>() {
             <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">workers</span>[<span class="ident">i</span>];
             <span class="ident">C</span>::<span class="ident">spawn_worker</span>(<span class="ident">worker</span>, <span class="ident">tls</span>, <span class="ident">context</span>);

@@ -161,9 +161,9 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">HeapMeta</span>;
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_imports</span>)]</span>
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">VMRequest</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">options</span>::<span class="ident">UnsafeOptionsWrapper</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::<span class="ident">SideMetadataContext</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 <span class="kw">use</span> <span class="ident">enum_map</span>::<span class="ident">EnumMap</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
@@ -189,7 +189,7 @@
 
     <span class="kw">fn</span> <span class="ident">create_worker_local</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
         <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">VM</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">GCWorkerLocalPtr</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">NoCopy</span>::<span class="ident">new</span>(<span class="ident">mmtk</span>);
@@ -217,11 +217,11 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>) {
+    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="macro">unreachable</span><span class="macro">!</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>) {
+    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="macro">unreachable</span><span class="macro">!</span>()
     }
 
@@ -237,7 +237,7 @@
         <span class="self">self</span>.<span class="ident">nogc_space</span>.<span class="ident">reserved_pages</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">handle_user_collection_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>, <span class="ident">_force</span>: <span class="ident">bool</span>) {
+    <span class="kw">fn</span> <span class="ident">handle_user_collection_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMMutatorThread</span>, <span class="ident">_force</span>: <span class="ident">bool</span>) {
         <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.&quot;</span>);
     }
 }

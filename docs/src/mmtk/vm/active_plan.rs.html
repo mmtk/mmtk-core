@@ -75,7 +75,7 @@
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">Mutator</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">Plan</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">MutexGuard</span>;
@@ -113,7 +113,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Safety</span>
     <span class="doccomment">/// The caller needs to make sure that the thread is valid (a value passed in by the VM binding through API).</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">is_mutator</span>(<span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
+    <span class="kw">fn</span> <span class="ident">is_mutator</span>(<span class="ident">tls</span>: <span class="ident">VMThread</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
 
     <span class="doccomment">/// Return a `Mutator` reference for the thread.</span>
     <span class="doccomment">///</span>
@@ -122,7 +122,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Safety</span>
     <span class="doccomment">/// The caller needs to make sure that the thread is a mutator thread.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">mutator</span>(<span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">mutator</span>(<span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.</span>
     <span class="kw">fn</span> <span class="ident">reset_mutator_iterator</span>();

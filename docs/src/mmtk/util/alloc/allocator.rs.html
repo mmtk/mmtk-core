@@ -212,7 +212,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">Plan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">Space</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">Collection</span>};
 <span class="kw">use</span> <span class="ident">downcast_rs</span>::<span class="ident">Downcast</span>;
@@ -311,7 +311,7 @@
 }
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Allocator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="ident">Downcast</span> {
-    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">OpaquePointer</span>;
+    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">VMThread</span>;
 
     <span class="kw">fn</span> <span class="ident">get_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
     <span class="kw">fn</span> <span class="ident">get_plan</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>;
@@ -337,7 +337,7 @@
             <span class="comment">// Try to allocate using the slow path</span>
             <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">alloc_slow_once</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
 
-            <span class="kw">if</span> <span class="op">!</span><span class="kw">unsafe</span> { <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="ident">tls</span>) } {
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="ident">tls</span>) {
                 <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">result</span>.<span class="ident">is_zero</span>());
                 <span class="kw">return</span> <span class="ident">result</span>;
             }

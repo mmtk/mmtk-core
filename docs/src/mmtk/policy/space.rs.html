@@ -602,7 +602,7 @@
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_MBYTE</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">SFT_MAP</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::<span class="ident">Mmapper</span>;
@@ -829,10 +829,10 @@
     <span class="kw">fn</span> <span class="ident">get_page_resource</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
     <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>);
 
-    <span class="kw">fn</span> <span class="ident">acquire</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">fn</span> <span class="ident">acquire</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Space.acquire, tls={:?}&quot;</span>, <span class="ident">tls</span>);
         <span class="comment">// Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.</span>
-        <span class="kw">let</span> <span class="ident">should_poll</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="ident">tls</span>) };
+        <span class="kw">let</span> <span class="ident">should_poll</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="ident">tls</span>);
         <span class="comment">// Is a GC allowed here? enable_collection() has to be called so we know GC is initialized.</span>
         <span class="kw">let</span> <span class="ident">allow_poll</span> <span class="op">=</span> <span class="ident">should_poll</span> <span class="op">&amp;&amp;</span> <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">is_initialized</span>();
 
@@ -848,7 +848,7 @@
                 <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Collection is not enabled.&quot;</span>);
             }
             <span class="ident">pr</span>.<span class="ident">clear_request</span>(<span class="ident">pages_reserved</span>);
-            <span class="ident">VM</span>::<span class="ident">VMCollection</span>::<span class="ident">block_for_gc</span>(<span class="ident">tls</span>);
+            <span class="ident">VM</span>::<span class="ident">VMCollection</span>::<span class="ident">block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>)); <span class="comment">// We have checked that this is mutator</span>
             <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">zero</span>() }
         } <span class="kw">else</span> {
             <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;Collection not required&quot;</span>);
@@ -888,7 +888,7 @@
                     <span class="kw">let</span> <span class="ident">gc_performed</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">poll</span>(<span class="bool-val">true</span>, <span class="self">self</span>.<span class="ident">as_space</span>());
                     <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">gc_performed</span>, <span class="string">&quot;GC not performed when forced.&quot;</span>);
                     <span class="ident">pr</span>.<span class="ident">clear_request</span>(<span class="ident">pages_reserved</span>);
-                    <span class="ident">VM</span>::<span class="ident">VMCollection</span>::<span class="ident">block_for_gc</span>(<span class="ident">tls</span>);
+                    <span class="ident">VM</span>::<span class="ident">VMCollection</span>::<span class="ident">block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>)); <span class="comment">// We asserted that this is mutator.</span>
                     <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">zero</span>() }
                 }
             }

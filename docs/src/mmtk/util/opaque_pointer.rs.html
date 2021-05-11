@@ -34,11 +34,36 @@
 <span id="31">31</span>
 <span id="32">32</span>
 <span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="ident">libc</span>::<span class="ident">c_void</span>;
 
-<span class="comment">// This is mainly used to represent TLS.</span>
 <span class="comment">// OpaquePointer does not provide any method for dereferencing, as we should not dereference it in MMTk.</span>
 <span class="comment">// However, there are occurrences that we may need to dereference tls in the VM binding code.</span>
 <span class="comment">// In JikesRVM&#39;s implementation of ActivePlan, we need to dereference tls to get mutator and collector context.</span>
@@ -68,5 +93,32 @@
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">is_null</span>()
     }
 }
+
+<span class="doccomment">/// A VMThread is an opaque pointer that can uniquely identify a thread in the VM.</span>
+<span class="doccomment">/// A VM binding may use thread pointers or thread IDs as VMThreads. MMTk does not make any assumption on this.</span>
+<span class="doccomment">/// This is used as arguments in the VM-&gt;MMTk APIs, and MMTk may store it and pass it back through the MMTk-&gt;VM traits,</span>
+<span class="doccomment">/// so the VM knows the context.</span>
+<span class="doccomment">/// A VMThread may be a VMMutatorThread, a VMWorkerThread, or any VMThread.</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">VMThread</span>(<span class="kw">pub</span> <span class="ident">OpaquePointer</span>);
+
+<span class="kw">impl</span> <span class="ident">VMThread</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">UNINITIALIZED</span>: <span class="self">Self</span> <span class="op">=</span> <span class="self">Self</span>(<span class="ident">OpaquePointer</span>::<span class="ident">UNINITIALIZED</span>);
+}
+
+<span class="doccomment">/// A VMMutatorThread is a VMThread that associates with a [Mutator](plan/mutator_context/Mutator).</span>
+<span class="doccomment">/// When a VMMutatorThread is used as an argument or a field of a type, it generally means</span>
+<span class="doccomment">/// the function or the functions for the type is executed in the context of the mutator thread.</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">VMMutatorThread</span>(<span class="kw">pub</span> <span class="ident">VMThread</span>);
+
+<span class="doccomment">/// A VMWorkerThread is a VMThread that is associates with a [GCWorker](scheduler/GCWorker).</span>
+<span class="doccomment">/// When a VMWorkerThread is used as an argument or a field of a type, it generally means</span>
+<span class="doccomment">/// the function or the functions for the type is executed in the context of the mutator thread.</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">VMWorkerThread</span>(<span class="kw">pub</span> <span class="ident">VMThread</span>);
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "mmtk";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

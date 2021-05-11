@@ -147,7 +147,7 @@
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">gc_work</span>::<span class="ident">ProcessEdgesWork</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::{<span class="ident">GCWork</span>, <span class="ident">GCWorker</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">ObjectReference</span>, <span class="ident">OpaquePointer</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">ObjectReference</span>, <span class="ident">VMWorkerThread</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::{<span class="ident">Collection</span>, <span class="ident">VMBinding</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">MMTK</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
@@ -194,7 +194,7 @@
         <span class="ident">e</span>.<span class="ident">trace_object</span>(<span class="ident">object</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>, <span class="ident">e</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E</span>, <span class="ident">nursery</span>: <span class="ident">bool</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">e</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E</span>, <span class="ident">nursery</span>: <span class="ident">bool</span>) {
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">nursery</span> { <span class="self">self</span>.<span class="ident">nursery_index</span> } <span class="kw">else</span> { <span class="number">0</span> };
 
         <span class="comment">// We should go through ready_for_finalize objects and keep them alive.</span>

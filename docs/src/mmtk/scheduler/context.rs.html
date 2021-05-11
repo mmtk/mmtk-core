@@ -32,14 +32,14 @@
 <span id="29">29</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 
 <span class="doccomment">/// The global context for the whole scheduling system.</span>
 <span class="doccomment">/// This context is globally accessable for all work-packets, workers and the scheduler.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// For mmtk, the global context is `MMTK&lt;VM&gt;`.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Context</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Sized</span> {
-    <span class="kw">fn</span> <span class="ident">spawn_worker</span>(<span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Worker</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>, <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">Self</span>) {
+    <span class="kw">fn</span> <span class="ident">spawn_worker</span>(<span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Worker</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">VMThread</span>, <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">Self</span>) {
         <span class="kw">let</span> <span class="ident">worker_ptr</span> <span class="op">=</span> <span class="ident">worker</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">Worker</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> <span class="kw">as</span> <span class="ident">usize</span>;
         <span class="ident">std</span>::<span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
             <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="ident">worker_ptr</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">Worker</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) };
@@ -55,7 +55,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// For mmtk, each gc can define their own worker-local data, to contain their required copy allocators and other stuffs.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">WorkerLocal</span> {
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">OpaquePointer</span>) {}
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {}
 }
 
 <span class="doccomment">/// A default implementation for scheduling systems that does not require a worker-local context.</span>

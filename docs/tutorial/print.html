@@ -138,13 +138,15 @@
                         </a>
                         
                         
+                        
+
                     </div>
                 </div>
 
                 
                 <div id="search-wrapper" class="hidden">
                     <form id="searchbar-outer" class="searchbar-outer">
-                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
                     </form>
                     <div id="searchresults-outer" class="searchresults-outer hidden">
                         <div id="searchresults-header" class="searchresults-header"></div>
@@ -180,7 +182,7 @@ be missing information (especially about import statements). If something is
 missing or inaccurate, refer to the relevant completed garbage collector if
 possible. Please also raise an issue, or create a pull request addressing 
 the problem. </p>
-<h1 id="what-is-mmtk"><a class="header" href="#what-is-mmtk">What <em>is</em> MMTk?</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="what-is-mmtk"><a class="header" href="#what-is-mmtk">What <em>is</em> MMTk?</a></h1>
 <p>The Memory Management Toolkit (MMTk) is a framework for designing and 
 implementing memory managers. It has a runtime-neutral core (mmtk-core) 
 written in Rust, and bindings that allow it to work with OpenJDK, V8, 
@@ -192,7 +194,7 @@ very flexible with runtime and able to be ported to many different VMs.</p>
 toolkit, allowing new GC algorithms to be rapidly developed using 
 common components. It also allows different GC algorithms to be 
 compared on an apples-to-apples basis, since they share common mechanisms.</p>
-<h1 id="what-will-this-tutorial-cover"><a class="header" href="#what-will-this-tutorial-cover">What will this tutorial cover?</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="what-will-this-tutorial-cover"><a class="header" href="#what-will-this-tutorial-cover">What will this tutorial cover?</a></h1>
 <p>This tutorial is intended to get you comfortable constructing new plans in 
 MMTk.</p>
 <p>You will first be guided through building a semispace collector. After that, 
@@ -207,7 +209,7 @@ these will be full collectors. Therefore, there may be some differences between
 these files and your collector due to your position in the tutorial. By the end 
 of each major section, your code should be functionally identical to the 
 finished code provided.</p>
-<h1 id="glossary"><a class="header" href="#glossary">Glossary</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="glossary"><a class="header" href="#glossary">Glossary</a></h1>
 <p><em>allocator</em>: Code that allocates new objects into memory.</p>
 <p><em>collector</em>: Finds and frees memory occupied by 'dead' objects. </p>
 <p><em>dead</em>: An object that is not live.</p>
@@ -245,7 +247,7 @@ what this tutorial covers.</p>
 collection policy (such as Immix, for example), would need to first create 
 a policy which specifies that algorithm, before creating a plan which defines 
 how the GC algorithm fits together and utilizes that policy.</p>
-<h1 id="set-up-mmtk-and-openjdk"><a class="header" href="#set-up-mmtk-and-openjdk">Set up MMTk and OpenJDK</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="set-up-mmtk-and-openjdk"><a class="header" href="#set-up-mmtk-and-openjdk">Set up MMTk and OpenJDK</a></h1>
 <p>This tutorial can be completed with any binding. However, for the sake of 
 simplicity, only the setup for the OpenJDK binding will be described in detail 
 here. If you would like to use another binding, you will need to follow the 
@@ -272,7 +274,7 @@ The plans that are relevant to this tutorial are <code>NoGC</code> and <code>Sem
 </ul>
 </li>
 </ol>
-<h1 id="test-the-build"><a class="header" href="#test-the-build">Test the build</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="test-the-build"><a class="header" href="#test-the-build">Test the build</a></h1>
 <p>A few benchmarks of varying size will be used throughout the tutorial. If you 
 haven't already, set them up now. All of the following commands should be 
 entered in <code>repos/openjdk</code>.</p>
@@ -403,7 +405,7 @@ same as they did while using NoGC.
 </code></pre>
 </li>
 </ol>
-<h1 id="create-mygc"><a class="header" href="#create-mygc">Create MyGC</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="create-mygc"><a class="header" href="#create-mygc">Create MyGC</a></h1>
 <p>NoGC is a GC plan that only allocates memory, and does not have a collector. 
 We're going to use it as a base for building a new garbage collector.</p>
 <p>Recall that this tutorial will take you through the steps of building a 
@@ -521,7 +523,7 @@ and <a href="mygc/../further_reading.html">Further Reading</a>: </p>
 <li>What kind of memory space policy is used?</li>
 <li>What happens if garbage has to be collected?</li>
 </ul>
-<h1 id="building-a-semispace-collector"><a class="header" href="#building-a-semispace-collector">Building a semispace collector</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="building-a-semispace-collector"><a class="header" href="#building-a-semispace-collector">Building a semispace collector</a></h1>
 <p>In a semispace collector, the heap is divided into two equally-sized spaces, 
 called 'semispaces'. One of these is defined as a 'fromspace', and the other 
 a 'tospace'. The allocator allocates to the tospace until it is full. </p>
@@ -532,7 +534,7 @@ is now the fromspace. If a live object is found, a copy of it is made in the
 tospace. That is to say, live objects are copied <em>from</em> the fromspace <em>to</em> 
 the tospace. After every object is scanned, the fromspace is cleared. The GC 
 finishes, and the mutator is resumed.</p>
-<h1 id="allocation-add-copyspaces"><a class="header" href="#allocation-add-copyspaces">Allocation: Add copyspaces</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="allocation-add-copyspaces"><a class="header" href="#allocation-add-copyspaces">Allocation: Add copyspaces</a></h1>
 <p>We will now change your MyGC plan from one that cannot collect garbage
 into one that implements the semispace algorithm. The first step of this
 is to add the two copyspaces, and allow collectors to allocate memory 
@@ -608,7 +610,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::side_metadata::SideMetadataContext;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add
@@ -835,7 +837,7 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
@@ -904,7 +906,7 @@ allocator in the common plan to avoid having to copy them. </li>
 <p>With this, you should have the allocation working, but not garbage collection. 
 Try building again. If you run HelloWorld or Fannkunchredux, they should
 work. DaCapo's lusearch should fail, as it requires garbage to be collected. </p>
-<h1 id="collection-implement-garbage-collection"><a class="header" href="#collection-implement-garbage-collection">Collection: Implement garbage collection</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="collection-implement-garbage-collection"><a class="header" href="#collection-implement-garbage-collection">Collection: Implement garbage collection</a></h1>
 <p>We need to add a few more things to get garbage collection working. 
 Specifically, we need to add a <code>CopyContext</code>, which a GC worker uses for 
 copying objects, and GC work packets that will be scheduled for a collection.</p>
@@ -924,7 +926,8 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::forwarding_word;
-use crate::util::{Address, ObjectReference, OpaquePointer};
+use crate::util::{Address, ObjectReference};
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::plan::PlanConstraints;
@@ -994,8 +997,8 @@ the one passed to the function. In <code>constraints()</code>, return a referenc
 </span>    fn constraints(&amp;self) -&gt; &amp;'static PlanConstraints {
         &amp;super::global::MYGC_CONSTRAINTS
     }
-    fn init(&amp;mut self, tls:OpaquePointer) {
-        self.mygc.tls = tls;
+    fn init(&amp;mut self, tls: VMWorkerThread) {
+        self.mygc.tls = tls.0;
     }
 <span class="boring">}
 </span></code></pre></pre>
@@ -1009,13 +1012,13 @@ the one passed to the function. In <code>constraints()</code>, return a referenc
         let plan = &amp;mmtk.plan.downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
         Self {
             plan,
-            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, plan.tospace(), &amp;*mmtk.plan),
+            mygc: BumpAllocator::new(VMThread::UNINITIALIZED, plan.tospace(), &amp;*mmtk.plan),
         }
     }
 }
 
 impl&lt;VM: VMBinding&gt; WorkerLocal for MyGCCopyContext&lt;VM&gt; {
-    fn init(&amp;mut self, tls: OpaquePointer) {
+    fn init(&amp;mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
 }
@@ -1059,7 +1062,7 @@ next few steps. </p>
 </span><span class="boring">fn main() {
 </span>    fn create_worker_local(
         &amp;self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &amp;'static MMTK&lt;Self::VM&gt;,
     ) -&gt; GCWorkerLocalPtr {
         let mut c = MyGCCopyContext::new(mmtk);
@@ -1105,7 +1108,7 @@ call, and add the following code:</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn prepare(&amp;self, tls: OpaquePointer) {
+</span>    fn prepare(&amp;self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
 
         self.hi
@@ -1251,7 +1254,7 @@ run after each collection.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn release(&amp;self, tls: OpaquePointer) {
+</span>    fn release(&amp;self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         self.fromspace().release();
     }
@@ -1275,7 +1278,7 @@ will then go to the new tospace.</p>
 </span><span class="boring">fn main() {
 </span>pub fn mygc_mutator_release&lt;VM: VMBinding&gt;(
     mutator: &amp;mut Mutator&lt;VM&gt;,
-    _tls: OpaquePointer,
+    _tls: VMWorkerThread,
 ) {
     // rebind the allocation bump pointer to the appropriate semispace
     let bump_allocator = unsafe {
@@ -1304,7 +1307,7 @@ benchmarks should be able to pass now. </p>
 collector!</p>
 <p>If you get particularly stuck, the code for the completed <code>MyGC</code> plan
 is available <a href="https://github.com/mmtk/mmtk-core/tree/master/docs/tutorial/code/mygc_semispace">here</a>.</p>
-<h1 id="exercise-adding-another-copyspace"><a class="header" href="#exercise-adding-another-copyspace">Exercise: Adding another copyspace</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="exercise-adding-another-copyspace"><a class="header" href="#exercise-adding-another-copyspace">Exercise: Adding another copyspace</a></h1>
 <p>Now that you have a working semispace collector, you should be familiar 
 enough with the code to start writing some yourself. The intention of this 
 exercise is to reinforce the information from the semispace section, rather 
@@ -1332,7 +1335,7 @@ next thing to do is to make this collector into a more efficient proper
 generational collector.</p>
 <p>When you are finished, try running the benchmarks and seeing how the 
 performance of this collector compares to MyGC. Great work!</p>
-<h1 id="triplespace-backup-instructions"><a class="header" href="#triplespace-backup-instructions">Triplespace backup instructions</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="triplespace-backup-instructions"><a class="header" href="#triplespace-backup-instructions">Triplespace backup instructions</a></h1>
 <p>This is <em>one</em> possible implementation of the Triplespace collector, provided
 in case you are stuck on the exercise. </p>
 <p><strong>Attempt the exercise yourself before reading this.</strong></p>
@@ -1556,7 +1559,7 @@ the tospace and fromspace:
 </span></code></pre></pre>
 </li>
 </ol>
-<h1 id="building-a-generational-copying-collector"><a class="header" href="#building-a-generational-copying-collector">Building a generational copying collector</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="building-a-generational-copying-collector"><a class="header" href="#building-a-generational-copying-collector">Building a generational copying collector</a></h1>
 <blockquote>
 <p>Note: This part is work in progress.</p>
 </blockquote>
@@ -1574,7 +1577,7 @@ these objects into a separate 'mature' space, the number of full heap
 collections needed is greatly reduced.</p>
 <p>This section is currently incomplete. Instructions for building a
 generational copying (gencopy) collector will be added in future.</p>
-<h1 id="further-reading"><a class="header" href="#further-reading">Further Reading</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="further-reading"><a class="header" href="#further-reading">Further Reading</a></h1>
 <ul>
 <li><a href="https://www.mmtk.io/mmtk-core/mmtk/index.html">MMTk Crate Documentation</a></li>
 <li>Original MMTk papers:

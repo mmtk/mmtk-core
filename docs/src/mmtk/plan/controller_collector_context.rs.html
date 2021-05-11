@@ -110,7 +110,7 @@
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">gc_work</span>::<span class="ident">ScheduleCollection</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">OpaquePointer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
@@ -118,7 +118,7 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Condvar</span>, <span class="ident">Mutex</span>};
 
 <span class="kw">struct</span> <span class="ident">RequestSync</span> {
-    <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>,
+    <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
     <span class="ident">request_count</span>: <span class="ident">isize</span>,
     <span class="ident">last_request_count</span>: <span class="ident">isize</span>,
 }
@@ -142,7 +142,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">ControllerCollectorContext</span> {
             <span class="ident">request_sync</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">RequestSync</span> {
-                <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>::<span class="ident">UNINITIALIZED</span>,
+                <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>(<span class="ident">VMThread</span>::<span class="ident">UNINITIALIZED</span>),
                 <span class="ident">request_count</span>: <span class="number">0</span>,
                 <span class="ident">last_request_count</span>: <span class="op">-</span><span class="number">1</span>,
             }),
@@ -159,7 +159,7 @@
         <span class="kw-2">*</span><span class="ident">scheduler_guard</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">scheduler</span>.<span class="ident">clone</span>());
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         {
             <span class="self">self</span>.<span class="ident">request_sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">tls</span> <span class="op">=</span> <span class="ident">tls</span>;
         }

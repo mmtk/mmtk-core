@@ -388,7 +388,7 @@
 }
 
 <span class="doccomment">/// Properly handle errors from a mmap Result, including invoking the binding code for an OOM error.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_mmap_error</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">error</span>: <span class="ident">Error</span>, <span class="ident">tls</span>: <span class="ident">OpaquePointer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="op">!</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_mmap_error</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">error</span>: <span class="ident">Error</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="op">!</span> {
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">ErrorKind</span>;
 
     <span class="kw">match</span> <span class="ident">error</span>.<span class="ident">kind</span>() {
