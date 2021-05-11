@@ -32,16 +32,16 @@ lazy_static! {
 /// An MMTk instance. MMTk allows mutiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
-    pub plan: Box<dyn Plan<VM = VM>>,
-    pub vm_map: &'static VMMap,
-    pub mmapper: &'static Mmapper,
-    pub sftmap: &'static SFTMap<'static>,
-    pub reference_processors: ReferenceProcessors,
-    pub finalizable_processor: Mutex<FinalizableProcessor>,
-    pub options: Arc<UnsafeOptionsWrapper>,
-    pub scheduler: Arc<Scheduler<Self>>,
+    pub(crate) plan: Box<dyn Plan<VM = VM>>,
+    pub(crate) vm_map: &'static VMMap,
+    pub(crate) mmapper: &'static Mmapper,
+    pub(crate) sftmap: &'static SFTMap<'static>,
+    pub(crate) reference_processors: ReferenceProcessors,
+    pub(crate) finalizable_processor: Mutex<FinalizableProcessor>,
+    pub(crate) options: Arc<UnsafeOptionsWrapper>,
+    pub(crate) scheduler: Arc<Scheduler<Self>>,
     #[cfg(feature = "sanity")]
-    pub sanity_checker: Mutex<SanityChecker>,
+    pub(crate) sanity_checker: Mutex<SanityChecker>,
     inside_harness: AtomicBool,
 }
 
@@ -77,6 +77,10 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn harness_end(&'static self) {
         self.plan.base().stats.stop_all(self);
         self.inside_harness.store(false, Ordering::SeqCst);
+    }
+
+    pub fn get_plan(&self) -> &dyn Plan<VM = VM> {
+        self.plan.as_ref()
     }
 }
 

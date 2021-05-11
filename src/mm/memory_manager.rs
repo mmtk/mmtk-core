@@ -15,6 +15,8 @@ use crate::mmtk::MMTK;
 use crate::plan::mutator_context::{Mutator, MutatorContext};
 use crate::plan::AllocationSemantics;
 use crate::scheduler::GCWorker;
+use crate::scheduler::WorkBucketStage;
+use crate::scheduler::Work;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
@@ -371,4 +373,16 @@ pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<Ob
         .lock()
         .unwrap()
         .get_ready_object()
+}
+
+pub fn num_of_workers<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> usize {
+    mmtk.scheduler.num_workers()
+}
+
+pub fn add_work_packet<VM: VMBinding, W: Work<MMTK<VM>>>(mmtk: &'static MMTK<VM>, bucket: WorkBucketStage, packet: W) {
+    mmtk.scheduler.work_buckets[bucket].add(packet)
+}
+
+pub fn add_work_packets<VM: VMBinding>(mmtk: &'static MMTK<VM>, bucket: WorkBucketStage, packets: Vec<Box<dyn Work<MMTK<VM>>>>) {
+    mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
 }
