@@ -7,7 +7,7 @@ use crate::util::{constants, Address};
 use std::io::Result;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SideMetadataScope {
     Global,
     PolicySpecific,
@@ -25,7 +25,7 @@ impl SideMetadataScope {
 /// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.
 ///
 /// For performance reasons, objects of this struct should be constants.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SideMetadataSpec {
     pub scope: SideMetadataScope,
     pub offset: usize,
@@ -60,6 +60,9 @@ pub struct SideMetadata {
 
 impl SideMetadata {
     pub fn new(context: SideMetadataContext) -> SideMetadata {
+        #[cfg(feature = "extreme_assertions")]
+        sanity::add_metadata_context(&context);
+
         Self {
             context,
             accounting: PageAccounting::new(),
@@ -309,7 +312,8 @@ pub fn compare_exchange_atomic(
 
     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log < 3 {
+    #[allow(clippy::let_and_return)]
+    let res = if bits_num_log < 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
         let mask = meta_byte_mask(metadata_spec) << lshift;
 
@@ -376,7 +380,12 @@ pub fn compare_exchange_atomic(
             "side metadata > {}-bits is not supported!",
             constants::BITS_IN_WORD
         );
-    }
+    };
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::store(metadata_spec, data_addr, new_metadata).unwrap();
+
+    res
 }
 
 // same as Rust atomics, this wraps around on overflow
@@ -388,7 +397,8 @@ pub fn fetch_add_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
 
     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log < 3 {
+    #[allow(clippy::let_and_return)]
+    let old_val = if bits_num_log < 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
         let mask = meta_byte_mask(metadata_spec) << lshift;
 
@@ -426,7 +436,24 @@ pub fn fetch_add_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
             "side metadata > {}-bits is not supported!",
             constants::BITS_IN_WORD
         );
+    };
+
+    #[cfg(feature = "extreme_assertions")]
+    match sanity::add(metadata_spec, data_addr, val) {
+        Ok(ov) => {
+            assert!(
+                ov == old_val,
+                "Expected old val (0x{:x}), but found (0x{:x})",
+                ov,
+                old_val
+            );
+        }
+        Err(e) => {
+            panic!("metadata sanity checker failed with {}", e);
+        }
     }
+
+    old_val
 }
 
 // same as Rust atomics, this wraps around on overflow
@@ -438,7 +465,8 @@ pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
 
     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log < 3 {
+    #[allow(clippy::let_and_return)]
+    let old_val = if bits_num_log < 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
         let mask = meta_byte_mask(metadata_spec) << lshift;
 
@@ -476,7 +504,24 @@ pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
             "side metadata > {}-bits is not supported!",
             constants::BITS_IN_WORD
         );
+    };
+
+    #[cfg(feature = "extreme_assertions")]
+    match sanity::sub(metadata_spec, data_addr, val) {
+        Ok(ov) => {
+            assert!(
+                ov == old_val,
+                "Expected old val (0x{:x}), but found (0x{:x})",
+                ov,
+                old_val
+            );
+        }
+        Err(e) => {
+            panic!("metadata sanity checker failed with {}", e);
+        }
     }
+
+    old_val
 }
 
 /// Non-atomic load of metadata.
@@ -496,7 +541,8 @@ pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
 
     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log <= 3 {
+    #[allow(clippy::let_and_return)]
+    let res = if bits_num_log <= 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
         let mask = meta_byte_mask(metadata_spec) << lshift;
         let byte_val = meta_addr.load::<u8>();
@@ -513,7 +559,24 @@ pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
             "side metadata > {}-bits is not supported!",
             constants::BITS_IN_WORD
         );
+    };
+
+    #[cfg(feature = "extreme_assertions")]
+    match sanity::load(&metadata_spec, data_addr) {
+        Ok(exp_res) => {
+            assert!(
+                exp_res == res,
+                "Expected old val (0x{:x}), but found (0x{:x})",
+                exp_res,
+                res
+            );
+        }
+        Err(e) => {
+            panic!("metadata sanity checker failed with {}", e);
+        }
     }
+
+    res
 }
 
 /// Non-atomic store of metadata.
@@ -555,6 +618,9 @@ pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
             constants::BITS_IN_WORD
         );
     }
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::store(metadata_spec, data_addr, metadata).unwrap();
 }
 
 /// Bulk-zero a specific metadata for a chunk.
@@ -569,6 +635,9 @@ pub fn bzero_metadata(metadata_spec: SideMetadataSpec, start: Address, size: usi
     debug_assert!(
         start.is_aligned_to(BYTES_IN_PAGE) && meta_byte_lshift(metadata_spec, start) == 0
     );
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::bzero(metadata_spec, start, size).unwrap();
 
     let meta_start = address_to_meta_address(metadata_spec, start);
     if cfg!(target_pointer_width = "64") || metadata_spec.scope.is_global() {

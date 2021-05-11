@@ -199,6 +199,8 @@ mod global;
 mod helpers;
 #[cfg(target_pointer_width = "32")]
 mod helpers_32;
+#[cfg(feature = "extreme_assertions")]
+pub(crate) mod sanity;
 mod side_metadata_tests;
 
 pub use constants::*;
