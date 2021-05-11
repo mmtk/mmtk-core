@@ -10,7 +10,7 @@ use crate::vm::{ActivePlan, Collection, ObjectModel};
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 
 use crate::mmtk::SFT_MAP;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -100,16 +100,16 @@ impl SFT for EmptySpaceSFT {
 }
 
 #[derive(Default)]
-pub struct SFTMap {
-    sft: Vec<*const (dyn SFT + Sync)>,
+pub struct SFTMap<'a> {
+    sft: Vec<&'a (dyn SFT + Sync + 'static)>,
 }
 
 // TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
-unsafe impl Sync for SFTMap {}
+unsafe impl<'a> Sync for SFTMap<'a> {}
 
 static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
-impl SFTMap {
+impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
         SFTMap {
             sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
@@ -124,28 +124,23 @@ impl SFTMap {
         &mut *(self as *const _ as *mut _)
     }
 
-    pub fn get(&self, address: Address) -> &'static dyn SFT {
+    pub fn get(&self, address: Address) -> &'a dyn SFT {
         let res = self.sft[address.chunk_index()];
         if DEBUG_SFT {
             trace!(
                 "Get SFT for {} #{} = {}",
                 address,
                 address.chunk_index(),
-                unsafe { &(*res) }.name()
+                res.name()
             );
         }
-        unsafe { &(*res) }
+        res
     }
 
-    fn log_update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+    fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, chunks: usize) {
         let first = start.chunk_index();
         let end = start + (chunks << LOG_BYTES_IN_CHUNK);
-        debug!(
-            "Update SFT for [{}, {}) as {}",
-            start,
-            end,
-            unsafe { &(*space) }.name()
-        );
+        debug!("Update SFT for [{}, {}) as {}", start, end, space.name());
         let start_chunk = chunk_index_to_address(first);
         let end_chunk = chunk_index_to_address(first + chunks);
         debug!(
@@ -170,10 +165,7 @@ impl SFTMap {
                     i + SPACE_PER_LINE
                 };
                 let chunks: Vec<usize> = (i..max).collect();
-                let space_names: Vec<&str> = chunks
-                    .iter()
-                    .map(|&x| unsafe { &*self.sft[x] }.name())
-                    .collect();
+                let space_names: Vec<&str> = chunks.iter().map(|&x| self.sft[x].name()).collect();
                 trace!("Chunk {}: {}", i, space_names.join(","));
             }
         }
@@ -181,7 +173,7 @@ impl SFTMap {
 
     /// Update SFT map for the given address range.
     /// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-    pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+    pub fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, chunks: usize) {
         if DEBUG_SFT {
             self.log_update(space, start, chunks);
         }
@@ -198,7 +190,7 @@ impl SFTMap {
         self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
 
-    fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
+    fn set(&self, chunk: usize, sft: &(dyn SFT + Sync + 'static)) {
         /*
          * This is safe (only) because a) this is only called during the
          * allocation and deallocation of chunks, which happens under a global
@@ -208,11 +200,11 @@ impl SFTMap {
          * which are reasonable), and in the other case it would either see the
          * old (valid) space or an empty space, both of which are valid.
          */
-        let self_mut: &mut Self = unsafe { self.mut_self() };
+        let self_mut = unsafe { self.mut_self() };
         // It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
         if cfg!(debug_assertions) {
-            let old = unsafe { self_mut.sft[chunk].as_ref() }.unwrap().name();
-            let new = unsafe { sft.as_ref() }.unwrap().name();
+            let old = self_mut.sft[chunk].name();
+            let new = sft.name();
             // Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,
             // in which case, we still set SFT map again.
             debug_assert!(
@@ -245,10 +237,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
     fn init(&mut self, vm_map: &'static VMMap);
 
-    fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
+    fn acquire(&self, tls: VMThread, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
         // Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.
-        let should_poll = unsafe { VM::VMActivePlan::is_mutator(tls) };
+        let should_poll = VM::VMActivePlan::is_mutator(tls);
         // Is a GC allowed here? enable_collection() has to be called so we know GC is initialized.
         let allow_poll = should_poll && VM::VMActivePlan::global().is_initialized();
 
@@ -264,7 +256,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 panic!("Collection is not enabled.");
             }
             pr.clear_request(pages_reserved);
-            VM::VMCollection::block_for_gc(tls);
+            VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
@@ -277,11 +269,15 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     // adding a space lock here.
                     let bytes = conversions::pages_to_bytes(res.pages);
                     self.grow_space(res.start, bytes, res.new_chunk);
-                    self.common().mmapper.ensure_mapped(
+                    // Mmap the pages and handle error. In case of any error,
+                    // we will either call back to the VM for OOM, or simply panic.
+                    if let Err(mmap_error) = self.common().mmapper.ensure_mapped(
                         res.start,
                         res.pages,
                         &self.common().metadata,
-                    );
+                    ) {
+                        memory::handle_mmap_error::<VM>(mmap_error, tls);
+                    }
 
                     // TODO: Concurrent zeroing
                     if self.common().zeroed {
@@ -300,7 +296,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
                     debug_assert!(gc_performed, "GC not performed when forced.");
                     pr.clear_request(pages_reserved);
-                    VM::VMCollection::block_for_gc(tls);
+                    VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
                     unsafe { Address::zero() }
                 }
             }
@@ -342,7 +338,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         );
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
-            SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
+            SFT_MAP.update(self.as_sft(), start, chunks);
         }
     }
 
@@ -361,11 +357,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(
-            self.as_sft() as *const (dyn SFT + Sync),
-            self.common().start,
-            chunks,
-        );
+        SFT_MAP.update(self.as_sft(), self.common().start, chunks);
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
