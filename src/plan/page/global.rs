@@ -24,6 +24,7 @@ use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::Arc;
 use enum_map::EnumMap;
+use crate::util::side_metadata::SideMetadataContext;
 
 
 
@@ -127,10 +128,6 @@ impl<VM: VMBinding> Plan for Page<VM> {
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
-
-    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &self.common().global_metadata_specs
-    }
 }
 
 impl<VM: VMBinding> Page<VM> {
@@ -140,18 +137,20 @@ impl<VM: VMBinding> Page<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
         Page {
             space: LargeObjectSpace::new(
                 "los",
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
                 &CONSTRAINTS,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &CONSTRAINTS, &[]),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &CONSTRAINTS, global_metadata_specs.clone()),
         }
     }
 }

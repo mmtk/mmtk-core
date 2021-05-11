@@ -16,6 +16,7 @@ use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::side_metadata::SideMetadataContext;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -97,10 +98,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     fn handle_user_collection_request(&self, _tls: OpaquePointer, _force: bool) {
         println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
     }
-
-    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &self.common().global_metadata_specs
-    }
 }
 
 impl<VM: VMBinding> NoGC<VM> {
@@ -114,14 +111,20 @@ impl<VM: VMBinding> NoGC<VM> {
         #[cfg(feature = "nogc_lock_free")]
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
 
+        let global_specs = SideMetadataContext::new_global_specs(&[]);
+
         #[cfg(feature = "nogc_lock_free")]
-        let nogc_space =
-            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")));
+        let nogc_space = NoGCImmortalSpace::new(
+            "nogc_space",
+            cfg!(not(feature = "nogc_no_zeroing")),
+            global_specs.clone(),
+        );
         #[cfg(not(feature = "nogc_lock_free"))]
         let nogc_space = NoGCImmortalSpace::new(
             "nogc_space",
             true,
             VMRequest::discontiguous(),
+            global_specs.clone(),
             vm_map,
             mmapper,
             &mut heap,
@@ -130,7 +133,7 @@ impl<VM: VMBinding> NoGC<VM> {
 
         NoGC {
             nogc_space,
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS, &[]),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS, vec![]),
         }
     }
 }

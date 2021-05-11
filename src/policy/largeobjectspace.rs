@@ -8,6 +8,7 @@ use crate::util::header_byte::HeaderByte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
+use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::treadmill::TreadMill;
 use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
@@ -94,10 +95,12 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 }
 
 impl<VM: VMBinding> LargeObjectSpace<VM> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
@@ -110,6 +113,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 immortal: false,
                 zeroed,
                 vmrequest,
+                side_metadata_specs: SideMetadataContext {
+                    global: global_side_metadata_specs,
+                    local: vec![],
+                },
             },
             vm_map,
             mmapper,

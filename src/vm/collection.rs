@@ -45,11 +45,17 @@ pub trait Collection<VM: VMBinding> {
     /// Allow VM-specific behaviors for a mutator after all the mutators are stopped and before any actual GC work starts.
     ///
     /// Arguments:
-    /// * `tls`: The thread pointer for a mutator thread.
+    /// * `tls_worker`: The thread pointer for the worker thread performing this call.
+    /// * `tls_mutator`: The thread pointer for the target mutator thread.
     /// * `m`: The mutator context for the thread.
-    fn prepare_mutator<T: MutatorContext<VM>>(tls: OpaquePointer, m: &T);
+    fn prepare_mutator<T: MutatorContext<VM>>(
+        tls_worker: OpaquePointer,
+        tls_mutator: OpaquePointer,
+        m: &T,
+    );
 
     /// Inform the VM for an out-of-memory error. The VM can implement its own error routine for OOM.
+    /// Note the VM needs to fail in this call. We do not expect the VM to resume in any way.
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the mutator which failed the allocation and triggered the OOM.

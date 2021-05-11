@@ -103,8 +103,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
                 {
                     let regions = 1 + ((page_offset - sync.highwater_mark) >> LOG_PAGES_IN_REGION);
                     let metapages = regions as usize * self.meta_data_pages_per_region;
-                    self.common.reserve(metapages);
-                    self.common.commit(metapages);
+                    self.common.accounting.reserve_and_commit(metapages);
                     // new_chunk = true;
                 }
                 sync.highwater_mark = page_offset;
@@ -296,28 +295,11 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         debug_assert!(conversions::is_page_aligned(first));
         let page_offset = conversions::bytes_to_pages(first - self.start);
         let pages = self.free_list.size(page_offset as _);
-        // if (VM.config.ZERO_PAGES_ON_RELEASE)
-        //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
-        debug_assert!(pages as usize <= self.common.get_committed());
         let bytes = (pages as usize) << 12;
         for i in (0..bytes).step_by(8) {
             unsafe { (first + i).store(0xdeadbeefdeadbeefusize) }
         }
-        // FIXME
-        #[allow(clippy::cast_ref_to_mut)]
-        let me = unsafe { &mut *(self as *const _ as *mut Self) };
-        let freed = {
-            let mut sync = self.sync.lock().unwrap();
-            self.common.release_reserved(pages as _);
-            self.common.release_committed(pages as _);
-            let freed = me.free_list.free(page_offset as _, true);
-            sync.pages_currently_on_freelist += pages as usize;
-            freed
-        };
-        if !self.common.contiguous {
-            // only discontiguous spaces use chunks
-            me.release_free_chunks(first, freed as _);
-        }
+        self.release_pages(first)
     }
 
     pub fn release_pages(&self, first: Address) {
@@ -326,14 +308,14 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         let pages = self.free_list.size(page_offset as _);
         // if (VM.config.ZERO_PAGES_ON_RELEASE)
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
-        debug_assert!(pages as usize <= self.common.get_committed());
+        debug_assert!(pages as usize <= self.common.accounting.get_committed_pages());
+
         // FIXME
         #[allow(clippy::cast_ref_to_mut)]
         let me = unsafe { &mut *(self as *const _ as *mut Self) };
         let freed = {
             let mut sync = self.sync.lock().unwrap();
-            self.common.release_reserved(pages as _);
-            self.common.release_committed(pages as _);
+            self.common.accounting.release(pages as _);
             let freed = me.free_list.free(page_offset as _, true);
             sync.pages_currently_on_freelist += pages as usize;
             freed

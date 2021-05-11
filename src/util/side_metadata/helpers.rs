@@ -33,15 +33,16 @@ pub(crate) fn address_to_contiguous_meta_address(
 pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
-    assert!(memory::try_munmap(start, size).is_ok())
+    assert!(memory::munmap(start, size).is_ok())
 }
 
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
+/// Returns the size in bytes that get munmapped.
 pub(super) fn ensure_munmap_contiguos_metadata_space(
     start: Address,
     size: usize,
     spec: &SideMetadataSpec,
-) {
+) -> usize {
     // nearest page-aligned starting address
     let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
@@ -50,16 +51,18 @@ pub(super) fn ensure_munmap_contiguos_metadata_space(
     if mmap_size > 0 {
         ensure_munmap_metadata(mmap_start, mmap_size);
     }
+    mmap_size
 }
 
 /// Tries to mmap the metadata space (`spec`) for the specified data address range (`start` and `size`).
 /// Setting `no_reserve` to true means the function will only map address range, without reserving swap-space/physical memory.
+/// Returns the size in bytes that gets mmapped in the function if success.
 pub(super) fn try_mmap_contiguous_metadata_space(
     start: Address,
     size: usize,
     spec: &SideMetadataSpec,
     no_reserve: bool,
-) -> Result<()> {
+) -> Result<usize> {
     debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
     debug_assert!(size % BYTES_IN_PAGE == 0);
 
@@ -77,8 +80,9 @@ pub(super) fn try_mmap_contiguous_metadata_space(
         } else {
             try_mmap_metadata_address_range(mmap_start, mmap_size)
         }
+        .map(|_| mmap_size)
     } else {
-        Ok(())
+        Ok(0)
     }
 }
 
@@ -95,10 +99,12 @@ pub(super) fn try_mmap_metadata_address_range(start: Address, size: usize) -> Re
 }
 
 /// Tries to map the specified metadata space (`start` and `size`), including reservation of swap-space/physical memory.
+/// This function should only be called if we have called try_mmap_metadata_address_range() first.
 pub(super) fn try_mmap_metadata(start: Address, size: usize) -> Result<()> {
     debug_assert!(size > 0 && size % BYTES_IN_PAGE == 0);
 
-    let res = memory::dzmmap(start, size);
+    // It is safe to call dzmmap here as we have reserved the address range.
+    let res = unsafe { memory::dzmmap(start, size) };
     trace!("try_mmap_metadata({}, 0x{:x}) -> {:#?}", start, size, res);
     res
 }

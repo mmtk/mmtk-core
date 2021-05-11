@@ -13,7 +13,6 @@ use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
-use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -313,10 +312,6 @@ pub trait Plan: 'static + Sync + Downcast {
             );
         }
     }
-
-    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &[]
-    }
 }
 
 impl_downcast!(Plan assoc VM);
@@ -345,8 +340,6 @@ pub struct BasePlan<VM: VMBinding> {
     pub max_collection_attempts: AtomicUsize,
     // Current collection attempt
     pub cur_collection_attempts: AtomicUsize,
-    // Lock used for out of memory handling
-    pub oom_lock: Mutex<()>,
     pub control_collector_context: ControllerCollectorContext<VM>,
     pub stats: Stats,
     mmapper: &'static Mmapper,
@@ -387,6 +380,7 @@ pub fn create_vm_space<VM: VMBinding>(
     heap: &mut HeapMeta,
     boot_segment_bytes: usize,
     constraints: &'static PlanConstraints,
+    global_side_metadata_specs: Vec<SideMetadataSpec>,
 ) -> ImmortalSpace<VM> {
     use crate::util::constants::LOG_BYTES_IN_MBYTE;
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
@@ -400,6 +394,7 @@ pub fn create_vm_space<VM: VMBinding>(
         "boot",
         false,
         VMRequest::fixed_size(boot_segment_mb),
+        global_side_metadata_specs,
         vm_map,
         mmapper,
         heap,
@@ -410,12 +405,14 @@ pub fn create_vm_space<VM: VMBinding>(
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'heap' only needs to be mutable for certain features
     #[allow(unused_variables)] // 'constraints' is only needed for certain features
+    #[allow(clippy::redundant_clone)] // depends on features, the last clone of side metadata specs is not necessary.
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> BasePlan<VM> {
         let stats = Stats::new();
         // Initializing the analysis manager and routines
@@ -429,6 +426,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     "code_space",
                     true,
                     VMRequest::discontiguous(),
+                    global_side_metadata_specs.clone(),
                     vm_map,
                     mmapper,
                     &mut heap,
@@ -439,6 +437,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     "ro_space",
                     true,
                     VMRequest::discontiguous(),
+                    global_side_metadata_specs.clone(),
                     vm_map,
                     mmapper,
                     &mut heap,
@@ -451,6 +450,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                     &mut heap,
                     options.vm_space_size,
                     constraints,
+                    global_side_metadata_specs,
                 ),
             }),
             initialized: AtomicBool::new(false),
@@ -462,7 +462,6 @@ impl<VM: VMBinding> BasePlan<VM> {
             allocation_success: AtomicBool::new(false),
             max_collection_attempts: AtomicUsize::new(0),
             cur_collection_attempts: AtomicUsize::new(0),
-            oom_lock: Mutex::new(()),
             control_collector_context: ControllerCollectorContext::new(),
             stats,
             mmapper,
@@ -728,7 +727,6 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 pub struct CommonPlan<VM: VMBinding> {
     pub unsync: UnsafeCell<CommonUnsync<VM>>,
     pub base: BasePlan<VM>,
-    pub global_metadata_specs: Vec<SideMetadataSpec>,
 }
 
 pub struct CommonUnsync<VM: VMBinding> {
@@ -746,20 +744,15 @@ impl<VM: VMBinding> CommonPlan<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
-        global_side_metadata_specs: &[SideMetadataSpec],
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> CommonPlan<VM> {
-        let mut specs = if cfg!(feature = "side_gc_header") {
-            vec![gc_byte::SIDE_GC_BYTE_SPEC]
-        } else {
-            vec![]
-        };
-        specs.extend_from_slice(global_side_metadata_specs);
         CommonPlan {
             unsync: UnsafeCell::new(CommonUnsync {
                 immortal: ImmortalSpace::new(
                     "immortal",
                     true,
                     VMRequest::discontiguous(),
+                    global_side_metadata_specs.clone(),
                     vm_map,
                     mmapper,
                     &mut heap,
@@ -769,14 +762,21 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     "los",
                     true,
                     VMRequest::discontiguous(),
+                    global_side_metadata_specs.clone(),
                     vm_map,
                     mmapper,
                     &mut heap,
                     constraints,
                 ),
             }),
-            base: BasePlan::new(vm_map, mmapper, options, heap, constraints),
-            global_metadata_specs: specs,
+            base: BasePlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                constraints,
+                global_side_metadata_specs,
+            ),
         }
     }
 
