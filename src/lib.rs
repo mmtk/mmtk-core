@@ -50,15 +50,11 @@ extern crate num_cpus;
 #[macro_use]
 extern crate downcast_rs;
 
-#[macro_use]
 pub mod util;
 mod mm;
 mod mmtk;
 
 pub mod plan;
-pub use crate::plan::{
-    AllocationSemantics, BarrierSelector, CopyContext, Mutator, MutatorContext, Plan, TraceLocal, TransitiveClosure,
-};
 
 mod policy;
 
@@ -68,3 +64,6 @@ pub mod vm;
 
 pub use crate::mm::memory_manager;
 pub use crate::mmtk::MMTK;
+pub use crate::plan::{
+    AllocationSemantics, BarrierSelector, CopyContext, Mutator, MutatorContext, Plan, TraceLocal, TransitiveClosure,
+};

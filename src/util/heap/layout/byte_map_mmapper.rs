@@ -18,11 +18,10 @@ const UNMAPPED: u8 = 0;
 const MAPPED: u8 = 1;
 const PROTECTED: u8 = 2;
 
-const MMAP_NUM_CHUNKS: usize = if_then_else_usize!(
-    LOG_BYTES_IN_ADDRESS_SPACE == 32,
-    1 << (LOG_BYTES_IN_ADDRESS_SPACE as usize - LOG_MMAP_CHUNK_BYTES),
-    1 << (33 - LOG_MMAP_CHUNK_BYTES)
-);
+const MMAP_NUM_CHUNKS: usize = if
+    LOG_BYTES_IN_ADDRESS_SPACE == 32 {
+    1 << (LOG_BYTES_IN_ADDRESS_SPACE as usize - LOG_MMAP_CHUNK_BYTES) }
+    else { 1 << (33 - LOG_MMAP_CHUNK_BYTES) };
 pub const VERBOSE: bool = true;
 
 pub struct ByteMapMmapper {
