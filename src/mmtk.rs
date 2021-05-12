@@ -50,7 +50,7 @@ impl<VM: VMBinding> MMTK<VM> {
         let scheduler = Scheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
         let plan =
-            crate::plan::global::create_plan(options.plan, &VM_MAP, &MMAPPER, options.clone());
+            crate::plan::create_plan(options.plan, &VM_MAP, &MMAPPER, options.clone());
         MMTK {
             plan,
             vm_map: &VM_MAP,

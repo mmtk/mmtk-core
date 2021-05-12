@@ -14,21 +14,31 @@
 //!
 //! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).
 
-pub mod barriers;
-pub mod controller_collector_context;
-pub mod global;
-pub mod mutator_context;
-pub mod plan_constraints;
-pub mod tracelocal;
-pub mod transitive_closure;
-pub use self::global::AllocationSemantics;
-pub use self::global::CopyContext;
-pub use self::global::Plan;
-pub use self::mutator_context::Mutator;
-pub use self::mutator_context::MutatorContext;
-pub use self::plan_constraints::PlanConstraints;
-pub use self::tracelocal::TraceLocal;
-pub use self::transitive_closure::TransitiveClosure;
+mod barriers;
+pub use barriers::BarrierSelector;
+
+mod controller_collector_context;
+
+mod global;
+pub use global::AllocationSemantics;
+pub use global::Plan;
+pub use global::CopyContext;
+pub(crate) use global::GcStatus;
+pub(crate) use global::create_mutator;
+pub(crate) use global::create_plan;
+
+mod mutator_context;
+pub use mutator_context::Mutator;
+pub use mutator_context::MutatorContext;
+
+mod plan_constraints;
+pub use plan_constraints::PlanConstraints;
+
+mod tracelocal;
+pub use tracelocal::TraceLocal;
+
+mod transitive_closure;
+pub use transitive_closure::TransitiveClosure;
 
 mod gencopy;
 mod marksweep;

@@ -1,4 +1,4 @@
-use crate::plan::global::Plan;
+use crate::Plan;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;

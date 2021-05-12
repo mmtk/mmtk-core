@@ -1,6 +1,6 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
-use crate::plan::global::GcStatus;
+use crate::plan::GcStatus;
 use crate::util::side_metadata::*;
 use crate::util::*;
 use crate::vm::*;

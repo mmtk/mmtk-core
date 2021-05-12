@@ -1,7 +1,7 @@
 use crate::plan::CopyContext;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
-use crate::AllocationSemantics;
+use crate::plan::AllocationSemantics;
 
 /// VM-specific methods for object model.
 ///

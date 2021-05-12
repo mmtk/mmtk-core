@@ -12,7 +12,7 @@
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
 use crate::mmtk::MMTK;
-use crate::plan::mutator_context::{Mutator, MutatorContext};
+use crate::plan::{Mutator, MutatorContext};
 use crate::plan::AllocationSemantics;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
@@ -65,7 +65,7 @@ pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: OpaquePointer,
 ) -> Box<Mutator<VM>> {
-    crate::plan::global::create_mutator(tls, mmtk)
+    crate::plan::create_mutator(tls, mmtk)
 }
 
 /// Reclaim a mutator that is no longer needed.
