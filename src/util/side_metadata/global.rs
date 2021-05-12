@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 use std::ops::Range;
 
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum SideMetadataScope {
     Global,
     PolicySpecific,
@@ -26,7 +26,7 @@ impl SideMetadataScope {
 /// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.
 ///
 /// For performance reasons, objects of this struct should be constants.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct SideMetadataSpec {
     pub scope: SideMetadataScope,
     pub offset: usize,
@@ -36,12 +36,7 @@ pub struct SideMetadataSpec {
 
 impl SideMetadataSpec {
     pub const fn accumulated_size(&self) -> usize {
-        self.offset + self.meta_bytes_per_chunk()
-    }
-
-    pub const fn meta_bytes_per_chunk(&self) -> usize {
-        1usize << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) - self.log_min_obj_size
-            + self.log_num_of_bits)
+        self.offset + super::metadata_address_range_size(*self)
     }
 }
 

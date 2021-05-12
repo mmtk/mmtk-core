@@ -18,7 +18,7 @@ impl Line {
 
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         scope: SideMetadataScope::PolicySpecific,
-        offset: 0,
+        offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,
     };

@@ -76,9 +76,15 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 
     fn local_side_metadata_specs(&self) -> &[SideMetadataSpec] {
         debug_assert!(!Self::HEADER_MARK_BITS);
-        &[
-            Self::OBJECT_MARK_TABLE, Block::MARK_TABLE, Block::DEFRAG_STATE_TABLE, Line::MARK_TABLE
-        ]
+        if super::BLOCK_ONLY {
+            &[
+                Block::DEFRAG_STATE_TABLE, Block::MARK_TABLE, Self::OBJECT_MARK_TABLE
+            ]
+        } else {
+            &[
+                Line::MARK_TABLE, Block::DEFRAG_STATE_TABLE, Block::MARK_TABLE, Self::OBJECT_MARK_TABLE
+            ]
+        }
     }
 }
 
