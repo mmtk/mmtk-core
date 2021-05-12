@@ -2,28 +2,28 @@ use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::{allocator, Allocator};
+use crate::util::opaque_pointer::*;
 use crate::util::Address;
-use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 
 #[repr(C)]
 pub struct LargeObjectAllocator<VM: VMBinding> {
-    pub tls: OpaquePointer,
-    space: Option<&'static LargeObjectSpace<VM>>,
+    pub tls: VMThread,
+    space: &'static LargeObjectSpace<VM>,
     plan: &'static dyn Plan<VM = VM>,
 }
 
 impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
-    fn get_tls(&self) -> OpaquePointer {
+    fn get_tls(&self) -> VMThread {
         self.tls
     }
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
         self.plan
     }
 
-    fn get_space(&self) -> Option<&'static dyn Space<VM>> {
+    fn get_space(&self) -> &'static dyn Space<VM> {
         // Casting the interior of the Option: from &LargeObjectSpace to &dyn Space
-        self.space.map(|s| s as &'static dyn Space<VM>)
+        self.space as &'static dyn Space<VM>
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
@@ -40,7 +40,7 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
         let maxbytes =
             allocator::get_maximum_aligned_size::<VM>(size + header, align, VM::MIN_ALIGNMENT);
         let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
-        let sp = self.space.unwrap().allocate_pages(self.tls, pages);
+        let sp = self.space.allocate_pages(self.tls, pages);
         if sp.is_zero() {
             sp
         } else {
@@ -51,8 +51,8 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
 
 impl<VM: VMBinding> LargeObjectAllocator<VM> {
     pub fn new(
-        tls: OpaquePointer,
-        space: Option<&'static LargeObjectSpace<VM>>,
+        tls: VMThread,
+        space: &'static LargeObjectSpace<VM>,
         plan: &'static dyn Plan<VM = VM>,
     ) -> Self {
         LargeObjectAllocator { tls, space, plan }

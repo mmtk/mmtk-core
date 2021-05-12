@@ -2,7 +2,7 @@ use super::stat::WorkerLocalStat;
 use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
@@ -45,7 +45,7 @@ impl WorkerLocalPtr {
 const LOCALLY_CACHED_WORKS: usize = 1;
 
 pub struct Worker<C: Context> {
-    pub tls: OpaquePointer,
+    pub tls: VMWorkerThread,
     pub ordinal: usize,
     pub parked: AtomicBool,
     scheduler: Arc<Scheduler<C>>,
@@ -64,15 +64,20 @@ unsafe impl<C: Context> Send for Worker<C> {}
 pub type GCWorker<VM> = Worker<MMTK<VM>>;
 
 impl<C: Context> Worker<C> {
-    pub fn new(ordinal: usize, scheduler: Weak<Scheduler<C>>, is_coordinator: bool) -> Self {
+    pub fn new(
+        ordinal: usize,
+        scheduler: Weak<Scheduler<C>>,
+        is_coordinator: bool,
+        sender: Sender<CoordinatorMessage<C>>,
+    ) -> Self {
         let scheduler = scheduler.upgrade().unwrap();
         Self {
-            tls: OpaquePointer::UNINITIALIZED,
+            tls: VMWorkerThread(VMThread::UNINITIALIZED),
             ordinal,
             parked: AtomicBool::new(true),
             local: WorkerLocalPtr::UNINITIALIZED,
             local_work_bucket: WorkBucket::new(true, scheduler.worker_monitor.clone()),
-            sender: scheduler.channel.0.clone(),
+            sender,
             scheduler,
             stat: Default::default(),
             context: None,
@@ -125,7 +130,7 @@ impl<C: Context> Worker<C> {
         self.local = local;
     }
 
-    pub fn init(&mut self, tls: OpaquePointer) {
+    pub fn init(&mut self, tls: VMWorkerThread) {
         self.tls = tls;
     }
 
@@ -153,10 +158,14 @@ pub struct WorkerGroup<C: Context> {
 }
 
 impl<C: Context> WorkerGroup<C> {
-    pub fn new(workers: usize, scheduler: Weak<Scheduler<C>>) -> Arc<Self> {
+    pub fn new(
+        workers: usize,
+        scheduler: Weak<Scheduler<C>>,
+        sender: Sender<CoordinatorMessage<C>>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             workers: (0..workers)
-                .map(|i| Worker::new(i, scheduler.clone(), false))
+                .map(|i| Worker::new(i, scheduler.clone(), false, sender.clone()))
                 .collect(),
         })
     }
@@ -173,7 +182,7 @@ impl<C: Context> WorkerGroup<C> {
         self.parked_workers() == self.worker_count()
     }
 
-    pub fn spawn_workers(&'static self, tls: OpaquePointer, context: &'static C) {
+    pub fn spawn_workers(&'static self, tls: VMThread, context: &'static C) {
         for i in 0..self.worker_count() {
             let worker = &self.workers[i];
             C::spawn_worker(worker, tls, context);

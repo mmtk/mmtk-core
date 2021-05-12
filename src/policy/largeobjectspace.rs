@@ -11,8 +11,9 @@ use crate::util::header_byte::HeaderByte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
+use crate::util::opaque_pointer::*;
+use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::treadmill::TreadMill;
-use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
@@ -28,15 +29,13 @@ const PRECEEDING_GC_HEADER_WORDS: usize = 1;
 const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTES_IN_WORD;
 
 pub struct LargeObjectSpace<VM: VMBinding> {
-    common: UnsafeCell<CommonSpace<VM>>,
+    common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
     mark_state: usize,
     in_nursery_gc: bool,
     treadmill: TreadMill,
     header_byte: HeaderByte,
 }
-
-unsafe impl<VM: VMBinding> Sync for LargeObjectSpace<VM> {}
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn name(&self) -> &str {
@@ -85,17 +84,10 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
-    fn init(&mut self, _vm_map: &'static VMMap) {
-        let me = unsafe { &*(self as *const Self) };
-        self.pr.bind_space(me);
-    }
+    fn init(&mut self, _vm_map: &'static VMMap) {}
 
     fn common(&self) -> &CommonSpace<VM> {
-        unsafe { &*self.common.get() }
-    }
-
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
-        &mut *self.common.get()
+        &self.common
     }
 
     fn release_multiple_pages(&mut self, start: Address) {
@@ -104,10 +96,12 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 }
 
 impl<VM: VMBinding> LargeObjectSpace<VM> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
@@ -120,6 +114,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 immortal: false,
                 zeroed,
                 vmrequest,
+                side_metadata_specs: SideMetadataContext {
+                    global: global_side_metadata_specs,
+                    local: vec![],
+                },
             },
             vm_map,
             mmapper,
@@ -131,7 +129,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             } else {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
-            common: UnsafeCell::new(common),
+            common,
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new(),
@@ -197,7 +195,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    pub fn allocate_pages(&self, tls: OpaquePointer, pages: usize) -> Address {
+    pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Address {
         let start = self.acquire(tls, pages);
         if start.is_zero() {
             return start;

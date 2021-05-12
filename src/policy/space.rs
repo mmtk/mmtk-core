@@ -1,4 +1,4 @@
-use crate::util::side_metadata::{try_map_metadata_address_range, try_map_metadata_space};
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
@@ -10,7 +10,7 @@ use crate::vm::{ActivePlan, Collection, ObjectModel};
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 
 use crate::mmtk::SFT_MAP;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -18,8 +18,10 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
+use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
+use crate::util::memory;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -60,7 +62,6 @@ const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 
 #[derive(Debug)]
 struct EmptySpaceSFT {}
-unsafe impl Sync for EmptySpaceSFT {}
 
 const EMPTY_SFT_NAME: &str = "empty";
 
@@ -99,14 +100,16 @@ impl SFT for EmptySpaceSFT {
 }
 
 #[derive(Default)]
-pub struct SFTMap {
-    sft: Vec<*const (dyn SFT + Sync)>,
+pub struct SFTMap<'a> {
+    sft: Vec<&'a (dyn SFT + Sync + 'static)>,
 }
-unsafe impl Sync for SFTMap {}
+
+// TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
+unsafe impl<'a> Sync for SFTMap<'a> {}
 
 static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
-impl SFTMap {
+impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
         SFTMap {
             sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
@@ -121,28 +124,23 @@ impl SFTMap {
         &mut *(self as *const _ as *mut _)
     }
 
-    pub fn get(&self, address: Address) -> &'static dyn SFT {
+    pub fn get(&self, address: Address) -> &'a dyn SFT {
         let res = self.sft[address.chunk_index()];
         if DEBUG_SFT {
             trace!(
                 "Get SFT for {} #{} = {}",
                 address,
                 address.chunk_index(),
-                unsafe { &(*res) }.name()
+                res.name()
             );
         }
-        unsafe { &(*res) }
+        res
     }
 
-    fn log_update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+    fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, chunks: usize) {
         let first = start.chunk_index();
         let end = start + (chunks << LOG_BYTES_IN_CHUNK);
-        debug!(
-            "Update SFT for [{}, {}) as {}",
-            start,
-            end,
-            unsafe { &(*space) }.name()
-        );
+        debug!("Update SFT for [{}, {}) as {}", start, end, space.name());
         let start_chunk = chunk_index_to_address(first);
         let end_chunk = chunk_index_to_address(first + chunks);
         debug!(
@@ -167,10 +165,7 @@ impl SFTMap {
                     i + SPACE_PER_LINE
                 };
                 let chunks: Vec<usize> = (i..max).collect();
-                let space_names: Vec<&str> = chunks
-                    .iter()
-                    .map(|&x| unsafe { &*self.sft[x] }.name())
-                    .collect();
+                let space_names: Vec<&str> = chunks.iter().map(|&x| self.sft[x].name()).collect();
                 trace!("Chunk {}: {}", i, space_names.join(","));
             }
         }
@@ -178,7 +173,7 @@ impl SFTMap {
 
     /// Update SFT map for the given address range.
     /// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-    pub fn update(&self, space: *const (dyn SFT + Sync), start: Address, chunks: usize) {
+    pub fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, chunks: usize) {
         if DEBUG_SFT {
             self.log_update(space, start, chunks);
         }
@@ -195,7 +190,7 @@ impl SFTMap {
         self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
 
-    fn set(&self, chunk: usize, sft: *const (dyn SFT + Sync)) {
+    fn set(&self, chunk: usize, sft: &(dyn SFT + Sync + 'static)) {
         /*
          * This is safe (only) because a) this is only called during the
          * allocation and deallocation of chunks, which happens under a global
@@ -205,11 +200,11 @@ impl SFTMap {
          * which are reasonable), and in the other case it would either see the
          * old (valid) space or an empty space, both of which are valid.
          */
-        let self_mut: &mut Self = unsafe { self.mut_self() };
+        let self_mut = unsafe { self.mut_self() };
         // It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
         if cfg!(debug_assertions) {
-            let old = unsafe { self_mut.sft[chunk].as_ref() }.unwrap().name();
-            let new = unsafe { sft.as_ref() }.unwrap().name();
+            let old = self_mut.sft[chunk].name();
+            let new = sft.name();
             // Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,
             // in which case, we still set SFT map again.
             debug_assert!(
@@ -242,10 +237,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
     fn init(&mut self, vm_map: &'static VMMap);
 
-    fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
+    fn acquire(&self, tls: VMThread, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
         // Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.
-        let should_poll = unsafe { VM::VMActivePlan::is_mutator(tls) };
+        let should_poll = VM::VMActivePlan::is_mutator(tls);
         // Is a GC allowed here? enable_collection() has to be called so we know GC is initialized.
         let allow_poll = should_poll && VM::VMActivePlan::global().is_initialized();
 
@@ -261,24 +256,49 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 panic!("Collection is not enabled.");
             }
             pr.clear_request(pages_reserved);
-            VM::VMCollection::block_for_gc(tls);
+            VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
-            let rtn = pr.get_new_pages(pages_reserved, pages, self.common().zeroed, tls);
-            if rtn.is_zero() {
-                // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
-                if !allow_poll {
-                    panic!("Physical allocation failed when polling not allowed!");
-                }
+            debug!("Collection not required");
 
-                let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
-                debug_assert!(gc_performed, "GC not performed when forced.");
-                pr.clear_request(pages_reserved);
-                VM::VMCollection::block_for_gc(tls);
-                unsafe { Address::zero() }
-            } else {
-                debug!("Space.acquire(), returned = {}", rtn);
-                rtn
+            match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
+                Ok(res) => {
+                    // The following code was guarded by a page resource lock in Java MMTk.
+                    // I think they are thread safe and we do not need a lock. So they
+                    // are no longer guarded by a lock. If we see any issue here, considering
+                    // adding a space lock here.
+                    let bytes = conversions::pages_to_bytes(res.pages);
+                    self.grow_space(res.start, bytes, res.new_chunk);
+                    // Mmap the pages and handle error. In case of any error,
+                    // we will either call back to the VM for OOM, or simply panic.
+                    if let Err(mmap_error) = self.common().mmapper.ensure_mapped(
+                        res.start,
+                        res.pages,
+                        &self.common().metadata,
+                    ) {
+                        memory::handle_mmap_error::<VM>(mmap_error, tls);
+                    }
+
+                    // TODO: Concurrent zeroing
+                    if self.common().zeroed {
+                        memory::zero(res.start, bytes);
+                    }
+
+                    debug!("Space.acquire(), returned = {}", res.start);
+                    res.start
+                }
+                Err(_) => {
+                    // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
+                    if !allow_poll {
+                        panic!("Physical allocation failed when polling not allowed!");
+                    }
+
+                    let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
+                    debug_assert!(gc_performed, "GC not performed when forced.");
+                    pr.clear_request(pages_reserved);
+                    VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
+                    unsafe { Address::zero() }
+                }
             }
         }
     }
@@ -296,26 +316,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         self.address_in_space(start)
     }
 
-    /// # Safety
-    /// potential data race as this mutates 'common'
-    /// FIXME: This does not sound like 'unsafe', it is more like 'incorrect'. Any allocator/mutator may do slowpath allocation, and call this.
-    unsafe fn grow_discontiguous_space(&self, chunks: usize) -> Address {
-        // FIXME
-        let new_head: Address = self.common().vm_map().allocate_contiguous_chunks(
-            self.common().descriptor,
-            chunks,
-            self.common().head_discontiguous_region,
-        );
-        if new_head.is_zero() {
-            return Address::zero();
-        }
-
-        self.unsafe_common_mut().head_discontiguous_region = new_head;
-        new_head
-    }
-
     /**
-     * This hook is called by page resources each time a space grows.  The space may
+     * This is called after we get result from page resources.  The space may
      * tap into the hook to monitor heap growth.  The call is made from within the
      * page resources' critical region, immediately before yielding the lock.
      *
@@ -336,7 +338,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // );
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
-            SFT_MAP.update(self.as_sft() as *const (dyn SFT + Sync), start, chunks);
+            SFT_MAP.update(self.as_sft(), start, chunks);
         }
     }
 
@@ -346,22 +348,16 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      */
     fn ensure_mapped(&self) {
         let chunks = conversions::bytes_to_chunks_up(self.common().extent);
-        if try_map_metadata_space(
-            self.common().start,
-            self.common().extent,
-            VM::VMActivePlan::global().global_side_metadata_specs(),
-            self.local_side_metadata_specs(),
-        )
-        .is_err()
+        if self
+            .common()
+            .metadata
+            .try_map_metadata_space(self.common().start, self.common().extent)
+            .is_err()
         {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(
-            self.as_sft() as *const (dyn SFT + Sync),
-            self.common().start,
-            chunks,
-        );
+        SFT_MAP.update(self.as_sft(), self.common().start, chunks);
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
@@ -369,7 +365,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn reserved_pages(&self) -> usize {
-        self.get_page_resource().reserved_pages()
+        self.get_page_resource().reserved_pages() + self.common().metadata.reserved_pages()
     }
 
     fn get_name(&self) -> &'static str {
@@ -377,36 +373,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn common(&self) -> &CommonSpace<VM>;
-    fn common_mut(&mut self) -> &mut CommonSpace<VM> {
-        // SAFE: Reference is exclusive
-        unsafe { self.unsafe_common_mut() }
-    }
-
-    /// # Safety
-    /// This get's a mutable reference from self.
-    /// (i.e. make sure their are no concurrent accesses through self when calling this)_
-    #[allow(clippy::mut_from_ref)]
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM>;
-
-    fn release_discontiguous_chunks(&mut self, chunk: Address) {
-        debug_assert!(chunk == conversions::chunk_align_down(chunk));
-        if chunk == self.common().head_discontiguous_region {
-            self.common_mut().head_discontiguous_region =
-                self.common().vm_map().get_next_contiguous_region(chunk);
-        }
-        self.common().vm_map().free_contiguous_chunks(chunk);
-    }
 
     fn release_multiple_pages(&mut self, start: Address);
-
-    /// # Safety
-    /// TODO: I am not sure why this is unsafe.
-    unsafe fn release_all_chunks(&self) {
-        self.common()
-            .vm_map()
-            .free_all_chunks(self.common().head_discontiguous_region);
-        self.unsafe_common_mut().head_discontiguous_region = Address::zero();
-    }
 
     fn print_vm_map(&self) {
         let common = self.common();
@@ -434,7 +402,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 _ => {}
             }
         } else {
-            let mut a = common.head_discontiguous_region;
+            let mut a = self
+                .get_page_resource()
+                .common()
+                .get_head_discontiguous_region();
             while !a.is_zero() {
                 print!(
                     "{}->{}",
@@ -474,6 +445,8 @@ pub struct CommonSpace<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
 
+    pub metadata: SideMetadata,
+
     p: PhantomData<VM>,
 }
 
@@ -483,12 +456,11 @@ pub struct SpaceOptions {
     pub immortal: bool,
     pub zeroed: bool,
     pub vmrequest: VMRequest,
+    pub side_metadata_specs: SideMetadataContext,
 }
 
 /// Print debug info for SFT. Should be false when committed.
 const DEBUG_SPACE: bool = cfg!(debug_assertions) && false;
-
-unsafe impl<VM: VMBinding> Sync for CommonSpace<VM> {}
 
 impl<VM: VMBinding> CommonSpace<VM> {
     pub fn new(
@@ -510,6 +482,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             head_discontiguous_region: unsafe { Address::zero() },
             vm_map,
             mmapper,
+            metadata: SideMetadata::new(opt.side_metadata_specs),
             p: PhantomData,
         };
 
@@ -579,13 +552,10 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn init(&self, space: &dyn Space<VM>) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            if try_map_metadata_address_range(
-                self.start,
-                self.extent,
-                VM::VMActivePlan::global().global_side_metadata_specs(),
-                space.local_side_metadata_specs(),
-            )
-            .is_err()
+            if self
+                .metadata
+                .try_map_metadata_address_range(self.start, self.extent)
+                .is_err()
             {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");

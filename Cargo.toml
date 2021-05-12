@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.3.0"
+version = "0.3.2"
 authors = ["The MMTk Developers <>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -20,9 +20,9 @@ doctest = false
 custom_derive = "0.1"
 enum_derive = "0.1"
 libc = "0.2"
-jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"] }
-mimalloc-sys = "0.1.6"
-hoard-sys = { git = "https://git@github.com/paigereeves/hoard-sys.git", rev = "36989b877962f086267b1d21d5008c9df0fd0984" }
+jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"], optional = true }
+mimalloc-sys = {version = "0.1.6", optional = true }
+hoard-sys = {version = "0.1.1", optional = true }
 lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
@@ -48,10 +48,9 @@ default = []
 # -- Non mutally exclusive features --
 
 # spaces
-base_spaces = []
-vm_space = ["base_spaces"]
-ro_space = ["base_spaces"]
-code_space  = ["base_spaces"]
+vm_space = []
+ro_space = []
+code_space  = []
 
 # Run sanity GC
 sanity = []
@@ -68,6 +67,9 @@ single_worker = []
 # To support VMs that do not provide in-header GC byte
 side_gc_header = []
 
+# To run expensive comprehensive runtime checks, such as checking duplicate edges
+extreme_assertions = []
+
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
 # Only one feature from each group can be provided. Otherwise build will fail.
@@ -76,9 +78,9 @@ side_gc_header = []
 # Group:malloc
 # only one of the following features should be enabled, or none to use the default malloc from libc
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
-malloc_mimalloc = []
-malloc_jemalloc = []
-malloc_hoard = []
+malloc_mimalloc = ["mimalloc-sys"]
+malloc_jemalloc = ["jemalloc-sys"]
+malloc_hoard = ["hoard-sys"]
 
 immix_header_mark_bits = []
 

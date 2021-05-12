@@ -9,6 +9,8 @@ pub mod alloc;
 #[cfg(feature = "analysis")]
 pub mod analysis;
 pub mod constants;
+#[cfg(feature = "extreme_assertions")]
+pub mod edge_logger;
 pub mod finalizable_processor;
 pub mod forwarding_word;
 pub mod gc_byte;
@@ -35,6 +37,6 @@ pub mod test_util;
 
 pub use self::address::Address;
 pub use self::address::ObjectReference;
-pub use self::opaque_pointer::OpaquePointer;
+pub use self::opaque_pointer::*;
 pub use self::reference_processor::ReferenceProcessor;
 pub use self::synchronized_counter::SynchronizedCounter;

@@ -5,11 +5,11 @@ use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
+use crate::util::opaque_pointer::*;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
-use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -26,7 +26,7 @@ lazy_static! {
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
     pub static ref VM_MAP: VMMap = VMMap::new();
     pub static ref MMAPPER: Mmapper = Mmapper::new();
-    pub static ref SFT_MAP: SFTMap = SFTMap::new();
+    pub static ref SFT_MAP: SFTMap<'static> = SFTMap::new();
 }
 
 /// An MMTk instance. MMTk allows mutiple instances to run independently, and each instance gives users a separate heap.
@@ -35,7 +35,7 @@ pub struct MMTK<VM: VMBinding> {
     pub plan: Box<dyn Plan<VM = VM>>,
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
-    pub sftmap: &'static SFTMap,
+    pub sftmap: &'static SFTMap<'static>,
     pub reference_processors: ReferenceProcessors,
     pub finalizable_processor: Mutex<FinalizableProcessor>,
     pub options: Arc<UnsafeOptionsWrapper>,
@@ -45,20 +45,13 @@ pub struct MMTK<VM: VMBinding> {
     inside_harness: AtomicBool,
 }
 
-unsafe impl<VM: VMBinding> Send for MMTK<VM> {}
-unsafe impl<VM: VMBinding> Sync for MMTK<VM> {}
-
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
         let scheduler = Scheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = crate::plan::global::create_plan(
-            options.plan,
-            &VM_MAP,
-            &MMAPPER,
-            options.clone(),
-            unsafe { &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>) },
-        );
+        let plan =
+            crate::plan::global::create_plan(options.plan, &VM_MAP, &MMAPPER, options.clone(),
+            unsafe { &*(scheduler.as_ref() as *const Scheduler<MMTK<VM>>) });
         MMTK {
             plan,
             vm_map: &VM_MAP,
@@ -74,7 +67,7 @@ impl<VM: VMBinding> MMTK<VM> {
         }
     }
 
-    pub fn harness_begin(&self, tls: OpaquePointer) {
+    pub fn harness_begin(&self, tls: VMMutatorThread) {
         // FIXME Do a full heap GC if we have generational GC
         self.plan.handle_user_collection_request(tls, true);
         self.inside_harness.store(true, Ordering::SeqCst);

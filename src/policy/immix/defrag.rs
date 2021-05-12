@@ -64,7 +64,7 @@ impl Defrag {
         }
     }
 
-    pub fn prepare<VM: VMBinding>(&'static self, space: &'static ImmixSpace<VM>) {
+    pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
         debug_assert!(!super::BLOCK_ONLY);
         self.defrag_space_exhausted.store(false, Ordering::Release);
 

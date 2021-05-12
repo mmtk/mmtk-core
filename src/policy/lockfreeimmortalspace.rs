@@ -3,7 +3,7 @@ use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
 use crate::util::conversions::bytes_to_chunks_up;
 use crate::util::heap::PageResource;
-use crate::util::side_metadata::try_map_metadata_space;
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 
 use crate::util::ObjectReference;
 
@@ -12,7 +12,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{
     AVAILABLE_BYTES, AVAILABLE_END, AVAILABLE_START,
 };
-use crate::util::opaque_pointer::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::vm::*;
 use std::marker::PhantomData;
@@ -30,10 +30,9 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     limit: Address,
     /// Zero memory after slow-path allocation
     slow_path_zeroing: bool,
+    metadata: SideMetadata,
     phantom: PhantomData<VM>,
 }
-
-unsafe impl<VM: VMBinding> Sync for LockFreeImmortalSpace<VM> {}
 
 impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn name(&self) -> &str {
@@ -67,9 +66,6 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn common(&self) -> &CommonSpace<VM> {
         unimplemented!()
     }
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
-        unimplemented!()
-    }
 
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")
@@ -91,14 +87,11 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         );
         self.limit = AVAILABLE_START + total_bytes;
         // Eagerly memory map the entire heap (also zero all the memory)
-        crate::util::memory::dzmmap(AVAILABLE_START, total_bytes).unwrap();
-        if try_map_metadata_space(
-            AVAILABLE_START,
-            total_bytes,
-            VM::VMActivePlan::global().global_side_metadata_specs(),
-            self.local_side_metadata_specs(),
-        )
-        .is_err()
+        crate::util::memory::dzmmap_noreplace(AVAILABLE_START, total_bytes).unwrap();
+        if self
+            .metadata
+            .try_map_metadata_space(AVAILABLE_START, total_bytes)
+            .is_err()
         {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
@@ -112,10 +105,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 
     fn reserved_pages(&self) -> usize {
         let cursor = unsafe { Address::from_usize(self.cursor.load(Ordering::Relaxed)) };
-        conversions::bytes_to_pages_up(self.limit - cursor)
+        conversions::bytes_to_pages_up(self.limit - cursor) + self.metadata.reserved_pages()
     }
 
-    fn acquire(&self, _tls: OpaquePointer, pages: usize) -> Address {
+    fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
         let bytes = conversions::pages_to_bytes(pages);
         let start = unsafe { Address::from_usize(self.cursor.fetch_add(bytes, Ordering::Relaxed)) };
         if start + bytes > self.limit {
@@ -129,12 +122,20 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
-    pub fn new(name: &'static str, slow_path_zeroing: bool) -> Self {
+    pub fn new(
+        name: &'static str,
+        slow_path_zeroing: bool,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
+    ) -> Self {
         Self {
             name,
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
             limit: AVAILABLE_END,
             slow_path_zeroing,
+            metadata: SideMetadata::new(SideMetadataContext {
+                global: global_side_metadata_specs,
+                local: vec![],
+            }),
             phantom: PhantomData,
         }
     }

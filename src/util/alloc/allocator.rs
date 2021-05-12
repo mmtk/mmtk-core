@@ -6,7 +6,7 @@ use std::sync::atomic::Ordering;
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::constants::*;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection};
 use downcast_rs::Downcast;
@@ -105,9 +105,9 @@ pub fn get_maximum_aligned_size<VM: VMBinding>(
 }
 
 pub trait Allocator<VM: VMBinding>: Downcast {
-    fn get_tls(&self) -> OpaquePointer;
+    fn get_tls(&self) -> VMThread;
 
-    fn get_space(&self) -> Option<&'static dyn Space<VM>>;
+    fn get_space(&self) -> &'static dyn Space<VM>;
     fn get_plan(&self) -> &'static dyn Plan<VM = VM>;
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
@@ -131,24 +131,15 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             // Try to allocate using the slow path
             let result = self.alloc_slow_once(size, align, offset);
 
-            if !unsafe { VM::VMActivePlan::is_mutator(tls) } {
+            if !VM::VMActivePlan::is_mutator(tls) {
                 debug_assert!(!result.is_zero());
                 return result;
             }
 
             if !result.is_zero() {
-                // TODO: Check if we need oom lock.
-                // It seems the lock only protects access to the atomic boolean. We could possibly do
-                // so with compare and swap
-
                 // Report allocation success to assist OutOfMemory handling.
                 if !plan.allocation_success.load(Ordering::Relaxed) {
-                    // XXX: Can we replace this with:
-                    // ALLOCATION_SUCCESS.store(1, Ordering::SeqCst);
-                    // (and get rid of the lock)
-                    let guard = plan.oom_lock.lock().unwrap();
-                    plan.allocation_success.store(true, Ordering::Relaxed);
-                    drop(guard);
+                    plan.allocation_success.store(true, Ordering::SeqCst);
                 }
 
                 // When a GC occurs, the resultant address provided by `acquire()` is 0x0.
@@ -175,11 +166,8 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             if emergency_collection && self.get_plan().is_emergency_collection() {
                 trace!("Emergency collection");
                 // Report allocation success to assist OutOfMemory handling.
-                let guard = plan.oom_lock.lock().unwrap();
-                let fail_with_oom = !plan.allocation_success.load(Ordering::Relaxed);
                 // This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)
-                plan.allocation_success.store(true, Ordering::Relaxed);
-                drop(guard);
+                let fail_with_oom = !plan.allocation_success.swap(true, Ordering::SeqCst);
                 trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
                     VM::VMCollection::out_of_memory(tls);

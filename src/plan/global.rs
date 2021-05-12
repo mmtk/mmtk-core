@@ -13,7 +13,6 @@ use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
-use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -22,13 +21,12 @@ use crate::util::heap::VMRequest;
 use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
-use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
+use crate::util::opaque_pointer::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
 use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
-use std::cell::UnsafeCell;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -36,10 +34,10 @@ use std::sync::{Arc, Mutex};
 /// A GC worker's context for copying GCs.
 /// Each GC plan should provide their implementation of a CopyContext.
 /// For non-copying GC, NoCopy can be used.
-pub trait CopyContext: 'static + Sync + Send {
+pub trait CopyContext: 'static + Send {
     type VM: VMBinding;
     fn constraints(&self) -> &'static PlanConstraints;
-    fn init(&mut self, tls: OpaquePointer);
+    fn init(&mut self, tls: VMWorkerThread);
     fn prepare(&mut self);
     fn release(&mut self);
     fn alloc_copy(
@@ -83,7 +81,7 @@ pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     type VM = VM;
 
-    fn init(&mut self, _tls: OpaquePointer) {}
+    fn init(&mut self, _tls: VMWorkerThread) {}
     fn constraints(&self) -> &'static PlanConstraints {
         unreachable!()
     }
@@ -108,13 +106,13 @@ impl<VM: VMBinding> NoCopy<VM> {
 }
 
 impl<VM: VMBinding> WorkerLocal for NoCopy<VM> {
-    fn init(&mut self, tls: OpaquePointer) {
+    fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
 }
 
 pub fn create_mutator<VM: VMBinding>(
-    tls: OpaquePointer,
+    tls: VMMutatorThread,
     mmtk: &'static MMTK<VM>,
 ) -> Box<Mutator<VM>> {
     Box::new(match mmtk.options.plan {
@@ -138,17 +136,15 @@ pub fn create_plan<VM: VMBinding>(
     scheduler: &'static MMTkScheduler<VM>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
-        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(
-            vm_map, mmapper, options, scheduler,
-        )),
+        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
         PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options,
         )),
-        PlanSelector::GenCopy => Box::new(crate::plan::gencopy::GenCopy::new(
-            vm_map, mmapper, options, scheduler,
-        )),
+        PlanSelector::GenCopy => {
+            Box::new(crate::plan::gencopy::GenCopy::new(vm_map, mmapper, options))
+        }
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options,
         )),
         PlanSelector::Immix => Box::new(crate::plan::immix::Immix::new(
             vm_map, mmapper, options, scheduler,
@@ -161,13 +157,13 @@ pub fn create_plan<VM: VMBinding>(
 ///
 /// The global instance defines and manages static resources
 /// (such as memory and virtual memory resources).
-pub trait Plan: 'static + Sync + Send + Downcast {
+pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
     fn constraints(&self) -> &'static PlanConstraints;
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr;
     fn base(&self) -> &BasePlan<Self::VM>;
@@ -215,8 +211,8 @@ pub trait Plan: 'static + Sync + Send + Downcast {
         self.base().initialized.load(Ordering::SeqCst)
     }
 
-    fn prepare(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>);
-    fn release(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<Self::VM>);
+    fn prepare(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<Self::VM>);
+    fn release(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<Self::VM>);
 
     fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
         if self.collection_required(space_full, space) {
@@ -263,17 +259,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool {
-        let stress_force_gc = self.stress_test_gc_required();
-        debug!(
-            "self.get_pages_reserved()={}, self.get_total_pages()={}",
-            self.get_pages_reserved(),
-            self.get_total_pages()
-        );
-        let heap_full = self.get_pages_reserved() > self.get_total_pages();
-
-        space_full || stress_force_gc || heap_full
-    }
+    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool;
 
     fn get_pages_reserved(&self) -> usize {
         self.get_pages_used() + self.get_collection_reserve()
@@ -301,26 +287,7 @@ pub trait Plan: 'static + Sync + Send + Downcast {
         self.get_total_pages() - self.get_pages_used()
     }
 
-    #[inline]
-    fn stress_test_gc_required(&self) -> bool {
-        let stress_factor = self.base().options.stress_factor;
-        if self.is_initialized()
-            && (self.base().allocation_bytes.load(Ordering::SeqCst) > stress_factor)
-        {
-            trace!(
-                "Stress GC: allocation_bytes = {}, stress_factor = {}",
-                self.base().allocation_bytes.load(Ordering::Relaxed),
-                stress_factor
-            );
-            trace!("Doing stress GC");
-            self.base().allocation_bytes.store(0, Ordering::SeqCst);
-            true
-        } else {
-            false
-        }
-    }
-
-    fn handle_user_collection_request(&self, tls: OpaquePointer, force: bool) {
+    fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
         if force || !self.options().ignore_system_g_c {
             info!("User triggerring collection");
             self.base()
@@ -344,10 +311,6 @@ pub trait Plan: 'static + Sync + Send + Downcast {
                 object
             );
         }
-    }
-
-    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &[]
     }
 
     fn pre_worker_spawn(&self, _mmtk: &'static MMTK<Self::VM>) {}
@@ -379,16 +342,12 @@ pub struct BasePlan<VM: VMBinding> {
     pub max_collection_attempts: AtomicUsize,
     // Current collection attempt
     pub cur_collection_attempts: AtomicUsize,
-    // Lock used for out of memory handling
-    pub oom_lock: Mutex<()>,
     pub control_collector_context: ControllerCollectorContext<VM>,
     pub stats: Stats,
     mmapper: &'static Mmapper,
     pub vm_map: &'static VMMap,
     pub options: Arc<UnsafeOptionsWrapper>,
     pub heap: HeapMeta,
-    #[cfg(feature = "base_spaces")]
-    pub unsync: UnsafeCell<BaseUnsync<VM>>,
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
     // A counter for per-mutator stack scanning
@@ -399,10 +358,8 @@ pub struct BasePlan<VM: VMBinding> {
     // Wrapper around analysis counters
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
-}
 
-#[cfg(feature = "base_spaces")]
-pub struct BaseUnsync<VM: VMBinding> {
+    // Spaces in base plan
     #[cfg(feature = "code_space")]
     pub code_space: ImmortalSpace<VM>,
     #[cfg(feature = "ro_space")]
@@ -418,6 +375,7 @@ pub fn create_vm_space<VM: VMBinding>(
     heap: &mut HeapMeta,
     boot_segment_bytes: usize,
     constraints: &'static PlanConstraints,
+    global_side_metadata_specs: Vec<SideMetadataSpec>,
 ) -> ImmortalSpace<VM> {
     use crate::util::constants::LOG_BYTES_IN_MBYTE;
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
@@ -431,6 +389,7 @@ pub fn create_vm_space<VM: VMBinding>(
         "boot",
         false,
         VMRequest::fixed_size(boot_segment_mb),
+        global_side_metadata_specs,
         vm_map,
         mmapper,
         heap,
@@ -441,49 +400,52 @@ pub fn create_vm_space<VM: VMBinding>(
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'heap' only needs to be mutable for certain features
     #[allow(unused_variables)] // 'constraints' is only needed for certain features
+    #[allow(clippy::redundant_clone)] // depends on features, the last clone of side metadata specs is not necessary.
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> BasePlan<VM> {
         let stats = Stats::new();
         // Initializing the analysis manager and routines
         #[cfg(feature = "analysis")]
         let analysis_manager = AnalysisManager::new(&stats);
         BasePlan {
-            #[cfg(feature = "base_spaces")]
-            unsync: UnsafeCell::new(BaseUnsync {
-                #[cfg(feature = "code_space")]
-                code_space: ImmortalSpace::new(
-                    "code_space",
-                    true,
-                    VMRequest::discontiguous(),
-                    vm_map,
-                    mmapper,
-                    &mut heap,
-                    constraints,
-                ),
-                #[cfg(feature = "ro_space")]
-                ro_space: ImmortalSpace::new(
-                    "ro_space",
-                    true,
-                    VMRequest::discontiguous(),
-                    vm_map,
-                    mmapper,
-                    &mut heap,
-                    constraints,
-                ),
-                #[cfg(feature = "vm_space")]
-                vm_space: create_vm_space(
-                    vm_map,
-                    mmapper,
-                    &mut heap,
-                    options.vm_space_size,
-                    constraints,
-                ),
-            }),
+            #[cfg(feature = "code_space")]
+            code_space: ImmortalSpace::new(
+                "code_space",
+                true,
+                VMRequest::discontiguous(),
+                global_side_metadata_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                constraints,
+            ),
+            #[cfg(feature = "ro_space")]
+            ro_space: ImmortalSpace::new(
+                "ro_space",
+                true,
+                VMRequest::discontiguous(),
+                global_side_metadata_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                constraints,
+            ),
+            #[cfg(feature = "vm_space")]
+            vm_space: create_vm_space(
+                vm_map,
+                mmapper,
+                &mut heap,
+                options.vm_space_size,
+                constraints,
+                global_side_metadata_specs,
+            ),
+
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),
             last_stress_pages: AtomicUsize::new(0),
@@ -493,7 +455,6 @@ impl<VM: VMBinding> BasePlan<VM> {
             allocation_success: AtomicBool::new(false),
             max_collection_attempts: AtomicUsize::new(0),
             cur_collection_attempts: AtomicUsize::new(0),
-            oom_lock: Mutex::new(()),
             control_collector_context: ControllerCollectorContext::new(),
             stats,
             mmapper,
@@ -526,47 +487,35 @@ impl<VM: VMBinding> BasePlan<VM> {
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);
         self.control_collector_context.init(scheduler);
 
-        #[cfg(feature = "base_spaces")]
+        #[cfg(feature = "code_space")]
+        self.code_space.init(vm_map);
+        #[cfg(feature = "ro_space")]
+        self.ro_space.init(vm_map);
+        #[cfg(feature = "vm_space")]
         {
-            let unsync = unsafe { &mut *self.unsync.get() };
-            #[cfg(feature = "code_space")]
-            unsync.code_space.init(vm_map);
-            #[cfg(feature = "ro_space")]
-            unsync.ro_space.init(vm_map);
-            #[cfg(feature = "vm_space")]
-            {
-                unsync.vm_space.init(vm_map);
-                unsync.vm_space.ensure_mapped();
-            }
+            self.vm_space.init(vm_map);
+            self.vm_space.ensure_mapped();
         }
     }
 
-    #[cfg(feature = "base_spaces")]
+    // Depends on what base spaces we use, unsync may be unused.
     pub fn get_pages_used(&self) -> usize {
+        // Depends on what base spaces we use, pages may be unchanged.
+        #[allow(unused_mut)]
         let mut pages = 0;
-        let unsync = unsafe { &mut *self.unsync.get() };
 
         #[cfg(feature = "code_space")]
         {
-            pages += unsync.code_space.reserved_pages();
+            pages += self.code_space.reserved_pages();
         }
         #[cfg(feature = "ro_space")]
         {
-            pages += unsync.ro_space.reserved_pages();
+            pages += self.ro_space.reserved_pages();
         }
 
         // The VM space may be used as an immutable boot image, in which case, we should not count
         // it as part of the heap size.
-        // #[cfg(feature = "vm_space")]
-        // {
-        //     pages += unsync.vm_space.reserved_pages();
-        // }
         pages
-    }
-
-    #[cfg(not(feature = "base_spaces"))]
-    pub fn get_pages_used(&self) -> usize {
-        0
     }
 
     pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
@@ -574,57 +523,42 @@ impl<VM: VMBinding> BasePlan<VM> {
         _trace: &mut T,
         _object: ObjectReference,
     ) -> ObjectReference {
-        #[cfg(feature = "base_spaces")]
-        {
-            let unsync = unsafe { &*self.unsync.get() };
+        #[cfg(feature = "code_space")]
+        if self.code_space.in_space(_object) {
+            trace!("trace_object: object in code space");
+            return self.code_space.trace_object::<T>(_trace, _object);
+        }
 
-            #[cfg(feature = "code_space")]
-            {
-                if unsync.code_space.in_space(_object) {
-                    trace!("trace_object: object in code space");
-                    return unsync.code_space.trace_object::<T>(_trace, _object);
-                }
-            }
+        #[cfg(feature = "ro_space")]
+        if self.ro_space.in_space(_object) {
+            trace!("trace_object: object in ro_space space");
+            return self.ro_space.trace_object(_trace, _object);
+        }
 
-            #[cfg(feature = "ro_space")]
-            {
-                if unsync.ro_space.in_space(_object) {
-                    trace!("trace_object: object in ro_space space");
-                    return unsync.ro_space.trace_object(_trace, _object);
-                }
-            }
-
-            #[cfg(feature = "vm_space")]
-            {
-                if unsync.vm_space.in_space(_object) {
-                    trace!("trace_object: object in boot space");
-                    return unsync.vm_space.trace_object(_trace, _object);
-                }
-            }
+        #[cfg(feature = "vm_space")]
+        if self.vm_space.in_space(_object) {
+            trace!("trace_object: object in boot space");
+            return self.vm_space.trace_object(_trace, _object);
         }
         panic!("No special case for space in trace_object({:?})", _object);
     }
 
-    pub fn prepare(&self, _tls: OpaquePointer, _primary: bool) {
-        #[cfg(feature = "base_spaces")]
-        let unsync = unsafe { &mut *self.unsync.get() };
+    pub fn prepare(&mut self, _tls: VMWorkerThread, _primary: bool) {
         #[cfg(feature = "code_space")]
-        unsync.code_space.prepare();
+        self.code_space.prepare();
         #[cfg(feature = "ro_space")]
-        unsync.ro_space.prepare();
+        self.ro_space.prepare();
         #[cfg(feature = "vm_space")]
-        unsync.vm_space.prepare();
+        self.vm_space.prepare();
     }
 
-    pub fn release(&self, _tls: OpaquePointer, _primary: bool) {
-        #[cfg(feature = "base_spaces")]
-        let unsync = unsafe { &mut *self.unsync.get() };
+    pub fn release(&mut self, _tls: VMWorkerThread, _primary: bool) {
         #[cfg(feature = "code_space")]
-        unsync.code_space.release();
+        self.code_space.release();
         #[cfg(feature = "ro_space")]
-        unsync.ro_space.release();
+        self.ro_space.release();
         #[cfg(feature = "vm_space")]
-        unsync.vm_space.release();
+        self.vm_space.release();
     }
 
     pub fn set_collection_kind(&self) {
@@ -711,20 +645,51 @@ impl<VM: VMBinding> BasePlan<VM> {
             self.allocation_bytes.load(Ordering::Relaxed),
         );
     }
+
+    #[inline]
+    pub(super) fn stress_test_gc_required(&self) -> bool {
+        let stress_factor = self.options.stress_factor;
+        if self.initialized.load(Ordering::SeqCst)
+            && (self.allocation_bytes.load(Ordering::SeqCst) > stress_factor)
+        {
+            trace!(
+                "Stress GC: allocation_bytes = {}, stress_factor = {}",
+                self.allocation_bytes.load(Ordering::Relaxed),
+                stress_factor
+            );
+            trace!("Doing stress GC");
+            self.allocation_bytes.store(0, Ordering::SeqCst);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub(super) fn collection_required<P: Plan>(
+        &self,
+        plan: &P,
+        space_full: bool,
+        _space: &dyn Space<VM>,
+    ) -> bool {
+        let stress_force_gc = self.stress_test_gc_required();
+        debug!(
+            "self.get_pages_reserved()={}, self.get_total_pages()={}",
+            plan.get_pages_reserved(),
+            plan.get_total_pages()
+        );
+        let heap_full = plan.get_pages_reserved() > plan.get_total_pages();
+
+        space_full || stress_force_gc || heap_full
+    }
 }
 
 /**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
 */
 pub struct CommonPlan<VM: VMBinding> {
-    pub unsync: UnsafeCell<CommonUnsync<VM>>,
-    pub base: BasePlan<VM>,
-    pub global_metadata_specs: Vec<SideMetadataSpec>,
-}
-
-pub struct CommonUnsync<VM: VMBinding> {
     pub immortal: ImmortalSpace<VM>,
     pub los: LargeObjectSpace<VM>,
+    pub base: BasePlan<VM>,
 }
 
 impl<VM: VMBinding> CommonPlan<VM> {
@@ -734,37 +699,37 @@ impl<VM: VMBinding> CommonPlan<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
-        global_side_metadata_specs: &[SideMetadataSpec],
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> CommonPlan<VM> {
-        let mut specs = if cfg!(feature = "side_gc_header") {
-            vec![gc_byte::SIDE_GC_BYTE_SPEC]
-        } else {
-            vec![]
-        };
-        specs.extend_from_slice(global_side_metadata_specs);
         CommonPlan {
-            unsync: UnsafeCell::new(CommonUnsync {
-                immortal: ImmortalSpace::new(
-                    "immortal",
-                    true,
-                    VMRequest::discontiguous(),
-                    vm_map,
-                    mmapper,
-                    &mut heap,
-                    constraints,
-                ),
-                los: LargeObjectSpace::new(
-                    "los",
-                    true,
-                    VMRequest::discontiguous(),
-                    vm_map,
-                    mmapper,
-                    &mut heap,
-                    constraints,
-                ),
-            }),
-            base: BasePlan::new(vm_map, mmapper, options, heap, constraints),
-            global_metadata_specs: specs,
+            immortal: ImmortalSpace::new(
+                "immortal",
+                true,
+                VMRequest::discontiguous(),
+                global_side_metadata_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                constraints,
+            ),
+            los: LargeObjectSpace::new(
+                "los",
+                true,
+                VMRequest::discontiguous(),
+                global_side_metadata_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                constraints,
+            ),
+            base: BasePlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                constraints,
+                global_side_metadata_specs,
+            ),
         }
     }
 
@@ -775,14 +740,12 @@ impl<VM: VMBinding> CommonPlan<VM> {
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
         self.base.gc_init(heap_size, vm_map, scheduler);
-        let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.immortal.init(vm_map);
-        unsync.los.init(vm_map);
+        self.immortal.init(vm_map);
+        self.los.init(vm_map);
     }
 
     pub fn get_pages_used(&self) -> usize {
-        let unsync = unsafe { &*self.unsync.get() };
-        unsync.immortal.reserved_pages() + unsync.los.reserved_pages() + self.base.get_pages_used()
+        self.immortal.reserved_pages() + self.los.reserved_pages() + self.base.get_pages_used()
     }
 
     pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
@@ -790,30 +753,26 @@ impl<VM: VMBinding> CommonPlan<VM> {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
-        let unsync = unsafe { &*self.unsync.get() };
-
-        if unsync.immortal.in_space(object) {
+        if self.immortal.in_space(object) {
             trace!("trace_object: object in immortal space");
-            return unsync.immortal.trace_object(trace, object);
+            return self.immortal.trace_object(trace, object);
         }
-        if unsync.los.in_space(object) {
+        if self.los.in_space(object) {
             trace!("trace_object: object in los");
-            return unsync.los.trace_object(trace, object);
+            return self.los.trace_object(trace, object);
         }
         self.base.trace_object::<T, C>(trace, object)
     }
 
-    pub fn prepare(&self, tls: OpaquePointer, primary: bool) {
-        let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.immortal.prepare();
-        unsync.los.prepare(primary);
+    pub fn prepare(&mut self, tls: VMWorkerThread, primary: bool) {
+        self.immortal.prepare();
+        self.los.prepare(primary);
         self.base.prepare(tls, primary)
     }
 
-    pub fn release(&self, tls: OpaquePointer, primary: bool) {
-        let unsync = unsafe { &mut *self.unsync.get() };
-        unsync.immortal.release();
-        unsync.los.release(primary);
+    pub fn release(&mut self, tls: VMWorkerThread, primary: bool) {
+        self.immortal.release();
+        self.los.release(primary);
         self.base.release(tls, primary)
     }
 
@@ -839,14 +798,12 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.stacks_prepared()
     }
 
-    pub fn get_immortal(&self) -> &'static ImmortalSpace<VM> {
-        let unsync = unsafe { &*self.unsync.get() };
-        &unsync.immortal
+    pub fn get_immortal(&self) -> &ImmortalSpace<VM> {
+        &self.immortal
     }
 
-    pub fn get_los(&self) -> &'static LargeObjectSpace<VM> {
-        let unsync = unsafe { &*self.unsync.get() };
-        &unsync.los
+    pub fn get_los(&self) -> &LargeObjectSpace<VM> {
+        &self.los
     }
 }
 

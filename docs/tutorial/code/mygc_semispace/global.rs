@@ -20,8 +20,9 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::side_metadata::SideMetadataContext;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add
@@ -44,8 +45,6 @@ pub struct MyGC<VM: VMBinding> {
 }
 // ANCHOR_END: plan_def
 
-unsafe impl<VM: VMBinding> Sync for MyGC<VM> {}
-
 // ANCHOR: constraints
 pub const MYGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
@@ -66,7 +65,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // ANCHOR: create_worker_local
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = MyGCCopyContext::new(mmtk);
@@ -104,13 +103,19 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     }
     // ANCHOR_END: schedule_collection
 
+    // ANCHOR: collection_required()
+    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
+        self.base().collection_required(self, space_full, space)
+    }
+    // ANCHOR_END: collection_required()
+
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
         &*ALLOCATOR_MAPPING
     }
 
     // Modify
     // ANCHOR: prepare
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
 
         self.hi
@@ -124,7 +129,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // Modify
     // ANCHOR: release
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         self.fromspace().release();
     }
@@ -170,6 +175,7 @@ impl<VM: VMBinding> MyGC<VM> {
     ) -> Self {
         // Modify
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
         MyGC {
             hi: AtomicBool::new(false),
@@ -179,6 +185,7 @@ impl<VM: VMBinding> MyGC<VM> {
                 false,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -189,11 +196,12 @@ impl<VM: VMBinding> MyGC<VM> {
                 true,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, &[]),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs),
         }
     }
     // ANCHOR_END: plan_new

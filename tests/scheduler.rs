@@ -4,7 +4,7 @@
 
 use lazy_static::lazy_static;
 use mmtk::scheduler::*;
-use mmtk::util::OpaquePointer;
+use mmtk::util::opaque_pointer::*;
 use rand::{thread_rng, Rng};
 use std::sync::Arc;
 
@@ -85,7 +85,7 @@ fn quicksort() {
 
     // println!("Original: {:?}", data);
 
-    SCHEDULER.initialize(NUM_WORKERS, &(), OpaquePointer::UNINITIALIZED);
+    SCHEDULER.initialize(NUM_WORKERS, &(), VMThread(OpaquePointer::UNINITIALIZED));
     SCHEDULER.work_buckets[WorkBucketStage::Unconstrained]
         .add(Sort(unsafe { &mut *(data as *mut _) }));
     SCHEDULER.wait_for_completion();

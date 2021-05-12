@@ -5,7 +5,8 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::forwarding_word;
-use crate::util::{Address, ObjectReference, OpaquePointer};
+use crate::util::{Address, ObjectReference};
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::plan::PlanConstraints;
@@ -28,13 +29,13 @@ impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
         &super::global::MYGC_CONSTRAINTS
     }
-    fn init(&mut self, tls:OpaquePointer) {
-        self.mygc.tls = tls;
+    fn init(&mut self, tls: VMWorkerThread) {
+        self.mygc.tls = tls.0;
     }
     // ANCHOR_END: copycontext_constraints_init
     // ANCHOR: copycontext_prepare
     fn prepare(&mut self) {
-        self.mygc.rebind(Some(self.plan.tospace()));
+        self.mygc.rebind(self.plan.tospace());
     }
     // ANCHOR_END: copycontext_prepare
     fn release(&mut self) {
@@ -69,15 +70,16 @@ impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> {
 // ANCHOR: constructor_and_workerlocal
 impl<VM: VMBinding> MyGCCopyContext<VM> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
+        let plan = &mmtk.plan.downcast_ref::<MyGC<VM>>().unwrap();
         Self {
-            plan: &mmtk.plan.downcast_ref::<MyGC<VM>>().unwrap(),
-            mygc: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
+            plan,
+            mygc: BumpAllocator::new(VMThread::UNINITIALIZED, plan.tospace(), &*mmtk.plan),
         }
     }
 }
 
 impl<VM: VMBinding> WorkerLocal for MyGCCopyContext<VM> {
-    fn init(&mut self, tls: OpaquePointer) {
+    fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
 }

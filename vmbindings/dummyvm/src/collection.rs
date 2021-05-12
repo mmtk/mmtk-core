@@ -1,6 +1,6 @@
 use mmtk::vm::Collection;
 use mmtk::MutatorContext;
-use mmtk::util::OpaquePointer;
+use mmtk::util::opaque_pointer::*;
 use mmtk::MMTK;
 use mmtk::scheduler::*;
 use mmtk::scheduler::gc_work::*;
@@ -9,23 +9,23 @@ use DummyVM;
 pub struct VMCollection {}
 
 impl Collection<DummyVM> for VMCollection {
-    fn stop_all_mutators<E: ProcessEdgesWork<VM=DummyVM>>(_tls: OpaquePointer) {
+    fn stop_all_mutators<E: ProcessEdgesWork<VM=DummyVM>>(_tls: VMWorkerThread) {
         unimplemented!()
     }
 
-    fn resume_mutators(_tls: OpaquePointer) {
+    fn resume_mutators(_tls: VMWorkerThread) {
         unimplemented!()
     }
 
-    fn block_for_gc(_tls: OpaquePointer) {
+    fn block_for_gc(_tls: VMMutatorThread) {
         unimplemented!();
     }
 
-    fn spawn_worker_thread(_tls: OpaquePointer, _ctx: Option<&Worker<MMTK<DummyVM>>>) {
+    fn spawn_worker_thread(_tls: VMThread, _ctx: Option<&Worker<MMTK<DummyVM>>>) {
         unimplemented!();
     }
 
-    fn prepare_mutator<T: MutatorContext<DummyVM>>(_tls: OpaquePointer, _mutator: &T) {
+    fn prepare_mutator<T: MutatorContext<DummyVM>>(_tls_w: VMWorkerThread, _tls_m: VMMutatorThread, _mutator: &T) {
         unimplemented!()
     }
 }

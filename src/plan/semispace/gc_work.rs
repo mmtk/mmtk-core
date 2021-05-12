@@ -6,7 +6,8 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkerLocal;
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::forwarding_word;
-use crate::util::{Address, ObjectReference, OpaquePointer};
+use crate::util::opaque_pointer::*;
+use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
@@ -22,11 +23,11 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
         &super::global::SS_CONSTRAINTS
     }
-    fn init(&mut self, tls: OpaquePointer) {
-        self.ss.tls = tls;
+    fn init(&mut self, tls: VMWorkerThread) {
+        self.ss.tls = tls.0;
     }
     fn prepare(&mut self) {
-        self.ss.rebind(Some(self.plan.tospace()));
+        self.ss.rebind(self.plan.tospace());
     }
     fn release(&mut self) {
         // self.ss.rebind(Some(self.plan.tospace()));
@@ -56,15 +57,17 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
 
 impl<VM: VMBinding> SSCopyContext<VM> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
+        let plan = &mmtk.plan.downcast_ref::<SemiSpace<VM>>().unwrap();
         Self {
-            plan: &mmtk.plan.downcast_ref::<SemiSpace<VM>>().unwrap(),
-            ss: BumpAllocator::new(OpaquePointer::UNINITIALIZED, None, &*mmtk.plan),
+            plan,
+            // it doesn't matter which space we bind with the copy allocator. We will rebind to a proper space in prepare().
+            ss: BumpAllocator::new(VMThread::UNINITIALIZED, plan.tospace(), &*mmtk.plan),
         }
     }
 }
 
 impl<VM: VMBinding> WorkerLocal for SSCopyContext<VM> {
-    fn init(&mut self, tls: OpaquePointer) {
+    fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
 }

@@ -1,5 +1,5 @@
 use super::global::Immix;
-use crate::plan::CopyContext;
+use crate::{plan::CopyContext, util::opaque_pointer::{VMThread, VMWorkerThread}};
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::policy::immix::ScanObjectsAndMarkLines;
@@ -22,8 +22,8 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
         &super::global::IMMIX_CONSTRAINTS
     }
-    fn init(&mut self, tls: OpaquePointer) {
-        self.immix.tls = tls;
+    fn init(&mut self, tls: VMWorkerThread) {
+        self.immix.tls = tls.0;
     }
     fn prepare(&mut self) {
         self.immix.reset()
@@ -57,13 +57,13 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
 impl<VM: VMBinding> ImmixCopyContext<VM> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
-            immix: ImmixAllocator::new(OpaquePointer::UNINITIALIZED, Some(&mmtk.plan.downcast_ref::<Immix<VM>>().unwrap().immix_space), &*mmtk.plan, true),
+            immix: ImmixAllocator::new(VMThread::UNINITIALIZED, Some(&mmtk.plan.downcast_ref::<Immix<VM>>().unwrap().immix_space), &*mmtk.plan, true),
         }
     }
 }
 
 impl<VM: VMBinding> WorkerLocal for ImmixCopyContext<VM> {
-    fn init(&mut self, tls: OpaquePointer) {
+    fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
 }

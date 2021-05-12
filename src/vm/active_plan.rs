@@ -1,7 +1,6 @@
 use crate::plan::Mutator;
 use crate::plan::Plan;
-use crate::scheduler::*;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 use std::sync::MutexGuard;
@@ -32,15 +31,6 @@ pub trait ActivePlan<VM: VMBinding> {
     // Possibly we should remove the use of this function, and remove this function?
     fn global() -> &'static dyn Plan<VM = VM>;
 
-    /// Return a `GCWorker` reference for the thread.
-    ///
-    /// Arguments:
-    /// * `tls`: The thread to query.
-    ///
-    /// # Safety
-    /// The caller needs to make sure that the thread is a GC worker thread.
-    unsafe fn worker(tls: OpaquePointer) -> &'static mut GCWorker<VM>;
-
     /// Return whether there is a mutator created and associated with the thread.
     ///
     /// Arguments:
@@ -48,7 +38,7 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// # Safety
     /// The caller needs to make sure that the thread is valid (a value passed in by the VM binding through API).
-    unsafe fn is_mutator(tls: OpaquePointer) -> bool;
+    fn is_mutator(tls: VMThread) -> bool;
 
     /// Return a `Mutator` reference for the thread.
     ///
@@ -57,7 +47,7 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// # Safety
     /// The caller needs to make sure that the thread is a mutator thread.
-    unsafe fn mutator(tls: OpaquePointer) -> &'static mut Mutator<VM>;
+    fn mutator(tls: VMMutatorThread) -> &'static mut Mutator<VM>;
 
     /// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.
     fn reset_mutator_iterator();

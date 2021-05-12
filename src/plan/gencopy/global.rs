@@ -3,6 +3,7 @@ use super::{
     gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges},
     LOGGING_META,
 };
+use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
@@ -22,10 +23,10 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::OpaquePointer;
+use crate::util::side_metadata::SideMetadataContext;
+use crate::util::opaque_pointer::VMWorkerThread;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
-use crate::{plan::global::BasePlan, util::side_metadata::SideMetadataSpec};
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -40,10 +41,7 @@ pub struct GenCopy<VM: VMBinding> {
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
     in_nursery: AtomicBool,
-    pub scheduler: &'static MMTkScheduler<VM>,
 }
-
-unsafe impl<VM: VMBinding> Sync for GenCopy<VM> {}
 
 pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
@@ -63,7 +61,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = GenCopyCopyContext::new(mmtk);
@@ -71,13 +69,13 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         GCWorkerLocalPtr::new(c)
     }
 
-    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool
+    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool
     where
         Self: Sized,
     {
         let nursery_full = self.nursery.reserved_pages() >= (NURSERY_SIZE >> LOG_BYTES_IN_PAGE);
-        let heap_full = self.get_pages_reserved() > self.get_total_pages();
-        space_full || nursery_full || heap_full
+
+        nursery_full || self.base().collection_required(self, space_full, space)
     }
 
     fn gc_init(
@@ -122,7 +120,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new());
+            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
@@ -130,7 +128,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer, _mmtk: &'static MMTK<VM>) {
+    fn prepare(&mut self, tls: VMWorkerThread, _mmtk: &'static MMTK<VM>) {
         self.common.prepare(tls, true);
         self.nursery.prepare(true);
         if !self.in_nursery() {
@@ -142,7 +140,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.copyspace1.prepare(!hi);
     }
 
-    fn release(&self, tls: OpaquePointer, _mmtk: &'static MMTK<VM>) {
+    fn release(&mut self, tls: VMWorkerThread, _mmtk: &'static MMTK<VM>) {
         self.common.release(tls, true);
         self.nursery.release();
         if !self.in_nursery() {
@@ -171,10 +169,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     fn in_nursery(&self) -> bool {
         self.in_nursery.load(Ordering::SeqCst)
     }
-
-    fn global_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &self.common().global_metadata_specs
-    }
 }
 
 impl<VM: VMBinding> GenCopy<VM> {
@@ -182,14 +176,14 @@ impl<VM: VMBinding> GenCopy<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let global_metadata_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+        let gencopy_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
             vec![LOGGING_META]
         } else {
             vec![]
         };
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&gencopy_specs);
 
         GenCopy {
             nursery: CopySpace::new(
@@ -197,6 +191,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 false,
                 true,
                 VMRequest::fixed_extent(NURSERY_SIZE, false),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -207,6 +202,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 false,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -216,6 +212,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 true,
                 true,
                 VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -226,10 +223,9 @@ impl<VM: VMBinding> GenCopy<VM> {
                 options,
                 heap,
                 &GENCOPY_CONSTRAINTS,
-                &&global_metadata_specs,
+                global_metadata_specs,
             ),
             in_nursery: AtomicBool::default(),
-            scheduler,
         }
     }
 

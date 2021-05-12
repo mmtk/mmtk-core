@@ -6,13 +6,13 @@ use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::policy::immix::block::*;
 use crate::policy::immix::line::*;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::VMThread;
 use crate::vm::*;
 
 
 #[repr(C)]
 pub struct ImmixAllocator<VM: VMBinding> {
-    pub tls: OpaquePointer,
+    pub tls: VMThread,
     /// bump pointer
     cursor: Address,
     /// limit for bump pointer
@@ -53,8 +53,8 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 }
 
 impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
-    fn get_space(&self) -> Option<&'static dyn Space<VM>> {
-        Some(self.space as _)
+    fn get_space(&self) -> &'static dyn Space<VM> {
+        self.space as _
     }
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
         self.plan
@@ -108,14 +108,14 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         }
     }
 
-    fn get_tls(&self) -> OpaquePointer {
+    fn get_tls(&self) -> VMThread {
         self.tls
     }
 }
 
 impl<VM: VMBinding> ImmixAllocator<VM> {
     pub fn new(
-        tls: OpaquePointer,
+        tls: VMThread,
         space: Option<&'static dyn Space<VM>>,
         plan: &'static dyn Plan<VM = VM>,
         copy: bool,

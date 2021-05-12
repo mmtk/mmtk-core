@@ -25,6 +25,8 @@ custom_derive! {
 }
 
 pub struct UnsafeOptionsWrapper(UnsafeCell<Options>);
+
+// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
 unsafe impl Sync for UnsafeOptionsWrapper {}
 
 impl UnsafeOptionsWrapper {

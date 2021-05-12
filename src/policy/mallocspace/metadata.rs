@@ -3,16 +3,15 @@ use crate::util::constants;
 use crate::util::constants::BYTES_IN_WORD;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+#[cfg(debug_assertions)]
 use crate::util::side_metadata::address_to_meta_address;
 use crate::util::side_metadata::load_atomic;
 #[cfg(target_pointer_width = "32")]
 use crate::util::side_metadata::meta_bytes_per_chunk;
 use crate::util::side_metadata::store_atomic;
-use crate::util::side_metadata::try_map_metadata_space;
-use crate::util::side_metadata::SideMetadataScope;
-use crate::util::side_metadata::SideMetadataSpec;
 #[cfg(target_pointer_width = "64")]
 use crate::util::side_metadata::{metadata_address_range_size, LOCAL_SIDE_METADATA_BASE_ADDRESS};
+use crate::util::side_metadata::{SideMetadata, SideMetadataScope, SideMetadataSpec};
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -72,18 +71,13 @@ pub fn is_meta_space_mapped(address: Address) -> bool {
     ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
 }
 
-pub fn map_meta_space_for_chunk(chunk_start: Address) {
+pub fn map_meta_space_for_chunk(metadata: &SideMetadata, chunk_start: Address) {
     let mut active_chunks = ACTIVE_CHUNKS.write().unwrap();
     if active_chunks.contains(&chunk_start) {
         return;
     }
     active_chunks.insert(chunk_start);
-    let mmap_metadata_result = try_map_metadata_space(
-        chunk_start,
-        BYTES_IN_CHUNK,
-        &[],
-        &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
-    );
+    let mmap_metadata_result = metadata.try_map_metadata_space(chunk_start, BYTES_IN_CHUNK);
     debug_assert!(
         mmap_metadata_result.is_ok(),
         "mmap sidemetadata failed for chunk_start ({})",

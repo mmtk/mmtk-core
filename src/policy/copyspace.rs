@@ -8,18 +8,16 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
+use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
-use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicBool, Ordering};
-
-unsafe impl<VM: VMBinding> Sync for CopySpace<VM> {}
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 pub struct CopySpace<VM: VMBinding> {
-    common: UnsafeCell<CommonSpace<VM>>,
+    common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
     from_space: AtomicBool,
 }
@@ -52,16 +50,10 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         &self.pr
     }
     fn common(&self) -> &CommonSpace<VM> {
-        unsafe { &*self.common.get() }
-    }
-    unsafe fn unsafe_common_mut(&self) -> &mut CommonSpace<VM> {
-        &mut *self.common.get()
+        &self.common
     }
 
     fn init(&mut self, _vm_map: &'static VMMap) {
-        // Borrow-checker fighting so that we can have a cyclic reference
-        let me = unsafe { &*(self as *const Self) };
-        self.pr.bind_space(me);
         self.common().init(self.as_space());
     }
 
@@ -71,11 +63,13 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 }
 
 impl<VM: VMBinding> CopySpace<VM> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &'static str,
         from_space: bool,
         zeroed: bool,
         vmrequest: VMRequest,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
@@ -87,6 +81,10 @@ impl<VM: VMBinding> CopySpace<VM> {
                 immortal: false,
                 zeroed,
                 vmrequest,
+                side_metadata_specs: SideMetadataContext {
+                    global: global_side_metadata_specs,
+                    local: vec![],
+                },
             },
             vm_map,
             mmapper,
@@ -103,7 +101,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                     vm_map,
                 )
             },
-            common: UnsafeCell::new(common),
+            common,
             from_space: AtomicBool::new(from_space),
         }
     }

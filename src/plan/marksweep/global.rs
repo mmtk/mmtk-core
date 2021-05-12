@@ -20,7 +20,8 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::OpaquePointer;
+use crate::util::side_metadata::SideMetadataContext;
+use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use std::sync::Arc;
 
@@ -30,8 +31,6 @@ pub struct MarkSweep<VM: VMBinding> {
     common: CommonPlan<VM>,
     ms: MallocSpace<VM>,
 }
-
-unsafe impl<VM: VMBinding> Sync for MarkSweep<VM> {}
 
 pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: false,
@@ -68,7 +67,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, NoCopy<VM>>::new());
+            .add(ScheduleSanityGC::<Self, NoCopy<VM>>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
@@ -76,15 +75,19 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer, _mmtk: &'static MMTK<Self::VM>) {
+    fn prepare(&mut self, tls: VMWorkerThread, _mmtk: &'static MMTK<VM>) {
         self.common.prepare(tls, true);
         // Dont need to prepare for MallocSpace
     }
 
-    fn release(&self, tls: OpaquePointer, _mmtk: &'static MMTK<Self::VM>) {
+    fn release(&mut self, tls: VMWorkerThread, _mmtk: &'static MMTK<VM>) {
         trace!("Marksweep: Release");
         self.common.release(tls, true);
-        unsafe { self.ms.release_all_chunks() };
+        self.ms.release_all_chunks();
+    }
+
+    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
+        self.base().collection_required(self, space_full, space)
     }
 
     fn get_collection_reserve(&self) -> usize {
@@ -109,7 +112,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = NoCopy::new(mmtk);
@@ -123,12 +126,13 @@ impl<VM: VMBinding> MarkSweep<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<VM>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let specs = SideMetadataContext::new_global_specs(&[]);
+
         MarkSweep {
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS, &[]),
-            ms: MallocSpace::new(),
+            ms: MallocSpace::new(specs.clone()),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MS_CONSTRAINTS, specs),
         }
     }
 

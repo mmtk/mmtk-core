@@ -1,5 +1,5 @@
 use super::gc_work::{ImmixCopyContext, ImmixProcessEdges};
-use crate::{mmtk::MMTK, policy::immix::{ImmixSpace, block::Block}};
+use crate::{mmtk::MMTK, policy::immix::{ImmixSpace, block::Block}, util::opaque_pointer::VMWorkerThread};
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -49,13 +49,17 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
 impl<VM: VMBinding> Plan for Immix<VM> {
     type VM = VM;
 
+    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
+        self.base().collection_required(self, space_full, space)
+    }
+
     fn constraints(&self) -> &'static PlanConstraints {
         &IMMIX_CONSTRAINTS
     }
 
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = ImmixCopyContext::new(mmtk);
@@ -102,12 +106,12 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<VM>) {
+    fn prepare(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         self.common.prepare(tls, true);
         self.immix_space.prepare(mmtk);
     }
 
-    fn release(&'static self, tls: OpaquePointer, mmtk: &'static MMTK<VM>) {
+    fn release(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         self.common.release(tls, true);
         // release the collected region
         self.immix_space.release(mmtk);
@@ -144,8 +148,8 @@ impl<VM: VMBinding> Immix<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         Immix {
-            immix_space: ImmixSpace::new("immix", vm_map, mmapper, &mut heap),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &IMMIX_CONSTRAINTS, &[]),
+            immix_space: ImmixSpace::new("immix", vm_map, mmapper, &mut heap, vec![]),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &IMMIX_CONSTRAINTS, vec![]),
         }
     }
 }

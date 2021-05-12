@@ -6,7 +6,7 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
@@ -17,7 +17,7 @@ use enum_map::EnumMap;
 // Add
 pub fn mygc_mutator_prepare<VM: VMBinding>(
     _mutator: &mut Mutator<VM>,
-    _tls: OpaquePointer,
+    _tls: VMWorkerThread,
 ) {
     // Do nothing
 }
@@ -26,7 +26,7 @@ pub fn mygc_mutator_prepare<VM: VMBinding>(
 // ANCHOR: release
 pub fn mygc_mutator_release<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
-    _tls: OpaquePointer,
+    _tls: VMWorkerThread,
 ) {
     // rebind the allocation bump pointer to the appropriate semispace
     let bump_allocator = unsafe {
@@ -36,13 +36,13 @@ pub fn mygc_mutator_release<VM: VMBinding>(
     }
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
-    bump_allocator.rebind(Some(
+    bump_allocator.rebind(
         mutator
             .plan
             .downcast_ref::<MyGC<VM>>()
             .unwrap()
             .tospace(),
-    ));
+    );
 }
 // ANCHOR_END: release
 
@@ -58,7 +58,7 @@ lazy_static! {
 // ANCHOR_END: allocator_mapping
 
 pub fn create_mygc_mutator<VM: VMBinding>(
-    mutator_tls: OpaquePointer,
+    mutator_tls: VMMutatorThread,
     plan: &'static MyGC<VM>,
 ) -> Mutator<VM> {
     let config = MutatorConfig {

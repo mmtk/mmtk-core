@@ -1,5 +1,5 @@
 use super::Immix;
-use crate::plan::barriers::NoBarrier;
+use crate::{plan::barriers::NoBarrier, util::opaque_pointer::{VMMutatorThread, VMWorkerThread}};
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
@@ -11,7 +11,7 @@ use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn immix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
+pub fn immix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // rebind the allocation bump pointer to the appropriate semispace
     let immix_allocator = unsafe {
         mutator
@@ -23,7 +23,7 @@ pub fn immix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: Opa
     immix_allocator.reset();
 }
 
-pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
+pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // rebind the allocation bump pointer to the appropriate semispace
     let immix_allocator = unsafe {
         mutator
@@ -44,7 +44,7 @@ lazy_static! {
 }
 
 pub fn create_immix_mutator<VM: VMBinding>(
-    mutator_tls: OpaquePointer,
+    mutator_tls: VMMutatorThread,
     plan: &'static dyn Plan<VM = VM>,
 ) -> Mutator<VM> {
     let immix = plan.downcast_ref::<Immix<VM>>().unwrap();

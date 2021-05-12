@@ -1,12 +1,12 @@
 use super::*;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 
 /// The global context for the whole scheduling system.
 /// This context is globally accessable for all work-packets, workers and the scheduler.
 ///
 /// For mmtk, the global context is `MMTK<VM>`.
-pub trait Context: 'static + Send + Sync + Sized {
-    fn spawn_worker(worker: &'static Worker<Self>, _tls: OpaquePointer, context: &'static Self) {
+pub trait Context: 'static + Sync + Sized {
+    fn spawn_worker(worker: &'static Worker<Self>, _tls: VMThread, context: &'static Self) {
         let worker_ptr = worker as *const Worker<Self> as usize;
         std::thread::spawn(move || {
             let worker = unsafe { &mut *(worker_ptr as *mut Worker<Self>) };
@@ -22,7 +22,7 @@ impl Context for () {}
 ///
 /// For mmtk, each gc can define their own worker-local data, to contain their required copy allocators and other stuffs.
 pub trait WorkerLocal {
-    fn init(&mut self, _tls: OpaquePointer) {}
+    fn init(&mut self, _tls: VMWorkerThread) {}
 }
 
 /// A default implementation for scheduling systems that does not require a worker-local context.

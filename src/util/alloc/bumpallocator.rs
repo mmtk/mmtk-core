@@ -9,7 +9,7 @@ use crate::util::alloc::Allocator;
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::{ActivePlan, VMBinding};
 
 const BYTES_IN_PAGE: usize = 1 << 12;
@@ -18,10 +18,10 @@ const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 #[repr(C)]
 pub struct BumpAllocator<VM: VMBinding> {
-    pub tls: OpaquePointer,
+    pub tls: VMThread,
     cursor: Address,
     limit: Address,
-    space: Option<&'static dyn Space<VM>>,
+    space: &'static dyn Space<VM>,
     plan: &'static dyn Plan<VM = VM>,
 }
 
@@ -36,14 +36,14 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         self.limit = unsafe { Address::zero() };
     }
 
-    pub fn rebind(&mut self, space: Option<&'static dyn Space<VM>>) {
+    pub fn rebind(&mut self, space: &'static dyn Space<VM>) {
         self.reset();
         self.space = space;
     }
 }
 
 impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
-    fn get_space(&self) -> Option<&'static dyn Space<VM>> {
+    fn get_space(&self) -> &'static dyn Space<VM> {
         self.space
     }
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
@@ -86,15 +86,15 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         }
     }
 
-    fn get_tls(&self) -> OpaquePointer {
+    fn get_tls(&self) -> VMThread {
         self.tls
     }
 }
 
 impl<VM: VMBinding> BumpAllocator<VM> {
     pub fn new(
-        tls: OpaquePointer,
-        space: Option<&'static dyn Space<VM>>,
+        tls: VMThread,
+        space: &'static dyn Space<VM>,
         plan: &'static dyn Plan<VM = VM>,
     ) -> Self {
         BumpAllocator {
@@ -123,8 +123,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
             self.acquire_block(size, align, offset, true)
         } else {
             let base = &self.plan.base();
-            let is_mutator =
-                unsafe { VM::VMActivePlan::is_mutator(self.tls) } && self.plan.is_initialized();
+            let is_mutator = VM::VMActivePlan::is_mutator(self.tls) && self.plan.is_initialized();
 
             if is_mutator
                 && base.allocation_bytes.load(Ordering::SeqCst) > base.options.stress_factor
@@ -175,10 +174,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         stress_test: bool,
     ) -> Address {
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start = self
-            .space
-            .unwrap()
-            .acquire(self.tls, bytes_to_pages(block_size));
+        let acquired_start = self.space.acquire(self.tls, bytes_to_pages(block_size));
         if acquired_start.is_zero() {
             trace!("Failed to acquire a new block");
             acquired_start
