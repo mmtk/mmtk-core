@@ -75,12 +75,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: VMWorkerThread) {
+    fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
         // Dont need to prepare for MallocSpace
     }
 
-    fn release(&self, tls: VMWorkerThread) {
+    fn release(&mut self, tls: VMWorkerThread) {
         trace!("Marksweep: Release");
         self.common.release(tls, true);
         self.ms.release_all_chunks();
