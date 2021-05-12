@@ -175,7 +175,7 @@
 //! When a space is created by a plan (e.g. SemiSpace::new), the plan can create its global specs by `SideMetadataContext::new_global_specs(&[GLOBAL_META_1, GLOBAL_META_2])`. Then,
 //! the global specs are passed to each space that the plan creates.
 //!
-//! Each space will then combine the global specs and its own local specs to create a [SideMetadata](util::side_metadata::SideMetadata).
+//! Each space will then combine the global specs and its own local specs to create a [SideMetadata](global::SideMetadata).
 //! Allocating side metadata space and accounting its memory usage is done by `SideMetadata`. If a space uses `CommonSpace`, `CommonSpace` will create `SideMetadata` and manage
 //! reserving and allocating metadata space when necessary. If a space does not use `CommonSpace`, it should create `SideMetadata` itself and manage allocating metadata space
 //! as its own responsibility.
