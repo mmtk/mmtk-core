@@ -24,7 +24,7 @@ impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for ScheduleCollection {}
 /// This work packet invokes prepare() for the plan (which will invoke prepare() for each space), and
 /// pushes work packets for preparing mutators and collectors.
 /// We should only have one such work packet per GC, before any actual GC work starts.
-/// We assume this work packet is the only work packet that accesses plan, and there should
+/// We assume this work packet is the only running work packet that accesses plan, and there should
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
 pub struct Prepare<P: Plan, W: CopyContext + WorkerLocal> {
@@ -44,7 +44,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> Prepare<P, W> {
 impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Prepare<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Prepare Global");
-        // We assume this is the only work packet that accesses plan at the point of execution
+        // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut P = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.prepare(worker.tls);
@@ -100,7 +100,7 @@ impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for PrepareCollecto
 /// This work packet invokes release() for the plan (which will invoke release() for each space), and
 /// pushes work packets for releasing mutators and collectors.
 /// We should only have one such work packet per GC, before any actual GC work starts.
-/// We assume this work packet is the only work packet that accesses plan, and there should
+/// We assume this work packet is the only running work packet that accesses plan, and there should
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
 pub struct Release<P: Plan, W: CopyContext + WorkerLocal> {
@@ -120,7 +120,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> Release<P, W> {
 impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Release Global");
-        // We assume this is the only work packet that accesses plan at the point of execution
+        // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut P = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.release(worker.tls);
