@@ -24,7 +24,7 @@ use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::util::side_metadata::SideMetadataContext;
-use crate::util::OpaquePointer;
+use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
 use enum_map::EnumMap;
@@ -61,7 +61,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = GenCopyCopyContext::new(mmtk);
@@ -128,7 +128,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: OpaquePointer) {
+    fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
         self.nursery.prepare(true);
         if !self.in_nursery() {
@@ -140,7 +140,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.copyspace1.prepare(!hi);
     }
 
-    fn release(&mut self, tls: OpaquePointer) {
+    fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         self.nursery.release();
         if !self.in_nursery() {

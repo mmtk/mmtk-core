@@ -12,7 +12,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{
     AVAILABLE_BYTES, AVAILABLE_END, AVAILABLE_START,
 };
-use crate::util::opaque_pointer::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::vm::*;
 use std::marker::PhantomData;
@@ -108,7 +108,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         conversions::bytes_to_pages_up(self.limit - cursor) + self.metadata.reserved_pages()
     }
 
-    fn acquire(&self, _tls: OpaquePointer, pages: usize) -> Address {
+    fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
         let bytes = conversions::pages_to_bytes(pages);
         let start = unsafe { Address::from_usize(self.cursor.fetch_add(bytes, Ordering::Relaxed)) };
         if start + bytes > self.limit {

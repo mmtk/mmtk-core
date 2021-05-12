@@ -22,7 +22,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::side_metadata::SideMetadataContext;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add
@@ -65,7 +65,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // ANCHOR: create_worker_local
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = MyGCCopyContext::new(mmtk);
@@ -115,7 +115,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // Modify
     // ANCHOR: prepare
-    fn prepare(&mut self, tls: OpaquePointer) {
+    fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
 
         self.hi
@@ -129,7 +129,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // Modify
     // ANCHOR: release
-    fn release(&mut self, tls: OpaquePointer) {
+    fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         self.fromspace().release();
     }

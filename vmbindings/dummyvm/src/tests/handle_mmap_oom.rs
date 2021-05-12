@@ -1,5 +1,5 @@
 use mmtk::util::Address;
-use mmtk::util::OpaquePointer;
+use mmtk::util::opaque_pointer::*;
 use mmtk::util::memory;
 use crate::DummyVM;
 
@@ -12,7 +12,7 @@ pub fn test_handle_mmap_oom() {
         // If that's not the case, increase the size we mmap.
         let mmap_res = memory::dzmmap_noreplace(start, one_terabyte);
 
-        memory::handle_mmap_error::<DummyVM>(mmap_res.err().unwrap(), OpaquePointer::UNINITIALIZED);
+        memory::handle_mmap_error::<DummyVM>(mmap_res.err().unwrap(), VMThread::UNINITIALIZED);
     });
     assert!(panic_res.is_err());
 

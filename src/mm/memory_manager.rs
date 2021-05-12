@@ -19,7 +19,7 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
 use crate::vm::VMBinding;
@@ -30,7 +30,7 @@ use std::sync::atomic::Ordering;
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that will be used as the GC controller.
-pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
+pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMWorkerThread) {
     mmtk.plan.base().control_collector_context.run(tls);
 }
 
@@ -61,7 +61,7 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
 /// * `tls`: The thread that will be associated with the mutator.
 pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
-    tls: OpaquePointer,
+    tls: VMMutatorThread,
 ) -> Box<Mutator<VM>> {
     crate::plan::global::create_mutator(tls, mmtk)
 }
@@ -148,7 +148,7 @@ pub fn get_allocator_mapping<VM: VMBinding>(
 /// * `worker`: A reference to the GC worker.
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn start_worker<VM: VMBinding>(
-    tls: OpaquePointer,
+    tls: VMWorkerThread,
     worker: &mut GCWorker<VM>,
     mmtk: &'static MMTK<VM>,
 ) {
@@ -165,7 +165,7 @@ pub fn start_worker<VM: VMBinding>(
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
 ///   Collection::spawn_worker_thread() so that the VM knows the context.
-pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
+pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
     mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
     VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
@@ -228,7 +228,7 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that triggers this collection request.
-pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
+pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     mmtk.plan.handle_user_collection_request(tls, false);
 }
 
@@ -326,7 +326,7 @@ pub fn add_phantom_candidate<VM: VMBinding>(
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that calls the function (and triggers a collection).
-pub fn harness_begin<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
+pub fn harness_begin<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     mmtk.harness_begin(tls);
 }
 
