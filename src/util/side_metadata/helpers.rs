@@ -6,14 +6,6 @@ use crate::util::{
     heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE,
 };
 use std::io::Result;
-use super::constants::*;
-
-
-pub(crate) const fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
-
-    LOCAL_SIDE_METADATA_BASE_ADDRESS
-        + ((data_addr.as_usize() & !CHUNK_MASK) >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
-}
 
 /// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
 #[inline(always)]

@@ -1,15 +1,13 @@
 use super::*;
-use crate::util::{constants::*, heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK};
+use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_PAGE};
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::PageAccounting;
 use crate::util::memory;
 use crate::util::{constants, Address};
 use std::io::Result;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
-use std::ops::Range;
 
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub enum SideMetadataScope {
     Global,
     PolicySpecific,
@@ -27,7 +25,7 @@ impl SideMetadataScope {
 /// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.
 ///
 /// For performance reasons, objects of this struct should be constants.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct SideMetadataSpec {
     pub scope: SideMetadataScope,
     pub offset: usize,
@@ -41,8 +39,6 @@ impl SideMetadataSpec {
     }
 }
 
-// ** NOTE: **
-//  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
 /// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own
 /// side metadata spec as well as the plan's specs.
 pub struct SideMetadataContext {
@@ -629,17 +625,4 @@ pub fn bzero_metadata(metadata_spec: SideMetadataSpec, start: Address, size: usi
             }
         }
     }
-}
-
-#[inline(always)]
-pub fn bzero_metadata_for_range(metadata_spec: SideMetadataSpec, heap_range: Range<Address>) {
-    let meta_start = address_to_meta_address(metadata_spec, heap_range.start);
-    let metadata_bytes = {
-        let bytes = heap_range.end - heap_range.start;
-        let bits = bytes >> metadata_spec.log_min_obj_size << metadata_spec.log_num_of_bits;
-        let metadata_bytes = bits >> LOG_BITS_IN_BYTE;
-        debug_assert_eq!(metadata_bytes << LOG_BITS_IN_BYTE, bits);
-        metadata_bytes
-    };
-    memory::zero(meta_start, metadata_bytes);
 }

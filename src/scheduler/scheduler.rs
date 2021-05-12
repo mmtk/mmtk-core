@@ -80,6 +80,12 @@ impl<C: Context> Scheduler<C> {
         tls: VMThread,
     ) {
         use crate::scheduler::work_bucket::WorkBucketStage::*;
+        let num_workers = if cfg!(feature = "single_worker") {
+            1
+        } else {
+            num_workers
+        };
+
         let mut self_mut = self.clone();
         let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
 

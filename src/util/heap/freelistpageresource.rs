@@ -18,7 +18,6 @@ use crate::util::opaque_pointer::*;
 use crate::vm::*;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
-use crate::vm::ActivePlan;
 
 pub struct CommonFreeListPageResource {
     free_list: Box<<VMMap as Map>::FreeList>,
@@ -88,7 +87,6 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         let mut sync = self.sync.lock().unwrap();
         let mut new_chunk = false;
         let mut page_offset = self_mut.free_list.alloc(required_pages as _);
-
         if page_offset == generic_freelist::FAILURE && self.common.growable {
             page_offset =
                 self_mut.allocate_contiguous_chunks(space_descriptor, required_pages, &mut sync);

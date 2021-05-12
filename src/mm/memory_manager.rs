@@ -107,7 +107,6 @@ pub fn alloc<VM: VMBinding>(
     // meet the min object size in the fastpath.
     #[cfg(debug_assertions)]
     crate::util::forwarding_word::check_alloc_size::<VM>(size);
-
     mutator.alloc(size, align, offset, semantics)
 }
 

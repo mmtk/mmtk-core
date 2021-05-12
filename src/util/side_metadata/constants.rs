@@ -1,5 +1,5 @@
 use crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
-// #[cfg(target_pointer_width = "32")]
+#[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
 use crate::util::Address;
 
@@ -20,7 +20,7 @@ pub(crate) const LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 1;
 /// This constant represents the worst-case ratio of source data size to global+local side metadata.
 /// A value of 1 means the space required for global+local side metadata must be less than 1/2nd of the source data.
 /// So, a value of `n` means this ratio must be less than $2^-n$.
-// #[cfg(target_pointer_width = "32")]
+#[cfg(target_pointer_width = "32")]
 pub const LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 3;
 
 pub(crate) const LOG_MAX_GLOBAL_SIDE_METADATA_SIZE: usize =
@@ -36,9 +36,9 @@ pub const LOCAL_SIDE_METADATA_BASE_ADDRESS: Address = unsafe {
     )
 };
 
-// #[cfg(target_pointer_width = "32")]
+#[cfg(target_pointer_width = "32")]
 pub const CHUNK_MASK: usize = (1 << LOG_BYTES_IN_CHUNK) - 1;
 
-// #[cfg(target_pointer_width = "32")]
+#[cfg(target_pointer_width = "32")]
 pub const LOCAL_SIDE_METADATA_PER_CHUNK: usize =
     BYTES_IN_CHUNK >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;

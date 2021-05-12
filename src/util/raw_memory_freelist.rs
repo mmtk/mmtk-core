@@ -62,7 +62,6 @@ impl GenericFreeList for RawMemoryFreeList {
             s = self.get_size(unit);
             s < size
         }) {}
-
         if unit == self.head() {
             FAILURE
         } else {
