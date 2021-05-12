@@ -30,7 +30,15 @@ pub use self::plan_constraints::PlanConstraints;
 pub use self::tracelocal::TraceLocal;
 pub use self::transitive_closure::TransitiveClosure;
 
-pub mod gencopy;
-pub mod marksweep;
-pub mod nogc;
-pub mod semispace;
+mod gencopy;
+mod marksweep;
+mod nogc;
+mod semispace;
+
+// Expose plan constraints as public. Though a binding can get them from plan.constraints(),
+// it is possible for performance reasons that they want the constraints as constants.
+
+pub use gencopy::GENCOPY_CONSTRAINTS;
+pub use marksweep::MS_CONSTRAINTS;
+pub use nogc::NOGC_CONSTRAINTS;
+pub use semispace::SS_CONSTRAINTS;
