@@ -48,10 +48,9 @@ default = []
 # -- Non mutally exclusive features --
 
 # spaces
-base_spaces = []
-vm_space = ["base_spaces"]
-ro_space = ["base_spaces"]
-code_space  = ["base_spaces"]
+vm_space = []
+ro_space = []
+code_space  = []
 
 # Run sanity GC
 sanity = []
