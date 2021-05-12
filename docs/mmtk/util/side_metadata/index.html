@@ -148,7 +148,7 @@ For the first bit-set, <code>offset</code> is <code>GLOBAL_SIDE_METADATA_BASE_AD
 <p>A space would need know all the global metadata specs and its own policy-specific/local metadata specs in order to calculate and allocate metadata space.
 When a space is created by a plan (e.g. SemiSpace::new), the plan can create its global specs by <code>SideMetadataContext::new_global_specs(&amp;[GLOBAL_META_1, GLOBAL_META_2])</code>. Then,
 the global specs are passed to each space that the plan creates.</p>
-<p>Each space will then combine the global specs and its own local specs to create a <a href="util::side_metadata::SideMetadata">SideMetadata</a>.
+<p>Each space will then combine the global specs and its own local specs to create a <a href="../../../mmtk/util/side_metadata/struct.SideMetadata.html">SideMetadata</a>.
 Allocating side metadata space and accounting its memory usage is done by <code>SideMetadata</code>. If a space uses <code>CommonSpace</code>, <code>CommonSpace</code> will create <code>SideMetadata</code> and manage
 reserving and allocating metadata space when necessary. If a space does not use <code>CommonSpace</code>, it should create <code>SideMetadata</code> itself and manage allocating metadata space
 as its own responsibility.</p>

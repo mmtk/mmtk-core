@@ -1108,7 +1108,7 @@ call, and add the following code:</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn prepare(&amp;self, tls: VMWorkerThread) {
+</span>    fn prepare(&amp;mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
 
         self.hi
@@ -1254,7 +1254,7 @@ run after each collection.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn release(&amp;self, tls: VMWorkerThread) {
+</span>    fn release(&amp;mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         self.fromspace().release();
     }

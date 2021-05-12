@@ -489,6 +489,30 @@
 <span id="486">486</span>
 <span id="487">487</span>
 <span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">work_bucket</span>::<span class="ident">WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -512,7 +536,13 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ScheduleCollection</span> {}
 
-<span class="doccomment">/// GC Preparation Work (include updating global states)</span>
+<span class="doccomment">/// The global GC Preparation Work</span>
+<span class="doccomment">/// This work packet invokes prepare() for the plan (which will invoke prepare() for each space), and</span>
+<span class="doccomment">/// pushes work packets for preparing mutators and collectors.</span>
+<span class="doccomment">/// We should only have one such work packet per GC, before any actual GC work starts.</span>
+<span class="doccomment">/// We assume this work packet is the only running work packet that accesses plan, and there should</span>
+<span class="doccomment">/// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may</span>
+<span class="doccomment">/// be a race condition.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">P</span>,
     <span class="ident">_p</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>,
@@ -530,7 +560,11 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">P</span>::<span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">P</span>::<span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">P</span>::<span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Prepare Global&quot;</span>);
-        <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">prepare</span>(<span class="ident">worker</span>.<span class="ident">tls</span>);
+        <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution</span>
+        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">cast_ref_to_mut</span>)]</span>
+        <span class="kw">let</span> <span class="ident">plan_mut</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">P</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">plan</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">_</span>) };
+        <span class="ident">plan_mut</span>.<span class="ident">prepare</span>(<span class="ident">worker</span>.<span class="ident">tls</span>);
+
         <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">P</span>::<span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span>::<span class="ident">VMActivePlan</span>::<span class="ident">mutators</span>() {
             <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Prepare</span>]
                 .<span class="ident">add</span>(<span class="ident">PrepareMutator</span>::<span class="op">&lt;</span><span class="ident">P</span>::<span class="ident">VM</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="ident">mutator</span>));
@@ -541,7 +575,7 @@
     }
 }
 
-<span class="doccomment">/// GC Preparation Work (include updating global states)</span>
+<span class="doccomment">/// The mutator GC Preparation Work</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PrepareMutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="comment">// The mutator reference has static lifetime.</span>
     <span class="comment">// It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.</span>
@@ -561,6 +595,7 @@
     }
 }
 
+<span class="doccomment">/// The collector GC Preparation Work</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PrepareCollector</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>);
 
@@ -577,6 +612,13 @@
     }
 }
 
+<span class="doccomment">/// The global GC release Work</span>
+<span class="doccomment">/// This work packet invokes release() for the plan (which will invoke release() for each space), and</span>
+<span class="doccomment">/// pushes work packets for releasing mutators and collectors.</span>
+<span class="doccomment">/// We should only have one such work packet per GC, before any actual GC work starts.</span>
+<span class="doccomment">/// We assume this work packet is the only running work packet that accesses plan, and there should</span>
+<span class="doccomment">/// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may</span>
+<span class="doccomment">/// be a race condition.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">P</span>,
     <span class="ident">_p</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>,
@@ -594,7 +636,11 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">P</span>::<span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">P</span>::<span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">P</span>::<span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Release Global&quot;</span>);
-        <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">release</span>(<span class="ident">worker</span>.<span class="ident">tls</span>);
+        <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution</span>
+        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">cast_ref_to_mut</span>)]</span>
+        <span class="kw">let</span> <span class="ident">plan_mut</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">P</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">plan</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">_</span>) };
+        <span class="ident">plan_mut</span>.<span class="ident">release</span>(<span class="ident">worker</span>.<span class="ident">tls</span>);
+
         <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">P</span>::<span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span>::<span class="ident">VMActivePlan</span>::<span class="ident">mutators</span>() {
             <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage</span>::<span class="ident">Release</span>]
                 .<span class="ident">add</span>(<span class="ident">ReleaseMutator</span>::<span class="op">&lt;</span><span class="ident">P</span>::<span class="ident">VM</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="ident">mutator</span>));
@@ -607,6 +653,7 @@
     }
 }
 
+<span class="doccomment">/// The mutator release Work</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ReleaseMutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="comment">// The mutator reference has static lifetime.</span>
     <span class="comment">// It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.</span>
@@ -626,6 +673,7 @@
     }
 }
 
+<span class="doccomment">/// The collector release Work</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ReleaseCollector</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>);
 

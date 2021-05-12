@@ -387,7 +387,7 @@
         <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">ALLOCATOR_MAPPING</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
+    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">prepare</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
         <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">prepare</span>(<span class="bool-val">true</span>);
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">in_nursery</span>() {
@@ -399,7 +399,7 @@
         <span class="self">self</span>.<span class="ident">copyspace1</span>.<span class="ident">prepare</span>(<span class="op">!</span><span class="ident">hi</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
+    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">release</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
         <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">release</span>();
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">in_nursery</span>() {
