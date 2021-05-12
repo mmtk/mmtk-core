@@ -8,6 +8,7 @@ pub mod stat;
 mod work;
 mod work_bucket;
 mod worker;
+mod affinity;
 
 pub use context::*;
 pub use mmtk_context::*;
