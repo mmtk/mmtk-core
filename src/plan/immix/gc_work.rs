@@ -7,7 +7,7 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::{WorkerLocal, WorkBucketStage};
 use crate::util::alloc::{Allocator, ImmixAllocator};
 use crate::util::forwarding_word;
-use crate::util::{Address, ObjectReference, OpaquePointer};
+use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::{mem, ops::{Deref, DerefMut}};

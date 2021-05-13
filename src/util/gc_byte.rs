@@ -25,7 +25,6 @@ pub const SIDE_GC_BYTE_SPEC: SideMetadataSpec = SideMetadataSpec {
 /// MMTk uses that byte as the per-object metadata.
 /// Otherwise, MMTk provides the metadata on its side.
 ///
-#[inline(always)]
 #[cfg(not(feature = "side_gc_header"))]
 fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 {
     unsafe { &*(object.to_address() + VM::VMObjectModel::GC_BYTE_OFFSET).to_ptr::<AtomicU8>() }
@@ -34,7 +33,6 @@ fn get_gc_byte<VM: VMBinding>(object: ObjectReference) -> &'static AtomicU8 {
 /// Atomically reads the current value of an object's GC byte.
 ///
 /// Returns an 8-bit unsigned integer
-#[inline(always)]
 pub fn read_gc_byte<VM: VMBinding>(object: ObjectReference) -> u8 {
     #[cfg(not(feature = "side_gc_header"))]
     {
@@ -48,7 +46,6 @@ pub fn read_gc_byte<VM: VMBinding>(object: ObjectReference) -> u8 {
 }
 
 /// Atomically writes a new value to the GC byte of an object
-#[inline(always)]
 pub fn write_gc_byte<VM: VMBinding>(object: ObjectReference, val: u8) {
     #[cfg(not(feature = "side_gc_header"))]
     {
@@ -64,7 +61,6 @@ pub fn write_gc_byte<VM: VMBinding>(object: ObjectReference, val: u8) {
 /// Atomically performs the compare-and-exchange operation on the GC byte of an object.
 ///
 /// Returns `true` if the operation succeeds.
-#[inline(always)]
 pub fn compare_exchange_gc_byte<VM: VMBinding>(
     object: ObjectReference,
     old_val: u8,

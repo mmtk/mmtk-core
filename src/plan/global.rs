@@ -22,7 +22,7 @@ use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
 use crate::util::{Address, ObjectReference};
-use crate::util::opaque_pointer::{VMMutatorThread, VMWorkerThread};
+use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
 use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
 use downcast_rs::Downcast;

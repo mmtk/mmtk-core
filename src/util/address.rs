@@ -22,7 +22,7 @@ pub type ByteOffset = isize;
 pub struct Address(usize);
 
 /// Address + ByteSize (positive)
-impl const Add<ByteSize> for Address {
+impl Add<ByteSize> for Address {
     type Output = Address;
     fn add(self, offset: ByteSize) -> Address {
         Address(self.0 + offset)
@@ -234,7 +234,6 @@ impl Address {
     /// atomic operation: load
     /// # Safety
     /// This could throw a segment fault if the address is invalid
-    #[inline(always)]
     pub unsafe fn atomic_load<T: Atomic>(self, order: Ordering) -> T::Type {
         let loc = &*(self.0 as *const T);
         loc.load(order)
@@ -251,7 +250,6 @@ impl Address {
     /// atomic operation: compare and exchange usize
     /// # Safety
     /// This could throw a segment fault if the address is invalid
-    #[inline(always)]
     pub unsafe fn compare_exchange<T: Atomic>(
         self,
         old: T::Type,
@@ -284,7 +282,7 @@ impl Address {
     }
 
     /// is this address aligned to the given alignment
-    pub const fn is_aligned_to(self, align: usize) -> bool {
+    pub fn is_aligned_to(self, align: usize) -> bool {
         use crate::util::conversions;
         conversions::raw_is_aligned(self.0, align)
     }
@@ -301,13 +299,13 @@ impl Address {
 
     /// converts the Address to a pointer
     #[inline(always)]
-    pub const fn to_ptr<T>(self) -> *const T {
+    pub fn to_ptr<T>(self) -> *const T {
         self.0 as *const T
     }
 
     /// converts the Address to a mutable pointer
     #[inline(always)]
-    pub const fn to_mut_ptr<T>(self) -> *mut T {
+    pub fn to_mut_ptr<T>(self) -> *mut T {
         self.0 as *mut T
     }
 
@@ -451,7 +449,7 @@ pub struct ObjectReference(usize);
 impl ObjectReference {
     /// converts the ObjectReference to an Address
     #[inline(always)]
-    pub const fn to_address(self) -> Address {
+    pub fn to_address(self) -> Address {
         Address(self.0)
     }
 

@@ -1,5 +1,5 @@
 use atomic::Ordering;
-use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorkBucket, GCWorker, WorkBucketStage, gc_work::ProcessEdgesWork}, util::{OpaquePointer, constants::{LOG_BYTES_IN_WORD}, gc_byte, heap::FreeListPageResource, opaque_pointer::{VMThread, VMWorkerThread}}};
+use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorker, WorkBucketStage, gc_work::ProcessEdgesWork}, util::{constants::{LOG_BYTES_IN_WORD}, gc_byte, heap::FreeListPageResource, opaque_pointer::{VMThread, VMWorkerThread}}};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::forwarding_word as ForwardingWord;
@@ -193,7 +193,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 defrag_threshold: if space.in_defrag() { Some(threshold) } else { None },
             }
         });
-        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(GCWorkBucket::<VM>::DEFAULT_PRIORITY, work_packets);
+        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(1000, work_packets);
 
         if !super::BLOCK_ONLY {
             self.line_mark_state.fetch_add(1, Ordering::AcqRel);
@@ -215,7 +215,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         let space = unsafe { &*(self as *const Self) };
         let work_packets = self.chunk_map.generate_sweep_tasks(space, mmtk);
-        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(GCWorkBucket::<VM>::DEFAULT_PRIORITY, work_packets);
+        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(1000, work_packets);
 
         self.in_collection.store(false, Ordering::Release);
         if !super::BLOCK_ONLY {

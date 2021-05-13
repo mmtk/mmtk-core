@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, sync::atomic::AtomicUsize};
+use std::sync::atomic::AtomicUsize;
 
 use atomic::Ordering;
 

@@ -302,7 +302,6 @@ pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
     }
 }
 
-#[inline(always)]
 pub fn compare_exchange_atomic(
     metadata_spec: SideMetadataSpec,
     data_addr: Address,
@@ -495,7 +494,6 @@ pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
 /// 1. Concurrent access to this operation is undefined behaviour.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
-#[inline(always)]
 pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
@@ -533,7 +531,6 @@ pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
 /// 1. Concurrent access to this operation is undefined behaviour.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
-#[inline(always)]
 pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {

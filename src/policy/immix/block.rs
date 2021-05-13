@@ -57,7 +57,8 @@ impl Block {
         address.align_down(Self::BYTES)
     }
 
-    pub const fn from(address: Address) -> Self {
+    #[inline(always)]
+    pub fn from(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
@@ -85,7 +86,8 @@ impl Block {
     //     unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), byte as usize) }
     // }
 
-    pub const fn chunk(&self) -> Chunk {
+    #[inline(always)]
+    pub fn chunk(&self) -> Chunk {
         Chunk::from(Chunk::align(self.0))
     }
 
@@ -174,7 +176,8 @@ impl Block {
         self.set_state(BlockState::Unallocated);
     }
 
-    pub const fn lines(&self) -> Range<Line> {
+    #[inline(always)]
+    pub fn lines(&self) -> Range<Line> {
         debug_assert!(!super::BLOCK_ONLY);
         Line::from(self.start()) .. Line::from(self.end())
     }

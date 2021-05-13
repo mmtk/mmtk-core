@@ -33,7 +33,8 @@ impl Line {
         Self::align(address).as_usize() == address.as_usize()
     }
 
-    pub const fn from(address: Address) -> Self {
+    #[inline(always)]
+    pub fn from(address: Address) -> Self {
         debug_assert!(!super::BLOCK_ONLY);
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
@@ -45,7 +46,8 @@ impl Line {
         Self(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
     }
 
-    pub const fn block(&self) -> Block {
+    #[inline(always)]
+    pub fn block(&self) -> Block {
         debug_assert!(!super::BLOCK_ONLY);
         Block::from(Block::align(self.0))
     }

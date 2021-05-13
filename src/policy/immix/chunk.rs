@@ -24,7 +24,8 @@ impl Chunk {
         Self::align(address).as_usize() == address.as_usize()
     }
 
-    pub const fn from(address: Address) -> Self {
+    #[inline(always)]
+    pub fn from(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
@@ -42,7 +43,8 @@ impl Chunk {
         unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
     }
 
-    pub const fn blocks(&self) -> Range<Block> {
+    #[inline(always)]
+    pub fn blocks(&self) -> Range<Block> {
         let start = Block::from(Block::align(self.0));
         let end = Block::from(start.start() + (Self::BLOCKS << Block::LOG_BYTES));
         start..end

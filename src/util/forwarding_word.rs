@@ -18,7 +18,6 @@ const FORWARDING_MASK: u8 = 3;
 #[allow(unused)]
 const FORWARDING_BITS: usize = 2;
 
-#[inline(always)]
 pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
     let mut old_value = gc_byte::read_gc_byte::<VM>(object);
     if old_value & FORWARDING_MASK != FORWARDING_NOT_TRIGGERED_YET {
@@ -33,7 +32,6 @@ pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
     old_value
 }
 
-#[inline(always)]
 pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     object: ObjectReference,
     gc_byte: u8,
@@ -63,7 +61,6 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
 }
 
-#[inline(always)]
 pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     object: ObjectReference,
     semantics: AllocationSemantics,
@@ -86,7 +83,6 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     new_object
 }
 
-#[inline(always)]
 pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: ObjectReference) {
     match gc_byte_offset_in_forwarding_word::<VM>() {
         Some(fw_offset) => {
@@ -103,25 +99,22 @@ pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: Objec
     }
 }
 
-#[inline(always)]
 pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
     gc_byte::read_gc_byte::<VM>(object) & FORWARDING_MASK == FORWARDED
 }
 
-#[inline(always)]
 pub fn is_forwarded_or_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
     gc_byte::read_gc_byte::<VM>(object) & FORWARDING_MASK != 0
 }
 
-pub const fn state_is_forwarded_or_being_forwarded(gc_byte: u8) -> bool {
+pub fn state_is_forwarded_or_being_forwarded(gc_byte: u8) -> bool {
     gc_byte & FORWARDING_MASK != 0
 }
 
-pub const fn state_is_being_forwarded(gc_byte: u8) -> bool {
+pub fn state_is_being_forwarded(gc_byte: u8) -> bool {
     gc_byte & FORWARDING_MASK == BEING_FORWARDED
 }
 
-#[inline(always)]
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
     let mut old_val = gc_byte::read_gc_byte::<VM>(object);
     while !gc_byte::compare_exchange_gc_byte::<VM>(object, old_val, old_val & !FORWARDING_MASK) {
@@ -139,7 +132,6 @@ pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
 ///
 /// Considering the minimum object storage of 2 words, the seconds step always succeeds.
 ///
-#[inline(always)]
 fn get_forwarding_word_address<VM: VMBinding>(object: ObjectReference) -> Address {
     match gc_byte_offset_in_forwarding_word::<VM>() {
         // forwarding word is located in the same word as gc byte
@@ -165,14 +157,12 @@ fn get_forwarding_word_address<VM: VMBinding>(object: ObjectReference) -> Addres
     }
 }
 
-#[inline(always)]
 pub fn read_forwarding_word<VM: VMBinding>(object: ObjectReference) -> usize {
     unsafe {
         get_forwarding_word_address::<VM>(object).atomic_load::<AtomicUsize>(Ordering::SeqCst)
     }
 }
 
-#[inline(always)]
 pub fn write_forwarding_word<VM: VMBinding>(object: ObjectReference, val: usize) {
     trace!("GCForwardingWord::write({:#?}, {:x})\n", object, val);
     unsafe {
@@ -180,7 +170,6 @@ pub fn write_forwarding_word<VM: VMBinding>(object: ObjectReference, val: usize)
     }
 }
 
-#[inline(always)]
 pub fn compare_exchange_forwarding_word<VM: VMBinding>(
     object: ObjectReference,
     old: usize,
@@ -212,7 +201,6 @@ pub fn compare_exchange_forwarding_word<VM: VMBinding>(
 // A return value of `Some(fw_offset)` implies that GC byte and forwarding word can be loaded/stored with a single instruction.
 //
 #[cfg(target_endian = "little")]
-#[inline(always)]
 pub fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize> {
     #[cfg(not(feature = "side_gc_header"))]
     {
@@ -234,13 +222,11 @@ pub fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize> {
 }
 
 #[cfg(target_endian = "big")]
-#[inline(always)]
 pub(super) fn gc_byte_offset_in_forwarding_word<VM: VMBinding>() -> Option<isize> {
     unimplemented!()
 }
 
 #[cfg(debug_assertions)]
-#[inline(always)]
 pub(crate) fn check_alloc_size<VM: VMBinding>(size: usize) {
     debug_assert!(
         if cfg!(feature = "side_gc_header") || gc_byte_offset_in_forwarding_word::<VM>().is_some() {
