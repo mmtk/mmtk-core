@@ -1,10 +1,10 @@
 //! Utilities used by other modules, including allocators, heap implementation, etc.
 
 // Allow unused code in the util mod. We may have some functions that are not in use,
-// but will be useful in the future implementation.
+// but will be useful in future implementations.
 #![allow(dead_code)]
 
-// These modules are public. The bindings can use them to help implementation.
+// The following modules are public. MMTk bindings can use them to help implementation.
 
 /// An abstract of memory address and object reference.
 pub mod address;
@@ -22,7 +22,7 @@ pub mod opaque_pointer;
 /// Reference processing implementation.
 pub mod reference_processor;
 
-// These modules are pub(crate). They should only be used in MMTk core.
+// The following modules are only public in the mmtk crate. They should only be used in MMTk core.
 
 /// An analysis framework for collecting data and profiling in GC.
 #[cfg(feature = "analysis")]
