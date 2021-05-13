@@ -16,6 +16,10 @@ use crate::util::heap::HeapMeta;
 use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::vm::VMBinding;
 
+/// This type implements a simple immortal collection
+/// policy. Under this policy all that is required is for the
+/// "collector" to propagate marks in a liveness trace.  It does not
+/// actually collect.
 pub struct ImmortalSpace<VM: VMBinding> {
     mark_state: u8,
     common: CommonSpace<VM>,

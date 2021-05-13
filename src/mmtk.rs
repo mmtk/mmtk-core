@@ -1,3 +1,5 @@
+///! MMTk instance.
+
 use crate::plan::Plan;
 use crate::policy::space::SFTMap;
 use crate::scheduler::MMTkScheduler;
@@ -24,8 +26,14 @@ lazy_static! {
     // 2. These mmappers are possibly global across multiple MMTk instances, as they manage the
     //    entire address space.
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
+
+    /// A global VMMap that manages the mapping of spaces to virtual memory ranges.
     pub static ref VM_MAP: VMMap = VMMap::new();
+
+    /// A global Mmapper for mmaping and protection of virtual memory.
     pub static ref MMAPPER: Mmapper = Mmapper::new();
+
+    // A global space function table that allows efficient dispatch space specific code for addresses in our heap.
     pub static ref SFT_MAP: SFTMap<'static> = SFTMap::new();
 }
 

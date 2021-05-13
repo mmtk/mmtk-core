@@ -13,7 +13,7 @@ pub mod address;
 pub mod alloc;
 /// Calculation, conversion and rounding for memory related numbers.
 pub mod conversions;
-// Constants used in MMTk
+/// Constants used in MMTk
 pub mod constants;
 /// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
 pub mod memory;
@@ -61,8 +61,12 @@ pub(crate) mod treadmill;
 
 // These modules are private. They are only used by other util modules.
 
+/// A very simple, generic malloc-free allocator
 mod generic_freelist;
+/// Implementation of GenericFreeList by an int vector.
 mod int_array_freelist;
+/// Implementation of GenericFreeList backed by raw memory, allocated
+/// on demand direct from the OS (via mmap).
 mod raw_memory_freelist;
 // TODO: This is not used. Probably we can remoev this.
 mod synchronized_counter;

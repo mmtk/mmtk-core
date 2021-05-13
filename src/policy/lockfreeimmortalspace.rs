@@ -18,6 +18,10 @@ use crate::vm::*;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// This type implements a lock free version of the immortal collection
+/// policy. This is close to the OpenJDK's epsilon GC.
+/// Different from the normal ImmortalSpace, this version should only
+/// be used by NoGC plan, and it assumes to take up the rest of the heap range.
 pub struct LockFreeImmortalSpace<VM: VMBinding> {
     #[allow(unused)]
     name: &'static str,

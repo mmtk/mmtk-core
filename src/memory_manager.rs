@@ -376,10 +376,22 @@ pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<Ob
         .get_ready_object()
 }
 
+/// Get the number of workers. MMTk spawns worker threads for the 'threads' defined in the options.
+/// So the number of workers is derived from the threads option.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
 pub fn num_of_workers<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> usize {
     mmtk.scheduler.num_workers()
 }
 
+/// Add a work packet to the given work bucket. Note that this simply adds the work packet to the given
+/// work bucket, and the scheduler will decide when to execute the work packet.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+/// * `bucket`: Which work bucket to add this packet to.
+/// * `packet`: The work packet to be added.
 pub fn add_work_packet<VM: VMBinding, W: Work<MMTK<VM>>>(
     mmtk: &'static MMTK<VM>,
     bucket: WorkBucketStage,
@@ -388,6 +400,13 @@ pub fn add_work_packet<VM: VMBinding, W: Work<MMTK<VM>>>(
     mmtk.scheduler.work_buckets[bucket].add(packet)
 }
 
+/// Bulk add a number of work packets to the given work bucket. Note that this simply adds the work packets
+/// to the given work bucket, and the scheduler will decide when to execute the work packets.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+/// * `bucket`: Which work bucket to add these packets to.
+/// * `packet`: The work packets to be added.
 pub fn add_work_packets<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     bucket: WorkBucketStage,
