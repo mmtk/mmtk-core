@@ -4,10 +4,11 @@ use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::PageAccounting;
 use crate::util::memory;
 use crate::util::{constants, Address};
+use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum SideMetadataScope {
     Global,
     PolicySpecific,
@@ -31,6 +32,16 @@ pub struct SideMetadataSpec {
     pub offset: usize,
     pub log_num_of_bits: usize,
     pub log_min_obj_size: usize,
+}
+
+impl fmt::Debug for SideMetadataSpec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "SideMetadataSpec {{").unwrap();
+        writeln!(f, "\tScope: {:?}", self.scope).unwrap();
+        writeln!(f, "\toffset: 0x{:x}", self.offset).unwrap();
+        writeln!(f, "\tlog_num_of_bits: 0x{:x}", self.log_num_of_bits).unwrap();
+        writeln!(f, "\tlog_min_obj_size: 0x{:x}\n}}", self.log_min_obj_size)
+    }
 }
 
 /// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own
@@ -60,8 +71,7 @@ pub struct SideMetadata {
 
 impl SideMetadata {
     pub fn new(context: SideMetadataContext) -> SideMetadata {
-        #[cfg(feature = "extreme_assertions")]
-        sanity::add_metadata_context(&context);
+        sanity::verify_metadata_context(&context).unwrap();
 
         Self {
             context,
