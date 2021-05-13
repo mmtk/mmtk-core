@@ -1,6 +1,6 @@
 use crate::plan::{Mutator, TransitiveClosure};
-use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::GCWorker;
+use crate::scheduler::ProcessEdgesWork;
 use crate::util::ObjectReference;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;

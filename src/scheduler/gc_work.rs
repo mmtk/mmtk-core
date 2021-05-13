@@ -108,7 +108,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work_bucket.add(ReleaseCollector::<W>(PhantomData));
+            w.local_work_bucket.add(ReleaseCollector::<W>::new());
         }
         // TODO: Process weak references properly
         mmtk.reference_processors.clear();

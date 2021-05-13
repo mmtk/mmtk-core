@@ -20,12 +20,12 @@ pub use barriers::BarrierSelector;
 mod controller_collector_context;
 
 mod global;
-pub use global::AllocationSemantics;
-pub use global::Plan;
-pub use global::CopyContext;
-pub(crate) use global::GcStatus;
 pub(crate) use global::create_mutator;
 pub(crate) use global::create_plan;
+pub use global::AllocationSemantics;
+pub use global::CopyContext;
+pub(crate) use global::GcStatus;
+pub use global::Plan;
 
 mod mutator_context;
 pub use mutator_context::Mutator;

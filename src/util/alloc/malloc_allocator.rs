@@ -1,10 +1,10 @@
-use crate::Plan;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
+use crate::Plan;
 
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {

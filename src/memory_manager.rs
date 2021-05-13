@@ -12,11 +12,11 @@
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
 use crate::mmtk::MMTK;
-use crate::plan::{Mutator, MutatorContext};
 use crate::plan::AllocationSemantics;
+use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::GCWorker;
-use crate::scheduler::WorkBucketStage;
 use crate::scheduler::Work;
+use crate::scheduler::WorkBucketStage;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
@@ -51,7 +51,8 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
         ),
     }
     assert!(heap_size > 0, "Invalid heap size");
-    mmtk.plan.gc_init(heap_size, &mmtk.vm_map, &mmtk.scheduler);
+    mmtk.plan
+        .gc_init(heap_size, &crate::VM_MAP, &mmtk.scheduler);
     info!("Initialized MMTk with {:?}", mmtk.options.plan);
 }
 
@@ -379,10 +380,18 @@ pub fn num_of_workers<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> usize {
     mmtk.scheduler.num_workers()
 }
 
-pub fn add_work_packet<VM: VMBinding, W: Work<MMTK<VM>>>(mmtk: &'static MMTK<VM>, bucket: WorkBucketStage, packet: W) {
+pub fn add_work_packet<VM: VMBinding, W: Work<MMTK<VM>>>(
+    mmtk: &'static MMTK<VM>,
+    bucket: WorkBucketStage,
+    packet: W,
+) {
     mmtk.scheduler.work_buckets[bucket].add(packet)
 }
 
-pub fn add_work_packets<VM: VMBinding>(mmtk: &'static MMTK<VM>, bucket: WorkBucketStage, packets: Vec<Box<dyn Work<MMTK<VM>>>>) {
+pub fn add_work_packets<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+    bucket: WorkBucketStage,
+    packets: Vec<Box<dyn Work<MMTK<VM>>>>,
+) {
     mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
 }

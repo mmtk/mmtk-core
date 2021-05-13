@@ -1,14 +1,18 @@
 //! Utilities used by other modules, including allocators, heap implementation, etc.
 
+// Allow unused code in the util mod. We may have some functions that are not in use,
+// but will be useful in the future implementation.
+#![allow(dead_code)]
+
 // These modules are public. The bindings can use them to help implementation.
 
-/// Calculation, conversion and rounding for memory related numbers.
-pub mod conversions;
 /// An abstract of memory address and object reference.
 pub mod address;
 /// Allocators
 // This module is made public so the binding could implement allocator slowpaths if they would like to.
 pub mod alloc;
+/// Calculation, conversion and rounding for memory related numbers.
+pub mod conversions;
 // Constants used in MMTk
 pub mod constants;
 /// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
@@ -49,11 +53,11 @@ pub(crate) mod sanity;
 pub(crate) mod side_metadata;
 /// Utils for collecting statistics.
 pub(crate) mod statistics;
-/// A treadmill implementation.
-pub(crate) mod treadmill;
 /// Test utilities.
 #[cfg(test)]
 pub(crate) mod test_util;
+/// A treadmill implementation.
+pub(crate) mod treadmill;
 
 // These modules are private. They are only used by other util modules.
 

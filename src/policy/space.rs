@@ -186,6 +186,8 @@ impl<'a> SFTMap<'a> {
         }
     }
 
+    // TODO: We should clear a SFT entry when a space releases a chunk.
+    #[allow(dead_code)]
     pub fn clear(&self, chunk_idx: usize) {
         self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }

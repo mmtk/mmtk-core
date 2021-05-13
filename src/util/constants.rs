@@ -34,7 +34,11 @@ pub const LOG_CARD_GRAIN: usize = 0; // track at byte grain, save shifting
 pub const LOG_CARD_BYTES: usize = LOG_CARD_UNITS + LOG_CARD_GRAIN;
 pub const LOG_CARD_META_BYTES: usize = LOG_BYTES_IN_REGION - LOG_CARD_BYTES + LOG_CARD_META_SIZE;
 pub const LOG_CARD_META_PAGES: usize = LOG_CARD_META_BYTES - LOG_BYTES_IN_PAGE as usize;
-pub const CARD_META_PAGES_PER_REGION: usize = if SUPPORT_CARD_SCANNING { 1 << LOG_CARD_META_PAGES } else { 0 };
+pub const CARD_META_PAGES_PER_REGION: usize = if SUPPORT_CARD_SCANNING {
+    1 << LOG_CARD_META_PAGES
+} else {
+    0
+};
 pub const CARD_MASK: usize = (1 << LOG_CARD_BYTES) - 1;
 
 /**

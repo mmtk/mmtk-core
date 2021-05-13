@@ -33,9 +33,6 @@ lazy_static! {
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
     pub(crate) plan: Box<dyn Plan<VM = VM>>,
-    pub(crate) vm_map: &'static VMMap,
-    pub(crate) mmapper: &'static Mmapper,
-    pub(crate) sftmap: &'static SFTMap<'static>,
     pub(crate) reference_processors: ReferenceProcessors,
     pub(crate) finalizable_processor: Mutex<FinalizableProcessor>,
     pub(crate) options: Arc<UnsafeOptionsWrapper>,
@@ -49,13 +46,9 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
         let scheduler = MMTkScheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan =
-            crate::plan::create_plan(options.plan, &VM_MAP, &MMAPPER, options.clone());
+        let plan = crate::plan::create_plan(options.plan, &VM_MAP, &MMAPPER, options.clone());
         MMTK {
             plan,
-            vm_map: &VM_MAP,
-            mmapper: &MMAPPER,
-            sftmap: &SFT_MAP,
             reference_processors: ReferenceProcessors::new(),
             finalizable_processor: Mutex::new(FinalizableProcessor::new()),
             options,

@@ -122,6 +122,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
+    #[allow(dead_code)] // Only used with certain features.
     pub fn new(
         name: &'static str,
         slow_path_zeroing: bool,

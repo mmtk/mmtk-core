@@ -9,7 +9,7 @@ pub struct VMActivePlan<> {}
 
 impl ActivePlan<DummyVM> for VMActivePlan {
     fn global() -> &'static dyn Plan<VM=DummyVM> {
-        &*SINGLETON.plan
+        SINGLETON.get_plan()
     }
 
     fn number_of_mutators() -> usize {

@@ -10,23 +10,23 @@ pub(crate) use mmtk_context::GCWorkerLocalPtr;
 
 #[allow(clippy::module_inception)]
 mod scheduler;
-pub(crate) use scheduler::MMTkScheduler;
 pub(crate) use scheduler::CoordinatorMessage;
+pub(crate) use scheduler::MMTkScheduler;
 pub(self) use scheduler::Scheduler;
 
 mod stat;
 
 mod work;
-pub(crate) use work::Work;
-pub use work::GCWork;
 pub use work::CoordinatorWork;
+pub use work::GCWork;
+pub(crate) use work::Work;
 
 mod work_bucket;
 pub use work_bucket::WorkBucketStage;
 
 mod worker;
-pub(crate) use worker::Worker;
 pub use worker::GCWorker;
+pub(crate) use worker::Worker;
 pub(crate) use worker::WorkerLocalPtr;
 
 pub(crate) mod gc_work;
