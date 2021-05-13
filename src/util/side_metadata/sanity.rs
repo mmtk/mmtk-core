@@ -303,17 +303,13 @@ fn do_math(
     match spec_to_index(&metadata_spec) {
         Some(idx) => {
             let sanity_map = &mut SANITY_MAP.write().unwrap()[idx];
-            match sanity_map.get_mut(&data_addr) {
-                Some(cur_val) => {
-                    let old_val = *cur_val;
-                    match math_op {
-                        MathOp::Add => *cur_val += val,
-                        MathOp::Sub => *cur_val -= val,
-                    }
-                    Ok(old_val)
-                }
-                None => Err(Error::new(ErrorKind::InvalidInput, "Invalid Data Address!")),
+            let cur_val = sanity_map.entry(data_addr).or_insert(0);
+            let old_val = *cur_val;
+            match math_op {
+                MathOp::Add => *cur_val += val,
+                MathOp::Sub => *cur_val -= val,
             }
+            Ok(old_val)
         }
         None => Err(Error::new(
             ErrorKind::InvalidInput,
