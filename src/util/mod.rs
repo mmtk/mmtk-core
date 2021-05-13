@@ -11,10 +11,10 @@ pub mod address;
 /// Allocators
 // This module is made public so the binding could implement allocator slowpaths if they would like to.
 pub mod alloc;
-/// Calculation, conversion and rounding for memory related numbers.
-pub mod conversions;
 /// Constants used in MMTk
 pub mod constants;
+/// Calculation, conversion and rounding for memory related numbers.
+pub mod conversions;
 /// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
 pub mod memory;
 /// Opaque pointers used in MMTk, e.g. VMThread.

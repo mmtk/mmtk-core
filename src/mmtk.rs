@@ -1,5 +1,4 @@
 ///! MMTk instance.
-
 use crate::plan::Plan;
 use crate::policy::space::SFTMap;
 use crate::scheduler::MMTkScheduler;
