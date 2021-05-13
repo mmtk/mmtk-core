@@ -4,7 +4,7 @@ use super::work_bucket::*;
 use super::worker::{Worker, WorkerGroup};
 use super::*;
 use crate::mmtk::MMTK;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
@@ -77,7 +77,7 @@ impl<C: Context> Scheduler<C> {
         self: &'static Arc<Self>,
         num_workers: usize,
         context: &'static C,
-        tls: OpaquePointer,
+        tls: VMThread,
     ) {
         use crate::scheduler::work_bucket::WorkBucketStage::*;
         let num_workers = if cfg!(feature = "single_worker") {
@@ -131,7 +131,7 @@ impl<C: Context> Scheduler<C> {
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
     }
 
-    pub fn initialize_worker(self: &Arc<Self>, tls: OpaquePointer) {
+    pub fn initialize_worker(self: &Arc<Self>, tls: VMWorkerThread) {
         let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
         coordinator_worker.init(tls);
     }
@@ -326,7 +326,7 @@ impl<C: Context> Scheduler<C> {
 mod tests {
     /* An implementation of parallel quicksort */
     use crate::scheduler::*;
-    use crate::util::OpaquePointer;
+    use crate::util::opaque_pointer::*;
     use lazy_static::lazy_static;
     use rand::{thread_rng, Rng};
     use std::sync::Arc;
@@ -409,7 +409,7 @@ mod tests {
 
         // println!("Original: {:?}", data);
 
-        SCHEDULER.initialize(NUM_WORKERS, &(), OpaquePointer::UNINITIALIZED);
+        SCHEDULER.initialize(NUM_WORKERS, &(), VMThread::UNINITIALIZED);
         SCHEDULER.work_buckets[WorkBucketStage::Unconstrained]
             .add(Sort(unsafe { &mut *(data as *mut _) }));
         SCHEDULER.wait_for_completion();

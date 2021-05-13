@@ -1,5 +1,5 @@
 use mmtk::util::Address;
-use mmtk::util::OpaquePointer;
+use mmtk::util::opaque_pointer::*;
 use mmtk::util::memory;
 use crate::DummyVM;
 
@@ -13,7 +13,7 @@ pub fn test_handle_mmap_conflict() {
     let panic_res = std::panic::catch_unwind(|| {
         let mmap2_res = memory::dzmmap_noreplace(start, one_megabyte);
         assert!(mmap2_res.is_err());
-        memory::handle_mmap_error::<DummyVM>(mmap2_res.err().unwrap(), OpaquePointer::UNINITIALIZED);
+        memory::handle_mmap_error::<DummyVM>(mmap2_res.err().unwrap(), VMThread::UNINITIALIZED);
     });
 
     // The error should match the error message in memory::handle_mmap_error()

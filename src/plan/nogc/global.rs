@@ -15,9 +15,9 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
+use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::side_metadata::SideMetadataContext;
-use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
@@ -43,7 +43,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = NoCopy::new(mmtk);
@@ -71,11 +71,11 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &self.base
     }
 
-    fn prepare(&self, _tls: OpaquePointer) {
+    fn prepare(&mut self, _tls: VMWorkerThread) {
         unreachable!()
     }
 
-    fn release(&self, _tls: OpaquePointer) {
+    fn release(&mut self, _tls: VMWorkerThread) {
         unreachable!()
     }
 
@@ -91,7 +91,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         self.nogc_space.reserved_pages()
     }
 
-    fn handle_user_collection_request(&self, _tls: OpaquePointer, _force: bool) {
+    fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
         println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
     }
 }
