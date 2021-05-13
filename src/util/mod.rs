@@ -15,6 +15,8 @@ pub mod constants;
 pub mod memory;
 /// Opaque pointers used in MMTk, e.g. VMThread.
 pub mod opaque_pointer;
+/// Reference processing implementation.
+pub mod reference_processor;
 
 // These modules are pub(crate). They should only be used in MMTk core.
 
@@ -40,10 +42,6 @@ pub(crate) mod logger;
 pub(crate) mod malloc;
 /// MMTk command line options.
 pub(crate) mod options;
-/// Reference processing implementation.
-// TODO: We should reconsider its visibility once we get reference processing working. This is not used at the point.
-// Its visibility may be similar to the finalizable_processor module, which is pub(crate).
-pub mod reference_processor;
 /// Sanity checker for GC.
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;

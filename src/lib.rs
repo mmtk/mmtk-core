@@ -13,6 +13,9 @@
 #![feature(specialization)]
 #![feature(trait_alias)]
 
+// TODO: We should fix missing docs for public items and turn this on (Issue #309).
+// #![deny(missing_docs)]
+
 //! Memory Management ToolKit (MMTk) is a portable and high performance memory manager
 //! that includes various garbage collection algorithms and provides clean and efficient
 //! interfaces to cooperate with language implementations. MMTk features highly modular
@@ -50,20 +53,17 @@ extern crate num_cpus;
 #[macro_use]
 extern crate downcast_rs;
 
-pub mod util;
-mod mm;
 mod mmtk;
-
-pub mod plan;
+pub use crate::mmtk::MMTK;
 
 mod policy;
 
+pub mod memory_manager;
 pub mod scheduler;
-
+pub mod plan;
+pub mod util;
 pub mod vm;
 
-pub use crate::mm::memory_manager;
-pub use crate::mmtk::MMTK;
 pub use crate::plan::{
     AllocationSemantics, BarrierSelector, CopyContext, Mutator, MutatorContext, Plan, TraceLocal, TransitiveClosure,
 };
