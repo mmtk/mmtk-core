@@ -221,6 +221,8 @@ mod tests {
             lspec.log_min_obj_size = 4;
             lspec.log_num_of_bits = 2;
 
+            sanity::reset();
+
             let metadata = SideMetadata::new(SideMetadataContext {
                 global: vec![gspec],
                 local: vec![lspec],
@@ -254,6 +256,8 @@ mod tests {
                 vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                 vm_layout_constants::BYTES_IN_CHUNK,
             );
+
+            sanity::reset();
         })
     }
 
@@ -266,7 +270,7 @@ mod tests {
                 scope: SideMetadataScope::Global,
                 offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
                 log_num_of_bits: 4,
-                log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+                log_min_obj_size: 6,
             };
 
             let metadata_2_spec = SideMetadataSpec {
@@ -310,6 +314,8 @@ mod tests {
             assert_eq!(three, 3);
 
             metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+
+            sanity::reset();
         })
     }
 
@@ -348,6 +354,8 @@ mod tests {
             assert_eq!(one, 1);
 
             metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+
+            sanity::reset();
         })
     }
 
@@ -427,6 +435,8 @@ mod tests {
             assert_eq!(five, 0);
 
             metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+
+            sanity::reset();
         })
     }
 }

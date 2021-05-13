@@ -36,11 +36,15 @@ pub struct SideMetadataSpec {
 
 impl fmt::Debug for SideMetadataSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "SideMetadataSpec {{").unwrap();
-        writeln!(f, "\tScope: {:?}", self.scope).unwrap();
-        writeln!(f, "\toffset: 0x{:x}", self.offset).unwrap();
-        writeln!(f, "\tlog_num_of_bits: 0x{:x}", self.log_num_of_bits).unwrap();
-        writeln!(f, "\tlog_min_obj_size: 0x{:x}\n}}", self.log_min_obj_size)
+        f.write_fmt(format_args!(
+            "SideMetadataSpec {{ \
+            **Scope: {:?} \
+            **offset: 0x{:x} \
+            **log_num_of_bits: 0x{:x} \
+            **log_min_obj_size: 0x{:x} \
+            }}",
+            self.scope, self.offset, self.log_num_of_bits, self.log_min_obj_size
+        ))
     }
 }
 
