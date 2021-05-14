@@ -1,6 +1,5 @@
 #[cfg(feature = "analysis")]
 use std::sync::atomic::Ordering;
-use crate::plan::global::Plan;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
@@ -9,6 +8,7 @@ use crate::util::Address;
 use crate::vm::VMBinding;
 #[cfg(feature = "analysis")]
 use crate::vm::ActivePlan;
+use crate::Plan;
 
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {

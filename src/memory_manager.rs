@@ -12,9 +12,11 @@
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
 use crate::mmtk::MMTK;
-use crate::plan::mutator_context::{Mutator, MutatorContext};
 use crate::plan::AllocationSemantics;
+use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::GCWorker;
+use crate::scheduler::Work;
+use crate::scheduler::WorkBucketStage;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
@@ -49,7 +51,8 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
         ),
     }
     assert!(heap_size > 0, "Invalid heap size");
-    mmtk.plan.gc_init(heap_size, &mmtk.vm_map, &mmtk.scheduler);
+    mmtk.plan
+        .gc_init(heap_size, &crate::VM_MAP, &mmtk.scheduler);
     info!("Initialized MMTk with {:?}", mmtk.options.plan);
 }
 
@@ -63,7 +66,7 @@ pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: VMMutatorThread,
 ) -> Box<Mutator<VM>> {
-    crate::plan::global::create_mutator(tls, mmtk)
+    crate::plan::create_mutator(tls, mmtk)
 }
 
 /// Reclaim a mutator that is no longer needed.
@@ -371,4 +374,44 @@ pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<Ob
         .lock()
         .unwrap()
         .get_ready_object()
+}
+
+/// Get the number of workers. MMTk spawns worker threads for the 'threads' defined in the options.
+/// So the number of workers is derived from the threads option. Note the feature single_worker overwrites
+/// the threads option, and force one worker thread.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn num_of_workers<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> usize {
+    mmtk.scheduler.num_workers()
+}
+
+/// Add a work packet to the given work bucket. Note that this simply adds the work packet to the given
+/// work bucket, and the scheduler will decide when to execute the work packet.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+/// * `bucket`: Which work bucket to add this packet to.
+/// * `packet`: The work packet to be added.
+pub fn add_work_packet<VM: VMBinding, W: Work<MMTK<VM>>>(
+    mmtk: &'static MMTK<VM>,
+    bucket: WorkBucketStage,
+    packet: W,
+) {
+    mmtk.scheduler.work_buckets[bucket].add(packet)
+}
+
+/// Bulk add a number of work packets to the given work bucket. Note that this simply adds the work packets
+/// to the given work bucket, and the scheduler will decide when to execute the work packets.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+/// * `bucket`: Which work bucket to add these packets to.
+/// * `packet`: The work packets to be added.
+pub fn add_work_packets<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+    bucket: WorkBucketStage,
+    packets: Vec<Box<dyn Work<MMTK<VM>>>>,
+) {
+    mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
 }

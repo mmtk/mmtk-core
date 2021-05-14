@@ -1,3 +1,4 @@
+///! A marksweep space that allocates from malloc.
 mod global;
 pub mod metadata;
 

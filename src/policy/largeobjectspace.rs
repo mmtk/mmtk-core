@@ -25,6 +25,8 @@ const USE_PRECEEDING_GC_HEADER: bool = true;
 const PRECEEDING_GC_HEADER_WORDS: usize = 1;
 const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTES_IN_WORD;
 
+/// This type implements a policy for large objects. Each instance corresponds
+/// to one Treadmill space.
 pub struct LargeObjectSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
