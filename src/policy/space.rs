@@ -28,33 +28,38 @@ use std::marker::PhantomData;
 
 use downcast_rs::Downcast;
 
-/**
- * Space Function Table (SFT).
- *
- * This trait captures functions that reflect _space-specific per-object
- * semantics_.   These functions are implemented for each object via a special
- * space-based dynamic dispatch mechanism where the semantics are _not_
- * determined by the object's _type_, but rather, are determined by the _space_
- * that the object is in.
- *
- * The underlying mechanism exploits the fact that spaces use the address space
- * at an MMTk chunk granularity with the consequence that each chunk maps to
- * exactluy one space, so knowing the chunk for an object reveals its space.
- * The dispatch then works by performing simple address arithmetic on the object
- * reference to find a chunk index which is used to index a table which returns
- * the space.   The relevant function is then dispatched against that space
- * object.
- *
- * We use the SFT trait to simplify typing for Rust, so our table is a
- * table of SFT rather than Space.
- */
+/// Space Function Table (SFT).
+///
+/// This trait captures functions that reflect _space-specific per-object
+/// semantics_.   These functions are implemented for each object via a special
+/// space-based dynamic dispatch mechanism where the semantics are _not_
+/// determined by the object's _type_, but rather, are determined by the _space_
+/// that the object is in.
+///
+/// The underlying mechanism exploits the fact that spaces use the address space
+/// at an MMTk chunk granularity with the consequence that each chunk maps to
+/// exactluy one space, so knowing the chunk for an object reveals its space.
+/// The dispatch then works by performing simple address arithmetic on the object
+/// reference to find a chunk index which is used to index a table which returns
+/// the space.   The relevant function is then dispatched against that space
+/// object.
+///
+/// We use the SFT trait to simplify typing for Rust, so our table is a
+/// table of SFT rather than Space.
 pub trait SFT {
+    /// The space name
     fn name(&self) -> &str;
+    /// Is the object live, determined by the policy?
     fn is_live(&self, object: ObjectReference) -> bool;
+    /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
+    /// or the object is pinned.
     fn is_movable(&self) -> bool;
+    /// Is the object sane? A policy should return false if there is any abnormality about
+    /// object - the sanity checker will fail if an object is not sane.
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool;
-    fn initialize_header(&self, object: ObjectReference, alloc: bool);
+    /// Initialize object metadata (in the header, or in the side metadata).
+    fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
 }
 
 /// Print debug info for SFT. Should be false when committed.
@@ -91,9 +96,9 @@ impl SFT for EmptySpaceSFT {
         false
     }
 
-    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         panic!(
-            "Called initialize_header() on {:x}, which maps to an empty space",
+            "Called initialize_object_metadata() on {:x}, which maps to an empty space",
             object
         )
     }
