@@ -36,7 +36,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     fn is_sane(&self) -> bool {
         !self.from_space()
     }
-    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
+    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {}
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
