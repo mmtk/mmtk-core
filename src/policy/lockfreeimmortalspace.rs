@@ -21,7 +21,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// This type implements a lock free version of the immortal collection
 /// policy. This is close to the OpenJDK's epsilon GC.
 /// Different from the normal ImmortalSpace, this version should only
-/// be used by NoGC plan, and it assumes to take up the rest of the heap range.
+/// be used by NoGC plan, and it now uses the whole heap range.
+// FIXME: It is wrong that the space uses the whole heap range. It has to reserve its own
+// range from HeapMeta, and not clash with other spaces.
 pub struct LockFreeImmortalSpace<VM: VMBinding> {
     #[allow(unused)]
     name: &'static str,

@@ -377,7 +377,8 @@ pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<Ob
 }
 
 /// Get the number of workers. MMTk spawns worker threads for the 'threads' defined in the options.
-/// So the number of workers is derived from the threads option.
+/// So the number of workers is derived from the threads option. Note the feature single_worker overwrites
+/// the threads option, and force one worker thread.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
