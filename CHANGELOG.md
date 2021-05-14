@@ -1,3 +1,25 @@
+0.4.0 (2021-05-14)
+===
+
+API
+---
+* The type OpaquePointer is now superseded by more specific types (VMThread/VMMutatorThread/VMWorkerThread).
+* The methods `ActivePlan::mutator()` and `ActivePlan::is_mutator()` are no longer unsafe due to the change above.
+* The method `ActivePlan::worker()` is removed.
+* Internal modules are no longer public visible. API functions are provided where necessary.
+
+Misc
+---
+* Added a feature 'extreme_assertions' that will enable expensive assertions to help debugging.
+* Refactored to clean up some unsafe code.
+* Improved OOM message for failed mmapping.
+* Improved page accounting - the memory used by side metadata is also included and reported.
+* Improved worker statistics - the total time per work packet type will be reported.
+* Fixed a bug that MMTk may overwrite existing memory mapping.
+* Fixed a bug that stress GC was not triggered properly in GenCopy.
+* Fixed a bug in FragmentedMmapper that may cause a memory region being mmapped twice.
+
+
 0.3.2 (2021-04-07)
 ===
 
