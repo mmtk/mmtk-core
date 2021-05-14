@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["NOGC_CONSTRAINTS",""]],"struct":[["NoGC",""]]});
+initSidebarItems({"mod":[["global",""],["mutator",""]]});

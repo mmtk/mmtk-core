@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["TRACE",""],["TRACE_DETAIL",""],["TRACE_FORWARD",""],["TRACE_UNREACHABLE",""]],"enum":[["Semantics",""]],"struct":[["ReferenceProcessor",""],["ReferenceProcessors",""]]});
+initSidebarItems({"constant":[["INITIAL_SIZE",""],["TRACE",""],["TRACE_DETAIL",""],["TRACE_FORWARD",""],["TRACE_UNREACHABLE",""]],"enum":[["Semantics",""]],"struct":[["ReferenceProcessor",""],["ReferenceProcessorSync",""],["ReferenceProcessors",""]]});

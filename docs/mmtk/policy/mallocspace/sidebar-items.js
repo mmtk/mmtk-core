@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["metadata",""]],"struct":[["MallocSpace",""]]});
+initSidebarItems({"mod":[["global","! A marksweep space that allocates from malloc."],["metadata",""]]});

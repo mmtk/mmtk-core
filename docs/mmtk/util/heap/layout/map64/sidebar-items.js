@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Map64",""]]});
+initSidebarItems({"constant":[["NON_MAP_FRACTION",""]],"struct":[["Map64",""]]});

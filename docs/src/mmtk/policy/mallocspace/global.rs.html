@@ -367,8 +367,8 @@
     <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="bool-val">true</span>
     }
-    <span class="kw">fn</span> <span class="ident">initialize_header</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
-        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;initialize_header for object {}&quot;</span>, <span class="ident">object</span>);
+    <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
+        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;initialize_object_metadata for object {}&quot;</span>, <span class="ident">object</span>);
         <span class="ident">set_alloc_bit</span>(<span class="ident">object</span>);
     }
 }

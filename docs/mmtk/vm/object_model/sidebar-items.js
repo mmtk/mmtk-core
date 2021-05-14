@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["ObjectModel","VM-specific methods for object model."]]});

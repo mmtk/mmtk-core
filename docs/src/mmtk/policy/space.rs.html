@@ -589,6 +589,13 @@
 <span id="586">586</span>
 <span id="587">587</span>
 <span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
@@ -620,33 +627,38 @@
 
 <span class="kw">use</span> <span class="ident">downcast_rs</span>::<span class="ident">Downcast</span>;
 
-<span class="doccomment">/**
- * Space Function Table (SFT).
- *
- * This trait captures functions that reflect _space-specific per-object
- * semantics_.   These functions are implemented for each object via a special
- * space-based dynamic dispatch mechanism where the semantics are _not_
- * determined by the object&#39;s _type_, but rather, are determined by the _space_
- * that the object is in.
- *
- * The underlying mechanism exploits the fact that spaces use the address space
- * at an MMTk chunk granularity with the consequence that each chunk maps to
- * exactluy one space, so knowing the chunk for an object reveals its space.
- * The dispatch then works by performing simple address arithmetic on the object
- * reference to find a chunk index which is used to index a table which returns
- * the space.   The relevant function is then dispatched against that space
- * object.
- *
- * We use the SFT trait to simplify typing for Rust, so our table is a
- * table of SFT rather than Space.
- */</span>
+<span class="doccomment">/// Space Function Table (SFT).</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This trait captures functions that reflect _space-specific per-object</span>
+<span class="doccomment">/// semantics_.   These functions are implemented for each object via a special</span>
+<span class="doccomment">/// space-based dynamic dispatch mechanism where the semantics are _not_</span>
+<span class="doccomment">/// determined by the object&#39;s _type_, but rather, are determined by the _space_</span>
+<span class="doccomment">/// that the object is in.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The underlying mechanism exploits the fact that spaces use the address space</span>
+<span class="doccomment">/// at an MMTk chunk granularity with the consequence that each chunk maps to</span>
+<span class="doccomment">/// exactluy one space, so knowing the chunk for an object reveals its space.</span>
+<span class="doccomment">/// The dispatch then works by performing simple address arithmetic on the object</span>
+<span class="doccomment">/// reference to find a chunk index which is used to index a table which returns</span>
+<span class="doccomment">/// the space.   The relevant function is then dispatched against that space</span>
+<span class="doccomment">/// object.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// We use the SFT trait to simplify typing for Rust, so our table is a</span>
+<span class="doccomment">/// table of SFT rather than Space.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">SFT</span> {
+    <span class="doccomment">/// The space name</span>
     <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span>;
+    <span class="doccomment">/// Is the object live, determined by the policy?</span>
     <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
+    <span class="doccomment">/// Is the object movable, determined by the policy? E.g. the policy is non-moving,</span>
+    <span class="doccomment">/// or the object is pinned.</span>
     <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
+    <span class="doccomment">/// Is the object sane? A policy should return false if there is any abnormality about</span>
+    <span class="doccomment">/// object - the sanity checker will fail if an object is not sane.</span>
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
     <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
-    <span class="kw">fn</span> <span class="ident">initialize_header</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">alloc</span>: <span class="ident">bool</span>);
+    <span class="doccomment">/// Initialize object metadata (in the header, or in the side metadata).</span>
+    <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">alloc</span>: <span class="ident">bool</span>);
 }
 
 <span class="doccomment">/// Print debug info for SFT. Should be false when committed.</span>
@@ -683,9 +695,9 @@
         <span class="bool-val">false</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">initialize_header</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
+    <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
         <span class="macro">panic</span><span class="macro">!</span>(
-            <span class="string">&quot;Called initialize_header() on {:x}, which maps to an empty space&quot;</span>,
+            <span class="string">&quot;Called initialize_object_metadata() on {:x}, which maps to an empty space&quot;</span>,
             <span class="ident">object</span>
         )
     }
@@ -778,6 +790,8 @@
         }
     }
 
+    <span class="comment">// TODO: We should clear a SFT entry when a space releases a chunk.</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk_idx</span>: <span class="ident">usize</span>) {
         <span class="self">self</span>.<span class="ident">set</span>(<span class="ident">chunk_idx</span>, <span class="kw-2">&amp;</span><span class="ident">EMPTY_SPACE_SFT</span>);
     }

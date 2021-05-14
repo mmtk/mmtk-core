@@ -201,7 +201,7 @@
                 .<span class="ident">get_allocator_mut</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">allocator_mapping</span>[<span class="ident">allocator</span>])
         }
         .<span class="ident">get_space</span>()
-        .<span class="ident">initialize_header</span>(<span class="ident">refer</span>, <span class="bool-val">true</span>)
+        .<span class="ident">initialize_object_metadata</span>(<span class="ident">refer</span>, <span class="bool-val">true</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">VMMutatorThread</span> {

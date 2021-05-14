@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["MS_CONSTRAINTS",""]],"mod":[["mutator",""]],"struct":[["MarkSweep",""]]});
+initSidebarItems({"mod":[["gc_work",""],["global",""],["mutator",""]]});

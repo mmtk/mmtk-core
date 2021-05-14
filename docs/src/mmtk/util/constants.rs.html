@@ -114,6 +114,9 @@
 <span id="111">111</span>
 <span id="112">112</span>
 <span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">embedded_meta_data</span>::<span class="ident">LOG_BYTES_IN_REGION</span>;
 
@@ -151,8 +154,11 @@
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_CARD_UNITS</span> <span class="op">+</span> <span class="ident">LOG_CARD_GRAIN</span>;
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_META_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_REGION</span> <span class="op">-</span> <span class="ident">LOG_CARD_BYTES</span> <span class="op">+</span> <span class="ident">LOG_CARD_META_SIZE</span>;
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_META_PAGES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_CARD_META_BYTES</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CARD_META_PAGES_PER_REGION</span>: <span class="ident">usize</span> <span class="op">=</span>
-    <span class="macro">if_then_else_usize</span><span class="macro">!</span>(<span class="ident">SUPPORT_CARD_SCANNING</span>, <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_CARD_META_PAGES</span>, <span class="number">0</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CARD_META_PAGES_PER_REGION</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">SUPPORT_CARD_SCANNING</span> {
+    <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_CARD_META_PAGES</span>
+} <span class="kw">else</span> {
+    <span class="number">0</span>
+};
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CARD_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_CARD_BYTES</span>) <span class="op">-</span> <span class="number">1</span>;
 
 <span class="doccomment">/**

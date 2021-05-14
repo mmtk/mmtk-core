@@ -37,42 +37,78 @@
 <span id="34">34</span>
 <span id="35">35</span>
 <span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! GC algorithms from the MMTk suite.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides various GC plans, each of which implements a GC algorithm.</span>
 <span class="doccomment">//! Generally a plan consists of a few parts:</span>
-<span class="doccomment">//! * A plan type that implements the [`Plan`](crate::plan::global::Plan) trait, which defines</span>
+<span class="doccomment">//! * A plan type that implements the [`Plan`](crate::plan::Plan) trait, which defines</span>
 <span class="doccomment">//!   spaces used in the plan, and their behaviors in GC and page accounting.</span>
 <span class="doccomment">//! * A mutator definition, which describes the mapping between allocators and allocation semantics,</span>
 <span class="doccomment">//!   and the mapping between allocators and spaces. If the plan needs barrier, the barrier definition is</span>
 <span class="doccomment">//!   also included here.</span>
-<span class="doccomment">//! * A constant for [`PlanConstraints`](crate::plan::plan_constraints::PlanConstraints), which defines</span>
+<span class="doccomment">//! * A constant for [`PlanConstraints`](crate::plan::PlanConstraints), which defines</span>
 <span class="doccomment">//!   plan-specific constants.</span>
 <span class="doccomment">//! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC. If the plan</span>
-<span class="doccomment">//!   implements a copying GC, a [`CopyContext`](crate::plan::global::CopyContext) also needs to be provided.</span>
+<span class="doccomment">//!   implements a copying GC, a [`CopyContext`](crate::plan::CopyContext) also needs to be provided.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).</span>
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">barriers</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">controller_collector_context</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">global</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">mutator_context</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">plan_constraints</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">tracelocal</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">transitive_closure</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">global</span>::<span class="ident">AllocationSemantics</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">global</span>::<span class="ident">CopyContext</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">global</span>::<span class="ident">Plan</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">mutator_context</span>::<span class="ident">Mutator</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">mutator_context</span>::<span class="ident">MutatorContext</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">plan_constraints</span>::<span class="ident">PlanConstraints</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">tracelocal</span>::<span class="ident">TraceLocal</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">transitive_closure</span>::<span class="ident">TransitiveClosure</span>;
+<span class="kw">mod</span> <span class="ident">barriers</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">barriers</span>::<span class="ident">BarrierSelector</span>;
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">gencopy</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">marksweep</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">nogc</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">semispace</span>;
+<span class="kw">mod</span> <span class="ident">controller_collector_context</span>;
+
+<span class="kw">mod</span> <span class="ident">global</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global</span>::<span class="ident">create_mutator</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global</span>::<span class="ident">create_plan</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">global</span>::<span class="ident">AllocationSemantics</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">global</span>::<span class="ident">CopyContext</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global</span>::<span class="ident">GcStatus</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">global</span>::<span class="ident">Plan</span>;
+
+<span class="kw">mod</span> <span class="ident">mutator_context</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">mutator_context</span>::<span class="ident">Mutator</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">mutator_context</span>::<span class="ident">MutatorContext</span>;
+
+<span class="kw">mod</span> <span class="ident">plan_constraints</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">plan_constraints</span>::<span class="ident">PlanConstraints</span>;
+
+<span class="kw">mod</span> <span class="ident">tracelocal</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tracelocal</span>::<span class="ident">TraceLocal</span>;
+
+<span class="kw">mod</span> <span class="ident">transitive_closure</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">transitive_closure</span>::<span class="ident">TransitiveClosure</span>;
+
+<span class="kw">mod</span> <span class="ident">gencopy</span>;
+<span class="kw">mod</span> <span class="ident">marksweep</span>;
+<span class="kw">mod</span> <span class="ident">nogc</span>;
+<span class="kw">mod</span> <span class="ident">semispace</span>;
+
+<span class="comment">// Expose plan constraints as public. Though a binding can get them from plan.constraints(),</span>
+<span class="comment">// it is possible for performance reasons that they want the constraints as constants.</span>
+
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">gencopy</span>::<span class="ident">GENCOPY_CONSTRAINTS</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">marksweep</span>::<span class="ident">MS_CONSTRAINTS</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">nogc</span>::<span class="ident">NOGC_CONSTRAINTS</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">semispace</span>::<span class="ident">SS_CONSTRAINTS</span>;
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "mmtk";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

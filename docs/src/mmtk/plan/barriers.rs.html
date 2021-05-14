@@ -86,6 +86,7 @@
 <span id="83">83</span>
 <span id="84">84</span>
 <span id="85">85</span>
+<span id="86">86</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Read/Write barrier implementations.</span>
 
@@ -95,6 +96,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">MMTK</span>;
 
+<span class="doccomment">/// BarrierSelector describes which barrier to use.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">BarrierSelector</span> {
     <span class="ident">NoBarrier</span>,

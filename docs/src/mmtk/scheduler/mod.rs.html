@@ -20,25 +20,61 @@
 <span id="17">17</span>
 <span id="18">18</span>
 <span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! A general scheduler implementation. MMTk uses it to schedule GC-related work.</span>
 
 <span class="kw">mod</span> <span class="ident">context</span>;
+<span class="kw">pub</span>(<span class="self">self</span>) <span class="kw">use</span> <span class="ident">context</span>::<span class="ident">Context</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">context</span>::<span class="ident">WorkerLocal</span>;
+
 <span class="kw">mod</span> <span class="ident">mmtk_context</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">mmtk_context</span>::<span class="ident">GCWorkerLocal</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">mmtk_context</span>::<span class="ident">GCWorkerLocalPtr</span>;
+
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">module_inception</span>)]</span>
 <span class="kw">mod</span> <span class="ident">scheduler</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">stat</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">scheduler</span>::<span class="ident">CoordinatorMessage</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">scheduler</span>::<span class="ident">MMTkScheduler</span>;
+<span class="kw">pub</span>(<span class="self">self</span>) <span class="kw">use</span> <span class="ident">scheduler</span>::<span class="ident">Scheduler</span>;
+
+<span class="kw">mod</span> <span class="ident">stat</span>;
+
 <span class="kw">mod</span> <span class="ident">work</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">work</span>::<span class="ident">CoordinatorWork</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">work</span>::<span class="ident">GCWork</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">work</span>::<span class="ident">Work</span>;
+
 <span class="kw">mod</span> <span class="ident">work_bucket</span>;
-<span class="kw">mod</span> <span class="ident">worker</span>;
-
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">context</span>::<span class="kw-2">*</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">mmtk_context</span>::<span class="kw-2">*</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">scheduler</span>::<span class="kw-2">*</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">work</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">work_bucket</span>::<span class="ident">WorkBucketStage</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">worker</span>::<span class="kw-2">*</span>;
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">gc_work</span>;
+<span class="kw">mod</span> <span class="ident">worker</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">worker</span>::<span class="ident">GCWorker</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">worker</span>::<span class="ident">Worker</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">worker</span>::<span class="ident">WorkerLocalPtr</span>;
+
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">gc_work</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">gc_work</span>::<span class="ident">ProcessEdgesWork</span>;
+<span class="comment">// TODO: We shouldn&#39;t need to expose ScanStackRoot. However, OpenJDK uses it.</span>
+<span class="comment">// We should do some refactoring related to Scanning::SCAN_MUTATORS_IN_SAFEPOINT</span>
+<span class="comment">// to make sure this type is not exposed to the bindings.</span>
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">gc_work</span>::<span class="ident">ScanStackRoot</span>;
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "mmtk";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

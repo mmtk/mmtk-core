@@ -244,6 +244,8 @@
 <span id="241">241</span>
 <span id="242">242</span>
 <span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">PlanConstraints</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">TransitiveClosure</span>;
@@ -272,6 +274,8 @@
 <span class="kw">const</span> <span class="ident">PRECEEDING_GC_HEADER_WORDS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
 <span class="kw">const</span> <span class="ident">PRECEEDING_GC_HEADER_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">PRECEEDING_GC_HEADER_WORDS</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_WORD</span>;
 
+<span class="doccomment">/// This type implements a policy for large objects. Each instance corresponds</span>
+<span class="doccomment">/// to one Treadmill space.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LargeObjectSpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">common</span>: <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">pr</span>: <span class="ident">FreeListPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
@@ -295,7 +299,7 @@
     <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="bool-val">true</span>
     }
-    <span class="kw">fn</span> <span class="ident">initialize_header</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">alloc</span>: <span class="ident">bool</span>) {
+    <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">alloc</span>: <span class="ident">bool</span>) {
         <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">gc_byte</span>::<span class="ident">read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_value</span> <span class="op">=</span> (<span class="ident">old_value</span> <span class="op">&amp;</span> (<span class="op">!</span><span class="ident">LOS_BIT_MASK</span>)) <span class="op">|</span> <span class="self">self</span>.<span class="ident">mark_state</span>;
         <span class="kw">if</span> <span class="ident">alloc</span> {

@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["RawMemoryFreeList",""]]});
+initSidebarItems({"constant":[["LOG_BYTES_IN_ENTRY","log2 of the number of bytes used by a free list entry (two entries per unit) "],["LOG_BYTES_IN_UNIT","log2 of the number of bytes used by a free list unit "],["LOG_ENTRY_BITS","log2 of the number of bits used by a free list entry (two entries per unit) "]],"struct":[["RawMemoryFreeList",""]]});

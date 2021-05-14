@@ -67,11 +67,17 @@
 <span id="64">64</span>
 <span id="65">65</span>
 <span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">incomplete_features</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_fn</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">integer_atomics</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">is_sorted</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">drain_filter</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">nll</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">box_syntax</span>)]</span>
@@ -82,6 +88,8 @@
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">associated_type_defaults</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">specialization</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
+<span class="comment">// TODO: We should fix missing docs for public items and turn this on (Issue #309).</span>
+<span class="comment">// #![deny(missing_docs)]</span>
 
 <span class="doccomment">//! Memory Management ToolKit (MMTk) is a portable and high performance memory manager</span>
 <span class="doccomment">//! that includes various garbage collection algorithms and provides clean and efficient</span>
@@ -120,19 +128,21 @@
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">downcast_rs</span>;
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">util</span>;
-<span class="kw">mod</span> <span class="ident">mm</span>;
 <span class="kw">mod</span> <span class="ident">mmtk</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">mmtk</span>::<span class="ident">MMTK</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">mmtk</span>::<span class="ident">VM_MAP</span>;
+
+<span class="kw">mod</span> <span class="ident">policy</span>;
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">memory_manager</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">plan</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">policy</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">scheduler</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">util</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">vm</span>;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mm</span>::<span class="ident">memory_manager</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">MMTK</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{
-    <span class="ident">AllocationSemantics</span>, <span class="ident">CopyContext</span>, <span class="ident">Mutator</span>, <span class="ident">MutatorContext</span>, <span class="ident">Plan</span>, <span class="ident">TraceLocal</span>, <span class="ident">TransitiveClosure</span>,
+    <span class="ident">AllocationSemantics</span>, <span class="ident">BarrierSelector</span>, <span class="ident">CopyContext</span>, <span class="ident">Mutator</span>, <span class="ident">MutatorContext</span>, <span class="ident">Plan</span>, <span class="ident">TraceLocal</span>,
+    <span class="ident">TransitiveClosure</span>,
 };
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "mmtk";</script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>

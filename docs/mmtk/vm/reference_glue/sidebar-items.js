@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["ReferenceGlue","VM-specific methods for reference processing."]]});

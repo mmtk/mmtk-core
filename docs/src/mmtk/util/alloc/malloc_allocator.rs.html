@@ -57,13 +57,13 @@
 <span id="54">54</span>
 <span id="55">55</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">global</span>::<span class="ident">Plan</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">mallocspace</span>::<span class="ident">MallocSpace</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">Space</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">alloc</span>::<span class="ident">Allocator</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">Plan</span>;
 
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MallocAllocator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["SynchronizedMutatorIterator",""]],"trait":[["ActivePlan","VM-specific methods for the current plan."]]});

@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ImmortalSpace",""]]});
+initSidebarItems({"constant":[["GC_MARK_BIT_MASK",""],["META_DATA_PAGES_PER_REGION",""]],"struct":[["ImmortalSpace","This type implements a simple immortal collection policy. Under this policy all that is required is for the \"collector\" to propagate marks in a liveness trace.  It does not actually collect."]]});

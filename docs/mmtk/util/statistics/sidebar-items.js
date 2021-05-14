@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["counter",""],["stats",""]],"type":[["Timer",""]]});
+initSidebarItems({"mod":[["counter",""],["stats",""]]});

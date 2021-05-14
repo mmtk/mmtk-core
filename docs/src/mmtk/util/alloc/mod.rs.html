@@ -16,21 +16,29 @@
 <span id="13">13</span>
 <span id="14">14</span>
 <span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">allocator</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">allocators</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">allocator</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">allocator</span>::<span class="ident">fill_alignment_gap</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">allocator</span>::<span class="ident">Allocator</span>;
+
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">allocators</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">allocators</span>::<span class="ident">AllocatorSelector</span>;
+
 <span class="kw">mod</span> <span class="ident">bumpallocator</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">dump_linear_scan</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">embedded_meta_data</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">large_object_allocator</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">linear_scan</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">malloc_allocator</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">bumpallocator</span>::<span class="ident">BumpAllocator</span>;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">allocator</span>::<span class="ident">Allocator</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">bumpallocator</span>::<span class="ident">BumpAllocator</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">large_object_allocator</span>::<span class="ident">LargeObjectAllocator</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">malloc_allocator</span>::<span class="ident">MallocAllocator</span>;
+<span class="kw">mod</span> <span class="ident">large_object_allocator</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">large_object_allocator</span>::<span class="ident">LargeObjectAllocator</span>;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">mallocspace</span>::<span class="ident">metadata</span>::<span class="ident">is_alloced_by_malloc</span>;
+<span class="kw">mod</span> <span class="ident">malloc_allocator</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">malloc_allocator</span>::<span class="ident">MallocAllocator</span>;
+
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">dump_linear_scan</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">embedded_meta_data</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">linear_scan</span>;
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../../";window.currentCrate = "mmtk";</script><script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>

@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ControllerCollectorContext",""]]});
+initSidebarItems({"struct":[["ControllerCollectorContext",""],["RequestSync",""]]});

@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["MonotonePageResourceConditional",""]],"struct":[["MonotonePageResource",""]]});
+initSidebarItems({"enum":[["MonotonePageResourceConditional",""]],"struct":[["MonotonePageResource",""],["MonotonePageResourceSync",""]]});

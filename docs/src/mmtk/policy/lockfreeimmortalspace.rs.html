@@ -143,6 +143,13 @@
 <span id="140">140</span>
 <span id="141">141</span>
 <span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">SFT_MAP</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
@@ -164,6 +171,12 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 
+<span class="doccomment">/// This type implements a lock free version of the immortal collection</span>
+<span class="doccomment">/// policy. This is close to the OpenJDK&#39;s epsilon GC.</span>
+<span class="doccomment">/// Different from the normal ImmortalSpace, this version should only</span>
+<span class="doccomment">/// be used by NoGC plan, and it now uses the whole heap range.</span>
+<span class="comment">// FIXME: It is wrong that the space uses the whole heap range. It has to reserve its own</span>
+<span class="comment">// range from HeapMeta, and not clash with other spaces.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LockFreeImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
     <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
@@ -194,7 +207,7 @@
     <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="macro">unimplemented</span><span class="macro">!</span>()
     }
-    <span class="kw">fn</span> <span class="ident">initialize_header</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
+    <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
         <span class="macro">unimplemented</span><span class="macro">!</span>()
     }
 }
@@ -268,6 +281,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">LockFreeImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span> <span class="comment">// Only used with certain features.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
         <span class="ident">slow_path_zeroing</span>: <span class="ident">bool</span>,

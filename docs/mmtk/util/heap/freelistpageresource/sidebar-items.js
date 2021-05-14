@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CommonFreeListPageResource",""],["FreeListPageResource",""]]});
+initSidebarItems({"struct":[["CommonFreeListPageResource",""],["FreeListPageResource",""],["FreeListPageResourceSync",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["Collection","VM-specific methods for garbage collection."]]});

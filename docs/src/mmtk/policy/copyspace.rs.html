@@ -188,6 +188,9 @@
 <span id="185">185</span>
 <span id="186">186</span>
 <span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">TransitiveClosure</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::{<span class="ident">AllocationSemantics</span>, <span class="ident">CopyContext</span>};
@@ -207,6 +210,7 @@
 
 <span class="kw">const</span> <span class="ident">META_DATA_PAGES_PER_REGION</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">CARD_META_PAGES_PER_REGION</span>;
 
+<span class="doccomment">/// This type implements a simple copying space.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">common</span>: <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">pr</span>: <span class="ident">MonotonePageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
@@ -227,7 +231,7 @@
     <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="op">!</span><span class="self">self</span>.<span class="ident">from_space</span>()
     }
-    <span class="kw">fn</span> <span class="ident">initialize_header</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {}
+    <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {}
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -344,6 +348,7 @@
         }
     }
 
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span> <span class="comment">// Only used with certain features (such as sanity)</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">protect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">common</span>().<span class="ident">contiguous</span> {
             <span class="macro">panic</span><span class="macro">!</span>(
@@ -358,6 +363,7 @@
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Protect {:x} {:x}&quot;</span>, <span class="ident">start</span>, <span class="ident">start</span> <span class="op">+</span> <span class="ident">extent</span>);
     }
 
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span> <span class="comment">// Only used with certain features (such as sanity)</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unprotect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">common</span>().<span class="ident">contiguous</span> {
             <span class="macro">panic</span><span class="macro">!</span>(
