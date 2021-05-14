@@ -50,7 +50,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_header(&self, object: ObjectReference, alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
         let old_value = gc_byte::read_gc_byte::<VM>(object);
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
         if alloc {

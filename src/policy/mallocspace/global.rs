@@ -69,7 +69,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         true
     }
 
-    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_header for object {}", object);
         let page_addr = conversions::page_align_down(object.to_address()); // XXX: page-bit diff
         set_page_mark_bit(page_addr); // XXX: page-bit diff
