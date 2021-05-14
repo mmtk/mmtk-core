@@ -75,7 +75,7 @@ pub struct SideMetadata {
 
 impl SideMetadata {
     pub fn new(context: SideMetadataContext) -> SideMetadata {
-        sanity::verify_metadata_context(&context).unwrap();
+        sanity::verify_metadata_context(&context);
 
         Self {
             context,
@@ -397,7 +397,9 @@ pub fn compare_exchange_atomic(
     };
 
     #[cfg(feature = "extreme_assertions")]
-    sanity::store(metadata_spec, data_addr, new_metadata).unwrap();
+    if res {
+        sanity::verify_store(metadata_spec, data_addr, new_metadata);
+    }
 
     res
 }
@@ -453,19 +455,7 @@ pub fn fetch_add_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
     };
 
     #[cfg(feature = "extreme_assertions")]
-    match sanity::add(metadata_spec, data_addr, val) {
-        Ok(ov) => {
-            assert!(
-                ov == old_val,
-                "Expected old val (0x{:x}), but found (0x{:x})",
-                ov,
-                old_val
-            );
-        }
-        Err(e) => {
-            panic!("metadata sanity checker failed with {}", e);
-        }
-    }
+    sanity::verify_add(metadata_spec, data_addr, val, old_val);
 
     old_val
 }
@@ -521,19 +511,7 @@ pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
     };
 
     #[cfg(feature = "extreme_assertions")]
-    match sanity::sub(metadata_spec, data_addr, val) {
-        Ok(ov) => {
-            assert!(
-                ov == old_val,
-                "Expected old val (0x{:x}), but found (0x{:x})",
-                ov,
-                old_val
-            );
-        }
-        Err(e) => {
-            panic!("metadata sanity checker failed with {}", e);
-        }
-    }
+    sanity::verify_sub(metadata_spec, data_addr, val, old_val);
 
     old_val
 }
@@ -576,19 +554,7 @@ pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
     };
 
     #[cfg(feature = "extreme_assertions")]
-    match sanity::load(&metadata_spec, data_addr) {
-        Ok(exp_res) => {
-            assert!(
-                exp_res == res,
-                "Expected old val (0x{:x}), but found (0x{:x})",
-                exp_res,
-                res
-            );
-        }
-        Err(e) => {
-            panic!("metadata sanity checker failed with {}", e);
-        }
-    }
+    sanity::verify_load(&metadata_spec, data_addr, res);
 
     res
 }
@@ -634,7 +600,7 @@ pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
     }
 
     #[cfg(feature = "extreme_assertions")]
-    sanity::store(metadata_spec, data_addr, metadata).unwrap();
+    sanity::verify_store(metadata_spec, data_addr, metadata);
 }
 
 /// Bulk-zero a specific metadata for a chunk.
@@ -651,7 +617,7 @@ pub fn bzero_metadata(metadata_spec: SideMetadataSpec, start: Address, size: usi
     );
 
     #[cfg(feature = "extreme_assertions")]
-    sanity::bzero(metadata_spec, start, size).unwrap();
+    sanity::verify_bzero(metadata_spec, start, size);
 
     let meta_start = address_to_meta_address(metadata_spec, start);
     if cfg!(target_pointer_width = "64") || metadata_spec.scope.is_global() {

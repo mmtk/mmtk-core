@@ -17,18 +17,8 @@ enum MathOp {
 }
 
 lazy_static! {
-    static ref SANITY_MAP: RwLock<Vec<HashMap<Address, usize>>> = RwLock::new(vec![]);
-    static ref SPEC_TO_IDX_MAP: RwLock<HashMap<SideMetadataSpec, usize>> =
+    static ref SANITY_MAP: RwLock<HashMap<SideMetadataSpec, HashMap<Address, usize>>> =
         RwLock::new(HashMap::new());
-}
-
-#[cfg(feature = "extreme_assertions")]
-fn spec_to_index(metadata_spec: &SideMetadataSpec) -> Option<usize> {
-    let spec_to_index_map = SPEC_TO_IDX_MAP.read().unwrap();
-    match spec_to_index_map.get(metadata_spec) {
-        Some(idx) => Some(*idx),
-        None => None,
-    }
 }
 
 fn verify_global_specs_total_size(g_specs: &[SideMetadataSpec]) -> Result<()> {
@@ -140,7 +130,7 @@ fn verify_global_specs(g_specs: &[SideMetadataSpec]) -> Result<()> {
 
 fn get_all_specs(global: bool) -> Vec<SideMetadataSpec> {
     let mut specs = vec![];
-    let idx_map = SPEC_TO_IDX_MAP.read().unwrap();
+    let idx_map = SANITY_MAP.read().unwrap();
     for (k, _) in idx_map.iter() {
         if !(global ^ k.scope.is_global()) {
             specs.push(*k);
@@ -177,21 +167,15 @@ fn verify_local_specs() -> Result<()> {
 #[allow(dead_code)]
 pub fn reset() {
     let mut sanity_map = SANITY_MAP.write().unwrap();
-    let mut idx_map = SPEC_TO_IDX_MAP.write().unwrap();
     sanity_map.clear();
-    idx_map.clear();
 }
 
-pub fn verify_metadata_context(metadata_context: &SideMetadataContext) -> Result<()> {
+pub fn verify_metadata_context(metadata_context: &SideMetadataContext) {
     // global metadata combination is the same for all contexts
-    let v = verify_global_specs(&metadata_context.global);
-    if v.is_err() {
-        return v;
-    }
+    verify_global_specs(&metadata_context.global).unwrap();
 
     // assert not initialised before
     let mut sanity_map = SANITY_MAP.write().unwrap();
-    let mut idx_map = SPEC_TO_IDX_MAP.write().unwrap();
 
     let global_count = metadata_context.global.len();
     let local_count = metadata_context.local.len();
@@ -206,90 +190,79 @@ pub fn verify_metadata_context(metadata_context: &SideMetadataContext) -> Result
         let spec = metadata_context.global[i];
         if first_call {
             // initialise the related hashmap
-            sanity_map.push(HashMap::new());
-            // add this metadata to index map
-            idx_map.insert(spec, i);
-        } else if !idx_map.contains_key(&spec) {
-            drop(idx_map);
-            drop(sanity_map);
-            return Err(Error::new(ErrorKind::InvalidInput, format!("Global metadata must not change between policies! NEW SPEC: {:#?} OLD SPECS: {:#?}", spec, get_all_specs(true))));
+            sanity_map.insert(spec, HashMap::new());
+        } else if !sanity_map.contains_key(&spec) {
+            panic!("Global metadata must not change between policies! NEW SPEC: {:#?} OLD SPECS: {:#?}", spec, get_all_specs(true));
         }
     }
 
     for i in 0..local_count {
-        if !idx_map.contains_key(&metadata_context.local[i]) {
+        if !sanity_map.contains_key(&metadata_context.local[i]) {
             // initialise the related hashmap
-            sanity_map.push(HashMap::new());
-            // add this metadata to index map
-            idx_map.insert(metadata_context.local[i], sanity_map.len() - 1);
+            sanity_map.insert(metadata_context.local[i], HashMap::new());
         } else {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                format!(
-                    "Policy-specific metadata spec is already in use:\n{:#?}",
-                    metadata_context.local[i]
-                ),
-            ));
+            panic!(
+                "Policy-specific metadata spec is already in use:\n{:#?}",
+                metadata_context.local[i]
+            )
         }
     }
 
-    drop(idx_map);
     drop(sanity_map);
 
-    verify_local_specs()
+    verify_local_specs().unwrap();
 }
 
 #[cfg(feature = "extreme_assertions")]
-pub fn bzero(metadata_spec: SideMetadataSpec, start: Address, size: usize) -> Result<()> {
-    match spec_to_index(&metadata_spec) {
-        Some(idx) => {
-            let sanity_map = &mut SANITY_MAP.write().unwrap()[idx];
-            // remove add entries where the key (data_addr) is in the range (start, start+size)
-            sanity_map.retain(|key, _| *key < start || *key >= start + size);
-            Ok(())
+pub fn verify_bzero(metadata_spec: SideMetadataSpec, start: Address, size: usize) {
+    let sanity_map = &mut SANITY_MAP.write().unwrap();
+    match sanity_map.get_mut(&metadata_spec) {
+        Some(spec_sanity_map) => {
+            // remove entries where the key (data_addr) is in the range (start, start+size)
+            spec_sanity_map.retain(|key, _| *key < start || *key >= start + size);
         }
-        None => Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Invalid Metadata Spec!",
-        )),
+        None => {
+            panic!("Invalid Metadata Spec!");
+        }
     }
 }
 
 #[cfg(feature = "extreme_assertions")]
-pub fn load(metadata_spec: &SideMetadataSpec, data_addr: Address) -> Result<usize> {
+pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_val: usize) {
     println!("load({}, {})", metadata_spec.offset, data_addr);
-    match spec_to_index(metadata_spec) {
-        Some(idx) => {
-            let sanity_map = &SANITY_MAP.read().unwrap()[idx];
-            match sanity_map.get(&data_addr) {
-                Some(val) => Ok(*val),
-                None => Err(Error::new(ErrorKind::InvalidInput, "Invalid Data Address!")),
+    let sanity_map = &mut SANITY_MAP.read().unwrap();
+    match sanity_map.get(&metadata_spec) {
+        Some(spec_sanity_map) => {
+            match spec_sanity_map.get(&data_addr) {
+                Some(expected_val) => {
+                    // hashmap is assumed to be correct
+                    assert!(
+                        *expected_val == actual_val,
+                        "Expected (0x{:x}) but found (0x{:x})",
+                        expected_val,
+                        actual_val
+                    );
+                }
+                None => panic!("Invalid Data Address ({})!", data_addr),
             }
         }
-        None => Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Invalid Metadata Spec!",
-        )),
+        None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
     }
 }
 
 #[cfg(feature = "extreme_assertions")]
-pub fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) -> Result<()> {
+pub fn verify_store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
     println!(
         "store({}, {}, {})",
         metadata_spec.offset, data_addr, metadata
     );
-    match spec_to_index(&metadata_spec) {
-        Some(idx) => {
-            let sanity_map = &mut SANITY_MAP.write().unwrap()[idx];
-            let content = sanity_map.entry(data_addr).or_insert(0);
+    let sanity_map = &mut SANITY_MAP.write().unwrap();
+    match sanity_map.get_mut(&metadata_spec) {
+        Some(spec_sanity_map) => {
+            let content = spec_sanity_map.entry(data_addr).or_insert(0);
             *content = metadata;
-            Ok(())
         }
-        None => Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Invalid Metadata Spec!",
-        )),
+        None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
     }
 }
 
@@ -300,10 +273,10 @@ fn do_math(
     val: usize,
     math_op: MathOp,
 ) -> Result<usize> {
-    match spec_to_index(&metadata_spec) {
-        Some(idx) => {
-            let sanity_map = &mut SANITY_MAP.write().unwrap()[idx];
-            let cur_val = sanity_map.entry(data_addr).or_insert(0);
+    let sanity_map = &mut SANITY_MAP.write().unwrap();
+    match sanity_map.get_mut(&metadata_spec) {
+        Some(spec_sanity_map) => {
+            let cur_val = spec_sanity_map.entry(data_addr).or_insert(0);
             let old_val = *cur_val;
             match math_op {
                 MathOp::Add => *cur_val += val,
@@ -313,19 +286,49 @@ fn do_math(
         }
         None => Err(Error::new(
             ErrorKind::InvalidInput,
-            "Invalid Metadata Spec!",
+            format!("Invalid Metadata Spec: {:#?}", metadata_spec),
         )),
     }
 }
 
 #[cfg(feature = "extreme_assertions")]
-pub fn add(metadata_spec: SideMetadataSpec, data_addr: Address, val: usize) -> Result<usize> {
-    do_math(metadata_spec, data_addr, val, MathOp::Add)
+pub fn verify_add(
+    metadata_spec: SideMetadataSpec,
+    data_addr: Address,
+    val_to_add: usize,
+    actual_old_val: usize,
+) {
+    match do_math(metadata_spec, data_addr, val_to_add, MathOp::Add) {
+        Ok(expected_old_val) => {
+            assert!(
+                actual_old_val == expected_old_val,
+                "Expected (0x{:x}) but found (0x{:x})",
+                expected_old_val,
+                actual_old_val
+            );
+        }
+        Err(e) => panic!("{}", e),
+    }
 }
 
 #[cfg(feature = "extreme_assertions")]
-pub fn sub(metadata_spec: SideMetadataSpec, data_addr: Address, val: usize) -> Result<usize> {
-    do_math(metadata_spec, data_addr, val, MathOp::Sub)
+pub fn verify_sub(
+    metadata_spec: SideMetadataSpec,
+    data_addr: Address,
+    val_to_sub: usize,
+    actual_old_val: usize,
+) {
+    match do_math(metadata_spec, data_addr, val_to_sub, MathOp::Sub) {
+        Ok(expected_old_val) => {
+            assert!(
+                actual_old_val == expected_old_val,
+                "Expected (0x{:x}) but found (0x{:x})",
+                expected_old_val,
+                actual_old_val
+            );
+        }
+        Err(e) => panic!("{}", e),
+    }
 }
 
 #[test]
