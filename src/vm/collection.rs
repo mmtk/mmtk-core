@@ -70,4 +70,5 @@ pub trait Collection<VM: VMBinding> {
     fn schedule_finalization(_tls: OpaquePointer) {}
 
     fn sweep(_addr: Address) {}
+    fn process_weak_refs() {}
 }
