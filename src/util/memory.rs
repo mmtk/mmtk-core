@@ -87,6 +87,13 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
     use std::io::ErrorKind;
 
     match error.kind() {
+        // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
+        ErrorKind::OutOfMemory => {
+            VM::VMCollection::out_of_memory(tls);
+            unreachable!()
+        }
+        // Before Rust had ErrorKind::OutOfMemory, this is how we capture OOM from OS calls.
+        // TODO: We may be able to remove this now.
         ErrorKind::Other => {
             // further check the error
             if let Some(os_errno) = error.raw_os_error() {
