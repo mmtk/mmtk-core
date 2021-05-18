@@ -1,117 +1,13 @@
+use super::work_counter::{WorkCounter, WorkCounterBase, WorkDuration};
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::SystemTime;
 
 #[derive(Default)]
 pub struct SchedulerStat {
     work_id_name_map: HashMap<TypeId, &'static str>,
     work_counts: HashMap<TypeId, usize>,
     work_counters: HashMap<TypeId, Vec<Vec<Box<dyn WorkCounter>>>>,
-}
-
-#[derive(Copy, Clone)]
-struct WorkCounterBase {
-    total: f64,
-    min: f64,
-    max: f64,
-}
-
-impl Default for WorkCounterBase {
-    fn default() -> Self {
-        WorkCounterBase {
-            total: 0.0,
-            min: f64::INFINITY,
-            max: f64::NEG_INFINITY,
-        }
-    }
-}
-
-impl WorkCounterBase {
-    fn merge(&self, other: &Self) -> Self {
-        let min = self.min.min(other.min);
-        let max = self.max.max(other.max);
-        let total = self.total + other.total;
-        WorkCounterBase { total, min, max }
-    }
-
-    fn merge_inplace(&mut self, other: &Self) {
-        self.min = self.min.min(other.min);
-        self.max = self.max.max(other.max);
-        self.total += other.total;
-    }
-
-    fn merge_val(&mut self, val: f64) {
-        self.min = self.min.min(val);
-        self.max = self.max.max(val);
-        self.total += val;
-    }
-}
-
-trait WorkCounter: WorkCounterClone {
-    // TODO: consolidate with crate::util::statistics::counter::Counter;
-    fn start(&mut self);
-    fn stop(&mut self);
-    fn name(&self) -> &'static str;
-    fn get_base(&self) -> &WorkCounterBase;
-    fn get_base_mut(&mut self) -> &mut WorkCounterBase;
-}
-
-trait WorkCounterClone {
-    fn clone_box(&self) -> Box<dyn WorkCounter>;
-}
-
-impl<T: 'static + WorkCounter + Clone> WorkCounterClone for T {
-    fn clone_box(&self) -> Box<dyn WorkCounter> {
-        Box::new(self.clone())
-    }
-}
-
-impl Clone for Box<dyn WorkCounter> {
-    fn clone(&self) -> Box<dyn WorkCounter> {
-        self.clone_box()
-    }
-}
-
-#[derive(Copy, Clone)]
-struct WorkDuration {
-    base: WorkCounterBase,
-    start_value: Option<SystemTime>,
-    running: bool,
-}
-
-impl WorkDuration {
-    fn new() -> Self {
-        WorkDuration {
-            base: Default::default(),
-            start_value: None,
-            running: false,
-        }
-    }
-}
-
-impl WorkCounter for WorkDuration {
-    fn start(&mut self) {
-        self.start_value = Some(SystemTime::now());
-        self.running = true;
-    }
-
-    fn stop(&mut self) {
-        let duration = self.start_value.unwrap().elapsed().unwrap().as_nanos() as f64;
-        self.base.merge_val(duration);
-    }
-
-    fn name(&self) -> &'static str {
-        "time"
-    }
-
-    fn get_base(&self) -> &WorkCounterBase {
-        &self.base
-    }
-
-    fn get_base_mut(&mut self) -> &mut WorkCounterBase {
-        &mut self.base
-    }
 }
 
 impl SchedulerStat {
