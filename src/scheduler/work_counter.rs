@@ -21,7 +21,7 @@ pub(super) trait WorkCounter: WorkCounterClone {
     // TODO: consolidate with crate::util::statistics::counter::Counter;
     fn start(&mut self);
     fn stop(&mut self);
-    fn name(&self) -> &'static str;
+    fn name(&self) -> String;
     fn get_base(&self) -> &WorkCounterBase;
     fn get_base_mut(&mut self) -> &mut WorkCounterBase;
 }
@@ -91,8 +91,8 @@ impl WorkCounter for WorkDuration {
         self.base.merge_val(duration);
     }
 
-    fn name(&self) -> &'static str {
-        "time"
+    fn name(&self) -> String {
+        "time".to_owned()
     }
 
     fn get_base(&self) -> &WorkCounterBase {
