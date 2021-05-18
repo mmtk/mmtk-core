@@ -38,13 +38,13 @@ impl WorkCounterBase {
     fn merge_inplace(&mut self, other: &Self) {
         self.min = self.min.min(other.min);
         self.max = self.max.max(other.max);
-        self.total = self.total + other.total;
+        self.total += other.total;
     }
 
     fn merge_val(&mut self, val: f64) {
         self.min = self.min.min(val);
         self.max = self.max.max(val);
-        self.total = self.total + val;
+        self.total += val;
     }
 }
 
@@ -197,7 +197,7 @@ impl SchedulerStat {
             let vs = self
                 .work_counters
                 .entry(*id)
-                .or_insert(vec![vec![]; counters.len()]);
+                .or_insert_with(|| vec![vec![]; counters.len()]);
             for (v, c) in vs.iter_mut().zip(counters.iter()) {
                 v.push(c.clone());
             }
@@ -254,7 +254,7 @@ impl WorkerLocalStat {
         };
         self.work_counters
             .entry(work_id)
-            .or_insert(WorkerLocalStat::counter_set())
+            .or_insert_with(WorkerLocalStat::counter_set)
             .iter_mut()
             .for_each(|c| c.start());
         stat
