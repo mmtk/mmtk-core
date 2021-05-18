@@ -1,3 +1,4 @@
+use pfm::PerfEvent;
 use std::time::SystemTime;
 
 #[derive(Copy, Clone)]
@@ -99,6 +100,50 @@ impl WorkCounter for WorkDuration {
         &self.base
     }
 
+    fn get_base_mut(&mut self) -> &mut WorkCounterBase {
+        &mut self.base
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(super) struct WorkPerfEvent {
+    base: WorkCounterBase,
+    running: bool,
+    event_name: &'static str,
+    pe: PerfEvent,
+}
+
+impl WorkPerfEvent {
+    pub(super) fn new(name: &'static str) -> WorkPerfEvent {
+        let mut pe = PerfEvent::new(name).expect(&format!("Failed to create perf event {}", name));
+        pe.open().expect(&format!("Failed to open perf event {}", name));
+        WorkPerfEvent {
+            base: Default::default(),
+            running: false,
+            event_name: name,
+            pe,
+        }
+    }
+}
+
+impl WorkCounter for WorkPerfEvent {
+    fn start(&mut self) {
+        self.running = true;
+        self.pe.reset();
+        self.pe.enable();
+    }
+    fn stop(&mut self) {
+        self.running = true;
+        let perf_event_value = self.pe.read().unwrap();
+        self.base.merge_val(perf_event_value.value as f64);
+        self.pe.disable();
+    }
+    fn name(&self) -> String {
+        self.event_name.to_owned()
+    }
+    fn get_base(&self) -> &WorkCounterBase {
+        &self.base
+    }
     fn get_base_mut(&mut self) -> &mut WorkCounterBase {
         &mut self.base
     }

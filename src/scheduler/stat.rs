@@ -1,4 +1,4 @@
-use super::work_counter::{WorkCounter, WorkCounterBase, WorkDuration};
+use super::work_counter::{WorkCounter, WorkCounterBase, WorkDuration, WorkPerfEvent};
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -157,6 +157,11 @@ impl WorkerLocalStat {
     }
 
     fn counter_set() -> Vec<Box<dyn WorkCounter>> {
-        vec![Box::new(WorkDuration::new())]
+        let events = "PERF_COUNT_HW_CPU_CYCLES,PERF_COUNT_HW_INSTRUCTIONS,PERF_COUNT_HW_CACHE_REFERENCES,PERF_COUNT_HW_CACHE_MISSES,PERF_COUNT_HW_CACHE_L1D:MISS,PERF_COUNT_HW_CACHE_L1I:MISS";
+        let mut counters: Vec<Box<dyn WorkCounter>> = vec![Box::new(WorkDuration::new())];
+        for event in events.split(",") {
+            counters.push(Box::new(WorkPerfEvent::new(event)))
+        }
+        counters
     }
 }
