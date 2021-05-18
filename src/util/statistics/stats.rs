@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
-use pfm::Perfmon;
 
 pub const MAX_PHASES: usize = 1 << 12;
 pub const MAX_COUNTERS: usize = 100;
@@ -38,7 +37,6 @@ impl SharedStats {
 pub struct Stats {
     gc_count: AtomicUsize,
     total_time: Arc<Mutex<Timer>>,
-    perfmon: Perfmon,
 
     pub shared: Arc<SharedStats>,
     counters: Mutex<Vec<Arc<Mutex<dyn Counter + Send>>>>,
@@ -57,12 +55,9 @@ impl Stats {
             true,
             false,
         )));
-        let mut perfmon: Perfmon = Default::default();
-        perfmon.initialize().expect("Perfmon failed to initialize");
         Stats {
             gc_count: AtomicUsize::new(0),
             total_time: t.clone(),
-            perfmon,
 
             shared,
             counters: Mutex::new(vec![t]),
