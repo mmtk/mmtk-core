@@ -1,13 +1,76 @@
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 #[derive(Default)]
 pub struct SchedulerStat {
     work_id_name_map: HashMap<TypeId, &'static str>,
     work_counts: HashMap<TypeId, usize>,
-    work_durations: HashMap<TypeId, Vec<Duration>>,
+    work_durations: HashMap<TypeId, Vec<WorkDuration>>,
+}
+
+trait SimpleCounter {
+    // TODO: consolidate with crate::util::statistics::counter::Counter;
+    fn start(&mut self);
+    fn stop(&mut self);
+}
+
+#[derive(Copy, Clone)]
+struct WorkDuration {
+    total: f64,
+    min: f64,
+    max: f64,
+    start_value: Option<SystemTime>,
+    running: bool,
+}
+
+impl WorkDuration {
+    fn new() -> Self {
+        WorkDuration {
+            total: 0.0,
+            min: f64::INFINITY,
+            max: f64::NEG_INFINITY,
+            start_value: None,
+            running: false,
+        }
+    }
+
+    fn process_duration(&mut self, duration: f64) {
+        self.min = self.min.min(duration);
+        self.max = self.max.max(duration);
+        self.total = self.total + duration;
+    }
+
+    fn merge_duration(&self, other: &Self) -> Self {
+        let min = self.min.min(other.min);
+        let max = self.max.max(other.max);
+        let total = self.total + other.total;
+        WorkDuration {
+            total,
+            min,
+            max,
+            start_value: None,
+            running: false,
+        }
+    }
+
+    fn merge_duration_inplace(&mut self, other: &Self) {
+        self.min = self.min.min(other.min);
+        self.max = self.max.max(other.max);
+        self.total = self.total + other.total;
+    }
+}
+impl SimpleCounter for WorkDuration {
+    fn start(&mut self) {
+        self.start_value = Some(SystemTime::now());
+        self.running = true;
+    }
+
+    fn stop(&mut self) {
+        let duration = self.start_value.unwrap().elapsed().unwrap().as_nanos() as f64;
+        self.process_duration(duration);
+    }
 }
 
 impl SchedulerStat {
@@ -20,37 +83,6 @@ impl SchedulerStat {
             Some(start_index) => name[(start_index + 1)..end_index].to_owned(),
             _ => name,
         }
-    }
-
-    fn geomean(&self, values: &[f64]) -> f64 {
-        // Geomean(xs, N=xs.len()) = (PI(xs))^(1/N) = e^{log{PI(xs)^(1/N)}} = e^{ (1/N) * sum_{x \in xs}{ log(x) } }
-        let logs = values.iter().map(|v| v.ln());
-        let sum_logs = logs.sum::<f64>();
-        (sum_logs / values.len() as f64).exp()
-    }
-
-    fn min(&self, values: &[f64]) -> f64 {
-        let mut min = values[0];
-        for v in values {
-            if *v < min {
-                min = *v
-            }
-        }
-        min
-    }
-
-    fn max(&self, values: &[f64]) -> f64 {
-        let mut max = values[0];
-        for v in values {
-            if *v > max {
-                max = *v
-            }
-        }
-        max
-    }
-
-    fn sum(&self, values: &[f64]) -> f64 {
-        values.iter().sum()
     }
 
     pub fn harness_stat(&self) -> HashMap<String, String> {
@@ -67,51 +99,39 @@ impl SchedulerStat {
         }
         stat.insert("total-work.count".to_owned(), format!("{}", total_count));
         // Work execution times
-        let mut total_durations = vec![];
+        let mut duration_overall = WorkDuration::new();
         for (t, durations) in &self.work_durations {
-            for d in durations {
-                total_durations.push(*d);
-            }
             let n = self.work_id_name_map[t];
-            let geomean = self.geomean(
-                &durations
-                    .iter()
-                    .map(|d| d.as_nanos() as f64)
-                    .collect::<Vec<_>>(),
+            let fold = durations
+                .iter()
+                .fold(WorkDuration::new(), |acc, x| acc.merge_duration(x));
+            duration_overall.merge_duration_inplace(&fold);
+            stat.insert(
+                format!("work.{}.time.total", self.work_name(n)),
+                format!("{:.2}", fold.total),
             );
             stat.insert(
-                format!("work.{}.time.geomean", self.work_name(n)),
-                format!("{:.2}", geomean),
-            );
-            let sum = self.sum(
-                &durations
-                    .iter()
-                    .map(|d| d.as_nanos() as f64)
-                    .collect::<Vec<_>>(),
+                format!("work.{}.time.min", self.work_name(n)),
+                format!("{:.2}", fold.min),
             );
             stat.insert(
-                format!("work.{}.time.sum", self.work_name(n)),
-                format!("{:.2}", sum),
+                format!("work.{}.time.max", self.work_name(n)),
+                format!("{:.2}", fold.max),
             );
         }
-        let durations = total_durations
-            .iter()
-            .map(|d| d.as_nanos() as f64)
-            .collect::<Vec<_>>();
-        if !durations.is_empty() {
-            stat.insert(
-                "total-work.time.geomean".to_owned(),
-                format!("{:.2}", self.geomean(&durations)),
-            );
-            stat.insert(
-                "total-work.time.min".to_owned(),
-                format!("{:.2}", self.min(&durations)),
-            );
-            stat.insert(
-                "total-work.time.max".to_owned(),
-                format!("{:.2}", self.max(&durations)),
-            );
-        }
+
+        stat.insert(
+            "total-work.time.total".to_owned(),
+            format!("{:.2}", duration_overall.total),
+        );
+        stat.insert(
+            "total-work.time.min".to_owned(),
+            format!("{:.2}", duration_overall.min),
+        );
+        stat.insert(
+            "total-work.time.max".to_owned(),
+            format!("{:.2}", duration_overall.max),
+        );
 
         stat
     }
@@ -127,15 +147,11 @@ impl SchedulerStat {
                 self.work_counts.insert(*id, *count);
             }
         }
-        for (id, durations) in &stat.work_durations {
-            if self.work_durations.contains_key(id) {
-                let work_durations = self.work_durations.get_mut(id).unwrap();
-                for d in durations {
-                    work_durations.push(*d);
-                }
-            } else {
-                self.work_durations.insert(*id, durations.clone());
-            }
+        for (id, duration) in &stat.work_durations {
+            self.work_durations
+                .entry(*id)
+                .and_modify(|v| v.push(*duration))
+                .or_insert(vec![*duration]);
         }
     }
 }
@@ -143,7 +159,6 @@ impl SchedulerStat {
 pub struct WorkStat {
     type_id: TypeId,
     type_name: &'static str,
-    start_time: SystemTime,
 }
 
 impl WorkStat {
@@ -156,12 +171,10 @@ impl WorkStat {
             .work_id_name_map
             .insert(self.type_id, self.type_name);
         *worker_stat.work_counts.entry(self.type_id).or_insert(0) += 1;
-        let duration = self.start_time.elapsed().unwrap();
         worker_stat
             .work_durations
             .entry(self.type_id)
-            .or_insert_with(Vec::new)
-            .push(duration);
+            .and_modify(|v| v.stop());
     }
 }
 
@@ -169,7 +182,7 @@ impl WorkStat {
 pub struct WorkerLocalStat {
     work_id_name_map: HashMap<TypeId, &'static str>,
     work_counts: HashMap<TypeId, usize>,
-    work_durations: HashMap<TypeId, Vec<Duration>>,
+    work_durations: HashMap<TypeId, WorkDuration>,
     enabled: AtomicBool,
 }
 
@@ -184,10 +197,14 @@ impl WorkerLocalStat {
     }
     #[inline]
     pub fn measure_work(&mut self, work_id: TypeId, work_name: &'static str) -> WorkStat {
-        WorkStat {
+        let stat = WorkStat {
             type_id: work_id,
             type_name: work_name,
-            start_time: SystemTime::now(),
-        }
+        };
+        self.work_durations
+            .entry(work_id)
+            .or_insert(WorkDuration::new())
+            .start();
+        stat
     }
 }
