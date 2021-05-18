@@ -5,33 +5,26 @@ use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
 #[cfg(debug_assertions)]
 use crate::util::side_metadata::address_to_meta_address;
-use crate::util::side_metadata::load_atomic;
+use crate::util::side_metadata::{load, load_atomic};
 #[cfg(target_pointer_width = "32")]
 use crate::util::side_metadata::meta_bytes_per_chunk;
-use crate::util::side_metadata::store_atomic;
+use crate::util::side_metadata::{store, store_atomic};
 use crate::util::side_metadata::try_map_metadata_space;
 use crate::util::side_metadata::SideMetadataScope;
 use crate::util::side_metadata::SideMetadataSpec;
 #[cfg(target_pointer_width = "64")]
 use crate::util::side_metadata::{metadata_address_range_size, LOCAL_SIDE_METADATA_BASE_ADDRESS};
-#[cfg(not(feature = "chunk_hashset"))]
 use crate::util::side_metadata::GLOBAL_SIDE_METADATA_BASE_ADDRESS;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
-#[cfg(any(debug_assertions, feature = "chunk_hashset"))]
+#[cfg(debug_assertions)]
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(any(debug_assertions, feature = "chunk_hashset"))]
+#[cfg(debug_assertions)]
 use std::sync::RwLock;
 
-#[cfg(not(feature = "chunk_hashset"))]
 static FIRST_CHUNK: AtomicBool = AtomicBool::new(true);
-
-#[cfg(feature = "chunk_hashset")]
-lazy_static! {
-    pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
-}
 
 // We use the following hashset to assert if bits are set/unset properly in side metadata.
 #[cfg(debug_assertions)]
@@ -43,7 +36,7 @@ lazy_static! {
     pub static ref MARK_MAP: RwLock<HashSet<ObjectReference>> = RwLock::default();
 }
 
-#[cfg(all(target_pointer_width = "32", not(feature = "chunk_hashset")))]
+#[cfg(target_pointer_width = "32")]
 pub(super) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::Global,
     offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
@@ -71,19 +64,19 @@ pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
-// #[cfg(target_pointer_width = "32")]
-// pub(super) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-//     scope: SideMetadataScope::PolicySpecific,
-//     offset: MARKING_METADATA_SPEC.offset
-//         + meta_bytes_per_chunk(
-//             MARKING_METADATA_SPEC.log_min_obj_size,
-//             MARKING_METADATA_SPEC.log_num_of_bits,
-//         ),
-//     log_num_of_bits: 0,
-//     log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
-// };
+#[cfg(target_pointer_width = "32")]
+pub(super) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    scope: SideMetadataScope::PolicySpecific,
+    offset: MARKING_METADATA_SPEC.offset
+        + meta_bytes_per_chunk(
+            MARKING_METADATA_SPEC.log_min_obj_size,
+            MARKING_METADATA_SPEC.log_num_of_bits,
+        ),
+    log_num_of_bits: 3,
+    log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
+};
 
-#[cfg(all(target_pointer_width = "64", not(feature = "chunk_hashset")))]
+#[cfg(target_pointer_width = "64")]
 pub(super) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     scope: SideMetadataScope::Global,
     offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
@@ -107,39 +100,19 @@ pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
-// #[cfg(target_pointer_width = "64")]
-// pub(super) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-//     scope: SideMetadataScope::PolicySpecific,
-//     offset: MARKING_METADATA_SPEC.offset + metadata_address_range_size(MARKING_METADATA_SPEC),
-//     log_num_of_bits: 0,
-//     log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
-// };
-
-// lazy_static! {
-//     pub static ref MS_LOCAL_META_VEC: Vec<SideMetadataSpec> =
-//         vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC, ACTIVE_PAGE_METADATA_SPEC];
-// }
-
-// #[cfg(not(feature = "chunk_hashset"))]
-// lazy_static! {
-//     pub static ref MS_ACTIVE_CHUNK_MAP: Vec<SideMetadataSpec> = vec![ACTIVE_CHUNK_METADATA_SPEC];
-// }
+#[cfg(target_pointer_width = "64")]
+pub(super) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    scope: SideMetadataScope::PolicySpecific,
+    offset: MARKING_METADATA_SPEC.offset + metadata_address_range_size(MARKING_METADATA_SPEC),
+    log_num_of_bits: 3,
+    log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
+};
 
 pub fn is_meta_space_mapped(address: Address) -> bool {
     let chunk_start = conversions::chunk_align_down(address);
-
-    #[cfg(feature = "chunk_hashset")]
-    {
-        ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
-    }
-
-    #[cfg(not(feature = "chunk_hashset"))]
-    {
-        is_chunk_marked(chunk_start)
-    }
+    is_chunk_marked(chunk_start)
 }
 
-#[cfg(not(feature = "chunk_hashset"))]
 fn map_chunk_mark_space(chunk_start: Address) {
     if try_map_metadata_space(
         chunk_start - 2048 * BYTES_IN_CHUNK, // start
@@ -159,54 +132,30 @@ fn map_chunk_mark_space(chunk_start: Address) {
     );
 }
 
-pub fn map_meta_space_for_chunk(chunk_start: Address) {
-    #[cfg(feature = "chunk_hashset")]
-    {
-        let mut active_chunks = ACTIVE_CHUNKS.write().unwrap();
-        if active_chunks.contains(&chunk_start) {
-            return;
-        }
-        active_chunks.insert(chunk_start);
-        let mmap_metadata_result = try_map_metadata_space(
-            chunk_start,
-            BYTES_IN_CHUNK,
-            &[],
-            &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
-            // &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC, ACTIVE_PAGE_METADATA_SPEC],
-        );
-        debug_assert!(
-            mmap_metadata_result.is_ok(),
-            "mmap sidemetadata failed for chunk_start ({})",
-            chunk_start
-        );
+pub fn map_chunk_meta_space(chunk_start: Address) {
+    if FIRST_CHUNK.load(Ordering::Acquire) {
+        map_chunk_mark_space(chunk_start);
+        FIRST_CHUNK.store(false, Ordering::Release);
     }
 
-    #[cfg(not(feature = "chunk_hashset"))]
-    {
-        if FIRST_CHUNK.load(Ordering::Acquire) {
-            map_chunk_mark_space(chunk_start);
-            FIRST_CHUNK.store(false, Ordering::Release);
-        }
-
-        if is_chunk_marked(chunk_start) {
-            return;
-        }
-
-        set_chunk_mark_bit(chunk_start);
-        let mmap_metadata_result = try_map_metadata_space(
-            chunk_start,
-            BYTES_IN_CHUNK,
-            &[],
-            &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
-            // &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC, ACTIVE_PAGE_METADATA_SPEC],
-        );
-        trace!("set chunk mark bit for {}", chunk_start);
-        debug_assert!(
-            mmap_metadata_result.is_ok(),
-            "mmap sidemetadata failed for chunk_start ({})",
-            chunk_start
-        );
+    if is_chunk_marked(chunk_start) {
+        return;
     }
+
+    set_chunk_mark_bit(chunk_start);
+    let mmap_metadata_result = try_map_metadata_space(
+        chunk_start,
+        BYTES_IN_CHUNK,
+        &[],
+        // &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC]
+        &[ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC, ACTIVE_PAGE_METADATA_SPEC] // XXX: page-bit diff
+    );
+    trace!("set chunk mark bit for {}", chunk_start);
+    debug_assert!(
+        mmap_metadata_result.is_ok(),
+        "mmap sidemetadata failed for chunk_start ({})",
+        chunk_start
+    );
 }
 
 // Check if a given object was allocated by malloc
@@ -240,6 +189,10 @@ pub fn is_alloced_object(address: Address) -> bool {
     load_atomic(ALLOC_METADATA_SPEC, address) == 1
 }
 
+pub unsafe fn is_alloced_object_unsafe(address: Address) -> bool {
+    load(ALLOC_METADATA_SPEC, address) == 1
+}
+
 pub fn is_marked(object: ObjectReference) -> bool {
     #[cfg(debug_assertions)]
     if ASSERT_METADATA {
@@ -260,17 +213,28 @@ pub fn is_marked(object: ObjectReference) -> bool {
     load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1
 }
 
-// pub fn is_page_marked(page_address: Address) -> bool {
-//     load_atomic(ACTIVE_PAGE_METADATA_SPEC, page_address) == 1
-// }
+pub unsafe fn is_marked_unsafe(object: ObjectReference) -> bool {
+    load(MARKING_METADATA_SPEC, object.to_address()) == 1
+}
 
-#[cfg(not(feature = "chunk_hashset"))]
+pub fn is_page_marked(page_addr: Address) -> bool {
+    load_atomic(ACTIVE_PAGE_METADATA_SPEC, page_addr) == 1
+}
+
+pub unsafe fn is_page_marked_unsafe(page_addr: Address) -> bool {
+    load(ACTIVE_PAGE_METADATA_SPEC, page_addr) == 1
+}
+
 pub fn is_chunk_marked(chunk_start: Address) -> bool {
     if FIRST_CHUNK.load(Ordering::Relaxed) {
         return false; // if first chunk has not been mapped, then no chunk is marked
     }
 
     load_atomic(ACTIVE_CHUNK_METADATA_SPEC, chunk_start) == 1
+}
+
+pub unsafe fn is_chunk_marked_unsafe(chunk_start: Address) -> bool {
+    load(ACTIVE_CHUNK_METADATA_SPEC, chunk_start) == 1
 }
 
 pub fn set_alloc_bit(object: ObjectReference) {
@@ -286,6 +250,10 @@ pub fn set_alloc_bit(object: ObjectReference) {
     store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 1);
 }
 
+pub unsafe fn set_alloc_bit_unsafe(object: ObjectReference) {
+    store(ALLOC_METADATA_SPEC, object.to_address(), 1);
+}
+
 pub fn set_mark_bit(object: ObjectReference) {
     #[cfg(debug_assertions)]
     if ASSERT_METADATA {
@@ -299,13 +267,24 @@ pub fn set_mark_bit(object: ObjectReference) {
     store_atomic(MARKING_METADATA_SPEC, object.to_address(), 1);
 }
 
-// pub fn set_page_mark_bit(page_address: Address) {
-//     store_atomic(ACTIVE_PAGE_METADATA_SPEC, page_address, 1);
-// }
+pub unsafe fn set_mark_bit_unsafe(object: ObjectReference) {
+    store(MARKING_METADATA_SPEC, object.to_address(), 1);
+}
 
-#[cfg(not(feature = "chunk_hashset"))]
+pub fn set_page_mark_bit(page_addr: Address) {
+    store_atomic(ACTIVE_PAGE_METADATA_SPEC, page_addr, 1);
+}
+
+pub unsafe fn set_page_mark_bit_unsafe(page_addr: Address) {
+    store(ACTIVE_PAGE_METADATA_SPEC, page_addr, 1);
+}
+
 pub fn set_chunk_mark_bit(chunk_start: Address) {
     store_atomic(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 1);
+}
+
+pub unsafe fn set_chunk_mark_bit_unsafe(chunk_start: Address) {
+    store(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 1);
 }
 
 pub fn unset_alloc_bit(object: ObjectReference) {
@@ -321,6 +300,10 @@ pub fn unset_alloc_bit(object: ObjectReference) {
     store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 0);
 }
 
+pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
+    store(ALLOC_METADATA_SPEC, object.to_address(), 0);
+}
+
 pub fn unset_mark_bit(object: ObjectReference) {
     #[cfg(debug_assertions)]
     if ASSERT_METADATA {
@@ -334,11 +317,22 @@ pub fn unset_mark_bit(object: ObjectReference) {
     store_atomic(MARKING_METADATA_SPEC, object.to_address(), 0);
 }
 
-// pub fn unset_page_mark_bit(page_address: Address) {
-//     store_atomic(ACTIVE_PAGE_METADATA_SPEC, page_address, 0);
-// }
+pub unsafe fn unset_mark_bit_unsafe(object: ObjectReference) {
+    store(MARKING_METADATA_SPEC, object.to_address(), 0);
+}
 
-#[cfg(not(feature = "chunk_hashset"))]
+pub fn unset_page_mark_bit(page_addr: Address) {
+    store_atomic(ACTIVE_PAGE_METADATA_SPEC, page_addr, 0);
+}
+
+pub unsafe fn unset_page_mark_bit_unsafe(page_addr: Address) {
+    store(ACTIVE_PAGE_METADATA_SPEC, page_addr, 0);
+}
+
 pub fn unset_chunk_mark_bit(chunk_start: Address) {
     store_atomic(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 0);
+}
+
+pub unsafe fn unset_chunk_mark_bit_unsafe(chunk_start: Address) {
+    store(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 0);
 }
