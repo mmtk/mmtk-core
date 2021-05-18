@@ -7,20 +7,75 @@ use std::time::SystemTime;
 pub struct SchedulerStat {
     work_id_name_map: HashMap<TypeId, &'static str>,
     work_counts: HashMap<TypeId, usize>,
-    work_durations: HashMap<TypeId, Vec<WorkDuration>>,
+    work_counters: HashMap<TypeId, Vec<Vec<Box<dyn WorkCounter>>>>,
 }
 
-trait SimpleCounter {
+#[derive(Copy, Clone)]
+struct WorkCounterBase {
+    total: f64,
+    min: f64,
+    max: f64,
+}
+
+impl Default for WorkCounterBase {
+    fn default() -> Self {
+        WorkCounterBase {
+            total: 0.0,
+            min: f64::INFINITY,
+            max: f64::NEG_INFINITY,
+        }
+    }
+}
+
+impl WorkCounterBase {
+    fn merge(&self, other: &Self) -> Self {
+        let min = self.min.min(other.min);
+        let max = self.max.max(other.max);
+        let total = self.total + other.total;
+        WorkCounterBase { total, min, max }
+    }
+
+    fn merge_inplace(&mut self, other: &Self) {
+        self.min = self.min.min(other.min);
+        self.max = self.max.max(other.max);
+        self.total = self.total + other.total;
+    }
+
+    fn merge_val(&mut self, val: f64) {
+        self.min = self.min.min(val);
+        self.max = self.max.max(val);
+        self.total = self.total + val;
+    }
+}
+
+trait WorkCounter: WorkCounterClone {
     // TODO: consolidate with crate::util::statistics::counter::Counter;
     fn start(&mut self);
     fn stop(&mut self);
+    fn name(&self) -> &'static str;
+    fn get_base(&self) -> &WorkCounterBase;
+    fn get_base_mut(&mut self) -> &mut WorkCounterBase;
+}
+
+trait WorkCounterClone {
+    fn clone_box(&self) -> Box<dyn WorkCounter>;
+}
+
+impl<T: 'static + WorkCounter + Clone> WorkCounterClone for T {
+    fn clone_box(&self) -> Box<dyn WorkCounter> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn WorkCounter> {
+    fn clone(&self) -> Box<dyn WorkCounter> {
+        self.clone_box()
+    }
 }
 
 #[derive(Copy, Clone)]
 struct WorkDuration {
-    total: f64,
-    min: f64,
-    max: f64,
+    base: WorkCounterBase,
     start_value: Option<SystemTime>,
     running: bool,
 }
@@ -28,40 +83,14 @@ struct WorkDuration {
 impl WorkDuration {
     fn new() -> Self {
         WorkDuration {
-            total: 0.0,
-            min: f64::INFINITY,
-            max: f64::NEG_INFINITY,
+            base: Default::default(),
             start_value: None,
             running: false,
         }
-    }
-
-    fn process_duration(&mut self, duration: f64) {
-        self.min = self.min.min(duration);
-        self.max = self.max.max(duration);
-        self.total = self.total + duration;
-    }
-
-    fn merge_duration(&self, other: &Self) -> Self {
-        let min = self.min.min(other.min);
-        let max = self.max.max(other.max);
-        let total = self.total + other.total;
-        WorkDuration {
-            total,
-            min,
-            max,
-            start_value: None,
-            running: false,
-        }
-    }
-
-    fn merge_duration_inplace(&mut self, other: &Self) {
-        self.min = self.min.min(other.min);
-        self.max = self.max.max(other.max);
-        self.total = self.total + other.total;
     }
 }
-impl SimpleCounter for WorkDuration {
+
+impl WorkCounter for WorkDuration {
     fn start(&mut self) {
         self.start_value = Some(SystemTime::now());
         self.running = true;
@@ -69,7 +98,19 @@ impl SimpleCounter for WorkDuration {
 
     fn stop(&mut self) {
         let duration = self.start_value.unwrap().elapsed().unwrap().as_nanos() as f64;
-        self.process_duration(duration);
+        self.base.merge_val(duration);
+    }
+
+    fn name(&self) -> &'static str {
+        "time"
+    }
+
+    fn get_base(&self) -> &WorkCounterBase {
+        &self.base
+    }
+
+    fn get_base_mut(&mut self) -> &mut WorkCounterBase {
+        &mut self.base
     }
 }
 
@@ -99,25 +140,30 @@ impl SchedulerStat {
         }
         stat.insert("total-work.count".to_owned(), format!("{}", total_count));
         // Work execution times
-        let mut duration_overall = WorkDuration::new();
-        for (t, durations) in &self.work_durations {
+        let mut duration_overall: WorkCounterBase = Default::default();
+        for (t, vs) in &self.work_counters {
             let n = self.work_id_name_map[t];
-            let fold = durations
-                .iter()
-                .fold(WorkDuration::new(), |acc, x| acc.merge_duration(x));
-            duration_overall.merge_duration_inplace(&fold);
-            stat.insert(
-                format!("work.{}.time.total", self.work_name(n)),
-                format!("{:.2}", fold.total),
-            );
-            stat.insert(
-                format!("work.{}.time.min", self.work_name(n)),
-                format!("{:.2}", fold.min),
-            );
-            stat.insert(
-                format!("work.{}.time.max", self.work_name(n)),
-                format!("{:.2}", fold.max),
-            );
+            for v in vs.iter() {
+                let fold = v
+                    .iter()
+                    .fold(Default::default(), |acc: WorkCounterBase, x| {
+                        acc.merge(x.get_base())
+                    });
+                duration_overall.merge_inplace(&fold);
+                let name = v.first().unwrap().name();
+                stat.insert(
+                    format!("work.{}.{}.total", self.work_name(n), name),
+                    format!("{:.2}", fold.total),
+                );
+                stat.insert(
+                    format!("work.{}.{}.min", self.work_name(n), name),
+                    format!("{:.2}", fold.min),
+                );
+                stat.insert(
+                    format!("work.{}.{}.max", self.work_name(n), name),
+                    format!("{:.2}", fold.max),
+                );
+            }
         }
 
         stat.insert(
@@ -147,11 +193,14 @@ impl SchedulerStat {
                 self.work_counts.insert(*id, *count);
             }
         }
-        for (id, duration) in &stat.work_durations {
-            self.work_durations
+        for (id, counters) in &stat.work_counters {
+            let vs = self
+                .work_counters
                 .entry(*id)
-                .and_modify(|v| v.push(*duration))
-                .or_insert(vec![*duration]);
+                .or_insert(vec![vec![]; counters.len()]);
+            for (v, c) in vs.iter_mut().zip(counters.iter()) {
+                v.push(c.clone());
+            }
         }
     }
 }
@@ -172,9 +221,11 @@ impl WorkStat {
             .insert(self.type_id, self.type_name);
         *worker_stat.work_counts.entry(self.type_id).or_insert(0) += 1;
         worker_stat
-            .work_durations
+            .work_counters
             .entry(self.type_id)
-            .and_modify(|v| v.stop());
+            .and_modify(|v| {
+                v.iter_mut().for_each(|c| c.stop());
+            });
     }
 }
 
@@ -182,7 +233,7 @@ impl WorkStat {
 pub struct WorkerLocalStat {
     work_id_name_map: HashMap<TypeId, &'static str>,
     work_counts: HashMap<TypeId, usize>,
-    work_durations: HashMap<TypeId, WorkDuration>,
+    work_counters: HashMap<TypeId, Vec<Box<dyn WorkCounter>>>,
     enabled: AtomicBool,
 }
 
@@ -201,10 +252,15 @@ impl WorkerLocalStat {
             type_id: work_id,
             type_name: work_name,
         };
-        self.work_durations
+        self.work_counters
             .entry(work_id)
-            .or_insert(WorkDuration::new())
-            .start();
+            .or_insert(WorkerLocalStat::counter_set())
+            .iter_mut()
+            .for_each(|c| c.start());
         stat
+    }
+
+    fn counter_set() -> Vec<Box<dyn WorkCounter>> {
+        vec![Box::new(WorkDuration::new())]
     }
 }
