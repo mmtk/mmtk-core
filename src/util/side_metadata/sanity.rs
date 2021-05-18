@@ -10,6 +10,7 @@ use crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 
+/// An internal enum to enhance code style for add/sub
 #[cfg(feature = "extreme_assertions")]
 enum MathOp {
     Add,
@@ -17,10 +18,20 @@ enum MathOp {
 }
 
 lazy_static! {
+    /// This is a two-level hashmap to store the metadata information for verification purposes.
+    /// It keeps a map from side metadata specifications to a second hashmap
+    /// which maps data addresses to their current metadata content.
     static ref SANITY_MAP: RwLock<HashMap<SideMetadataSpec, HashMap<Address, usize>>> =
         RwLock::new(HashMap::new());
 }
 
+/// Checks whether the input global specifications fit within the current upper bound for all global metadata (limited by `side_metadata::constants::LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO`).
+///
+/// Returns `Ok` if all global specs fit and `Err` otherwise.
+///
+/// Arguments:
+/// * `g_specs`: a slice of global specs to be checked.
+///
 fn verify_global_specs_total_size(g_specs: &[SideMetadataSpec]) -> Result<()> {
     let mut total_size = 0usize;
     for spec in g_specs {
@@ -37,6 +48,13 @@ fn verify_global_specs_total_size(g_specs: &[SideMetadataSpec]) -> Result<()> {
     }
 }
 
+/// (For 64-bits targets) Checks whether the input local specifications fit within the current upper bound for each local metadata (limited for each local metadata by `side_metadata::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO`).
+///
+/// Returns `Ok` if all local specs fit and `Err` otherwise.
+///
+/// Arguments:
+/// * `l_specs`: a slice of local specs to be checked.
+///
 #[cfg(target_pointer_width = "64")]
 fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
     for spec in l_specs {
@@ -53,6 +71,13 @@ fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
     Ok(())
 }
 
+/// (For 32-bits targets) Checks whether the input local specifications fit within the current upper bound for all chunked local metadata (limited for all chunked local metadata by `side_metadata::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO`).
+///
+/// Returns `Ok` if all local specs fit and `Err` otherwise.
+///
+/// Arguments:
+/// * `l_specs`: a slice of local specs to be checked.
+///
 #[cfg(target_pointer_width = "32")]
 fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
     let mut total_size = 0usize;
@@ -70,6 +95,14 @@ fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
     Ok(())
 }
 
+/// (For contiguous metadata) Checks whether two input specifications overlap, considering their offsets and maximum size.
+///
+/// Returns `Err` if overlap is detected.
+///
+/// Arguments:
+/// * `spec_1`: first target specification
+/// * `spec_2`: second target specification
+///
 fn verify_no_overlap_contiguous(
     spec_1: &SideMetadataSpec,
     spec_2: &SideMetadataSpec,
@@ -89,6 +122,14 @@ fn verify_no_overlap_contiguous(
     Ok(())
 }
 
+/// (For chunked metadata) Checks whether two input specifications overlap, considering their offsets and maximum per-chunk size.
+///
+/// Returns `Err` if overlap is detected.
+///
+/// Arguments:
+/// * `spec_1`: first target specification
+/// * `spec_2`: second target specification
+///
 #[cfg(target_pointer_width = "32")]
 fn verify_no_overlap_chunked(spec_1: &SideMetadataSpec, spec_2: &SideMetadataSpec) -> Result<()> {
     let end_1 = spec_1.offset
@@ -108,6 +149,13 @@ fn verify_no_overlap_chunked(spec_1: &SideMetadataSpec, spec_2: &SideMetadataSpe
     Ok(())
 }
 
+/// Checks whether a slice of global specifications fit within the memory limits and don't overlap.
+///
+/// Returns `Ok` if no issue is detected, or otherwise an `Err` explaining the issue.
+///
+/// Arguments:
+/// * `g_specs`: the slice of global specifications to be checked
+///
 fn verify_global_specs(g_specs: &[SideMetadataSpec]) -> Result<()> {
     let v = verify_global_specs_total_size(g_specs);
     if v.is_err() {
