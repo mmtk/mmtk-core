@@ -187,7 +187,7 @@ mod tests {
             let res = std::panic::catch_unwind(|| {
                 let options = Options::default();
                 assert_eq!(options.stress_factor, 4096);
-                assert_eq!(options.vm_space, false);
+                assert!(!options.vm_space);
             });
             assert!(res.is_ok());
 
