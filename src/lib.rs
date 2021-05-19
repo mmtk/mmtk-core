@@ -12,11 +12,6 @@
 #![feature(associated_type_defaults)]
 #![feature(specialization)]
 #![feature(trait_alias)]
-// Clippy favors assert!(a) rather than assert_eq!(a, true).
-// Yi: I do not completely agree with this. Sometimes, assert_eq!() is clearer
-// the original value and the expected value, especially when the expression a is long.
-// Currently we allow this pattern.
-#![allow(clippy::bool_assert_comparison)]
 // TODO: We should fix missing docs for public items and turn this on (Issue #309).
 // #![deny(missing_docs)]
 
