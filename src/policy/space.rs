@@ -482,7 +482,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             head_discontiguous_region: unsafe { Address::zero() },
             vm_map,
             mmapper,
-            metadata: SideMetadata::new(opt.side_metadata_specs),
+            metadata: SideMetadata::new(opt.name, opt.side_metadata_specs),
             p: PhantomData,
         };
 

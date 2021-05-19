@@ -209,10 +209,13 @@ mod tests {
     const MAX_SIZE: usize = BYTE_MAP_MMAPPER_TEST_REGION.size;
 
     lazy_static! {
-        static ref NO_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext {
-            global: vec![],
-            local: vec![]
-        });
+        static ref NO_METADATA: SideMetadata = SideMetadata::new(
+            "NO_METADATA",
+            SideMetadataContext {
+                global: vec![],
+                local: vec![]
+            }
+        );
     }
 
     #[test]

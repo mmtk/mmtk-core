@@ -74,8 +74,8 @@ pub struct SideMetadata {
 }
 
 impl SideMetadata {
-    pub fn new(context: SideMetadataContext) -> SideMetadata {
-        sanity::verify_metadata_context(&context);
+    pub fn new(_policy_name: &'static str, context: SideMetadataContext) -> SideMetadata {
+        sanity::verify_metadata_context(_policy_name, &context);
 
         Self {
             context,

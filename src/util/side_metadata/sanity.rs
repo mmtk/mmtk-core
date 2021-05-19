@@ -17,11 +17,20 @@ enum MathOp {
     Sub,
 }
 
+/// An internal str used as a name for global side metadata
+/// (policy-specific metadata is named after the policy who own it)
+static GLOBAL_META_NAME: &str = "Global";
+
 lazy_static! {
+    /// This is a hashmap to store the metadata specs information for policy-specific and global metadata.
+    /// It uses policy name (or GLOBAL_META_NAME for globals) as the key and keeps a vector of specs as the value.
+    /// This needs to be replicated (e.g. transformed to vector/hashmap) to support multiple mmtk instances.
+    static ref SPECS_SANITY_MAP: RwLock<HashMap<&'static str, Vec<SideMetadataSpec>>> =
+        RwLock::new(HashMap::new());
     /// This is a two-level hashmap to store the metadata information for verification purposes.
     /// It keeps a map from side metadata specifications to a second hashmap
     /// which maps data addresses to their current metadata content.
-    static ref SANITY_MAP: RwLock<HashMap<SideMetadataSpec, HashMap<Address, usize>>> =
+    static ref CONTENT_SANITY_MAP: RwLock<HashMap<SideMetadataSpec, HashMap<Address, usize>>> =
         RwLock::new(HashMap::new());
 }
 
@@ -176,18 +185,31 @@ fn verify_global_specs(g_specs: &[SideMetadataSpec]) -> Result<()> {
     Ok(())
 }
 
+/// Returns all global or policy-specific specs based-on the input argument.
+///
+/// Returns a vector of globals if `global` is true and a vector of locals otherwise.
+///
+/// Arguments:
+/// * `global`: a boolean to show whether global (`true`) or policy-specific (`false`) specs are required.
+///
 fn get_all_specs(global: bool) -> Vec<SideMetadataSpec> {
     let mut specs = vec![];
-    let idx_map = SANITY_MAP.read().unwrap();
-    for (k, _) in idx_map.iter() {
-        if !(global ^ k.scope.is_global()) {
-            specs.push(*k);
+    let spec_map = SPECS_SANITY_MAP.read().unwrap();
+    for (k, v) in spec_map.iter() {
+        if !(global ^ (*k == GLOBAL_META_NAME)) {
+            specs.append(&mut (*v).clone());
         }
     }
 
     specs
 }
 
+/// Verifies that all local side metadata specs:
+/// 1 - are not too big,
+/// 2 - do not overlap.
+///
+/// Returns `Ok(())` if no issue is detected, or `Err` otherwise.
+///
 fn verify_local_specs() -> Result<()> {
     let local_specs = get_all_specs(false);
 
@@ -212,70 +234,115 @@ fn verify_local_specs() -> Result<()> {
     Ok(())
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub fn reset() {
-    let mut sanity_map = SANITY_MAP.write().unwrap();
-    sanity_map.clear();
+    let mut specs_sanity_map = SPECS_SANITY_MAP.write().unwrap();
+    let mut content_sanity_map = CONTENT_SANITY_MAP.write().unwrap();
+    specs_sanity_map.clear();
+    content_sanity_map.clear();
 }
 
-pub fn verify_metadata_context(metadata_context: &SideMetadataContext) {
-    // global metadata combination is the same for all contexts
-    verify_global_specs(&metadata_context.global).unwrap();
+/// Ensures that a metadata context does not have any issues.
+/// Panics with a suitable message if any issue is detected.
+/// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.
+///
+/// This function is called once per space but may be called multiple times per policy. Hence, policy name is needed as an argument to differentiate this case from potential errors.
+///
+/// Arguments:
+/// * `policy_name`: name of the policy of the calling space
+/// * `metadata_context`: the metadata context to examine
+///
+pub fn verify_metadata_context(policy_name: &'static str, metadata_context: &SideMetadataContext) {
+    let mut specs_sanity_map = SPECS_SANITY_MAP.write().unwrap();
+    let mut content_sanity_map = CONTENT_SANITY_MAP.write().unwrap();
 
-    // assert not initialised before
-    let mut sanity_map = SANITY_MAP.write().unwrap();
+    // is this the first call of this function?
+    let first_call = !specs_sanity_map.contains_key(&GLOBAL_META_NAME);
 
-    let global_count = metadata_context.global.len();
-    let local_count = metadata_context.local.len();
+    if first_call {
+        // global metadata combination is the same for all contexts
+        verify_global_specs(&metadata_context.global).unwrap();
+        specs_sanity_map.insert(GLOBAL_META_NAME, metadata_context.global.clone());
+    } else {
+        // make sure the global metadata in the current context has the same length as before
+        let g_specs = specs_sanity_map.get(&GLOBAL_META_NAME).unwrap();
+        assert!(
+            g_specs.len() == metadata_context.global.len(),
+            "Global metadata must not change between policies! NEW SPECS: {:#?} OLD SPECS: {:#?}",
+            metadata_context.global,
+            g_specs
+        );
+    }
 
-    // println!("check_metadata_context.g({}).l({})", global_count, local_count);
-
-    let cur_total_count = sanity_map.len();
-    let first_call = cur_total_count == 0;
-
-    for i in 0..global_count {
-        let spec = metadata_context.global[i];
+    for spec in &metadata_context.global {
+        // Make sure all input global specs are actually global
         if !spec.scope.is_global() {
             panic!(
                 "Policy-specific spec {:#?} detected in the global specs: {:#?}",
                 spec, metadata_context.global
             );
         }
+        // On the first call to the function, initialise the content sanity map, and
+        // on the future calls, checks the global metadata specs have not changed
         if first_call {
             // initialise the related hashmap
-            sanity_map.insert(spec, HashMap::new());
-        } else if !sanity_map.contains_key(&spec) {
+            content_sanity_map.insert(*spec, HashMap::new());
+        } else if !specs_sanity_map
+            .get(&GLOBAL_META_NAME)
+            .unwrap()
+            .contains(&spec)
+        {
             panic!("Global metadata must not change between policies! NEW SPEC: {:#?} OLD SPECS: {:#?}", spec, get_all_specs(true));
         }
     }
 
-    for i in 0..local_count {
-        let spec = metadata_context.local[i];
+    // Is this the first time this function is called by any space of a policy?
+    let first_call = !specs_sanity_map.contains_key(&policy_name);
+
+    if first_call {
+        specs_sanity_map.insert(policy_name, metadata_context.local.clone());
+    }
+
+    for spec in &metadata_context.local {
+        // Make sure all input local specs are actually local
         if spec.scope.is_global() {
             panic!(
                 "Global spec {:#?} detected in the policy-specific specs: {:#?}",
                 spec, metadata_context.local
             );
         }
-        if !sanity_map.contains_key(&spec) {
+        // The first call from each policy inserts the relevant (spec, hashmap) pair.
+        // Future calls only check that the metadata specs have not changed.
+        // This should work with multi mmtk instances, because the local side metadata specs are assumed to be constant per policy.
+        if first_call {
             // initialise the related hashmap
-            sanity_map.insert(spec, HashMap::new());
-        } else {
+            content_sanity_map.insert(*spec, HashMap::new());
+        } else if !specs_sanity_map.get(policy_name).unwrap().contains(&spec) {
             panic!(
-                "Policy-specific metadata spec is already in use:\n{:#?}",
-                spec
+                "Policy-specific metadata for -{}- changed from {:#?} to {:#?}",
+                policy_name,
+                specs_sanity_map.get(policy_name).unwrap(),
+                metadata_context.local
             )
         }
     }
 
-    drop(sanity_map);
+    drop(specs_sanity_map);
 
     verify_local_specs().unwrap();
 }
 
+/// Commits a side metadata bulk zero operation.
+/// Panics if the metadata spec is not valid.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to perform the bulk zeroing on
+/// * `start`: the starting address of the source data
+/// * `size`: size of the source data
+///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_bzero(metadata_spec: SideMetadataSpec, start: Address, size: usize) {
-    let sanity_map = &mut SANITY_MAP.write().unwrap();
+    let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
             // remove entries where the key (data_addr) is in the range (start, start+size)
@@ -287,10 +354,20 @@ pub fn verify_bzero(metadata_spec: SideMetadataSpec, start: Address, size: usize
     }
 }
 
+/// Ensures a side metadata load operation returns the correct side metadata content.
+/// Panics if:
+/// 1 - the metadata spec is not valid,
+/// 2 - data address is not valid,
+/// 3 - the loaded side metadata content is not equal to the correct content.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to verify the loaded content for
+/// * `data_addr`: the address of the source data
+/// * `actual_val`: the actual content returned by the side metadata load operation
+///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_val: usize) {
-    println!("load({}, {})", metadata_spec.offset, data_addr);
-    let sanity_map = &mut SANITY_MAP.read().unwrap();
+    let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
     match sanity_map.get(&metadata_spec) {
         Some(spec_sanity_map) => {
             match spec_sanity_map.get(&data_addr) {
@@ -310,13 +387,18 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
     }
 }
 
+/// Commits a side metadata store operation.
+/// Panics if:
+/// 1 - the loaded side metadata content is not equal to the correct content.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to commit the store operation for
+/// * `data_addr`: the address of the source data
+/// * `metadata`: the metadata content to store
+///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
-    println!(
-        "store({}, {}, {})",
-        metadata_spec.offset, data_addr, metadata
-    );
-    let sanity_map = &mut SANITY_MAP.write().unwrap();
+    let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
             let content = spec_sanity_map.entry(data_addr).or_insert(0);
@@ -326,6 +408,7 @@ pub fn verify_store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
     }
 }
 
+/// A helper function encapsulating the common parts of addition and subtraction
 #[cfg(feature = "extreme_assertions")]
 fn do_math(
     metadata_spec: SideMetadataSpec,
@@ -333,7 +416,7 @@ fn do_math(
     val: usize,
     math_op: MathOp,
 ) -> Result<usize> {
-    let sanity_map = &mut SANITY_MAP.write().unwrap();
+    let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
             let cur_val = spec_sanity_map.entry(data_addr).or_insert(0);
@@ -351,6 +434,17 @@ fn do_math(
     }
 }
 
+/// Commits a fetch and add operation and ensures it returns the correct old side metadata content.
+/// Panics if:
+/// 1 - the metadata spec is not valid,
+/// 2 - the old side metadata content is not equal to the correct old content.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to verify the old content for
+/// * `data_addr`: the address of the source data
+/// * `val_to_add`: the number to be added to the old content
+/// * `actual_old_val`: the actual old content returned by the side metadata fetch and add operation
+///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_add(
     metadata_spec: SideMetadataSpec,
@@ -371,6 +465,17 @@ pub fn verify_add(
     }
 }
 
+/// Commits a fetch and sub operation and ensures it returns the correct old side metadata content.
+/// Panics if:
+/// 1 - the metadata spec is not valid,
+/// 2 - the old side metadata content is not equal to the correct old content.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to verify the old content for
+/// * `data_addr`: the address of the source data
+/// * `val_to_sub`: the number to be subtracted from the old content
+/// * `actual_old_val`: the actual old content returned by the side metadata fetch and sub operation
+///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_sub(
     metadata_spec: SideMetadataSpec,

@@ -172,6 +172,8 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
+                    // We need to do this because of the static NO_METADATA
+                    sanity::reset();
                     let mut gspec = SideMetadataSpec {
                         scope: SideMetadataScope::Global,
                         offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
@@ -193,10 +195,13 @@ mod tests {
                         log_min_obj_size: 1,
                     };
 
-                    let metadata = SideMetadata::new(SideMetadataContext {
-                        global: vec![gspec],
-                        local: vec![lspec],
-                    });
+                    let metadata = SideMetadata::new(
+                        "NoPolicy",
+                        SideMetadataContext {
+                            global: vec![gspec],
+                            local: vec![lspec],
+                        },
+                    );
 
                     assert!(metadata
                         .try_map_metadata_space(
@@ -228,10 +233,13 @@ mod tests {
 
                     sanity::reset();
 
-                    let metadata = SideMetadata::new(SideMetadataContext {
-                        global: vec![gspec],
-                        local: vec![lspec],
-                    });
+                    let metadata = SideMetadata::new(
+                        "NoPolicy",
+                        SideMetadataContext {
+                            global: vec![gspec],
+                            local: vec![lspec],
+                        },
+                    );
 
                     assert!(metadata
                         .try_map_metadata_space(
@@ -276,6 +284,8 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
+                    // We need to do this because of the static NO_METADATA
+                    sanity::reset();
                     let data_addr = vm_layout_constants::HEAP_START;
 
                     let metadata_1_spec = SideMetadataSpec {
@@ -293,10 +303,13 @@ mod tests {
                         log_min_obj_size: 7,
                     };
 
-                    let metadata = SideMetadata::new(SideMetadataContext {
-                        global: vec![metadata_1_spec, metadata_2_spec],
-                        local: vec![],
-                    });
+                    let metadata = SideMetadata::new(
+                        "NoPolicy",
+                        SideMetadataContext {
+                            global: vec![metadata_1_spec, metadata_2_spec],
+                            local: vec![],
+                        },
+                    );
 
                     assert!(metadata
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
@@ -340,6 +353,8 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
+                    // We need to do this because of the static NO_METADATA
+                    sanity::reset();
                     let data_addr = vm_layout_constants::HEAP_START
                         + (vm_layout_constants::BYTES_IN_CHUNK << 1);
 
@@ -350,10 +365,13 @@ mod tests {
                         log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
                     };
 
-                    let metadata = SideMetadata::new(SideMetadataContext {
-                        global: vec![metadata_1_spec],
-                        local: vec![],
-                    });
+                    let metadata = SideMetadata::new(
+                        "NoPolicy",
+                        SideMetadataContext {
+                            global: vec![metadata_1_spec],
+                            local: vec![],
+                        },
+                    );
 
                     assert!(metadata
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
@@ -385,6 +403,8 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
+                    // We need to do this because of the static NO_METADATA
+                    sanity::reset();
                     let data_addr = vm_layout_constants::HEAP_START
                         + (vm_layout_constants::BYTES_IN_CHUNK << 2);
 
@@ -423,10 +443,13 @@ mod tests {
                         log_min_obj_size: 7,
                     };
 
-                    let metadata = SideMetadata::new(SideMetadataContext {
-                        global: vec![],
-                        local: vec![metadata_1_spec, metadata_2_spec],
-                    });
+                    let metadata = SideMetadata::new(
+                        "NoPolicy",
+                        SideMetadataContext {
+                            global: vec![],
+                            local: vec![metadata_1_spec, metadata_2_spec],
+                        },
+                    );
 
                     assert!(metadata
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)

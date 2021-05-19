@@ -136,10 +136,13 @@ impl<VM: VMBinding> MallocSpace<VM> {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
-            metadata: SideMetadata::new(SideMetadataContext {
-                global: global_side_metadata_specs,
-                local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
-            }),
+            metadata: SideMetadata::new(
+                "MallocSpace",
+                SideMetadataContext {
+                    global: global_side_metadata_specs,
+                    local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
+                },
+            ),
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
         }

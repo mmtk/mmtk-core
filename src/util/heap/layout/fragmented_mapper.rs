@@ -348,10 +348,13 @@ mod tests {
     const MAX_BYTES: usize = FRAGMENTED_MMAPPER_TEST_REGION.size;
 
     lazy_static! {
-        static ref NO_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext {
-            global: vec![],
-            local: vec![]
-        });
+        static ref NO_METADATA: SideMetadata = SideMetadata::new(
+            "NO_METADATA",
+            SideMetadataContext {
+                global: vec![],
+                local: vec![]
+            }
+        );
     }
 
     fn pages_to_chunks_up(pages: usize) -> usize {
