@@ -148,11 +148,13 @@ impl WorkerLocalStat {
             type_id: work_id,
             type_name: work_name,
         };
-        self.work_counters
-            .entry(work_id)
-            .or_insert_with(WorkerLocalStat::counter_set)
-            .iter_mut()
-            .for_each(|c| c.start());
+        if self.is_enabled() {
+            self.work_counters
+                .entry(work_id)
+                .or_insert_with(WorkerLocalStat::counter_set)
+                .iter_mut()
+                .for_each(|c| c.start());
+        }
         stat
     }
 
