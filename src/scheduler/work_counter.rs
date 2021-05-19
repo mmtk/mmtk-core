@@ -1,5 +1,6 @@
 use pfm::PerfEvent;
 use std::time::SystemTime;
+use std::fmt;
 
 #[derive(Copy, Clone, Debug)]
 pub(super) struct WorkCounterBase {
@@ -123,6 +124,16 @@ impl WorkPerfEvent {
             event_name: name,
             pe,
         }
+    }
+}
+
+impl fmt::Debug for WorkPerfEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WorkPerfEvent")
+         .field("base", &self.base)
+         .field("running", &self.running)
+         .field("event_name", &self.event_name)
+         .finish()
     }
 }
 
