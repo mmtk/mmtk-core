@@ -147,6 +147,8 @@ impl WorkCounter for WorkPerfEvent {
         self.running = true;
         let perf_event_value = self.pe.read().unwrap();
         self.base.merge_val(perf_event_value.value as f64);
+        // assert not multiplexing
+        assert_eq!(perf_event_value.time_enabled, perf_event_value.time_running);
         self.pe.disable();
     }
     fn name(&self) -> String {
