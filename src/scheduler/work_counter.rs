@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(super) struct WorkCounterBase {
     pub(super) total: f64,
     pub(super) min: f64,
@@ -17,7 +17,7 @@ impl<T: 'static + WorkCounter + Clone> WorkCounterClone for T {
     }
 }
 
-pub(super) trait WorkCounter: WorkCounterClone {
+pub(super) trait WorkCounter: WorkCounterClone + std::fmt::Debug {
     // TODO: consolidate with crate::util::statistics::counter::Counter;
     fn start(&mut self);
     fn stop(&mut self);
@@ -63,7 +63,7 @@ impl WorkCounterBase {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(super) struct WorkDuration {
     base: WorkCounterBase,
     start_value: Option<SystemTime>,
