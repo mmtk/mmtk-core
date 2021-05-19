@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["mmtk"] = [{"text":"impl&lt;'a, VM:&nbsp;VMBinding&gt; Iterator for SynchronizedMutatorIterator&lt;'a, VM&gt;","synthetic":false,"types":[]}];
+implementors["mmtk"] = [{"text":"impl&lt;'a, VM:&nbsp;<a class=\"trait\" href=\"mmtk/vm/trait.VMBinding.html\" title=\"trait mmtk::vm::VMBinding\">VMBinding</a>&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/iter/traits/iterator/trait.Iterator.html\" title=\"trait core::iter::traits::iterator::Iterator\">Iterator</a> for <a class=\"struct\" href=\"mmtk/vm/active_plan/struct.SynchronizedMutatorIterator.html\" title=\"struct mmtk::vm::active_plan::SynchronizedMutatorIterator\">SynchronizedMutatorIterator</a>&lt;'a, VM&gt;","synthetic":false,"types":["mmtk::vm::active_plan::SynchronizedMutatorIterator"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

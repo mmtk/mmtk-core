@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/layout/map64.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>map64.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/layout/map64.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>map64.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../../mmtk/index.html'><div class='logo-container rust-logo'><img src='../../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../../../settings.html"><img src="../../../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../../../mmtk/index.html'><div class='logo-container rust-logo'><img src='../../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../../../settings.html"><img src="../../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -242,18 +242,18 @@
 <span id="239">239</span>
 <span id="240">240</span>
 <span id="241">241</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">map</span>::<span class="ident">Map</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">generic_freelist</span>::<span class="ident">GenericFreeList</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">freelistpageresource</span>::<span class="ident">CommonFreeListPageResource</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_parameters</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">space_descriptor</span>::<span class="ident">SpaceDescriptor</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">raw_memory_freelist</span>::<span class="ident">RawMemoryFreeList</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
+</pre><pre class="rust">
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::map::Map</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::conversions</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::generic_freelist::GenericFreeList</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::freelistpageresource::CommonFreeListPageResource</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::heap_parameters</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::space_descriptor::SpaceDescriptor</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::raw_memory_freelist::RawMemoryFreeList</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::Address</span>;
+<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 
 <span class="kw">const</span> <span class="ident">NON_MAP_FRACTION</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="number">1.0</span> <span class="op">-</span> <span class="number">8.0</span> <span class="op">/</span> <span class="number">4096.0</span>;
 
@@ -276,37 +276,37 @@
     <span class="kw">type</span> <span class="ident">FreeList</span> <span class="op">=</span> <span class="ident">RawMemoryFreeList</span>;
 
     <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">high_water</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Address</span>::<span class="ident">ZERO</span>; <span class="ident">MAX_SPACES</span>];
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">base_address</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Address</span>::<span class="ident">ZERO</span>; <span class="ident">MAX_SPACES</span>];
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">high_water</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Address::ZERO</span>; <span class="ident">MAX_SPACES</span>];
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">base_address</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Address::ZERO</span>; <span class="ident">MAX_SPACES</span>];
 
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">MAX_SPACES</span> {
-            <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">from_usize</span>(<span class="ident">i</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_SPACE_SIZE_64</span>) };
+            <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">i</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_SPACE_SIZE_64</span>) };
             <span class="ident">high_water</span>[<span class="ident">i</span>] <span class="op">=</span> <span class="ident">base</span>;
             <span class="ident">base_address</span>[<span class="ident">i</span>] <span class="op">=</span> <span class="ident">base</span>;
         }
 
         <span class="self">Self</span> {
-            <span class="ident">descriptor_map</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SpaceDescriptor</span>::<span class="ident">UNINITIALIZED</span>; <span class="ident">MAX_CHUNKS</span>],
+            <span class="ident">descriptor_map</span>: <span class="macro">vec!</span>[<span class="ident">SpaceDescriptor::UNINITIALIZED</span>; <span class="ident">MAX_CHUNKS</span>],
             <span class="ident">high_water</span>,
             <span class="ident">base_address</span>,
-            <span class="ident">fl_page_resources</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">None</span>; <span class="ident">MAX_SPACES</span>],
-            <span class="ident">fl_map</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">None</span>; <span class="ident">MAX_SPACES</span>],
+            <span class="ident">fl_page_resources</span>: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; <span class="ident">MAX_SPACES</span>],
+            <span class="ident">fl_map</span>: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; <span class="ident">MAX_SPACES</span>],
             <span class="ident">finalized</span>: <span class="bool-val">false</span>,
-            <span class="ident">cumulative_committed_pages</span>: <span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>),
+            <span class="ident">cumulative_committed_pages</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
         }
     }
 
     <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">extent</span>: <span class="ident">usize</span>, <span class="ident">descriptor</span>: <span class="ident">SpaceDescriptor</span>) {
-        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="self">Self</span>::<span class="ident">is_space_start</span>(<span class="ident">start</span>));
-        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">extent</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">SPACE_SIZE_64</span>);
+        <span class="macro">debug_assert!</span>(<span class="self">Self</span><span class="ident">::is_space_start</span>(<span class="ident">start</span>));
+        <span class="macro">debug_assert!</span>(<span class="ident">extent</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">SPACE_SIZE_64</span>);
         <span class="comment">// Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,</span>
         <span class="comment">// as each space will update different indices.</span>
         <span class="kw">let</span> <span class="ident">self_mut</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
-        <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">space_index</span>(<span class="ident">start</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::space_index</span>(<span class="ident">start</span>).<span class="ident">unwrap</span>();
         <span class="ident">self_mut</span>.<span class="ident">descriptor_map</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="ident">descriptor</span>;
     }
 
-    <span class="kw">fn</span> <span class="ident">create_freelist</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pr</span>: <span class="kw-2">&amp;</span><span class="ident">CommonFreeListPageResource</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">FreeList</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">create_freelist</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pr</span>: <span class="kw-2">&amp;</span><span class="ident">CommonFreeListPageResource</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::FreeList</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">units</span> <span class="op">=</span> <span class="ident">SPACE_SIZE_64</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>;
         <span class="self">self</span>.<span class="ident">create_parent_freelist</span>(<span class="ident">pr</span>, <span class="ident">units</span>, <span class="ident">units</span> <span class="kw">as</span> <span class="kw">_</span>)
     }
@@ -316,19 +316,19 @@
         <span class="ident">pr</span>: <span class="kw-2">&amp;</span><span class="ident">CommonFreeListPageResource</span>,
         <span class="kw-2">mut</span> <span class="ident">units</span>: <span class="ident">usize</span>,
         <span class="ident">grain</span>: <span class="ident">i32</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">FreeList</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::FreeList</span><span class="op">&gt;</span> {
         <span class="comment">// This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.</span>
         <span class="kw">let</span> <span class="ident">self_mut</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">pr</span>.<span class="ident">get_start</span>();
-        <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">space_index</span>(<span class="ident">start</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::space_index</span>(<span class="ident">start</span>).<span class="ident">unwrap</span>();
 
         <span class="ident">units</span> <span class="op">=</span> (<span class="ident">units</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">*</span> <span class="ident">NON_MAP_FRACTION</span>) <span class="kw">as</span> <span class="kw">_</span>;
         <span class="kw">let</span> <span class="ident">list_extent</span> <span class="op">=</span>
-            <span class="ident">conversions</span>::<span class="ident">pages_to_bytes</span>(<span class="ident">RawMemoryFreeList</span>::<span class="ident">size_in_pages</span>(<span class="ident">units</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="number">1</span>) <span class="kw">as</span> <span class="kw">_</span>);
+            <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">RawMemoryFreeList::size_in_pages</span>(<span class="ident">units</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="number">1</span>) <span class="kw">as</span> <span class="kw">_</span>);
 
         <span class="kw">let</span> <span class="ident">heads</span> <span class="op">=</span> <span class="number">1</span>;
-        <span class="kw">let</span> <span class="ident">pages_per_block</span> <span class="op">=</span> <span class="ident">RawMemoryFreeList</span>::<span class="ident">default_block_size</span>(<span class="ident">units</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="ident">heads</span>);
-        <span class="kw">let</span> <span class="ident">list</span> <span class="op">=</span> <span class="kw">box</span> <span class="ident">RawMemoryFreeList</span>::<span class="ident">new</span>(
+        <span class="kw">let</span> <span class="ident">pages_per_block</span> <span class="op">=</span> <span class="ident">RawMemoryFreeList::default_block_size</span>(<span class="ident">units</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="ident">heads</span>);
+        <span class="kw">let</span> <span class="ident">list</span> <span class="op">=</span> <span class="kw">box</span> <span class="ident">RawMemoryFreeList::new</span>(
             <span class="ident">start</span>,
             <span class="ident">start</span> <span class="op">+</span> <span class="ident">list_extent</span>,
             <span class="ident">pages_per_block</span>,
@@ -346,7 +346,7 @@
             <span class="prelude-val">Some</span>(<span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="kw-2">&amp;</span><span class="ident">list</span> <span class="kw">as</span> <span class="kw-2">&amp;</span><span class="ident">RawMemoryFreeList</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">RawMemoryFreeList</span>) });
 
         <span class="comment">/* Adjust the base address and highwater to account for the allocated chunks for the map */</span>
-        <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="ident">conversions</span>::<span class="ident">chunk_align_up</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">list_extent</span>);
+        <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="ident">conversions::chunk_align_up</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">list_extent</span>);
 
         <span class="ident">self_mut</span>.<span class="ident">high_water</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="ident">base</span>;
         <span class="ident">self_mut</span>.<span class="ident">base_address</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="ident">base</span>;
@@ -359,7 +359,7 @@
         <span class="ident">chunks</span>: <span class="ident">usize</span>,
         <span class="ident">_head</span>: <span class="ident">Address</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
-        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="self">Self</span>::<span class="ident">space_index</span>(<span class="ident">descriptor</span>.<span class="ident">get_start</span>()).<span class="ident">unwrap</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">descriptor</span>.<span class="ident">get_index</span>());
+        <span class="macro">debug_assert!</span>(<span class="self">Self</span><span class="ident">::space_index</span>(<span class="ident">descriptor</span>.<span class="ident">get_start</span>()).<span class="ident">unwrap</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">descriptor</span>.<span class="ident">get_index</span>());
         <span class="comment">// Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,</span>
         <span class="comment">// as each space will update different indices.</span>
         <span class="kw">let</span> <span class="ident">self_mut</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
@@ -370,12 +370,12 @@
         <span class="ident">self_mut</span>.<span class="ident">high_water</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="ident">rtn</span> <span class="op">+</span> <span class="ident">extent</span>;
 
         <span class="comment">/* Grow the free list to accommodate the new chunks */</span>
-        <span class="kw">let</span> <span class="ident">free_list</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fl_map</span>[<span class="self">Self</span>::<span class="ident">space_index</span>(<span class="ident">descriptor</span>.<span class="ident">get_start</span>()).<span class="ident">unwrap</span>()];
+        <span class="kw">let</span> <span class="ident">free_list</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fl_map</span>[<span class="self">Self</span><span class="ident">::space_index</span>(<span class="ident">descriptor</span>.<span class="ident">get_start</span>()).<span class="ident">unwrap</span>()];
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">free_list</span>) <span class="op">=</span> <span class="ident">free_list</span> {
             <span class="kw">let</span> <span class="ident">free_list</span> <span class="op">=</span>
                 <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="ident">free_list</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">RawMemoryFreeList</span>) };
-            <span class="ident">free_list</span>.<span class="ident">grow_freelist</span>(<span class="ident">conversions</span>::<span class="ident">bytes_to_pages</span>(<span class="ident">extent</span>) <span class="kw">as</span> <span class="kw">_</span>);
-            <span class="kw">let</span> <span class="ident">base_page</span> <span class="op">=</span> <span class="ident">conversions</span>::<span class="ident">bytes_to_pages</span>(<span class="ident">rtn</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">base_address</span>[<span class="ident">index</span>]);
+            <span class="ident">free_list</span>.<span class="ident">grow_freelist</span>(<span class="ident">conversions::bytes_to_pages</span>(<span class="ident">extent</span>) <span class="kw">as</span> <span class="kw">_</span>);
+            <span class="kw">let</span> <span class="ident">base_page</span> <span class="op">=</span> <span class="ident">conversions::bytes_to_pages</span>(<span class="ident">rtn</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">base_address</span>[<span class="ident">index</span>]);
             <span class="kw">for</span> <span class="ident">offset</span> <span class="kw">in</span> (<span class="number">0</span>..(<span class="ident">chunks</span> <span class="op">*</span> <span class="ident">PAGES_IN_CHUNK</span>)).<span class="ident">step_by</span>(<span class="ident">PAGES_IN_CHUNK</span>) {
                 <span class="ident">free_list</span>.<span class="ident">set_uncoalescable</span>((<span class="ident">base_page</span> <span class="op">+</span> <span class="ident">offset</span>) <span class="kw">as</span> <span class="kw">_</span>);
                 <span class="comment">/* The 32-bit implementation requires that pages are returned allocated to the caller */</span>
@@ -386,23 +386,23 @@
     }
 
     <span class="kw">fn</span> <span class="ident">get_next_contiguous_region</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
-        <span class="macro">unreachable</span><span class="macro">!</span>()
+        <span class="macro">unreachable!</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">get_contiguous_region_chunks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="macro">unreachable</span><span class="macro">!</span>()
+        <span class="macro">unreachable!</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">get_contiguous_region_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="macro">unreachable</span><span class="macro">!</span>()
+        <span class="macro">unreachable!</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">free_all_chunks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_any_chunk</span>: <span class="ident">Address</span>) {
-        <span class="macro">unreachable</span><span class="macro">!</span>()
+        <span class="macro">unreachable!</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">free_contiguous_chunks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="macro">unreachable</span><span class="macro">!</span>()
+        <span class="macro">unreachable!</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">boot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
@@ -411,7 +411,7 @@
         <span class="kw">let</span> <span class="ident">self_mut</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
         <span class="kw">for</span> <span class="ident">pr</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">MAX_SPACES</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">fl</span>) <span class="op">=</span> <span class="ident">self_mut</span>.<span class="ident">fl_map</span>[<span class="ident">pr</span>] {
-                <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">cast_ref_to_mut</span>)]</span>
+                <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::cast_ref_to_mut</span>)]</span>
                 <span class="kw">let</span> <span class="ident">fl_mut</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RawMemoryFreeList</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="ident">fl</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">_</span>) };
                 <span class="ident">fl_mut</span>.<span class="ident">grow_freelist</span>(<span class="number">0</span>);
             }
@@ -424,10 +424,10 @@
         <span class="kw">let</span> <span class="ident">self_mut</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
         <span class="kw">for</span> <span class="ident">pr</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">MAX_SPACES</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">fl</span>) <span class="op">=</span> <span class="ident">self_mut</span>.<span class="ident">fl_page_resources</span>[<span class="ident">pr</span>] {
-                <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">cast_ref_to_mut</span>)]</span>
+                <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::cast_ref_to_mut</span>)]</span>
                 <span class="kw">let</span> <span class="ident">fl_mut</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CommonFreeListPageResource</span> <span class="op">=</span>
                     <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="ident">fl</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">_</span>) };
-                <span class="ident">fl_mut</span>.<span class="ident">resize_freelist</span>(<span class="ident">conversions</span>::<span class="ident">chunk_align_up</span>(
+                <span class="ident">fl_mut</span>.<span class="ident">resize_freelist</span>(<span class="ident">conversions::chunk_align_up</span>(
                     <span class="self">self</span>.<span class="ident">fl_map</span>[<span class="ident">pr</span>].<span class="ident">unwrap</span>().<span class="ident">get_limit</span>(),
                 ));
             }
@@ -440,18 +440,18 @@
     }
 
     <span class="kw">fn</span> <span class="ident">get_discontig_freelist_pr_ordinal</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_pr</span>: <span class="kw-2">&amp;</span><span class="ident">CommonFreeListPageResource</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="macro">unreachable</span><span class="macro">!</span>()
+        <span class="macro">unreachable!</span>()
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">get_descriptor_for_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SpaceDescriptor</span> {
-        <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">space_index</span>(<span class="ident">address</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::space_index</span>(<span class="ident">address</span>).<span class="ident">unwrap</span>();
         <span class="self">self</span>.<span class="ident">descriptor_map</span>[<span class="ident">index</span>]
     }
 
     <span class="kw">fn</span> <span class="ident">add_to_cumulative_committed_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) {
         <span class="self">self</span>.<span class="ident">cumulative_committed_pages</span>
-            .<span class="ident">fetch_add</span>(<span class="ident">pages</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
+            .<span class="ident">fetch_add</span>(<span class="ident">pages</span>, <span class="ident">Ordering::Relaxed</span>);
     }
 }
 
@@ -461,8 +461,8 @@
     <span class="doccomment">/// The caller needs to guarantee there is no race condition. Either only one single thread</span>
     <span class="doccomment">/// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).</span>
     <span class="doccomment">/// In other cases, use mut_self_with_sync().</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">cast_ref_to_mut</span>)]</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">mut_from_ref</span>)]</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::cast_ref_to_mut</span>)]</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::mut_from_ref</span>)]</span>
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">mut_self</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span> {
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">_</span>)
     }
@@ -481,8 +481,9 @@
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Map64</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span>::<span class="ident">new</span>()
+        <span class="self">Self</span><span class="ident">::new</span>()
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../../../";window.currentCrate = "mmtk";</script><script src="../../../../../main.js"></script><script src="../../../../../source-script.js"></script><script src="../../../../../source-files.js"></script><script defer src="../../../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-search-index-js="../../../../../search-index.js" data-search-js="../../../../../search.js"></div>
+    <script src="../../../../../main.js"></script><script src="../../../../../source-script.js"></script><script src="../../../../../source-files.js"></script></body></html>

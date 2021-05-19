@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/space.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>space.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/space.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>space.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../mmtk/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../mmtk/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -596,36 +596,36 @@
 <span id="593">593</span>
 <span id="594">594</span>
 <span id="595">595</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">Address</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">ObjectReference</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">conversions</span>::<span class="kw-2">*</span>, <span class="ident">side_metadata</span>::<span class="ident">SideMetadataSpec</span>};
+</pre><pre class="rust">
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::Address</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::ObjectReference</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">conversions</span>::<span class="kw-2">*</span>, <span class="ident">side_metadata::SideMetadataSpec</span>};
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::{<span class="ident">AVAILABLE_BYTES</span>, <span class="ident">LOG_BYTES_IN_CHUNK</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::{<span class="ident">AVAILABLE_END</span>, <span class="ident">AVAILABLE_START</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::{<span class="ident">PageResource</span>, <span class="ident">VMRequest</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">Collection</span>, <span class="ident">ObjectModel</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::{<span class="ident">AVAILABLE_BYTES</span>, <span class="ident">LOG_BYTES_IN_CHUNK</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::{<span class="ident">AVAILABLE_END</span>, <span class="ident">AVAILABLE_START</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap</span>::{<span class="ident">PageResource</span>, <span class="ident">VMRequest</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">Collection</span>, <span class="ident">ObjectModel</span>};
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">constants</span>::<span class="ident">LOG_BYTES_IN_MBYTE</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">conversions</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants::LOG_BYTES_IN_MBYTE</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::conversions</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mmtk</span>::<span class="ident">SFT_MAP</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::<span class="ident">Mmapper</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::<span class="ident">VMMap</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">map</span>::<span class="ident">Map</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">BYTES_IN_CHUNK</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">vm_layout_constants</span>::<span class="ident">MAX_CHUNKS</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">Mmapper</span> <span class="kw">as</span> <span class="ident">IMmapper</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">space_descriptor</span>::<span class="ident">SpaceDescriptor</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">HeapMeta</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">memory</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::mmtk::SFT_MAP</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::heap_layout::Mmapper</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::heap_layout::VMMap</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::map::Map</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants::MAX_CHUNKS</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::Mmapper</span> <span class="kw">as</span> <span class="ident">IMmapper</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::space_descriptor::SpaceDescriptor</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::HeapMeta</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::memory</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::VMBinding</span>;
+<span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
 
-<span class="kw">use</span> <span class="ident">downcast_rs</span>::<span class="ident">Downcast</span>;
+<span class="kw">use</span> <span class="ident">downcast_rs::Downcast</span>;
 
 <span class="doccomment">/// Space Function Table (SFT).</span>
 <span class="doccomment">///</span>
@@ -662,7 +662,7 @@
 }
 
 <span class="doccomment">/// Print debug info for SFT. Should be false when committed.</span>
-<span class="kw">const</span> <span class="ident">DEBUG_SFT</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">debug_assertions</span>) <span class="op">&amp;&amp;</span> <span class="bool-val">false</span>;
+<span class="kw">const</span> <span class="ident">DEBUG_SFT</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) <span class="op">&amp;&amp;</span> <span class="bool-val">false</span>;
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">struct</span> <span class="ident">EmptySpaceSFT</span> {}
@@ -674,7 +674,7 @@
         <span class="ident">EMPTY_SFT_NAME</span>
     }
     <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="macro">panic</span><span class="macro">!</span>(
+        <span class="macro">panic!</span>(
             <span class="string">&quot;Called is_live() on {:x}, which maps to an empty space&quot;</span>,
             <span class="ident">object</span>
         )
@@ -696,7 +696,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
-        <span class="macro">panic</span><span class="macro">!</span>(
+        <span class="macro">panic!</span>(
             <span class="string">&quot;Called initialize_object_metadata() on {:x}, which maps to an empty space&quot;</span>,
             <span class="ident">object</span>
         )
@@ -705,7 +705,7 @@
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SFTMap</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">sft</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> (<span class="ident">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>)<span class="op">&gt;</span>,
+    <span class="ident">sft</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> (<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>)<span class="op">&gt;</span>,
 }
 
 <span class="comment">// TODO: MMTK&lt;VM&gt; holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.</span>
@@ -716,22 +716,22 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">SFTMap</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">SFTMap</span> {
-            <span class="ident">sft</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="kw-2">&amp;</span><span class="ident">EMPTY_SPACE_SFT</span>; <span class="ident">MAX_CHUNKS</span>],
+            <span class="ident">sft</span>: <span class="macro">vec!</span>[<span class="kw-2">&amp;</span><span class="ident">EMPTY_SPACE_SFT</span>; <span class="ident">MAX_CHUNKS</span>],
         }
     }
     <span class="comment">// This is a temporary solution to allow unsafe mut reference. We do not want several occurrence</span>
     <span class="comment">// of the same unsafe code.</span>
     <span class="comment">// FIXME: We need a safe implementation.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">cast_ref_to_mut</span>)]</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">mut_from_ref</span>)]</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::cast_ref_to_mut</span>)]</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::mut_from_ref</span>)]</span>
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">mut_self</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span> {
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">_</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">dyn</span> <span class="ident">SFT</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw">dyn</span> <span class="ident">SFT</span> {
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sft</span>[<span class="ident">address</span>.<span class="ident">chunk_index</span>()];
         <span class="kw">if</span> <span class="ident">DEBUG_SFT</span> {
-            <span class="macro">trace</span><span class="macro">!</span>(
+            <span class="macro">trace!</span>(
                 <span class="string">&quot;Get SFT for {} #{} = {}&quot;</span>,
                 <span class="ident">address</span>,
                 <span class="ident">address</span>.<span class="ident">chunk_index</span>(),
@@ -741,13 +741,13 @@
         <span class="ident">res</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">log_update</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span>(<span class="ident">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>), <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">chunks</span>: <span class="ident">usize</span>) {
+    <span class="kw">fn</span> <span class="ident">log_update</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>), <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">chunks</span>: <span class="ident">usize</span>) {
         <span class="kw">let</span> <span class="ident">first</span> <span class="op">=</span> <span class="ident">start</span>.<span class="ident">chunk_index</span>();
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> (<span class="ident">chunks</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>);
-        <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;Update SFT for [{}, {}) as {}&quot;</span>, <span class="ident">start</span>, <span class="ident">end</span>, <span class="ident">space</span>.<span class="ident">name</span>());
+        <span class="macro">debug!</span>(<span class="string">&quot;Update SFT for [{}, {}) as {}&quot;</span>, <span class="ident">start</span>, <span class="ident">end</span>, <span class="ident">space</span>.<span class="ident">name</span>());
         <span class="kw">let</span> <span class="ident">start_chunk</span> <span class="op">=</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">first</span>);
         <span class="kw">let</span> <span class="ident">end_chunk</span> <span class="op">=</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">first</span> <span class="op">+</span> <span class="ident">chunks</span>);
-        <span class="macro">debug</span><span class="macro">!</span>(
+        <span class="macro">debug!</span>(
             <span class="string">&quot;Update SFT for {} chunks of [{} #{}, {} #{})&quot;</span>,
             <span class="ident">chunks</span>,
             <span class="ident">start_chunk</span>,
@@ -759,7 +759,7 @@
 
     <span class="kw">fn</span> <span class="ident">trace_sft_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="comment">// For large heaps, it takes long to iterate each chunk. So check log level first.</span>
-        <span class="kw">if</span> <span class="ident">log</span>::<span class="macro">log_enabled</span><span class="macro">!</span>(<span class="ident">log</span>::<span class="ident">Level</span>::<span class="ident">Trace</span>) {
+        <span class="kw">if</span> <span class="macro">log::log_enabled!</span>(<span class="ident">log::Level::Trace</span>) {
             <span class="comment">// print the entire SFT map</span>
             <span class="kw">const</span> <span class="ident">SPACE_PER_LINE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">10</span>;
             <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> (<span class="number">0</span>..<span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>()).<span class="ident">step_by</span>(<span class="ident">SPACE_PER_LINE</span>) {
@@ -770,14 +770,14 @@
                 };
                 <span class="kw">let</span> <span class="ident">chunks</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">i</span>..<span class="ident">max</span>).<span class="ident">collect</span>();
                 <span class="kw">let</span> <span class="ident">space_names</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">chunks</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">sft</span>[<span class="ident">x</span>].<span class="ident">name</span>()).<span class="ident">collect</span>();
-                <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Chunk {}: {}&quot;</span>, <span class="ident">i</span>, <span class="ident">space_names</span>.<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>));
+                <span class="macro">trace!</span>(<span class="string">&quot;Chunk {}: {}&quot;</span>, <span class="ident">i</span>, <span class="ident">space_names</span>.<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>));
             }
         }
     }
 
     <span class="doccomment">/// Update SFT map for the given address range.</span>
     <span class="doccomment">/// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span>(<span class="ident">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>), <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">chunks</span>: <span class="ident">usize</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>), <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">chunks</span>: <span class="ident">usize</span>) {
         <span class="kw">if</span> <span class="ident">DEBUG_SFT</span> {
             <span class="self">self</span>.<span class="ident">log_update</span>(<span class="ident">space</span>, <span class="ident">start</span>, <span class="ident">chunks</span>);
         }
@@ -796,7 +796,7 @@
         <span class="self">self</span>.<span class="ident">set</span>(<span class="ident">chunk_idx</span>, <span class="kw-2">&amp;</span><span class="ident">EMPTY_SPACE_SFT</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">set</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">usize</span>, <span class="ident">sft</span>: <span class="kw-2">&amp;</span>(<span class="ident">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>)) {
+    <span class="kw">fn</span> <span class="ident">set</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">usize</span>, <span class="ident">sft</span>: <span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>)) {
         <span class="comment">/*
          * This is safe (only) because a) this is only called during the
          * allocation and deallocation of chunks, which happens under a global
@@ -808,12 +808,12 @@
          */</span>
         <span class="kw">let</span> <span class="ident">self_mut</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
         <span class="comment">// It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.</span>
-        <span class="kw">if</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">debug_assertions</span>) {
+        <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) {
             <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="ident">self_mut</span>.<span class="ident">sft</span>[<span class="ident">chunk</span>].<span class="ident">name</span>();
             <span class="kw">let</span> <span class="ident">new</span> <span class="op">=</span> <span class="ident">sft</span>.<span class="ident">name</span>();
             <span class="comment">// Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,</span>
             <span class="comment">// in which case, we still set SFT map again.</span>
-            <span class="macro">debug_assert</span><span class="macro">!</span>(
+            <span class="macro">debug_assert!</span>(
                 <span class="ident">old</span> <span class="op">=</span><span class="op">=</span> <span class="ident">EMPTY_SFT_NAME</span> <span class="op">|</span><span class="op">|</span> <span class="ident">new</span> <span class="op">=</span><span class="op">=</span> <span class="ident">EMPTY_SFT_NAME</span> <span class="op">|</span><span class="op">|</span> <span class="ident">old</span> <span class="op">=</span><span class="op">=</span> <span class="ident">new</span>,
                 <span class="string">&quot;attempt to overwrite a non-empty chunk in SFT map (from {} to {})&quot;</span>,
                 <span class="ident">old</span>,
@@ -829,7 +829,7 @@
 
         <span class="kw">if</span> <span class="ident">not_in_space</span> {
             <span class="comment">// special case - we do not yet have SFT entries for malloc space</span>
-            <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">mallocspace</span>::<span class="ident">is_alloced_by_malloc</span>;
+            <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::mallocspace::is_alloced_by_malloc</span>;
             <span class="ident">is_alloced_by_malloc</span>(<span class="ident">object</span>)
         } <span class="kw">else</span> {
             <span class="bool-val">true</span>
@@ -838,34 +838,34 @@
 }
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Downcast</span> {
-    <span class="kw">fn</span> <span class="ident">as_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">as_sft</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>(<span class="ident">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>);
-    <span class="kw">fn</span> <span class="ident">get_page_resource</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">as_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">as_sft</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>);
+    <span class="kw">fn</span> <span class="ident">get_page_resource</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
     <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>);
 
     <span class="kw">fn</span> <span class="ident">acquire</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
-        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Space.acquire, tls={:?}&quot;</span>, <span class="ident">tls</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;Space.acquire, tls={:?}&quot;</span>, <span class="ident">tls</span>);
         <span class="comment">// Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.</span>
-        <span class="kw">let</span> <span class="ident">should_poll</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">is_mutator</span>(<span class="ident">tls</span>);
+        <span class="kw">let</span> <span class="ident">should_poll</span> <span class="op">=</span> <span class="ident">VM::VMActivePlan::is_mutator</span>(<span class="ident">tls</span>);
         <span class="comment">// Is a GC allowed here? enable_collection() has to be called so we know GC is initialized.</span>
-        <span class="kw">let</span> <span class="ident">allow_poll</span> <span class="op">=</span> <span class="ident">should_poll</span> <span class="op">&amp;&amp;</span> <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">is_initialized</span>();
+        <span class="kw">let</span> <span class="ident">allow_poll</span> <span class="op">=</span> <span class="ident">should_poll</span> <span class="op">&amp;&amp;</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">is_initialized</span>();
 
-        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Reserving pages&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;Reserving pages&quot;</span>);
         <span class="kw">let</span> <span class="ident">pr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_page_resource</span>();
         <span class="kw">let</span> <span class="ident">pages_reserved</span> <span class="op">=</span> <span class="ident">pr</span>.<span class="ident">reserve_pages</span>(<span class="ident">pages</span>);
-        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Pages reserved&quot;</span>);
-        <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Polling ..&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;Pages reserved&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;Polling ..&quot;</span>);
 
-        <span class="kw">if</span> <span class="ident">should_poll</span> <span class="op">&amp;&amp;</span> <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">poll</span>(<span class="bool-val">false</span>, <span class="self">self</span>.<span class="ident">as_space</span>()) {
-            <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;Collection required&quot;</span>);
+        <span class="kw">if</span> <span class="ident">should_poll</span> <span class="op">&amp;&amp;</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">poll</span>(<span class="bool-val">false</span>, <span class="self">self</span>.<span class="ident">as_space</span>()) {
+            <span class="macro">debug!</span>(<span class="string">&quot;Collection required&quot;</span>);
             <span class="kw">if</span> <span class="op">!</span><span class="ident">allow_poll</span> {
-                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Collection is not enabled.&quot;</span>);
+                <span class="macro">panic!</span>(<span class="string">&quot;Collection is not enabled.&quot;</span>);
             }
             <span class="ident">pr</span>.<span class="ident">clear_request</span>(<span class="ident">pages_reserved</span>);
-            <span class="ident">VM</span>::<span class="ident">VMCollection</span>::<span class="ident">block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>)); <span class="comment">// We have checked that this is mutator</span>
-            <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">zero</span>() }
+            <span class="ident">VM::VMCollection::block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>)); <span class="comment">// We have checked that this is mutator</span>
+            <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() }
         } <span class="kw">else</span> {
-            <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;Collection not required&quot;</span>);
+            <span class="macro">debug!</span>(<span class="string">&quot;Collection not required&quot;</span>);
 
             <span class="kw">match</span> <span class="ident">pr</span>.<span class="ident">get_new_pages</span>(<span class="self">self</span>.<span class="ident">common</span>().<span class="ident">descriptor</span>, <span class="ident">pages_reserved</span>, <span class="ident">pages</span>, <span class="ident">tls</span>) {
                 <span class="prelude-val">Ok</span>(<span class="ident">res</span>) <span class="op">=</span><span class="op">&gt;</span> {
@@ -873,7 +873,7 @@
                     <span class="comment">// I think they are thread safe and we do not need a lock. So they</span>
                     <span class="comment">// are no longer guarded by a lock. If we see any issue here, considering</span>
                     <span class="comment">// adding a space lock here.</span>
-                    <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">conversions</span>::<span class="ident">pages_to_bytes</span>(<span class="ident">res</span>.<span class="ident">pages</span>);
+                    <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">res</span>.<span class="ident">pages</span>);
                     <span class="self">self</span>.<span class="ident">grow_space</span>(<span class="ident">res</span>.<span class="ident">start</span>, <span class="ident">bytes</span>, <span class="ident">res</span>.<span class="ident">new_chunk</span>);
                     <span class="comment">// Mmap the pages and handle error. In case of any error,</span>
                     <span class="comment">// we will either call back to the VM for OOM, or simply panic.</span>
@@ -882,28 +882,28 @@
                         <span class="ident">res</span>.<span class="ident">pages</span>,
                         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>().<span class="ident">metadata</span>,
                     ) {
-                        <span class="ident">memory</span>::<span class="ident">handle_mmap_error</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">mmap_error</span>, <span class="ident">tls</span>);
+                        <span class="ident">memory::handle_mmap_error</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">mmap_error</span>, <span class="ident">tls</span>);
                     }
 
                     <span class="comment">// TODO: Concurrent zeroing</span>
                     <span class="kw">if</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">zeroed</span> {
-                        <span class="ident">memory</span>::<span class="ident">zero</span>(<span class="ident">res</span>.<span class="ident">start</span>, <span class="ident">bytes</span>);
+                        <span class="ident">memory::zero</span>(<span class="ident">res</span>.<span class="ident">start</span>, <span class="ident">bytes</span>);
                     }
 
-                    <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;Space.acquire(), returned = {}&quot;</span>, <span class="ident">res</span>.<span class="ident">start</span>);
+                    <span class="macro">debug!</span>(<span class="string">&quot;Space.acquire(), returned = {}&quot;</span>, <span class="ident">res</span>.<span class="ident">start</span>);
                     <span class="ident">res</span>.<span class="ident">start</span>
                 }
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="comment">// We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.</span>
                     <span class="kw">if</span> <span class="op">!</span><span class="ident">allow_poll</span> {
-                        <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Physical allocation failed when polling not allowed!&quot;</span>);
+                        <span class="macro">panic!</span>(<span class="string">&quot;Physical allocation failed when polling not allowed!&quot;</span>);
                     }
 
-                    <span class="kw">let</span> <span class="ident">gc_performed</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMActivePlan</span>::<span class="ident">global</span>().<span class="ident">poll</span>(<span class="bool-val">true</span>, <span class="self">self</span>.<span class="ident">as_space</span>());
-                    <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">gc_performed</span>, <span class="string">&quot;GC not performed when forced.&quot;</span>);
+                    <span class="kw">let</span> <span class="ident">gc_performed</span> <span class="op">=</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">poll</span>(<span class="bool-val">true</span>, <span class="self">self</span>.<span class="ident">as_space</span>());
+                    <span class="macro">debug_assert!</span>(<span class="ident">gc_performed</span>, <span class="string">&quot;GC not performed when forced.&quot;</span>);
                     <span class="ident">pr</span>.<span class="ident">clear_request</span>(<span class="ident">pages_reserved</span>);
-                    <span class="ident">VM</span>::<span class="ident">VMCollection</span>::<span class="ident">block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>)); <span class="comment">// We asserted that this is mutator.</span>
-                    <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">zero</span>() }
+                    <span class="ident">VM::VMCollection::block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>)); <span class="comment">// We asserted that this is mutator.</span>
+                    <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() }
                 }
             }
         }
@@ -918,7 +918,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">in_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">VM</span>::<span class="ident">VMObjectModel</span>::<span class="ident">ref_to_address</span>(<span class="ident">object</span>);
+        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::ref_to_address</span>(<span class="ident">object</span>);
         <span class="self">self</span>.<span class="ident">address_in_space</span>(<span class="ident">start</span>)
     }
 
@@ -932,18 +932,18 @@
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */</span>
     <span class="kw">fn</span> <span class="ident">grow_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>, <span class="ident">new_chunk</span>: <span class="ident">bool</span>) {
-        <span class="macro">trace</span><span class="macro">!</span>(
+        <span class="macro">trace!</span>(
             <span class="string">&quot;Grow space from {} for {} bytes (new chunk = {})&quot;</span>,
             <span class="ident">start</span>,
             <span class="ident">bytes</span>,
             <span class="ident">new_chunk</span>
         );
-        <span class="macro">debug_assert</span><span class="macro">!</span>(
+        <span class="macro">debug_assert!</span>(
             (<span class="ident">new_chunk</span> <span class="op">&amp;&amp;</span> <span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_CHUNK</span>)) <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="ident">new_chunk</span>,
             <span class="string">&quot;should only grow space for new chunks at chunk-aligned start address&quot;</span>
         );
         <span class="kw">if</span> <span class="ident">new_chunk</span> {
-            <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">conversions</span>::<span class="ident">bytes_to_chunks_up</span>(<span class="ident">bytes</span>);
+            <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">conversions::bytes_to_chunks_up</span>(<span class="ident">bytes</span>);
             <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="self">self</span>.<span class="ident">as_sft</span>(), <span class="ident">start</span>, <span class="ident">chunks</span>);
         }
     }
@@ -953,7 +953,7 @@
      *  mapped (e.g. for a vm image which is externally mmapped.)
      */</span>
     <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">conversions</span>::<span class="ident">bytes_to_chunks_up</span>(<span class="self">self</span>.<span class="ident">common</span>().<span class="ident">extent</span>);
+        <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">conversions::bytes_to_chunks_up</span>(<span class="self">self</span>.<span class="ident">common</span>().<span class="ident">extent</span>);
         <span class="kw">if</span> <span class="self">self</span>
             .<span class="ident">common</span>()
             .<span class="ident">metadata</span>
@@ -961,10 +961,10 @@
             .<span class="ident">is_err</span>()
         {
             <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
-            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
+            <span class="macro">panic!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
         }
         <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="self">self</span>.<span class="ident">as_sft</span>(), <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">start</span>, <span class="ident">chunks</span>);
-        <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">mmapper</span>::<span class="ident">Mmapper</span>;
+        <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::mmapper::Mmapper</span>;
         <span class="self">self</span>.<span class="ident">common</span>()
             .<span class="ident">mmapper</span>
             .<span class="ident">mark_as_mapped</span>(<span class="self">self</span>.<span class="ident">common</span>().<span class="ident">start</span>, <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">extent</span>);
@@ -984,26 +984,26 @@
 
     <span class="kw">fn</span> <span class="ident">print_vm_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>();
-        <span class="macro">print</span><span class="macro">!</span>(<span class="string">&quot;{} &quot;</span>, <span class="ident">common</span>.<span class="ident">name</span>);
+        <span class="macro">print!</span>(<span class="string">&quot;{} &quot;</span>, <span class="ident">common</span>.<span class="ident">name</span>);
         <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">immortal</span> {
-            <span class="macro">print</span><span class="macro">!</span>(<span class="string">&quot;I&quot;</span>);
+            <span class="macro">print!</span>(<span class="string">&quot;I&quot;</span>);
         } <span class="kw">else</span> {
-            <span class="macro">print</span><span class="macro">!</span>(<span class="string">&quot; &quot;</span>);
+            <span class="macro">print!</span>(<span class="string">&quot; &quot;</span>);
         }
         <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">movable</span> {
-            <span class="macro">print</span><span class="macro">!</span>(<span class="string">&quot; &quot;</span>);
+            <span class="macro">print!</span>(<span class="string">&quot; &quot;</span>);
         } <span class="kw">else</span> {
-            <span class="macro">print</span><span class="macro">!</span>(<span class="string">&quot;N&quot;</span>);
+            <span class="macro">print!</span>(<span class="string">&quot;N&quot;</span>);
         }
-        <span class="macro">print</span><span class="macro">!</span>(<span class="string">&quot; &quot;</span>);
+        <span class="macro">print!</span>(<span class="string">&quot; &quot;</span>);
         <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">contiguous</span> {
-            <span class="macro">print</span><span class="macro">!</span>(<span class="string">&quot;{}-&gt;{}&quot;</span>, <span class="ident">common</span>.<span class="ident">start</span>, <span class="ident">common</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">common</span>.<span class="ident">extent</span> <span class="op">-</span> <span class="number">1</span>);
+            <span class="macro">print!</span>(<span class="string">&quot;{}-&gt;{}&quot;</span>, <span class="ident">common</span>.<span class="ident">start</span>, <span class="ident">common</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">common</span>.<span class="ident">extent</span> <span class="op">-</span> <span class="number">1</span>);
             <span class="kw">match</span> <span class="ident">common</span>.<span class="ident">vmrequest</span> {
-                <span class="ident">VMRequest</span>::<span class="ident">RequestExtent</span> { <span class="ident">extent</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">print</span><span class="macro">!</span>(<span class="string">&quot; E {}&quot;</span>, <span class="ident">extent</span>);
+                <span class="ident">VMRequest::RequestExtent</span> { <span class="ident">extent</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">print!</span>(<span class="string">&quot; E {}&quot;</span>, <span class="ident">extent</span>);
                 }
-                <span class="ident">VMRequest</span>::<span class="ident">RequestFraction</span> { <span class="ident">frac</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">print</span><span class="macro">!</span>(<span class="string">&quot; F {}&quot;</span>, <span class="ident">frac</span>);
+                <span class="ident">VMRequest::RequestFraction</span> { <span class="ident">frac</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">print!</span>(<span class="string">&quot; F {}&quot;</span>, <span class="ident">frac</span>);
                 }
                 <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {}
             }
@@ -1013,18 +1013,18 @@
                 .<span class="ident">common</span>()
                 .<span class="ident">get_head_discontiguous_region</span>();
             <span class="kw">while</span> <span class="op">!</span><span class="ident">a</span>.<span class="ident">is_zero</span>() {
-                <span class="macro">print</span><span class="macro">!</span>(
+                <span class="macro">print!</span>(
                     <span class="string">&quot;{}-&gt;{}&quot;</span>,
                     <span class="ident">a</span>,
                     <span class="ident">a</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">vm_map</span>().<span class="ident">get_contiguous_region_size</span>(<span class="ident">a</span>) <span class="op">-</span> <span class="number">1</span>
                 );
                 <span class="ident">a</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">vm_map</span>().<span class="ident">get_next_contiguous_region</span>(<span class="ident">a</span>);
                 <span class="kw">if</span> <span class="op">!</span><span class="ident">a</span>.<span class="ident">is_zero</span>() {
-                    <span class="macro">print</span><span class="macro">!</span>(<span class="string">&quot; &quot;</span>);
+                    <span class="macro">print!</span>(<span class="string">&quot; &quot;</span>);
                 }
             }
         }
-        <span class="macro">println</span><span class="macro">!</span>();
+        <span class="macro">println!</span>();
     }
 
     <span class="kw">fn</span> <span class="ident">local_side_metadata_specs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>] {
@@ -1032,7 +1032,7 @@
     }
 }
 
-<span class="macro">impl_downcast</span><span class="macro">!</span>(<span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">VM</span>: <span class="ident">VMBinding</span>);
+<span class="macro">impl_downcast!</span>(<span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">VM</span>: <span class="ident">VMBinding</span>);
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
@@ -1066,7 +1066,7 @@
 }
 
 <span class="doccomment">/// Print debug info for SFT. Should be false when committed.</span>
-<span class="kw">const</span> <span class="ident">DEBUG_SPACE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="macro">cfg</span><span class="macro">!</span>(<span class="ident">debug_assertions</span>) <span class="op">&amp;&amp;</span> <span class="bool-val">false</span>;
+<span class="kw">const</span> <span class="ident">DEBUG_SPACE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) <span class="op">&amp;&amp;</span> <span class="bool-val">false</span>;
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
@@ -1077,18 +1077,18 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rtn</span> <span class="op">=</span> <span class="ident">CommonSpace</span> {
             <span class="ident">name</span>: <span class="ident">opt</span>.<span class="ident">name</span>,
-            <span class="ident">descriptor</span>: <span class="ident">SpaceDescriptor</span>::<span class="ident">UNINITIALIZED</span>,
+            <span class="ident">descriptor</span>: <span class="ident">SpaceDescriptor::UNINITIALIZED</span>,
             <span class="ident">vmrequest</span>: <span class="ident">opt</span>.<span class="ident">vmrequest</span>,
             <span class="ident">immortal</span>: <span class="ident">opt</span>.<span class="ident">immortal</span>,
             <span class="ident">movable</span>: <span class="ident">opt</span>.<span class="ident">movable</span>,
             <span class="ident">contiguous</span>: <span class="bool-val">true</span>,
             <span class="ident">zeroed</span>: <span class="ident">opt</span>.<span class="ident">zeroed</span>,
-            <span class="ident">start</span>: <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">zero</span>() },
+            <span class="ident">start</span>: <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() },
             <span class="ident">extent</span>: <span class="number">0</span>,
-            <span class="ident">head_discontiguous_region</span>: <span class="kw">unsafe</span> { <span class="ident">Address</span>::<span class="ident">zero</span>() },
+            <span class="ident">head_discontiguous_region</span>: <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() },
             <span class="ident">vm_map</span>,
             <span class="ident">mmapper</span>,
-            <span class="ident">metadata</span>: <span class="ident">SideMetadata</span>::<span class="ident">new</span>(<span class="ident">opt</span>.<span class="ident">side_metadata_specs</span>),
+            <span class="ident">metadata</span>: <span class="ident">SideMetadata::new</span>(<span class="ident">opt</span>.<span class="ident">side_metadata_specs</span>),
             <span class="ident">p</span>: <span class="ident">PhantomData</span>,
         };
 
@@ -1096,34 +1096,34 @@
         <span class="kw">if</span> <span class="ident">vmrequest</span>.<span class="ident">is_discontiguous</span>() {
             <span class="ident">rtn</span>.<span class="ident">contiguous</span> <span class="op">=</span> <span class="bool-val">false</span>;
             <span class="comment">// FIXME</span>
-            <span class="ident">rtn</span>.<span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">SpaceDescriptor</span>::<span class="ident">create_descriptor</span>();
+            <span class="ident">rtn</span>.<span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">SpaceDescriptor::create_descriptor</span>();
             <span class="comment">// VM.memory.setHeapRange(index, HEAP_START, HEAP_END);</span>
             <span class="kw">return</span> <span class="ident">rtn</span>;
         }
 
         <span class="kw">let</span> (<span class="ident">extent</span>, <span class="ident">top</span>) <span class="op">=</span> <span class="kw">match</span> <span class="ident">vmrequest</span> {
-            <span class="ident">VMRequest</span>::<span class="ident">RequestFraction</span> { <span class="ident">frac</span>, <span class="ident">top</span>: <span class="ident">_top</span> } <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">get_frac_available</span>(<span class="ident">frac</span>), <span class="ident">_top</span>),
-            <span class="ident">VMRequest</span>::<span class="ident">RequestExtent</span> {
+            <span class="ident">VMRequest::RequestFraction</span> { <span class="ident">frac</span>, <span class="ident">top</span>: <span class="ident">_top</span> } <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">get_frac_available</span>(<span class="ident">frac</span>), <span class="ident">_top</span>),
+            <span class="ident">VMRequest::RequestExtent</span> {
                 <span class="ident">extent</span>: <span class="ident">_extent</span>,
                 <span class="ident">top</span>: <span class="ident">_top</span>,
             } <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">_extent</span>, <span class="ident">_top</span>),
-            <span class="ident">VMRequest</span>::<span class="ident">RequestFixed</span> {
+            <span class="ident">VMRequest::RequestFixed</span> {
                 <span class="ident">extent</span>: <span class="ident">_extent</span>,
                 <span class="ident">top</span>: <span class="ident">_top</span>,
                 ..
             } <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">_extent</span>, <span class="ident">_top</span>),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable!</span>(),
         };
 
         <span class="kw">if</span> <span class="ident">extent</span> <span class="op">!</span><span class="op">=</span> <span class="ident">raw_align_up</span>(<span class="ident">extent</span>, <span class="ident">BYTES_IN_CHUNK</span>) {
-            <span class="macro">panic</span><span class="macro">!</span>(
+            <span class="macro">panic!</span>(
                 <span class="string">&quot;{} requested non-aligned extent: {} bytes&quot;</span>,
                 <span class="ident">rtn</span>.<span class="ident">name</span>, <span class="ident">extent</span>
             );
         }
 
         <span class="kw">let</span> <span class="ident">start</span>: <span class="ident">Address</span>;
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">VMRequest</span>::<span class="ident">RequestFixed</span> { <span class="ident">start</span>: <span class="ident">_start</span>, .. } <span class="op">=</span> <span class="ident">vmrequest</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">VMRequest::RequestFixed</span> { <span class="ident">start</span>: <span class="ident">_start</span>, .. } <span class="op">=</span> <span class="ident">vmrequest</span> {
             <span class="ident">start</span> <span class="op">=</span> <span class="ident">_start</span>;
         } <span class="kw">else</span> {
             <span class="comment">// FIXME</span>
@@ -1131,19 +1131,19 @@
             <span class="ident">start</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">reserve</span>(<span class="ident">extent</span>, <span class="ident">top</span>);
         }
         <span class="kw">if</span> <span class="ident">start</span> <span class="op">!</span><span class="op">=</span> <span class="ident">chunk_align_up</span>(<span class="ident">start</span>) {
-            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;{} starting on non-aligned boundary: {}&quot;</span>, <span class="ident">rtn</span>.<span class="ident">name</span>, <span class="ident">start</span>);
+            <span class="macro">panic!</span>(<span class="string">&quot;{} starting on non-aligned boundary: {}&quot;</span>, <span class="ident">rtn</span>.<span class="ident">name</span>, <span class="ident">start</span>);
         }
 
         <span class="ident">rtn</span>.<span class="ident">contiguous</span> <span class="op">=</span> <span class="bool-val">true</span>;
         <span class="ident">rtn</span>.<span class="ident">start</span> <span class="op">=</span> <span class="ident">start</span>;
         <span class="ident">rtn</span>.<span class="ident">extent</span> <span class="op">=</span> <span class="ident">extent</span>;
         <span class="comment">// FIXME</span>
-        <span class="ident">rtn</span>.<span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">SpaceDescriptor</span>::<span class="ident">create_descriptor_from_heap_range</span>(<span class="ident">start</span>, <span class="ident">start</span> <span class="op">+</span> <span class="ident">extent</span>);
+        <span class="ident">rtn</span>.<span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">SpaceDescriptor::create_descriptor_from_heap_range</span>(<span class="ident">start</span>, <span class="ident">start</span> <span class="op">+</span> <span class="ident">extent</span>);
         <span class="comment">// VM.memory.setHeapRange(index, start, start.plus(extent));</span>
         <span class="ident">vm_map</span>.<span class="ident">insert</span>(<span class="ident">start</span>, <span class="ident">extent</span>, <span class="ident">rtn</span>.<span class="ident">descriptor</span>);
 
         <span class="kw">if</span> <span class="ident">DEBUG_SPACE</span> {
-            <span class="macro">println</span><span class="macro">!</span>(
+            <span class="macro">println!</span>(
                 <span class="string">&quot;Created space {} [{}, {}) for {} bytes&quot;</span>,
                 <span class="ident">rtn</span>.<span class="ident">name</span>,
                 <span class="ident">start</span>,
@@ -1155,7 +1155,7 @@
         <span class="ident">rtn</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="comment">// For contiguous space, we eagerly initialize SFT map based on its address range.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contiguous</span> {
             <span class="kw">if</span> <span class="self">self</span>
@@ -1164,7 +1164,7 @@
                 .<span class="ident">is_err</span>()
             {
                 <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
-                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
+                <span class="macro">panic!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
             }
             <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="ident">space</span>.<span class="ident">as_sft</span>(), <span class="self">self</span>.<span class="ident">start</span>, <span class="ident">bytes_to_chunks_up</span>(<span class="self">self</span>.<span class="ident">extent</span>));
         }
@@ -1176,15 +1176,15 @@
 }
 
 <span class="kw">fn</span> <span class="ident">get_frac_available</span>(<span class="ident">frac</span>: <span class="ident">f32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-    <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;AVAILABLE_START={}&quot;</span>, <span class="ident">AVAILABLE_START</span>);
-    <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;AVAILABLE_END={}&quot;</span>, <span class="ident">AVAILABLE_END</span>);
+    <span class="macro">trace!</span>(<span class="string">&quot;AVAILABLE_START={}&quot;</span>, <span class="ident">AVAILABLE_START</span>);
+    <span class="macro">trace!</span>(<span class="string">&quot;AVAILABLE_END={}&quot;</span>, <span class="ident">AVAILABLE_END</span>);
     <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> (<span class="ident">frac</span> <span class="op">*</span> <span class="ident">AVAILABLE_BYTES</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="kw">as</span> <span class="ident">usize</span>;
-    <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;bytes={}*{}={}&quot;</span>, <span class="ident">frac</span>, <span class="ident">AVAILABLE_BYTES</span>, <span class="ident">bytes</span>);
+    <span class="macro">trace!</span>(<span class="string">&quot;bytes={}*{}={}&quot;</span>, <span class="ident">frac</span>, <span class="ident">AVAILABLE_BYTES</span>, <span class="ident">bytes</span>);
     <span class="kw">let</span> <span class="ident">mb</span> <span class="op">=</span> <span class="ident">bytes</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_MBYTE</span>;
     <span class="kw">let</span> <span class="ident">rtn</span> <span class="op">=</span> <span class="ident">mb</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_MBYTE</span>;
-    <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;rtn={}&quot;</span>, <span class="ident">rtn</span>);
+    <span class="macro">trace!</span>(<span class="string">&quot;rtn={}&quot;</span>, <span class="ident">rtn</span>);
     <span class="kw">let</span> <span class="ident">aligned_rtn</span> <span class="op">=</span> <span class="ident">raw_align_up</span>(<span class="ident">rtn</span>, <span class="ident">BYTES_IN_CHUNK</span>);
-    <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;aligned_rtn={}&quot;</span>, <span class="ident">aligned_rtn</span>);
+    <span class="macro">trace!</span>(<span class="string">&quot;aligned_rtn={}&quot;</span>, <span class="ident">aligned_rtn</span>);
     <span class="ident">aligned_rtn</span>
 }
 
@@ -1193,4 +1193,5 @@
     <span class="ident">extent</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "mmtk";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
+    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>

@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/mmtk.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mmtk.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/mmtk.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mmtk.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../mmtk/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1"> 1</span>
+<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../mmtk/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
 <span id="2"> 2</span>
 <span id="3"> 3</span>
 <span id="4"> 4</span>
@@ -92,27 +92,27 @@
 <span id="89">89</span>
 <span id="90">90</span>
 <span id="91">91</span>
-</pre><div class="example-wrap"><pre class="rust ">
+</pre><pre class="rust">
 <span class="doccomment">///! MMTk instance.</span>
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">Plan</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">policy</span>::<span class="ident">space</span>::<span class="ident">SFTMap</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">scheduler</span>::<span class="ident">MMTkScheduler</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">finalizable_processor</span>::<span class="ident">FinalizableProcessor</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::<span class="ident">Mmapper</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">heap_layout</span>::<span class="ident">VMMap</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">heap</span>::<span class="ident">layout</span>::<span class="ident">map</span>::<span class="ident">Map</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">options</span>::{<span class="ident">Options</span>, <span class="ident">UnsafeOptionsWrapper</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">reference_processor</span>::<span class="ident">ReferenceProcessors</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::Plan</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::space::SFTMap</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::MMTkScheduler</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::finalizable_processor::FinalizableProcessor</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::heap_layout::Mmapper</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::heap_layout::VMMap</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::map::Map</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::options</span>::{<span class="ident">Options</span>, <span class="ident">UnsafeOptionsWrapper</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::reference_processor::ReferenceProcessors</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">sanity</span>::<span class="ident">sanity_checker</span>::<span class="ident">SanityChecker</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vm</span>::<span class="ident">VMBinding</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">default</span>::<span class="ident">Default</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Mutex</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::sanity::sanity_checker::SanityChecker</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::VMBinding</span>;
+<span class="kw">use</span> <span class="ident">std::default::Default</span>;
+<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Mutex</span>;
 
-<span class="macro">lazy_static</span><span class="macro">!</span> {
+<span class="macro">lazy_static!</span> {
     <span class="comment">// I am not sure if we should include these mmappers as part of MMTk struct.</span>
     <span class="comment">// The considerations are:</span>
     <span class="comment">// 1. We need VMMap and Mmapper to create spaces. It is natural that the mappers are not</span>
@@ -122,19 +122,19 @@
     <span class="comment">// TODO: We should refactor this when we know more about how multiple MMTK instances work.</span>
 
     <span class="doccomment">/// A global VMMap that manages the mapping of spaces to virtual memory ranges.</span>
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">VM_MAP</span>: <span class="ident">VMMap</span> <span class="op">=</span> <span class="ident">VMMap</span>::<span class="ident">new</span>();
+    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">VM_MAP</span>: <span class="ident">VMMap</span> <span class="op">=</span> <span class="ident">VMMap::new</span>();
 
     <span class="doccomment">/// A global Mmapper for mmaping and protection of virtual memory.</span>
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">MMAPPER</span>: <span class="ident">Mmapper</span> <span class="op">=</span> <span class="ident">Mmapper</span>::<span class="ident">new</span>();
+    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">MMAPPER</span>: <span class="ident">Mmapper</span> <span class="op">=</span> <span class="ident">Mmapper::new</span>();
 
     <span class="comment">// A global space function table that allows efficient dispatch space specific code for addresses in our heap.</span>
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">SFT_MAP</span>: <span class="ident">SFTMap</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">SFTMap</span>::<span class="ident">new</span>();
+    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">SFT_MAP</span>: <span class="ident">SFTMap</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">SFTMap::new</span>();
 }
 
 <span class="doccomment">/// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.</span>
 <span class="doccomment">/// *Note that multi-instances is not fully supported yet*</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">plan</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">plan</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">reference_processors</span>: <span class="ident">ReferenceProcessors</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">finalizable_processor</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FinalizableProcessor</span><span class="op">&gt;</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
@@ -146,43 +146,44 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">MMTkScheduler</span>::<span class="ident">new</span>();
-        <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">UnsafeOptionsWrapper</span>::<span class="ident">new</span>(<span class="ident">Options</span>::<span class="ident">default</span>()));
-        <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="kw">crate</span>::<span class="ident">plan</span>::<span class="ident">create_plan</span>(<span class="ident">options</span>.<span class="ident">plan</span>, <span class="kw-2">&amp;</span><span class="ident">VM_MAP</span>, <span class="kw-2">&amp;</span><span class="ident">MMAPPER</span>, <span class="ident">options</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">MMTkScheduler::new</span>();
+        <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">UnsafeOptionsWrapper::new</span>(<span class="ident">Options::default</span>()));
+        <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="kw">crate</span><span class="ident">::plan::create_plan</span>(<span class="ident">options</span>.<span class="ident">plan</span>, <span class="kw-2">&amp;</span><span class="ident">VM_MAP</span>, <span class="kw-2">&amp;</span><span class="ident">MMAPPER</span>, <span class="ident">options</span>.<span class="ident">clone</span>());
         <span class="ident">MMTK</span> {
             <span class="ident">plan</span>,
-            <span class="ident">reference_processors</span>: <span class="ident">ReferenceProcessors</span>::<span class="ident">new</span>(),
-            <span class="ident">finalizable_processor</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">FinalizableProcessor</span>::<span class="ident">new</span>()),
+            <span class="ident">reference_processors</span>: <span class="ident">ReferenceProcessors::new</span>(),
+            <span class="ident">finalizable_processor</span>: <span class="ident">Mutex::new</span>(<span class="ident">FinalizableProcessor::new</span>()),
             <span class="ident">options</span>,
             <span class="ident">scheduler</span>,
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-            <span class="ident">sanity_checker</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">SanityChecker</span>::<span class="ident">new</span>()),
-            <span class="ident">inside_harness</span>: <span class="ident">AtomicBool</span>::<span class="ident">new</span>(<span class="bool-val">false</span>),
+            <span class="ident">sanity_checker</span>: <span class="ident">Mutex::new</span>(<span class="ident">SanityChecker::new</span>()),
+            <span class="ident">inside_harness</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
         }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">harness_begin</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>) {
         <span class="comment">// FIXME Do a full heap GC if we have generational GC</span>
         <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">handle_user_collection_request</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
-        <span class="self">self</span>.<span class="ident">inside_harness</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+        <span class="self">self</span>.<span class="ident">inside_harness</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
         <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">stats</span>.<span class="ident">start_all</span>();
         <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">enable_stat</span>();
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">harness_end</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">stats</span>.<span class="ident">stop_all</span>(<span class="self">self</span>);
-        <span class="self">self</span>.<span class="ident">inside_harness</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+        <span class="self">self</span>.<span class="ident">inside_harness</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_plan</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_plan</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">as_ref</span>()
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span>::<span class="ident">new</span>()
+        <span class="self">Self</span><span class="ident">::new</span>()
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "mmtk";</script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mmtk" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
+    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
