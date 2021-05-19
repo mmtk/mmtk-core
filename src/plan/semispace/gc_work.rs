@@ -90,7 +90,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<SemiSpace<VM>>().unwrap();
-        Self { base, plan }
+        Self { plan, base }
     }
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {

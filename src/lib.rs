@@ -1,6 +1,5 @@
 #![allow(incomplete_features)]
 #![feature(asm)]
-#![feature(const_fn)]
 #![feature(integer_atomics)]
 #![feature(is_sorted)]
 #![feature(drain_filter)]
