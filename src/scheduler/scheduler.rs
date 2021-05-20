@@ -410,7 +410,6 @@ mod tests {
         // println!("Original: {:?}", data);
 
         SCHEDULER.initialize(NUM_WORKERS, &(), VMThread::UNINITIALIZED);
-        SCHEDULER.enable_stat();
         SCHEDULER.work_buckets[WorkBucketStage::Unconstrained]
             .add(Sort(unsafe { &mut *(data as *mut _) }));
         SCHEDULER.wait_for_completion();
