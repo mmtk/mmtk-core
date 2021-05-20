@@ -1,0 +1,27 @@
+name: Publish to crates.io
+
+on:
+  release:
+    types: [published]
+  # Test only
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  cargo-publish:
+    runs-on: ubuntu-18.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          components: rustfmt, clippy
+          target: i686-unknown-linux-gnu
+          # This overwrites the default toolchain with the toolchain specified above.
+          override: true
+      - name: Cargo login
+        run: cargo login ${{ secrets.CI_CARGO_LOGIN }}
+      - name: Cargo publish
+        run: cargo publish --dry-run
