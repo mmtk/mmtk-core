@@ -173,7 +173,7 @@ mod tests {
             with_cleanup(
                 || {
                     // We need to do this because of the static NO_METADATA
-                    sanity::reset();
+                    // sanity::reset();
                     let mut gspec = SideMetadataSpec {
                         scope: SideMetadataScope::Global,
                         offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
@@ -285,7 +285,7 @@ mod tests {
             with_cleanup(
                 || {
                     // We need to do this because of the static NO_METADATA
-                    sanity::reset();
+                    // sanity::reset();
                     let data_addr = vm_layout_constants::HEAP_START;
 
                     let metadata_1_spec = SideMetadataSpec {
@@ -354,7 +354,7 @@ mod tests {
             with_cleanup(
                 || {
                     // We need to do this because of the static NO_METADATA
-                    sanity::reset();
+                    // sanity::reset();
                     let data_addr = vm_layout_constants::HEAP_START
                         + (vm_layout_constants::BYTES_IN_CHUNK << 1);
 
@@ -404,7 +404,7 @@ mod tests {
             with_cleanup(
                 || {
                     // We need to do this because of the static NO_METADATA
-                    sanity::reset();
+                    // sanity::reset();
                     let data_addr = vm_layout_constants::HEAP_START
                         + (vm_layout_constants::BYTES_IN_CHUNK << 2);
 

@@ -199,7 +199,7 @@ mod global;
 mod helpers;
 #[cfg(target_pointer_width = "32")]
 mod helpers_32;
-mod sanity;
+pub(crate) mod sanity;
 mod side_metadata_tests;
 
 pub use constants::*;
