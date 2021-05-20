@@ -4,8 +4,6 @@ use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::GcStatus; // Add
-use crate::plan::mutator_context::Mutator;
-use crate::plan::mygc::mutator::create_mygc_mutator;
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -201,14 +199,14 @@ impl<VM: VMBinding> MyGC<VM> {
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs.clone()),
         };
 
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         side_metadata_sanity_checker.verify_metadata_context(
             "CopySpace",
             &SideMetadataContext {
-                global: global_metadata_specs,
+                global: global_metadata_specs.clone(),
                 local: Vec::from(res.copyspace0.local_side_metadata_specs()),
             },
         );

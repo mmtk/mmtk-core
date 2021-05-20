@@ -261,7 +261,7 @@ pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
 
     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log <= 3 {
+    let res = if bits_num_log <= 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
         let mask = meta_byte_mask(metadata_spec) << lshift;
         let byte_val = unsafe { meta_addr.atomic_load::<AtomicU8>(Ordering::SeqCst) };
@@ -278,7 +278,12 @@ pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
             "side metadata > {}-bits is not supported!",
             constants::BITS_IN_WORD
         );
-    }
+    };
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::verify_load(&metadata_spec, data_addr, res);
+
+    res
 }
 
 pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
@@ -318,6 +323,9 @@ pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
             constants::BITS_IN_WORD
         );
     }
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::verify_store(metadata_spec, data_addr, metadata);
 }
 
 pub fn compare_exchange_atomic(
