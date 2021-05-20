@@ -145,13 +145,12 @@ pub trait GenericFreeList: Sized {
     }
 
     fn set_size(&mut self, unit: i32, size: i32) {
+        let hi = self.get_hi_entry(unit);
         if size > 1 {
-            let hi = self.get_hi_entry(unit);
             self.set_hi_entry(unit, hi | MULTI_MASK);
             self.set_hi_entry(unit + 1, MULTI_MASK | size);
             self.set_hi_entry(unit + size - 1, MULTI_MASK | size);
         } else {
-            let hi = self.get_hi_entry(unit);
             self.set_hi_entry(unit, hi & !MULTI_MASK);
         }
     }
@@ -162,8 +161,8 @@ pub trait GenericFreeList: Sized {
 
     fn set_free(&mut self, unit: i32, is_free: bool) {
         let size;
+        let lo = self.get_lo_entry(unit);
         if is_free {
-            let lo = self.get_lo_entry(unit);
             self.set_lo_entry(unit, lo | FREE_MASK);
             size = self.get_size(unit);
             if size > 1 {
@@ -171,7 +170,6 @@ pub trait GenericFreeList: Sized {
                 self.set_lo_entry(unit + size - 1, lo | FREE_MASK);
             }
         } else {
-            let lo = self.get_lo_entry(unit);
             self.set_lo_entry(unit, lo & !FREE_MASK);
             size = self.get_size(unit);
             if size > 1 {
