@@ -235,20 +235,20 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let mut chunk_is_empty = true;
         let mut address = chunk_start;
         let chunk_end = chunk_start + BYTES_IN_CHUNK;
-        let mut page = conversions::page_align_down(address); // XXX: page-bit diff
-        let mut page_is_empty = true; // XXX: page-bit diff
+        // let mut page = conversions::page_align_down(address); // XXX: page-bit diff
+        // let mut page_is_empty = true; // XXX: page-bit diff
 
         // Linear scan through the chunk
         while address < chunk_end {
             trace!("Check address {}", address);
 
-            if address - page >= BYTES_IN_PAGE { // XXX: page-bit diff
-                if page_is_empty {
-                    unset_page_mark_bit_unsafe(page);
-                }
-                page = conversions::page_align_down(address);
-                page_is_empty = true;
-            }
+            // if address - page >= BYTES_IN_PAGE { // XXX: page-bit diff
+            //     if page_is_empty {
+            //         unset_page_mark_bit_unsafe(page);
+            //     }
+            //     page = conversions::page_align_down(address);
+            //     page_is_empty = true;
+            // }
 
             // Check if the address is an object
             if is_alloced_object_unsafe(address) {
@@ -287,7 +287,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     unset_mark_bit_unsafe(object);
                     // This chunk is still active.
                     chunk_is_empty = false;
-                    page_is_empty = false; // XXX: page-bit diff
+                    // page_is_empty = false; // XXX: page-bit diff
 
                     #[cfg(debug_assertions)]
                     {
