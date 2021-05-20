@@ -22,9 +22,10 @@ dependencies by following the instructions in the
    testing. The rest of the tutorial will assume you are using `slowdebug`.
    * You can use the env var `MMTK_PLAN=[PlanName]` to choose a plan to use at run-time.
    The plans that are relevant to this tutorial are `NoGC` and `SemiSpace`.
-   * Make sure you only use `MMTK_PLAN` when you run the generated `java` binary
+   * Make sure you *only* use the env var `MMTK_PLAN=[PlanName]` when you run the generated `java` binary
    (`./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java`). Do not set `MMTK_PLAN`
-   when you build OpenJDK.
+   when you build OpenJDK (if you already have set the env var `MMTK_PLAN`, you would need to do
+   `export MMTK_PLAN=` or `unset MMTK_PLAN` to clear the env var before building).
 
 The MMTk OpenJDK binding ships with a fixed version of mmtk-core, specified in `mmtk-openjdk/mmtk/Cargo.toml`.
 For local development, you would need to build the binding with a local copy of the mmtk-core repo that you
