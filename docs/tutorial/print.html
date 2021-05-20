@@ -271,8 +271,23 @@ fastest debug variant to build, and allows for easier debugging and better
 testing. The rest of the tutorial will assume you are using <code>slowdebug</code>.</li>
 <li>You can use the env var <code>MMTK_PLAN=[PlanName]</code> to choose a plan to use at run-time.
 The plans that are relevant to this tutorial are <code>NoGC</code> and <code>SemiSpace</code>.</li>
+<li>Make sure you <em>only</em> use the env var <code>MMTK_PLAN=[PlanName]</code> when you run the generated <code>java</code> binary
+(<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java</code>). Do not set <code>MMTK_PLAN</code>
+when you build OpenJDK (if you already have set the env var <code>MMTK_PLAN</code>, you would need to do
+<code>export MMTK_PLAN=</code> or <code>unset MMTK_PLAN</code> to clear the env var before building).</li>
 </ul>
 </li>
+</ol>
+<p>The MMTk OpenJDK binding ships with a fixed version of mmtk-core, specified in <code>mmtk-openjdk/mmtk/Cargo.toml</code>.
+For local development, you would need to build the binding with a local copy of the mmtk-core repo that you
+can modify. You would need to point the mmtk dependency to a local path.</p>
+<ol>
+<li>Find <code>mmtk</code> under <code>[dependencies]</code> in <code>mmtk-openjdk/mmtk/Cargo.toml</code>. It should point
+to the mmtk-core git path with a specific revision.</li>
+<li>Comment out the line for the git dependency, and uncomment the following line for a local dependency.</li>
+<li>The local dependency points to <code>mmtk-openjdk/repos/mmtk-core</code> by default. If your local mmtk-core path is
+not <code>mmtk-openjdk/repos/mmtk-core</code>, modify the path to point to your local mmtk-core.</li>
+<li>Rebuild the OpenJDK binding.</li>
 </ol>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="test-the-build"><a class="header" href="#test-the-build">Test the build</a></h1>
 <p>A few benchmarks of varying size will be used throughout the tutorial. If you 
