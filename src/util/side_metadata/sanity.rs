@@ -375,8 +375,13 @@ pub fn verify_bzero(metadata_spec: SideMetadataSpec, start: Address, size: usize
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
-            // remove entries where the key (data_addr) is in the range (start, start+size)
-            spec_sanity_map.retain(|key, _| *key < start || *key >= start + size);
+            // zero entries where the key (data_addr) is in the range (start, start+size)
+            for (k, v) in spec_sanity_map.iter_mut() {
+                // If the source address is in the bzero's range
+                if *k >= start && *k < start + size {
+                    *v = 0;
+                }
+            }
         }
         None => {
             panic!("Invalid Metadata Spec!");
