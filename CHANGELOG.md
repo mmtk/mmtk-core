@@ -1,3 +1,10 @@
+0.4.1 (2021-05-20)
+===
+
+Misc
+---
+* Upgrade the Rust version we use to nightly-2021-05-12 (1.54.0-nightly).
+
 0.4.0 (2021-05-14)
 ===
 
