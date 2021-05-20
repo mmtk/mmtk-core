@@ -402,10 +402,10 @@ mod tests {
     #[test]
     fn is_aligned_to() {
         unsafe {
-            assert_eq!(Address::from_usize(0x10).is_aligned_to(0x10), true);
-            assert_eq!(Address::from_usize(0x11).is_aligned_to(0x10), false);
-            assert_eq!(Address::from_usize(0x10).is_aligned_to(0x8), true);
-            assert_eq!(Address::from_usize(0x10).is_aligned_to(0x20), false);
+            assert!(Address::from_usize(0x10).is_aligned_to(0x10));
+            assert!(!Address::from_usize(0x11).is_aligned_to(0x10));
+            assert!(Address::from_usize(0x10).is_aligned_to(0x8));
+            assert!(!Address::from_usize(0x10).is_aligned_to(0x20));
         }
     }
 

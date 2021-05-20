@@ -52,8 +52,8 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
-        trace!("initialize_header for object {}", object);
+    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
+        trace!("initialize_object_metadata for object {}", object);
         set_alloc_bit(object);
     }
 }

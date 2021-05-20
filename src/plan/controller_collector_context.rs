@@ -10,7 +10,6 @@ use std::sync::RwLock;
 use std::sync::{Arc, Condvar, Mutex};
 
 struct RequestSync {
-    tls: VMWorkerThread,
     request_count: isize,
     last_request_count: isize,
 }
@@ -34,7 +33,6 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
     pub fn new() -> Self {
         ControllerCollectorContext {
             request_sync: Mutex::new(RequestSync {
-                tls: VMWorkerThread(VMThread::UNINITIALIZED),
                 request_count: 0,
                 last_request_count: -1,
             }),
@@ -52,10 +50,6 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
     }
 
     pub fn run(&self, tls: VMWorkerThread) {
-        {
-            self.request_sync.lock().unwrap().tls = tls;
-        }
-
         loop {
             debug!("[STWController: Waiting for request...]");
             self.wait_for_request();

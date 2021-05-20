@@ -115,7 +115,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // Modify
     // ANCHOR: prepare
-    fn prepare(&self, tls: VMWorkerThread) {
+    fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
 
         self.hi
@@ -129,7 +129,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // Modify
     // ANCHOR: release
-    fn release(&self, tls: VMWorkerThread) {
+    fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         self.fromspace().release();
     }

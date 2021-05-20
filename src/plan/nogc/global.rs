@@ -71,11 +71,11 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &self.base
     }
 
-    fn prepare(&self, _tls: VMWorkerThread) {
+    fn prepare(&mut self, _tls: VMWorkerThread) {
         unreachable!()
     }
 
-    fn release(&self, _tls: VMWorkerThread) {
+    fn release(&mut self, _tls: VMWorkerThread) {
         unreachable!()
     }
 

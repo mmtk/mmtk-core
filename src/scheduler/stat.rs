@@ -28,6 +28,7 @@ impl SchedulerStat {
         let sum_logs = logs.sum::<f64>();
         (sum_logs / values.len() as f64).exp()
     }
+
     fn min(&self, values: &[f64]) -> f64 {
         let mut min = values[0];
         for v in values {
@@ -37,6 +38,7 @@ impl SchedulerStat {
         }
         min
     }
+
     fn max(&self, values: &[f64]) -> f64 {
         let mut max = values[0];
         for v in values {
@@ -45,6 +47,10 @@ impl SchedulerStat {
             }
         }
         max
+    }
+
+    fn sum(&self, values: &[f64]) -> f64 {
+        values.iter().sum()
     }
 
     pub fn harness_stat(&self) -> HashMap<String, String> {
@@ -76,6 +82,16 @@ impl SchedulerStat {
             stat.insert(
                 format!("work.{}.time.geomean", self.work_name(n)),
                 format!("{:.2}", geomean),
+            );
+            let sum = self.sum(
+                &durations
+                    .iter()
+                    .map(|d| d.as_nanos() as f64)
+                    .collect::<Vec<_>>(),
+            );
+            stat.insert(
+                format!("work.{}.time.sum", self.work_name(n)),
+                format!("{:.2}", sum),
             );
         }
         let durations = total_durations

@@ -112,7 +112,7 @@ impl<C: Context> WorkBucket<C> {
     pub fn add<W: Work<C>>(&self, work: W) {
         self.add_with_priority(1000, box work);
     }
-    pub fn bulk_add(&self, priority: usize, work_vec: Vec<Box<dyn Work<C>>>) {
+    pub fn bulk_add_with_priority(&self, priority: usize, work_vec: Vec<Box<dyn Work<C>>>) {
         {
             let mut queue = self.queue.write();
             for w in work_vec {
@@ -120,6 +120,9 @@ impl<C: Context> WorkBucket<C> {
             }
         }
         self.notify_all_workers(); // FIXME: Performance
+    }
+    pub fn bulk_add(&self, work_vec: Vec<Box<dyn Work<C>>>) {
+        self.bulk_add_with_priority(1000, work_vec)
     }
     /// Get a work packet (with the greatest priority) from this bucket
     pub fn poll(&self) -> Option<Box<dyn Work<C>>> {

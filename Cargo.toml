@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.3.2"
+version = "0.4.1"
 authors = ["The MMTk Developers <>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -48,10 +48,9 @@ default = []
 # -- Non mutally exclusive features --
 
 # spaces
-base_spaces = []
-vm_space = ["base_spaces"]
-ro_space = ["base_spaces"]
-code_space  = ["base_spaces"]
+vm_space = []
+ro_space = []
+code_space  = []
 
 # Run sanity GC
 sanity = []
