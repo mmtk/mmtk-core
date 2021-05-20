@@ -252,6 +252,12 @@ pub fn reset() {
 /// * `policy_name`: name of the policy of the calling space
 /// * `metadata_context`: the metadata context to examine
 ///
+/// NOTE:
+/// Any unit test using metadata directly or indirectly may need to make sure:
+/// 1 - it uses `util::test_util::serial_test` to prevent metadata sanity conflicts,
+/// 2 - uses exclusive SideMetadata instances (v.s. static instances), and
+/// 3 - uses `util::test_util::with_cleanup` to call `sanity::reset` to cleanup the metadata sanity states to prevent future conflicts.
+///
 pub fn verify_metadata_context(policy_name: &'static str, metadata_context: &SideMetadataContext) {
     let mut specs_sanity_map = SPECS_SANITY_MAP.write().unwrap();
     let mut content_sanity_map = CONTENT_SANITY_MAP.write().unwrap();
@@ -401,6 +407,7 @@ pub fn verify_store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
+            // Newly mapped memory including the side metadata memory is zeroed
             let content = spec_sanity_map.entry(data_addr).or_insert(0);
             *content = metadata;
         }
@@ -419,6 +426,7 @@ fn do_math(
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
+            // Newly mapped memory including the side metadata memory is zeroed
             let cur_val = spec_sanity_map.entry(data_addr).or_insert(0);
             let old_val = *cur_val;
             match math_op {
