@@ -28,7 +28,7 @@ static GLOBAL_META_NAME: &str = "Global";
 /// NOTE:
 /// Content sanity check is expensive and is only activated with the `extreme_assertions` feature.
 pub(crate) struct SideMetadataSanity {
-    specs_sanity_map: RwLock<HashMap<&'static str, Vec<SideMetadataSpec>>>,
+    specs_sanity_map: HashMap<&'static str, Vec<SideMetadataSpec>>,
 }
 
 lazy_static! {
@@ -200,7 +200,7 @@ impl SideMetadataSanity {
     /// Creates a new SideMetadataSanity instance.
     pub fn new() -> SideMetadataSanity {
         SideMetadataSanity {
-            specs_sanity_map: RwLock::new(HashMap::new()),
+            specs_sanity_map: HashMap::new(),
         }
     }
     /// Returns all global or policy-specific specs based-on the input argument.
@@ -212,8 +212,7 @@ impl SideMetadataSanity {
     ///
     fn get_all_specs(&self, global: bool) -> Vec<SideMetadataSpec> {
         let mut specs = vec![];
-        let spec_map = self.specs_sanity_map.read().unwrap();
-        for (k, v) in spec_map.iter() {
+        for (k, v) in self.specs_sanity_map.iter() {
             if !(global ^ (*k == GLOBAL_META_NAME)) {
                 specs.append(&mut (*v).clone());
             }
@@ -273,19 +272,19 @@ impl SideMetadataSanity {
         policy_name: &'static str,
         metadata_context: &SideMetadataContext,
     ) {
-        let mut specs_sanity_map = self.specs_sanity_map.write().unwrap();
         let mut content_sanity_map = CONTENT_SANITY_MAP.write().unwrap();
 
         // is this the first call of this function?
-        let first_call = !specs_sanity_map.contains_key(&GLOBAL_META_NAME);
+        let first_call = !self.specs_sanity_map.contains_key(&GLOBAL_META_NAME);
 
         if first_call {
             // global metadata combination is the same for all contexts
             verify_global_specs(&metadata_context.global).unwrap();
-            specs_sanity_map.insert(GLOBAL_META_NAME, metadata_context.global.clone());
+            self.specs_sanity_map
+                .insert(GLOBAL_META_NAME, metadata_context.global.clone());
         } else {
             // make sure the global metadata in the current context has the same length as before
-            let g_specs = specs_sanity_map.get(&GLOBAL_META_NAME).unwrap();
+            let g_specs = self.specs_sanity_map.get(&GLOBAL_META_NAME).unwrap();
             assert!(
             g_specs.len() == metadata_context.global.len(),
             "Global metadata must not change between policies! NEW SPECS: {:#?} OLD SPECS: {:#?}",
@@ -307,21 +306,22 @@ impl SideMetadataSanity {
             if first_call {
                 // initialise the related hashmap
                 content_sanity_map.insert(*spec, HashMap::new());
-            } else if !specs_sanity_map
+            } else if !self
+                .specs_sanity_map
                 .get(&GLOBAL_META_NAME)
                 .unwrap()
                 .contains(&spec)
             {
-                drop(specs_sanity_map);
                 panic!("Global metadata must not change between policies! NEW SPEC: {:#?} OLD SPECS: {:#?}", spec, self.get_all_specs(true));
             }
         }
 
         // Is this the first time this function is called by any space of a policy?
-        let first_call = !specs_sanity_map.contains_key(&policy_name);
+        let first_call = !self.specs_sanity_map.contains_key(&policy_name);
 
         if first_call {
-            specs_sanity_map.insert(policy_name, metadata_context.local.clone());
+            self.specs_sanity_map
+                .insert(policy_name, metadata_context.local.clone());
         }
 
         for spec in &metadata_context.local {
@@ -338,26 +338,28 @@ impl SideMetadataSanity {
             if first_call {
                 // initialise the related hashmap
                 content_sanity_map.insert(*spec, HashMap::new());
-            } else if !specs_sanity_map.get(policy_name).unwrap().contains(&spec) {
+            } else if !self
+                .specs_sanity_map
+                .get(policy_name)
+                .unwrap()
+                .contains(&spec)
+            {
                 panic!(
                     "Policy-specific metadata for -{}- changed from {:#?} to {:#?}",
                     policy_name,
-                    specs_sanity_map.get(policy_name).unwrap(),
+                    self.specs_sanity_map.get(policy_name).unwrap(),
                     metadata_context.local
                 )
             }
         }
-
-        drop(specs_sanity_map);
 
         self.verify_local_specs().unwrap();
     }
 
     #[cfg(test)]
     pub fn reset(&mut self) {
-        let mut specs_sanity_map = self.specs_sanity_map.write().unwrap();
         let mut content_sanity_map = CONTENT_SANITY_MAP.write().unwrap();
-        specs_sanity_map.clear();
+        self.specs_sanity_map.clear();
         content_sanity_map.clear();
     }
 }
