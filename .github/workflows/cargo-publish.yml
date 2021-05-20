@@ -1,17 +1,13 @@
 name: Publish to crates.io
 
 on:
+  # Triggered when we tag a release (including a prerelease)
   release:
     types: [published]
-  # Test only
-  pull_request:
-    branches:
-    - master
 
 jobs:
   cargo-publish:
     runs-on: ubuntu-18.04
-    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v2
       - name: Install latest nightly
@@ -24,4 +20,4 @@ jobs:
       - name: Cargo login
         run: cargo login ${{ secrets.CI_CARGO_LOGIN }}
       - name: Cargo publish
-        run: cargo publish --dry-run
+        run: cargo publish
