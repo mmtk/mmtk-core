@@ -3,7 +3,7 @@
 //! Provides an abstraction and implementations of counters for collecting
 //! work-packet level statistics
 //!
-//! See [crate::util::statistics] for collecting statistics over a GC cycle
+//! See [`crate::util::statistics`] for collecting statistics over a GC cycle
 use std::time::SystemTime;
 
 /// Common struct for different work counters
@@ -16,7 +16,7 @@ pub(super) struct WorkCounterBase {
     pub(super) max: f64,
 }
 
-/// Make WorkCounter trait objects cloneable
+/// Make [`WorkCounter`] trait objects cloneable
 pub(super) trait WorkCounterClone {
     /// Clone the object
     fn clone_box(&self) -> Box<dyn WorkCounter>;
@@ -29,6 +29,11 @@ impl<T: 'static + WorkCounter + Clone> WorkCounterClone for T {
 }
 
 /// An abstraction of work counters
+///
+/// Use for trait objects, as we have might have types of work counters for
+/// the same work packet and the types are not statically known.alloc
+/// The overhead should be negligible compared with the cost of executing
+/// a work packet.
 pub(super) trait WorkCounter: WorkCounterClone + std::fmt::Debug {
     // TODO: consolidate with crate::util::statistics::counter::Counter;
     /// Start the counter
@@ -37,9 +42,9 @@ pub(super) trait WorkCounter: WorkCounterClone + std::fmt::Debug {
     fn stop(&mut self);
     /// Name of counter
     fn name(&self) -> String;
-    /// Return a reference to [WorkCounterBase]
+    /// Return a reference to [`WorkCounterBase`]
     fn get_base(&self) -> &WorkCounterBase;
-    /// Return a mutatable reference to [WorkCounterBase]
+    /// Return a mutatable reference to [`WorkCounterBase`]
     fn get_base_mut(&mut self) -> &mut WorkCounterBase;
 }
 
@@ -60,7 +65,7 @@ impl Default for WorkCounterBase {
 }
 
 impl WorkCounterBase {
-    /// Merge two [WorkCounterBase], keep the semantics of the fields,
+    /// Merge two [`WorkCounterBase`], keep the semantics of the fields,
     /// and return a new object
     pub(super) fn merge(&self, other: &Self) -> Self {
         let min = self.min.min(other.min);
@@ -69,7 +74,7 @@ impl WorkCounterBase {
         WorkCounterBase { total, min, max }
     }
 
-    /// Merge two [WorkCounterBase], modify the current object in place,
+    /// Merge two [`WorkCounterBase`], modify the current object in place,
     /// and keep the semantics of the fields
     pub(super) fn merge_inplace(&mut self, other: &Self) {
         self.min = self.min.min(other.min);
@@ -87,7 +92,7 @@ impl WorkCounterBase {
 
 /// Measure the durations of work packets
 ///
-/// Timing is based on [SystemTime]
+/// Timing is based on [`SystemTime`]
 #[derive(Copy, Clone, Debug)]
 pub(super) struct WorkDuration {
     base: WorkCounterBase,
