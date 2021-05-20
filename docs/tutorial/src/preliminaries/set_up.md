@@ -22,3 +22,16 @@ dependencies by following the instructions in the
    testing. The rest of the tutorial will assume you are using `slowdebug`.
    * You can use the env var `MMTK_PLAN=[PlanName]` to choose a plan to use at run-time.
    The plans that are relevant to this tutorial are `NoGC` and `SemiSpace`.
+   * Make sure you only use `MMTK_PLAN` when you run the generated `java` binary
+   (`./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java`). Do not set `MMTK_PLAN`
+   when you build OpenJDK.
+
+The MMTk OpenJDK binding ships with a fixed version of mmtk-core, specified in `mmtk-openjdk/mmtk/Cargo.toml`.
+For local development, you would need to build the binding with a local copy of the mmtk-core repo that you
+can modify. You would need to point the mmtk dependency to a local path.
+1. Find `mmtk` under `[dependencies]` in `mmtk-openjdk/mmtk/Cargo.toml`. It should point
+to the mmtk-core git path with a specific revision.
+2. Comment out the line for the git dependency, and uncomment the following line for a local dependency.
+3. The local dependency points to `mmtk-openjdk/repos/mmtk-core` by default. If your local mmtk-core path is
+not `mmtk-openjdk/repos/mmtk-core`, modify the path to point to your local mmtk-core.
+4. Rebuild the OpenJDK binding.
