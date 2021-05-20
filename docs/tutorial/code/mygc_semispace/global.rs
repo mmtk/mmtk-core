@@ -20,7 +20,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
-use crate::util::side_metadata::SideMetadataContext;
+use crate::util::side_metadata::{SideMetadataSanity, SideMetadataContext};
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -177,7 +177,7 @@ impl<VM: VMBinding> MyGC<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
-        MyGC {
+        let res = MyGC {
             hi: AtomicBool::new(false),
             // ANCHOR: copyspace_new
             copyspace0: CopySpace::new(
@@ -202,7 +202,25 @@ impl<VM: VMBinding> MyGC<VM> {
                 &mut heap,
             ),
             common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs),
-        }
+        };
+
+        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+        side_metadata_sanity_checker.verify_metadata_context(
+            "CopySpace",
+            &SideMetadataContext {
+                global: global_metadata_specs,
+                local: Vec::from(res.copyspace0.local_side_metadata_specs()),
+            },
+        );
+        side_metadata_sanity_checker.verify_metadata_context(
+            "CopySpace",
+            &SideMetadataContext {
+                global: global_metadata_specs,
+                local: Vec::from(res.copyspace1.local_side_metadata_specs()),
+            },
+        );
+
+        res
     }
     // ANCHOR_END: plan_new
 

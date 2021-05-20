@@ -74,13 +74,15 @@ pub struct SideMetadata {
 }
 
 impl SideMetadata {
-    pub fn new(_policy_name: &'static str, context: SideMetadataContext) -> SideMetadata {
-        sanity::verify_metadata_context(_policy_name, &context);
-
+    pub fn new(context: SideMetadataContext) -> SideMetadata {
         Self {
             context,
             accounting: PageAccounting::new(),
         }
+    }
+
+    pub fn get_local_specs(&self) -> &[SideMetadataSpec] {
+        &self.context.local
     }
 
     pub fn reserved_pages(&self) -> usize {
@@ -229,6 +231,11 @@ impl SideMetadata {
                 self.accounting.release(size >> LOG_BYTES_IN_PAGE);
             }
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_context(&self) -> &SideMetadataContext {
+        &self.context
     }
 }
 

@@ -195,13 +195,13 @@ mod tests {
                         log_min_obj_size: 1,
                     };
 
-                    let metadata = SideMetadata::new(
-                        "NoPolicy",
-                        SideMetadataContext {
-                            global: vec![gspec],
-                            local: vec![lspec],
-                        },
-                    );
+                    let metadata = SideMetadata::new(SideMetadataContext {
+                        global: vec![gspec],
+                        local: vec![lspec],
+                    });
+
+                    let mut metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context("NoPolicy", metadata.get_context());
 
                     assert!(metadata
                         .try_map_metadata_space(
@@ -231,15 +231,15 @@ mod tests {
                     lspec.log_min_obj_size = 4;
                     lspec.log_num_of_bits = 2;
 
-                    sanity::reset();
+                    metadata_sanity.reset();
 
-                    let metadata = SideMetadata::new(
-                        "NoPolicy",
-                        SideMetadataContext {
-                            global: vec![gspec],
-                            local: vec![lspec],
-                        },
-                    );
+                    let metadata = SideMetadata::new(SideMetadataContext {
+                        global: vec![gspec],
+                        local: vec![lspec],
+                    });
+
+                    metadata_sanity.verify_metadata_context("NoPolicy", metadata.get_context());
+                    metadata_sanity.reset();
 
                     assert!(metadata
                         .try_map_metadata_space(
@@ -303,13 +303,13 @@ mod tests {
                         log_min_obj_size: 7,
                     };
 
-                    let metadata = SideMetadata::new(
-                        "NoPolicy",
-                        SideMetadataContext {
-                            global: vec![metadata_1_spec, metadata_2_spec],
-                            local: vec![],
-                        },
-                    );
+                    let metadata = SideMetadata::new(SideMetadataContext {
+                        global: vec![metadata_1_spec, metadata_2_spec],
+                        local: vec![],
+                    });
+
+                    let mut metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context("NoPolicy", metadata.get_context());
 
                     assert!(metadata
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
@@ -340,6 +340,7 @@ mod tests {
                     assert_eq!(three, 3);
 
                     metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+                    metadata_sanity.reset();
                 },
                 || {
                     sanity::reset();
@@ -365,13 +366,13 @@ mod tests {
                         log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
                     };
 
-                    let metadata = SideMetadata::new(
-                        "NoPolicy",
-                        SideMetadataContext {
-                            global: vec![metadata_1_spec],
-                            local: vec![],
-                        },
-                    );
+                    let metadata = SideMetadata::new(SideMetadataContext {
+                        global: vec![metadata_1_spec],
+                        local: vec![],
+                    });
+
+                    let mut metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context("NoPolicy", metadata.get_context());
 
                     assert!(metadata
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
@@ -390,6 +391,8 @@ mod tests {
                     assert_eq!(one, 1);
 
                     metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+
+                    metadata_sanity.reset();
                 },
                 || {
                     sanity::reset();
@@ -443,13 +446,13 @@ mod tests {
                         log_min_obj_size: 7,
                     };
 
-                    let metadata = SideMetadata::new(
-                        "NoPolicy",
-                        SideMetadataContext {
-                            global: vec![],
-                            local: vec![metadata_1_spec, metadata_2_spec],
-                        },
-                    );
+                    let metadata = SideMetadata::new(SideMetadataContext {
+                        global: vec![],
+                        local: vec![metadata_1_spec, metadata_2_spec],
+                    });
+
+                    let mut metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context("NoPolicy", metadata.get_context());
 
                     assert!(metadata
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
@@ -482,6 +485,8 @@ mod tests {
                     assert_eq!(five, 0);
 
                     metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+
+                    metadata_sanity.reset();
                 },
                 || {
                     sanity::reset();

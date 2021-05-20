@@ -339,7 +339,7 @@ mod tests {
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use crate::util::memory;
-    use crate::util::side_metadata::{sanity, SideMetadata, SideMetadataContext};
+    use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
     use crate::util::test_util::FRAGMENTED_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::{conversions, Address};
@@ -348,13 +348,10 @@ mod tests {
     const MAX_BYTES: usize = FRAGMENTED_MMAPPER_TEST_REGION.size;
 
     fn new_no_metadata() -> SideMetadata {
-        SideMetadata::new(
-            "NO_METADATA",
-            SideMetadataContext {
-                global: vec![],
-                local: vec![],
-            },
-        )
+        SideMetadata::new(SideMetadataContext {
+            global: vec![],
+            local: vec![],
+        })
     }
 
     fn pages_to_chunks_up(pages: usize) -> usize {
@@ -423,7 +420,6 @@ mod tests {
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
-                    sanity::reset();
                 },
             )
         })
@@ -453,7 +449,6 @@ mod tests {
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
-                    sanity::reset();
                 },
             )
         })
@@ -484,7 +479,6 @@ mod tests {
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
-                    sanity::reset();
                 },
             )
         })
@@ -517,7 +511,6 @@ mod tests {
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
-                    sanity::reset();
                 },
             )
         })
@@ -563,7 +556,6 @@ mod tests {
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
-                    sanity::reset();
                 },
             )
         })

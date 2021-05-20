@@ -132,13 +132,10 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
             limit: AVAILABLE_END,
             slow_path_zeroing,
-            metadata: SideMetadata::new(
-                name,
-                SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: vec![],
-                },
-            ),
+            metadata: SideMetadata::new(SideMetadataContext {
+                global: global_side_metadata_specs,
+                local: vec![],
+            }),
             phantom: PhantomData,
         }
     }

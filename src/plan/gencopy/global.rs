@@ -23,7 +23,7 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::SideMetadataContext;
+use crate::util::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
@@ -185,7 +185,7 @@ impl<VM: VMBinding> GenCopy<VM> {
         };
         let global_metadata_specs = SideMetadataContext::new_global_specs(&gencopy_specs);
 
-        GenCopy {
+        let res = GenCopy {
             nursery: CopySpace::new(
                 "nursery",
                 false,
@@ -223,10 +223,35 @@ impl<VM: VMBinding> GenCopy<VM> {
                 options,
                 heap,
                 &GENCOPY_CONSTRAINTS,
-                global_metadata_specs,
+                global_metadata_specs.clone(),
             ),
             in_nursery: AtomicBool::default(),
-        }
+        };
+
+        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+        side_metadata_sanity_checker.verify_metadata_context(
+            "CopySpace",
+            &SideMetadataContext {
+                global: global_metadata_specs.clone(),
+                local: Vec::from(res.nursery.local_side_metadata_specs()),
+            },
+        );
+        side_metadata_sanity_checker.verify_metadata_context(
+            "CopySpace",
+            &SideMetadataContext {
+                global: global_metadata_specs.clone(),
+                local: Vec::from(res.copyspace0.local_side_metadata_specs()),
+            },
+        );
+        side_metadata_sanity_checker.verify_metadata_context(
+            "CopySpace",
+            &SideMetadataContext {
+                global: global_metadata_specs,
+                local: Vec::from(res.copyspace1.local_side_metadata_specs()),
+            },
+        );
+
+        res
     }
 
     fn request_full_heap_collection(&self) -> bool {

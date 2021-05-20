@@ -17,7 +17,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::util::side_metadata::SideMetadataContext;
+use crate::util::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
@@ -127,7 +127,7 @@ impl<VM: VMBinding> NoGC<VM> {
             &NOGC_CONSTRAINTS,
         );
 
-        NoGC {
+        let res = NoGC {
             nogc_space,
             base: BasePlan::new(
                 vm_map,
@@ -135,8 +135,19 @@ impl<VM: VMBinding> NoGC<VM> {
                 options,
                 heap,
                 &NOGC_CONSTRAINTS,
-                global_specs,
+                global_specs.clone(),
             ),
-        }
+        };
+
+        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+        side_metadata_sanity_checker.verify_metadata_context(
+            "NoGCImmortalSpace",
+            &SideMetadataContext {
+                global: global_specs,
+                local: Vec::from(res.nogc_space.local_side_metadata_specs()),
+            },
+        );
+
+        res
     }
 }

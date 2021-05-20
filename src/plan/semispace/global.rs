@@ -22,7 +22,7 @@ use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::SideMetadataContext;
+use crate::util::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -151,7 +151,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
-        SemiSpace {
+        let res = SemiSpace {
             hi: AtomicBool::new(false),
             copyspace0: CopySpace::new(
                 "copyspace0",
@@ -179,9 +179,27 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 options,
                 heap,
                 &SS_CONSTRAINTS,
-                global_metadata_specs,
+                global_metadata_specs.clone(),
             ),
-        }
+        };
+
+        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+        side_metadata_sanity_checker.verify_metadata_context(
+            "CopySpace",
+            &SideMetadataContext {
+                global: global_metadata_specs.clone(),
+                local: Vec::from(res.copyspace0.local_side_metadata_specs()),
+            },
+        );
+        side_metadata_sanity_checker.verify_metadata_context(
+            "CopySpace",
+            &SideMetadataContext {
+                global: global_metadata_specs,
+                local: Vec::from(res.copyspace1.local_side_metadata_specs()),
+            },
+        );
+
+        res
     }
 
     pub fn tospace(&self) -> &CopySpace<VM> {

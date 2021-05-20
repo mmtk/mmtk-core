@@ -209,13 +209,10 @@ mod tests {
     const MAX_SIZE: usize = BYTE_MAP_MMAPPER_TEST_REGION.size;
 
     fn new_no_metadata() -> SideMetadata {
-        SideMetadata::new(
-            "NO_METADATA",
-            SideMetadataContext {
-                global: vec![],
-                local: vec![],
-            },
-        )
+        SideMetadata::new(SideMetadataContext {
+            global: vec![],
+            local: vec![],
+        })
     }
 
     #[test]
@@ -277,7 +274,6 @@ mod tests {
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
-                    sanity::reset();
                 },
             )
         })
@@ -305,7 +301,6 @@ mod tests {
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
-                    sanity::reset();
                 },
             )
         })
@@ -335,7 +330,6 @@ mod tests {
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
-                    sanity::reset();
                 },
             )
         })
@@ -363,7 +357,6 @@ mod tests {
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
-                    sanity::reset();
                 },
             )
         })
@@ -398,7 +391,6 @@ mod tests {
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
-                    sanity::reset();
                 },
             )
         })

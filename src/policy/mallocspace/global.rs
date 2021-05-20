@@ -129,6 +129,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst))
             + self.metadata.reserved_pages()
     }
+
+    fn local_side_metadata_specs(&self) -> &[SideMetadataSpec] {
+        self.metadata.get_local_specs()
+    }
 }
 
 impl<VM: VMBinding> MallocSpace<VM> {
@@ -136,13 +140,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
-            metadata: SideMetadata::new(
-                "MallocSpace",
-                SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
-                },
-            ),
+            metadata: SideMetadata::new(SideMetadataContext {
+                global: global_side_metadata_specs,
+                local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
+            }),
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
         }
