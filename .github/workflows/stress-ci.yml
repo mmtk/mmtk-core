@@ -2,8 +2,11 @@ name: Stress Test CI
 
 on:
   push:
-    branches:
-      - master
+    # branches:
+    #   - master
+    # Disable our stress test for now. We will rework on the config: https://github.com/mmtk/mmtk-core/issues/328
+    branches-ignore:
+      - '**'
 
 jobs:
   jikesrvm-stress-test:
