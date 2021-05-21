@@ -31,7 +31,7 @@ impl<T: 'static + WorkCounter + Clone> WorkCounterClone for T {
 /// An abstraction of work counters
 ///
 /// Use for trait objects, as we have might have types of work counters for
-/// the same work packet and the types are not statically known.alloc
+/// the same work packet and the types are not statically known.
 /// The overhead should be negligible compared with the cost of executing
 /// a work packet.
 pub(super) trait WorkCounter: WorkCounterClone + std::fmt::Debug {
