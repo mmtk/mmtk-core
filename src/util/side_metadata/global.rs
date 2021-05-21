@@ -287,6 +287,10 @@ pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
 }
 
 pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
+    println!(
+        "store_atomic({:?}, {}, {})",
+        metadata_spec, data_addr, metadata
+    );
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
@@ -316,7 +320,7 @@ pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
     } else if bits_num_log == 5 {
         unsafe { meta_addr.atomic_store::<AtomicU32>(metadata as u32, Ordering::SeqCst) };
     } else if bits_num_log == 6 {
-        unsafe { meta_addr.atomic_store::<AtomicUsize>(metadata as usize, Ordering::SeqCst) }
+        unsafe { meta_addr.atomic_store::<AtomicUsize>(metadata as usize, Ordering::SeqCst) };
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
@@ -334,6 +338,10 @@ pub fn compare_exchange_atomic(
     old_metadata: usize,
     new_metadata: usize,
 ) -> bool {
+    println!(
+        "compare_exchange_atomic({:?}, {}, {}, {})",
+        metadata_spec, data_addr, old_metadata, new_metadata
+    );
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);

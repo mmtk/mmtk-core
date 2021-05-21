@@ -408,22 +408,19 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
     match sanity_map.get(&metadata_spec) {
         Some(spec_sanity_map) => {
             // A content of None is Ok because we may load before store
-            if let Some(expected_val) = spec_sanity_map.get(&data_addr) {
-                assert!(
-                    *expected_val == actual_val,
-                    "Expected (0x{:x}) but found (0x{:x})",
-                    expected_val,
-                    actual_val
-                );
+            let expected_val = if let Some(expected_val) = spec_sanity_map.get(&data_addr) {
+                *expected_val
             } else {
-                let expected_val = 0usize;
-                assert!(
-                    expected_val == actual_val,
-                    "Expected (0x{:x}) but found (0x{:x})",
-                    expected_val,
-                    actual_val
-                );
-            }
+                0usize
+            };
+            assert!(
+                expected_val == actual_val,
+                "verify_load({:#?}, {}) -> Expected (0x{:x}) but found (0x{:x})",
+                metadata_spec,
+                data_addr,
+                expected_val,
+                actual_val
+            );
         }
         None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
     }
@@ -440,6 +437,10 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
 ///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
+    println!(
+        "verify_store({:?}, {}, {})",
+        metadata_spec, data_addr, metadata
+    );
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
