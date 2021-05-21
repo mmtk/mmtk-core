@@ -19,8 +19,7 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::OpaquePointer;
-use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
+use crate::mmtk::MMTK;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::Arc;
 use enum_map::EnumMap;

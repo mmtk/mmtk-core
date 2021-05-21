@@ -5,7 +5,6 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;

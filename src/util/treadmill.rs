@@ -56,7 +56,7 @@ impl TreadMill {
         // println!("cn -> ts {}", cell);
         } else {
             let mut guard = self.from_space.lock().unwrap();
-            debug_assert!(guard.contains(&cell), "Unknown cell {:?}", cell);
+            debug_assert!(guard.contains(&cell));
             guard.remove(&cell);
             // println!("fs -> ts {}", cell);
         }

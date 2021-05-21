@@ -1,4 +1,4 @@
-use crate::{plan::MutatorContext, util::Address};
+use crate::plan::MutatorContext;
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
 use crate::util::opaque_pointer::*;
@@ -68,7 +68,4 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The thread pointer for the current GC thread.
     fn schedule_finalization(_tls: VMWorkerThread) {}
-
-    fn sweep(_addr: Address) {}
-    fn process_weak_refs() {}
 }
