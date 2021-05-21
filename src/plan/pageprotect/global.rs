@@ -1,4 +1,4 @@
-use super::gc_work::PageProcessEdges;
+use super::gc_work::PPProcessEdges;
 use crate::{plan::global::{CommonPlan, NoCopy}, policy::largeobjectspace::LargeObjectSpace, util::opaque_pointer::VMWorkerThread};
 use crate::plan::global::GcStatus;
 use super::mutator::ALLOCATOR_MAPPING;
@@ -27,7 +27,7 @@ use crate::util::side_metadata::SideMetadataContext;
 
 
 
-pub struct Page<VM: VMBinding> {
+pub struct PageProtect<VM: VMBinding> {
     pub space: LargeObjectSpace<VM>,
     pub common: CommonPlan<VM>,
 }
@@ -40,7 +40,7 @@ pub const CONSTRAINTS: PlanConstraints = PlanConstraints {
     ..PlanConstraints::default()
 };
 
-impl<VM: VMBinding> Plan for Page<VM> {
+impl<VM: VMBinding> Plan for PageProtect<VM> {
     type VM = VM;
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -71,10 +71,10 @@ impl<VM: VMBinding> Plan for Page<VM> {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()
-            .schedule_common::<PageProcessEdges<VM>>(&CONSTRAINTS, scheduler);
+            .schedule_common::<PPProcessEdges<VM>>(&CONSTRAINTS, scheduler);
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<PageProcessEdges<VM>>::new());
+            .add(StopMutators::<PPProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, NoCopy<VM>>::new(self));
@@ -129,7 +129,7 @@ impl<VM: VMBinding> Plan for Page<VM> {
     }
 }
 
-impl<VM: VMBinding> Page<VM> {
+impl<VM: VMBinding> PageProtect<VM> {
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
@@ -138,7 +138,7 @@ impl<VM: VMBinding> Page<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
-        Page {
+        PageProtect {
             space: LargeObjectSpace::new(
                 "los",
                 true,

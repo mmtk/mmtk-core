@@ -20,7 +20,7 @@ custom_derive! {
         SemiSpace,
         GenCopy,
         MarkSweep,
-        Page,
+        PageProtect,
     }
 }
 
