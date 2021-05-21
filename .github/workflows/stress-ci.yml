@@ -1,17 +1,20 @@
 name: Stress Test CI
 
 on:
-  push:
+  # push:
     # branches:
     #   - master
     # Disable our stress test for now. We will rework on the config: https://github.com/mmtk/mmtk-core/issues/328
-    branches-ignore:
-      - '**'
+    # branches-ignore:
+    #   - '**'
+  pull_request:
+    branches:
+    - master
 
 jobs:
   jikesrvm-stress-test:
     runs-on: [self-hosted, Linux, freq-scaling-on]
-    timeout-minutes: 720
+    timeout-minutes: 6000
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -37,65 +40,65 @@ jobs:
       - name: Build SemiSpace
         run: |
           cd mmtk-jikesrvm/repos/jikesrvm
-          python scripts/testMMTk.py -g RFastAdaptiveSemiSpace -j /usr/lib/jvm/java-1.8.0-openjdk-amd64 --build-only -- --answer-yes --quick --use-third-party-heap=../../ --use-third-party-build-configs=../../jikesrvm/build/configs --use-external-source=../../jikesrvm/rvm/src
+          python scripts/testMMTk.py -g RFastAdaptiveSemiSpace -j /usr/lib/jvm/java-1.8.0-openjdk-amd64 --build-only -- --answer-yes --quick --use-third-party-heap=../../ --use-third-party-build-configs=../../jikesrvm/build/configs --use-external-source=../../jikesrvm/rvm/src --m32
       # Set parameters
       - name: Set stress test parameters
         id: stress_test
         run: echo "MMTK_STRESS_FACTOR=1" >> $GITHUB_ENV
       - name: antlr
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
-          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64_m32-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr
       - name: bloat
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
-          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar bloat
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64_m32-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar bloat
       - name: fop
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
-          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64_m32-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop
       - name: hsqldb
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
-          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms200M -Xmx200M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64_m32-linux/rvm -Xms200M -Xmx200M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb
       - name: jython
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
-          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar jython
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64_m32-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar jython
       - name: luindex
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
-          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64_m32-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex
       - name: pmd
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
-          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64_m32-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd
       - name: xalan
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
-          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms100M -Xmx100M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar xalan
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64_m32-linux/rvm -Xms100M -Xmx100M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar xalan
       - name: lusearch
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
-          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar lusearch
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64_m32-linux/rvm -Xms75M -Xmx75M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar lusearch
       - name: eclipse
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
-          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64-linux/rvm -Xms150M -Xmx150M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse
+          mmtk-jikesrvm/repos/jikesrvm/dist/RFastAdaptiveSemiSpace_x86_64_m32-linux/rvm -Xms150M -Xmx150M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse
 
   openjdk-stress-test:
     runs-on: [self-hosted, Linux, freq-scaling-on]
-    timeout-minutes: 720
+    timeout-minutes: 6000
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -132,31 +135,31 @@ jobs:
       # Run
       - name: antlr
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
           mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar antlr
       - name: fop
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
           mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar fop
       - name: luindex
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
           mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar luindex
       - name: pmd
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
           mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar pmd
       - name: hsqldb
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
           mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar hsqldb
       - name: eclipse
         if: always()
-        timeout-minutes: 180
+        timeout-minutes: 600
         run:
           mmtk-openjdk/repos/openjdk/build/linux-x86_64-normal-server-release/jdk/bin/java -XX:+UseThirdPartyHeap -server -XX:MetaspaceSize=100M -Xms500M -Xmx500M -jar /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar eclipse
