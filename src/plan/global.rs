@@ -2,6 +2,7 @@
 
 use super::controller_collector_context::ControllerCollectorContext;
 use super::PlanConstraints;
+use crate::mmtk::MMTK;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -20,11 +21,11 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
+use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::statistics::stats::Stats;
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
-use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::marker::PhantomData;

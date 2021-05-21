@@ -135,18 +135,13 @@ impl<VM: VMBinding> NoGC<VM> {
                 options,
                 heap,
                 &NOGC_CONSTRAINTS,
-                global_specs.clone(),
+                global_specs,
             ),
         };
 
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        side_metadata_sanity_checker.verify_metadata_context(
-            "NoGCImmortalSpace",
-            &SideMetadataContext {
-                global: global_specs,
-                local: Vec::from(res.nogc_space.local_side_metadata_specs()),
-            },
-        );
+        side_metadata_sanity_checker.verify_base_spaces(&res.base);
+        side_metadata_sanity_checker.verify_space(&res.nogc_space);
 
         res
     }

@@ -223,33 +223,18 @@ impl<VM: VMBinding> GenCopy<VM> {
                 options,
                 heap,
                 &GENCOPY_CONSTRAINTS,
-                global_metadata_specs.clone(),
+                global_metadata_specs,
             ),
             in_nursery: AtomicBool::default(),
         };
 
-        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        side_metadata_sanity_checker.verify_metadata_context(
-            "CopySpace",
-            &SideMetadataContext {
-                global: global_metadata_specs.clone(),
-                local: Vec::from(res.nursery.local_side_metadata_specs()),
-            },
-        );
-        side_metadata_sanity_checker.verify_metadata_context(
-            "CopySpace",
-            &SideMetadataContext {
-                global: global_metadata_specs.clone(),
-                local: Vec::from(res.copyspace0.local_side_metadata_specs()),
-            },
-        );
-        side_metadata_sanity_checker.verify_metadata_context(
-            "CopySpace",
-            &SideMetadataContext {
-                global: global_metadata_specs,
-                local: Vec::from(res.copyspace1.local_side_metadata_specs()),
-            },
-        );
+        {
+            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+            side_metadata_sanity_checker.verify_common_spaces(&res.common);
+            side_metadata_sanity_checker.verify_space(&res.nursery);
+            side_metadata_sanity_checker.verify_space(&res.copyspace0);
+            side_metadata_sanity_checker.verify_space(&res.copyspace1);
+        }
 
         res
     }

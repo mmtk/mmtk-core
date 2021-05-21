@@ -130,8 +130,8 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             + self.metadata.reserved_pages()
     }
 
-    fn local_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        self.metadata.get_local_specs()
+    fn get_side_metadata_context(&self) -> &SideMetadataContext {
+        self.metadata.get_context()
     }
 }
 

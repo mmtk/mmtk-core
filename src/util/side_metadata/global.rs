@@ -81,6 +81,10 @@ impl SideMetadata {
         }
     }
 
+    pub fn get_context(&self) -> &SideMetadataContext {
+        &self.context
+    }
+
     pub fn get_local_specs(&self) -> &[SideMetadataSpec] {
         &self.context.local
     }
@@ -231,11 +235,6 @@ impl SideMetadata {
                 self.accounting.release(size >> LOG_BYTES_IN_PAGE);
             }
         }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn get_context(&self) -> &SideMetadataContext {
-        &self.context
     }
 }
 

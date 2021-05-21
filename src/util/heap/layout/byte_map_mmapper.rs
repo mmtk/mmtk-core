@@ -199,7 +199,7 @@ mod tests {
     use crate::util::heap::layout::byte_map_mmapper::{MAPPED, PROTECTED};
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use crate::util::memory;
-    use crate::util::side_metadata::{sanity, SideMetadata, SideMetadataContext};
+    use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
     use crate::util::test_util::BYTE_MAP_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
     use std::sync::atomic::Ordering;
