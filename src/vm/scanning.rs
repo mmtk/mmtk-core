@@ -1,8 +1,8 @@
 use crate::plan::{Mutator, TransitiveClosure};
-use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::GCWorker;
+use crate::scheduler::ProcessEdgesWork;
 use crate::util::ObjectReference;
-use crate::util::OpaquePointer;
+use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 
 /// VM-specific methods for scanning roots/objects.
@@ -26,7 +26,7 @@ pub trait Scanning<VM: VMBinding> {
     fn scan_object<T: TransitiveClosure>(
         trace: &mut T,
         object: ObjectReference,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
     );
 
     /// MMTk calls this method at the first time during a collection that thread's stacks
@@ -36,7 +36,7 @@ pub trait Scanning<VM: VMBinding> {
     /// Arguments:
     /// * `partial_scan`: Whether the scan was partial or full-heap.
     /// * `tls`: The GC thread that is performing the thread scan.
-    fn notify_initial_thread_scan_complete(partial_scan: bool, tls: OpaquePointer);
+    fn notify_initial_thread_scan_complete(partial_scan: bool, tls: VMWorkerThread);
 
     /// Bulk scanning of objects, processing each pointer field for each object.
     ///
@@ -57,7 +57,7 @@ pub trait Scanning<VM: VMBinding> {
     /// * `tls`: The GC thread that is performing this scanning.
     fn scan_thread_root<W: ProcessEdgesWork<VM = VM>>(
         mutator: &'static mut Mutator<VM>,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
     );
 
     /// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)

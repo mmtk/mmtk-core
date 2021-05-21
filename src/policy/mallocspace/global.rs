@@ -6,10 +6,10 @@ use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
+use crate::util::opaque_pointer::*;
 use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
@@ -52,8 +52,8 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
-        trace!("initialize_header for object {}", object);
+    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
+        trace!("initialize_object_metadata for object {}", object);
         set_alloc_bit(object);
     }
 }
@@ -145,10 +145,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    pub fn alloc(&self, tls: OpaquePointer, size: usize) -> Address {
+    pub fn alloc(&self, tls: VMThread, size: usize) -> Address {
         // TODO: Should refactor this and Space.acquire()
         if VM::VMActivePlan::global().poll(false, self) {
-            VM::VMCollection::block_for_gc(tls);
+            assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
+            VM::VMCollection::block_for_gc(VMMutatorThread(tls));
             return unsafe { Address::zero() };
         }
 

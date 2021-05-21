@@ -1,7 +1,7 @@
 use crate::plan::TraceLocal;
+use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::OpaquePointer;
 use crate::vm::VMBinding;
 
 /// VM-specific methods for reference processing.
@@ -40,6 +40,6 @@ pub trait ReferenceGlue<VM: VMBinding> {
     fn process_reference<T: TraceLocal>(
         trace: &mut T,
         reference: ObjectReference,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
     ) -> ObjectReference;
 }

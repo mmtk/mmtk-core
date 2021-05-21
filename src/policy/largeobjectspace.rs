@@ -8,9 +8,9 @@ use crate::util::header_byte::HeaderByte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
+use crate::util::opaque_pointer::*;
 use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::treadmill::TreadMill;
-use crate::util::OpaquePointer;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
@@ -25,6 +25,8 @@ const USE_PRECEEDING_GC_HEADER: bool = false;
 const PRECEEDING_GC_HEADER_WORDS: usize = 1;
 const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTES_IN_WORD;
 
+/// This type implements a policy for large objects. Each instance corresponds
+/// to one Treadmill space.
 pub struct LargeObjectSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
@@ -48,7 +50,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_header(&self, object: ObjectReference, alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
         let old_value = gc_byte::read_gc_byte::<VM>(object);
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
         if alloc {
@@ -200,7 +202,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         self.pr.release_and_zap_pages(start);
     }
 
-    pub fn allocate_pages(&self, tls: OpaquePointer, pages: usize) -> Address {
+    pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Address {
         let start = self.acquire(tls, pages);
         if start.is_zero() {
             return start;

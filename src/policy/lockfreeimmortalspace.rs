@@ -12,12 +12,18 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{
     AVAILABLE_BYTES, AVAILABLE_END, AVAILABLE_START,
 };
-use crate::util::opaque_pointer::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::vm::*;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// This type implements a lock free version of the immortal collection
+/// policy. This is close to the OpenJDK's epsilon GC.
+/// Different from the normal ImmortalSpace, this version should only
+/// be used by NoGC plan, and it now uses the whole heap range.
+// FIXME: It is wrong that the space uses the whole heap range. It has to reserve its own
+// range from HeapMeta, and not clash with other spaces.
 pub struct LockFreeImmortalSpace<VM: VMBinding> {
     #[allow(unused)]
     name: &'static str,
@@ -48,7 +54,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn is_sane(&self) -> bool {
         unimplemented!()
     }
-    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         unimplemented!()
     }
 }
@@ -108,7 +114,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         conversions::bytes_to_pages_up(self.limit - cursor) + self.metadata.reserved_pages()
     }
 
-    fn acquire(&self, _tls: OpaquePointer, pages: usize) -> Address {
+    fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
         let bytes = conversions::pages_to_bytes(pages);
         let start = unsafe { Address::from_usize(self.cursor.fetch_add(bytes, Ordering::Relaxed)) };
         if start + bytes > self.limit {
@@ -122,6 +128,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 }
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
+    #[allow(dead_code)] // Only used with certain features.
     pub fn new(
         name: &'static str,
         slow_path_zeroing: bool,

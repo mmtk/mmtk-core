@@ -1,5 +1,5 @@
 use super::Page;
-use crate::plan::barriers::NoBarrier;
+use crate::{plan::barriers::NoBarrier, util::opaque_pointer::{VMMutatorThread, VMWorkerThread}};
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
@@ -10,9 +10,9 @@ use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn page_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: OpaquePointer) {}
+pub fn page_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
-pub fn page_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: OpaquePointer) {}
+pub fn page_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
@@ -22,7 +22,7 @@ lazy_static! {
 }
 
 pub fn create_page_mutator<VM: VMBinding>(
-    mutator_tls: OpaquePointer,
+    mutator_tls: VMMutatorThread,
     plan: &'static dyn Plan<VM = VM>,
 ) -> Mutator<VM> {
     let page = plan.downcast_ref::<Page<VM>>().unwrap();

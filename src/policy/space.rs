@@ -10,7 +10,7 @@ use crate::vm::{ActivePlan, Collection, ObjectModel};
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 
 use crate::mmtk::SFT_MAP;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -28,33 +28,38 @@ use std::marker::PhantomData;
 
 use downcast_rs::Downcast;
 
-/**
- * Space Function Table (SFT).
- *
- * This trait captures functions that reflect _space-specific per-object
- * semantics_.   These functions are implemented for each object via a special
- * space-based dynamic dispatch mechanism where the semantics are _not_
- * determined by the object's _type_, but rather, are determined by the _space_
- * that the object is in.
- *
- * The underlying mechanism exploits the fact that spaces use the address space
- * at an MMTk chunk granularity with the consequence that each chunk maps to
- * exactluy one space, so knowing the chunk for an object reveals its space.
- * The dispatch then works by performing simple address arithmetic on the object
- * reference to find a chunk index which is used to index a table which returns
- * the space.   The relevant function is then dispatched against that space
- * object.
- *
- * We use the SFT trait to simplify typing for Rust, so our table is a
- * table of SFT rather than Space.
- */
+/// Space Function Table (SFT).
+///
+/// This trait captures functions that reflect _space-specific per-object
+/// semantics_.   These functions are implemented for each object via a special
+/// space-based dynamic dispatch mechanism where the semantics are _not_
+/// determined by the object's _type_, but rather, are determined by the _space_
+/// that the object is in.
+///
+/// The underlying mechanism exploits the fact that spaces use the address space
+/// at an MMTk chunk granularity with the consequence that each chunk maps to
+/// exactluy one space, so knowing the chunk for an object reveals its space.
+/// The dispatch then works by performing simple address arithmetic on the object
+/// reference to find a chunk index which is used to index a table which returns
+/// the space.   The relevant function is then dispatched against that space
+/// object.
+///
+/// We use the SFT trait to simplify typing for Rust, so our table is a
+/// table of SFT rather than Space.
 pub trait SFT {
+    /// The space name
     fn name(&self) -> &str;
+    /// Is the object live, determined by the policy?
     fn is_live(&self, object: ObjectReference) -> bool;
+    /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
+    /// or the object is pinned.
     fn is_movable(&self) -> bool;
+    /// Is the object sane? A policy should return false if there is any abnormality about
+    /// object - the sanity checker will fail if an object is not sane.
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool;
-    fn initialize_header(&self, object: ObjectReference, alloc: bool);
+    /// Initialize object metadata (in the header, or in the side metadata).
+    fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
 }
 
 /// Print debug info for SFT. Should be false when committed.
@@ -91,9 +96,9 @@ impl SFT for EmptySpaceSFT {
         false
     }
 
-    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         panic!(
-            "Called initialize_header() on {:x}, which maps to an empty space",
+            "Called initialize_object_metadata() on {:x}, which maps to an empty space",
             object
         )
     }
@@ -186,6 +191,8 @@ impl<'a> SFTMap<'a> {
         }
     }
 
+    // TODO: We should clear a SFT entry when a space releases a chunk.
+    #[allow(dead_code)]
     pub fn clear(&self, chunk_idx: usize) {
         self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
@@ -237,10 +244,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
     fn init(&mut self, vm_map: &'static VMMap);
 
-    fn acquire(&self, tls: OpaquePointer, pages: usize) -> Address {
+    fn acquire(&self, tls: VMThread, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
         // Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.
-        let should_poll = unsafe { VM::VMActivePlan::is_mutator(tls) };
+        let should_poll = VM::VMActivePlan::is_mutator(tls);
         // Is a GC allowed here? enable_collection() has to be called so we know GC is initialized.
         let allow_poll = should_poll && VM::VMActivePlan::global().is_initialized();
 
@@ -256,7 +263,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 panic!("Collection is not enabled.");
             }
             pr.clear_request(pages_reserved);
-            VM::VMCollection::block_for_gc(tls);
+            VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
@@ -296,7 +303,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
                     debug_assert!(gc_performed, "GC not performed when forced.");
                     pr.clear_request(pages_reserved);
-                    VM::VMCollection::block_for_gc(tls);
+                    VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
                     unsafe { Address::zero() }
                 }
             }

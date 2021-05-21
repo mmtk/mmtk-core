@@ -166,6 +166,11 @@ impl Map for Map32 {
         // start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
         // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912
         self_mut.global_page_map.resize_freelist(pages, pages as _);
+        // TODO: Clippy favors using iter().flatten() rather than iter() with if-let.
+        // https://rust-lang.github.io/rust-clippy/master/index.html#manual_flatten
+        // Yi: I am not doing this refactoring right now, as I am not familiar with flatten() and
+        // there is no test to ensure the refactoring will be correct.
+        #[allow(clippy::manual_flatten)]
         for fl in self_mut.shared_fl_map.iter() {
             if let Some(fl) = fl {
                 #[allow(clippy::cast_ref_to_mut)]

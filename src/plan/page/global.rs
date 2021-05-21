@@ -1,5 +1,5 @@
 use super::gc_work::PageProcessEdges;
-use crate::{plan::global::{CommonPlan, NoCopy}, policy::largeobjectspace::LargeObjectSpace};
+use crate::{plan::global::{CommonPlan, NoCopy}, policy::largeobjectspace::LargeObjectSpace, util::opaque_pointer::VMWorkerThread};
 use crate::plan::global::GcStatus;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -50,7 +50,7 @@ impl<VM: VMBinding> Plan for Page<VM> {
 
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = NoCopy::new(mmtk);
@@ -97,13 +97,13 @@ impl<VM: VMBinding> Plan for Page<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&self, tls: OpaquePointer) {
+    fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
         let space = unsafe { &mut *(&self.space as *const LargeObjectSpace<VM> as *mut LargeObjectSpace<VM>) };
         space.prepare(true);
     }
 
-    fn release(&self, tls: OpaquePointer) {
+    fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         let space = unsafe { &mut *(&self.space as *const LargeObjectSpace<VM> as *mut LargeObjectSpace<VM>) };
         space.release(true);

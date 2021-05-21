@@ -1,0 +1,23 @@
+name: Publish to crates.io
+
+on:
+  # Triggered when we tag a release (including a prerelease)
+  release:
+    types: [published]
+
+jobs:
+  cargo-publish:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          components: rustfmt, clippy
+          target: i686-unknown-linux-gnu
+          # This overwrites the default toolchain with the toolchain specified above.
+          override: true
+      - name: Cargo login
+        run: cargo login ${{ secrets.CI_CARGO_LOGIN }}
+      - name: Cargo publish
+        run: cargo publish

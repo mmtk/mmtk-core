@@ -1,7 +1,7 @@
-use crate::plan::MutatorContext;
+use crate::{plan::MutatorContext, util::Address};
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
-use crate::util::{OpaquePointer, Address};
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
 /// VM-specific methods for garbage collection.
@@ -13,13 +13,13 @@ pub trait Collection<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the GC controller/coordinator.
-    fn stop_all_mutators<E: ProcessEdgesWork<VM = VM>>(tls: OpaquePointer);
+    fn stop_all_mutators<E: ProcessEdgesWork<VM = VM>>(tls: VMWorkerThread);
 
     /// Resume all the mutator threads, the opposite of the above. When a GC is finished, MMTk calls this method.
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the GC controller/coordinator.
-    fn resume_mutators(tls: OpaquePointer);
+    fn resume_mutators(tls: VMWorkerThread);
 
     /// Block the current thread for GC. This is called when an allocation request cannot be fulfilled and a GC
     /// is needed. MMTk calls this method to inform the VM that the current thread needs to be blocked as a GC
@@ -28,7 +28,7 @@ pub trait Collection<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `tls`: The current thread pointer that should be blocked. The VM can optionally check if the current thread matches `tls`.
-    fn block_for_gc(tls: OpaquePointer);
+    fn block_for_gc(tls: VMMutatorThread);
 
     /// Ask the VM to spawn a GC thread for MMTk. A GC thread may later call into the VM through these VM traits. Some VMs
     /// have assumptions that those calls needs to be within VM internal threads.
@@ -40,7 +40,7 @@ pub trait Collection<VM: VMBinding> {
     ///   calls `enable_collection()` and passes as an argument.
     /// * `ctx`: The GC worker context for the GC thread. If `None` is passed, it means spawning a GC thread for the GC controller,
     ///   which does not have a worker context.
-    fn spawn_worker_thread(tls: OpaquePointer, ctx: Option<&GCWorker<VM>>);
+    fn spawn_worker_thread(tls: VMThread, ctx: Option<&GCWorker<VM>>);
 
     /// Allow VM-specific behaviors for a mutator after all the mutators are stopped and before any actual GC work starts.
     ///
@@ -49,8 +49,8 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls_mutator`: The thread pointer for the target mutator thread.
     /// * `m`: The mutator context for the thread.
     fn prepare_mutator<T: MutatorContext<VM>>(
-        tls_worker: OpaquePointer,
-        tls_mutator: OpaquePointer,
+        tls_worker: VMWorkerThread,
+        tls_mutator: VMMutatorThread,
         m: &T,
     );
 
@@ -59,7 +59,7 @@ pub trait Collection<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the mutator which failed the allocation and triggered the OOM.
-    fn out_of_memory(_tls: OpaquePointer) {
+    fn out_of_memory(_tls: VMThread) {
         panic!("Out of memory!");
     }
 
@@ -67,7 +67,7 @@ pub trait Collection<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the current GC thread.
-    fn schedule_finalization(_tls: OpaquePointer) {}
+    fn schedule_finalization(_tls: VMWorkerThread) {}
 
     fn sweep(_addr: Address) {}
     fn process_weak_refs() {}

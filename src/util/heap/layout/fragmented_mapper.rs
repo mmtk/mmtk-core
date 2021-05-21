@@ -361,16 +361,10 @@ mod tests {
     fn get_chunk_map_state(mmapper: &FragmentedMapper, chunk: Address) -> Option<MapState> {
         assert_eq!(conversions::mmap_chunk_align_up(chunk), chunk);
         let mapped = mmapper.slab_table(chunk);
-        match mapped {
-            Some(mapped) => Some(
-                mapped[FragmentedMapper::chunk_index(
-                    FragmentedMapper::slab_align_down(chunk),
-                    chunk,
-                )]
-                .load(Ordering::Relaxed),
-            ),
-            _ => None,
-        }
+        mapped.map(|m| {
+            m[FragmentedMapper::chunk_index(FragmentedMapper::slab_align_down(chunk), chunk)]
+                .load(Ordering::Relaxed)
+        })
     }
 
     #[test]
