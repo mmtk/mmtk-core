@@ -407,17 +407,22 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
     let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
     match sanity_map.get(&metadata_spec) {
         Some(spec_sanity_map) => {
-            match spec_sanity_map.get(&data_addr) {
-                Some(expected_val) => {
-                    // hashmap is assumed to be correct
-                    assert!(
-                        *expected_val == actual_val,
-                        "Expected (0x{:x}) but found (0x{:x})",
-                        expected_val,
-                        actual_val
-                    );
-                }
-                None => panic!("Invalid Data Address ({})!", data_addr),
+            // A content of None is Ok because we may load before store
+            if let Some(expected_val) = spec_sanity_map.get(&data_addr) {
+                assert!(
+                    *expected_val == actual_val,
+                    "Expected (0x{:x}) but found (0x{:x})",
+                    expected_val,
+                    actual_val
+                );
+            } else {
+                let expected_val = 0usize;
+                assert!(
+                    expected_val == actual_val,
+                    "Expected (0x{:x}) but found (0x{:x})",
+                    expected_val,
+                    actual_val
+                );
             }
         }
         None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
