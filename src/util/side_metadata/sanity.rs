@@ -1,4 +1,7 @@
+use crate::plan::{BasePlan, CommonPlan};
+use crate::policy::space::Space;
 use crate::util::Address;
+use crate::vm::VMBinding;
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
 use std::sync::RwLock;
@@ -251,11 +254,43 @@ impl SideMetadataSanity {
         Ok(())
     }
 
-    /// Ensures that a metadata context does not have any issues.
+    /// Ensure that a metadata context does not have any issues for a space.
     /// Panics with a suitable message if any issue is detected.
     /// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.
+    /// Internally this calls verify_metadata_context().
     ///
-    /// This function is called once per space but may be called multiple times per policy. Hence, policy name is needed as an argument to differentiate this case from potential errors.
+    /// This function is called once per space but may be called multiple times per policy.
+    ///
+    /// Arguments:
+    /// * `space`: The space to check.
+    pub fn verify_space<VM: VMBinding, S: Space<VM>>(&mut self, space: &S) {
+        self.verify_metadata_context(
+            std::any::type_name::<S>(),
+            space.get_side_metadata_context(),
+        )
+    }
+
+    /// Ensure that metadata context used in spaces in CommonPlan (including BasePlan) also comply with our assumption.
+    /// If a plan uses CommonPlan, it needs to invoke this method .
+    pub fn verify_common_spaces<VM: VMBinding>(&mut self, common: &CommonPlan<VM>) {
+        self.verify_base_spaces(&common.base);
+        self.verify_space(&common.immortal);
+        self.verify_space(&common.los);
+    }
+
+    /// Ensure that metadata context used in spaces in BasePlan also comply with our assumption.
+    /// If a plan uses BasePlan, it needs to invoke this method.
+    #[allow(unused_variables)] // depends on the enabled features, base may not be used.
+    pub fn verify_base_spaces<VM: VMBinding>(&mut self, base: &BasePlan<VM>) {
+        #[cfg(feature = "code_space")]
+        self.verify_space(&base.code_space);
+        #[cfg(feature = "ro_space")]
+        self.verify_space(&base.ro_space);
+        #[cfg(feature = "vm_space")]
+        self.verify_space(&base.vm_space);
+    }
+
+    /// An internal method to ensure that a metadata context does not have any issues.
     ///
     /// Arguments:
     /// * `policy_name`: name of the policy of the calling space
@@ -267,7 +302,8 @@ impl SideMetadataSanity {
     /// 2 - uses exclusive SideMetadata instances (v.s. static instances), and
     /// 3 - uses `util::test_util::with_cleanup` to call `sanity::reset` to cleanup the metadata sanity states to prevent future conflicts.
     ///
-    pub fn verify_metadata_context(
+    // pub(super) so we can test it.
+    pub(super) fn verify_metadata_context(
         &mut self,
         policy_name: &'static str,
         metadata_context: &SideMetadataContext,

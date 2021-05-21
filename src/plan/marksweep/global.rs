@@ -138,18 +138,15 @@ impl<VM: VMBinding> MarkSweep<VM> {
                 options,
                 heap,
                 &MS_CONSTRAINTS,
-                global_metadata_specs.clone(),
+                global_metadata_specs,
             ),
         };
 
-        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        side_metadata_sanity_checker.verify_metadata_context(
-            "MallocSpace",
-            &SideMetadataContext {
-                global: global_metadata_specs,
-                local: Vec::from(res.ms.local_side_metadata_specs()),
-            },
-        );
+        {
+            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+            side_metadata_sanity_checker.verify_common_spaces(&res.common);
+            side_metadata_sanity_checker.verify_space(&res.ms);
+        }
 
         res
     }
