@@ -35,3 +35,9 @@ pub use markcompact_allocator::MarkCompactAllocator;
 
 /// Embedded metadata pages
 pub(crate) mod embedded_meta_data;
+pub mod mimalloc;
+
+
+pub use crate::policy::mallocspace::metadata::is_alloced_by_malloc;
+pub use self::mimalloc::do_something;
+pub use self::mimalloc::mimalloc_dzmmap;
