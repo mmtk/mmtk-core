@@ -13,7 +13,7 @@ keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
 
 [lib]
 name = "mmtk"
-crate-type = ["rlib"]
+crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
