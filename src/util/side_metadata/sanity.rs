@@ -4,7 +4,7 @@ use crate::util::Address;
 use crate::vm::VMBinding;
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
-use std::sync::RwLock;
+use std::sync::{Mutex, RwLock};
 
 use super::constants::LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;
 use super::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
@@ -40,6 +40,7 @@ lazy_static! {
     /// which maps data addresses to their current metadata content.
     static ref CONTENT_SANITY_MAP: RwLock<HashMap<SideMetadataSpec, HashMap<Address, usize>>> =
         RwLock::new(HashMap::new());
+    pub(crate) static ref SANITY_LOCK: Mutex<()> = Mutex::new(());
 }
 
 /// A test helper function which resets contents map to prevent propagation of test failure
@@ -473,10 +474,6 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
 ///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
-    println!(
-        "verify_store({:?}, {}, {})",
-        metadata_spec, data_addr, metadata
-    );
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
