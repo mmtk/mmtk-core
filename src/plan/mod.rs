@@ -26,7 +26,6 @@ pub use global::AllocationSemantics;
 pub use global::CopyContext;
 pub(crate) use global::GcStatus;
 pub use global::Plan;
-pub(crate) use global::{BasePlan, CommonPlan};
 
 mod mutator_context;
 pub use mutator_context::Mutator;

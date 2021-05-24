@@ -144,8 +144,10 @@ impl<VM: VMBinding> MarkSweep<VM> {
 
         {
             let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-            side_metadata_sanity_checker.verify_common_spaces(&res.common);
-            side_metadata_sanity_checker.verify_space(&res.ms);
+            res.common
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            res.ms
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         }
 
         res

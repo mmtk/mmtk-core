@@ -21,6 +21,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
+use crate::util::side_metadata::SideMetadataSanity;
 use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::statistics::stats::Stats;
 use crate::util::{Address, ObjectReference};
@@ -675,6 +676,22 @@ impl<VM: VMBinding> BasePlan<VM> {
 
         space_full || stress_force_gc || heap_full
     }
+
+    #[allow(unused_variables)] // depending on the enabled features, base may not be used.
+    pub(crate) fn verify_side_metadata_sanity(
+        &self,
+        side_metadata_sanity_checker: &mut SideMetadataSanity,
+    ) {
+        #[cfg(feature = "code_space")]
+        self.code_space
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+        #[cfg(feature = "ro_space")]
+        self.ro_space
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+        #[cfg(feature = "vm_space")]
+        self.vm_space
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+    }
 }
 
 /**
@@ -798,6 +815,18 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     pub fn get_los(&self) -> &LargeObjectSpace<VM> {
         &self.los
+    }
+
+    pub(crate) fn verify_side_metadata_sanity(
+        &self,
+        side_metadata_sanity_checker: &mut SideMetadataSanity,
+    ) {
+        self.base
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+        self.immortal
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+        self.los
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
     }
 }
 

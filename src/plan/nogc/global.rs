@@ -140,8 +140,10 @@ impl<VM: VMBinding> NoGC<VM> {
         };
 
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        side_metadata_sanity_checker.verify_base_spaces(&res.base);
-        side_metadata_sanity_checker.verify_space(&res.nogc_space);
+        res.base
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        res.nogc_space
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
 
         res
     }

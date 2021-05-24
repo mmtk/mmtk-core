@@ -129,10 +129,6 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst))
             + self.metadata.reserved_pages()
     }
-
-    fn get_side_metadata_context(&self) -> &SideMetadataContext {
-        self.metadata.get_context()
-    }
 }
 
 impl<VM: VMBinding> MallocSpace<VM> {

@@ -185,9 +185,12 @@ impl<VM: VMBinding> SemiSpace<VM> {
 
         {
             let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-            side_metadata_sanity_checker.verify_common_spaces(&res.common);
-            side_metadata_sanity_checker.verify_space(&res.copyspace0);
-            side_metadata_sanity_checker.verify_space(&res.copyspace1);
+            res.common
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            res.copyspace0
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            res.copyspace1
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         }
 
         res
