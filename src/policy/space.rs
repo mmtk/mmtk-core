@@ -439,7 +439,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// * `side_metadata_sanity_checker`: The `SideMetadataSanity` object instantiated in the calling plan.
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker.verify_metadata_context(
-            std::any::type_name::<dyn Space<VM>>(),
+            std::any::type_name::<Self>(),
             self.common().metadata.get_context(),
         )
     }
