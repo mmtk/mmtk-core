@@ -29,7 +29,7 @@ pub use worker::GCWorker;
 pub(crate) use worker::Worker;
 pub(crate) use worker::WorkerLocalPtr;
 
-pub(crate) mod gc_work;
+pub mod gc_work;
 pub use gc_work::ProcessEdgesWork;
 // TODO: We shouldn't need to expose ScanStackRoot. However, OpenJDK uses it.
 // We should do some refactoring related to Scanning::SCAN_MUTATORS_IN_SAFEPOINT
