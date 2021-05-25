@@ -476,6 +476,10 @@ impl ObjectReference {
         SFT_MAP.get(Address(self.0)).is_movable()
     }
 
+    pub fn get_forwarded_object(self) -> Option<Self> {
+        SFT_MAP.get(Address(self.0)).get_forwarded_object(self)
+    }
+
     pub fn is_mapped(self) -> bool {
         SFT_MAP.is_in_space(self)
     }
