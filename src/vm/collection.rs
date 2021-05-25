@@ -69,6 +69,6 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls`: The thread pointer for the current GC thread.
     fn schedule_finalization(_tls: VMWorkerThread) {}
 
-    fn sweep(_addr: Address) {}
+    fn update_object_archive() {}
     fn process_weak_refs() {}
 }

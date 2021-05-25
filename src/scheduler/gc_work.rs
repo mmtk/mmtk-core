@@ -121,6 +121,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Release Global");
         // FIXME: This is only a work-around
+        <P::VM as VMBinding>::VMCollection::update_object_archive();
         <P::VM as VMBinding>::VMCollection::process_weak_refs();
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]

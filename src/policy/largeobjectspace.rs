@@ -197,8 +197,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     fn release_pages(&mut self, start: Address) {
-        use crate::vm::Collection;
-        VM::VMCollection::sweep(start);
         self.pr.release_and_zap_pages(start);
     }
 
