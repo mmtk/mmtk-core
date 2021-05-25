@@ -3,7 +3,7 @@ use crate::plan::{AllocationSemantics, CopyContext};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
-use crate::util::forwarding_word as ForwardingWord;
+use crate::util::{forwarding_word as ForwardingWord, gc_byte};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
@@ -38,6 +38,14 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         !self.from_space()
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {}
+    fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
+        if ForwardingWord::is_forwarded::<VM>(object) {
+            let old_value = gc_byte::read_gc_byte::<VM>(object);
+            Some(ForwardingWord::spin_and_get_forwarded_object::<VM>(object, old_value))
+        } else {
+            None
+        }
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {

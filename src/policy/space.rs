@@ -49,6 +49,9 @@ use downcast_rs::Downcast;
 pub trait SFT {
     /// The space name
     fn name(&self) -> &str;
+    fn get_forwarded_object(&self, _object: ObjectReference) -> Option<ObjectReference> {
+        None
+    }
     /// Is the object live, determined by the policy?
     fn is_live(&self, object: ObjectReference) -> bool;
     /// Is the object movable, determined by the policy? E.g. the policy is non-moving,

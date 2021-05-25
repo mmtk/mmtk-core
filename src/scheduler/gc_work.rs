@@ -424,9 +424,13 @@ pub trait ProcessEdgesWork:
     #[inline]
     fn process_edge(&mut self, slot: Address) {
         let object = unsafe { slot.load::<ObjectReference>() };
-        let new_object = self.trace_object(object);
+        let tag = object.to_address().as_usize() & 0b11usize;
+        let object_untagged = unsafe {
+            Address::from_usize(object.to_address().as_usize() & !0b11usize).to_object_reference()
+        };
+        let new_object = self.trace_object(object_untagged);
         if Self::OVERWRITE_REFERENCE {
-            unsafe { slot.store(new_object) };
+            unsafe { slot.store((new_object.to_address().as_usize() & !0b11) | tag) };
         }
     }
 
