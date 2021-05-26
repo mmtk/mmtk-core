@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["constants",""],["global",""],["helpers",""],["side_metadata_tests",""]]});
+initSidebarItems({"mod":[["constants",""],["global",""],["helpers",""],["sanity",""],["side_metadata_tests",""]]});

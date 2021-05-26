@@ -620,6 +620,97 @@
 <span id="617">617</span>
 <span id="618">618</span>
 <span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+<span id="630">630</span>
+<span id="631">631</span>
+<span id="632">632</span>
+<span id="633">633</span>
+<span id="634">634</span>
+<span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
+<span id="663">663</span>
+<span id="664">664</span>
+<span id="665">665</span>
+<span id="666">666</span>
+<span id="667">667</span>
+<span id="668">668</span>
+<span id="669">669</span>
+<span id="670">670</span>
+<span id="671">671</span>
+<span id="672">672</span>
+<span id="673">673</span>
+<span id="674">674</span>
+<span id="675">675</span>
+<span id="676">676</span>
+<span id="677">677</span>
+<span id="678">678</span>
+<span id="679">679</span>
+<span id="680">680</span>
+<span id="681">681</span>
+<span id="682">682</span>
+<span id="683">683</span>
+<span id="684">684</span>
+<span id="685">685</span>
+<span id="686">686</span>
+<span id="687">687</span>
+<span id="688">688</span>
+<span id="689">689</span>
+<span id="690">690</span>
+<span id="691">691</span>
+<span id="692">692</span>
+<span id="693">693</span>
+<span id="694">694</span>
+<span id="695">695</span>
+<span id="696">696</span>
+<span id="697">697</span>
+<span id="698">698</span>
+<span id="699">699</span>
+<span id="700">700</span>
+<span id="701">701</span>
+<span id="702">702</span>
+<span id="703">703</span>
+<span id="704">704</span>
+<span id="705">705</span>
+<span id="706">706</span>
+<span id="707">707</span>
+<span id="708">708</span>
+<span id="709">709</span>
+<span id="710">710</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants</span>::{<span class="ident">BYTES_IN_PAGE</span>, <span class="ident">LOG_BYTES_IN_PAGE</span>};
@@ -627,10 +718,11 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::PageAccounting</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::memory</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">constants</span>, <span class="ident">Address</span>};
+<span class="kw">use</span> <span class="ident">std::fmt</span>;
 <span class="kw">use</span> <span class="ident">std::io::Result</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicU16</span>, <span class="ident">AtomicU32</span>, <span class="ident">AtomicU8</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">SideMetadataScope</span> {
     <span class="ident">Global</span>,
     <span class="ident">PolicySpecific</span>,
@@ -648,12 +740,26 @@
 <span class="doccomment">/// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// For performance reasons, objects of this struct should be constants.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SideMetadataSpec</span> {
     <span class="kw">pub</span> <span class="ident">scope</span>: <span class="ident">SideMetadataScope</span>,
     <span class="kw">pub</span> <span class="ident">offset</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">log_num_of_bits</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">log_min_obj_size</span>: <span class="ident">usize</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">SideMetadataSpec</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+        <span class="ident">f</span>.<span class="ident">write_fmt</span>(<span class="macro">format_args!</span>(
+            <span class="string">&quot;SideMetadataSpec {{ \
+            **Scope: {:?} \
+            **offset: 0x{:x} \
+            **log_num_of_bits: 0x{:x} \
+            **log_min_obj_size: 0x{:x} \
+            }}&quot;</span>,
+            <span class="self">self</span>.<span class="ident">scope</span>, <span class="self">self</span>.<span class="ident">offset</span>, <span class="self">self</span>.<span class="ident">log_num_of_bits</span>, <span class="self">self</span>.<span class="ident">log_min_obj_size</span>
+        ))
+    }
 }
 
 <span class="doccomment">/// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own</span>
@@ -687,6 +793,14 @@
             <span class="ident">context</span>,
             <span class="ident">accounting</span>: <span class="ident">PageAccounting::new</span>(),
         }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_context</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">SideMetadataContext</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">context</span>
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_local_specs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>] {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">context</span>.<span class="ident">local</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
@@ -853,6 +967,9 @@
 
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_atomic</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="ident">sanity::SANITY_LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+
     <span class="kw">let</span> <span class="ident">meta_addr</span> <span class="op">=</span> <span class="ident">address_to_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
     <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) {
         <span class="ident">ensure_metadata_is_mapped</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
@@ -860,7 +977,7 @@
 
     <span class="kw">let</span> <span class="ident">bits_num_log</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>;
 
-    <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">3</span> {
+    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">3</span> {
         <span class="kw">let</span> <span class="ident">lshift</span> <span class="op">=</span> <span class="ident">meta_byte_lshift</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
         <span class="kw">let</span> <span class="ident">mask</span> <span class="op">=</span> <span class="ident">meta_byte_mask</span>(<span class="ident">metadata_spec</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">lshift</span>;
         <span class="kw">let</span> <span class="ident">byte_val</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">meta_addr</span>.<span class="ident">atomic_load</span>::<span class="op">&lt;</span><span class="ident">AtomicU8</span><span class="op">&gt;</span>(<span class="ident">Ordering::SeqCst</span>) };
@@ -877,10 +994,18 @@
             <span class="string">&quot;side metadata &gt; {}-bits is not supported!&quot;</span>,
             <span class="ident">constants::BITS_IN_WORD</span>
         );
-    }
+    };
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="ident">sanity::verify_load</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>, <span class="ident">res</span>);
+
+    <span class="ident">res</span>
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_atomic</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>, <span class="ident">metadata</span>: <span class="ident">usize</span>) {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="ident">sanity::SANITY_LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+
     <span class="kw">let</span> <span class="ident">meta_addr</span> <span class="op">=</span> <span class="ident">address_to_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
     <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) {
         <span class="ident">ensure_metadata_is_mapped</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
@@ -910,13 +1035,16 @@
     } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">=</span><span class="op">=</span> <span class="number">5</span> {
         <span class="kw">unsafe</span> { <span class="ident">meta_addr</span>.<span class="ident">atomic_store</span>::<span class="op">&lt;</span><span class="ident">AtomicU32</span><span class="op">&gt;</span>(<span class="ident">metadata</span> <span class="kw">as</span> <span class="ident">u32</span>, <span class="ident">Ordering::SeqCst</span>) };
     } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">=</span><span class="op">=</span> <span class="number">6</span> {
-        <span class="kw">unsafe</span> { <span class="ident">meta_addr</span>.<span class="ident">atomic_store</span>::<span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>(<span class="ident">metadata</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">Ordering::SeqCst</span>) }
+        <span class="kw">unsafe</span> { <span class="ident">meta_addr</span>.<span class="ident">atomic_store</span>::<span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>(<span class="ident">metadata</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">Ordering::SeqCst</span>) };
     } <span class="kw">else</span> {
         <span class="macro">unreachable!</span>(
             <span class="string">&quot;side metadata &gt; {}-bits is not supported!&quot;</span>,
             <span class="ident">constants::BITS_IN_WORD</span>
         );
     }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="ident">sanity::verify_store</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>, <span class="ident">metadata</span>);
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compare_exchange_atomic</span>(
@@ -925,6 +1053,13 @@
     <span class="ident">old_metadata</span>: <span class="ident">usize</span>,
     <span class="ident">new_metadata</span>: <span class="ident">usize</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="ident">sanity::SANITY_LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+
+    <span class="macro">debug!</span>(
+        <span class="string">&quot;compare_exchange_atomic({:?}, {}, {}, {})&quot;</span>,
+        <span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>, <span class="ident">old_metadata</span>, <span class="ident">new_metadata</span>
+    );
     <span class="kw">let</span> <span class="ident">meta_addr</span> <span class="op">=</span> <span class="ident">address_to_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
     <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) {
         <span class="ident">ensure_metadata_is_mapped</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
@@ -932,7 +1067,8 @@
 
     <span class="kw">let</span> <span class="ident">bits_num_log</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>;
 
-    <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">&lt;</span> <span class="number">3</span> {
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::let_and_return</span>)]</span>
+    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">&lt;</span> <span class="number">3</span> {
         <span class="kw">let</span> <span class="ident">lshift</span> <span class="op">=</span> <span class="ident">meta_byte_lshift</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
         <span class="kw">let</span> <span class="ident">mask</span> <span class="op">=</span> <span class="ident">meta_byte_mask</span>(<span class="ident">metadata_spec</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">lshift</span>;
 
@@ -999,11 +1135,21 @@
             <span class="string">&quot;side metadata &gt; {}-bits is not supported!&quot;</span>,
             <span class="ident">constants::BITS_IN_WORD</span>
         );
+    };
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="kw">if</span> <span class="ident">res</span> {
+        <span class="ident">sanity::verify_store</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>, <span class="ident">new_metadata</span>);
     }
+
+    <span class="ident">res</span>
 }
 
 <span class="comment">// same as Rust atomics, this wraps around on overflow</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_add_atomic</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>, <span class="ident">val</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="ident">sanity::SANITY_LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+
     <span class="kw">let</span> <span class="ident">meta_addr</span> <span class="op">=</span> <span class="ident">address_to_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
     <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) {
         <span class="ident">ensure_metadata_is_mapped</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
@@ -1011,7 +1157,8 @@
 
     <span class="kw">let</span> <span class="ident">bits_num_log</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>;
 
-    <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">&lt;</span> <span class="number">3</span> {
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::let_and_return</span>)]</span>
+    <span class="kw">let</span> <span class="ident">old_val</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">&lt;</span> <span class="number">3</span> {
         <span class="kw">let</span> <span class="ident">lshift</span> <span class="op">=</span> <span class="ident">meta_byte_lshift</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
         <span class="kw">let</span> <span class="ident">mask</span> <span class="op">=</span> <span class="ident">meta_byte_mask</span>(<span class="ident">metadata_spec</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">lshift</span>;
 
@@ -1049,11 +1196,19 @@
             <span class="string">&quot;side metadata &gt; {}-bits is not supported!&quot;</span>,
             <span class="ident">constants::BITS_IN_WORD</span>
         );
-    }
+    };
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="ident">sanity::verify_add</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>, <span class="ident">val</span>, <span class="ident">old_val</span>);
+
+    <span class="ident">old_val</span>
 }
 
 <span class="comment">// same as Rust atomics, this wraps around on overflow</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_sub_atomic</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>, <span class="ident">val</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="ident">sanity::SANITY_LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+
     <span class="kw">let</span> <span class="ident">meta_addr</span> <span class="op">=</span> <span class="ident">address_to_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
     <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) {
         <span class="ident">ensure_metadata_is_mapped</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
@@ -1061,7 +1216,8 @@
 
     <span class="kw">let</span> <span class="ident">bits_num_log</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>;
 
-    <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">&lt;</span> <span class="number">3</span> {
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::let_and_return</span>)]</span>
+    <span class="kw">let</span> <span class="ident">old_val</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">&lt;</span> <span class="number">3</span> {
         <span class="kw">let</span> <span class="ident">lshift</span> <span class="op">=</span> <span class="ident">meta_byte_lshift</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
         <span class="kw">let</span> <span class="ident">mask</span> <span class="op">=</span> <span class="ident">meta_byte_mask</span>(<span class="ident">metadata_spec</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">lshift</span>;
 
@@ -1099,7 +1255,12 @@
             <span class="string">&quot;side metadata &gt; {}-bits is not supported!&quot;</span>,
             <span class="ident">constants::BITS_IN_WORD</span>
         );
-    }
+    };
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="ident">sanity::verify_sub</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>, <span class="ident">val</span>, <span class="ident">old_val</span>);
+
+    <span class="ident">old_val</span>
 }
 
 <span class="doccomment">/// Non-atomic load of metadata.</span>
@@ -1112,6 +1273,9 @@
 <span class="doccomment">/// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.</span>
 <span class="doccomment">///</span>
 <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="ident">sanity::SANITY_LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+
     <span class="kw">let</span> <span class="ident">meta_addr</span> <span class="op">=</span> <span class="ident">address_to_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
     <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) {
         <span class="ident">ensure_metadata_is_mapped</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
@@ -1119,7 +1283,8 @@
 
     <span class="kw">let</span> <span class="ident">bits_num_log</span> <span class="op">=</span> <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>;
 
-    <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">3</span> {
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::let_and_return</span>)]</span>
+    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">bits_num_log</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">3</span> {
         <span class="kw">let</span> <span class="ident">lshift</span> <span class="op">=</span> <span class="ident">meta_byte_lshift</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
         <span class="kw">let</span> <span class="ident">mask</span> <span class="op">=</span> <span class="ident">meta_byte_mask</span>(<span class="ident">metadata_spec</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">lshift</span>;
         <span class="kw">let</span> <span class="ident">byte_val</span> <span class="op">=</span> <span class="ident">meta_addr</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>();
@@ -1136,7 +1301,12 @@
             <span class="string">&quot;side metadata &gt; {}-bits is not supported!&quot;</span>,
             <span class="ident">constants::BITS_IN_WORD</span>
         );
-    }
+    };
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="ident">sanity::verify_load</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>, <span class="ident">res</span>);
+
+    <span class="ident">res</span>
 }
 
 <span class="doccomment">/// Non-atomic store of metadata.</span>
@@ -1149,6 +1319,9 @@
 <span class="doccomment">/// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.</span>
 <span class="doccomment">///</span>
 <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">store</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>, <span class="ident">metadata</span>: <span class="ident">usize</span>) {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="ident">sanity::SANITY_LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+
     <span class="kw">let</span> <span class="ident">meta_addr</span> <span class="op">=</span> <span class="ident">address_to_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
     <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) {
         <span class="ident">ensure_metadata_is_mapped</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
@@ -1178,6 +1351,9 @@
             <span class="ident">constants::BITS_IN_WORD</span>
         );
     }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="ident">sanity::verify_store</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>, <span class="ident">metadata</span>);
 }
 
 <span class="doccomment">/// Bulk-zero a specific metadata for a chunk.</span>
@@ -1189,9 +1365,15 @@
 <span class="doccomment">/// * `chunk_start` - The starting address of the chunk whose metadata is being zeroed.</span>
 <span class="doccomment">///</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bzero_metadata</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="ident">sanity::SANITY_LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+
     <span class="macro">debug_assert!</span>(
         <span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_PAGE</span>) <span class="op">&amp;&amp;</span> <span class="ident">meta_byte_lshift</span>(<span class="ident">metadata_spec</span>, <span class="ident">start</span>) <span class="op">=</span><span class="op">=</span> <span class="number">0</span>
     );
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="ident">sanity::verify_bzero</span>(<span class="ident">metadata_spec</span>, <span class="ident">start</span>, <span class="ident">size</span>);
 
     <span class="kw">let</span> <span class="ident">meta_start</span> <span class="op">=</span> <span class="ident">address_to_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">start</span>);
     <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) <span class="op">|</span><span class="op">|</span> <span class="ident">metadata_spec</span>.<span class="ident">scope</span>.<span class="ident">is_global</span>() {

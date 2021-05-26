@@ -553,6 +553,11 @@
 <span id="550">550</span>
 <span id="551">551</span>
 <span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::Mmapper</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::<span class="kw-2">*</span>;
@@ -903,11 +908,11 @@
     <span class="kw">const</span> <span class="ident">FIXED_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">FRAGMENTED_MMAPPER_TEST_REGION</span>.<span class="ident">start</span>;
     <span class="kw">const</span> <span class="ident">MAX_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">FRAGMENTED_MMAPPER_TEST_REGION</span>.<span class="ident">size</span>;
 
-    <span class="macro">lazy_static!</span> {
-        <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">NO_METADATA</span>: <span class="ident">SideMetadata</span> <span class="op">=</span> <span class="ident">SideMetadata::new</span>(<span class="ident">SideMetadataContext</span> {
+    <span class="kw">fn</span> <span class="ident">new_no_metadata</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SideMetadata</span> {
+        <span class="ident">SideMetadata::new</span>(<span class="ident">SideMetadataContext</span> {
             <span class="ident">global</span>: <span class="macro">vec!</span>[],
-            <span class="ident">local</span>: <span class="macro">vec!</span>[]
-        });
+            <span class="ident">local</span>: <span class="macro">vec!</span>[],
+        })
     }
 
     <span class="kw">fn</span> <span class="ident">pages_to_chunks_up</span>(<span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
@@ -951,9 +956,10 @@
             <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="number">1</span>;
             <span class="ident">with_cleanup</span>(
                 <span class="op">|</span><span class="op">|</span> {
+                    <span class="kw">let</span> <span class="ident">no_metadata</span> <span class="op">=</span> <span class="ident">new_no_metadata</span>();
                     <span class="kw">let</span> <span class="ident">mmapper</span> <span class="op">=</span> <span class="ident">FragmentedMapper::new</span>();
                     <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>, <span class="kw-2">&amp;</span><span class="ident">NO_METADATA</span>)
+                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
                         .<span class="ident">unwrap</span>();
 
                     <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">pages_to_chunks_up</span>(<span class="ident">pages</span>);
@@ -979,9 +985,10 @@
             <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">MMAP_CHUNK_BYTES</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
             <span class="ident">with_cleanup</span>(
                 <span class="op">|</span><span class="op">|</span> {
+                    <span class="kw">let</span> <span class="ident">no_metadata</span> <span class="op">=</span> <span class="ident">new_no_metadata</span>();
                     <span class="kw">let</span> <span class="ident">mmapper</span> <span class="op">=</span> <span class="ident">FragmentedMapper::new</span>();
                     <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>, <span class="kw-2">&amp;</span><span class="ident">NO_METADATA</span>)
+                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
                         .<span class="ident">unwrap</span>();
 
                     <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">pages_to_chunks_up</span>(<span class="ident">pages</span>);
@@ -1008,9 +1015,10 @@
             <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> (<span class="ident">MMAP_CHUNK_BYTES</span> <span class="op">+</span> <span class="ident">MMAP_CHUNK_BYTES</span> <span class="op">/</span> <span class="number">2</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
             <span class="ident">with_cleanup</span>(
                 <span class="op">|</span><span class="op">|</span> {
+                    <span class="kw">let</span> <span class="ident">no_metadata</span> <span class="op">=</span> <span class="ident">new_no_metadata</span>();
                     <span class="kw">let</span> <span class="ident">mmapper</span> <span class="op">=</span> <span class="ident">FragmentedMapper::new</span>();
                     <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>, <span class="kw-2">&amp;</span><span class="ident">NO_METADATA</span>)
+                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
                         .<span class="ident">unwrap</span>();
 
                     <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">pages_to_chunks_up</span>(<span class="ident">pages</span>);
@@ -1036,11 +1044,12 @@
         <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
             <span class="ident">with_cleanup</span>(
                 <span class="op">|</span><span class="op">|</span> {
+                    <span class="kw">let</span> <span class="ident">no_metadata</span> <span class="op">=</span> <span class="ident">new_no_metadata</span>();
                     <span class="comment">// map 2 chunks</span>
                     <span class="kw">let</span> <span class="ident">mmapper</span> <span class="op">=</span> <span class="ident">FragmentedMapper::new</span>();
                     <span class="kw">let</span> <span class="ident">pages_per_chunk</span> <span class="op">=</span> <span class="ident">MMAP_CHUNK_BYTES</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
                     <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>, <span class="kw-2">&amp;</span><span class="ident">NO_METADATA</span>)
+                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
                         .<span class="ident">unwrap</span>();
 
                     <span class="comment">// protect 1 chunk</span>
@@ -1067,11 +1076,12 @@
         <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
             <span class="ident">with_cleanup</span>(
                 <span class="op">|</span><span class="op">|</span> {
+                    <span class="kw">let</span> <span class="ident">no_metadata</span> <span class="op">=</span> <span class="ident">new_no_metadata</span>();
                     <span class="comment">// map 2 chunks</span>
                     <span class="kw">let</span> <span class="ident">mmapper</span> <span class="op">=</span> <span class="ident">FragmentedMapper::new</span>();
                     <span class="kw">let</span> <span class="ident">pages_per_chunk</span> <span class="op">=</span> <span class="ident">MMAP_CHUNK_BYTES</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
                     <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>, <span class="kw-2">&amp;</span><span class="ident">NO_METADATA</span>)
+                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
                         .<span class="ident">unwrap</span>();
 
                     <span class="comment">// protect 1 chunk</span>
@@ -1088,7 +1098,7 @@
 
                     <span class="comment">// ensure mapped - this will unprotect the previously protected chunk</span>
                     <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>, <span class="kw-2">&amp;</span><span class="ident">NO_METADATA</span>)
+                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
                         .<span class="ident">unwrap</span>();
                     <span class="macro">assert_eq!</span>(
                         <span class="ident">get_chunk_map_state</span>(<span class="kw-2">&amp;</span><span class="ident">mmapper</span>, <span class="ident">FIXED_ADDRESS</span>),

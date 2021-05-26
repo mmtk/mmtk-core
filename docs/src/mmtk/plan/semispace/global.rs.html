@@ -203,6 +203,18 @@
 <span id="200">200</span>
 <span id="201">201</span>
 <span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::gc_work</span>::{<span class="ident">SSCopyContext</span>, <span class="ident">SSProcessEdges</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::mmtk::MMTK</span>;
@@ -228,7 +240,7 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::options::UnsafeOptionsWrapper</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::sanity::sanity_checker</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata::SideMetadataContext</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">plan::global::BasePlan</span>, <span class="ident">vm::VMBinding</span>};
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
@@ -357,7 +369,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="ident">HEAP_START</span>, <span class="ident">HEAP_END</span>);
         <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span> <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]);
 
-        <span class="ident">SemiSpace</span> {
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">SemiSpace</span> {
             <span class="ident">hi</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
             <span class="ident">copyspace0</span>: <span class="ident">CopySpace::new</span>(
                 <span class="string">&quot;copyspace0&quot;</span>,
@@ -387,7 +399,19 @@
                 <span class="kw-2">&amp;</span><span class="ident">SS_CONSTRAINTS</span>,
                 <span class="ident">global_metadata_specs</span>,
             ),
+        };
+
+        {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">side_metadata_sanity_checker</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
+            <span class="ident">res</span>.<span class="ident">common</span>
+                .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">side_metadata_sanity_checker</span>);
+            <span class="ident">res</span>.<span class="ident">copyspace0</span>
+                .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">side_metadata_sanity_checker</span>);
+            <span class="ident">res</span>.<span class="ident">copyspace1</span>
+                .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">side_metadata_sanity_checker</span>);
         }
+
+        <span class="ident">res</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tospace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {

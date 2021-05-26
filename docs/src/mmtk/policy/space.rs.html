@@ -596,11 +596,23 @@
 <span id="593">593</span>
 <span id="594">594</span>
 <span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
 </pre><pre class="rust">
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::conversions</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::ObjectReference</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">conversions</span>::<span class="kw-2">*</span>, <span class="ident">side_metadata::SideMetadataSpec</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::{<span class="ident">AVAILABLE_BYTES</span>, <span class="ident">LOG_BYTES_IN_CHUNK</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::{<span class="ident">AVAILABLE_END</span>, <span class="ident">AVAILABLE_START</span>};
@@ -1027,8 +1039,20 @@
         <span class="macro">println!</span>();
     }
 
-    <span class="kw">fn</span> <span class="ident">local_side_metadata_specs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>] {
-        <span class="kw-2">&amp;</span>[]
+    <span class="doccomment">/// Ensure that the current space&#39;s metadata context does not have any issues.</span>
+    <span class="doccomment">/// Panics with a suitable message if any issue is detected.</span>
+    <span class="doccomment">/// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.</span>
+    <span class="doccomment">/// Internally this calls verify_metadata_context() from `util::side_metadata::sanity`</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This function is called once per space by its parent plan but may be called multiple times per policy.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `side_metadata_sanity_checker`: The `SideMetadataSanity` object instantiated in the calling plan.</span>
+    <span class="kw">fn</span> <span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">side_metadata_sanity_checker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SideMetadataSanity</span>) {
+        <span class="ident">side_metadata_sanity_checker</span>.<span class="ident">verify_metadata_context</span>(
+            <span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(),
+            <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">metadata</span>.<span class="ident">get_context</span>(),
+        )
     }
 }
 

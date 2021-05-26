@@ -312,6 +312,12 @@
 <span id="309">309</span>
 <span id="310">310</span>
 <span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::TransitiveClosure</span>;
@@ -322,6 +328,7 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::PageResource</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::malloc</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata::SideMetadataSanity</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::ObjectReference</span>;
@@ -443,6 +450,11 @@
     <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="ident">conversions::bytes_to_pages_up</span>(<span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>))
             <span class="op">+</span> <span class="self">self</span>.<span class="ident">metadata</span>.<span class="ident">reserved_pages</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">side_metadata_sanity_checker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SideMetadataSanity</span>) {
+        <span class="ident">side_metadata_sanity_checker</span>
+            .<span class="ident">verify_metadata_context</span>(<span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(), <span class="self">self</span>.<span class="ident">metadata</span>.<span class="ident">get_context</span>())
     }
 }
 
