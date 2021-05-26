@@ -23,7 +23,7 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::SideMetadataContext;
+use crate::util::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
@@ -185,7 +185,7 @@ impl<VM: VMBinding> GenCopy<VM> {
         };
         let global_metadata_specs = SideMetadataContext::new_global_specs(&gencopy_specs);
 
-        GenCopy {
+        let res = GenCopy {
             nursery: CopySpace::new(
                 "nursery",
                 false,
@@ -226,7 +226,21 @@ impl<VM: VMBinding> GenCopy<VM> {
                 global_metadata_specs,
             ),
             in_nursery: AtomicBool::default(),
+        };
+
+        {
+            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+            res.common
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            res.nursery
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            res.copyspace0
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            res.copyspace1
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         }
+
+        res
     }
 
     fn request_full_heap_collection(&self) -> bool {

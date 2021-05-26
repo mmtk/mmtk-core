@@ -11,7 +11,6 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::plan::PlanConstraints;
 use crate::scheduler::WorkerLocal;
-use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 // ANCHOR_END: imports
 
