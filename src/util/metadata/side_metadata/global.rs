@@ -4,61 +4,20 @@ use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::PageAccounting;
 use crate::util::memory;
 use crate::util::{constants, Address};
-use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum SideMetadataScope {
-    Global,
-    PolicySpecific,
-}
-
-impl SideMetadataScope {
-    pub const fn is_global(&self) -> bool {
-        matches!(self, SideMetadataScope::Global)
-    }
-}
-
-/// This struct stores the specification of a side metadata bit-set.
-/// It is used as an input to the (inline) functions provided by the side metadata module.
-///
-/// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.
-///
-/// For performance reasons, objects of this struct should be constants.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SideMetadataSpec {
-    pub scope: SideMetadataScope,
-    pub offset: usize,
-    pub log_num_of_bits: usize,
-    pub log_min_obj_size: usize,
-}
-
-impl fmt::Debug for SideMetadataSpec {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!(
-            "SideMetadataSpec {{ \
-            **Scope: {:?} \
-            **offset: 0x{:x} \
-            **log_num_of_bits: 0x{:x} \
-            **log_min_obj_size: 0x{:x} \
-            }}",
-            self.scope, self.offset, self.log_num_of_bits, self.log_min_obj_size
-        ))
-    }
-}
 
 /// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own
 /// side metadata spec as well as the plan's specs.
 pub struct SideMetadataContext {
     // For plans
-    pub global: Vec<SideMetadataSpec>,
+    pub global: Vec<MetadataSpec>,
     // For policies
-    pub local: Vec<SideMetadataSpec>,
+    pub local: Vec<MetadataSpec>,
 }
 
 impl SideMetadataContext {
-    pub fn new_global_specs(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
+    pub fn new_global_specs(specs: &[MetadataSpec]) -> Vec<MetadataSpec> {
         let mut ret = vec![];
         ret.extend_from_slice(specs);
         if cfg!(feature = "side_gc_header") {
@@ -85,7 +44,7 @@ impl SideMetadata {
         &self.context
     }
 
-    pub fn get_local_specs(&self) -> &[SideMetadataSpec] {
+    pub fn get_local_specs(&self) -> &[MetadataSpec] {
         &self.context.local
     }
 
@@ -240,7 +199,7 @@ impl SideMetadata {
 
 // Used only for debugging
 // Panics in the required metadata for data_addr is not mapped
-pub fn ensure_metadata_is_mapped(metadata_spec: SideMetadataSpec, data_addr: Address) {
+pub fn ensure_metadata_is_mapped(metadata_spec: MetadataSpec, data_addr: Address) {
     let meta_start = address_to_meta_address(metadata_spec, data_addr).align_down(BYTES_IN_PAGE);
 
     debug!(
@@ -252,7 +211,7 @@ pub fn ensure_metadata_is_mapped(metadata_spec: SideMetadataSpec, data_addr: Add
 }
 
 #[inline(always)]
-pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
+pub fn load_atomic(metadata_spec: MetadataSpec, data_addr: Address) -> usize {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
@@ -288,7 +247,7 @@ pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
     res
 }
 
-pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
+pub fn store_atomic(metadata_spec: MetadataSpec, data_addr: Address, metadata: usize) {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
@@ -334,7 +293,7 @@ pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
 }
 
 pub fn compare_exchange_atomic(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: MetadataSpec,
     data_addr: Address,
     old_metadata: usize,
     new_metadata: usize,
@@ -432,7 +391,7 @@ pub fn compare_exchange_atomic(
 }
 
 // same as Rust atomics, this wraps around on overflow
-pub fn fetch_add_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val: usize) -> usize {
+pub fn fetch_add_atomic(metadata_spec: MetadataSpec, data_addr: Address, val: usize) -> usize {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
@@ -491,7 +450,7 @@ pub fn fetch_add_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
 }
 
 // same as Rust atomics, this wraps around on overflow
-pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val: usize) -> usize {
+pub fn fetch_sub_atomic(metadata_spec: MetadataSpec, data_addr: Address, val: usize) -> usize {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
@@ -558,7 +517,7 @@ pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
 /// 1. Concurrent access to this operation is undefined behaviour.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
-pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
+pub unsafe fn load(metadata_spec: MetadataSpec, data_addr: Address) -> usize {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
@@ -604,7 +563,7 @@ pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
 /// 1. Concurrent access to this operation is undefined behaviour.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
-pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
+pub unsafe fn store(metadata_spec: MetadataSpec, data_addr: Address, metadata: usize) {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
@@ -650,7 +609,7 @@ pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
 ///
 /// * `chunk_start` - The starting address of the chunk whose metadata is being zeroed.
 ///
-pub fn bzero_metadata(metadata_spec: SideMetadataSpec, start: Address, size: usize) {
+pub fn bzero_metadata(metadata_spec: MetadataSpec, start: Address, size: usize) {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 

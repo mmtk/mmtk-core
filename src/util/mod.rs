@@ -49,8 +49,8 @@ pub(crate) mod options;
 /// Sanity checker for GC.
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;
-/// Side metadata implementation.
-pub(crate) mod side_metadata;
+/// Metadata implementation (on-side and in-header)
+pub(crate) mod metadata;
 /// Utils for collecting statistics.
 pub(crate) mod statistics;
 /// Test utilities.
