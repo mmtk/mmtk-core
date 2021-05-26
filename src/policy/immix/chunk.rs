@@ -74,6 +74,7 @@ impl Chunk {
             }
         } else {
             let line_mark_state = space.line_mark_state.load(Ordering::Acquire);
+            let mut allocated_blocks = 0;
             for block in self.blocks().filter(|block| block.get_state() != BlockState::Unallocated) {
                 let mut marked_lines = 0;
                 let mut holes = 0;
@@ -94,6 +95,7 @@ impl Chunk {
                 if marked_lines == 0 {
                     space.release_block(block);
                 } else {
+                    allocated_blocks += 1;
                     if marked_lines != Block::LINES {
                         block.set_state(BlockState::Reusable { unavailable_lines: marked_lines as _ });
                         space.reusable_blocks.push(block)
@@ -102,8 +104,12 @@ impl Chunk {
                     }
                     let old_value = mark_histogram[holes].load(Ordering::Acquire);
                     mark_histogram[holes].store(old_value + marked_lines, Ordering::Release);
+                    block.set_holes(holes);
                 }
-                block.set_holes(holes);
+            }
+            // Remove this chunk if there are no live blocks
+            if allocated_blocks == 0 {
+                space.chunk_map.set(*self, ChunkState::Free)
             }
         }
     }
