@@ -22,6 +22,8 @@ pub(crate) const LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 1;
 /// So, a value of `n` means this ratio must be less than $2^-n$.
 #[cfg(target_pointer_width = "32")]
 pub const LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 3;
+#[cfg(target_pointer_width = "64")]
+pub const LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 1;
 
 pub(crate) const LOG_MAX_GLOBAL_SIDE_METADATA_SIZE: usize =
     LOG_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;

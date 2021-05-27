@@ -4,8 +4,6 @@ use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::GcStatus; // Add
-use crate::plan::mutator_context::Mutator;
-use crate::plan::mygc::mutator::create_mygc_mutator;
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -20,7 +18,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
-use crate::util::side_metadata::SideMetadataContext;
+use crate::util::side_metadata::{SideMetadataSanity, SideMetadataContext};
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -177,7 +175,7 @@ impl<VM: VMBinding> MyGC<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
-        MyGC {
+        let res = MyGC {
             hi: AtomicBool::new(false),
             // ANCHOR: copyspace_new
             copyspace0: CopySpace::new(
@@ -201,8 +199,15 @@ impl<VM: VMBinding> MyGC<VM> {
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs),
-        }
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs.clone()),
+        };
+
+        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+        res.common.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        res.copyspace0.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        res.copyspace1.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+
+        res
     }
     // ANCHOR_END: plan_new
 
