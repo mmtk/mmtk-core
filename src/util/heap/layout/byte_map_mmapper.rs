@@ -65,37 +65,42 @@ impl Mmapper for ByteMapMmapper {
 
             let mmap_start = Self::mmap_chunks_to_address(chunk);
             let guard = self.lock.lock().unwrap();
-            // might have become MapState::Mapped here
-            if self.mapped[chunk].load(Ordering::Relaxed) == MapState::Unmapped {
-                // map data
-                let res = dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES);
-                if res.is_err() {
-                    return res;
+            match self.mapped[chunk].load(Ordering::Relaxed) {
+                MapState::Unmapped => {
+                    // map data
+                    let res = dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES);
+                    if res.is_err() {
+                        return res;
+                    }
+                    // map metadata
+                    let res = self.map_metadata(mmap_start, metadata);
+                    if res.is_err() {
+                        return res;
+                    }
                 }
-                // map metadata
-                let res = self.map_metadata(mmap_start, metadata);
-                if res.is_err() {
-                    return res;
-                }
-            }
-
-            if self.mapped[chunk].load(Ordering::Relaxed) == MapState::Protected {
-                match munprotect(mmap_start, MMAP_CHUNK_BYTES) {
-                    Ok(_) => {
-                        if VERBOSE {
-                            trace!(
-                                "munprotect succeeded at chunk {}  {} with len = {}",
-                                chunk,
-                                mmap_start,
-                                MMAP_CHUNK_BYTES
-                            );
+                MapState::Protected => {
+                    match munprotect(mmap_start, MMAP_CHUNK_BYTES) {
+                        Ok(_) => {
+                            if VERBOSE {
+                                trace!(
+                                    "munprotect succeeded at chunk {}  {} with len = {}",
+                                    chunk,
+                                    mmap_start,
+                                    MMAP_CHUNK_BYTES
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            drop(guard);
+                            panic!("Mmapper.ensureMapped (unprotect) failed: {}", e);
                         }
                     }
-                    Err(e) => {
-                        drop(guard);
-                        panic!("Mmapper.ensureMapped (unprotect) failed: {}", e);
-                    }
                 }
+                MapState::Quarantined => {
+                    unimplemented!()
+                }
+                // might have become MapState::Mapped here
+                MapState::Mapped => {}
             }
 
             self.mapped[chunk].store(MapState::Mapped, Ordering::Relaxed);

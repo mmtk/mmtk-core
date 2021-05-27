@@ -64,6 +64,7 @@ pub trait Mmapper {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(super) enum MapState {
     Unmapped,
+    Quarantined,
     Mapped,
     Protected,
 }

@@ -124,6 +124,9 @@ impl Mmapper for FragmentedMapper {
                         let mmap_start = Self::chunk_index_to_address(base, chunk);
                         crate::util::memory::munprotect(mmap_start, MMAP_CHUNK_BYTES).unwrap();
                     }
+                    MapState::Quarantined => {
+                        unimplemented!()
+                    }
                     // might have become MAPPED here
                     MapState::Mapped => {}
                 }
