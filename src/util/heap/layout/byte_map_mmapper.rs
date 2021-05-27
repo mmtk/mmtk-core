@@ -1,4 +1,5 @@
 use super::Mmapper;
+use super::mmapper::MapState;
 use crate::util::Address;
 
 use crate::util::constants::*;
@@ -11,12 +12,9 @@ use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
 use crate::util::memory::{dzmmap_noreplace, mprotect, munprotect};
+use atomic::Atomic;
 use std::io::Result;
 use std::mem::transmute;
-
-const UNMAPPED: u8 = 0;
-const MAPPED: u8 = 1;
-const PROTECTED: u8 = 2;
 
 const MMAP_NUM_CHUNKS: usize = if LOG_BYTES_IN_ADDRESS_SPACE == 32 {
     1 << (LOG_BYTES_IN_ADDRESS_SPACE as usize - LOG_MMAP_CHUNK_BYTES)
@@ -27,7 +25,7 @@ pub const VERBOSE: bool = true;
 
 pub struct ByteMapMmapper {
     lock: Mutex<()>,
-    mapped: [AtomicU8; MMAP_NUM_CHUNKS],
+    mapped: [Atomic<MapState>; MMAP_NUM_CHUNKS],
 }
 
 impl fmt::Debug for ByteMapMmapper {
@@ -45,7 +43,7 @@ impl Mmapper for ByteMapMmapper {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + bytes) - 1;
         for i in start_chunk..=end_chunk {
-            self.mapped[i].store(MAPPED, Ordering::Relaxed);
+            self.mapped[i].store(MapState::Mapped, Ordering::Relaxed);
         }
     }
 
@@ -61,14 +59,14 @@ impl Mmapper for ByteMapMmapper {
         );
 
         for chunk in start_chunk..end_chunk {
-            if self.mapped[chunk].load(Ordering::Relaxed) == MAPPED {
+            if self.mapped[chunk].load(Ordering::Relaxed) == MapState::Mapped {
                 continue;
             }
 
             let mmap_start = Self::mmap_chunks_to_address(chunk);
             let guard = self.lock.lock().unwrap();
-            // might have become MAPPED here
-            if self.mapped[chunk].load(Ordering::Relaxed) == UNMAPPED {
+            // might have become MapState::Mapped here
+            if self.mapped[chunk].load(Ordering::Relaxed) == MapState::Unmapped {
                 // map data
                 let res = dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES);
                 if res.is_err() {
@@ -81,7 +79,7 @@ impl Mmapper for ByteMapMmapper {
                 }
             }
 
-            if self.mapped[chunk].load(Ordering::Relaxed) == PROTECTED {
+            if self.mapped[chunk].load(Ordering::Relaxed) == MapState::Protected {
                 match munprotect(mmap_start, MMAP_CHUNK_BYTES) {
                     Ok(_) => {
                         if VERBOSE {
@@ -100,7 +98,7 @@ impl Mmapper for ByteMapMmapper {
                 }
             }
 
-            self.mapped[chunk].store(MAPPED, Ordering::Relaxed);
+            self.mapped[chunk].store(MapState::Mapped, Ordering::Relaxed);
             drop(guard);
         }
 
@@ -115,7 +113,7 @@ impl Mmapper for ByteMapMmapper {
      */
     fn is_mapped_address(&self, addr: Address) -> bool {
         let chunk = Self::address_to_mmap_chunks_down(addr);
-        self.mapped[chunk].load(Ordering::Relaxed) == MAPPED
+        self.mapped[chunk].load(Ordering::Relaxed) == MapState::Mapped
     }
 
     fn protect(&self, start: Address, pages: usize) {
@@ -125,7 +123,7 @@ impl Mmapper for ByteMapMmapper {
         let guard = self.lock.lock().unwrap();
 
         for chunk in start_chunk..end_chunk {
-            if self.mapped[chunk].load(Ordering::Relaxed) == MAPPED {
+            if self.mapped[chunk].load(Ordering::Relaxed) == MapState::Mapped {
                 let mmap_start = Self::mmap_chunks_to_address(chunk);
                 match mprotect(mmap_start, MMAP_CHUNK_BYTES) {
                     Ok(_) => {
@@ -143,9 +141,9 @@ impl Mmapper for ByteMapMmapper {
                         panic!("Mmapper.mprotect failed: {}", e);
                     }
                 }
-                self.mapped[chunk].store(PROTECTED, Ordering::Relaxed);
+                self.mapped[chunk].store(MapState::Protected, Ordering::Relaxed);
             } else {
-                debug_assert!(self.mapped[chunk].load(Ordering::Relaxed) == PROTECTED);
+                debug_assert!(self.mapped[chunk].load(Ordering::Relaxed) == MapState::Protected);
             }
         }
         drop(guard);
@@ -158,7 +156,7 @@ impl ByteMapMmapper {
         // Should be fiiine because AtomicXXX has the same bit representation as XXX
         ByteMapMmapper {
             lock: Mutex::new(()),
-            mapped: unsafe { transmute([UNMAPPED; MMAP_NUM_CHUNKS]) },
+            mapped: unsafe { transmute([MapState::Unmapped; MMAP_NUM_CHUNKS]) },
         }
     }
 
@@ -196,7 +194,7 @@ mod tests {
 
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::conversions::pages_to_bytes;
-    use crate::util::heap::layout::byte_map_mmapper::{MAPPED, PROTECTED};
+    use crate::util::heap::layout::mmapper::MapState;
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use crate::util::memory;
     use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
@@ -269,7 +267,7 @@ mod tests {
                         FIXED_ADDRESS + pages_to_bytes(pages),
                     );
                     for chunk in start_chunk..end_chunk {
-                        assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MAPPED);
+                        assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MapState::Mapped);
                     }
                 },
                 || {
@@ -296,7 +294,7 @@ mod tests {
                         FIXED_ADDRESS + pages_to_bytes(pages),
                     );
                     for chunk in start_chunk..end_chunk {
-                        assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MAPPED);
+                        assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MapState::Mapped);
                     }
                 },
                 || {
@@ -325,7 +323,7 @@ mod tests {
                     );
                     assert_eq!(end_chunk - start_chunk, 2);
                     for chunk in start_chunk..end_chunk {
-                        assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MAPPED);
+                        assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MapState::Mapped);
                     }
                 },
                 || {
@@ -352,8 +350,8 @@ mod tests {
                     mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
 
                     let chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
-                    assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), PROTECTED);
-                    assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MAPPED);
+                    assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MapState::Protected);
+                    assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MapState::Mapped);
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
@@ -379,15 +377,15 @@ mod tests {
                     mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
 
                     let chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
-                    assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), PROTECTED);
-                    assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MAPPED);
+                    assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MapState::Protected);
+                    assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MapState::Mapped);
 
                     // ensure mapped - this will unprotect the previously protected chunk
                     mmapper
                         .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &no_metadata)
                         .unwrap();
-                    assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MAPPED);
-                    assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MAPPED);
+                    assert_eq!(mmapper.mapped[chunk].load(Ordering::Relaxed), MapState::Mapped);
+                    assert_eq!(mmapper.mapped[chunk + 1].load(Ordering::Relaxed), MapState::Mapped);
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();

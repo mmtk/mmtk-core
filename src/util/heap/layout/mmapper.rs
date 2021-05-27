@@ -59,3 +59,11 @@ pub trait Mmapper {
      */
     fn protect(&self, start: Address, pages: usize);
 }
+
+#[repr(u8)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub(super) enum MapState {
+    Unmapped,
+    Mapped,
+    Protected,
+}

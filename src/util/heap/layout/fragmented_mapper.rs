@@ -1,4 +1,5 @@
 use super::Mmapper;
+use super::mmapper::MapState;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::Address;
 use crate::util::{conversions, side_metadata::SideMetadata};
@@ -7,14 +8,6 @@ use std::fmt;
 use std::io::Result;
 use std::mem::transmute;
 use std::sync::Mutex;
-
-#[repr(u8)]
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-enum MapState {
-    Unmapped,
-    Mapped,
-    Protected,
-}
 
 const MMAP_NUM_CHUNKS: usize = 1 << (33 - LOG_MMAP_CHUNK_BYTES);
 
