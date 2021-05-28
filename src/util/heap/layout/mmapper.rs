@@ -27,6 +27,8 @@ pub trait Mmapper {
      */
     fn mark_as_mapped(&self, start: Address, bytes: usize);
 
+    fn quarantine_address_range(&self, start: Address, pages: usize) -> Result<()>;
+
     /**
      * Ensure that a range of pages is mmapped (or equivalent).  If the
      * pages are not yet mapped, demand-zero map them. Note that mapping
@@ -88,6 +90,27 @@ impl MapState {
         };
         if res.is_ok() {
             state.store(MapState::Mapped, Ordering::Relaxed);
+        }
+        res
+    }
+
+    pub(super) fn transition_to_quarantined(
+        state: &Atomic<MapState>,
+        mmap_start: Address,
+    ) -> Result<()> {
+        let res = match state.load(Ordering::Relaxed) {
+            MapState::Unmapped => {
+                // map data
+                // dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES)
+                //     .and(metadata.try_map_metadata_space(mmap_start, MMAP_CHUNK_BYTES))
+                mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES)
+            }
+            MapState::Quarantined => Ok(()),
+            MapState::Mapped => panic!("Cannot quarantine mapped memory"),
+            MapState::Protected => panic!("Cannot quarantine protected memory"),
+        };
+        if res.is_ok() {
+            state.store(MapState::Quarantined, Ordering::Relaxed);
         }
         res
     }

@@ -93,6 +93,10 @@ impl SideMetadata {
         self.accounting.get_reserved_pages()
     }
 
+    pub fn reset(&self) {
+        self.accounting.reset();
+    }
+
     // ** NOTE: **
     //  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
 

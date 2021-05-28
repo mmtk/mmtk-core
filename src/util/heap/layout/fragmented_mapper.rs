@@ -11,12 +11,16 @@ use std::sync::Mutex;
 
 const MMAP_NUM_CHUNKS: usize = 1 << (33 - LOG_MMAP_CHUNK_BYTES);
 
-const LOG_MAPPABLE_BYTES: usize = 36; // 128GB - physical memory larger than this is uncommon
-                                      /*
-                                       * Size of a slab.  The value 10 gives a slab size of 1GB, with 1024
-                                       * chunks per slab, ie a 1k slab map.  In a 64-bit address space, this
-                                       * will require 1M of slab maps.
-                                       */
+// 36 = 128G - physical memory larger than this is uncommon
+// 40 = 2T. Increased to 2T. Though we probably won't use this much memory, we allow quarantine memory range,
+// and that is usually used to quarantine a large amount of memory.
+const LOG_MAPPABLE_BYTES: usize = 40;
+
+/*
+ * Size of a slab.  The value 10 gives a slab size of 1GB, with 1024
+ * chunks per slab, ie a 1k slab map.  In a 64-bit address space, this
+ * will require 1M of slab maps.
+ */
 const LOG_MMAP_CHUNKS_PER_SLAB: usize = 8;
 const LOG_MMAP_SLAB_BYTES: usize = LOG_MMAP_CHUNKS_PER_SLAB + LOG_MMAP_CHUNK_BYTES;
 const MMAP_SLAB_EXTENT: usize = 1 << LOG_MMAP_SLAB_BYTES;
@@ -76,6 +80,38 @@ impl Mmapper for FragmentedMapper {
         }
     }
 
+    fn quarantine_address_range(&self, mut start: Address, pages: usize) -> Result<()> {
+        let end = start + conversions::pages_to_bytes(pages);
+        // Iterate over the slabs covered
+        while start < end {
+            let base = Self::slab_align_down(start);
+            let high = if end > Self::slab_limit(start) && !Self::slab_limit(start).is_zero() {
+                Self::slab_limit(start)
+            } else {
+                end
+            };
+
+            let slab = Self::slab_align_down(start);
+            let start_chunk = Self::chunk_index(slab, start);
+            let end_chunk = Self::chunk_index(slab, conversions::mmap_chunk_align_up(high));
+
+            let mapped = self.get_or_allocate_slab_table(start);
+
+            /* Iterate over the chunks within the slab */
+            for (chunk, entry) in mapped.iter().enumerate().take(end_chunk).skip(start_chunk) {
+                if matches!(entry.load(Ordering::Relaxed), MapState::Quarantined) {
+                    continue;
+                }
+
+                let mmap_start = Self::chunk_index_to_address(base, chunk);
+                let _guard = self.lock.lock().unwrap();
+                MapState::transition_to_quarantined(entry, mmap_start).unwrap();
+            }
+            start = high;
+        }
+        Ok(())
+    }
+
     fn ensure_mapped(&self, mut start: Address, pages: usize) -> Result<()> {
         let end = start + conversions::pages_to_bytes(pages);
         // Iterate over the slabs covered
@@ -101,7 +137,10 @@ impl Mmapper for FragmentedMapper {
 
                 let mmap_start = Self::chunk_index_to_address(base, chunk);
                 let _guard = self.lock.lock().unwrap();
-                MapState::transition_to_mapped(entry, mmap_start).unwrap();
+                let res = MapState::transition_to_mapped(entry, mmap_start);
+                if res.is_err() {
+                    return res;
+                }
             }
             start = high;
         }

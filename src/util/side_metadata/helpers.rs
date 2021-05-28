@@ -1,10 +1,13 @@
 use super::*;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::heap::layout::Mmapper;
 use crate::util::memory;
 use crate::util::Address;
 use crate::util::{
     constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE},
     heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE,
 };
+use crate::MMAPPER;
 use std::io::Result;
 
 /// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
@@ -76,9 +79,11 @@ pub(super) fn try_mmap_contiguous_metadata_space(
         // While this never happens in our current use-cases where the minimum data mmap size is a chunk and the metadata ratio is larger than 1/64, it could happen if (min_data_mmap_size * metadata_ratio) is smaller than a page.
         // E.g. the current implementation detects such a case as an overlap and returns false.
         if !no_reserve {
-            try_mmap_metadata(mmap_start, mmap_size)
+            MMAPPER.ensure_mapped(mmap_start, mmap_size >> LOG_BYTES_IN_PAGE)
+            // try_mmap_metadata(mmap_start, mmap_size)
         } else {
-            try_mmap_metadata_address_range(mmap_start, mmap_size)
+            MMAPPER.quarantine_address_range(mmap_start, mmap_size >> LOG_BYTES_IN_PAGE)
+            // try_mmap_metadata_address_range(mmap_start, mmap_size)
         }
         .map(|_| mmap_size)
     } else {

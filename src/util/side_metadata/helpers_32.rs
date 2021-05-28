@@ -10,6 +10,9 @@ use super::{
     LOCAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_PER_CHUNK,
     LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
+use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::heap::layout::Mmapper;
+use crate::MMAPPER;
 
 #[inline(always)]
 pub(super) fn address_to_chunked_meta_address(
@@ -165,8 +168,10 @@ pub fn try_mmap_metadata_chunk(
     let policy_meta_start = address_to_meta_chunk_addr(start);
     if !no_reserve {
         // We have reserved the memory
-        unsafe { memory::dzmmap(policy_meta_start, local_per_chunk) }
+        MMAPPER.ensure_mapped(policy_meta_start, local_per_chunk >> LOG_BYTES_IN_PAGE)
+        // unsafe { memory::dzmmap(policy_meta_start, local_per_chunk) }
     } else {
-        memory::mmap_noreserve(policy_meta_start, local_per_chunk)
+        MMAPPER.quarantine_address_range(policy_meta_start, local_per_chunk >> LOG_BYTES_IN_PAGE)
+        // memory::mmap_noreserve(policy_meta_start, local_per_chunk)
     }
 }

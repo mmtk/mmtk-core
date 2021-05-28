@@ -68,6 +68,30 @@ impl Mmapper for ByteMapMmapper {
         Ok(())
     }
 
+    fn quarantine_address_range(&self, start: Address, pages: usize) -> Result<()> {
+        let start_chunk = Self::address_to_mmap_chunks_down(start);
+        let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
+        trace!(
+            "Calling ensure_mapped with start={:?} and {} pages, {}-{}",
+            start,
+            pages,
+            Self::mmap_chunks_to_address(start_chunk),
+            Self::mmap_chunks_to_address(end_chunk)
+        );
+
+        for chunk in start_chunk..end_chunk {
+            if self.mapped[chunk].load(Ordering::Relaxed) == MapState::Mapped {
+                continue;
+            }
+
+            let mmap_start = Self::mmap_chunks_to_address(chunk);
+            let _guard = self.lock.lock().unwrap();
+            MapState::transition_to_quarantined(&self.mapped[chunk], mmap_start).unwrap();
+        }
+
+        Ok(())
+    }
+
     /**
      * Return {@code true} if the given address has been mmapped
      *
@@ -139,7 +163,6 @@ mod tests {
     use crate::util::heap::layout::mmapper::MapState;
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use crate::util::memory;
-    use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
     use crate::util::test_util::BYTE_MAP_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
     use std::sync::atomic::Ordering;
