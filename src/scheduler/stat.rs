@@ -12,10 +12,14 @@ pub struct SchedulerStat {
     /// Count the number of work packets executed for different types
     work_counts: HashMap<TypeId, usize>,
     /// Collect work counters from work threads.
-    /// Two dimensional vectors are used.
-    /// The first dimension is for different types of work counters.
+    /// Two dimensional vectors are used, e.g.
+    /// `[[foo_0, ..., foo_n], ..., [bar_0, ..., bar_n]]`.
+    /// The first dimension is for different types of work counters,
+    /// (`foo` and `bar` in the above example).
     /// The second dimension if for work counters of the same type but from
-    /// different threads.
+    /// different threads (`foo_0` and `bar_0` are from the same thread).
+    /// The order of insertion is determined by when [`SchedulerStat::merge`] is
+    /// called for each [`WorkerLocalStat`].
     /// We assume different threads have the same set of work counters
     /// (in the same order).
     work_counters: HashMap<TypeId, Vec<Vec<Box<dyn WorkCounter>>>>,
