@@ -38,6 +38,7 @@
 <span id="35">35</span>
 <span id="36">36</span>
 <span id="37">37</span>
+<span id="38">38</span>
 </pre><pre class="rust">
 <span class="doccomment">//! A general scheduler implementation. MMTk uses it to schedule GC-related work.</span>
 
@@ -56,6 +57,7 @@
 <span class="kw">pub</span>(<span class="self">self</span>) <span class="kw">use</span> <span class="ident">scheduler::Scheduler</span>;
 
 <span class="kw">mod</span> <span class="ident">stat</span>;
+<span class="kw">mod</span> <span class="ident">work_counter</span>;
 
 <span class="kw">mod</span> <span class="ident">work</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">work::CoordinatorWork</span>;
