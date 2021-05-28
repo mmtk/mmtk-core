@@ -1,6 +1,6 @@
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::memory::*;
-use crate::util::{side_metadata::SideMetadata, Address};
+use crate::util::Address;
 use atomic::{Atomic, Ordering};
 use std::io::Result;
 
@@ -39,7 +39,7 @@ pub trait Mmapper {
      * @param start The start of the range to be mapped.
      * @param pages The size of the range to be mapped, in pages
      */
-    fn ensure_mapped(&self, start: Address, pages: usize, metadata: &SideMetadata) -> Result<()>;
+    fn ensure_mapped(&self, start: Address, pages: usize) -> Result<()>;
 
     /**
      * Is the page pointed to by this address mapped ?
@@ -72,16 +72,17 @@ impl MapState {
     pub(super) fn transition_to_mapped(
         state: &Atomic<MapState>,
         mmap_start: Address,
-        metadata: &SideMetadata,
+        // metadata: &SideMetadata,
     ) -> Result<()> {
         let res = match state.load(Ordering::Relaxed) {
             MapState::Unmapped => {
                 // map data
+                // dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES)
+                //     .and(metadata.try_map_metadata_space(mmap_start, MMAP_CHUNK_BYTES))
                 dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES)
-                    .and(metadata.try_map_metadata_space(mmap_start, MMAP_CHUNK_BYTES))
             }
             MapState::Protected => munprotect(mmap_start, MMAP_CHUNK_BYTES),
-            MapState::Quarantined => unimplemented!(),
+            MapState::Quarantined => unsafe { dzmmap(mmap_start, MMAP_CHUNK_BYTES) },
             // might have become MapState::Mapped here
             MapState::Mapped => Ok(()),
         };

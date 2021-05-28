@@ -5,7 +5,6 @@ use crate::util::Address;
 use crate::util::constants::*;
 use crate::util::conversions::pages_to_bytes;
 use crate::util::heap::layout::vm_layout_constants::*;
-use crate::util::side_metadata::SideMetadata;
 use std::fmt;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
@@ -45,7 +44,7 @@ impl Mmapper for ByteMapMmapper {
         }
     }
 
-    fn ensure_mapped(&self, start: Address, pages: usize, metadata: &SideMetadata) -> Result<()> {
+    fn ensure_mapped(&self, start: Address, pages: usize) -> Result<()> {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         trace!(
@@ -63,7 +62,7 @@ impl Mmapper for ByteMapMmapper {
 
             let mmap_start = Self::mmap_chunks_to_address(chunk);
             let _guard = self.lock.lock().unwrap();
-            MapState::transition_to_mapped(&self.mapped[chunk], mmap_start, metadata).unwrap();
+            MapState::transition_to_mapped(&self.mapped[chunk], mmap_start).unwrap();
         }
 
         Ok(())
@@ -149,13 +148,6 @@ mod tests {
     const FIXED_ADDRESS: Address = BYTE_MAP_MMAPPER_TEST_REGION.start;
     const MAX_SIZE: usize = BYTE_MAP_MMAPPER_TEST_REGION.size;
 
-    fn new_no_metadata() -> SideMetadata {
-        SideMetadata::new(SideMetadataContext {
-            global: vec![],
-            local: vec![],
-        })
-    }
-
     #[test]
     fn address_to_mmap_chunks() {
         for i in 0..10 {
@@ -198,12 +190,9 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let no_metadata = new_no_metadata();
                     let mmapper = ByteMapMmapper::new();
                     let pages = 1;
-                    mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, &no_metadata)
-                        .unwrap();
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
                     let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
                     let end_chunk = ByteMapMmapper::address_to_mmap_chunks_up(
@@ -228,12 +217,9 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let no_metadata = new_no_metadata();
                     let mmapper = ByteMapMmapper::new();
                     let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
-                    mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, &no_metadata)
-                        .unwrap();
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
                     let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
                     let end_chunk = ByteMapMmapper::address_to_mmap_chunks_up(
@@ -258,13 +244,10 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let no_metadata = new_no_metadata();
                     let mmapper = ByteMapMmapper::new();
                     let pages =
                         (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
-                    mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, &no_metadata)
-                        .unwrap();
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
                     let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
                     let end_chunk = ByteMapMmapper::address_to_mmap_chunks_up(
@@ -290,12 +273,11 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let no_metadata = new_no_metadata();
                     // map 2 chunks
                     let mmapper = ByteMapMmapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &no_metadata)
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
                         .unwrap();
 
                     // protect 1 chunk
@@ -323,12 +305,11 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let no_metadata = new_no_metadata();
                     // map 2 chunks
                     let mmapper = ByteMapMmapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &no_metadata)
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
                         .unwrap();
 
                     // protect 1 chunk
@@ -346,7 +327,7 @@ mod tests {
 
                     // ensure mapped - this will unprotect the previously protected chunk
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &no_metadata)
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
                         .unwrap();
                     assert_eq!(
                         mmapper.mapped[chunk].load(Ordering::Relaxed),

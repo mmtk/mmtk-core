@@ -1,8 +1,8 @@
 use super::mmapper::MapState;
 use super::Mmapper;
+use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::Address;
-use crate::util::{conversions, side_metadata::SideMetadata};
 use atomic::{Atomic, Ordering};
 use std::fmt;
 use std::io::Result;
@@ -76,12 +76,7 @@ impl Mmapper for FragmentedMapper {
         }
     }
 
-    fn ensure_mapped(
-        &self,
-        mut start: Address,
-        pages: usize,
-        metadata: &SideMetadata,
-    ) -> Result<()> {
+    fn ensure_mapped(&self, mut start: Address, pages: usize) -> Result<()> {
         let end = start + conversions::pages_to_bytes(pages);
         // Iterate over the slabs covered
         while start < end {
@@ -106,7 +101,7 @@ impl Mmapper for FragmentedMapper {
 
                 let mmap_start = Self::chunk_index_to_address(base, chunk);
                 let _guard = self.lock.lock().unwrap();
-                MapState::transition_to_mapped(entry, mmap_start, metadata).unwrap();
+                MapState::transition_to_mapped(entry, mmap_start).unwrap();
             }
             start = high;
         }
@@ -305,20 +300,12 @@ mod tests {
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use crate::util::memory;
-    use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
     use crate::util::test_util::FRAGMENTED_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::{conversions, Address};
 
     const FIXED_ADDRESS: Address = FRAGMENTED_MMAPPER_TEST_REGION.start;
     const MAX_BYTES: usize = FRAGMENTED_MMAPPER_TEST_REGION.size;
-
-    fn new_no_metadata() -> SideMetadata {
-        SideMetadata::new(SideMetadataContext {
-            global: vec![],
-            local: vec![],
-        })
-    }
 
     fn pages_to_chunks_up(pages: usize) -> usize {
         conversions::raw_align_up(pages, MMAP_CHUNK_BYTES) / MMAP_CHUNK_BYTES
@@ -361,11 +348,8 @@ mod tests {
             let pages = 1;
             with_cleanup(
                 || {
-                    let no_metadata = new_no_metadata();
                     let mmapper = FragmentedMapper::new();
-                    mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, &no_metadata)
-                        .unwrap();
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
                     for i in 0..chunks {
@@ -390,11 +374,8 @@ mod tests {
             let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
             with_cleanup(
                 || {
-                    let no_metadata = new_no_metadata();
                     let mmapper = FragmentedMapper::new();
-                    mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, &no_metadata)
-                        .unwrap();
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
                     for i in 0..chunks {
@@ -420,11 +401,8 @@ mod tests {
             let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
             with_cleanup(
                 || {
-                    let no_metadata = new_no_metadata();
                     let mmapper = FragmentedMapper::new();
-                    mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, &no_metadata)
-                        .unwrap();
+                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
                     for i in 0..chunks {
@@ -449,12 +427,11 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let no_metadata = new_no_metadata();
                     // map 2 chunks
                     let mmapper = FragmentedMapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &no_metadata)
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
                         .unwrap();
 
                     // protect 1 chunk
@@ -481,12 +458,11 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let no_metadata = new_no_metadata();
                     // map 2 chunks
                     let mmapper = FragmentedMapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &no_metadata)
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
                         .unwrap();
 
                     // protect 1 chunk
@@ -503,7 +479,7 @@ mod tests {
 
                     // ensure mapped - this will unprotect the previously protected chunk
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, &no_metadata)
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
                         .unwrap();
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS),
