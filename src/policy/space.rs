@@ -1,7 +1,7 @@
-use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
+use crate::util::conversions::*;
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSanity};
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
@@ -428,8 +428,20 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         println!();
     }
 
-    fn local_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &[]
+    /// Ensure that the current space's metadata context does not have any issues.
+    /// Panics with a suitable message if any issue is detected.
+    /// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.
+    /// Internally this calls verify_metadata_context() from `util::side_metadata::sanity`
+    ///
+    /// This function is called once per space by its parent plan but may be called multiple times per policy.
+    ///
+    /// Arguments:
+    /// * `side_metadata_sanity_checker`: The `SideMetadataSanity` object instantiated in the calling plan.
+    fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
+        side_metadata_sanity_checker.verify_metadata_context(
+            std::any::type_name::<Self>(),
+            self.common().metadata.get_context(),
+        )
     }
 }
 
