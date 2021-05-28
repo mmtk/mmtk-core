@@ -1,5 +1,5 @@
-use super::Mmapper;
 use super::mmapper::MapState;
+use super::Mmapper;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::Address;
 use crate::util::{conversions, side_metadata::SideMetadata};
@@ -104,34 +104,9 @@ impl Mmapper for FragmentedMapper {
                     continue;
                 }
 
+                let mmap_start = Self::chunk_index_to_address(base, chunk);
                 let _guard = self.lock.lock().unwrap();
-                match entry.load(Ordering::Relaxed) {
-                    MapState::Unmapped => {
-                        let mmap_start = Self::chunk_index_to_address(base, chunk);
-                        // map data
-                        let res =
-                            crate::util::memory::dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES);
-                        if res.is_err() {
-                            return res;
-                        }
-                        // map metadata
-                        let res = self.map_metadata(mmap_start, metadata);
-                        if res.is_err() {
-                            return res;
-                        }
-                    }
-                    MapState::Protected => {
-                        let mmap_start = Self::chunk_index_to_address(base, chunk);
-                        crate::util::memory::munprotect(mmap_start, MMAP_CHUNK_BYTES).unwrap();
-                    }
-                    MapState::Quarantined => {
-                        unimplemented!()
-                    }
-                    // might have become MAPPED here
-                    MapState::Mapped => {}
-                }
-
-                entry.store(MapState::Mapped, Ordering::Relaxed);
+                MapState::transition_to_mapped(entry, mmap_start, metadata).unwrap();
             }
             start = high;
         }
@@ -174,13 +149,8 @@ impl Mmapper for FragmentedMapper {
             let mapped = self.get_or_allocate_slab_table(start);
 
             for (chunk, entry) in mapped.iter().enumerate().take(end_chunk).skip(start_chunk) {
-                if entry.load(Ordering::Relaxed) == MapState::Mapped {
-                    let mmap_start = Self::chunk_index_to_address(base, chunk);
-                    crate::util::memory::mprotect(mmap_start, MMAP_CHUNK_BYTES).unwrap();
-                    entry.store(MapState::Protected, Ordering::Relaxed);
-                } else {
-                    debug_assert!(entry.load(Ordering::Relaxed) == MapState::Protected);
-                }
+                let mmap_start = Self::chunk_index_to_address(base, chunk);
+                MapState::transition_to_protected(entry, mmap_start).unwrap();
             }
             start = high;
         }
