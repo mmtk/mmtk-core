@@ -193,6 +193,14 @@
 //! 7. store (non-atomic)
 //! 8. bulk zeroing
 //!
+//! # List of PolicySpecific side metadata instances
+//!
+//! Here is a list of policy-specific side metadata instances used so far.
+//! For 64-bit targets, new policy-specific side metadata instances must be added to the end of this list and their offsets should be calculated based-on their sequence in this list:
+//!
+//! 1. Allocation Metadata (`src/policy/mallocspace/metadata.rs::ALLOC_METADATA_SPEC`)
+//! 2. Marking Metadata (`src/policy/mallocspace/metadata.rs::MARKING_METADATA_SPEC`)
+//!
 
 mod constants;
 mod global;
@@ -202,7 +210,7 @@ mod helpers_32;
 pub(crate) mod sanity;
 mod side_metadata_tests;
 
-use super::*;
+// use super::*;
 pub use constants::*;
 pub use global::*;
 pub(crate) use helpers::*;

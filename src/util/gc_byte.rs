@@ -1,4 +1,3 @@
-use crate::util::side_metadata::*;
 use crate::util::ObjectReference;
 #[cfg(not(feature = "side_gc_header"))]
 use crate::vm::ObjectModel;
@@ -6,12 +5,18 @@ use crate::vm::VMBinding;
 #[cfg(not(feature = "side_gc_header"))]
 use std::sync::atomic::{AtomicU8, Ordering};
 
-use super::constants;
+#[cfg(feature = "side_gc_header")]
+use super::metadata::{compare_exchange_atomic, load_atomic, store_atomic};
+use super::{
+    constants,
+    metadata::{MetadataScope, MetadataSpec, GLOBAL_SIDE_METADATA_BASE_ADDRESS},
+};
 
-pub const SIDE_GC_BYTE_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::Global,
+pub const SIDE_GC_BYTE_SPEC: MetadataSpec = MetadataSpec {
+    is_on_side: true,
+    scope: MetadataScope::Global,
     offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-    log_num_of_bits: 1,
+    num_of_bits: 2,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 

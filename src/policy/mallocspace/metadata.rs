@@ -4,14 +4,14 @@ use crate::util::constants::BYTES_IN_WORD;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 #[cfg(debug_assertions)]
-use crate::util::side_metadata::address_to_meta_address;
-use crate::util::side_metadata::load_atomic;
+use crate::util::metadata::address_to_side_metadata_address;
+use crate::util::metadata::load_atomic;
 #[cfg(target_pointer_width = "32")]
-use crate::util::side_metadata::meta_bytes_per_chunk;
-use crate::util::side_metadata::store_atomic;
+use crate::util::metadata::side_metadata_bytes_per_chunk;
+use crate::util::metadata::store_atomic;
 #[cfg(target_pointer_width = "64")]
-use crate::util::side_metadata::{metadata_address_range_size, LOCAL_SIDE_METADATA_BASE_ADDRESS};
-use crate::util::side_metadata::{SideMetadata, SideMetadataScope, SideMetadataSpec};
+use crate::util::metadata::{side_metadata_address_range_size, LOCAL_SIDE_METADATA_BASE_ADDRESS};
+use crate::util::metadata::{Metadata, MetadataScope, MetadataSpec};
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -33,36 +33,40 @@ lazy_static! {
 }
 
 #[cfg(target_pointer_width = "32")]
-pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
+pub(super) const ALLOC_METADATA_SPEC: MetadataSpec = MetadataSpec {
+    is_on_side: true,
+    scope: MetadataScope::PolicySpecific,
     offset: 0,
-    log_num_of_bits: 0,
+    num_of_bits: 1,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 #[cfg(target_pointer_width = "32")]
-pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
+pub(super) const MARKING_METADATA_SPEC: MetadataSpec = MetadataSpec {
+    is_on_side: true,
+    scope: MetadataScope::PolicySpecific,
     offset: ALLOC_METADATA_SPEC.offset
-        + meta_bytes_per_chunk(
+        + side_metadata_bytes_per_chunk(
             ALLOC_METADATA_SPEC.log_min_obj_size,
-            ALLOC_METADATA_SPEC.log_num_of_bits,
+            ALLOC_METADATA_SPEC.num_of_bits,
         ),
-    log_num_of_bits: 0,
+    num_of_bits: 1,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
 #[cfg(target_pointer_width = "64")]
-pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
+pub(super) const ALLOC_METADATA_SPEC: MetadataSpec = MetadataSpec {
+    is_on_side: true,
+    scope: MetadataScope::PolicySpecific,
     offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-    log_num_of_bits: 0,
+    num_of_bits: 1,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 #[cfg(target_pointer_width = "64")]
-pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
-    offset: ALLOC_METADATA_SPEC.offset + metadata_address_range_size(ALLOC_METADATA_SPEC),
-    log_num_of_bits: 0,
+pub(super) const MARKING_METADATA_SPEC: MetadataSpec = MetadataSpec {
+    is_on_side: true,
+    scope: MetadataScope::PolicySpecific,
+    offset: ALLOC_METADATA_SPEC.offset + side_metadata_address_range_size(ALLOC_METADATA_SPEC),
+    num_of_bits: 1,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
@@ -71,7 +75,7 @@ pub fn is_meta_space_mapped(address: Address) -> bool {
     ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
 }
 
-pub fn map_meta_space_for_chunk(metadata: &SideMetadata, chunk_start: Address) {
+pub fn map_meta_space_for_chunk(metadata: &Metadata, chunk_start: Address) {
     let mut active_chunks = ACTIVE_CHUNKS.write().unwrap();
     if active_chunks.contains(&chunk_start) {
         return;
@@ -108,7 +112,7 @@ pub fn is_alloced_object(address: Address) -> bool {
             "is_alloced_object(): alloc bit does not match alloc map, address = {} (aligned to {}), meta address = {}",
             address,
             address.align_down(BYTES_IN_WORD),
-            address_to_meta_address(ALLOC_METADATA_SPEC, address)
+            address_to_side_metadata_address(ALLOC_METADATA_SPEC, address)
         );
         return ret;
     }
@@ -128,7 +132,7 @@ pub fn is_marked(object: ObjectReference) -> bool {
             "is_marked(): mark bit does not match mark map, address = {} (aligned to {}), meta address = {}",
             object.to_address(),
             object.to_address().align_down(BYTES_IN_WORD),
-            address_to_meta_address(MARKING_METADATA_SPEC, object.to_address())
+            address_to_side_metadata_address(MARKING_METADATA_SPEC, object.to_address())
         );
         return ret;
     }

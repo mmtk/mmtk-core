@@ -2,7 +2,26 @@
 mod tests {
     use crate::util::constants;
     use crate::util::heap::layout::vm_layout_constants;
-    use super::super::side_metadata::*;
+    use crate::util::metadata::side_metadata::address_to_meta_address;
+    use crate::util::metadata::side_metadata::bzero_metadata;
+    use crate::util::metadata::side_metadata::ensure_metadata_is_mapped;
+    use crate::util::metadata::side_metadata::fetch_add_atomic;
+    use crate::util::metadata::side_metadata::fetch_sub_atomic;
+    use crate::util::metadata::side_metadata::load_atomic;
+    use crate::util::metadata::side_metadata::meta_byte_lshift;
+    use crate::util::metadata::side_metadata::meta_byte_mask;
+    #[cfg(target_pointer_width = "32")]
+    use crate::util::metadata::side_metadata::meta_bytes_per_chunk;
+    use crate::util::metadata::side_metadata::metadata_address_range_size;
+    use crate::util::metadata::side_metadata::sanity;
+    use crate::util::metadata::side_metadata::SideMetadata;
+    use crate::util::metadata::side_metadata::SideMetadataContext;
+    use crate::util::metadata::side_metadata::SideMetadataSanity;
+    use crate::util::metadata::MetadataScope;
+    use crate::util::metadata::MetadataSpec;
+    use crate::util::metadata::GLOBAL_SIDE_METADATA_BASE_ADDRESS;
+    // #[cfg(target_pointer_width = "64")]
+    use crate::util::metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
     use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::Address;
 
@@ -455,7 +474,7 @@ mod tests {
                         offset: metadata_1_spec.offset
                             + meta_bytes_per_chunk(
                                 metadata_1_spec.log_min_obj_size,
-                                metadata_1_spec.log_num_of_bits,
+                                metadata_1_spec.num_of_bits,
                             ),
                         num_of_bits: 8,
                         log_min_obj_size: 7,

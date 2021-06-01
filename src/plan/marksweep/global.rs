@@ -17,10 +17,10 @@ use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
+use crate::util::metadata::{MetadataContext, MetadataSanity};
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use std::sync::Arc;
@@ -128,7 +128,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let global_metadata_specs = MetadataContext::new_global_specs(&[]);
 
         let res = MarkSweep {
             ms: MallocSpace::new(global_metadata_specs.clone()),
@@ -143,11 +143,10 @@ impl<VM: VMBinding> MarkSweep<VM> {
         };
 
         {
-            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+            let mut metadata_sanity_checker = MetadataSanity::new();
             res.common
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-            res.ms
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+                .verify_metadata_sanity(&mut metadata_sanity_checker);
+            res.ms.verify_metadata_sanity(&mut metadata_sanity_checker);
         }
 
         res

@@ -19,10 +19,10 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::metadata::MetadataSanity;
+use crate::util::metadata::MetadataSpec;
 use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
-use crate::util::side_metadata::SideMetadataSanity;
-use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::statistics::stats::Stats;
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
@@ -370,7 +370,7 @@ pub fn create_vm_space<VM: VMBinding>(
     heap: &mut HeapMeta,
     boot_segment_bytes: usize,
     constraints: &'static PlanConstraints,
-    global_side_metadata_specs: Vec<SideMetadataSpec>,
+    global_metadata_specs: Vec<MetadataSpec>,
 ) -> ImmortalSpace<VM> {
     use crate::util::constants::LOG_BYTES_IN_MBYTE;
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
@@ -384,7 +384,7 @@ pub fn create_vm_space<VM: VMBinding>(
         "boot",
         false,
         VMRequest::fixed_size(boot_segment_mb),
-        global_side_metadata_specs,
+        global_metadata_specs,
         vm_map,
         mmapper,
         heap,
@@ -402,7 +402,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        global_metadata_specs: Vec<MetadataSpec>,
     ) -> BasePlan<VM> {
         let stats = Stats::new();
         // Initializing the analysis manager and routines
@@ -414,7 +414,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 "code_space",
                 true,
                 VMRequest::discontiguous(),
-                global_side_metadata_specs.clone(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -425,7 +425,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 "ro_space",
                 true,
                 VMRequest::discontiguous(),
-                global_side_metadata_specs.clone(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -438,7 +438,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 &mut heap,
                 options.vm_space_size,
                 constraints,
-                global_side_metadata_specs,
+                global_metadata_specs,
             ),
 
             initialized: AtomicBool::new(false),
@@ -678,19 +678,16 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     #[allow(unused_variables)] // depending on the enabled features, base may not be used.
-    pub(crate) fn verify_side_metadata_sanity(
-        &self,
-        side_metadata_sanity_checker: &mut SideMetadataSanity,
-    ) {
+    pub(crate) fn verify_metadata_sanity(&self, metadata_sanity_checker: &mut MetadataSanity) {
         #[cfg(feature = "code_space")]
         self.code_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+            .verify_metadata_sanity(metadata_sanity_checker);
         #[cfg(feature = "ro_space")]
         self.ro_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+            .verify_metadata_sanity(metadata_sanity_checker);
         #[cfg(feature = "vm_space")]
         self.vm_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+            .verify_metadata_sanity(metadata_sanity_checker);
     }
 }
 
@@ -710,14 +707,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        global_metadata_specs: Vec<MetadataSpec>,
     ) -> CommonPlan<VM> {
         CommonPlan {
             immortal: ImmortalSpace::new(
                 "immortal",
                 true,
                 VMRequest::discontiguous(),
-                global_side_metadata_specs.clone(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -727,7 +724,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 "los",
                 true,
                 VMRequest::discontiguous(),
-                global_side_metadata_specs.clone(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -739,7 +736,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 options,
                 heap,
                 constraints,
-                global_side_metadata_specs,
+                global_metadata_specs,
             ),
         }
     }
@@ -817,16 +814,11 @@ impl<VM: VMBinding> CommonPlan<VM> {
         &self.los
     }
 
-    pub(crate) fn verify_side_metadata_sanity(
-        &self,
-        side_metadata_sanity_checker: &mut SideMetadataSanity,
-    ) {
-        self.base
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+    pub(crate) fn verify_metadata_sanity(&self, metadata_sanity_checker: &mut MetadataSanity) {
+        self.base.verify_metadata_sanity(metadata_sanity_checker);
         self.immortal
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        self.los
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+            .verify_metadata_sanity(metadata_sanity_checker);
+        self.los.verify_metadata_sanity(metadata_sanity_checker);
     }
 }
 

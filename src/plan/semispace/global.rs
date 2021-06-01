@@ -18,11 +18,11 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::metadata::{MetadataContext, MetadataSanity};
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -149,7 +149,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let global_metadata_specs = MetadataContext::new_global_specs(&[]);
 
         let res = SemiSpace {
             hi: AtomicBool::new(false),
@@ -184,13 +184,13 @@ impl<VM: VMBinding> SemiSpace<VM> {
         };
 
         {
-            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+            let mut metadata_sanity_checker = MetadataSanity::new();
             res.common
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+                .verify_metadata_sanity(&mut metadata_sanity_checker);
             res.copyspace0
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+                .verify_metadata_sanity(&mut metadata_sanity_checker);
             res.copyspace1
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+                .verify_metadata_sanity(&mut metadata_sanity_checker);
         }
 
         res

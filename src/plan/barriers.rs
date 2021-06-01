@@ -2,7 +2,7 @@
 
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
-use crate::util::side_metadata::*;
+use crate::util::metadata::*;
 use crate::util::*;
 use crate::MMTK;
 
@@ -34,12 +34,12 @@ impl Barrier for NoBarrier {
 pub struct ObjectRememberingBarrier<E: ProcessEdgesWork> {
     mmtk: &'static MMTK<E::VM>,
     modbuf: Vec<ObjectReference>,
-    meta: SideMetadataSpec,
+    meta: MetadataSpec,
 }
 
 impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     #[allow(unused)]
-    pub fn new(mmtk: &'static MMTK<E::VM>, meta: SideMetadataSpec) -> Self {
+    pub fn new(mmtk: &'static MMTK<E::VM>, meta: MetadataSpec) -> Self {
         Self {
             mmtk,
             modbuf: vec![],

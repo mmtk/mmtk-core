@@ -6,9 +6,8 @@ use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
+use crate::util::metadata::{Metadata, MetadataContext, MetadataSanity, MetadataSpec};
 use crate::util::opaque_pointer::*;
-use crate::util::side_metadata::SideMetadataSanity;
-use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
@@ -31,7 +30,7 @@ const ASSERT_ALLOCATION: bool = false;
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
-    metadata: SideMetadata,
+    metadata: Metadata,
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
@@ -131,19 +130,19 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             + self.metadata.reserved_pages()
     }
 
-    fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
-        side_metadata_sanity_checker
+    fn verify_metadata_sanity(&self, metadata_sanity_checker: &mut MetadataSanity) {
+        metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), self.metadata.get_context())
     }
 }
 
 impl<VM: VMBinding> MallocSpace<VM> {
-    pub fn new(global_side_metadata_specs: Vec<SideMetadataSpec>) -> Self {
+    pub fn new(global_metadata_specs: Vec<MetadataSpec>) -> Self {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
-            metadata: SideMetadata::new(SideMetadataContext {
-                global: global_side_metadata_specs,
+            metadata: Metadata::new(MetadataContext {
+                global: global_metadata_specs,
                 local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
             }),
             #[cfg(debug_assertions)]

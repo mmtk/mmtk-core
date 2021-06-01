@@ -1,31 +1,26 @@
-use super::*;
+#[cfg(feature = "extreme_assertions")]
+use super::sanity;
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_PAGE};
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::PageAccounting;
 use crate::util::memory;
+use crate::util::metadata::side_metadata::{
+    address_to_meta_address, ensure_munmap_contiguos_metadata_space, meta_byte_lshift,
+    meta_byte_mask, try_mmap_contiguous_metadata_space,
+};
+#[cfg(target_pointer_width = "32")]
+use crate::util::metadata::side_metadata::{
+    ensure_munmap_chunked_metadata_space, meta_bytes_per_chunk, try_map_per_chunk_metadata_space,
+    LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
+};
+use crate::util::metadata::{MetadataContext, MetadataSpec};
 use crate::util::{constants, Address};
 use std::io::Result;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 
 /// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own
 /// side metadata spec as well as the plan's specs.
-pub struct SideMetadataContext {
-    // For plans
-    pub global: Vec<MetadataSpec>,
-    // For policies
-    pub local: Vec<MetadataSpec>,
-}
-
-impl SideMetadataContext {
-    pub fn new_global_specs(specs: &[MetadataSpec]) -> Vec<MetadataSpec> {
-        let mut ret = vec![];
-        ret.extend_from_slice(specs);
-        if cfg!(feature = "side_gc_header") {
-            ret.push(crate::util::gc_byte::SIDE_GC_BYTE_SPEC);
-        }
-        ret
-    }
-}
+pub(crate) type SideMetadataContext = MetadataContext;
 
 pub struct SideMetadata {
     context: SideMetadataContext,
@@ -94,7 +89,7 @@ impl SideMetadata {
     /// # Arguments
     /// * `start` - The starting address of the source data.
     /// * `size` - The size of the source data (in bytes).
-    /// * `no_reserve` - whether to invoke mmap with a noreserve flag (we use this flag to quanrantine address range)
+    /// * `no_reserve` - whether to invoke mmap with a noreserve flag (we use this flag to quarantine address range)
     fn map_metadata_internal(&self, start: Address, size: usize, no_reserve: bool) -> Result<()> {
         for spec in self.context.global.iter() {
             match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
@@ -137,7 +132,7 @@ impl SideMetadata {
             }
             #[cfg(target_pointer_width = "32")]
             {
-                lsize += meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+                lsize += meta_bytes_per_chunk(spec.log_min_obj_size, spec.num_of_bits);
             }
         }
 
@@ -220,7 +215,7 @@ pub fn load_atomic(metadata_spec: MetadataSpec, data_addr: Address) -> usize {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     let res = if bits_num_log <= 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
@@ -256,7 +251,7 @@ pub fn store_atomic(metadata_spec: MetadataSpec, data_addr: Address, metadata: u
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     if bits_num_log < 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
@@ -310,7 +305,7 @@ pub fn compare_exchange_atomic(
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     #[allow(clippy::let_and_return)]
     let res = if bits_num_log < 3 {
@@ -400,7 +395,7 @@ pub fn fetch_add_atomic(metadata_spec: MetadataSpec, data_addr: Address, val: us
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     #[allow(clippy::let_and_return)]
     let old_val = if bits_num_log < 3 {
@@ -459,7 +454,7 @@ pub fn fetch_sub_atomic(metadata_spec: MetadataSpec, data_addr: Address, val: us
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     #[allow(clippy::let_and_return)]
     let old_val = if bits_num_log < 3 {
@@ -526,7 +521,7 @@ pub unsafe fn load(metadata_spec: MetadataSpec, data_addr: Address) -> usize {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     #[allow(clippy::let_and_return)]
     let res = if bits_num_log <= 3 {
@@ -572,7 +567,7 @@ pub unsafe fn store(metadata_spec: MetadataSpec, data_addr: Address, metadata: u
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     if bits_num_log < 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
@@ -657,10 +652,7 @@ pub fn bzero_metadata(metadata_spec: MetadataSpec, start: Address, size: usize) 
             while next_data_chunk != last_data_chunk {
                 memory::zero(
                     address_to_meta_address(metadata_spec, next_data_chunk),
-                    meta_bytes_per_chunk(
-                        metadata_spec.log_min_obj_size,
-                        metadata_spec.log_num_of_bits,
-                    ),
+                    meta_bytes_per_chunk(metadata_spec.log_min_obj_size, metadata_spec.num_of_bits),
                 );
                 next_data_chunk += BYTES_IN_CHUNK;
             }

@@ -8,8 +8,8 @@ use crate::util::header_byte::HeaderByte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
+use crate::util::metadata::{MetadataContext, MetadataSpec};
 use crate::util::opaque_pointer::*;
-use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
@@ -100,7 +100,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        global_metadata_specs: Vec<MetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
@@ -113,8 +113,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 immortal: false,
                 zeroed,
                 vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
+                metadata_context: MetadataContext {
+                    global: global_metadata_specs,
                     local: vec![],
                 },
             },

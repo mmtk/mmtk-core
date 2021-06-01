@@ -13,7 +13,7 @@ use crate::policy::space::SpaceOptions;
 use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
-use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
+use crate::util::metadata::{MetadataContext, MetadataSpec};
 use crate::vm::VMBinding;
 
 /// This type implements a simple immortal collection
@@ -83,7 +83,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        global_metadata_specs: Vec<MetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
@@ -96,8 +96,8 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 immortal: true,
                 zeroed,
                 vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
+                metadata_context: MetadataContext {
+                    global: global_metadata_specs,
                     local: vec![],
                 },
             },

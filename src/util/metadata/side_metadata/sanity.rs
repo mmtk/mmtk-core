@@ -1,3 +1,4 @@
+use crate::util::metadata::MetadataSpec;
 use crate::util::Address;
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
@@ -5,10 +6,12 @@ use std::sync::{Mutex, RwLock};
 
 use super::constants::LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;
 use super::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
-use super::{SideMetadataContext, SideMetadataSpec};
+use super::SideMetadataContext;
 use crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
+
+// TODO - add a check for number of bits being power of two for side metadata
 
 /// An internal enum to enhance code style for add/sub
 #[cfg(feature = "extreme_assertions")]
@@ -30,14 +33,14 @@ static GLOBAL_META_NAME: &str = "Global";
 ///
 /// FIXME: This struct should be pub(crate) visible, but changing its scope will need changing other scopes, such as the Space trait's. For now, I will not do that.
 pub struct SideMetadataSanity {
-    specs_sanity_map: HashMap<&'static str, Vec<SideMetadataSpec>>,
+    specs_sanity_map: HashMap<&'static str, Vec<MetadataSpec>>,
 }
 
 lazy_static! {
     /// This is a two-level hashmap to store the metadata content for verification purposes.
     /// It keeps a map from side metadata specifications to a second hashmap
     /// which maps data addresses to their current metadata content.
-    static ref CONTENT_SANITY_MAP: RwLock<HashMap<SideMetadataSpec, HashMap<Address, usize>>> =
+    static ref CONTENT_SANITY_MAP: RwLock<HashMap<MetadataSpec, HashMap<Address, usize>>> =
         RwLock::new(HashMap::new());
     pub(crate) static ref SANITY_LOCK: Mutex<()> = Mutex::new(());
 }
@@ -55,7 +58,7 @@ pub(crate) fn reset() {
 /// Arguments:
 /// * `g_specs`: a slice of global specs to be checked.
 ///
-fn verify_global_specs_total_size(g_specs: &[SideMetadataSpec]) -> Result<()> {
+fn verify_global_specs_total_size(g_specs: &[MetadataSpec]) -> Result<()> {
     let mut total_size = 0usize;
     for spec in g_specs {
         total_size += super::metadata_address_range_size(*spec);
@@ -79,7 +82,7 @@ fn verify_global_specs_total_size(g_specs: &[SideMetadataSpec]) -> Result<()> {
 /// * `l_specs`: a slice of local specs to be checked.
 ///
 #[cfg(target_pointer_width = "64")]
-fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
+fn verify_local_specs_size(l_specs: &[MetadataSpec]) -> Result<()> {
     for spec in l_specs {
         if super::metadata_address_range_size(*spec)
             > 1usize << (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
@@ -102,10 +105,10 @@ fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
 /// * `l_specs`: a slice of local specs to be checked.
 ///
 #[cfg(target_pointer_width = "32")]
-fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
+fn verify_local_specs_size(l_specs: &[MetadataSpec]) -> Result<()> {
     let mut total_size = 0usize;
     for spec in l_specs {
-        total_size += super::meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+        total_size += super::meta_bytes_per_chunk(spec.log_min_obj_size, spec.num_of_bits);
     }
 
     if total_size > 1usize << (LOG_BYTES_IN_CHUNK - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO) {
@@ -126,10 +129,7 @@ fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
 /// * `spec_1`: first target specification
 /// * `spec_2`: second target specification
 ///
-fn verify_no_overlap_contiguous(
-    spec_1: &SideMetadataSpec,
-    spec_2: &SideMetadataSpec,
-) -> Result<()> {
+fn verify_no_overlap_contiguous(spec_1: &MetadataSpec, spec_2: &MetadataSpec) -> Result<()> {
     let end_1 = spec_1.offset + super::metadata_address_range_size(*spec_1);
     let end_2 = spec_2.offset + super::metadata_address_range_size(*spec_2);
 
@@ -154,11 +154,11 @@ fn verify_no_overlap_contiguous(
 /// * `spec_2`: second target specification
 ///
 #[cfg(target_pointer_width = "32")]
-fn verify_no_overlap_chunked(spec_1: &SideMetadataSpec, spec_2: &SideMetadataSpec) -> Result<()> {
-    let end_1 = spec_1.offset
-        + super::meta_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.log_num_of_bits);
-    let end_2 = spec_2.offset
-        + super::meta_bytes_per_chunk(spec_2.log_min_obj_size, spec_2.log_num_of_bits);
+fn verify_no_overlap_chunked(spec_1: &MetadataSpec, spec_2: &MetadataSpec) -> Result<()> {
+    let end_1 =
+        spec_1.offset + super::meta_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.num_of_bits);
+    let end_2 =
+        spec_2.offset + super::meta_bytes_per_chunk(spec_2.log_min_obj_size, spec_2.num_of_bits);
 
     if !(spec_1.offset >= end_2 || spec_2.offset >= end_1) {
         return Err(Error::new(
@@ -179,7 +179,7 @@ fn verify_no_overlap_chunked(spec_1: &SideMetadataSpec, spec_2: &SideMetadataSpe
 /// Arguments:
 /// * `g_specs`: the slice of global specifications to be checked
 ///
-fn verify_global_specs(g_specs: &[SideMetadataSpec]) -> Result<()> {
+fn verify_global_specs(g_specs: &[MetadataSpec]) -> Result<()> {
     let v = verify_global_specs_total_size(g_specs);
     if v.is_err() {
         return v;
@@ -220,7 +220,7 @@ impl SideMetadataSanity {
     /// Arguments:
     /// * `global`: a boolean to show whether global (`true`) or policy-specific (`false`) specs are required.
     ///
-    fn get_all_specs(&self, global: bool) -> Vec<SideMetadataSpec> {
+    fn get_all_specs(&self, global: bool) -> Vec<MetadataSpec> {
         let mut specs = vec![];
         for (k, v) in self.specs_sanity_map.iter() {
             if !(global ^ (*k == GLOBAL_META_NAME)) {
@@ -379,7 +379,7 @@ impl SideMetadataSanity {
 /// * `size`: size of the source data
 ///
 #[cfg(feature = "extreme_assertions")]
-pub fn verify_bzero(metadata_spec: SideMetadataSpec, start: Address, size: usize) {
+pub fn verify_bzero(metadata_spec: MetadataSpec, start: Address, size: usize) {
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
@@ -409,7 +409,7 @@ pub fn verify_bzero(metadata_spec: SideMetadataSpec, start: Address, size: usize
 /// * `actual_val`: the actual content returned by the side metadata load operation
 ///
 #[cfg(feature = "extreme_assertions")]
-pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_val: usize) {
+pub fn verify_load(metadata_spec: &MetadataSpec, data_addr: Address, actual_val: usize) {
     let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
     match sanity_map.get(&metadata_spec) {
         Some(spec_sanity_map) => {
@@ -442,7 +442,7 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
 /// * `metadata`: the metadata content to store
 ///
 #[cfg(feature = "extreme_assertions")]
-pub fn verify_store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
+pub fn verify_store(metadata_spec: MetadataSpec, data_addr: Address, metadata: usize) {
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
@@ -457,7 +457,7 @@ pub fn verify_store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
 /// A helper function encapsulating the common parts of addition and subtraction
 #[cfg(feature = "extreme_assertions")]
 fn do_math(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: MetadataSpec,
     data_addr: Address,
     val: usize,
     math_op: MathOp,
@@ -494,7 +494,7 @@ fn do_math(
 ///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_add(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: MetadataSpec,
     data_addr: Address,
     val_to_add: usize,
     actual_old_val: usize,
@@ -525,7 +525,7 @@ pub fn verify_add(
 ///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_sub(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: MetadataSpec,
     data_addr: Address,
     val_to_sub: usize,
     actual_old_val: usize,
@@ -545,22 +545,35 @@ pub fn verify_sub(
 
 #[cfg(test)]
 mod tests {
-    use super::super::*;
-    use super::*;
+    #[cfg(target_pointer_width = "32")]
+    use crate::util::metadata::side_metadata::meta_bytes_per_chunk;
+    #[cfg(target_pointer_width = "32")]
+    use crate::util::metadata::side_metadata::sanity::verify_local_specs_size;
+    #[cfg(target_pointer_width = "32")]
+    use crate::util::metadata::side_metadata::sanity::verify_no_overlap_chunked;
+    use crate::util::metadata::{
+        side_metadata::{
+            metadata_address_range_size,
+            sanity::{verify_global_specs_total_size, verify_no_overlap_contiguous},
+        },
+        MetadataScope, MetadataSpec,
+    };
 
     #[test]
     fn test_side_metadata_sanity_verify_global_specs_total_size() {
-        let spec_1 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_1 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
-        let spec_2 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_2 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: metadata_address_range_size(spec_1),
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_global_specs_total_size(&[spec_1]).is_ok());
@@ -569,32 +582,35 @@ mod tests {
         #[cfg(target_pointer_width = "32")]
         assert!(verify_global_specs_total_size(&[spec_1, spec_2]).is_err());
 
-        let spec_2 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_2 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: metadata_address_range_size(spec_1),
             log_min_obj_size: 1,
-            log_num_of_bits: 3,
+            num_of_bits: 8,
         };
 
         assert!(verify_global_specs_total_size(&[spec_1, spec_2]).is_err());
 
-        let spec_1 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_1 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: 0,
             #[cfg(target_pointer_width = "64")]
             log_min_obj_size: 0,
             #[cfg(target_pointer_width = "32")]
             log_min_obj_size: 2,
-            log_num_of_bits: 1,
+            num_of_bits: 2,
         };
-        let spec_2 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_2 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: metadata_address_range_size(spec_1),
             #[cfg(target_pointer_width = "64")]
             log_min_obj_size: 2,
             #[cfg(target_pointer_width = "32")]
             log_min_obj_size: 4,
-            log_num_of_bits: 3,
+            num_of_bits: 8,
         };
 
         assert!(verify_global_specs_total_size(&[spec_1, spec_2]).is_ok());
@@ -603,42 +619,47 @@ mod tests {
 
     #[test]
     fn test_side_metadata_sanity_verify_no_overlap_contiguous() {
-        let spec_1 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_1 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
-        let spec_2 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_2 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: metadata_address_range_size(spec_1),
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_contiguous(&spec_1, &spec_1).is_err());
         assert!(verify_no_overlap_contiguous(&spec_1, &spec_2).is_ok());
 
-        let spec_1 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_1 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: 1,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_contiguous(&spec_1, &spec_2).is_err());
 
-        let spec_1 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_1 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
-        let spec_2 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_2 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: metadata_address_range_size(spec_1) - 1,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_contiguous(&spec_1, &spec_2).is_err());
@@ -647,42 +668,47 @@ mod tests {
     #[cfg(target_pointer_width = "32")]
     #[test]
     fn test_side_metadata_sanity_verify_no_overlap_chunked() {
-        let spec_1 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_1 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
-        let spec_2 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
-            offset: meta_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.log_num_of_bits),
+        let spec_2 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
+            offset: meta_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.num_of_bits),
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_chunked(&spec_1, &spec_1).is_err());
         assert!(verify_no_overlap_chunked(&spec_1, &spec_2).is_ok());
 
-        let spec_1 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_1 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: 1,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_chunked(&spec_1, &spec_2).is_err());
 
-        let spec_1 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
+        let spec_1 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
-        let spec_2 = SideMetadataSpec {
-            scope: SideMetadataScope::Global,
-            offset: meta_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.log_num_of_bits) - 1,
+        let spec_2 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::Global,
+            offset: meta_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.num_of_bits) - 1,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_chunked(&spec_1, &spec_2).is_err());
@@ -691,11 +717,12 @@ mod tests {
     #[cfg(target_pointer_width = "32")]
     #[test]
     fn test_side_metadata_sanity_verify_local_specs_size() {
-        let spec_1 = SideMetadataSpec {
-            scope: SideMetadataScope::PolicySpecific,
+        let spec_1 = MetadataSpec {
+            is_on_side: true,
+            scope: MetadataScope::PolicySpecific,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_local_specs_size(&[spec_1]).is_ok());

@@ -1,7 +1,7 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::plan::GcStatus;
-use crate::util::side_metadata::*;
+use crate::util::metadata::{compare_exchange_atomic, MetadataSpec};
 use crate::util::*;
 use crate::vm::*;
 use crate::*;
@@ -478,11 +478,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
 pub struct ProcessModBuf<E: ProcessEdgesWork> {
     modbuf: Vec<ObjectReference>,
     phantom: PhantomData<E>,
-    meta: SideMetadataSpec,
+    meta: MetadataSpec,
 }
 
 impl<E: ProcessEdgesWork> ProcessModBuf<E> {
-    pub fn new(modbuf: Vec<ObjectReference>, meta: SideMetadataSpec) -> Self {
+    pub fn new(modbuf: Vec<ObjectReference>, meta: MetadataSpec) -> Self {
         Self {
             modbuf,
             meta,

@@ -4,7 +4,7 @@ use crate::util::Address;
 use crate::util::constants::*;
 use crate::util::conversions::pages_to_bytes;
 use crate::util::heap::layout::vm_layout_constants::*;
-use crate::util::side_metadata::SideMetadata;
+use crate::util::metadata::Metadata;
 use std::fmt;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering;
@@ -49,7 +49,7 @@ impl Mmapper for ByteMapMmapper {
         }
     }
 
-    fn ensure_mapped(&self, start: Address, pages: usize, metadata: &SideMetadata) -> Result<()> {
+    fn ensure_mapped(&self, start: Address, pages: usize, metadata: &Metadata) -> Result<()> {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         trace!(
@@ -199,7 +199,7 @@ mod tests {
     use crate::util::heap::layout::byte_map_mmapper::{MAPPED, PROTECTED};
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use crate::util::memory;
-    use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
+    use crate::util::metadata::{Metadata, MetadataContext};
     use crate::util::test_util::BYTE_MAP_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
     use std::sync::atomic::Ordering;
@@ -208,8 +208,8 @@ mod tests {
     const FIXED_ADDRESS: Address = BYTE_MAP_MMAPPER_TEST_REGION.start;
     const MAX_SIZE: usize = BYTE_MAP_MMAPPER_TEST_REGION.size;
 
-    fn new_no_metadata() -> SideMetadata {
-        SideMetadata::new(SideMetadataContext {
+    fn new_no_metadata() -> Metadata {
+        Metadata::new(MetadataContext {
             global: vec![],
             local: vec![],
         })

@@ -1,5 +1,5 @@
 use super::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::{side_metadata::SideMetadata, Address};
+use crate::util::{metadata::Metadata, Address};
 use std::io::Result;
 
 pub trait Mmapper {
@@ -37,11 +37,11 @@ pub trait Mmapper {
      * @param start The start of the range to be mapped.
      * @param pages The size of the range to be mapped, in pages
      */
-    fn ensure_mapped(&self, start: Address, pages: usize, metadata: &SideMetadata) -> Result<()>;
+    fn ensure_mapped(&self, start: Address, pages: usize, metadata: &Metadata) -> Result<()>;
 
     /// Map metadata memory for a given chunk
     #[allow(clippy::result_unit_err)]
-    fn map_metadata(&self, chunk: Address, metadata: &SideMetadata) -> Result<()> {
+    fn map_metadata(&self, chunk: Address, metadata: &Metadata) -> Result<()> {
         metadata.try_map_metadata_space(chunk, BYTES_IN_CHUNK)
     }
 

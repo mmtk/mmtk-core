@@ -18,7 +18,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
-use crate::util::side_metadata::{SideMetadataSanity, SideMetadataContext};
+use crate::util::metadata::{MetadataSanity, MetadataContext};
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -173,7 +173,7 @@ impl<VM: VMBinding> MyGC<VM> {
     ) -> Self {
         // Modify
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let global_metadata_specs = MetadataContext::new_global_specs(&[]);
 
         let res = MyGC {
             hi: AtomicBool::new(false),
@@ -202,10 +202,10 @@ impl<VM: VMBinding> MyGC<VM> {
             common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs.clone()),
         };
 
-        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        res.common.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.copyspace0.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.copyspace1.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        let mut metadata_sanity_checker = MetadataSanity::new();
+        res.common.verify_metadata_sanity(&mut metadata_sanity_checker);
+        res.copyspace0.verify_metadata_sanity(&mut metadata_sanity_checker);
+        res.copyspace1.verify_metadata_sanity(&mut metadata_sanity_checker);
 
         res
     }

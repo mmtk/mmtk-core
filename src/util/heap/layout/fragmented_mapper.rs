@@ -1,7 +1,7 @@
 use super::Mmapper;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::Address;
-use crate::util::{conversions, side_metadata::SideMetadata};
+use crate::util::{conversions, metadata::Metadata};
 use atomic::{Atomic, Ordering};
 use std::fmt;
 use std::io::Result;
@@ -83,12 +83,7 @@ impl Mmapper for FragmentedMapper {
         }
     }
 
-    fn ensure_mapped(
-        &self,
-        mut start: Address,
-        pages: usize,
-        metadata: &SideMetadata,
-    ) -> Result<()> {
+    fn ensure_mapped(&self, mut start: Address, pages: usize, metadata: &Metadata) -> Result<()> {
         let end = start + conversions::pages_to_bytes(pages);
         // Iterate over the slabs covered
         while start < end {
@@ -339,7 +334,7 @@ mod tests {
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
     use crate::util::memory;
-    use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
+    use crate::util::metadata::{Metadata, MetadataContext};
     use crate::util::test_util::FRAGMENTED_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::{conversions, Address};
@@ -347,8 +342,8 @@ mod tests {
     const FIXED_ADDRESS: Address = FRAGMENTED_MMAPPER_TEST_REGION.start;
     const MAX_BYTES: usize = FRAGMENTED_MMAPPER_TEST_REGION.size;
 
-    fn new_no_metadata() -> SideMetadata {
-        SideMetadata::new(SideMetadataContext {
+    fn new_no_metadata() -> Metadata {
+        Metadata::new(MetadataContext {
             global: vec![],
             local: vec![],
         })

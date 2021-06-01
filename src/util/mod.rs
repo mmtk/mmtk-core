@@ -44,13 +44,13 @@ pub(crate) mod heap;
 pub(crate) mod logger;
 /// Various malloc implementations (conditionally compiled by features)
 pub(crate) mod malloc;
+/// Metadata implementation (on-side and in-header)
+pub(crate) mod metadata;
 /// MMTk command line options.
 pub(crate) mod options;
 /// Sanity checker for GC.
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;
-/// Metadata implementation (on-side and in-header)
-pub(crate) mod metadata;
 /// Utils for collecting statistics.
 pub(crate) mod statistics;
 /// Test utilities.
