@@ -68,26 +68,26 @@ impl Mmapper for ByteMapMmapper {
         Ok(())
     }
 
-    fn quarantine_address_range(&self, start: Address, pages: usize) -> Result<()> {
-        let start_chunk = Self::address_to_mmap_chunks_down(start);
-        let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
-        trace!(
-            "Calling ensure_mapped with start={:?} and {} pages, {}-{}",
-            start,
-            pages,
-            Self::mmap_chunks_to_address(start_chunk),
-            Self::mmap_chunks_to_address(end_chunk)
-        );
+    fn quarantine_address_range(&self, _start: Address, _pages: usize) -> Result<()> {
+        // let start_chunk = Self::address_to_mmap_chunks_down(start);
+        // let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
+        // trace!(
+        //     "Calling ensure_mapped with start={:?} and {} pages, {}-{}",
+        //     start,
+        //     pages,
+        //     Self::mmap_chunks_to_address(start_chunk),
+        //     Self::mmap_chunks_to_address(end_chunk)
+        // );
 
-        for chunk in start_chunk..end_chunk {
-            if self.mapped[chunk].load(Ordering::Relaxed) == MapState::Mapped {
-                continue;
-            }
+        // for chunk in start_chunk..end_chunk {
+        //     if self.mapped[chunk].load(Ordering::Relaxed) == MapState::Mapped {
+        //         continue;
+        //     }
 
-            let mmap_start = Self::mmap_chunks_to_address(chunk);
-            let _guard = self.lock.lock().unwrap();
-            MapState::transition_to_quarantined(&self.mapped[chunk], mmap_start).unwrap();
-        }
+        //     let mmap_start = Self::mmap_chunks_to_address(chunk);
+        //     let _guard = self.lock.lock().unwrap();
+        //     MapState::transition_to_quarantined(&self.mapped[chunk], mmap_start).unwrap();
+        // }
 
         Ok(())
     }

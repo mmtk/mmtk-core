@@ -115,7 +115,6 @@ impl<VM: VMBinding> CopySpace<VM> {
         unsafe {
             self.pr.reset();
         }
-        self.common.metadata.reset();
         self.from_space.store(false, Ordering::SeqCst);
     }
 
