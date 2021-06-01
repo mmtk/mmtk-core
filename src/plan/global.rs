@@ -23,8 +23,6 @@ use crate::util::metadata::MetadataSanity;
 use crate::util::metadata::MetadataSpec;
 use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
-use crate::util::side_metadata::SideMetadataSanity;
-use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::statistics::stats::Stats;
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};

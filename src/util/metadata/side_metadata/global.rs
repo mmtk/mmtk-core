@@ -15,7 +15,6 @@ use crate::util::metadata::side_metadata::{
 };
 use crate::util::metadata::{MetadataContext, MetadataSpec};
 use crate::util::{constants, Address};
-use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 
