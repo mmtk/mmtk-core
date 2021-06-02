@@ -377,7 +377,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn reserved_pages(&self) -> usize {
-        self.get_page_resource().reserved_pages() + self.common().metadata.reserved_pages()
+        let data_pages = self.get_page_resource().reserved_pages();
+        let meta_pages = self.common().metadata.calculate_reserved_pages(data_pages);
+        data_pages + meta_pages
     }
 
     fn get_name(&self) -> &'static str {

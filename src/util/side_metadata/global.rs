@@ -89,8 +89,18 @@ impl SideMetadata {
         &self.context.local
     }
 
-    pub fn reserved_pages(&self) -> usize {
-        self.accounting.get_reserved_pages()
+    // pub fn reserved_pages(&self) -> usize {
+    //     self.accounting.get_reserved_pages()
+    // }
+    pub fn calculate_reserved_pages(&self, data_pages: usize) -> usize {
+        let mut total = 0;
+        for spec in self.context.global.iter() {
+            total += data_pages >> (spec.log_min_obj_size + 3 - spec.log_num_of_bits);
+        }
+        for spec in self.context.local.iter() {
+            total += data_pages >> (spec.log_min_obj_size + 3 - spec.log_num_of_bits);
+        }
+        total
     }
 
     pub fn reset(&self) {
