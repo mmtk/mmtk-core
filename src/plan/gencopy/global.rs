@@ -41,6 +41,9 @@ pub struct GenCopy<VM: VMBinding> {
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
     in_nursery: AtomicBool,
+    // TODO: The following should belong to 'generational', and we should check the Java MMTk's implementation.
+    /// Is next GC full heap?
+    next_gc_full_heap: AtomicBool,
 }
 
 pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -74,8 +77,16 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         Self: Sized,
     {
         let nursery_full = self.nursery.reserved_pages() >= (NURSERY_SIZE >> LOG_BYTES_IN_PAGE);
+        if nursery_full {
+            debug!("collection_required? nursery_full = {}", nursery_full);
+            return true;
+        }
 
-        nursery_full || self.base().collection_required(self, space_full, space)
+        if space_full && space.common().descriptor != self.nursery.common().descriptor {
+            self.next_gc_full_heap.store(true, Ordering::SeqCst);
+        }
+
+        self.base().collection_required(self, space_full, space)
     }
 
     fn gc_init(
@@ -96,9 +107,11 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         if in_nursery {
+            debug!("Nursery GC");
             self.common()
                 .schedule_common::<GenCopyNurseryProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
         } else {
+            debug!("Full heap GC");
             self.common()
                 .schedule_common::<GenCopyMatureProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
         }
@@ -146,6 +159,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         if !self.in_nursery() {
             self.fromspace().release();
         }
+
+        self.next_gc_full_heap.store(self.get_pages_avail() < (NURSERY_SIZE >> LOG_BYTES_IN_PAGE), Ordering::SeqCst);
     }
 
     fn get_collection_reserve(&self) -> usize {
@@ -226,6 +241,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 global_metadata_specs,
             ),
             in_nursery: AtomicBool::default(),
+            next_gc_full_heap: AtomicBool::new(false),
         };
 
         {
@@ -244,12 +260,14 @@ impl<VM: VMBinding> GenCopy<VM> {
     }
 
     fn request_full_heap_collection(&self) -> bool {
+        debug!("full heap GC? attempt = {}, total = {}, reserved = {}", self.base().cur_collection_attempts.load(Ordering::SeqCst), self.get_total_pages(), self.get_pages_reserved());
+
         // For barrier overhead measurements, we always do full gc in nursery collections.
         if super::FULL_NURSERY_GC {
             return true;
         }
 
-        if self.base().cur_collection_attempts.load(Ordering::SeqCst) > 1 {
+        if self.next_gc_full_heap.load(Ordering::SeqCst) || self.base().cur_collection_attempts.load(Ordering::SeqCst) > 1 {
             return true;
         }
 
