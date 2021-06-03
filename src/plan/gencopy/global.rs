@@ -248,6 +248,11 @@ impl<VM: VMBinding> GenCopy<VM> {
         if super::FULL_NURSERY_GC {
             return true;
         }
+
+        if self.base().cur_collection_attempts.load(Ordering::SeqCst) > 1 {
+            return true;
+        }
+
         self.get_total_pages() <= self.get_pages_reserved()
     }
 
