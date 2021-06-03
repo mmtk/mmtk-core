@@ -160,7 +160,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             self.fromspace().release();
         }
 
-        self.next_gc_full_heap.store(self.get_pages_avail() < (NURSERY_SIZE >> LOG_BYTES_IN_PAGE), Ordering::SeqCst);
+        self.next_gc_full_heap.store(
+            self.get_pages_avail() < (NURSERY_SIZE >> LOG_BYTES_IN_PAGE),
+            Ordering::SeqCst,
+        );
     }
 
     fn get_collection_reserve(&self) -> usize {
@@ -260,14 +263,21 @@ impl<VM: VMBinding> GenCopy<VM> {
     }
 
     fn request_full_heap_collection(&self) -> bool {
-        debug!("full heap GC? attempt = {}, total = {}, reserved = {}", self.base().cur_collection_attempts.load(Ordering::SeqCst), self.get_total_pages(), self.get_pages_reserved());
+        debug!(
+            "full heap GC? attempt = {}, total = {}, reserved = {}",
+            self.base().cur_collection_attempts.load(Ordering::SeqCst),
+            self.get_total_pages(),
+            self.get_pages_reserved()
+        );
 
         // For barrier overhead measurements, we always do full gc in nursery collections.
         if super::FULL_NURSERY_GC {
             return true;
         }
 
-        if self.next_gc_full_heap.load(Ordering::SeqCst) || self.base().cur_collection_attempts.load(Ordering::SeqCst) > 1 {
+        if self.next_gc_full_heap.load(Ordering::SeqCst)
+            || self.base().cur_collection_attempts.load(Ordering::SeqCst) > 1
+        {
             return true;
         }
 
