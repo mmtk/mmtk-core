@@ -158,7 +158,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         }
 
         self.next_gc_full_heap.store(
-            self.get_pages_avail() < self.base().options.min_nursery,
+            self.get_pages_avail() < conversions::bytes_to_pages_up(self.base().options.min_nursery),
             Ordering::SeqCst,
         );
     }
