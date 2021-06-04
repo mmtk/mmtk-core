@@ -173,6 +173,12 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             + self.common.get_pages_used()
     }
 
+    /// Return the number of pages avilable for allocation. Assuming all future allocations goes to nursery.
+    fn get_pages_avail(&self) -> usize {
+        // super.get_pages_avail() / 2 to reserve pages for copying
+        (self.get_total_pages() - self.get_pages_reserved()) >> 1
+    }
+
     fn base(&self) -> &BasePlan<VM> {
         &self.common.base
     }
