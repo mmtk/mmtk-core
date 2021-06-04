@@ -14,7 +14,7 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -32,10 +32,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
-// TODO: These constants should be replaced by command line options.
-// For now use a fixed nursery size of 32mb.
-pub const NURSERY_MAX_SIZE: usize = 32 * 1024 * 1024;
-pub const NURSERY_MIN_SIZE: usize = 32 * 1024 * 1024;
 
 pub struct GenCopy<VM: VMBinding> {
     pub nursery: CopySpace<VM>,
@@ -43,9 +39,11 @@ pub struct GenCopy<VM: VMBinding> {
     pub copyspace0: CopySpace<VM>,
     pub copyspace1: CopySpace<VM>,
     pub common: CommonPlan<VM>,
-    // These should belong to a common generational implementation.
-    // Is this GC full heap?
+    // TODO: These should belong to a common generational implementation.
+    /// Is this GC full heap?
     gc_full_heap: AtomicBool,
+    /// Is next GC full heap?
+    next_gc_full_heap: AtomicBool,
 }
 
 pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -78,9 +76,17 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     where
         Self: Sized,
     {
-        let nursery_full = self.nursery.reserved_pages() >= (NURSERY_MAX_SIZE >> LOG_BYTES_IN_PAGE);
+        let nursery_full = self.nursery.reserved_pages()
+            >= (conversions::bytes_to_pages_up(self.base().options.max_nursery));
+        if nursery_full {
+            return true;
+        }
 
-        nursery_full || self.base().collection_required(self, space_full, space)
+        if space_full && space.common().descriptor != self.nursery.common().descriptor {
+            self.next_gc_full_heap.store(true, Ordering::Relaxed);
+        }
+
+        self.base().collection_required(self, space_full, space)
     }
 
     fn gc_init(
@@ -150,6 +156,11 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         if !self.is_current_gc_nursery() {
             self.fromspace().release();
         }
+
+        self.next_gc_full_heap.store(
+            self.get_pages_avail() < self.base().options.min_nursery,
+            Ordering::SeqCst,
+        );
     }
 
     fn get_collection_reserve(&self) -> usize {
@@ -194,7 +205,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 "nursery",
                 false,
                 true,
-                VMRequest::fixed_extent(NURSERY_MAX_SIZE, false),
+                VMRequest::fixed_extent(options.max_nursery, false),
                 global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
@@ -230,6 +241,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 global_metadata_specs,
             ),
             gc_full_heap: AtomicBool::default(),
+            next_gc_full_heap: AtomicBool::new(false),
         };
 
         {
@@ -252,6 +264,20 @@ impl<VM: VMBinding> GenCopy<VM> {
         if super::FULL_NURSERY_GC {
             return true;
         }
+
+        if self.base().user_triggered_collection.load(Ordering::SeqCst)
+            && self.base().options.full_heap_system_gc
+        {
+            return true;
+        }
+
+        if self.next_gc_full_heap.load(Ordering::SeqCst)
+            || self.base().cur_collection_attempts.load(Ordering::SeqCst) > 1
+        {
+            // Forces full heap collection
+            return true;
+        }
+
         self.get_total_pages() <= self.get_pages_reserved()
     }
 
