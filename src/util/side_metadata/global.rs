@@ -1,7 +1,6 @@
 use super::*;
-use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_PAGE};
+use crate::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::heap::PageAccounting;
 use crate::util::memory;
 use crate::util::{constants, Address};
 use std::fmt;
@@ -30,7 +29,9 @@ impl SideMetadataScope {
 pub struct SideMetadataSpec {
     pub scope: SideMetadataScope,
     pub offset: usize,
+    /// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.
     pub log_num_of_bits: usize,
+    /// Number of bytes of the region. E.g. 3 = 8 bytes, 12 = 4096 bytes (page).
     pub log_min_obj_size: usize,
 }
 
@@ -70,14 +71,12 @@ impl SideMetadataContext {
 
 pub struct SideMetadata {
     context: SideMetadataContext,
-    accounting: PageAccounting,
 }
 
 impl SideMetadata {
     pub fn new(context: SideMetadataContext) -> SideMetadata {
         Self {
             context,
-            accounting: PageAccounting::new(),
         }
     }
 
@@ -89,22 +88,27 @@ impl SideMetadata {
         &self.context.local
     }
 
-    // pub fn reserved_pages(&self) -> usize {
-    //     self.accounting.get_reserved_pages()
-    // }
+    /// Return the pages reserved for side metadata based on the data pages we used.
+    // We used to use PageAccouting to count pages used in side metadata. However,
+    // that means we always count pages while we may reserve less than a page each time.
+    // This could lead to overcount. I think the easier way is to not account
+    // when we allocate for sidemetadata, but to calculate the side metadata usage based on
+    // how many data pages we use when reporting.
     pub fn calculate_reserved_pages(&self, data_pages: usize) -> usize {
         let mut total = 0;
         for spec in self.context.global.iter() {
-            total += data_pages >> (spec.log_min_obj_size + 3 - spec.log_num_of_bits);
+            let rshift = spec.log_min_obj_size + LOG_BITS_IN_BYTE as usize - spec.log_num_of_bits;
+            total += data_pages + ((1 << rshift) - 1) >> rshift;
         }
         for spec in self.context.local.iter() {
-            total += data_pages >> (spec.log_min_obj_size + 3 - spec.log_num_of_bits);
+            let rshift = spec.log_min_obj_size + LOG_BITS_IN_BYTE as usize - spec.log_num_of_bits;
+            total += data_pages + ((1 << rshift) - 1) >> rshift;
         }
         total
     }
 
     pub fn reset(&self) {
-        self.accounting.reset();
+
     }
 
     // ** NOTE: **
@@ -153,13 +157,7 @@ impl SideMetadata {
     fn map_metadata_internal(&self, start: Address, size: usize, no_reserve: bool) -> Result<()> {
         for spec in self.context.global.iter() {
             match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
-                Ok(mapped) => {
-                    // We actually reserved memory
-                    if !no_reserve {
-                        self.accounting
-                            .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
-                    }
-                }
+                Ok(_) => {}
                 Err(e) => return Result::Err(e),
             }
         }
@@ -180,13 +178,7 @@ impl SideMetadata {
             #[cfg(target_pointer_width = "64")]
             {
                 match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
-                    Ok(mapped) => {
-                        // We actually reserved memory
-                        if !no_reserve {
-                            self.accounting
-                                .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
-                        }
-                    }
+                    Ok(_) => {}
                     Err(e) => return Result::Err(e),
                 }
             }
@@ -206,13 +198,7 @@ impl SideMetadata {
                 max
             );
             match try_map_per_chunk_metadata_space(start, size, lsize, no_reserve) {
-                Ok(mapped) => {
-                    // We actually reserved memory
-                    if !no_reserve {
-                        self.accounting
-                            .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
-                    }
-                }
+                Ok(_) => {}
                 Err(e) => return Result::Err(e),
             }
         }
@@ -233,20 +219,17 @@ impl SideMetadata {
         debug_assert!(size % BYTES_IN_PAGE == 0);
 
         for spec in self.context.global.iter() {
-            let size = ensure_munmap_contiguos_metadata_space(start, size, spec);
-            self.accounting.release(size >> LOG_BYTES_IN_PAGE);
+            ensure_munmap_contiguos_metadata_space(start, size, spec);
         }
 
         for spec in self.context.local.iter() {
             #[cfg(target_pointer_width = "64")]
             {
-                let size = ensure_munmap_contiguos_metadata_space(start, size, spec);
-                self.accounting.release(size >> LOG_BYTES_IN_PAGE);
+                ensure_munmap_contiguos_metadata_space(start, size, spec);
             }
             #[cfg(target_pointer_width = "32")]
             {
-                let size = ensure_munmap_chunked_metadata_space(start, size, spec);
-                self.accounting.release(size >> LOG_BYTES_IN_PAGE);
+                ensure_munmap_chunked_metadata_space(start, size, spec);
             }
         }
     }
@@ -720,5 +703,57 @@ pub fn bzero_metadata(metadata_spec: SideMetadataSpec, start: Address, size: usi
                 next_data_chunk += BYTES_IN_CHUNK;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn calculate_reserved_pages_one_spec() {
+        // 1 bit per 8 bytes - 1:64
+        let spec = SideMetadataSpec {
+            scope: SideMetadataScope::Global,
+            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            log_num_of_bits: 0,
+            log_min_obj_size: 3,
+        };
+        let side_metadata = SideMetadata {
+            context: SideMetadataContext {
+                global: vec![spec],
+                local: vec![],
+            }
+        };
+        assert_eq!(side_metadata.calculate_reserved_pages(0), 0);
+        assert_eq!(side_metadata.calculate_reserved_pages(63), 1);
+        assert_eq!(side_metadata.calculate_reserved_pages(64), 1);
+        assert_eq!(side_metadata.calculate_reserved_pages(65), 2);
+        assert_eq!(side_metadata.calculate_reserved_pages(1024), 16);
+    }
+
+    #[test]
+    fn calculate_reserved_pages_multi_specs() {
+        // 1 bit per 8 bytes - 1:64
+        let gspec = SideMetadataSpec {
+            scope: SideMetadataScope::Global,
+            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            log_num_of_bits: 0,
+            log_min_obj_size: 3,
+        };
+        // 2 bits per page - 2 / (4k * 8) = 1:16k
+        let lspec = SideMetadataSpec {
+            scope: SideMetadataScope::PolicySpecific,
+            offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            log_num_of_bits: 1,
+            log_min_obj_size: 12,
+        };
+        let side_metadata = SideMetadata {
+            context: SideMetadataContext {
+                global: vec![gspec],
+                local: vec![lspec],
+            }
+        };
+        assert_eq!(side_metadata.calculate_reserved_pages(1024), 16 + 1);
     }
 }
