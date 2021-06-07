@@ -1,5 +1,5 @@
 use super::*;
-use crate::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
+use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
 use crate::util::{constants, Address};
@@ -97,12 +97,12 @@ impl SideMetadata {
     pub fn calculate_reserved_pages(&self, data_pages: usize) -> usize {
         let mut total = 0;
         for spec in self.context.global.iter() {
-            let rshift = spec.log_min_obj_size + LOG_BITS_IN_BYTE as usize - spec.log_num_of_bits;
-            total += data_pages + ((1 << rshift) - 1) >> rshift;
+            let rshift = addr_rshift(spec);
+            total += (data_pages + ((1 << rshift) - 1)) >> rshift;
         }
         for spec in self.context.local.iter() {
-            let rshift = spec.log_min_obj_size + LOG_BITS_IN_BYTE as usize - spec.log_num_of_bits;
-            total += data_pages + ((1 << rshift) - 1) >> rshift;
+            let rshift = addr_rshift(spec);
+            total += (data_pages + ((1 << rshift) - 1)) >> rshift;
         }
         total
     }
@@ -213,6 +213,7 @@ impl SideMetadata {
     /// Note-2: This function uses munmap() which works at page granularity.
     ///     If the corresponding metadata space's size is not a multiple of page size,
     ///     the actual unmapped space will be bigger than what you specify.
+    #[cfg(test)]
     pub fn ensure_unmap_metadata_space(&self, start: Address, size: usize) {
         trace!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
