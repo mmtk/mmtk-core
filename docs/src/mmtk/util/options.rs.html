@@ -231,6 +231,19 @@
 <span id="228">228</span>
 <span id="229">229</span>
 <span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants::DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident">std::cell::UnsafeCell</span>;
@@ -331,26 +344,39 @@
     ]
 }
 <span class="macro">options!</span> {
+    <span class="comment">// The plan to use. This needs to be initialized before creating an MMTk instance (currently by setting env vars)</span>
     <span class="ident">plan</span>:                  <span class="ident">PlanSelector</span>         [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">PlanSelector::NoGC</span>,
+    <span class="comment">// Number of GC threads.</span>
     <span class="ident">threads</span>:               <span class="ident">usize</span>                [<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span>]    <span class="op">=</span> <span class="ident">num_cpus::get</span>(),
+    <span class="comment">// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)</span>
     <span class="ident">use_short_stack_scans</span>: <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="comment">// Enable a return barrier (not supported)</span>
     <span class="ident">use_return_barrier</span>:    <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="comment">// Should we eagerly finish sweeping at the start of a collection? (not supported)</span>
     <span class="ident">eager_complete_sweep</span>:  <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="comment">// Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?</span>
     <span class="ident">ignore_system_g_c</span>:     <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
-    <span class="comment">// Note: Not used. To workaround cmd args passed by the running script</span>
+    <span class="comment">// The upper bound of nursery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)</span>
+    <span class="ident">max_nursery</span>:           <span class="ident">usize</span>                [<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span>]    <span class="op">=</span> (<span class="number">32</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>),
+    <span class="comment">// The lower bound of nusery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)</span>
+    <span class="ident">min_nursery</span>:           <span class="ident">usize</span>                [<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span>]    <span class="op">=</span> (<span class="number">32</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>),
+    <span class="comment">// Should a major GC be performed when a system GC is required?</span>
+    <span class="ident">full_heap_system_gc</span>:   <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="comment">// Should we shrink/grow the heap to adjust to application working set? (not supported)</span>
     <span class="ident">variable_size_heap</span>:    <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">true</span>,
+    <span class="comment">// Should finalization be disabled?</span>
     <span class="ident">no_finalizer</span>:          <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="comment">// Should reference type processing be disabled?</span>
     <span class="ident">no_reference_types</span>:    <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="comment">// The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)</span>
     <span class="ident">nursery_zeroing</span>:       <span class="ident">NurseryZeroingOptions</span>[<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">NurseryZeroingOptions::Temporal</span>,
-    <span class="comment">// Note: This gets ignored. Use RUST_LOG to specify log level.</span>
-    <span class="comment">// TODO: Delete this option.</span>
-    <span class="ident">verbose</span>:               <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="number">0</span>,
+    <span class="comment">// How frequent (every X bytes) should we do a stress GC?</span>
     <span class="ident">stress_factor</span>:         <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>,
+    <span class="comment">// How frequent (every X bytes) should we run analysis (a STW event that collects data)</span>
     <span class="ident">analysis_factor</span>:       <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>,
-    <span class="comment">// vmspace</span>
-    <span class="comment">// FIXME: These options are set for JikesRVM. We need a proper way to set options.</span>
+    <span class="comment">// The size of vmspace. This needs to be initialized before creating an MMTk instance (currently by setting env vars)</span>
+    <span class="comment">// FIXME: This value is set for JikesRVM. We need a proper way to set options.</span>
     <span class="comment">//   We need to set these values programmatically in VM specific code.</span>
-    <span class="ident">vm_space</span>:              <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">true</span>,
     <span class="ident">vm_space_size</span>:         <span class="ident">usize</span>                [<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span>]    <span class="op">=</span> <span class="number">0x7cc_cccc</span>,
 }
 
@@ -416,17 +442,17 @@
     <span class="kw">fn</span> <span class="ident">with_multiple_valid_env_vars</span>() {
         <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
             <span class="ident">std::env::set_var</span>(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>, <span class="string">&quot;4096&quot;</span>);
-            <span class="ident">std::env::set_var</span>(<span class="string">&quot;MMTK_VM_SPACE&quot;</span>, <span class="string">&quot;false&quot;</span>);
+            <span class="ident">std::env::set_var</span>(<span class="string">&quot;MMTK_NO_FINALIZER&quot;</span>, <span class="string">&quot;true&quot;</span>);
 
             <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">std::panic::catch_unwind</span>(<span class="op">|</span><span class="op">|</span> {
                 <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options::default</span>();
                 <span class="macro">assert_eq!</span>(<span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="number">4096</span>);
-                <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">options</span>.<span class="ident">vm_space</span>);
+                <span class="macro">assert!</span>(<span class="ident">options</span>.<span class="ident">no_finalizer</span>);
             });
             <span class="macro">assert!</span>(<span class="ident">res</span>.<span class="ident">is_ok</span>());
 
             <span class="ident">std::env::remove_var</span>(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>);
-            <span class="ident">std::env::remove_var</span>(<span class="string">&quot;MMTK_VM_SPACE&quot;</span>);
+            <span class="ident">std::env::remove_var</span>(<span class="string">&quot;MMTK_NO_FINALIZER&quot;</span>);
         })
     }
 

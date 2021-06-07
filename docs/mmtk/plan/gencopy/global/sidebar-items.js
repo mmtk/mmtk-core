@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["ALLOC_SS",""],["GENCOPY_CONSTRAINTS",""],["NURSERY_SIZE",""]],"struct":[["GenCopy",""]]});
+initSidebarItems({"constant":[["ALLOC_SS",""],["GENCOPY_CONSTRAINTS",""]],"struct":[["GenCopy",""]]});

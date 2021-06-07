@@ -845,6 +845,7 @@
 <span id="842">842</span>
 <span id="843">843</span>
 <span id="844">844</span>
+<span id="845">845</span>
 </pre><pre class="rust">
 <span class="doccomment">//! The global part of a plan implementation.</span>
 
@@ -1033,7 +1034,8 @@
 
     <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span>;
 
-    <span class="kw">fn</span> <span class="ident">in_nursery</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="doccomment">/// Is current GC only collecting objects allocated since last GC?</span>
+    <span class="kw">fn</span> <span class="ident">is_current_gc_nursery</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="bool-val">false</span>
     }
 
