@@ -3,7 +3,7 @@ use crate::plan::{AllocationSemantics, CopyContext};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
-use crate::util::{forwarding_word as ForwardingWord, gc_byte};
+use crate::util::{forwarding_word as ForwardingWord, gc_byte, side_metadata};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
@@ -117,6 +117,7 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn prepare(&self, from_space: bool) {
         self.from_space.store(from_space, Ordering::SeqCst);
+        side_metadata::bzero_metadata(gc_byte::SIDE_GC_BYTE_SPEC, self.common.start, self.pr.cursor() - self.common.start);
     }
 
     pub fn release(&self) {
