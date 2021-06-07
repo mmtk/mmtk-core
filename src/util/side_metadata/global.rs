@@ -75,9 +75,7 @@ pub struct SideMetadata {
 
 impl SideMetadata {
     pub fn new(context: SideMetadataContext) -> SideMetadata {
-        Self {
-            context,
-        }
+        Self { context }
     }
 
     pub fn get_context(&self) -> &SideMetadataContext {
@@ -107,9 +105,7 @@ impl SideMetadata {
         total
     }
 
-    pub fn reset(&self) {
-
-    }
+    pub fn reset(&self) {}
 
     // ** NOTE: **
     //  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
@@ -724,7 +720,7 @@ mod tests {
             context: SideMetadataContext {
                 global: vec![spec],
                 local: vec![],
-            }
+            },
         };
         assert_eq!(side_metadata.calculate_reserved_pages(0), 0);
         assert_eq!(side_metadata.calculate_reserved_pages(63), 1);
@@ -753,7 +749,7 @@ mod tests {
             context: SideMetadataContext {
                 global: vec![gspec],
                 local: vec![lspec],
-            }
+            },
         };
         assert_eq!(side_metadata.calculate_reserved_pages(1024), 16 + 1);
     }

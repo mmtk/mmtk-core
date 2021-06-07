@@ -5,13 +5,12 @@ use crate::util::{
 };
 use std::io::Result;
 
-use super::{
-    SideMetadataSpec, CHUNK_MASK,
-    LOCAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_PER_CHUNK,
-    LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
-};
 #[cfg(test)]
 use super::ensure_munmap_metadata;
+use super::{
+    SideMetadataSpec, CHUNK_MASK, LOCAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_PER_CHUNK,
+    LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
+};
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::Mmapper;
 use crate::MMAPPER;
@@ -45,8 +44,8 @@ pub(super) fn ensure_munmap_chunked_metadata_space(
     size: usize,
     spec: &SideMetadataSpec,
 ) -> usize {
-    use crate::util::constants::BYTES_IN_PAGE;
     use super::address_to_meta_address;
+    use crate::util::constants::BYTES_IN_PAGE;
     let meta_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
     // per chunk policy-specific metadata for 32-bits targets
     let chunk_num = ((start + size - 1usize).align_down(BYTES_IN_CHUNK)
