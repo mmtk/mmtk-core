@@ -185,7 +185,8 @@ pub trait Plan: 'static + Sync + Downcast {
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
-    fn in_nursery(&self) -> bool {
+    /// Is current GC only collecting objects allocated since last GC?
+    fn is_current_gc_nursery(&self) -> bool {
         false
     }
 
