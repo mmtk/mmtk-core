@@ -499,7 +499,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
                 compare_exchange_atomic(self.meta, obj.to_address(), 0b0, 0b1);
             }
         }
-        if mmtk.plan.in_nursery() {
+        if mmtk.plan.is_current_gc_nursery() {
             if !self.modbuf.is_empty() {
                 let mut modbuf = vec![];
                 ::std::mem::swap(&mut modbuf, &mut self.modbuf);

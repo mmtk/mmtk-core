@@ -97,26 +97,39 @@ macro_rules! options {
     ]
 }
 options! {
+    // The plan to use. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
     plan:                  PlanSelector         [always_valid] = PlanSelector::NoGC,
+    // Number of GC threads.
     threads:               usize                [|v| v > 0]    = num_cpus::get(),
+    // Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [always_valid] = false,
+    // Enable a return barrier (not supported)
     use_return_barrier:    bool                 [always_valid] = false,
+    // Should we eagerly finish sweeping at the start of a collection? (not supported)
     eager_complete_sweep:  bool                 [always_valid] = false,
+    // Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     ignore_system_g_c:     bool                 [always_valid] = false,
-    // Note: Not used. To workaround cmd args passed by the running script
+    // The upper bound of nursery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
+    max_nursery:           usize                [|v| v > 0]    = (32 * 1024 * 1024),
+    // The lower bound of nusery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
+    min_nursery:           usize                [|v| v > 0]    = (32 * 1024 * 1024),
+    // Should a major GC be performed when a system GC is required?
+    full_heap_system_gc:   bool                 [always_valid] = false,
+    // Should we shrink/grow the heap to adjust to application working set? (not supported)
     variable_size_heap:    bool                 [always_valid] = true,
+    // Should finalization be disabled?
     no_finalizer:          bool                 [always_valid] = false,
+    // Should reference type processing be disabled?
     no_reference_types:    bool                 [always_valid] = false,
+    // The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
     nursery_zeroing:       NurseryZeroingOptions[always_valid] = NurseryZeroingOptions::Temporal,
-    // Note: This gets ignored. Use RUST_LOG to specify log level.
-    // TODO: Delete this option.
-    verbose:               usize                [always_valid] = 0,
+    // How frequent (every X bytes) should we do a stress GC?
     stress_factor:         usize                [always_valid] = DEFAULT_STRESS_FACTOR,
+    // How frequent (every X bytes) should we run analysis (a STW event that collects data)
     analysis_factor:       usize                [always_valid] = DEFAULT_STRESS_FACTOR,
-    // vmspace
-    // FIXME: These options are set for JikesRVM. We need a proper way to set options.
+    // The size of vmspace. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
+    // FIXME: This value is set for JikesRVM. We need a proper way to set options.
     //   We need to set these values programmatically in VM specific code.
-    vm_space:              bool                 [always_valid] = true,
     vm_space_size:         usize                [|v| v > 0]    = 0x7cc_cccc,
 }
 
@@ -182,17 +195,17 @@ mod tests {
     fn with_multiple_valid_env_vars() {
         serial_test(|| {
             std::env::set_var("MMTK_STRESS_FACTOR", "4096");
-            std::env::set_var("MMTK_VM_SPACE", "false");
+            std::env::set_var("MMTK_NO_FINALIZER", "true");
 
             let res = std::panic::catch_unwind(|| {
                 let options = Options::default();
                 assert_eq!(options.stress_factor, 4096);
-                assert!(!options.vm_space);
+                assert!(options.no_finalizer);
             });
             assert!(res.is_ok());
 
             std::env::remove_var("MMTK_STRESS_FACTOR");
-            std::env::remove_var("MMTK_VM_SPACE");
+            std::env::remove_var("MMTK_NO_FINALIZER");
         })
     }
 
