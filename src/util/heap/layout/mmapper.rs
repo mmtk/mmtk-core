@@ -62,9 +62,14 @@ pub trait Mmapper {
 #[repr(u8)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(super) enum MapState {
+    /// The chunk is unmapped and not managed by MMTk.
     Unmapped,
+    /// The chunk is reserved for future use. MMTk reserved the address range but hasn't used it yet.
+    /// We have reserved the addresss range with mmap_noreserve with PROT_NONE.
     Quarantined,
+    /// The chunk is mapped by MMTk and is in use.
     Mapped,
+    /// The chunk is mapped and is also protected by MMTk.
     Protected,
 }
 
@@ -74,15 +79,9 @@ impl MapState {
     pub(super) fn transition_to_mapped(
         state: &Atomic<MapState>,
         mmap_start: Address,
-        // metadata: &SideMetadata,
     ) -> Result<()> {
         let res = match state.load(Ordering::Relaxed) {
-            MapState::Unmapped => {
-                // map data
-                // dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES)
-                //     .and(metadata.try_map_metadata_space(mmap_start, MMAP_CHUNK_BYTES))
-                dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES)
-            }
+            MapState::Unmapped => dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES),
             MapState::Protected => munprotect(mmap_start, MMAP_CHUNK_BYTES),
             MapState::Quarantined => unsafe { dzmmap(mmap_start, MMAP_CHUNK_BYTES) },
             // might have become MapState::Mapped here
@@ -94,17 +93,14 @@ impl MapState {
         res
     }
 
+    /// Check the current MapState of the chunk, and transition the chunk to MapState::Quarantined.
+    /// The caller should hold a lock before invoking this method.
     pub(super) fn transition_to_quarantined(
         state: &Atomic<MapState>,
         mmap_start: Address,
     ) -> Result<()> {
         let res = match state.load(Ordering::Relaxed) {
-            MapState::Unmapped => {
-                // map data
-                // dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES)
-                //     .and(metadata.try_map_metadata_space(mmap_start, MMAP_CHUNK_BYTES))
-                mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES)
-            }
+            MapState::Unmapped => mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES),
             MapState::Quarantined => Ok(()),
             MapState::Mapped => panic!("Cannot quarantine mapped memory"),
             MapState::Protected => panic!("Cannot quarantine protected memory"),

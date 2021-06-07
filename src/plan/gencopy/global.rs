@@ -108,12 +108,14 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         if !is_full_heap {
+            debug!("Nursery GC");
             self.common()
                 .schedule_common::<GenCopyNurseryProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
             // Stop & scan mutators (mutator scanning can happen before STW)
             scheduler.work_buckets[WorkBucketStage::Unconstrained]
                 .add(StopMutators::<GenCopyNurseryProcessEdges<VM>>::new());
         } else {
+            debug!("Full heap GC");
             self.common()
                 .schedule_common::<GenCopyMatureProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
             // Stop & scan mutators (mutator scanning can happen before STW)
@@ -267,13 +269,6 @@ impl<VM: VMBinding> GenCopy<VM> {
     }
 
     fn request_full_heap_collection(&self) -> bool {
-        debug!(
-            "full heap GC? attempt = {}, total = {}, reserved = {}",
-            self.base().cur_collection_attempts.load(Ordering::SeqCst),
-            self.get_total_pages(),
-            self.get_pages_reserved()
-        );
-
         // For barrier overhead measurements, we always do full gc in nursery collections.
         if super::FULL_NURSERY_GC {
             return true;
