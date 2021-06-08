@@ -12,6 +12,9 @@ pub struct PlanConstraints {
     pub gc_header_bits: usize,
     pub gc_header_words: usize,
     pub num_specialized_scans: usize,
+    /// Size (in bytes) beyond which new regular objects must be allocated to the LOS
+    pub max_non_los_default_alloc_bytes: usize,
+    /// Size (in bytes) beyond which copied objects must be copied to the LOS
     pub max_non_los_copy_bytes: usize,
     pub needs_log_bit_in_header: bool,
     pub needs_log_bit_in_header_num: usize,
@@ -30,6 +33,7 @@ impl PlanConstraints {
             gc_header_bits: 0,
             gc_header_words: 0,
             num_specialized_scans: 0,
+            max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
             needs_log_bit_in_header: false,
             needs_log_bit_in_header_num: 0,
