@@ -15,9 +15,9 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
+use crate::util::metadata::{MetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::util::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
@@ -107,7 +107,7 @@ impl<VM: VMBinding> NoGC<VM> {
         #[cfg(feature = "nogc_lock_free")]
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
 
-        let global_specs = SideMetadataContext::new_global_specs(&[]);
+        let global_specs = MetadataContext::new_global_specs(&[]);
 
         #[cfg(feature = "nogc_lock_free")]
         let nogc_space = NoGCImmortalSpace::new(

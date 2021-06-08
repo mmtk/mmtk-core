@@ -10,7 +10,7 @@ use std::io::Result;
 /// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
 #[inline(always)]
 pub(crate) fn address_to_contiguous_meta_address(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: MetadataSpec,
     data_addr: Address,
 ) -> Address {
     let log_bits_num = metadata_spec.log_num_of_bits as i32;
@@ -41,7 +41,7 @@ pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
 pub(super) fn ensure_munmap_contiguos_metadata_space(
     start: Address,
     size: usize,
-    spec: &SideMetadataSpec,
+    spec: &MetadataSpec,
 ) -> usize {
     // nearest page-aligned starting address
     let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
@@ -60,7 +60,7 @@ pub(super) fn ensure_munmap_contiguos_metadata_space(
 pub(super) fn try_mmap_contiguous_metadata_space(
     start: Address,
     size: usize,
-    spec: &SideMetadataSpec,
+    spec: &MetadataSpec,
     no_reserve: bool,
 ) -> Result<usize> {
     debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
@@ -111,13 +111,10 @@ pub(super) fn try_mmap_metadata(start: Address, size: usize) -> Result<()> {
 
 /// Performs the translation of data address (`data_addr`) to metadata address for the specified metadata (`metadata_spec`).
 #[inline(always)]
-pub(crate) fn address_to_meta_address(
-    metadata_spec: SideMetadataSpec,
-    data_addr: Address,
-) -> Address {
+pub(crate) fn address_to_meta_address(metadata_spec: MetadataSpec, data_addr: Address) -> Address {
     #[cfg(target_pointer_width = "32")]
     let res = {
-        if metadata_spec.scope.is_global() {
+        if metadata_spec.is_global {
             address_to_contiguous_meta_address(metadata_spec, data_addr)
         } else {
             address_to_chunked_meta_address(metadata_spec, data_addr)
@@ -138,19 +135,19 @@ pub(crate) fn address_to_meta_address(
     res
 }
 
-const fn addr_rshift(metadata_spec: SideMetadataSpec) -> i32 {
+const fn addr_rshift(metadata_spec: MetadataSpec) -> i32 {
     ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_min_obj_size - metadata_spec.log_num_of_bits)
         as i32
 }
 
 #[allow(dead_code)]
 #[inline(always)]
-pub(crate) const fn metadata_address_range_size(metadata_spec: SideMetadataSpec) -> usize {
+pub(crate) const fn metadata_address_range_size(metadata_spec: MetadataSpec) -> usize {
     1usize << (LOG_ADDRESS_SPACE - addr_rshift(metadata_spec) as usize)
 }
 
 #[inline(always)]
-pub(crate) fn meta_byte_lshift(metadata_spec: SideMetadataSpec, data_addr: Address) -> u8 {
+pub(crate) fn meta_byte_lshift(metadata_spec: MetadataSpec, data_addr: Address) -> u8 {
     let bits_num_log = metadata_spec.log_num_of_bits as i32;
     if bits_num_log >= 3 {
         return 0;
@@ -161,7 +158,7 @@ pub(crate) fn meta_byte_lshift(metadata_spec: SideMetadataSpec, data_addr: Addre
 }
 
 #[inline(always)]
-pub(crate) fn meta_byte_mask(metadata_spec: SideMetadataSpec) -> u8 {
+pub(crate) fn meta_byte_mask(metadata_spec: MetadataSpec) -> u8 {
     let bits_num_log = metadata_spec.log_num_of_bits;
     ((1usize << (1usize << bits_num_log)) - 1) as u8
 }

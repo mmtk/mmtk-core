@@ -92,11 +92,11 @@
 //!     _______________________________     <= offset-1 = 0x0
 //!     |                             |
 //!     |        Local-1              |
-//!     |_____________________________|     <= offset-2 = meta_bytes_per_chunk(Local-1)
+//!     |_____________________________|     <= offset-2 = metadata_bytes_per_chunk(Local-1)
 //!     |                             |
 //!     |        Local-2              |
 //!     |                             |
-//!     |_____________________________|     <= offset-g3 = offset-g2 + meta_bytes_per_chunk(Local-2)
+//!     |_____________________________|     <= offset-g3 = offset-g2 + metadata_bytes_per_chunk(Local-2)
 //!     |                             |
 //!     |        Not Mapped           |
 //!     |                             |
@@ -109,13 +109,13 @@
 //!
 //! ## Declare side metadata specs
 //!
-//! For each global side metadata bit-set, a constant object of the `SideMetadataSpec` struct should be created.
+//! For each global side metadata bit-set, a constant object of the `MetadataSpec` struct should be created.
 //!
 //! For the first global side metadata bit-set:
 //!
 //! ```
-//! const GLOBAL_META_1: SideMetadataSpec = SideMetadataSpec {
-//!    scope: SideMetadataScope::Global,
+//! const GLOBAL_META_1: MetadataSpec = MetadataSpec {
+//!    scope: MetadataScope::Global,
 //!    offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS,
 //!    log_num_of_bits: b1,
 //!    log_min_obj_size: s1,
@@ -129,8 +129,8 @@
 //! Now, to add a second side metadata bit-set, offset needs to be calculated based-on the first global bit-set:
 //!
 //! ```
-//! const GLOBAL_META_2: SideMetadataSpec = SideMetadataSpec {
-//!    scope: SideMetadataScope::Global,
+//! const GLOBAL_META_2: MetadataSpec = MetadataSpec {
+//!    scope: MetadataScope::Global,
 //!    offset: GLOBAL_META_1.offset + metadata_address_range_size(GLOBAL_META_1)
 //!    log_num_of_bits: b2,
 //!    log_min_obj_size: s2,
@@ -146,8 +146,8 @@
 //! For the first local side metadata bit-set:
 //!
 //! ```
-//! const LOCAL_META_1: SideMetadataSpec = SideMetadataSpec {
-//!    scope: SideMetadataScope::PolicySpecific,
+//! const LOCAL_META_1: MetadataSpec = MetadataSpec {
+//!    scope: MetadataScope::PolicySpecific,
 //!    offset: 0,
 //!    log_num_of_bits: b1,
 //!    log_min_obj_size: s1,
@@ -159,9 +159,9 @@
 //! Now, to add a second side metadata bit-set, offset needs to be calculated based-on the first global bit-set:
 //!
 //! ```
-//! const LOCAL_META_2: SideMetadataSpec = SideMetadataSpec {
-//!    scope: SideMetadataScope::PolicySpecific,
-//!    offset: LOCAL_META_1.offset + meta_bytes_per_chunk(LOCAL_META_1)
+//! const LOCAL_META_2: MetadataSpec = MetadataSpec {
+//!    scope: MetadataScope::PolicySpecific,
+//!    offset: LOCAL_META_1.offset + metadata_bytes_per_chunk(LOCAL_META_1)
 //!    log_num_of_bits: b2,
 //!    log_min_obj_size: s2,
 //! };
@@ -172,10 +172,10 @@
 //! ## Create and allocate side metadata for spaces
 //!
 //! A space would need know all the global metadata specs and its own policy-specific/local metadata specs in order to calculate and allocate metadata space.
-//! When a space is created by a plan (e.g. SemiSpace::new), the plan can create its global specs by `SideMetadataContext::new_global_specs(&[GLOBAL_META_1, GLOBAL_META_2])`. Then,
+//! When a space is created by a plan (e.g. SemiSpace::new), the plan can create its global specs by `MetadataContext::new_global_specs(&[GLOBAL_META_1, GLOBAL_META_2])`. Then,
 //! the global specs are passed to each space that the plan creates.
 //!
-//! Each space will then combine the global specs and its own local specs to create a [SideMetadata](crate::util::side_metadata::SideMetadata).
+//! Each space will then combine the global specs and its own local specs to create a [SideMetadata](crate::util::metadata::SideMetadata).
 //! Allocating side metadata space and accounting its memory usage is done by `SideMetadata`. If a space uses `CommonSpace`, `CommonSpace` will create `SideMetadata` and manage
 //! reserving and allocating metadata space when necessary. If a space does not use `CommonSpace`, it should create `SideMetadata` itself and manage allocating metadata space
 //! as its own responsibility.
@@ -199,7 +199,9 @@ mod global;
 mod helpers;
 #[cfg(target_pointer_width = "32")]
 mod helpers_32;
+pub(crate) mod metadata_defaults;
 pub(crate) mod sanity;
+mod side_metadata;
 mod side_metadata_tests;
 
 pub use constants::*;
@@ -207,5 +209,6 @@ pub use global::*;
 pub(crate) use helpers::*;
 #[cfg(target_pointer_width = "32")]
 pub(crate) use helpers_32::*;
+pub use side_metadata::*;
 
 pub(crate) use sanity::SideMetadataSanity;

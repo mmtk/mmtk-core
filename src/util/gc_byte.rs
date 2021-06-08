@@ -1,4 +1,4 @@
-use crate::util::side_metadata::*;
+use crate::util::metadata::*;
 use crate::util::ObjectReference;
 #[cfg(not(feature = "side_gc_header"))]
 use crate::vm::ObjectModel;
@@ -8,12 +8,12 @@ use std::sync::atomic::{AtomicU8, Ordering};
 
 use super::constants;
 
-pub const SIDE_GC_BYTE_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::Global,
-    offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-    log_num_of_bits: 1,
-    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
-};
+// pub const SIDE_GC_BYTE_SPEC: MetadataSpec = MetadataSpec {
+//     scope: MetadataScope::Global,
+//     offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+//     log_num_of_bits: 1,
+//     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
+// };
 
 // TODO: we probably need to add non-atomic versions of the read and write methods
 /// Return the GC byte of an object as an atomic.

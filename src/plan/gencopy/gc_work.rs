@@ -1,3 +1,5 @@
+use atomic::Ordering;
+
 use super::global::GenCopy;
 use crate::plan::PlanConstraints;
 use crate::plan::{barriers::BarrierSelector, CopyContext};
@@ -7,7 +9,6 @@ use crate::scheduler::WorkerLocal;
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::forwarding_word;
 use crate::util::opaque_pointer::*;
-use crate::util::side_metadata::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
@@ -55,7 +56,13 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
     ) {
         forwarding_word::clear_forwarding_bits::<VM>(obj);
         if !super::NO_SLOW && super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-            store_atomic(super::LOGGING_META, obj.to_address(), 0b1);
+            VM::VMObjectModel::store_metadata(
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+                obj,
+                0b1,
+                None,
+                Some(Ordering::SeqCst),
+            );
         }
     }
 }

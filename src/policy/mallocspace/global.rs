@@ -6,9 +6,9 @@ use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
+use crate::util::metadata::SideMetadataSanity;
+use crate::util::metadata::{MetadataContext, MetadataSpec, SideMetadata};
 use crate::util::opaque_pointer::*;
-use crate::util::side_metadata::SideMetadataSanity;
-use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
@@ -44,7 +44,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        is_marked(object)
+        is_marked::<VM>(object)
     }
     fn is_movable(&self) -> bool {
         false
@@ -138,13 +138,14 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 }
 
 impl<VM: VMBinding> MallocSpace<VM> {
-    pub fn new(global_side_metadata_specs: Vec<SideMetadataSpec>) -> Self {
+    pub fn new(global_side_metadata_specs: Vec<MetadataSpec>) -> Self {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
-            metadata: SideMetadata::new(SideMetadataContext {
+            metadata: SideMetadata::new(MetadataContext {
                 global: global_side_metadata_specs,
-                local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
+                // FIXME: it assumes marking metadata is always kept on side
+                local: vec![ALLOC_METADATA_SPEC, VM::VMObjectModel::LOCAL_MARK_BIT_SPEC],
             }),
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
@@ -214,8 +215,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
             "Cannot mark an object {} that was not alloced by malloc.",
             address,
         );
-        if !is_marked(object) {
-            set_mark_bit(object);
+        if !is_marked::<VM>(object) {
+            set_mark_bit::<VM>(object);
             trace.process_node(object);
         }
         object
@@ -258,7 +259,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                         debug_assert_eq!(self.active_mem.lock().unwrap().get(&obj_start), Some(&bytes), "Address {} size in active_mem does not match the size from malloc_usable_size", obj_start);
                     }
 
-                    if !is_marked(object) {
+                    if !is_marked::<VM>(object) {
                         // Dead object
                         trace!(
                             "Object {} has alloc bit but no mark bit, it is dead. ",
@@ -271,7 +272,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                         unset_alloc_bit(object);
                     } else {
                         // Live object. Unset mark bit
-                        unset_mark_bit(object);
+                        unset_mark_bit::<VM>(object);
                         // This chunk is still active.
                         chunk_is_empty = false;
 

@@ -1,7 +1,7 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::plan::GcStatus;
-use crate::util::side_metadata::*;
+use crate::util::metadata::*;
 use crate::util::*;
 use crate::vm::*;
 use crate::*;
@@ -478,11 +478,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
 pub struct ProcessModBuf<E: ProcessEdgesWork> {
     modbuf: Vec<ObjectReference>,
     phantom: PhantomData<E>,
-    meta: SideMetadataSpec,
+    meta: MetadataSpec,
 }
 
 impl<E: ProcessEdgesWork> ProcessModBuf<E> {
-    pub fn new(modbuf: Vec<ObjectReference>, meta: SideMetadataSpec) -> Self {
+    pub fn new(modbuf: Vec<ObjectReference>, meta: MetadataSpec) -> Self {
         Self {
             modbuf,
             meta,
@@ -496,7 +496,14 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
-                compare_exchange_atomic(self.meta, obj.to_address(), 0b0, 0b1);
+                compare_exchange_atomic(
+                    self.meta,
+                    obj.to_address(),
+                    0b0,
+                    0b1,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                );
             }
         }
         if mmtk.plan.in_nursery() {

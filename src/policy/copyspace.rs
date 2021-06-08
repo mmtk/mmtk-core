@@ -8,7 +8,7 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
+use crate::util::metadata::{MetadataContext, MetadataSpec};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
@@ -70,7 +70,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         from_space: bool,
         zeroed: bool,
         vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        global_side_metadata_specs: Vec<MetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
@@ -82,7 +82,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 immortal: false,
                 zeroed,
                 vmrequest,
-                side_metadata_specs: SideMetadataContext {
+                side_metadata_specs: MetadataContext {
                     global: global_side_metadata_specs,
                     local: vec![],
                 },

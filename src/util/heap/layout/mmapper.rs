@@ -1,5 +1,5 @@
 use super::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::{side_metadata::SideMetadata, Address};
+use crate::util::{metadata::SideMetadata, Address};
 use std::io::Result;
 
 pub trait Mmapper {

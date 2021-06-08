@@ -3,7 +3,7 @@ use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
 use crate::util::conversions::bytes_to_chunks_up;
 use crate::util::heap::PageResource;
-use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
+use crate::util::metadata::{MetadataContext, MetadataSpec, SideMetadata};
 
 use crate::util::ObjectReference;
 
@@ -132,14 +132,14 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
     pub fn new(
         name: &'static str,
         slow_path_zeroing: bool,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        global_side_metadata_specs: Vec<MetadataSpec>,
     ) -> Self {
         Self {
             name,
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
             limit: AVAILABLE_END,
             slow_path_zeroing,
-            metadata: SideMetadata::new(SideMetadataContext {
+            metadata: SideMetadata::new(MetadataContext {
                 global: global_side_metadata_specs,
                 local: vec![],
             }),

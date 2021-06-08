@@ -1,5 +1,5 @@
 use crate::util::conversions::*;
-use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSanity};
+use crate::util::metadata::{MetadataContext, SideMetadata, SideMetadataSanity};
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -431,7 +431,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Ensure that the current space's metadata context does not have any issues.
     /// Panics with a suitable message if any issue is detected.
     /// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.
-    /// Internally this calls verify_metadata_context() from `util::side_metadata::sanity`
+    /// Internally this calls verify_metadata_context() from `util::metadata::sanity`
     ///
     /// This function is called once per space by its parent plan but may be called multiple times per policy.
     ///
@@ -475,7 +475,7 @@ pub struct SpaceOptions {
     pub immortal: bool,
     pub zeroed: bool,
     pub vmrequest: VMRequest,
-    pub side_metadata_specs: SideMetadataContext,
+    pub side_metadata_specs: MetadataContext,
 }
 
 /// Print debug info for SFT. Should be false when committed.

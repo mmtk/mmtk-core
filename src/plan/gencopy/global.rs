@@ -1,8 +1,5 @@
+use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
 use super::mutator::ALLOCATOR_MAPPING;
-use super::{
-    gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges},
-    LOGGING_META,
-};
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -20,10 +17,10 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::metadata::{MetadataContext, SideMetadataSanity};
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
@@ -179,11 +176,15 @@ impl<VM: VMBinding> GenCopy<VM> {
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let gencopy_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-            vec![LOGGING_META]
+            if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_side_metadata {
+                vec![VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC]
+            } else {
+                vec![]
+            }
         } else {
             vec![]
         };
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&gencopy_specs);
+        let global_metadata_specs = MetadataContext::new_global_specs(&gencopy_specs);
 
         let res = GenCopy {
             nursery: CopySpace::new(
