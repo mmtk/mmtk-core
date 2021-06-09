@@ -35,7 +35,9 @@ impl<VM: VMBinding> ProcessEdgesWork for PPProcessEdges<VM> {
         if self.plan.space.in_space(object) {
             self.plan.space.trace_object::<Self>(self, object)
         } else {
-            self.plan.common.trace_object::<Self, NoCopy<VM>>(self, object)
+            self.plan
+                .common
+                .trace_object::<Self, NoCopy<VM>>(self, object)
         }
     }
 }

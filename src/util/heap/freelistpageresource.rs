@@ -14,11 +14,11 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::memory;
 use crate::util::opaque_pointer::*;
 use crate::vm::*;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
-use crate::util::memory;
 
 pub struct CommonFreeListPageResource {
     free_list: Box<<VMMap as Map>::FreeList>,

@@ -1,4 +1,3 @@
-use crate::{plan::PlanConstraints, util::{constants, side_metadata::{self, SideMetadataScope}}};
 use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
@@ -8,11 +7,20 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use crate::util::opaque_pointer::*;
-use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec, LOCAL_SIDE_METADATA_BASE_ADDRESS};
+use crate::util::side_metadata::{
+    SideMetadataContext, SideMetadataSpec, LOCAL_SIDE_METADATA_BASE_ADDRESS,
+};
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use crate::{
+    plan::PlanConstraints,
+    util::{
+        constants,
+        side_metadata::{self, SideMetadataScope},
+    },
+};
 
 const MARK_BIT: u8 = 0b01;
 /// This type implements a policy for large objects. Each instance corresponds
@@ -81,7 +89,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     };
     const NURSERY_STATE: SideMetadataSpec = SideMetadataSpec {
         scope: SideMetadataScope::PolicySpecific,
-        offset: Self::MARK_TABLE.offset + side_metadata::metadata_address_range_size(Self::MARK_TABLE),
+        offset: Self::MARK_TABLE.offset
+            + side_metadata::metadata_address_range_size(Self::MARK_TABLE),
         log_num_of_bits: 0,
         log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as _,
     };
@@ -107,7 +116,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
-                    local: vec![ Self::MARK_TABLE, Self::NURSERY_STATE ],
+                    local: vec![Self::MARK_TABLE, Self::NURSERY_STATE],
                 },
             },
             vm_map,
@@ -196,7 +205,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if old_value == value {
             return false;
         }
-        while !side_metadata::compare_exchange_atomic(Self::MARK_TABLE, cell, old_value as _, value as _) {
+        while !side_metadata::compare_exchange_atomic(
+            Self::MARK_TABLE,
+            cell,
+            old_value as _,
+            value as _,
+        ) {
             old_value = unsafe { side_metadata::load(Self::MARK_TABLE, cell) } as u8;
             if old_value == value {
                 return false;

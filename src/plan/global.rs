@@ -125,8 +125,10 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::GenCopy => crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
-        },
-        PlanSelector::PageProtect => crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan),
+        }
+        PlanSelector::PageProtect => {
+            crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
+        }
     })
 }
 

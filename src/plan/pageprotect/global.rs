@@ -1,7 +1,7 @@
 use super::gc_work::PPProcessEdges;
-use crate::{plan::global::{CommonPlan, NoCopy}, policy::largeobjectspace::LargeObjectSpace, util::opaque_pointer::VMWorkerThread};
-use crate::plan::global::GcStatus;
 use super::mutator::ALLOCATOR_MAPPING;
+use crate::mmtk::MMTK;
+use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -19,13 +19,15 @@ use crate::util::heap::VMRequest;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::mmtk::MMTK;
-use crate::{plan::global::BasePlan, vm::VMBinding};
-use std::sync::Arc;
-use enum_map::EnumMap;
 use crate::util::side_metadata::SideMetadataContext;
-
-
+use crate::{plan::global::BasePlan, vm::VMBinding};
+use crate::{
+    plan::global::{CommonPlan, NoCopy},
+    policy::largeobjectspace::LargeObjectSpace,
+    util::opaque_pointer::VMWorkerThread,
+};
+use enum_map::EnumMap;
+use std::sync::Arc;
 
 pub struct PageProtect<VM: VMBinding> {
     pub space: LargeObjectSpace<VM>,
@@ -95,13 +97,17 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        let space = unsafe { &mut *(&self.space as *const LargeObjectSpace<VM> as *mut LargeObjectSpace<VM>) };
+        let space = unsafe {
+            &mut *(&self.space as *const LargeObjectSpace<VM> as *mut LargeObjectSpace<VM>)
+        };
         space.prepare(true);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
-        let space = unsafe { &mut *(&self.space as *const LargeObjectSpace<VM> as *mut LargeObjectSpace<VM>) };
+        let space = unsafe {
+            &mut *(&self.space as *const LargeObjectSpace<VM> as *mut LargeObjectSpace<VM>)
+        };
         space.release(true);
     }
 
@@ -147,7 +153,14 @@ impl<VM: VMBinding> PageProtect<VM> {
                 &CONSTRAINTS,
                 true,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &CONSTRAINTS, global_metadata_specs.clone()),
+            common: CommonPlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                &CONSTRAINTS,
+                global_metadata_specs.clone(),
+            ),
         }
     }
 }
