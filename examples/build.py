@@ -31,7 +31,7 @@ if len(sys.argv) > 1:
 
 
 def exec_and_redirect(args, env=None):
-    print("[exec_and_redirect] {}".format(args))
+    print("[exec_and_redirect] {} {}".format(args, env))
     p = subprocess.Popen(args,
                          env=env)
     p.wait()
@@ -101,7 +101,7 @@ if system == "Linux":
 
 for plan in PLANS:
     exec_and_redirect(["./test_mmtk"], env={LIBRARY_PATH: ".", "MMTK_PLAN": plan})
-    if system == "Linux":
+    if system == "Linux" and plan != 'PageProtect': # FIXME: PageProtect for 32bit MMTk does not work yet.
         exec_and_redirect(["./test_mmtk_32"], env={LIBRARY_PATH: ".", "MMTK_PLAN": plan})
 
 os.remove("./test_mmtk")

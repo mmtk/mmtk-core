@@ -97,18 +97,12 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        let space = unsafe {
-            &mut *(&self.space as *const LargeObjectSpace<VM> as *mut LargeObjectSpace<VM>)
-        };
-        space.prepare(true);
+        self.space.prepare(true);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
-        let space = unsafe {
-            &mut *(&self.space as *const LargeObjectSpace<VM> as *mut LargeObjectSpace<VM>)
-        };
-        space.release(true);
+        self.space.release(true);
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
@@ -159,7 +153,7 @@ impl<VM: VMBinding> PageProtect<VM> {
                 options,
                 heap,
                 &CONSTRAINTS,
-                global_metadata_specs.clone(),
+                global_metadata_specs,
             ),
         }
     }

@@ -7,9 +7,11 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use crate::util::opaque_pointer::*;
-use crate::util::side_metadata::{
-    SideMetadataContext, SideMetadataSpec, LOCAL_SIDE_METADATA_BASE_ADDRESS,
-};
+#[cfg(target_pointer_width = "32")]
+use crate::util::side_metadata::meta_bytes_per_chunk;
+#[cfg(target_pointer_width = "64")]
+use crate::util::side_metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
+use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
@@ -81,16 +83,37 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 }
 
 impl<VM: VMBinding> LargeObjectSpace<VM> {
+    #[cfg(target_pointer_width = "64")]
     const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         scope: SideMetadataScope::PolicySpecific,
         offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
         log_num_of_bits: 0,
         log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as _,
     };
+    #[cfg(target_pointer_width = "64")]
     const NURSERY_STATE: SideMetadataSpec = SideMetadataSpec {
         scope: SideMetadataScope::PolicySpecific,
         offset: Self::MARK_TABLE.offset
             + side_metadata::metadata_address_range_size(Self::MARK_TABLE),
+        log_num_of_bits: 0,
+        log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as _,
+    };
+
+    #[cfg(target_pointer_width = "32")]
+    pub(super) const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
+        scope: SideMetadataScope::PolicySpecific,
+        offset: 0,
+        log_num_of_bits: 0,
+        log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as _,
+    };
+    #[cfg(target_pointer_width = "32")]
+    pub(super) const NURSERY_STATE: SideMetadataSpec = SideMetadataSpec {
+        scope: SideMetadataScope::PolicySpecific,
+        offset: Self::MARK_TABLE.offset
+            + meta_bytes_per_chunk(
+                Self::MARK_TABLE.log_min_obj_size,
+                Self::MARK_TABLE.log_num_of_bits,
+            ),
         log_num_of_bits: 0,
         log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as _,
     };
