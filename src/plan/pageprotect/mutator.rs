@@ -9,17 +9,22 @@ use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn pp_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
+/// Prepare mutator. Do nothing.
+fn pp_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
-pub fn pp_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
+/// Release mutator. Do nothing.
+fn pp_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default | AllocationType::Los => AllocatorSelector::LargeObject(0),
+        // Temporarily put code and readonly objects to immortal space, for v8 support.
         AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(0),
     };
 }
 
+/// Create a mutator instance.
+/// Every object is allocated to LOS.
 pub fn create_pp_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
     plan: &'static dyn Plan<VM = VM>,

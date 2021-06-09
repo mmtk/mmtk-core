@@ -33,10 +33,7 @@ pub struct PageProtect<VM: VMBinding> {
 }
 
 pub const CONSTRAINTS: PlanConstraints = PlanConstraints {
-    moves_objects: true,
-    gc_header_bits: 2,
-    gc_header_words: 0,
-    num_specialized_scans: 1,
+    moves_objects: false,
     ..PlanConstraints::default()
 };
 

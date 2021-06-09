@@ -7,9 +7,10 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
+/// Edge scanning work packet.
 pub struct PPProcessEdges<VM: VMBinding> {
-    // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
-    // downcast for each traced object.
+    /// Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
+    /// downcast for each traced object.
     plan: &'static PageProtect<VM>,
     base: ProcessEdgesBase<PPProcessEdges<VM>>,
 }
