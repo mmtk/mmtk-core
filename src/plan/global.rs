@@ -737,6 +737,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 mmapper,
                 &mut heap,
                 constraints,
+                false,
             ),
             base: BasePlan::new(
                 vm_map,

@@ -14,6 +14,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 
+const MARK_BIT: u8 = 0b01;
 /// This type implements a policy for large objects. Each instance corresponds
 /// to one Treadmill space.
 pub struct LargeObjectSpace<VM: VMBinding> {
@@ -95,6 +96,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
         constraints: &'static PlanConstraints,
+        protect_memory_on_release: bool,
     ) -> Self {
         let common = CommonSpace::new(
             SpaceOptions {
@@ -112,12 +114,14 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             mmapper,
             heap,
         );
+        let mut pr = if vmrequest.is_discontiguous() {
+            FreeListPageResource::new_discontiguous(0, vm_map)
+        } else {
+            FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
+        };
+        pr.protect_memory_on_release = protect_memory_on_release;
         LargeObjectSpace {
-            pr: if vmrequest.is_discontiguous() {
-                FreeListPageResource::new_discontiguous(0, vm_map)
-            } else {
-                FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
-            },
+            pr,
             common,
             mark_state: 0,
             in_nursery_gc: false,
@@ -129,7 +133,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     pub fn prepare(&mut self, full_heap: bool) {
         if full_heap {
             debug_assert!(self.treadmill.from_space_empty());
-            self.mark_state = 1 - self.mark_state;
+            self.mark_state = MARK_BIT - self.mark_state;
         }
         self.treadmill.flip(full_heap);
         self.in_nursery_gc = !full_heap;
@@ -170,24 +174,22 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
-                self.release_pages(get_super_page(cell));
+                self.pr.release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
-                self.release_pages(get_super_page(cell));
+                self.pr.release_pages(get_super_page(cell));
             }
         }
     }
 
-    fn release_pages(&mut self, start: Address) {
-        self.pr.release_and_zap_pages(start);
-    }
-
+    /// Allocate an object
     pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Address {
         self.acquire(tls, pages)
     }
 
+    /// Attempt to mark the object. Return true on success.
     fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
         let cell = self.get_cell(object);
         let mut old_value = unsafe { side_metadata::load(Self::MARK_TABLE, cell) } as u8;
@@ -203,18 +205,22 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         true
     }
 
+    /// Get the mark bit for a given object
     fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
         unsafe { side_metadata::load(Self::MARK_TABLE, self.get_cell(object)) as u8 == value }
     }
 
+    /// Check if a given object is in nursery
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
         unsafe { side_metadata::load(Self::NURSERY_STATE, self.get_cell(object)) == 1 }
     }
 
+    /// Move a given object out of nursery
     fn clear_nursery(&self, object: ObjectReference) {
         side_metadata::store_atomic(Self::NURSERY_STATE, self.get_cell(object), 0)
     }
 
+    /// The the cell of an object
     #[inline(always)]
     fn get_cell(&self, object: ObjectReference) -> Address {
         VM::VMObjectModel::object_start_ref(object)

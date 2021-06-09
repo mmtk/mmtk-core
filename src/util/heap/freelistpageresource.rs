@@ -18,6 +18,7 @@ use crate::util::opaque_pointer::*;
 use crate::vm::*;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
+use crate::util::memory;
 
 pub struct CommonFreeListPageResource {
     free_list: Box<<VMMap as Map>::FreeList>,
@@ -41,6 +42,8 @@ pub struct FreeListPageResource<VM: VMBinding> {
     meta_data_pages_per_region: usize,
     sync: Mutex<FreeListPageResourceSync>,
     _p: PhantomData<VM>,
+    /// Protect memory on release, and unprotect on re-allocate.
+    pub(crate) protect_memory_on_release: bool,
 }
 
 struct FreeListPageResourceSync {
@@ -113,7 +116,9 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         let rtn = self.start + conversions::pages_to_bytes(page_offset as _);
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
-        if !new_chunk { self.munprotect(rtn, self.free_list.size(page_offset as _) as _) };
+        if self.protect_memory_on_release && !new_chunk {
+            self.munprotect(rtn, self.free_list.size(page_offset as _) as _)
+        };
         Result::Ok(PRAllocResult {
             start: rtn,
             pages: required_pages,
@@ -159,6 +164,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 highwater_mark: 0,
             }),
             _p: PhantomData,
+            protect_memory_on_release: false,
         };
         if !flpr.common.growable {
             // For non-growable space, we just need to reserve metadata according to the requested size.
@@ -194,14 +200,25 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 highwater_mark: 0,
             }),
             _p: PhantomData,
+            protect_memory_on_release: false,
         }
     }
 
+    /// Protect the memory
     fn mprotect(&self, start: Address, pages: usize) {
-        // crate::util::memory::mprotect(start, pages << 12).unwrap();
+        // No `unwrap()` here since this may cause ENOMEM error and fail to protect the memory.
+        // See: https://man7.org/linux/man-pages/man2/mprotect.2.html#ERRORS
+        // > Changing the protection of a memory region would result in
+        // > the total number of mappings with distinct attributes
+        // > (e.g., read versus read/write protection) exceeding the
+        // > allowed maximum.
+        let _ = memory::mprotect(start, pages << LOG_BYTES_IN_PAGE);
     }
+
+    /// Unprotect the memory
     fn munprotect(&self, start: Address, pages: usize) {
-        // crate::util::memory::munprotect(start, pages << 12).unwrap();
+        // No `unwrap()` here. See explanation in `mprotect`.
+        let _ = memory::munprotect(start, pages << LOG_BYTES_IN_PAGE);
     }
 
     fn allocate_contiguous_chunks(
@@ -298,18 +315,6 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         }
     }
 
-    pub fn release_and_zap_pages(&self, first: Address) {
-        debug_assert!(conversions::is_page_aligned(first));
-        let page_offset = conversions::bytes_to_pages(first - self.start);
-        let pages = self.free_list.size(page_offset as _);
-        let bytes = (pages as usize) << 12;
-        for i in (0..bytes).step_by(8) {
-            unsafe { (first + i).store(0xdeadbeefdeadbeefusize) }
-        }
-        self.mprotect(first, pages as _);
-        self.release_pages(first)
-    }
-
     pub fn release_pages(&self, first: Address) {
         debug_assert!(conversions::is_page_aligned(first));
         let page_offset = conversions::bytes_to_pages(first - self.start);
@@ -317,6 +322,10 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // if (VM.config.ZERO_PAGES_ON_RELEASE)
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
         debug_assert!(pages as usize <= self.common.accounting.get_committed_pages());
+
+        if self.protect_memory_on_release {
+            self.mprotect(first, pages as _);
+        }
 
         // FIXME
         #[allow(clippy::cast_ref_to_mut)]
