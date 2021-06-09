@@ -31,7 +31,7 @@ if len(sys.argv) > 1:
 
 
 def exec_and_redirect(args, env=None):
-    print("[exec_and_redirect] {} {}".format(args, env))
+    print("[exec_and_redirect] {}".format(args))
     p = subprocess.Popen(args,
                          env=env)
     p.wait()
