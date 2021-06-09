@@ -1,7 +1,7 @@
-use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
+use crate::util::conversions::*;
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSanity};
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
@@ -276,13 +276,18 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     // adding a space lock here.
                     let bytes = conversions::pages_to_bytes(res.pages);
                     self.grow_space(res.start, bytes, res.new_chunk);
-                    // Mmap the pages and handle error. In case of any error,
+                    // Mmap the pages and the side metadata, and handle error. In case of any error,
                     // we will either call back to the VM for OOM, or simply panic.
-                    if let Err(mmap_error) = self.common().mmapper.ensure_mapped(
-                        res.start,
-                        res.pages,
-                        &self.common().metadata,
-                    ) {
+                    if let Err(mmap_error) = self
+                        .common()
+                        .mmapper
+                        .ensure_mapped(res.start, res.pages)
+                        .and(
+                            self.common()
+                                .metadata
+                                .try_map_metadata_space(res.start, bytes),
+                        )
+                    {
                         memory::handle_mmap_error::<VM>(mmap_error, tls);
                     }
 
@@ -372,7 +377,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn reserved_pages(&self) -> usize {
-        self.get_page_resource().reserved_pages() + self.common().metadata.reserved_pages()
+        let data_pages = self.get_page_resource().reserved_pages();
+        let meta_pages = self.common().metadata.calculate_reserved_pages(data_pages);
+        data_pages + meta_pages
     }
 
     fn get_name(&self) -> &'static str {
@@ -428,8 +435,20 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         println!();
     }
 
-    fn local_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &[]
+    /// Ensure that the current space's metadata context does not have any issues.
+    /// Panics with a suitable message if any issue is detected.
+    /// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.
+    /// Internally this calls verify_metadata_context() from `util::side_metadata::sanity`
+    ///
+    /// This function is called once per space by its parent plan but may be called multiple times per policy.
+    ///
+    /// Arguments:
+    /// * `side_metadata_sanity_checker`: The `SideMetadataSanity` object instantiated in the calling plan.
+    fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
+        side_metadata_sanity_checker.verify_metadata_context(
+            std::any::type_name::<Self>(),
+            self.common().metadata.get_context(),
+        )
     }
 }
 
