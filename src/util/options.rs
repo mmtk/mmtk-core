@@ -141,7 +141,7 @@ options! {
     vm_space_size:         usize                [|v: &usize| *v > 0]    = 0x7cc_cccc,
     // An example string option. Can be deleted when we have other string options.
     // Make sure to include the string option tests in the unit tests.
-    better_string_option: String                [|v: &str| v.starts_with("hello") ] = "hello world".to_string(),
+    example_string_option: String                [|v: &str| v.starts_with("hello") ] = "hello world".to_string(),
 }
 
 impl Options {
@@ -190,61 +190,73 @@ mod tests {
     #[test]
     fn with_valid_env_var() {
         serial_test(|| {
-            with_cleanup(|| {
-                std::env::set_var("MMTK_STRESS_FACTOR", "4096");
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_STRESS_FACTOR", "4096");
 
-                let options = Options::default();
-                assert_eq!(options.stress_factor, 4096);
-            }, || {
-                std::env::remove_var("MMTK_STRESS_FACTOR");
-            })
+                    let options = Options::default();
+                    assert_eq!(options.stress_factor, 4096);
+                },
+                || {
+                    std::env::remove_var("MMTK_STRESS_FACTOR");
+                },
+            )
         })
     }
 
     #[test]
     fn with_multiple_valid_env_vars() {
         serial_test(|| {
-            with_cleanup(|| {
-                std::env::set_var("MMTK_STRESS_FACTOR", "4096");
-                std::env::set_var("MMTK_NO_FINALIZER", "true");
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_STRESS_FACTOR", "4096");
+                    std::env::set_var("MMTK_NO_FINALIZER", "true");
 
-                let options = Options::default();
-                assert_eq!(options.stress_factor, 4096);
-                assert!(options.no_finalizer);
-            }, || {
-                std::env::remove_var("MMTK_STRESS_FACTOR");
-                std::env::remove_var("MMTK_NO_FINALIZER");
-            })
+                    let options = Options::default();
+                    assert_eq!(options.stress_factor, 4096);
+                    assert!(options.no_finalizer);
+                },
+                || {
+                    std::env::remove_var("MMTK_STRESS_FACTOR");
+                    std::env::remove_var("MMTK_NO_FINALIZER");
+                },
+            )
         })
     }
 
     #[test]
     fn with_invalid_env_var_value() {
         serial_test(|| {
-            with_cleanup(|| {
-                // invalid value, we cannot parse the value, so use the default value
-                std::env::set_var("MMTK_STRESS_FACTOR", "abc");
+            with_cleanup(
+                || {
+                    // invalid value, we cannot parse the value, so use the default value
+                    std::env::set_var("MMTK_STRESS_FACTOR", "abc");
 
-                let options = Options::default();
-                assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
-            }, || {
-                std::env::remove_var("MMTK_STRESS_FACTOR");
-            })
+                    let options = Options::default();
+                    assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+                },
+                || {
+                    std::env::remove_var("MMTK_STRESS_FACTOR");
+                },
+            )
         })
     }
 
     #[test]
     fn with_invalid_env_var_key() {
         serial_test(|| {
-            with_cleanup(|| {
-                // invalid value, we cannot parse the value, so use the default value
-                std::env::set_var("MMTK_ABC", "42");
+            with_cleanup(
+                || {
+                    // invalid value, we cannot parse the value, so use the default value
+                    std::env::set_var("MMTK_ABC", "42");
 
-                let options = Options::default();
-                assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
-            }, || {
-                std::env::remove_var("MMTK_ABC");
-            })
+                    let options = Options::default();
+                    assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+                },
+                || {
+                    std::env::remove_var("MMTK_ABC");
+                },
+            )
         })
     }
 
@@ -252,37 +264,43 @@ mod tests {
     fn test_str_option_default() {
         serial_test(|| {
             let options = Options::default();
-            assert_eq!(&options.better_string_option as &str, "hello world");
+            assert_eq!(&options.example_string_option as &str, "hello world");
         })
     }
 
     #[test]
     fn test_str_option_from_env_var() {
         serial_test(|| {
-            with_cleanup(|| {
-                std::env::set_var("MMTK_BETTER_STRING_OPTION", "hello string");
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_EXAMPLE_STRING_OPTION", "hello string");
 
-                let options = Options::default();
-                assert_eq!(&options.better_string_option as &str, "hello string");
-            }, || {
-                std::env::remove_var("MMTK_BETTER_STRING_OPTION");
-            })
+                    let options = Options::default();
+                    assert_eq!(&options.example_string_option as &str, "hello string");
+                },
+                || {
+                    std::env::remove_var("MMTK_EXAMPLE_STRING_OPTION");
+                },
+            )
         })
     }
 
     #[test]
     fn test_invalid_str_option_from_env_var() {
         serial_test(|| {
-            with_cleanup(|| {
-                // The option needs to start with "hello", otherwise it is invalid.
-                std::env::set_var("MMTK_BETTER_STRING_OPTION", "abc");
+            with_cleanup(
+                || {
+                    // The option needs to start with "hello", otherwise it is invalid.
+                    std::env::set_var("MMTK_EXAMPLE_STRING_OPTION", "abc");
 
-                let options = Options::default();
-                // invalid value from env var, use default.
-                assert_eq!(&options.better_string_option as &str, "hello world");
-            }, || {
-                std::env::remove_var("MMTK_BETTER_STRING_OPTION");
-            })
+                    let options = Options::default();
+                    // invalid value from env var, use default.
+                    assert_eq!(&options.example_string_option as &str, "hello world");
+                },
+                || {
+                    std::env::remove_var("MMTK_EXAMPLE_STRING_OPTION");
+                },
+            )
         })
     }
 }
