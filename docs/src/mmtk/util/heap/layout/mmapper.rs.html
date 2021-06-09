@@ -1,128 +1,268 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/layout/mmapper.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mmapper.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../../../mmtk/index.html'><div class='logo-container rust-logo'><img src='../../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../../../settings.html"><img src="../../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
-<span id="10">10</span>
-<span id="11">11</span>
-<span id="12">12</span>
-<span id="13">13</span>
-<span id="14">14</span>
-<span id="15">15</span>
-<span id="16">16</span>
-<span id="17">17</span>
-<span id="18">18</span>
-<span id="19">19</span>
-<span id="20">20</span>
-<span id="21">21</span>
-<span id="22">22</span>
-<span id="23">23</span>
-<span id="24">24</span>
-<span id="25">25</span>
-<span id="26">26</span>
-<span id="27">27</span>
-<span id="28">28</span>
-<span id="29">29</span>
-<span id="30">30</span>
-<span id="31">31</span>
-<span id="32">32</span>
-<span id="33">33</span>
-<span id="34">34</span>
-<span id="35">35</span>
-<span id="36">36</span>
-<span id="37">37</span>
-<span id="38">38</span>
-<span id="39">39</span>
-<span id="40">40</span>
-<span id="41">41</span>
-<span id="42">42</span>
-<span id="43">43</span>
-<span id="44">44</span>
-<span id="45">45</span>
-<span id="46">46</span>
-<span id="47">47</span>
-<span id="48">48</span>
-<span id="49">49</span>
-<span id="50">50</span>
-<span id="51">51</span>
-<span id="52">52</span>
-<span id="53">53</span>
-<span id="54">54</span>
-<span id="55">55</span>
-<span id="56">56</span>
-<span id="57">57</span>
-<span id="58">58</span>
-<span id="59">59</span>
-<span id="60">60</span>
-<span id="61">61</span>
+                <a id="settings-menu" href="../../../../../settings.html"><img src="../../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
 </pre><pre class="rust">
-<span class="kw">use</span> <span class="kw">super</span><span class="ident">::vm_layout_constants::BYTES_IN_CHUNK</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">side_metadata::SideMetadata</span>, <span class="ident">Address</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::memory</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::Address</span>;
+<span class="kw">use</span> <span class="ident">atomic</span>::{<span class="ident">Atomic</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::io::Result</span>;
 
+<span class="doccomment">/// Generic mmap and protection functionality</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Mmapper</span> {
-    <span class="comment">/****************************************************************************
-     * Generic mmap and protection functionality
-     */</span>
-
-    <span class="doccomment">/**
-     * Given an address array describing the regions of virtual memory to be used
-     * by MMTk, demand zero map all of them if they are not already mapped.
-     *
-     * @param spaceMap An address array containing a pairs of start and end
-     * addresses for each of the regions to be mappe3d
-     */</span>
+    <span class="doccomment">/// Given an address array describing the regions of virtual memory to be used</span>
+    <span class="doccomment">/// by MMTk, demand zero map all of them if they are not already mapped.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `spaceMap`: An address array containing a pairs of start and end</span>
+    <span class="doccomment">///   addresses for each of the regions to be mapped</span>
     <span class="kw">fn</span> <span class="ident">eagerly_mmap_all_spaces</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_map</span>: <span class="kw-2">&amp;</span>[<span class="ident">Address</span>]);
 
-    <span class="doccomment">/**
-     * Mark a number of pages as mapped, without making any
-     * request to the operating system.  Used to mark pages
-     * that the VM has already mapped.
-     * @param start Address of the first page to be mapped
-     * @param bytes Number of bytes to ensure mapped
-     */</span>
+    <span class="doccomment">/// Mark a number of pages as mapped, without making any</span>
+    <span class="doccomment">/// request to the operating system.  Used to mark pages</span>
+    <span class="doccomment">/// that the VM has already mapped.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `start`: Address of the first page to be mapped</span>
+    <span class="doccomment">/// * `bytes`: Number of bytes to ensure mapped</span>
     <span class="kw">fn</span> <span class="ident">mark_as_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>);
 
-    <span class="doccomment">/**
-     * Ensure that a range of pages is mmapped (or equivalent).  If the
-     * pages are not yet mapped, demand-zero map them. Note that mapping
-     * occurs at chunk granularity, not page granularity.&lt;p&gt;
-     *
-     * NOTE: There is a monotonicity assumption so that only updates require lock
-     * acquisition.
-     * TODO: Fix the above to support unmapping.
-     *
-     * @param start The start of the range to be mapped.
-     * @param pages The size of the range to be mapped, in pages
-     */</span>
-    <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>, <span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadata</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+    <span class="doccomment">/// Quarantine/reserve address range. We mmap from the OS with no reserve and with PROT_NONE,</span>
+    <span class="doccomment">/// which should be little overhead. This ensures that we can reserve certain address range that</span>
+    <span class="doccomment">/// we can use if needed. Quarantined memory needs to be mapped before it can be used.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `start`: Address of the first page to be quarantined</span>
+    <span class="doccomment">/// * `bytes`: Number of bytes to quarantine from the start</span>
+    <span class="kw">fn</span> <span class="ident">quarantine_address_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
 
-    <span class="doccomment">/// Map metadata memory for a given chunk</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::result_unit_err</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">map_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">Address</span>, <span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadata</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="ident">metadata</span>.<span class="ident">try_map_metadata_space</span>(<span class="ident">chunk</span>, <span class="ident">BYTES_IN_CHUNK</span>)
-    }
+    <span class="doccomment">/// Ensure that a range of pages is mmapped (or equivalent).  If the</span>
+    <span class="doccomment">/// pages are not yet mapped, demand-zero map them. Note that mapping</span>
+    <span class="doccomment">/// occurs at chunk granularity, not page granularity.&lt;p&gt;</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Argumetns:</span>
+    <span class="doccomment">/// `start`: The start of the range to be mapped.</span>
+    <span class="doccomment">/// `pages`: The size of the range to be mapped, in pages</span>
+    <span class="comment">// NOTE: There is a monotonicity assumption so that only updates require lock</span>
+    <span class="comment">// acquisition.</span>
+    <span class="comment">// TODO: Fix the above to support unmapping.</span>
+    <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
 
-    <span class="doccomment">/**
-     * Is the page pointed to by this address mapped ?
-     * @param addr Address in question
-     * @return {@code true} if the page at the given address is mapped.
-     */</span>
+    <span class="doccomment">/// Is the page pointed to by this address mapped? Returns true if</span>
+    <span class="doccomment">/// the page at the given address is mapped.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `addr`: Address in question</span>
     <span class="kw">fn</span> <span class="ident">is_mapped_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
 
-    <span class="doccomment">/**
-     * Mark a number of pages as inaccessible.
-     * @param start Address of the first page to be protected
-     * @param pages Number of pages to be protected
-     */</span>
+    <span class="doccomment">/// Mark a number of pages as inaccessible.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `start`: Address of the first page to be protected</span>
+    <span class="doccomment">/// * `pages`: Number of pages to be protected</span>
     <span class="kw">fn</span> <span class="ident">protect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>);
+}
+
+<span class="doccomment">/// The mmap state of a mmap chunk.</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">enum</span> <span class="ident">MapState</span> {
+    <span class="doccomment">/// The chunk is unmapped and not managed by MMTk.</span>
+    <span class="ident">Unmapped</span>,
+    <span class="doccomment">/// The chunk is reserved for future use. MMTk reserved the address range but hasn&#39;t used it yet.</span>
+    <span class="doccomment">/// We have reserved the addresss range with mmap_noreserve with PROT_NONE.</span>
+    <span class="ident">Quarantined</span>,
+    <span class="doccomment">/// The chunk is mapped by MMTk and is in use.</span>
+    <span class="ident">Mapped</span>,
+    <span class="doccomment">/// The chunk is mapped and is also protected by MMTk.</span>
+    <span class="ident">Protected</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">MapState</span> {
+    <span class="doccomment">/// Check the current MapState of the chunk, and transition the chunk to MapState::Mapped.</span>
+    <span class="doccomment">/// The caller should hold a lock before invoking this method.</span>
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">transition_to_mapped</span>(
+        <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">Atomic</span><span class="op">&lt;</span><span class="ident">MapState</span><span class="op">&gt;</span>,
+        <span class="ident">mmap_start</span>: <span class="ident">Address</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">state</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
+            <span class="ident">MapState::Unmapped</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">dzmmap_noreplace</span>(<span class="ident">mmap_start</span>, <span class="ident">MMAP_CHUNK_BYTES</span>),
+            <span class="ident">MapState::Protected</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">munprotect</span>(<span class="ident">mmap_start</span>, <span class="ident">MMAP_CHUNK_BYTES</span>),
+            <span class="ident">MapState::Quarantined</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">unsafe</span> { <span class="ident">dzmmap</span>(<span class="ident">mmap_start</span>, <span class="ident">MMAP_CHUNK_BYTES</span>) },
+            <span class="comment">// might have become MapState::Mapped here</span>
+            <span class="ident">MapState::Mapped</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(()),
+        };
+        <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_ok</span>() {
+            <span class="ident">state</span>.<span class="ident">store</span>(<span class="ident">MapState::Mapped</span>, <span class="ident">Ordering::Relaxed</span>);
+        }
+        <span class="ident">res</span>
+    }
+
+    <span class="doccomment">/// Check the current MapState of the chunk, and transition the chunk to MapState::Quarantined.</span>
+    <span class="doccomment">/// The caller should hold a lock before invoking this method.</span>
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">transition_to_quarantined</span>(
+        <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">Atomic</span><span class="op">&lt;</span><span class="ident">MapState</span><span class="op">&gt;</span>,
+        <span class="ident">mmap_start</span>: <span class="ident">Address</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">state</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
+            <span class="ident">MapState::Unmapped</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">mmap_noreserve</span>(<span class="ident">mmap_start</span>, <span class="ident">MMAP_CHUNK_BYTES</span>),
+            <span class="ident">MapState::Quarantined</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(()),
+            <span class="ident">MapState::Mapped</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;Cannot quarantine mapped memory&quot;</span>),
+            <span class="ident">MapState::Protected</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;Cannot quarantine protected memory&quot;</span>),
+        };
+        <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_ok</span>() {
+            <span class="ident">state</span>.<span class="ident">store</span>(<span class="ident">MapState::Quarantined</span>, <span class="ident">Ordering::Relaxed</span>);
+        }
+        <span class="ident">res</span>
+    }
+
+    <span class="doccomment">/// Check the current MapState of the chunk, and transition the chunk to MapState::Protected.</span>
+    <span class="doccomment">/// The caller should hold a lock before invoking this method.</span>
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">transition_to_protected</span>(
+        <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">Atomic</span><span class="op">&lt;</span><span class="ident">MapState</span><span class="op">&gt;</span>,
+        <span class="ident">mmap_start</span>: <span class="ident">Address</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="ident">state</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
+            <span class="ident">MapState::Mapped</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">crate</span><span class="ident">::util::memory::mprotect</span>(<span class="ident">mmap_start</span>, <span class="ident">MMAP_CHUNK_BYTES</span>).<span class="ident">unwrap</span>();
+                <span class="ident">state</span>.<span class="ident">store</span>(<span class="ident">MapState::Protected</span>, <span class="ident">Ordering::Relaxed</span>);
+            }
+            <span class="ident">MapState::Protected</span> <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;Cannot transition {:?} to protected&quot;</span>, <span class="ident">mmap_start</span>),
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-search-index-js="../../../../../search-index.js" data-search-js="../../../../../search.js"></div>

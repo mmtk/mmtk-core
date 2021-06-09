@@ -608,6 +608,13 @@
 <span id="605">605</span>
 <span id="606">606</span>
 <span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
@@ -887,13 +894,18 @@
                     <span class="comment">// adding a space lock here.</span>
                     <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">res</span>.<span class="ident">pages</span>);
                     <span class="self">self</span>.<span class="ident">grow_space</span>(<span class="ident">res</span>.<span class="ident">start</span>, <span class="ident">bytes</span>, <span class="ident">res</span>.<span class="ident">new_chunk</span>);
-                    <span class="comment">// Mmap the pages and handle error. In case of any error,</span>
+                    <span class="comment">// Mmap the pages and the side metadata, and handle error. In case of any error,</span>
                     <span class="comment">// we will either call back to the VM for OOM, or simply panic.</span>
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">mmap_error</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">mmapper</span>.<span class="ident">ensure_mapped</span>(
-                        <span class="ident">res</span>.<span class="ident">start</span>,
-                        <span class="ident">res</span>.<span class="ident">pages</span>,
-                        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>().<span class="ident">metadata</span>,
-                    ) {
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">mmap_error</span>) <span class="op">=</span> <span class="self">self</span>
+                        .<span class="ident">common</span>()
+                        .<span class="ident">mmapper</span>
+                        .<span class="ident">ensure_mapped</span>(<span class="ident">res</span>.<span class="ident">start</span>, <span class="ident">res</span>.<span class="ident">pages</span>)
+                        .<span class="ident">and</span>(
+                            <span class="self">self</span>.<span class="ident">common</span>()
+                                .<span class="ident">metadata</span>
+                                .<span class="ident">try_map_metadata_space</span>(<span class="ident">res</span>.<span class="ident">start</span>, <span class="ident">bytes</span>),
+                        )
+                    {
                         <span class="ident">memory::handle_mmap_error</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">mmap_error</span>, <span class="ident">tls</span>);
                     }
 
@@ -983,7 +995,9 @@
     }
 
     <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">get_page_resource</span>().<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">metadata</span>.<span class="ident">reserved_pages</span>()
+        <span class="kw">let</span> <span class="ident">data_pages</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_page_resource</span>().<span class="ident">reserved_pages</span>();
+        <span class="kw">let</span> <span class="ident">meta_pages</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">metadata</span>.<span class="ident">calculate_reserved_pages</span>(<span class="ident">data_pages</span>);
+        <span class="ident">data_pages</span> <span class="op">+</span> <span class="ident">meta_pages</span>
     }
 
     <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {

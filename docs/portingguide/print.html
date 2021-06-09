@@ -4,40 +4,28 @@
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
         <title>MMTk Porting Guide</title>
-        
-        <meta name="robots" content="noindex" />
-        
-        
-
+                <meta name="robots" content="noindex" />
+                
 
         <!-- Custom HTML head -->
         
-
 
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
-        
-        <link rel="icon" href="favicon.svg">
-        
-        
-        <link rel="shortcut icon" href="favicon.png">
-        
-        <link rel="stylesheet" href="css/variables.css">
+                <link rel="icon" href="favicon.svg">
+                        <link rel="shortcut icon" href="favicon.png">
+                <link rel="stylesheet" href="css/variables.css">
         <link rel="stylesheet" href="css/general.css">
         <link rel="stylesheet" href="css/chrome.css">
+                <link rel="stylesheet" href="css/print.css" media="print">
         
-        <link rel="stylesheet" href="css/print.css" media="print">
-        
-
         <!-- Fonts -->
         <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+                <link rel="stylesheet" href="fonts/fonts.css">
         
-        <link rel="stylesheet" href="fonts/fonts.css">
-        
-
         <!-- Highlight.js Stylesheets -->
         <link rel="stylesheet" href="highlight.css">
         <link rel="stylesheet" href="tomorrow-night.css">
@@ -45,9 +33,7 @@
 
         <!-- Custom theme stylesheets -->
         
-
-        
-    </head>
+            </head>
     <body>
         <!-- Provide site root to javascript -->
         <script type="text/javascript">
@@ -97,8 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="prefix.html">MMTk Porting Guide</a></li><li class="chapter-item expanded "><a href="portability.html"><strong aria-hidden="true">1.</strong> MMTk’s Approach to Portability</a></li><li class="chapter-item expanded "><a href="before_start.html"><strong aria-hidden="true">2.</strong> Before Starting a Port</a></li><li class="chapter-item expanded "><a href="howto/prefix.html"><strong aria-hidden="true">3.</strong> How to Undertake a Port</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="howto/nogc.html"><strong aria-hidden="true">3.1.</strong> NoGC</a></li><li class="chapter-item expanded "><a href="howto/next_steps.html"><strong aria-hidden="true">3.2.</strong> Next Steps</a></li></ol></li></ol>
-            </div>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="prefix.html">MMTk Porting Guide</a></li><li class="chapter-item expanded "><a href="portability.html"><strong aria-hidden="true">1.</strong> MMTk’s Approach to Portability</a></li><li class="chapter-item expanded "><a href="before_start.html"><strong aria-hidden="true">2.</strong> Before Starting a Port</a></li><li class="chapter-item expanded "><a href="howto/prefix.html"><strong aria-hidden="true">3.</strong> How to Undertake a Port</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="howto/nogc.html"><strong aria-hidden="true">3.1.</strong> NoGC</a></li><li class="chapter-item expanded "><a href="howto/next_steps.html"><strong aria-hidden="true">3.2.</strong> Next Steps</a></li></ol></li></ol>            </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
 
@@ -122,29 +107,22 @@
                             <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
                         </ul>
-                        
-                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                                                <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
                             <i class="fa fa-search"></i>
                         </button>
-                        
-                    </div>
+                                            </div>
 
                     <h1 class="menu-title">MMTk Porting Guide</h1>
 
                     <div class="right-buttons">
-                        
-                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                                                <a href="print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        
-                        
-                        
-
+                                                                        
                     </div>
                 </div>
 
-                
-                <div id="search-wrapper" class="hidden">
+                                <div id="search-wrapper" class="hidden">
                     <form id="searchbar-outer" class="searchbar-outer">
                         <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
                     </form>
@@ -155,7 +133,6 @@
                     </div>
                 </div>
                 
-
                 <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
                 <script type="text/javascript">
                     document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
@@ -175,7 +152,7 @@
 We start with an overview of the MMTk approach to porting and then step through recommended strategies for implementing a port.</p>
 <p>There’s no fixed way to implement a new port.
 What we outline here is a distillation of best practices that have emerged from community as it has worked through six ports (JikesRVM, OpenJDK, V8, Mu, Ruby, and .NET, which are at various levels of maturity).</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="overview-of-mmtks-approach-to-portability"><a class="header" href="#overview-of-mmtks-approach-to-portability">Overview of MMTk’s Approach to Portability</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="overview-of-mmtks-approach-to-portability"><a class="header" href="#overview-of-mmtks-approach-to-portability">Overview of MMTk’s Approach to Portability</a></h1>
 <p>MMTk is designed from the outset to be both high performance and portable.
 The core of MMTk is entirely runtime-neutral, and is written in Rust.
 Runtimes that wish to use MMTk may be written in any language so long as they have a means to call into MMTk’s API, which presents itself as a shared library.</p>
@@ -202,7 +179,7 @@ The leftmost box should be entirely free of any MMTk-specific code.</p>
 <p>Note: we do currently maintain a fork of OpenJDK which includes some necessary changes to their code base, but this is not MMTk-specific and ideally this will be upstreamed.  Our port to V8 is a cleaner example, where we’ve managed to work closely with the V8 team to upstream all of the refactoring of the V8 code base that was necessary for it to support a third party heap.</p>
 </blockquote>
 <p>We structure the code into three repos.  The <a href="https://github.com/mmtk/mmtk-core">MMTk core</a>, the <a href="https://github.com/mmtk/mmtk-openjdk">binding repo</a> containing both parts of the binding, and the OpenJDK repo, which is currently <a href="https://github.com/mmtk/openjdk">a fork</a> we maintain.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="things-to-consider-before-starting-a-port"><a class="header" href="#things-to-consider-before-starting-a-port">Things to Consider Before Starting a Port</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="things-to-consider-before-starting-a-port"><a class="header" href="#things-to-consider-before-starting-a-port">Things to Consider Before Starting a Port</a></h1>
 <p>In principle, a port to MMTk is not particularly difficult.
 MMTk can present itself as a standard library and the core of the API is relatively simple.</p>
 <p>However, porting a runtime to a different GC (any GC) can be difficult and time consuming.
@@ -216,7 +193,7 @@ Key questions include: </p>
 <li>etc.</li>
 </ul>
 <p>Thinking through these questions should give you a sense for how big a task a GC port will be.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="how-to-undertake-a-port"><a class="header" href="#how-to-undertake-a-port">How to Undertake a Port</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="how-to-undertake-a-port"><a class="header" href="#how-to-undertake-a-port">How to Undertake a Port</a></h1>
 <p>We recommend a highly incremental approach to implementing a port.   The broad idea is:</p>
 <ul>
 <li>Start with the NoGC plan and gradually move to more advanced collectors</li>
@@ -227,7 +204,7 @@ Key questions include: </p>
 Plans can be selected at run time.
 Not all plans will be suitable for all runtimes.
 For example, a runtime that for some reason cannot support object movement won’t be able to use plans that use copying garbage collection.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="nogc"><a class="header" href="#nogc">NoGC</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="nogc"><a class="header" href="#nogc">NoGC</a></h1>
 <p>We always start a port with NoGC.
 It is the simplest possible plan, simply allocates memory and never collects it.
 Although this appears trivial, depending on the complexity of the runtime and how well factored (or not) its internal GC interfaces are, just getting this working may be a major undertaking.
@@ -287,7 +264,7 @@ So it’s a good idea not to underestimate the difficulty of a NoGC port!</p>
 </ol>
 </li>
 </ol>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h1>
 <p>Your choice of the next GC plan to implement depends on your situation.
 If you’re developing a new VM from scratch, or if you are intimately familiar with the internals of your target VM, then implementing a SemiSpace collector is probably the best course of action.
 Although the GC itself is rather simplistic, it stresses many of the key components of the MMTk &lt;-&gt; VM binding that will be required for later (and more powerful) GCs.
@@ -302,9 +279,7 @@ This can then serve as a stepping stone for future, moving GCs such as SemiSpace
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-
                         
-
                         <div style="clear: both"></div>
                     </nav>
                 </div>
@@ -312,48 +287,33 @@ This can then serve as a stepping stone for future, moving GCs such as SemiSpace
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-
-                
-            </nav>
+                            </nav>
 
         </div>
 
         
-
         
-
         
-
-        
-        <script type="text/javascript">
+                <script type="text/javascript">
             window.playground_copyable = true;
         </script>
         
-
         
-
-        
-        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+                <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
         <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
         <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
         
-
         <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
         <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
         <script src="book.js" type="text/javascript" charset="utf-8"></script>
 
         <!-- Custom JS scripts -->
         
-
-        
-        
-        <script type="text/javascript">
+                        <script type="text/javascript">
         window.addEventListener('load', function() {
             window.setTimeout(window.print, 100);
         });
         </script>
-        
-        
-
+                
     </body>
 </html>

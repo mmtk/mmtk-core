@@ -71,6 +71,7 @@
 <span id="68">68</span>
 <span id="69">69</span>
 <span id="70">70</span>
+<span id="71">71</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">incomplete_features</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>)]</span>
@@ -127,6 +128,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">downcast_rs</span>;
 
 <span class="kw">mod</span> <span class="ident">mmtk</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">mmtk::MMAPPER</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">mmtk::MMTK</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">mmtk::VM_MAP</span>;
 

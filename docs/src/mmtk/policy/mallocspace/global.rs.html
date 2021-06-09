@@ -318,6 +318,7 @@
 <span id="315">315</span>
 <span id="316">316</span>
 <span id="317">317</span>
+<span id="318">318</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::TransitiveClosure</span>;
@@ -448,8 +449,9 @@
     }
 
     <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="ident">conversions::bytes_to_pages_up</span>(<span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>))
-            <span class="op">+</span> <span class="self">self</span>.<span class="ident">metadata</span>.<span class="ident">reserved_pages</span>()
+        <span class="kw">let</span> <span class="ident">data_pages</span> <span class="op">=</span> <span class="ident">conversions::bytes_to_pages_up</span>(<span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>));
+        <span class="kw">let</span> <span class="ident">meta_pages</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">metadata</span>.<span class="ident">calculate_reserved_pages</span>(<span class="ident">data_pages</span>);
+        <span class="ident">data_pages</span> <span class="op">+</span> <span class="ident">meta_pages</span>
     }
 
     <span class="kw">fn</span> <span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">side_metadata_sanity_checker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SideMetadataSanity</span>) {

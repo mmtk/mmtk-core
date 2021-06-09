@@ -539,52 +539,30 @@
 <span id="536">536</span>
 <span id="537">537</span>
 <span id="538">538</span>
-<span id="539">539</span>
-<span id="540">540</span>
-<span id="541">541</span>
-<span id="542">542</span>
-<span id="543">543</span>
-<span id="544">544</span>
-<span id="545">545</span>
-<span id="546">546</span>
-<span id="547">547</span>
-<span id="548">548</span>
-<span id="549">549</span>
-<span id="550">550</span>
-<span id="551">551</span>
-<span id="552">552</span>
-<span id="553">553</span>
-<span id="554">554</span>
-<span id="555">555</span>
-<span id="556">556</span>
-<span id="557">557</span>
 </pre><pre class="rust">
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::mmapper::MapState</span>;
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::Mmapper</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::conversions</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::Address</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">conversions</span>, <span class="ident">side_metadata::SideMetadata</span>};
 <span class="kw">use</span> <span class="ident">atomic</span>::{<span class="ident">Atomic</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::fmt</span>;
 <span class="kw">use</span> <span class="ident">std::io::Result</span>;
 <span class="kw">use</span> <span class="ident">std::mem::transmute</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Mutex</span>;
 
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Debug</span>)]</span>
-<span class="kw">enum</span> <span class="ident">MapState</span> {
-    <span class="ident">Unmapped</span>,
-    <span class="ident">Mapped</span>,
-    <span class="ident">Protected</span>,
-}
-
 <span class="kw">const</span> <span class="ident">MMAP_NUM_CHUNKS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="number">33</span> <span class="op">-</span> <span class="ident">LOG_MMAP_CHUNK_BYTES</span>);
 
-<span class="kw">const</span> <span class="ident">LOG_MAPPABLE_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">36</span>; <span class="comment">// 128GB - physical memory larger than this is uncommon</span>
-                                      <span class="comment">/*
-                                       * Size of a slab.  The value 10 gives a slab size of 1GB, with 1024
-                                       * chunks per slab, ie a 1k slab map.  In a 64-bit address space, this
-                                       * will require 1M of slab maps.
-                                       */</span>
+<span class="comment">// 36 = 128G - physical memory larger than this is uncommon</span>
+<span class="comment">// 40 = 2T. Increased to 2T. Though we probably won&#39;t use this much memory, we allow quarantine memory range,</span>
+<span class="comment">// and that is usually used to quarantine a large amount of memory.</span>
+<span class="kw">const</span> <span class="ident">LOG_MAPPABLE_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">40</span>;
+
+<span class="comment">/*
+ * Size of a slab.  The value 10 gives a slab size of 1GB, with 1024
+ * chunks per slab, ie a 1k slab map.  In a 64-bit address space, this
+ * will require 1M of slab maps.
+ */</span>
 <span class="kw">const</span> <span class="ident">LOG_MMAP_CHUNKS_PER_SLAB</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8</span>;
 <span class="kw">const</span> <span class="ident">LOG_MMAP_SLAB_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_MMAP_CHUNKS_PER_SLAB</span> <span class="op">+</span> <span class="ident">LOG_MMAP_CHUNK_BYTES</span>;
 <span class="kw">const</span> <span class="ident">MMAP_SLAB_EXTENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MMAP_SLAB_BYTES</span>;
@@ -644,12 +622,39 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="kw-2">mut</span> <span class="ident">start</span>: <span class="ident">Address</span>,
-        <span class="ident">pages</span>: <span class="ident">usize</span>,
-        <span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadata</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">quarantine_address_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">pages</span>);
+        <span class="comment">// Iterate over the slabs covered</span>
+        <span class="kw">while</span> <span class="ident">start</span> <span class="op">&lt;</span> <span class="ident">end</span> {
+            <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::slab_align_down</span>(<span class="ident">start</span>);
+            <span class="kw">let</span> <span class="ident">high</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">end</span> <span class="op">&gt;</span> <span class="self">Self</span><span class="ident">::slab_limit</span>(<span class="ident">start</span>) <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="self">Self</span><span class="ident">::slab_limit</span>(<span class="ident">start</span>).<span class="ident">is_zero</span>() {
+                <span class="self">Self</span><span class="ident">::slab_limit</span>(<span class="ident">start</span>)
+            } <span class="kw">else</span> {
+                <span class="ident">end</span>
+            };
+
+            <span class="kw">let</span> <span class="ident">slab</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::slab_align_down</span>(<span class="ident">start</span>);
+            <span class="kw">let</span> <span class="ident">start_chunk</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::chunk_index</span>(<span class="ident">slab</span>, <span class="ident">start</span>);
+            <span class="kw">let</span> <span class="ident">end_chunk</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::chunk_index</span>(<span class="ident">slab</span>, <span class="ident">conversions::mmap_chunk_align_up</span>(<span class="ident">high</span>));
+
+            <span class="kw">let</span> <span class="ident">mapped</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_or_allocate_slab_table</span>(<span class="ident">start</span>);
+
+            <span class="comment">/* Iterate over the chunks within the slab */</span>
+            <span class="kw">for</span> (<span class="ident">chunk</span>, <span class="ident">entry</span>) <span class="kw">in</span> <span class="ident">mapped</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>().<span class="ident">take</span>(<span class="ident">end_chunk</span>).<span class="ident">skip</span>(<span class="ident">start_chunk</span>) {
+                <span class="kw">if</span> <span class="macro">matches!</span>(<span class="ident">entry</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>), <span class="ident">MapState::Quarantined</span>) {
+                    <span class="kw">continue</span>;
+                }
+
+                <span class="kw">let</span> <span class="ident">mmap_start</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::chunk_index_to_address</span>(<span class="ident">base</span>, <span class="ident">chunk</span>);
+                <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+                <span class="ident">MapState::transition_to_quarantined</span>(<span class="ident">entry</span>, <span class="ident">mmap_start</span>).<span class="ident">unwrap</span>();
+            }
+            <span class="ident">start</span> <span class="op">=</span> <span class="ident">high</span>;
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">pages</span>);
         <span class="comment">// Iterate over the slabs covered</span>
         <span class="kw">while</span> <span class="ident">start</span> <span class="op">&lt;</span> <span class="ident">end</span> {
@@ -672,31 +677,12 @@
                     <span class="kw">continue</span>;
                 }
 
+                <span class="kw">let</span> <span class="ident">mmap_start</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::chunk_index_to_address</span>(<span class="ident">base</span>, <span class="ident">chunk</span>);
                 <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-                <span class="kw">match</span> <span class="ident">entry</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
-                    <span class="ident">MapState::Unmapped</span> <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="kw">let</span> <span class="ident">mmap_start</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::chunk_index_to_address</span>(<span class="ident">base</span>, <span class="ident">chunk</span>);
-                        <span class="comment">// map data</span>
-                        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span>
-                            <span class="kw">crate</span><span class="ident">::util::memory::dzmmap_noreplace</span>(<span class="ident">mmap_start</span>, <span class="ident">MMAP_CHUNK_BYTES</span>);
-                        <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_err</span>() {
-                            <span class="kw">return</span> <span class="ident">res</span>;
-                        }
-                        <span class="comment">// map metadata</span>
-                        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">map_metadata</span>(<span class="ident">mmap_start</span>, <span class="ident">metadata</span>);
-                        <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_err</span>() {
-                            <span class="kw">return</span> <span class="ident">res</span>;
-                        }
-                    }
-                    <span class="ident">MapState::Protected</span> <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="kw">let</span> <span class="ident">mmap_start</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::chunk_index_to_address</span>(<span class="ident">base</span>, <span class="ident">chunk</span>);
-                        <span class="kw">crate</span><span class="ident">::util::memory::munprotect</span>(<span class="ident">mmap_start</span>, <span class="ident">MMAP_CHUNK_BYTES</span>).<span class="ident">unwrap</span>();
-                    }
-                    <span class="comment">// might have become MAPPED here</span>
-                    <span class="ident">MapState::Mapped</span> <span class="op">=</span><span class="op">&gt;</span> {}
+                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">MapState::transition_to_mapped</span>(<span class="ident">entry</span>, <span class="ident">mmap_start</span>);
+                <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_err</span>() {
+                    <span class="kw">return</span> <span class="ident">res</span>;
                 }
-
-                <span class="ident">entry</span>.<span class="ident">store</span>(<span class="ident">MapState::Mapped</span>, <span class="ident">Ordering::Relaxed</span>);
             }
             <span class="ident">start</span> <span class="op">=</span> <span class="ident">high</span>;
         }
@@ -739,13 +725,8 @@
             <span class="kw">let</span> <span class="ident">mapped</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_or_allocate_slab_table</span>(<span class="ident">start</span>);
 
             <span class="kw">for</span> (<span class="ident">chunk</span>, <span class="ident">entry</span>) <span class="kw">in</span> <span class="ident">mapped</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>().<span class="ident">take</span>(<span class="ident">end_chunk</span>).<span class="ident">skip</span>(<span class="ident">start_chunk</span>) {
-                <span class="kw">if</span> <span class="ident">entry</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">MapState::Mapped</span> {
-                    <span class="kw">let</span> <span class="ident">mmap_start</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::chunk_index_to_address</span>(<span class="ident">base</span>, <span class="ident">chunk</span>);
-                    <span class="kw">crate</span><span class="ident">::util::memory::mprotect</span>(<span class="ident">mmap_start</span>, <span class="ident">MMAP_CHUNK_BYTES</span>).<span class="ident">unwrap</span>();
-                    <span class="ident">entry</span>.<span class="ident">store</span>(<span class="ident">MapState::Protected</span>, <span class="ident">Ordering::Relaxed</span>);
-                } <span class="kw">else</span> {
-                    <span class="macro">debug_assert!</span>(<span class="ident">entry</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">MapState::Protected</span>);
-                }
+                <span class="kw">let</span> <span class="ident">mmap_start</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::chunk_index_to_address</span>(<span class="ident">base</span>, <span class="ident">chunk</span>);
+                <span class="ident">MapState::transition_to_protected</span>(<span class="ident">entry</span>, <span class="ident">mmap_start</span>).<span class="ident">unwrap</span>();
             }
             <span class="ident">start</span> <span class="op">=</span> <span class="ident">high</span>;
         }
@@ -900,20 +881,12 @@
     <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants::LOG_BYTES_IN_PAGE</span>;
     <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES</span>;
     <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::memory</span>;
-    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>};
     <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::test_util::FRAGMENTED_MMAPPER_TEST_REGION</span>;
     <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::test_util</span>::{<span class="ident">serial_test</span>, <span class="ident">with_cleanup</span>};
     <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">conversions</span>, <span class="ident">Address</span>};
 
     <span class="kw">const</span> <span class="ident">FIXED_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">FRAGMENTED_MMAPPER_TEST_REGION</span>.<span class="ident">start</span>;
     <span class="kw">const</span> <span class="ident">MAX_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">FRAGMENTED_MMAPPER_TEST_REGION</span>.<span class="ident">size</span>;
-
-    <span class="kw">fn</span> <span class="ident">new_no_metadata</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SideMetadata</span> {
-        <span class="ident">SideMetadata::new</span>(<span class="ident">SideMetadataContext</span> {
-            <span class="ident">global</span>: <span class="macro">vec!</span>[],
-            <span class="ident">local</span>: <span class="macro">vec!</span>[],
-        })
-    }
 
     <span class="kw">fn</span> <span class="ident">pages_to_chunks_up</span>(<span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="ident">conversions::raw_align_up</span>(<span class="ident">pages</span>, <span class="ident">MMAP_CHUNK_BYTES</span>) <span class="op">/</span> <span class="ident">MMAP_CHUNK_BYTES</span>
@@ -956,11 +929,8 @@
             <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="number">1</span>;
             <span class="ident">with_cleanup</span>(
                 <span class="op">|</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">no_metadata</span> <span class="op">=</span> <span class="ident">new_no_metadata</span>();
                     <span class="kw">let</span> <span class="ident">mmapper</span> <span class="op">=</span> <span class="ident">FragmentedMapper::new</span>();
-                    <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
-                        .<span class="ident">unwrap</span>();
+                    <span class="ident">mmapper</span>.<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>).<span class="ident">unwrap</span>();
 
                     <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">pages_to_chunks_up</span>(<span class="ident">pages</span>);
                     <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">chunks</span> {
@@ -985,11 +955,8 @@
             <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">MMAP_CHUNK_BYTES</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
             <span class="ident">with_cleanup</span>(
                 <span class="op">|</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">no_metadata</span> <span class="op">=</span> <span class="ident">new_no_metadata</span>();
                     <span class="kw">let</span> <span class="ident">mmapper</span> <span class="op">=</span> <span class="ident">FragmentedMapper::new</span>();
-                    <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
-                        .<span class="ident">unwrap</span>();
+                    <span class="ident">mmapper</span>.<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>).<span class="ident">unwrap</span>();
 
                     <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">pages_to_chunks_up</span>(<span class="ident">pages</span>);
                     <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">chunks</span> {
@@ -1015,11 +982,8 @@
             <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> (<span class="ident">MMAP_CHUNK_BYTES</span> <span class="op">+</span> <span class="ident">MMAP_CHUNK_BYTES</span> <span class="op">/</span> <span class="number">2</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
             <span class="ident">with_cleanup</span>(
                 <span class="op">|</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">no_metadata</span> <span class="op">=</span> <span class="ident">new_no_metadata</span>();
                     <span class="kw">let</span> <span class="ident">mmapper</span> <span class="op">=</span> <span class="ident">FragmentedMapper::new</span>();
-                    <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
-                        .<span class="ident">unwrap</span>();
+                    <span class="ident">mmapper</span>.<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages</span>).<span class="ident">unwrap</span>();
 
                     <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="ident">pages_to_chunks_up</span>(<span class="ident">pages</span>);
                     <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">chunks</span> {
@@ -1044,12 +1008,11 @@
         <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
             <span class="ident">with_cleanup</span>(
                 <span class="op">|</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">no_metadata</span> <span class="op">=</span> <span class="ident">new_no_metadata</span>();
                     <span class="comment">// map 2 chunks</span>
                     <span class="kw">let</span> <span class="ident">mmapper</span> <span class="op">=</span> <span class="ident">FragmentedMapper::new</span>();
                     <span class="kw">let</span> <span class="ident">pages_per_chunk</span> <span class="op">=</span> <span class="ident">MMAP_CHUNK_BYTES</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
                     <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
+                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>)
                         .<span class="ident">unwrap</span>();
 
                     <span class="comment">// protect 1 chunk</span>
@@ -1076,12 +1039,11 @@
         <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
             <span class="ident">with_cleanup</span>(
                 <span class="op">|</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">no_metadata</span> <span class="op">=</span> <span class="ident">new_no_metadata</span>();
                     <span class="comment">// map 2 chunks</span>
                     <span class="kw">let</span> <span class="ident">mmapper</span> <span class="op">=</span> <span class="ident">FragmentedMapper::new</span>();
                     <span class="kw">let</span> <span class="ident">pages_per_chunk</span> <span class="op">=</span> <span class="ident">MMAP_CHUNK_BYTES</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
                     <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
+                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>)
                         .<span class="ident">unwrap</span>();
 
                     <span class="comment">// protect 1 chunk</span>
@@ -1098,7 +1060,7 @@
 
                     <span class="comment">// ensure mapped - this will unprotect the previously protected chunk</span>
                     <span class="ident">mmapper</span>
-                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>, <span class="kw-2">&amp;</span><span class="ident">no_metadata</span>)
+                        .<span class="ident">ensure_mapped</span>(<span class="ident">FIXED_ADDRESS</span>, <span class="ident">pages_per_chunk</span> <span class="op">*</span> <span class="number">2</span>)
                         .<span class="ident">unwrap</span>();
                     <span class="macro">assert_eq!</span>(
                         <span class="ident">get_chunk_map_state</span>(<span class="kw-2">&amp;</span><span class="ident">mmapper</span>, <span class="ident">FIXED_ADDRESS</span>),
