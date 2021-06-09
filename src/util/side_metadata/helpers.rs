@@ -1,10 +1,12 @@
 use super::*;
-use crate::util::memory;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::heap::layout::Mmapper;
 use crate::util::Address;
 use crate::util::{
     constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE},
     heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE,
 };
+use crate::MMAPPER;
 use std::io::Result;
 
 /// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
@@ -30,7 +32,9 @@ pub(crate) fn address_to_contiguous_meta_address(
 }
 
 /// Unmaps the specified metadata range, or panics.
+#[cfg(test)]
 pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
+    use crate::util::memory;
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
     assert!(memory::munmap(start, size).is_ok())
@@ -38,6 +42,7 @@ pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
 
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
 /// Returns the size in bytes that get munmapped.
+#[cfg(test)]
 pub(super) fn ensure_munmap_contiguos_metadata_space(
     start: Address,
     size: usize,
@@ -72,41 +77,15 @@ pub(super) fn try_mmap_contiguous_metadata_space(
     let mmap_size =
         address_to_meta_address(*spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
     if mmap_size > 0 {
-        // FIXME - This assumes that we never mmap a metadata page twice.
-        // While this never happens in our current use-cases where the minimum data mmap size is a chunk and the metadata ratio is larger than 1/64, it could happen if (min_data_mmap_size * metadata_ratio) is smaller than a page.
-        // E.g. the current implementation detects such a case as an overlap and returns false.
         if !no_reserve {
-            try_mmap_metadata(mmap_start, mmap_size)
+            MMAPPER.ensure_mapped(mmap_start, mmap_size >> LOG_BYTES_IN_PAGE)
         } else {
-            try_mmap_metadata_address_range(mmap_start, mmap_size)
+            MMAPPER.quarantine_address_range(mmap_start, mmap_size >> LOG_BYTES_IN_PAGE)
         }
         .map(|_| mmap_size)
     } else {
         Ok(0)
     }
-}
-
-/// Tries to map the specified metadata address range (`start` and `size`), without reserving swap-space for it.
-pub(super) fn try_mmap_metadata_address_range(start: Address, size: usize) -> Result<()> {
-    let res = memory::mmap_noreserve(start, size);
-    trace!(
-        "try_mmap_metadata_address_range({}, 0x{:x}) -> {:#?}",
-        start,
-        size,
-        res
-    );
-    res
-}
-
-/// Tries to map the specified metadata space (`start` and `size`), including reservation of swap-space/physical memory.
-/// This function should only be called if we have called try_mmap_metadata_address_range() first.
-pub(super) fn try_mmap_metadata(start: Address, size: usize) -> Result<()> {
-    debug_assert!(size > 0 && size % BYTES_IN_PAGE == 0);
-
-    // It is safe to call dzmmap here as we have reserved the address range.
-    let res = unsafe { memory::dzmmap(start, size) };
-    trace!("try_mmap_metadata({}, 0x{:x}) -> {:#?}", start, size, res);
-    res
 }
 
 /// Performs the translation of data address (`data_addr`) to metadata address for the specified metadata (`metadata_spec`).
@@ -138,7 +117,7 @@ pub(crate) fn address_to_meta_address(
     res
 }
 
-const fn addr_rshift(metadata_spec: SideMetadataSpec) -> i32 {
+pub(super) const fn addr_rshift(metadata_spec: &SideMetadataSpec) -> i32 {
     ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_min_obj_size - metadata_spec.log_num_of_bits)
         as i32
 }
@@ -146,7 +125,7 @@ const fn addr_rshift(metadata_spec: SideMetadataSpec) -> i32 {
 #[allow(dead_code)]
 #[inline(always)]
 pub(crate) const fn metadata_address_range_size(metadata_spec: SideMetadataSpec) -> usize {
-    1usize << (LOG_ADDRESS_SPACE - addr_rshift(metadata_spec) as usize)
+    1usize << (LOG_ADDRESS_SPACE - addr_rshift(&metadata_spec) as usize)
 }
 
 #[inline(always)]
