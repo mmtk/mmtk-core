@@ -5,6 +5,14 @@ on:
   push:
     branches:
       - master
+  # READ BEFORE ENABLING THE TRIGGER BELOW
+  # This trigger is only used when testing the scripts in a branch, and should be commented out in other cases.
+  # If this trigger is used, please change the RESULT_REPO_BRANCH to 'test' or something so the results will be pushed
+  # to a branch of our result repo. Our master data is put to the 'self-hosted' branch. We do not want to mix test data 
+  # with our master data.
+  pull_request:
+    branches:
+      - master
 
 jobs:
   # JikesRVM
@@ -50,7 +58,7 @@ jobs:
       - name: Performance Run
         run: |
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=self-hosted
+          export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
           JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${{ steps.branch.outputs.branch_name }}
@@ -112,7 +120,7 @@ jobs:
       - name: Performance Run
         run: |
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=self-hosted
+          export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
           ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
@@ -173,7 +181,7 @@ jobs:
       - name: Performance Run
         run: |
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=self-hosted
+          export RESULT_REPO_BRANCH=test
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-08-03
           export JAVA_HOME=/usr/lib/jvm/java-1.6.0-openjdk-amd64
