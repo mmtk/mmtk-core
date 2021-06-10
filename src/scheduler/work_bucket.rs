@@ -1,4 +1,3 @@
-use crate::MMTK;
 use super::work::Work;
 use super::*;
 use enum_map::Enum;
@@ -159,5 +158,3 @@ pub enum WorkBucketStage {
     Release,
     Final,
 }
-
-pub type GCWorkBucket<VM> = WorkBucket<MMTK<VM>>;

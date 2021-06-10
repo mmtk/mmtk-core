@@ -56,7 +56,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
             }
         }
 
-        let ret = self.space.unwrap().alloc(self.tls, size);
+        let ret = self.space.alloc(self.tls, size);
 
         trace!(
             "MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}",

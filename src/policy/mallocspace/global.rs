@@ -1,8 +1,5 @@
-use crate::MMTK;
 use super::metadata::*;
 use crate::plan::TransitiveClosure;
-#[cfg(debug_assertions)]
-use crate::plan::marksweep::MarkSweep;
 use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
 use crate::util::constants::BYTES_IN_PAGE;
@@ -10,14 +7,13 @@ use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
-use crate::scheduler::*;
 use crate::util::opaque_pointer::*;
 use crate::util::side_metadata::SideMetadataSanity;
 use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
-use crate::util::side_metadata::bzero_metadata;
+// use crate::util::side_metadata::bzero_metadata;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
 use std::sync::atomic::AtomicUsize;
@@ -37,19 +33,19 @@ const ASSERT_ALLOCATION: bool = false;
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
-    chunk_addr_min: AtomicUsize, // XXX: have to use AtomicUsize to represent an Address
-    chunk_addr_max: AtomicUsize,
+    pub chunk_addr_min: AtomicUsize, // XXX: have to use AtomicUsize to represent an Address
+    pub chunk_addr_max: AtomicUsize,
     metadata: SideMetadata,
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
     active_mem: Mutex<HashMap<Address, usize>>,
     #[cfg(debug_assertions)]
-    total_work_packets: AtomicUsize,
+    pub total_work_packets: AtomicUsize,
     #[cfg(debug_assertions)]
-    completed_work_packets: AtomicUsize,
+    pub completed_work_packets: AtomicUsize,
     #[cfg(debug_assertions)]
-    work_live_bytes: AtomicUsize,
+    pub work_live_bytes: AtomicUsize,
 }
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
@@ -160,59 +156,6 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 }
 
-// `pub Address' is used for the starting address of a chunk
-pub struct MSSweepChunk<VM: VMBinding>(pub &'static MallocSpace<VM>, pub Address);
-
-// Simple work packet that just sweeps a single chunk
-impl<VM: VMBinding> GCWork<VM> for MSSweepChunk<VM> {
-    #[inline]
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        unsafe { &self.0.sweep_chunk(self.1, mmtk); }
-    }
-}
-
-pub struct MSSweepChunks<VM: VMBinding>(pub &'static MallocSpace<VM>);
-
-impl<VM: VMBinding> MSSweepChunks<VM> {
-    pub fn new(ms: &'static MallocSpace<VM>) -> Self {
-        Self(ms)
-    }
-}
-
-// Work packet that generates sweep jobs for gc workers. Each chunk is given its own work packet
-impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
-    #[inline]
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
-        let mut chunk = unsafe { Address::from_usize(self.0.chunk_addr_min.load(Ordering::Relaxed)) }; // XXX: have to use AtomicUsize to represent an Address
-        let end = unsafe { Address::from_usize(self.0.chunk_addr_max.load(Ordering::Relaxed)) } + BYTES_IN_CHUNK;
-
-        while chunk < end {
-            if unsafe { is_chunk_marked_unsafe(chunk) } {
-                work_packets.push(box MSSweepChunk(self.0, chunk));
-            }
-
-            chunk += BYTES_IN_CHUNK;
-        }
-
-        info!("Generated {} work packets", work_packets.len());
-        #[cfg(debug_assertions)]
-        {
-            // TODO: malloc-free can potentially be used with other Plans
-            // Is there a way to get a handle to MallocSpace from a work packet?
-            mmtk.plan.downcast_ref::<MarkSweep<VM>>().unwrap()
-                    .ms_space().total_work_packets.store(work_packets.len(), Ordering::SeqCst);
-            mmtk.plan.downcast_ref::<MarkSweep<VM>>().unwrap()
-                    .ms_space().completed_work_packets.store(0, Ordering::SeqCst);
-            mmtk.plan.downcast_ref::<MarkSweep<VM>>().unwrap()
-                    .ms_space().work_live_bytes.store(0, Ordering::SeqCst);
-        }
-
-        mmtk.scheduler.work_buckets[WorkBucketStage::Release]
-            .bulk_add(GCWorkBucket::<VM>::DEFAULT_PRIORITY, work_packets);
-    }
-}
-
 impl<VM: VMBinding> MallocSpace<VM> {
     pub fn new(global_side_metadata_specs: Vec<SideMetadataSpec>) -> Self {
         MallocSpace {
@@ -222,7 +165,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             chunk_addr_max: AtomicUsize::new(0),
             metadata: SideMetadata::new(SideMetadataContext {
                 global: global_side_metadata_specs,
-                local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
+                local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC, ACTIVE_PAGE_METADATA_SPEC],
             }),
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
@@ -355,7 +298,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// unsafe as it uses non-atomic accesses to side metadata (although these
     /// non-atomic accesses should not have race conditions associated with them)
     /// as well as calling libc functions
-    pub unsafe fn sweep_chunk(&self, chunk_start: Address, mmtk: &'static MMTK<VM>) {
+    pub unsafe fn sweep_chunk(&self, chunk_start: Address) {
         #[cfg(debug_assertions)]
         let mut live_bytes = 0;
 
@@ -371,9 +314,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
             trace!("Check address {}", address);
 
             if address - page >= BYTES_IN_PAGE { // XXX: page-bit diff
-                // if page_is_empty {
-                //     unset_page_mark_bit_unsafe(page);
-                // }
+                if page_is_empty {
+                    unset_page_mark_bit_unsafe(page);
+                }
                 page = conversions::page_align_down(address);
                 page_is_empty = true;
             }
@@ -434,8 +377,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
         if chunk_is_empty {
             unset_chunk_mark_bit_unsafe(chunk_start);
         }
-
-        // bzero_metadata(ACTIVE_PAGE_METADATA_SPEC, chunk_start, BYTES_IN_CHUNK);
 
         debug!(
             "Used bytes after releasing: {}",
