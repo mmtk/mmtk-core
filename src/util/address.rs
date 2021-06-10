@@ -315,6 +315,12 @@ impl Address {
         self.0
     }
 
+    /// converts the Address to a pointer-sized signed integer
+    #[inline(always)]
+    pub const fn as_isize(self) -> isize {
+        self.0 as isize
+    }
+
     /// returns the chunk index for this address
     pub fn chunk_index(self) -> usize {
         use crate::util::conversions;

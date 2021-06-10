@@ -41,7 +41,7 @@ pub(crate) mod logger;
 /// Various malloc implementations (conditionally compiled by features)
 pub(crate) mod malloc;
 /// Side metadata implementation.
-pub(crate) mod metadata;
+pub mod metadata;
 /// MMTk command line options.
 pub(crate) mod options;
 /// Sanity checker for GC.

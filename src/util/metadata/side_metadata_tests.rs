@@ -13,16 +13,16 @@ mod tests {
         let mut gspec = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-            log_num_of_bits: 0,
+            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+            num_of_bits: 1,
             log_min_obj_size: 0,
         };
         #[cfg(target_pointer_width = "64")]
         let mut lspec = MetadataSpec {
             is_side_metadata: true,
             is_global: false,
-            offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-            log_num_of_bits: 0,
+            offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+            num_of_bits: 1,
             log_min_obj_size: 0,
         };
 
@@ -31,7 +31,7 @@ mod tests {
             is_side_metadata: true,
             is_global: false,
             offset: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
             log_min_obj_size: 0,
         };
 
@@ -92,8 +92,8 @@ mod tests {
             LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 19
         );
 
-        gspec.log_num_of_bits = 1;
-        lspec.log_num_of_bits = 3;
+        gspec.num_of_bits = 2;
+        lspec.num_of_bits = 8;
 
         assert_eq!(
             address_to_meta_address(gspec, unsafe { Address::from_usize(0) }).as_usize(),
@@ -128,18 +128,18 @@ mod tests {
         let mut spec = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-            log_num_of_bits: 0,
+            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+            num_of_bits: 1,
             log_min_obj_size: 0,
         };
 
         assert_eq!(meta_byte_mask(spec), 1);
 
-        spec.log_num_of_bits = 1;
+        spec.num_of_bits = 2;
         assert_eq!(meta_byte_mask(spec), 3);
-        spec.log_num_of_bits = 2;
+        spec.num_of_bits = 4;
         assert_eq!(meta_byte_mask(spec), 15);
-        spec.log_num_of_bits = 3;
+        spec.num_of_bits = 8;
         assert_eq!(meta_byte_mask(spec), 255);
     }
 
@@ -148,8 +148,8 @@ mod tests {
         let mut spec = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-            log_num_of_bits: 0,
+            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+            num_of_bits: 1,
             log_min_obj_size: 0,
         };
 
@@ -160,7 +160,7 @@ mod tests {
             7
         );
 
-        spec.log_num_of_bits = 2;
+        spec.num_of_bits = 4;
 
         assert_eq!(meta_byte_lshift(spec, unsafe { Address::from_usize(0) }), 0);
         assert_eq!(meta_byte_lshift(spec, unsafe { Address::from_usize(5) }), 4);
@@ -184,16 +184,16 @@ mod tests {
                     let mut gspec = MetadataSpec {
                         is_side_metadata: true,
                         is_global: true,
-                        offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-                        log_num_of_bits: 0,
+                        offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+                        num_of_bits: 1,
                         log_min_obj_size: 0,
                     };
                     #[cfg(target_pointer_width = "64")]
                     let mut lspec = MetadataSpec {
                         is_side_metadata: true,
                         is_global: false,
-                        offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-                        log_num_of_bits: 1,
+                        offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+                        num_of_bits: 2,
                         log_min_obj_size: 1,
                     };
                     #[cfg(target_pointer_width = "32")]
@@ -201,7 +201,7 @@ mod tests {
                         is_side_metadata: true,
                         is_global: false,
                         offset: 0,
-                        log_num_of_bits: 1,
+                        num_of_bits: 2,
                         log_min_obj_size: 1,
                     };
 
@@ -237,9 +237,9 @@ mod tests {
                     );
 
                     gspec.log_min_obj_size = 3;
-                    gspec.log_num_of_bits = 2;
+                    gspec.num_of_bits = 4;
                     lspec.log_min_obj_size = 4;
-                    lspec.log_num_of_bits = 2;
+                    lspec.num_of_bits = 4;
 
                     metadata_sanity.reset();
 
@@ -301,8 +301,8 @@ mod tests {
                     let metadata_1_spec = MetadataSpec {
                         is_side_metadata: true,
                         is_global: true,
-                        offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-                        log_num_of_bits: 4,
+                        offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+                        num_of_bits: 16,
                         log_min_obj_size: 6,
                     };
 
@@ -310,8 +310,8 @@ mod tests {
                         is_side_metadata: true,
                         is_global: true,
                         offset: metadata_1_spec.offset
-                            + metadata_address_range_size(metadata_1_spec),
-                        log_num_of_bits: 3,
+                            + metadata_address_range_size(metadata_1_spec) as isize,
+                        num_of_bits: 8,
                         log_min_obj_size: 7,
                     };
 
@@ -376,8 +376,8 @@ mod tests {
                     let metadata_1_spec = MetadataSpec {
                         is_side_metadata: true,
                         is_global: true,
-                        offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-                        log_num_of_bits: 1,
+                        offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+                        num_of_bits: 2,
                         log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
                     };
 
@@ -431,8 +431,8 @@ mod tests {
                     let metadata_1_spec = MetadataSpec {
                         is_side_metadata: true,
                         is_global: false,
-                        offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-                        log_num_of_bits: 4,
+                        offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+                        num_of_bits: 16,
                         log_min_obj_size: 9,
                     };
                     #[cfg(target_pointer_width = "64")]
@@ -440,8 +440,8 @@ mod tests {
                         is_side_metadata: true,
                         is_global: false,
                         offset: metadata_1_spec.offset
-                            + metadata_address_range_size(metadata_1_spec),
-                        log_num_of_bits: 3,
+                            + metadata_address_range_size(metadata_1_spec) as isize,
+                        num_of_bits: 8,
                         log_min_obj_size: 7,
                     };
 
@@ -450,7 +450,7 @@ mod tests {
                         is_side_metadata: true,
                         is_global: false,
                         offset: 0,
-                        log_num_of_bits: 4,
+                        num_of_bits: 16,
                         log_min_obj_size: 9,
                     };
                     #[cfg(target_pointer_width = "32")]
@@ -460,9 +460,9 @@ mod tests {
                         offset: metadata_1_spec.offset
                             + metadata_bytes_per_chunk(
                                 metadata_1_spec.log_min_obj_size,
-                                metadata_1_spec.log_num_of_bits,
-                            ),
-                        log_num_of_bits: 3,
+                                metadata_1_spec.num_of_bits,
+                            ) as isize,
+                        num_of_bits: 8,
                         log_min_obj_size: 7,
                     };
 

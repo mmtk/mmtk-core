@@ -105,7 +105,7 @@ fn verify_local_specs_size(l_specs: &[MetadataSpec]) -> Result<()> {
 fn verify_local_specs_size(l_specs: &[MetadataSpec]) -> Result<()> {
     let mut total_size = 0usize;
     for spec in l_specs {
-        total_size += super::metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+        total_size += super::metadata_bytes_per_chunk(spec.log_min_obj_size, spec.num_of_bits);
     }
 
     if total_size > 1usize << (LOG_BYTES_IN_CHUNK - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO) {
@@ -127,8 +127,8 @@ fn verify_local_specs_size(l_specs: &[MetadataSpec]) -> Result<()> {
 /// * `spec_2`: second target specification
 ///
 fn verify_no_overlap_contiguous(spec_1: &MetadataSpec, spec_2: &MetadataSpec) -> Result<()> {
-    let end_1 = spec_1.offset + super::metadata_address_range_size(*spec_1);
-    let end_2 = spec_2.offset + super::metadata_address_range_size(*spec_2);
+    let end_1 = spec_1.offset + super::metadata_address_range_size(*spec_1) as isize;
+    let end_2 = spec_2.offset + super::metadata_address_range_size(*spec_2) as isize;
 
     if !(spec_1.offset >= end_2 || spec_2.offset >= end_1) {
         return Err(Error::new(
@@ -153,9 +153,9 @@ fn verify_no_overlap_contiguous(spec_1: &MetadataSpec, spec_2: &MetadataSpec) ->
 #[cfg(target_pointer_width = "32")]
 fn verify_no_overlap_chunked(spec_1: &MetadataSpec, spec_2: &MetadataSpec) -> Result<()> {
     let end_1 = spec_1.offset
-        + super::metadata_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.log_num_of_bits);
+        + super::metadata_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.num_of_bits) as isize;
     let end_2 = spec_2.offset
-        + super::metadata_bytes_per_chunk(spec_2.log_min_obj_size, spec_2.log_num_of_bits);
+        + super::metadata_bytes_per_chunk(spec_2.log_min_obj_size, spec_2.num_of_bits) as isize;
 
     if !(spec_1.offset >= end_2 || spec_2.offset >= end_1) {
         return Err(Error::new(
@@ -552,14 +552,14 @@ mod tests {
             is_global: true,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: metadata_address_range_size(spec_1),
+            offset: metadata_address_range_size(spec_1) as isize,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_global_specs_total_size(&[spec_1]).is_ok());
@@ -571,9 +571,9 @@ mod tests {
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: metadata_address_range_size(spec_1),
+            offset: metadata_address_range_size(spec_1) as isize,
             log_min_obj_size: 1,
-            log_num_of_bits: 3,
+            num_of_bits: 8,
         };
 
         assert!(verify_global_specs_total_size(&[spec_1, spec_2]).is_err());
@@ -586,17 +586,17 @@ mod tests {
             log_min_obj_size: 0,
             #[cfg(target_pointer_width = "32")]
             log_min_obj_size: 2,
-            log_num_of_bits: 1,
+            num_of_bits: 2,
         };
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: metadata_address_range_size(spec_1),
+            offset: metadata_address_range_size(spec_1) as isize,
             #[cfg(target_pointer_width = "64")]
             log_min_obj_size: 2,
             #[cfg(target_pointer_width = "32")]
             log_min_obj_size: 4,
-            log_num_of_bits: 3,
+            num_of_bits: 8,
         };
 
         assert!(verify_global_specs_total_size(&[spec_1, spec_2]).is_ok());
@@ -610,14 +610,14 @@ mod tests {
             is_global: true,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: metadata_address_range_size(spec_1),
+            offset: metadata_address_range_size(spec_1) as isize,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_contiguous(&spec_1, &spec_1).is_err());
@@ -628,7 +628,7 @@ mod tests {
             is_global: true,
             offset: 1,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_contiguous(&spec_1, &spec_2).is_err());
@@ -638,14 +638,14 @@ mod tests {
             is_global: true,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: metadata_address_range_size(spec_1) - 1,
+            offset: (metadata_address_range_size(spec_1) - 1) as isize,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_contiguous(&spec_1, &spec_2).is_err());
@@ -659,14 +659,14 @@ mod tests {
             is_global: true,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: metadata_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.log_num_of_bits),
+            offset: metadata_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.num_of_bits) as isize,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_chunked(&spec_1, &spec_1).is_err());
@@ -677,7 +677,7 @@ mod tests {
             is_global: true,
             offset: 1,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_chunked(&spec_1, &spec_2).is_err());
@@ -687,14 +687,15 @@ mod tests {
             is_global: true,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: metadata_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.log_num_of_bits) - 1,
+            offset: (metadata_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.num_of_bits) - 1)
+                as isize,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_no_overlap_chunked(&spec_1, &spec_2).is_err());
@@ -708,7 +709,7 @@ mod tests {
             is_global: false,
             offset: 0,
             log_min_obj_size: 0,
-            log_num_of_bits: 0,
+            num_of_bits: 1,
         };
 
         assert!(verify_local_specs_size(&[spec_1]).is_ok());

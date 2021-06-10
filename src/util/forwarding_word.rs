@@ -21,7 +21,7 @@ const FORWARDING_BITS: usize = 2;
 #[cfg(target_pointer_width = "64")]
 const FORWARDING_POINTER_MASK: usize = 0x00ff_ffff_ffff_fff8;
 #[cfg(target_pointer_width = "32")]
-const FORWARDING_POINTER_MASK: usize = 0xffff_fff8;
+const FORWARDING_POINTER_MASK: usize = 0xffff_fffc;
 
 pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> usize {
     loop {
@@ -79,11 +79,14 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
 ) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
     write_forwarding_pointer::<VM>(object, new_object);
+    VM::VMObjectModel::store_metadata(
+        VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+        object,
+        FORWARDED,
+        None,
+        Some(Ordering::SeqCst),
+    );
     new_object
-}
-
-pub fn set_forwarding_pointer<VM: VMBinding>(object: ObjectReference, ptr: ObjectReference) {
-    write_forwarding_pointer::<VM>(object, ptr)
 }
 
 pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {

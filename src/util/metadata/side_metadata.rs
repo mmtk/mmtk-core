@@ -27,7 +27,7 @@ pub fn load_atomic(metadata_spec: MetadataSpec, data_addr: Address, order: Order
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     let res = if bits_num_log <= 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
@@ -68,7 +68,7 @@ pub fn store_atomic(
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     if bits_num_log < 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
@@ -124,7 +124,7 @@ pub fn compare_exchange_atomic(
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     #[allow(clippy::let_and_return)]
     let res = if bits_num_log < 3 {
@@ -219,7 +219,7 @@ pub fn fetch_add_atomic(
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     #[allow(clippy::let_and_return)]
     let old_val = if bits_num_log < 3 {
@@ -277,7 +277,7 @@ pub fn fetch_sub_atomic(
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     #[allow(clippy::let_and_return)]
     let old_val = if bits_num_log < 3 {
@@ -338,7 +338,7 @@ pub unsafe fn load(metadata_spec: MetadataSpec, data_addr: Address) -> usize {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     #[allow(clippy::let_and_return)]
     let res = if bits_num_log <= 3 {
@@ -384,7 +384,7 @@ pub unsafe fn store(metadata_spec: MetadataSpec, data_addr: Address, metadata: u
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
 
     if bits_num_log < 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
@@ -473,7 +473,7 @@ pub fn bzero_metadata(metadata_spec: MetadataSpec, start: Address, size: usize) 
                     address_to_meta_address(metadata_spec, next_data_chunk),
                     metadata_bytes_per_chunk(
                         metadata_spec.log_min_obj_size,
-                        metadata_spec.log_num_of_bits,
+                        metadata_spec.num_of_bits,
                     ),
                 );
                 next_data_chunk += BYTES_IN_CHUNK;

@@ -38,7 +38,7 @@ pub(super) const ALLOC_METADATA_SPEC: MetadataSpec = MetadataSpec {
     is_side_metadata: true,
     is_global: false,
     offset: 0,
-    log_num_of_bits: 0,
+    num_of_bits: 1,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
@@ -46,8 +46,8 @@ pub(super) const ALLOC_METADATA_SPEC: MetadataSpec = MetadataSpec {
 pub(super) const ALLOC_METADATA_SPEC: MetadataSpec = MetadataSpec {
     is_side_metadata: true,
     is_global: false,
-    offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-    log_num_of_bits: 0,
+    offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+    num_of_bits: 1,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 

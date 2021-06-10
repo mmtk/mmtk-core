@@ -3,7 +3,9 @@ use atomic::Ordering;
 use crate::plan::AllocationSemantics;
 use crate::plan::CopyContext;
 use crate::util::metadata::MetadataSpec;
-use crate::util::metadata::{compare_exchange_atomic, metadata_defaults};
+use crate::util::metadata::{
+    compare_exchange_atomic, fetch_add_atomic, fetch_sub_atomic, metadata_defaults,
+};
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
@@ -101,6 +103,24 @@ pub trait ObjectModel<VM: VMBinding> {
             success_order,
             failure_order,
         )
+    }
+
+    fn fetch_add_metadata(
+        metadata_spec: MetadataSpec,
+        object: ObjectReference,
+        val: usize,
+        order: Ordering,
+    ) -> usize {
+        fetch_add_atomic(metadata_spec, object.to_address(), val, order)
+    }
+
+    fn fetch_sub_metadata(
+        metadata_spec: MetadataSpec,
+        object: ObjectReference,
+        val: usize,
+        order: Ordering,
+    ) -> usize {
+        fetch_sub_atomic(metadata_spec, object.to_address(), val, order)
     }
 
     const GLOBAL_LOG_BIT_SPEC: MetadataSpec = metadata_defaults::LOGGING_SIDE_METADATA_SPEC;

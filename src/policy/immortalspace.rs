@@ -128,35 +128,28 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
     }
 
     fn test_and_mark(object: ObjectReference, value: usize) -> bool {
-        let mut old_value = VM::VMObjectModel::load_metadata(
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-            object,
-            None,
-            Some(Ordering::SeqCst),
-        );
-        let mut mark_bit = old_value & GC_MARK_BIT_MASK;
-        if mark_bit == value {
-            return false;
-        }
-
-        while VM::VMObjectModel::compare_exchange_metadata(
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-            object,
-            old_value,
-            old_value ^ GC_MARK_BIT_MASK,
-            None,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
-            old_value = VM::VMObjectModel::load_metadata(
+        loop {
+            let old_value = VM::VMObjectModel::load_metadata(
                 VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 object,
                 None,
                 Some(Ordering::SeqCst),
             );
-            mark_bit = old_value & GC_MARK_BIT_MASK;
+            let mark_bit = old_value & GC_MARK_BIT_MASK;
             if mark_bit == value {
                 return false;
+            }
+
+            if VM::VMObjectModel::compare_exchange_metadata(
+                VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                object,
+                old_value,
+                old_value ^ GC_MARK_BIT_MASK,
+                None,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                break;
             }
         }
         true

@@ -27,8 +27,8 @@ use super::try_mmap_contiguous_metadata_space;
 pub struct MetadataSpec {
     pub is_side_metadata: bool,
     pub is_global: bool,
-    pub offset: usize,
-    pub log_num_of_bits: usize,
+    pub offset: isize,
+    pub num_of_bits: usize,
     pub log_min_obj_size: usize,
 }
 
@@ -39,13 +39,13 @@ impl fmt::Debug for MetadataSpec {
             **side?: {}, \
             **global: {} \
             **offset: 0x{:x} \
-            **log_num_of_bits: 0x{:x} \
+            **num_of_bits: 0x{:x} \
             **log_min_obj_size: 0x{:x} \
             }}",
             self.is_side_metadata,
             self.is_global,
             self.offset,
-            self.log_num_of_bits,
+            self.num_of_bits,
             self.log_min_obj_size
         ))
     }
@@ -181,7 +181,7 @@ impl SideMetadata {
             }
             #[cfg(target_pointer_width = "32")]
             {
-                lsize += metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+                lsize += metadata_bytes_per_chunk(spec.log_min_obj_size, spec.num_of_bits);
             }
         }
 

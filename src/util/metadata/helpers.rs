@@ -13,17 +13,19 @@ pub(crate) fn address_to_contiguous_meta_address(
     metadata_spec: MetadataSpec,
     data_addr: Address,
 ) -> Address {
-    let log_bits_num = metadata_spec.log_num_of_bits as i32;
+    let log_bits_num = metadata_spec.num_of_bits.trailing_zeros() as i32;
     let log_min_obj_size = metadata_spec.log_min_obj_size as usize;
 
     let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
     unsafe {
         if rshift >= 0 {
-            Address::from_usize(metadata_spec.offset + ((data_addr >> log_min_obj_size) >> rshift))
+            Address::from_usize(
+                metadata_spec.offset as usize + ((data_addr >> log_min_obj_size) >> rshift),
+            )
         } else {
             Address::from_usize(
-                metadata_spec.offset + ((data_addr >> log_min_obj_size) << (-rshift)),
+                metadata_spec.offset as usize + ((data_addr >> log_min_obj_size) << (-rshift)),
             )
         }
     }
@@ -124,10 +126,10 @@ pub(crate) fn address_to_meta_address(metadata_spec: MetadataSpec, data_addr: Ad
     let res = { address_to_contiguous_meta_address(metadata_spec, data_addr) };
 
     trace!(
-        "address_to_meta_address(addr: {}, off: 0x{:x}, lbits: {}, lmin: {}) -> 0x{:x}",
+        "address_to_meta_address(addr: {}, off: 0x{:x}, bits: {}, lmin: {}) -> 0x{:x}",
         data_addr,
         metadata_spec.offset,
-        metadata_spec.log_num_of_bits,
+        metadata_spec.num_of_bits,
         metadata_spec.log_min_obj_size,
         res
     );
@@ -136,19 +138,19 @@ pub(crate) fn address_to_meta_address(metadata_spec: MetadataSpec, data_addr: Ad
 }
 
 const fn addr_rshift(metadata_spec: MetadataSpec) -> i32 {
-    ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_min_obj_size - metadata_spec.log_num_of_bits)
-        as i32
+    ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_min_obj_size
+        - (metadata_spec.num_of_bits.trailing_zeros() as usize)) as i32
 }
 
 #[allow(dead_code)]
 #[inline(always)]
-pub(crate) const fn metadata_address_range_size(metadata_spec: MetadataSpec) -> usize {
+pub const fn metadata_address_range_size(metadata_spec: MetadataSpec) -> usize {
     1usize << (LOG_ADDRESS_SPACE - addr_rshift(metadata_spec) as usize)
 }
 
 #[inline(always)]
 pub(crate) fn meta_byte_lshift(metadata_spec: MetadataSpec, data_addr: Address) -> u8 {
-    let bits_num_log = metadata_spec.log_num_of_bits as i32;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros() as i32;
     if bits_num_log >= 3 {
         return 0;
     }
@@ -159,6 +161,6 @@ pub(crate) fn meta_byte_lshift(metadata_spec: MetadataSpec, data_addr: Address) 
 
 #[inline(always)]
 pub(crate) fn meta_byte_mask(metadata_spec: MetadataSpec) -> u8 {
-    let bits_num_log = metadata_spec.log_num_of_bits;
+    let bits_num_log = metadata_spec.num_of_bits.trailing_zeros();
     ((1usize << (1usize << bits_num_log)) - 1) as u8
 }
