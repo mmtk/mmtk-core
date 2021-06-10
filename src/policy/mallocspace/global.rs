@@ -145,7 +145,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
             metadata: SideMetadata::new(MetadataContext {
                 global: global_side_metadata_specs,
                 // FIXME: it assumes marking metadata is always kept on side
-                local: vec![ALLOC_METADATA_SPEC, VM::VMObjectModel::LOCAL_MARK_BIT_SPEC],
+                local: if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_side_metadata {
+                    vec![ALLOC_METADATA_SPEC, VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]
+                } else {
+                    vec![ALLOC_METADATA_SPEC]
+                },
             }),
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
