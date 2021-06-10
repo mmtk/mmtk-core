@@ -315,10 +315,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
             // if address - page >= BYTES_IN_PAGE { // XXX: page-bit diff
             //     if page_is_empty {
-            //         unset_page_mark_bit_unsafe(page);
+                    unset_page_mark_bit_unsafe(page);
             //     }
-            //     page = conversions::page_align_down(address);
-            //     page_is_empty = true;
+                page = conversions::page_align_down(address);
+                page_is_empty = true;
             // }
 
             // Check if the address is an object
