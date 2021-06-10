@@ -15,24 +15,14 @@ pub(crate) use scheduler::MMTkScheduler;
 pub(self) use scheduler::Scheduler;
 
 mod stat;
-mod work_counter;
 
 mod work;
 pub use work::CoordinatorWork;
 pub use work::GCWork;
 pub(crate) use work::Work;
 
-<<<<<<< HEAD
-pub use context::*;
-pub use mmtk_context::*;
-pub use scheduler::*;
-pub use work::*;
-pub use work_bucket::{WorkBucketStage, GCWorkBucket};
-pub use worker::*;
-=======
 mod work_bucket;
 pub use work_bucket::WorkBucketStage;
->>>>>>> 33fba23b... Reduce public visibility (#312)
 
 mod worker;
 pub use worker::GCWorker;
