@@ -4,18 +4,19 @@ use std::io::Result;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::metadata::ensure_munmap_contiguos_metadata_space;
 #[cfg(target_pointer_width = "32")]
-use crate::util::metadata::try_map_per_chunk_metadata_space;
+use crate::util::metadata::side_metadata::try_map_per_chunk_metadata_space;
 #[cfg(target_pointer_width = "32")]
-use crate::util::metadata::{
+use crate::util::metadata::side_metadata::{
     ensure_munmap_chunked_metadata_space, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
 use crate::util::{heap::PageAccounting, Address};
 
 #[cfg(target_pointer_width = "32")]
-use super::metadata_bytes_per_chunk;
-use super::try_mmap_contiguous_metadata_space;
+use super::side_metadata::metadata_bytes_per_chunk;
+use super::side_metadata::{
+    ensure_munmap_contiguos_metadata_space, try_mmap_contiguous_metadata_space,
+};
 
 /// This struct stores the specification of a side metadata bit-set.
 /// It is used as an input to the (inline) functions provided by the side metadata module.

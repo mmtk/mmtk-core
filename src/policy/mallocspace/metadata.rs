@@ -6,11 +6,10 @@ use crate::util::constants::BYTES_IN_WORD;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 #[cfg(debug_assertions)]
-use crate::util::metadata::address_to_meta_address;
-use crate::util::metadata::load_atomic;
-use crate::util::metadata::store_atomic;
+use crate::util::metadata::side_metadata::address_to_meta_address;
 #[cfg(target_pointer_width = "64")]
-use crate::util::metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
+use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
+use crate::util::metadata::side_metadata::{load_atomic, store_atomic};
 use crate::util::metadata::{MetadataSpec, SideMetadata};
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -102,24 +101,6 @@ pub fn is_alloced_object(address: Address) -> bool {
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference) -> bool {
-    // #[cfg(debug_assertions)]
-    // if ASSERT_METADATA {
-    //     // Need to make sure we atomically access the side metadata and the map.
-    //     let lock = MARK_MAP.read().unwrap();
-    //     // let ret = load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1;
-    //     let ret = VM::VMObjectModel::get_mark_bit(object, Some(Ordering::SeqCst)) == 1;
-    //     debug_assert_eq!(
-    //         lock.contains(&unsafe { object.to_address().align_down(BYTES_IN_WORD).to_object_reference() }),
-    //         ret,
-    //         "is_marked(): mark bit does not match mark map, address = {} (aligned to {}), meta address = {}",
-    //         object.to_address(),
-    //         object.to_address().align_down(BYTES_IN_WORD),
-    //         address_to_meta_address(MARKING_METADATA_SPEC, object.to_address())
-    //     );
-    //     return ret;
-    // }
-
-    // load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1
     VM::VMObjectModel::load_metadata(
         VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
         object,

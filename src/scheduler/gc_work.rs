@@ -1,6 +1,7 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::plan::GcStatus;
+use crate::util::metadata::side_metadata::compare_exchange_atomic;
 use crate::util::metadata::*;
 use crate::util::*;
 use crate::vm::*;

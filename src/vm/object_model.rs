@@ -2,10 +2,11 @@ use atomic::Ordering;
 
 use crate::plan::AllocationSemantics;
 use crate::plan::CopyContext;
-use crate::util::metadata::MetadataSpec;
-use crate::util::metadata::{
-    compare_exchange_atomic, fetch_add_atomic, fetch_sub_atomic, metadata_defaults,
+use crate::util::metadata::metadata_defaults;
+use crate::util::metadata::side_metadata::{
+    compare_exchange_atomic, fetch_add_atomic, fetch_sub_atomic,
 };
+use crate::util::metadata::MetadataSpec;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 

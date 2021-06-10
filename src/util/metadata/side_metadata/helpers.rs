@@ -1,5 +1,7 @@
-use super::*;
 use crate::util::memory;
+#[cfg(target_pointer_width = "32")]
+use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
+use crate::util::metadata::MetadataSpec;
 use crate::util::Address;
 use crate::util::{
     constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE},
@@ -40,7 +42,7 @@ pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
 
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
 /// Returns the size in bytes that get munmapped.
-pub(super) fn ensure_munmap_contiguos_metadata_space(
+pub(crate) fn ensure_munmap_contiguos_metadata_space(
     start: Address,
     size: usize,
     spec: &MetadataSpec,
@@ -59,7 +61,7 @@ pub(super) fn ensure_munmap_contiguos_metadata_space(
 /// Tries to mmap the metadata space (`spec`) for the specified data address range (`start` and `size`).
 /// Setting `no_reserve` to true means the function will only map address range, without reserving swap-space/physical memory.
 /// Returns the size in bytes that gets mmapped in the function if success.
-pub(super) fn try_mmap_contiguous_metadata_space(
+pub(crate) fn try_mmap_contiguous_metadata_space(
     start: Address,
     size: usize,
     spec: &MetadataSpec,

@@ -1,3 +1,4 @@
+use crate::util::metadata::MetadataSpec;
 use crate::util::{
     constants::{self, BYTES_IN_PAGE, LOG_BITS_IN_BYTE},
     heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK},
@@ -6,9 +7,8 @@ use crate::util::{
 use std::io::Result;
 
 use super::{
-    address_to_meta_address, ensure_munmap_metadata, MetadataSpec, CHUNK_MASK,
-    LOCAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_PER_CHUNK,
-    LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
+    address_to_meta_address, ensure_munmap_metadata, CHUNK_MASK, LOCAL_SIDE_METADATA_BASE_ADDRESS,
+    LOCAL_SIDE_METADATA_PER_CHUNK, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
 
 #[inline(always)]
@@ -34,7 +34,7 @@ pub(super) fn address_to_chunked_meta_address(
 }
 
 /// Returns the size in bytes that gets munmapped.
-pub(super) fn ensure_munmap_chunked_metadata_space(
+pub(crate) fn ensure_munmap_chunked_metadata_space(
     start: Address,
     size: usize,
     spec: &MetadataSpec,

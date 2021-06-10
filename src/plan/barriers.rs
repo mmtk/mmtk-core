@@ -4,7 +4,8 @@ use atomic::Ordering;
 
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
-use crate::util::metadata::*;
+use crate::util::metadata::side_metadata::compare_exchange_atomic;
+use crate::util::metadata::MetadataSpec;
 use crate::util::*;
 use crate::MMTK;
 

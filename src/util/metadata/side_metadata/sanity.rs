@@ -1,11 +1,13 @@
+use crate::util::metadata::MetadataContext;
+use crate::util::metadata::MetadataSpec;
 use crate::util::Address;
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
 use std::sync::{Mutex, RwLock};
 
-use super::constants::LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;
-use super::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
-use super::{MetadataContext, MetadataSpec};
+use super::constants::{
+    LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
+};
 use crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;

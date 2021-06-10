@@ -4,7 +4,10 @@ mod tests {
 
     use crate::util::constants;
     use crate::util::heap::layout::vm_layout_constants;
-    use crate::util::metadata::*;
+    use crate::util::metadata::side_metadata::*;
+    use crate::util::metadata::MetadataContext;
+    use crate::util::metadata::MetadataSpec;
+    use crate::util::metadata::SideMetadata;
     use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::Address;
 

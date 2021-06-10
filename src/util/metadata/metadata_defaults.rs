@@ -6,10 +6,13 @@ use crate::util::{
 };
 
 #[cfg(target_pointer_width = "32")]
-use super::metadata_bytes_per_chunk;
+use super::side_metadata::metadata_bytes_per_chunk;
 use super::{
-    metadata_address_range_size, MetadataSpec, GLOBAL_SIDE_METADATA_BASE_ADDRESS,
-    LOCAL_SIDE_METADATA_BASE_ADDRESS,
+    side_metadata::{
+        load, load_atomic, metadata_address_range_size, store, store_atomic,
+        GLOBAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_BASE_ADDRESS,
+    },
+    MetadataSpec,
 };
 
 /// This module includes `MetadataSpec` instances for all per_object metadata bit-sets, assuming that all of these should be allocated on side.
@@ -98,9 +101,9 @@ pub fn default_store(
     atomic_ordering: Option<Ordering>,
 ) {
     if let Some(order) = atomic_ordering {
-        super::store_atomic(spec, data_addr, val, order)
+        store_atomic(spec, data_addr, val, order)
     } else {
-        unsafe { super::store(spec, data_addr, val) }
+        unsafe { store(spec, data_addr, val) }
     }
 }
 
@@ -110,8 +113,8 @@ pub fn default_load(
     atomic_ordering: Option<Ordering>,
 ) -> usize {
     if let Some(order) = atomic_ordering {
-        super::load_atomic(spec, data_addr, order)
+        load_atomic(spec, data_addr, order)
     } else {
-        unsafe { super::load(spec, data_addr) }
+        unsafe { load(spec, data_addr) }
     }
 }

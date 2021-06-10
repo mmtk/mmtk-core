@@ -218,25 +218,9 @@
 //! 8. bulk zeroing
 //!
 
-mod constants;
 mod global;
-mod helpers;
-#[cfg(target_pointer_width = "32")]
-mod helpers_32;
-pub(crate) mod metadata_defaults;
-pub(crate) mod sanity;
-mod side_metadata;
-mod side_metadata_tests;
+pub mod metadata_defaults;
+pub mod side_metadata;
 
-pub use constants::*;
 pub use global::*;
-pub(crate) use helpers::*;
-#[cfg(target_pointer_width = "32")]
-pub(crate) use helpers_32::*;
-pub use side_metadata::*;
-
-pub use helpers::metadata_address_range_size;
-#[cfg(target_pointer_width = "32")]
-pub use helpers_32::metadata_bytes_per_chunk;
-
-pub(crate) use sanity::SideMetadataSanity;
+pub use side_metadata::SideMetadataSanity;
