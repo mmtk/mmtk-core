@@ -507,7 +507,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
                 );
             }
         }
-        if mmtk.plan.in_nursery() {
+        if mmtk.plan.is_current_gc_nursery() {
             if !self.modbuf.is_empty() {
                 let mut modbuf = vec![];
                 ::std::mem::swap(&mut modbuf, &mut self.modbuf);
