@@ -16,7 +16,7 @@ use super::{
 };
 
 /// This module includes `MetadataSpec` instances for all per_object metadata bit-sets, assuming that all of these should be allocated on side.
-/// This module is used in implementing the metadata part of `ObjectModel`.
+/// This module is used in the default implementation of the metadata part of `ObjectModel`.
 
 // private helper functions
 

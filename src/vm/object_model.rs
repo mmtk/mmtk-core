@@ -13,10 +13,46 @@ use crate::vm::VMBinding;
 /// VM-specific methods for object model.
 ///
 /// MMTk does not require but recommands using in-header per-object metadata for better performance.
-/// MMTk requires VMs to announce whether they can provide certain per-object metadata in object headers by overriding the metadata related functions in the ObjectModel trait.
+/// MMTk requires VMs to announce whether they can provide certain per-object metadata in object headers by overriding the metadata related constants in the ObjectModel trait.
 ///
 /// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.
 pub trait ObjectModel<VM: VMBinding> {
+    /// The metadata specification of the global  log bit.
+    const GLOBAL_LOG_BIT_SPEC: MetadataSpec = metadata_defaults::LOGGING_SIDE_METADATA_SPEC;
+
+    /// The metadata specification for the forwarding pointer, which is currently specific to the CopySpace policy.
+    const LOCAL_FORWARDING_POINTER_SPEC: MetadataSpec =
+        metadata_defaults::FORWARDING_POINTER_METADATA_SPEC;
+    /// The metadata specification for the forwarding status bits, which is currently specific to the CopySpace policy.
+    const LOCAL_FORWARDING_BITS_SPEC: MetadataSpec =
+        metadata_defaults::FORWARDING_BITS_SIDE_METADATA_SPEC;
+    /// The metadata specification for the mark bit, which is currently specific to the ImmortalSpace policy.
+    const LOCAL_MARK_BIT_SPEC: MetadataSpec = metadata_defaults::MARKING_SIDE_METADATA_SPEC;
+    /// The metadata specification for the mark-and-nursery bits, which is currently specific to the LargeObjectSpace policy.
+    const LOCAL_LOS_MARK_NURSERY_SPEC: MetadataSpec = metadata_defaults::LOS_SIDE_METADATA_SPEC;
+    /// The metadata specification for the unlogged bit, which is currently not used but is specific to the LargeObjectSpace policy.
+    const LOCAL_UNLOGGED_BIT_SPEC: MetadataSpec = metadata_defaults::UNLOGGED_SIDE_METADATA_SPEC;
+
+    /// The last (highest) memory address used by the global per-object side metadata of the current VM ObjectModel.
+    const LAST_GLOBAL_SIDE_METADATA_OFFSET: usize =
+        metadata_defaults::LAST_GLOBAL_SIDE_METADATA_OFFSET;
+
+    /// The last (highest) memory address used by the policy-specific per-object side metadata of the current VM ObjectModel.
+    /// For 32-bits targets, this is the last (highest) per-chunk offset, rather than an absolute memory address.
+    const LAST_LOCAL_SIDE_METADATA_OFFSET: usize =
+        metadata_defaults::LAST_LOCAL_SIDE_METADATA_OFFSET;
+
+    /// A function to load the specified per-object metadata's content.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `object`: is a reference to the target object.
+    /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
+    /// * `atomic_ordering`: is an optional atomic ordering for the load operation. An input value of `None` means the load operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic load operation will use the `Ordering::X`.
+    ///
+    /// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.
+    ///
     fn load_metadata(
         metadata_spec: MetadataSpec,
         object: ObjectReference,
@@ -32,6 +68,16 @@ pub trait ObjectModel<VM: VMBinding> {
         }
     }
 
+    /// A function to store a value to the specified per-object metadata.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `object`: is a reference to the target object.
+    /// * `val`: is the new metadata value to be stored.
+    /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
+    /// * `atomic_ordering`: is an optional atomic ordering for the store operation. An input value of `None` means the store operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic store operation will use the `Ordering::X`.
+    ///
     fn store_metadata(
         metadata_spec: MetadataSpec,
         object: ObjectReference,
@@ -68,6 +114,20 @@ pub trait ObjectModel<VM: VMBinding> {
         }
     }
 
+    /// A function to atomically compare-and-exchange the specified per-object metadata's content.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `object`: is a reference to the target object.
+    /// * `old_val`: is the expected current value of the metadata.
+    /// * `new_val`: is the new metadata value to be stored if the compare-and-exchange operation is successful.
+    /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
+    /// * `success_order`: is the atomic ordering used if the operation is successful.
+    /// * `failure_order`: is the atomic ordering used if the operation fails.
+    ///
+    /// # Returns `true` if the operation is successful, and `false` otherwise.
+    ///
     fn compare_exchange_metadata(
         metadata_spec: MetadataSpec,
         object: ObjectReference,
@@ -106,6 +166,17 @@ pub trait ObjectModel<VM: VMBinding> {
         )
     }
 
+    /// A function to atomically perform an add operation on the specified per-object metadata's content.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `object`: is a reference to the target object.
+    /// * `val`: is the value to be added to the current value of the metadata.
+    /// * `order`: is the atomic ordering of the fetch-and-add operation.
+    ///
+    /// # Returns the old metadata value as a word.
+    ///
     fn fetch_add_metadata(
         metadata_spec: MetadataSpec,
         object: ObjectReference,
@@ -115,6 +186,17 @@ pub trait ObjectModel<VM: VMBinding> {
         fetch_add_atomic(metadata_spec, object.to_address(), val, order)
     }
 
+    /// A function to atomically perform a subtract operation on the specified per-object metadata's content.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `object`: is a reference to the target object.
+    /// * `val`: is the value to be subtracted from the current value of the metadata.
+    /// * `order`: is the atomic ordering of the fetch-and-add operation.
+    ///
+    /// # Returns the old metadata value as a word.
+    ///
     fn fetch_sub_metadata(
         metadata_spec: MetadataSpec,
         object: ObjectReference,
@@ -123,22 +205,6 @@ pub trait ObjectModel<VM: VMBinding> {
     ) -> usize {
         fetch_sub_atomic(metadata_spec, object.to_address(), val, order)
     }
-
-    const GLOBAL_LOG_BIT_SPEC: MetadataSpec = metadata_defaults::LOGGING_SIDE_METADATA_SPEC;
-
-    const LOCAL_FORWARDING_POINTER_SPEC: MetadataSpec =
-        metadata_defaults::FORWARDING_POINTER_METADATA_SPEC;
-    const LOCAL_FORWARDING_BITS_SPEC: MetadataSpec =
-        metadata_defaults::FORWARDING_BITS_SIDE_METADATA_SPEC;
-    const LOCAL_MARK_BIT_SPEC: MetadataSpec = metadata_defaults::MARKING_SIDE_METADATA_SPEC;
-    const LOCAL_LOS_MARK_NURSERY_SPEC: MetadataSpec = metadata_defaults::LOS_SIDE_METADATA_SPEC;
-    const LOCAL_UNLOGGED_BIT_SPEC: MetadataSpec = metadata_defaults::UNLOGGED_SIDE_METADATA_SPEC;
-
-    const LAST_GLOBAL_SIDE_METADATA_OFFSET: usize =
-        metadata_defaults::LAST_GLOBAL_SIDE_METADATA_OFFSET;
-
-    const LAST_LOCAL_SIDE_METADATA_OFFSET: usize =
-        metadata_defaults::LAST_LOCAL_SIDE_METADATA_OFFSET;
 
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,
     /// `alloc_copy()` and `post_copy()` from a plan's [`CopyContext`](../trait.CopyContext.html) are used for copying.
