@@ -4,7 +4,7 @@ use std::default::Default;
 use std::ops::Deref;
 
 custom_derive! {
-    #[derive(Copy, Clone, EnumFromStr)]
+    #[derive(Copy, Clone, EnumFromStr, Debug)]
     pub enum NurseryZeroingOptions {
         Temporal,
         Nontemporal,
@@ -46,7 +46,7 @@ impl Deref for UnsafeOptionsWrapper {
     }
 }
 
-fn always_valid<T>(_: T) -> bool {
+fn always_valid<T>(_: &T) -> bool {
     true
 }
 macro_rules! options {
@@ -60,12 +60,20 @@ macro_rules! options {
         impl Options {
             pub fn set_from_str(&mut self, s: &str, val: &str)->bool {
                 match s {
-                    $(stringify!($name) => if let Ok(val) = val.parse() {
-                        self.$name = val;
+                    // Parse the given value from str (by env vars or by calling process()) to the right type
+                    $(stringify!($name) => if let Ok(ref val) = val.parse::<$type>() {
+                        // Validate
                         let validate_fn = $validator;
-                        validate_fn(val)
+                        let is_valid = validate_fn(val);
+                        if is_valid {
+                            // Only set value if valid.
+                            self.$name = val.clone();
+                        } else {
+                            eprintln!("Warn: unable to set {}={:?}. Invalid value. Default value will be used.", s, val);
+                        }
+                        is_valid
                     } else {
-                        eprintln!("Warn: unable to set {}={}. Default value will be used.", s, val);
+                        eprintln!("Warn: unable to set {}={:?}. Cant parse value. Default value will be used.", s, val);
                         false
                     })*
                     _ => panic!("Invalid Options key")
@@ -100,7 +108,7 @@ options! {
     // The plan to use. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
     plan:                  PlanSelector         [always_valid] = PlanSelector::NoGC,
     // Number of GC threads.
-    threads:               usize                [|v| v > 0]    = num_cpus::get(),
+    threads:               usize                [|v: &usize| *v > 0]    = num_cpus::get(),
     // Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [always_valid] = false,
     // Enable a return barrier (not supported)
@@ -110,9 +118,9 @@ options! {
     // Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     ignore_system_g_c:     bool                 [always_valid] = false,
     // The upper bound of nursery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    max_nursery:           usize                [|v| v > 0]    = (32 * 1024 * 1024),
+    max_nursery:           usize                [|v: &usize| *v > 0]    = (32 * 1024 * 1024),
     // The lower bound of nusery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    min_nursery:           usize                [|v| v > 0]    = (32 * 1024 * 1024),
+    min_nursery:           usize                [|v: &usize| *v > 0]    = (32 * 1024 * 1024),
     // Should a major GC be performed when a system GC is required?
     full_heap_system_gc:   bool                 [always_valid] = false,
     // Should we shrink/grow the heap to adjust to application working set? (not supported)
@@ -130,7 +138,10 @@ options! {
     // The size of vmspace. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
     // FIXME: This value is set for JikesRVM. We need a proper way to set options.
     //   We need to set these values programmatically in VM specific code.
-    vm_space_size:         usize                [|v| v > 0]    = 0x7cc_cccc,
+    vm_space_size:         usize                [|v: &usize| *v > 0]    = 0x7cc_cccc,
+    // An example string option. Can be deleted when we have other string options.
+    // Make sure to include the string option tests in the unit tests.
+    example_string_option: String                [|v: &str| v.starts_with("hello") ] = "hello world".to_string(),
 }
 
 impl Options {
@@ -166,7 +177,7 @@ impl Options {
 mod tests {
     use crate::util::constants::DEFAULT_STRESS_FACTOR;
     use crate::util::options::Options;
-    use crate::util::test_util::serial_test;
+    use crate::util::test_util::{serial_test, with_cleanup};
 
     #[test]
     fn no_env_var() {
@@ -179,65 +190,117 @@ mod tests {
     #[test]
     fn with_valid_env_var() {
         serial_test(|| {
-            std::env::set_var("MMTK_STRESS_FACTOR", "4096");
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_STRESS_FACTOR", "4096");
 
-            let res = std::panic::catch_unwind(|| {
-                let options = Options::default();
-                assert_eq!(options.stress_factor, 4096);
-            });
-            assert!(res.is_ok());
-
-            std::env::remove_var("MMTK_STRESS_FACTOR");
+                    let options = Options::default();
+                    assert_eq!(options.stress_factor, 4096);
+                },
+                || {
+                    std::env::remove_var("MMTK_STRESS_FACTOR");
+                },
+            )
         })
     }
 
     #[test]
     fn with_multiple_valid_env_vars() {
         serial_test(|| {
-            std::env::set_var("MMTK_STRESS_FACTOR", "4096");
-            std::env::set_var("MMTK_NO_FINALIZER", "true");
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_STRESS_FACTOR", "4096");
+                    std::env::set_var("MMTK_NO_FINALIZER", "true");
 
-            let res = std::panic::catch_unwind(|| {
-                let options = Options::default();
-                assert_eq!(options.stress_factor, 4096);
-                assert!(options.no_finalizer);
-            });
-            assert!(res.is_ok());
-
-            std::env::remove_var("MMTK_STRESS_FACTOR");
-            std::env::remove_var("MMTK_NO_FINALIZER");
+                    let options = Options::default();
+                    assert_eq!(options.stress_factor, 4096);
+                    assert!(options.no_finalizer);
+                },
+                || {
+                    std::env::remove_var("MMTK_STRESS_FACTOR");
+                    std::env::remove_var("MMTK_NO_FINALIZER");
+                },
+            )
         })
     }
 
     #[test]
     fn with_invalid_env_var_value() {
         serial_test(|| {
-            // invalid value, we cannot parse the value, so use the default value
-            std::env::set_var("MMTK_STRESS_FACTOR", "abc");
+            with_cleanup(
+                || {
+                    // invalid value, we cannot parse the value, so use the default value
+                    std::env::set_var("MMTK_STRESS_FACTOR", "abc");
 
-            let res = std::panic::catch_unwind(|| {
-                let options = Options::default();
-                assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
-            });
-            assert!(res.is_ok());
-
-            std::env::remove_var("MMTK_STRESS_FACTOR");
+                    let options = Options::default();
+                    assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+                },
+                || {
+                    std::env::remove_var("MMTK_STRESS_FACTOR");
+                },
+            )
         })
     }
 
     #[test]
     fn with_invalid_env_var_key() {
         serial_test(|| {
-            // invalid value, we cannot parse the value, so use the default value
-            std::env::set_var("MMTK_ABC", "42");
+            with_cleanup(
+                || {
+                    // invalid value, we cannot parse the value, so use the default value
+                    std::env::set_var("MMTK_ABC", "42");
 
-            let res = std::panic::catch_unwind(|| {
-                let options = Options::default();
-                assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
-            });
-            assert!(res.is_ok());
+                    let options = Options::default();
+                    assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+                },
+                || {
+                    std::env::remove_var("MMTK_ABC");
+                },
+            )
+        })
+    }
 
-            std::env::remove_var("MMTK_ABC");
+    #[test]
+    fn test_str_option_default() {
+        serial_test(|| {
+            let options = Options::default();
+            assert_eq!(&options.example_string_option as &str, "hello world");
+        })
+    }
+
+    #[test]
+    fn test_str_option_from_env_var() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_EXAMPLE_STRING_OPTION", "hello string");
+
+                    let options = Options::default();
+                    assert_eq!(&options.example_string_option as &str, "hello string");
+                },
+                || {
+                    std::env::remove_var("MMTK_EXAMPLE_STRING_OPTION");
+                },
+            )
+        })
+    }
+
+    #[test]
+    fn test_invalid_str_option_from_env_var() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    // The option needs to start with "hello", otherwise it is invalid.
+                    std::env::set_var("MMTK_EXAMPLE_STRING_OPTION", "abc");
+
+                    let options = Options::default();
+                    // invalid value from env var, use default.
+                    assert_eq!(&options.example_string_option as &str, "hello world");
+                },
+                || {
+                    std::env::remove_var("MMTK_EXAMPLE_STRING_OPTION");
+                },
+            )
         })
     }
 }
