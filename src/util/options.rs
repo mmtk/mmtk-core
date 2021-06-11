@@ -49,6 +49,23 @@ impl Deref for UnsafeOptionsWrapper {
 fn always_valid<T>(_: &T) -> bool {
     true
 }
+
+fn validate_perf_events(events: &str) -> bool {
+    for event in events.split(";") {
+        let e: Vec<&str> = event.split(",").into_iter().collect();
+        if e.len() != 3 {
+            return false;
+        }
+        if e[1].parse::<i32>().is_err() {
+            return false;
+        }
+        if e[2].parse::<i32>().is_err() {
+            return false;
+        }
+    }
+    true
+}
+
 macro_rules! options {
     ($($name:ident: $type:ty[$validator:expr] = $default:expr),*,) => [
         options!($($name: $type[$validator] = $default),*);
@@ -139,9 +156,10 @@ options! {
     // FIXME: This value is set for JikesRVM. We need a proper way to set options.
     //   We need to set these values programmatically in VM specific code.
     vm_space_size:         usize                [|v: &usize| *v > 0]    = 0x7cc_cccc,
-    // An example string option. Can be deleted when we have other string options.
-    // Make sure to include the string option tests in the unit tests.
-    example_string_option: String                [|v: &str| v.starts_with("hello") ] = "hello world".to_string(),
+    // Perf events to measure
+    // Semicolons are used to separate events
+    // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean)
+    perf_events:           String               [validate_perf_events] = "".to_string(),
 }
 
 impl Options {
@@ -264,7 +282,7 @@ mod tests {
     fn test_str_option_default() {
         serial_test(|| {
             let options = Options::default();
-            assert_eq!(&options.example_string_option as &str, "hello world");
+            assert_eq!(&options.perf_events as &str, "");
         })
     }
 
@@ -273,13 +291,13 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var("MMTK_EXAMPLE_STRING_OPTION", "hello string");
+                    std::env::set_var("MMTK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
 
                     let options = Options::default();
-                    assert_eq!(&options.example_string_option as &str, "hello string");
+                    assert_eq!(&options.perf_events as &str, "PERF_COUNT_HW_CPU_CYCLES,0,-1");
                 },
                 || {
-                    std::env::remove_var("MMTK_EXAMPLE_STRING_OPTION");
+                    std::env::remove_var("MMTK_PERF_EVENTS");
                 },
             )
         })
@@ -291,14 +309,14 @@ mod tests {
             with_cleanup(
                 || {
                     // The option needs to start with "hello", otherwise it is invalid.
-                    std::env::set_var("MMTK_EXAMPLE_STRING_OPTION", "abc");
+                    std::env::set_var("MMTK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES");
 
                     let options = Options::default();
                     // invalid value from env var, use default.
-                    assert_eq!(&options.example_string_option as &str, "hello world");
+                    assert_eq!(&options.perf_events as &str, "");
                 },
                 || {
-                    std::env::remove_var("MMTK_EXAMPLE_STRING_OPTION");
+                    std::env::remove_var("MMTK_PERF_EVENTS");
                 },
             )
         })
