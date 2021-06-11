@@ -83,7 +83,7 @@ fn verify_global_specs_total_size(g_specs: &[MetadataSpec]) -> Result<()> {
 #[cfg(target_pointer_width = "64")]
 fn verify_local_specs_size(l_specs: &[MetadataSpec]) -> Result<()> {
     for spec in l_specs {
-        if super::metadata_address_range_size(*spec)
+        if super::metadata_address_range_size(spec)
             > 1usize << (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
         {
             return Err(Error::new(

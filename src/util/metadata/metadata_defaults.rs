@@ -21,7 +21,7 @@ use super::{
 // private helper functions
 
 #[cfg(target_pointer_width = "64")]
-const fn side_metadata_size(metadata_spec: MetadataSpec) -> usize {
+const fn side_metadata_size(metadata_spec: &MetadataSpec) -> usize {
     metadata_address_range_size(metadata_spec)
 }
 #[cfg(target_pointer_width = "32")]

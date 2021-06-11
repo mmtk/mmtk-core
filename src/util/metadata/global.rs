@@ -165,7 +165,7 @@ impl SideMetadata {
             #[cfg(target_pointer_width = "64")]
             {
                 match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
-                    Ok(mapped) => {}
+                    Ok(_) => {}
                     Err(e) => return Result::Err(e),
                 }
             }
