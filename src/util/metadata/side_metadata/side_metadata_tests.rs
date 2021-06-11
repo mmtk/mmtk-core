@@ -313,7 +313,7 @@ mod tests {
                         is_side_metadata: true,
                         is_global: true,
                         offset: metadata_1_spec.offset
-                            + metadata_address_range_size(metadata_1_spec) as isize,
+                            + metadata_address_range_size(&metadata_1_spec) as isize,
                         num_of_bits: 8,
                         log_min_obj_size: 7,
                     };

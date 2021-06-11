@@ -60,7 +60,7 @@ pub(crate) fn reset() {
 fn verify_global_specs_total_size(g_specs: &[MetadataSpec]) -> Result<()> {
     let mut total_size = 0usize;
     for spec in g_specs {
-        total_size += super::metadata_address_range_size(*spec);
+        total_size += super::metadata_address_range_size(spec);
     }
 
     if total_size <= 1usize << (LOG_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO) {
@@ -129,8 +129,8 @@ fn verify_local_specs_size(l_specs: &[MetadataSpec]) -> Result<()> {
 /// * `spec_2`: second target specification
 ///
 fn verify_no_overlap_contiguous(spec_1: &MetadataSpec, spec_2: &MetadataSpec) -> Result<()> {
-    let end_1 = spec_1.offset + super::metadata_address_range_size(*spec_1) as isize;
-    let end_2 = spec_2.offset + super::metadata_address_range_size(*spec_2) as isize;
+    let end_1 = spec_1.offset + super::metadata_address_range_size(spec_1) as isize;
+    let end_2 = spec_2.offset + super::metadata_address_range_size(spec_2) as isize;
 
     if !(spec_1.offset >= end_2 || spec_2.offset >= end_1) {
         return Err(Error::new(
@@ -559,7 +559,7 @@ mod tests {
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: metadata_address_range_size(spec_1) as isize,
+            offset: metadata_address_range_size(&spec_1) as isize,
             log_min_obj_size: 0,
             num_of_bits: 1,
         };
@@ -573,7 +573,7 @@ mod tests {
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: metadata_address_range_size(spec_1) as isize,
+            offset: metadata_address_range_size(&spec_1) as isize,
             log_min_obj_size: 1,
             num_of_bits: 8,
         };
@@ -593,7 +593,7 @@ mod tests {
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: metadata_address_range_size(spec_1) as isize,
+            offset: metadata_address_range_size(&spec_1) as isize,
             #[cfg(target_pointer_width = "64")]
             log_min_obj_size: 2,
             #[cfg(target_pointer_width = "32")]
@@ -617,7 +617,7 @@ mod tests {
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: metadata_address_range_size(spec_1) as isize,
+            offset: metadata_address_range_size(&spec_1) as isize,
             log_min_obj_size: 0,
             num_of_bits: 1,
         };
@@ -645,7 +645,7 @@ mod tests {
         let spec_2 = MetadataSpec {
             is_side_metadata: true,
             is_global: true,
-            offset: (metadata_address_range_size(spec_1) - 1) as isize,
+            offset: (metadata_address_range_size(&spec_1) - 1) as isize,
             log_min_obj_size: 0,
             num_of_bits: 1,
         };

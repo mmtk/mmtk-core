@@ -80,7 +80,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         }
 
         if space_full && space.common().descriptor != self.nursery.common().descriptor {
-            self.next_gc_full_heap.store(true, Ordering::Relaxed);
+            self.next_gc_full_heap.store(true, Ordering::SeqCst);
         }
 
         self.base().collection_required(self, space_full, space)
@@ -105,12 +105,14 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         if !is_full_heap {
+            debug!("Nursery GC");
             self.common()
                 .schedule_common::<GenCopyNurseryProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
             // Stop & scan mutators (mutator scanning can happen before STW)
             scheduler.work_buckets[WorkBucketStage::Unconstrained]
                 .add(StopMutators::<GenCopyNurseryProcessEdges<VM>>::new());
         } else {
+            debug!("Full heap GC");
             self.common()
                 .schedule_common::<GenCopyMatureProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
             // Stop & scan mutators (mutator scanning can happen before STW)

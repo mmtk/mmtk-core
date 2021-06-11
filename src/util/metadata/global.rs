@@ -2,21 +2,9 @@ use std::fmt;
 use std::io::Result;
 
 use crate::util::constants::BYTES_IN_PAGE;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-#[cfg(target_pointer_width = "32")]
-use crate::util::metadata::side_metadata::try_map_per_chunk_metadata_space;
-#[cfg(target_pointer_width = "32")]
-use crate::util::metadata::side_metadata::{
-    ensure_munmap_chunked_metadata_space, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
-};
-use crate::util::{heap::PageAccounting, Address};
-
-#[cfg(target_pointer_width = "32")]
-use super::side_metadata::metadata_bytes_per_chunk;
-use super::side_metadata::{
-    ensure_munmap_contiguos_metadata_space, try_mmap_contiguous_metadata_space,
-};
+use crate::util::metadata::side_metadata::*;
+use crate::util::Address;
 
 /// This struct stores the specification of a side metadata bit-set.
 /// It is used as an input to the (inline) functions provided by the side metadata module.
@@ -74,15 +62,11 @@ impl MetadataContext {
 
 pub struct SideMetadata {
     context: MetadataContext,
-    accounting: PageAccounting,
 }
 
 impl SideMetadata {
     pub fn new(context: MetadataContext) -> SideMetadata {
-        Self {
-            context,
-            accounting: PageAccounting::new(),
-        }
+        Self { context }
     }
 
     pub fn get_context(&self) -> &MetadataContext {
@@ -93,9 +77,26 @@ impl SideMetadata {
         &self.context.local
     }
 
-    pub fn reserved_pages(&self) -> usize {
-        self.accounting.get_reserved_pages()
+    /// Return the pages reserved for side metadata based on the data pages we used.
+    // We used to use PageAccouting to count pages used in side metadata. However,
+    // that means we always count pages while we may reserve less than a page each time.
+    // This could lead to overcount. I think the easier way is to not account
+    // when we allocate for sidemetadata, but to calculate the side metadata usage based on
+    // how many data pages we use when reporting.
+    pub fn calculate_reserved_pages(&self, data_pages: usize) -> usize {
+        let mut total = 0;
+        for spec in self.context.global.iter() {
+            let rshift = addr_rshift(spec);
+            total += (data_pages + ((1 << rshift) - 1)) >> rshift;
+        }
+        for spec in self.context.local.iter() {
+            let rshift = addr_rshift(spec);
+            total += (data_pages + ((1 << rshift) - 1)) >> rshift;
+        }
+        total
     }
+
+    pub fn reset(&self) {}
 
     // ** NOTE: **
     //  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
@@ -143,13 +144,7 @@ impl SideMetadata {
     fn map_metadata_internal(&self, start: Address, size: usize, no_reserve: bool) -> Result<()> {
         for spec in self.context.global.iter() {
             match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
-                Ok(mapped) => {
-                    // We actually reserved memory
-                    if !no_reserve {
-                        self.accounting
-                            .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
-                    }
-                }
+                Ok(_) => {}
                 Err(e) => return Result::Err(e),
             }
         }
@@ -170,13 +165,7 @@ impl SideMetadata {
             #[cfg(target_pointer_width = "64")]
             {
                 match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
-                    Ok(mapped) => {
-                        // We actually reserved memory
-                        if !no_reserve {
-                            self.accounting
-                                .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
-                        }
-                    }
+                    Ok(mapped) => {}
                     Err(e) => return Result::Err(e),
                 }
             }
@@ -196,13 +185,7 @@ impl SideMetadata {
                 max
             );
             match try_map_per_chunk_metadata_space(start, size, lsize, no_reserve) {
-                Ok(mapped) => {
-                    // We actually reserved memory
-                    if !no_reserve {
-                        self.accounting
-                            .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
-                    }
-                }
+                Ok(_) => {}
                 Err(e) => return Result::Err(e),
             }
         }
@@ -217,26 +200,24 @@ impl SideMetadata {
     /// Note-2: This function uses munmap() which works at page granularity.
     ///     If the corresponding metadata space's size is not a multiple of page size,
     ///     the actual unmapped space will be bigger than what you specify.
+    #[cfg(test)]
     pub fn ensure_unmap_metadata_space(&self, start: Address, size: usize) {
         trace!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
         debug_assert!(size % BYTES_IN_PAGE == 0);
 
         for spec in self.context.global.iter() {
-            let size = ensure_munmap_contiguos_metadata_space(start, size, spec);
-            self.accounting.release(size >> LOG_BYTES_IN_PAGE);
+            ensure_munmap_contiguos_metadata_space(start, size, spec);
         }
 
         for spec in self.context.local.iter() {
             #[cfg(target_pointer_width = "64")]
             {
-                let size = ensure_munmap_contiguos_metadata_space(start, size, spec);
-                self.accounting.release(size >> LOG_BYTES_IN_PAGE);
+                ensure_munmap_contiguos_metadata_space(start, size, spec);
             }
             #[cfg(target_pointer_width = "32")]
             {
-                let size = ensure_munmap_chunked_metadata_space(start, size, spec);
-                self.accounting.release(size >> LOG_BYTES_IN_PAGE);
+                ensure_munmap_chunked_metadata_space(start, size, spec);
             }
         }
     }

@@ -127,8 +127,9 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     fn reserved_pages(&self) -> usize {
-        conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst))
-            + self.metadata.reserved_pages()
+        let data_pages = conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst));
+        let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
+        data_pages + meta_pages
     }
 
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {

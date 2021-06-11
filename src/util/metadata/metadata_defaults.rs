@@ -25,7 +25,7 @@ const fn side_metadata_size(metadata_spec: MetadataSpec) -> usize {
     metadata_address_range_size(metadata_spec)
 }
 #[cfg(target_pointer_width = "32")]
-const fn side_metadata_size(metadata_spec: MetadataSpec) -> usize {
+const fn side_metadata_size(metadata_spec: &MetadataSpec) -> usize {
     if metadata_spec.is_global {
         metadata_address_range_size(metadata_spec)
     } else {
@@ -66,7 +66,7 @@ pub const MARKING_SIDE_METADATA_SPEC: MetadataSpec = MetadataSpec {
     is_side_metadata: true,
     is_global: false,
     offset: FORWARDING_BITS_SIDE_METADATA_SPEC.offset
-        + side_metadata_size(FORWARDING_BITS_SIDE_METADATA_SPEC) as isize,
+        + side_metadata_size(&FORWARDING_BITS_SIDE_METADATA_SPEC) as isize,
     num_of_bits: 1,
     log_min_obj_size: LOG_MIN_OBJECT_SIZE as usize,
 };
@@ -75,7 +75,7 @@ pub const LOS_SIDE_METADATA_SPEC: MetadataSpec = MetadataSpec {
     is_side_metadata: true,
     is_global: false,
     offset: MARKING_SIDE_METADATA_SPEC.offset
-        + side_metadata_size(MARKING_SIDE_METADATA_SPEC) as isize,
+        + side_metadata_size(&MARKING_SIDE_METADATA_SPEC) as isize,
     num_of_bits: 2,
     log_min_obj_size: LOG_MIN_OBJECT_SIZE as usize,
 };
@@ -83,16 +83,16 @@ pub const LOS_SIDE_METADATA_SPEC: MetadataSpec = MetadataSpec {
 pub const UNLOGGED_SIDE_METADATA_SPEC: MetadataSpec = MetadataSpec {
     is_side_metadata: true,
     is_global: false,
-    offset: LOS_SIDE_METADATA_SPEC.offset + side_metadata_size(LOS_SIDE_METADATA_SPEC) as isize,
+    offset: LOS_SIDE_METADATA_SPEC.offset + side_metadata_size(&LOS_SIDE_METADATA_SPEC) as isize,
     num_of_bits: 1,
     log_min_obj_size: LOG_MIN_OBJECT_SIZE as usize,
 };
 
 pub const LAST_GLOBAL_SIDE_METADATA_OFFSET: usize =
-    GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + side_metadata_size(LOGGING_SIDE_METADATA_SPEC);
+    GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + side_metadata_size(&LOGGING_SIDE_METADATA_SPEC);
 
 pub const LAST_LOCAL_SIDE_METADATA_OFFSET: usize =
-    UNLOGGED_SIDE_METADATA_SPEC.offset as usize + side_metadata_size(UNLOGGED_SIDE_METADATA_SPEC);
+    UNLOGGED_SIDE_METADATA_SPEC.offset as usize + side_metadata_size(&UNLOGGED_SIDE_METADATA_SPEC);
 
 pub fn default_store(
     spec: MetadataSpec,

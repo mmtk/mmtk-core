@@ -482,3 +482,56 @@ pub fn bzero_metadata(metadata_spec: MetadataSpec, start: Address, size: usize) 
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::util::metadata::{MetadataContext, SideMetadata};
+
+    use super::*;
+
+    #[test]
+    fn calculate_reserved_pages_one_spec() {
+        // 1 bit per 8 bytes - 1:64
+        let spec = MetadataSpec {
+            is_side_metadata: true,
+            is_global: true,
+            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+            num_of_bits: 1,
+            log_min_obj_size: 3,
+        };
+        let side_metadata = SideMetadata::new(MetadataContext {
+            global: vec![spec],
+            local: vec![],
+        });
+        assert_eq!(side_metadata.calculate_reserved_pages(0), 0);
+        assert_eq!(side_metadata.calculate_reserved_pages(63), 1);
+        assert_eq!(side_metadata.calculate_reserved_pages(64), 1);
+        assert_eq!(side_metadata.calculate_reserved_pages(65), 2);
+        assert_eq!(side_metadata.calculate_reserved_pages(1024), 16);
+    }
+
+    #[test]
+    fn calculate_reserved_pages_multi_specs() {
+        // 1 bit per 8 bytes - 1:64
+        let gspec = MetadataSpec {
+            is_side_metadata: true,
+            is_global: true,
+            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+            num_of_bits: 1,
+            log_min_obj_size: 3,
+        };
+        // 2 bits per page - 2 / (4k * 8) = 1:16k
+        let lspec = MetadataSpec {
+            is_side_metadata: true,
+            is_global: false,
+            offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_isize(),
+            num_of_bits: 2,
+            log_min_obj_size: 12,
+        };
+        let side_metadata = SideMetadata::new(MetadataContext {
+            global: vec![gspec],
+            local: vec![lspec],
+        });
+        assert_eq!(side_metadata.calculate_reserved_pages(1024), 16 + 1);
+    }
+}

@@ -111,7 +111,9 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 
     fn reserved_pages(&self) -> usize {
         let cursor = unsafe { Address::from_usize(self.cursor.load(Ordering::Relaxed)) };
-        conversions::bytes_to_pages_up(self.limit - cursor) + self.metadata.reserved_pages()
+        let data_pages = conversions::bytes_to_pages_up(self.limit - cursor);
+        let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
+        data_pages + meta_pages
     }
 
     fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
