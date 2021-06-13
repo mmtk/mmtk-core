@@ -134,6 +134,22 @@ impl WorkCounter for WorkDuration {
     }
 }
 
+pub fn validate_perf_events(events: &str) -> bool {
+    for event in events.split(";").filter(|e| e.len() > 0) {
+        let e: Vec<&str> = event.split(",").into_iter().collect();
+        if e.len() != 3 {
+            return false;
+        }
+        if e[1].parse::<i32>().is_err() {
+            return false;
+        }
+        if e[2].parse::<i32>().is_err() {
+            return false;
+        }
+    }
+    true
+}
+
 #[cfg(feature = "perf")]
 mod perf_event {
     //! Measure the perf events of work packets
@@ -147,22 +163,6 @@ mod perf_event {
     use libc::{c_int, pid_t};
     use pfm::PerfEvent;
     use std::fmt;
-
-    pub fn validate_perf_events(events: &str) -> bool {
-        for event in events.split(";").filter(|e| e.len() > 0) {
-            let e: Vec<&str> = event.split(",").into_iter().collect();
-            if e.len() != 3 {
-                return false;
-            }
-            if e[1].parse::<i32>().is_err() {
-                return false;
-            }
-            if e[2].parse::<i32>().is_err() {
-                return false;
-            }
-        }
-        true
-    }
 
     pub fn parse_perf_events(events: &str) -> Vec<(String, i32, i32)> {
         events
@@ -250,4 +250,4 @@ mod perf_event {
 }
 
 #[cfg(feature = "perf")]
-pub use perf_event::{parse_perf_events, validate_perf_events, WorkPerfEvent};
+pub use perf_event::{parse_perf_events, WorkPerfEvent};

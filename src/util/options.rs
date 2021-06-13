@@ -1,4 +1,3 @@
-#[cfg(feature = "perf")]
 use crate::scheduler::work_counter::validate_perf_events;
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use std::cell::UnsafeCell;
@@ -50,11 +49,6 @@ impl Deref for UnsafeOptionsWrapper {
 
 fn always_valid<T>(_: &T) -> bool {
     true
-}
-
-#[cfg(not(feature = "perf"))]
-fn validate_perf_events(events: &str) -> bool {
-    !events.is_empty()
 }
 
 macro_rules! options {
