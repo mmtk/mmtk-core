@@ -3,8 +3,10 @@ use super::work_counter::{WorkCounter, WorkCounterBase, WorkDuration};
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(feature = "perf")]
 use std::sync::RwLock;
 
+#[cfg(feature = "perf")]
 lazy_static! {
     pub static ref PERF_EVENTS: RwLock<Vec<(String, i32, i32)>> = RwLock::new(vec![]);
 }

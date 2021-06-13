@@ -60,6 +60,9 @@ impl Stats {
             true,
             false,
         )));
+        // The following lines are NOT put into a conditionally compiled block
+        // Otherwise, the perfmon variable will not be accessible to the outer
+        // scope
         #[cfg(feature = "perf")]
         let mut perfmon: Perfmon = Default::default();
         #[cfg(feature = "perf")]

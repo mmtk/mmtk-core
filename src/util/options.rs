@@ -54,7 +54,7 @@ fn always_valid<T>(_: &T) -> bool {
 
 #[cfg(not(feature = "perf"))]
 fn validate_perf_events(events: &str) -> bool {
-    !(events.len() > 0)
+    !events.is_empty()
 }
 
 macro_rules! options {

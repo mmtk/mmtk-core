@@ -136,13 +136,20 @@ impl WorkCounter for WorkDuration {
 
 #[cfg(feature = "perf")]
 mod perf_event {
+    //! Measure the perf events of work packets
+    //!
+    //! This is built on top of libpfm4.
+    //! The events to measure are parsed from MMTk option `perf_events`
+    //! The format is
+    //! <event> ::= <event-name> "," <pid> "," <cpu>
+    //! <events> ::= <event> ";" <events> | <event> | ""
     use super::*;
     use libc::{c_int, pid_t};
     use pfm::PerfEvent;
     use std::fmt;
 
     pub fn validate_perf_events(events: &str) -> bool {
-        for event in events.split(";") {
+        for event in events.split(";").filter(|e| e.len() > 0) {
             let e: Vec<&str> = event.split(",").into_iter().collect();
             if e.len() != 3 {
                 return false;
@@ -166,9 +173,6 @@ mod perf_event {
                 if e.len() != 3 {
                     panic!("Please supply (event name, pid, cpu)");
                 }
-                // 0, -1 measures the calling thread on all CPUs
-                // -1, 0 measures all threads on CPU 0
-                // -1, -1 is invalid
                 (
                     e[0].into(),
                     e[1].parse().expect("Failed to parse pid"),
@@ -178,6 +182,7 @@ mod perf_event {
             .collect()
     }
 
+    /// Work counter for perf events
     #[derive(Clone)]
     pub struct WorkPerfEvent {
         base: WorkCounterBase,
@@ -187,6 +192,13 @@ mod perf_event {
     }
 
     impl WorkPerfEvent {
+        /// Create a work counter
+        ///
+        /// See `perf_event_open` for more details on `pid` and `cpu`
+        /// Examples:
+        /// 0, -1 measures the calling thread on all CPUs
+        /// -1, 0 measures all threads on CPU 0
+        /// -1, -1 is invalid
         pub fn new(name: &str, pid: pid_t, cpu: c_int) -> WorkPerfEvent {
             let mut pe =
                 PerfEvent::new(name).expect(&format!("Failed to create perf event {}", name));
