@@ -169,6 +169,13 @@ pub fn start_worker<VM: VMBinding>(
 /// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
 ///   Collection::spawn_worker_thread() so that the VM knows the context.
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
+    #[cfg(feature = "perf")]
+    {
+        use crate::scheduler::stat::PERF_EVENTS;
+        use crate::scheduler::work_counter::parse_perf_events;
+        let mut w = PERF_EVENTS.write().unwrap();
+        *w = parse_perf_events(&mmtk.options.perf_events)
+    }
     mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
     VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);

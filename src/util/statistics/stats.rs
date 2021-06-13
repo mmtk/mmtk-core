@@ -2,11 +2,13 @@ use crate::mmtk::MMTK;
 use crate::util::statistics::counter::*;
 use crate::util::statistics::Timer;
 use crate::vm::VMBinding;
+
+#[cfg(feature = "perf")]
+use pfm::Perfmon;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
-use pfm::Perfmon;
 
 pub const MAX_PHASES: usize = 1 << 12;
 pub const MAX_COUNTERS: usize = 100;
@@ -38,6 +40,7 @@ impl SharedStats {
 pub struct Stats {
     gc_count: AtomicUsize,
     total_time: Arc<Mutex<Timer>>,
+    #[cfg(feature = "perf")]
     perfmon: Perfmon,
 
     pub shared: Arc<SharedStats>,
@@ -57,11 +60,15 @@ impl Stats {
             true,
             false,
         )));
-        let mut perfmon: Perfmon = Default::default();
-        perfmon.initialize().expect("Perfmon failed to initialize");
+        #[cfg(feature = "perf")]
+        {
+            let mut perfmon: Perfmon = Default::default();
+            perfmon.initialize().expect("Perfmon failed to initialize");
+        }
         Stats {
             gc_count: AtomicUsize::new(0),
             total_time: t.clone(),
+            #[cfg(feature = "perf")]
             perfmon,
 
             shared,

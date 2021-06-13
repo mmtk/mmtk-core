@@ -4,9 +4,7 @@
 //! work-packet level statistics
 //!
 //! See [`crate::util::statistics`] for collecting statistics over a GC cycle
-use pfm::PerfEvent;
 use std::time::SystemTime;
-use std::fmt;
 
 /// Common struct for different work counters
 ///
@@ -136,58 +134,107 @@ impl WorkCounter for WorkDuration {
     }
 }
 
-#[derive(Copy, Clone)]
-pub(super) struct WorkPerfEvent {
-    base: WorkCounterBase,
-    running: bool,
-    event_name: &'static str,
-    pe: PerfEvent,
-}
+#[cfg(feature = "perf")]
+mod perf_event {
+    use super::*;
+    use libc::{c_int, pid_t};
+    use pfm::PerfEvent;
+    use std::fmt;
 
-impl WorkPerfEvent {
-    pub(super) fn new(name: &'static str) -> WorkPerfEvent {
-        let mut pe = PerfEvent::new(name).expect(&format!("Failed to create perf event {}", name));
-        pe.open().expect(&format!("Failed to open perf event {}", name));
-        WorkPerfEvent {
-            base: Default::default(),
-            running: false,
-            event_name: name,
-            pe,
+    pub fn validate_perf_events(events: &str) -> bool {
+        for event in events.split(";") {
+            let e: Vec<&str> = event.split(",").into_iter().collect();
+            if e.len() != 3 {
+                return false;
+            }
+            if e[1].parse::<i32>().is_err() {
+                return false;
+            }
+            if e[2].parse::<i32>().is_err() {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn parse_perf_events(events: &str) -> Vec<(String, i32, i32)> {
+        events
+            .split(";")
+            .map(|e| {
+                let e: Vec<&str> = e.split(",").into_iter().collect();
+                if e.len() != 3 {
+                    panic!("Please supply (event name, pid, cpu)");
+                }
+                // 0, -1 measures the callthing thread on all CPUs
+                // -1, 0 measures all threads on CPU 0
+                // -1, -1 is invalid
+                (
+                    e[0].into(),
+                    e[1].parse().expect("Failed to parse pid"),
+                    e[2].parse().expect("Failed to parse cpu"),
+                )
+            })
+            .collect()
+    }
+
+    #[derive(Clone)]
+    pub struct WorkPerfEvent {
+        base: WorkCounterBase,
+        running: bool,
+        event_name: String,
+        pe: PerfEvent,
+    }
+
+    impl WorkPerfEvent {
+        pub fn new(name: &str, pid: pid_t, cpu: c_int) -> WorkPerfEvent {
+            let mut pe =
+                PerfEvent::new(name).expect(&format!("Failed to create perf event {}", name));
+            pe.open(pid, cpu)
+                .expect(&format!("Failed to open perf event {}", name));
+            WorkPerfEvent {
+                base: Default::default(),
+                running: false,
+                event_name: name.to_string(),
+                pe,
+            }
+        }
+    }
+
+    impl fmt::Debug for WorkPerfEvent {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("WorkPerfEvent")
+                .field("base", &self.base)
+                .field("running", &self.running)
+                .field("event_name", &self.event_name)
+                .finish()
+        }
+    }
+
+    impl WorkCounter for WorkPerfEvent {
+        fn start(&mut self) {
+            self.running = true;
+            self.pe.reset();
+            self.pe.enable();
+        }
+        fn stop(&mut self) {
+            self.running = true;
+            let perf_event_value = self.pe.read().unwrap();
+            self.base.merge_val(perf_event_value.value as f64);
+            // assert not multiplexing
+            assert_eq!(perf_event_value.time_enabled, perf_event_value.time_running);
+            self.pe.disable();
+        }
+        fn name(&self) -> String {
+            self.event_name.to_owned()
+        }
+        fn get_base(&self) -> &WorkCounterBase {
+            &self.base
+        }
+        fn get_base_mut(&mut self) -> &mut WorkCounterBase {
+            &mut self.base
         }
     }
 }
 
-impl fmt::Debug for WorkPerfEvent {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("WorkPerfEvent")
-         .field("base", &self.base)
-         .field("running", &self.running)
-         .field("event_name", &self.event_name)
-         .finish()
-    }
-}
-
-impl WorkCounter for WorkPerfEvent {
-    fn start(&mut self) {
-        self.running = true;
-        self.pe.reset();
-        self.pe.enable();
-    }
-    fn stop(&mut self) {
-        self.running = true;
-        let perf_event_value = self.pe.read().unwrap();
-        self.base.merge_val(perf_event_value.value as f64);
-        // assert not multiplexing
-        assert_eq!(perf_event_value.time_enabled, perf_event_value.time_running);
-        self.pe.disable();
-    }
-    fn name(&self) -> String {
-        self.event_name.to_owned()
-    }
-    fn get_base(&self) -> &WorkCounterBase {
-        &self.base
-    }
-    fn get_base_mut(&mut self) -> &mut WorkCounterBase {
-        &mut self.base
-    }
-}
+#[cfg(feature = "perf")]
+pub use perf_event::{parse_perf_events, validate_perf_events, WorkPerfEvent};

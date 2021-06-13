@@ -1,3 +1,5 @@
+#[cfg(feature = "perf")]
+use crate::scheduler::work_counter::validate_perf_events;
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use std::cell::UnsafeCell;
 use std::default::Default;
@@ -50,20 +52,9 @@ fn always_valid<T>(_: &T) -> bool {
     true
 }
 
+#[cfg(not(feature = "perf"))]
 fn validate_perf_events(events: &str) -> bool {
-    for event in events.split(";") {
-        let e: Vec<&str> = event.split(",").into_iter().collect();
-        if e.len() != 3 {
-            return false;
-        }
-        if e[1].parse::<i32>().is_err() {
-            return false;
-        }
-        if e[2].parse::<i32>().is_err() {
-            return false;
-        }
-    }
-    true
+    !(events.len() > 0)
 }
 
 macro_rules! options {
@@ -294,7 +285,10 @@ mod tests {
                     std::env::set_var("MMTK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
 
                     let options = Options::default();
-                    assert_eq!(&options.perf_events as &str, "PERF_COUNT_HW_CPU_CYCLES,0,-1");
+                    assert_eq!(
+                        &options.perf_events as &str,
+                        "PERF_COUNT_HW_CPU_CYCLES,0,-1"
+                    );
                 },
                 || {
                     std::env::remove_var("MMTK_PERF_EVENTS");
