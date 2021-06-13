@@ -135,8 +135,8 @@ impl WorkCounter for WorkDuration {
 }
 
 pub fn validate_perf_events(events: &str) -> bool {
-    for event in events.split(";").filter(|e| e.len() > 0) {
-        let e: Vec<&str> = event.split(",").into_iter().collect();
+    for event in events.split(';').filter(|e| !e.is_empty()) {
+        let e: Vec<&str> = event.split(',').into_iter().collect();
         if e.len() != 3 {
             return false;
         }
@@ -166,10 +166,10 @@ mod perf_event {
 
     pub fn parse_perf_events(events: &str) -> Vec<(String, i32, i32)> {
         events
-            .split(";")
-            .filter(|e| e.len() > 0)
+            .split(';')
+            .filter(|e| !e.is_empty())
             .map(|e| {
-                let e: Vec<&str> = e.split(",").into_iter().collect();
+                let e: Vec<&str> = e.split(',').into_iter().collect();
                 if e.len() != 3 {
                     panic!("Please supply (event name, pid, cpu)");
                 }
@@ -201,9 +201,9 @@ mod perf_event {
         /// -1, -1 is invalid
         pub fn new(name: &str, pid: pid_t, cpu: c_int) -> WorkPerfEvent {
             let mut pe =
-                PerfEvent::new(name).expect(&format!("Failed to create perf event {}", name));
+                PerfEvent::new(name).unwrap_or_else(|_| panic!("Failed to create perf event {}", name));
             pe.open(pid, cpu)
-                .expect(&format!("Failed to open perf event {}", name));
+                .unwrap_or_else(|_| panic!("Failed to open perf event {}", name));
             WorkPerfEvent {
                 base: Default::default(),
                 running: false,
