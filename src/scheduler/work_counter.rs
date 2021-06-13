@@ -160,12 +160,13 @@ mod perf_event {
     pub fn parse_perf_events(events: &str) -> Vec<(String, i32, i32)> {
         events
             .split(";")
+            .filter(|e| e.len() > 0)
             .map(|e| {
                 let e: Vec<&str> = e.split(",").into_iter().collect();
                 if e.len() != 3 {
                     panic!("Please supply (event name, pid, cpu)");
                 }
-                // 0, -1 measures the callthing thread on all CPUs
+                // 0, -1 measures the calling thread on all CPUs
                 // -1, 0 measures all threads on CPU 0
                 // -1, -1 is invalid
                 (

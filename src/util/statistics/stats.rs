@@ -61,10 +61,9 @@ impl Stats {
             false,
         )));
         #[cfg(feature = "perf")]
-        {
-            let mut perfmon: Perfmon = Default::default();
-            perfmon.initialize().expect("Perfmon failed to initialize");
-        }
+        let mut perfmon: Perfmon = Default::default();
+        #[cfg(feature = "perf")]
+        perfmon.initialize().expect("Perfmon failed to initialize");
         Stats {
             gc_count: AtomicUsize::new(0),
             total_time: t.clone(),
