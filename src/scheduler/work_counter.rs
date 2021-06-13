@@ -200,8 +200,8 @@ mod perf_event {
         /// -1, 0 measures all threads on CPU 0
         /// -1, -1 is invalid
         pub fn new(name: &str, pid: pid_t, cpu: c_int) -> WorkPerfEvent {
-            let mut pe =
-                PerfEvent::new(name).unwrap_or_else(|_| panic!("Failed to create perf event {}", name));
+            let mut pe = PerfEvent::new(name)
+                .unwrap_or_else(|_| panic!("Failed to create perf event {}", name));
             pe.open(pid, cpu)
                 .unwrap_or_else(|_| panic!("Failed to open perf event {}", name));
             WorkPerfEvent {
