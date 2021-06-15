@@ -76,7 +76,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             };
         self.treadmill.add_to_treadmill(cell, alloc);
         // This is not used right now.
-        // Future use will need refactoring the we mmtk deals with unlogged_bit, e.g. same as any other metadata.
+        // Future use will need refactoring how mmtk deals with unlogged_bit, e.g. same as any other metadata.
         // if self.header_byte.needs_unlogged_bit {
         //     VM::VMObjectModel::store_metadata(
         //         VM::VMObjectModel::LOCAL_UNLOGGED_BIT_SPEC,

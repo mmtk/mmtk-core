@@ -23,6 +23,8 @@ const FORWARDING_POINTER_MASK: usize = 0x00ff_ffff_ffff_fff8;
 #[cfg(target_pointer_width = "32")]
 const FORWARDING_POINTER_MASK: usize = 0xffff_fffc;
 
+// Attempt to become the worker thread who will forward the object.
+// The successful worker will set the object forwarding bits to BEING_FORWARDED, preventing other workers from forwarding the same object.
 pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> usize {
     loop {
         let old_value = VM::VMObjectModel::load_metadata(

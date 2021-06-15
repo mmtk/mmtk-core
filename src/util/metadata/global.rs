@@ -14,10 +14,19 @@ use crate::util::Address;
 /// For performance reasons, objects of this struct should be constants.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MetadataSpec {
+    /// Shows whether the side metadata is on side (`true`) or in object header (`false`).
     pub is_side_metadata: bool,
+    /// Shows whether the metadata is global, or policy-specific
     pub is_global: bool,
+    /// A multi-purpose field:
+    ///  - For contiguous side metadata, this field represents the absolute starting address.
+    ///  - For chunked side metadata, this field represents the offset (in bytes) from the start of the metadata chunk.
+    ///  - For in-header metadata, this is the offset (in bits) from the object reference.
     pub offset: isize,
+    /// The number of bits included in this metadata.
+    /// For side metadata, this must be a power of two (2^n)
     pub num_of_bits: usize,
+    /// Log2 of the minimum object size
     pub log_min_obj_size: usize,
 }
 

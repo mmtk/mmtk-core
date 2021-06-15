@@ -7,7 +7,7 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkerLocal;
 use crate::util::alloc::{Allocator, BumpAllocator};
-use crate::util::forwarding_word;
+use crate::util::object_forwarding;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -54,7 +54,7 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
         _bytes: usize,
         _semantics: crate::AllocationSemantics,
     ) {
-        forwarding_word::clear_forwarding_bits::<VM>(obj);
+        object_forwarding::clear_forwarding_bits::<VM>(obj);
         if !super::NO_SLOW && super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
             VM::VMObjectModel::store_metadata(
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,

@@ -32,8 +32,6 @@ pub(crate) mod analysis;
 pub(crate) mod edge_logger;
 /// Finalization implementation.
 pub(crate) mod finalizable_processor;
-/// Forwarding word in object copying.
-pub(crate) mod forwarding_word;
 /// Heap implementation, including page resource, mmapper, etc.
 pub(crate) mod heap;
 /// Logger initialization
@@ -42,6 +40,8 @@ pub(crate) mod logger;
 pub(crate) mod malloc;
 /// Side metadata implementation.
 pub mod metadata;
+/// Forwarding word in object copying.
+pub(crate) mod object_forwarding;
 /// MMTk command line options.
 pub(crate) mod options;
 /// Sanity checker for GC.
