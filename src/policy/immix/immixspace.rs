@@ -44,7 +44,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
+    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {}
 }
 
 impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
@@ -66,10 +66,6 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
-    }
-
-    fn local_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        Self::side_metadata_specs()
     }
 }
 
@@ -193,7 +189,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 defrag_threshold: if space.in_defrag() { Some(threshold) } else { None },
             }
         });
-        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(1000, work_packets);
+        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
 
         if !super::BLOCK_ONLY {
             self.line_mark_state.fetch_add(1, Ordering::AcqRel);
@@ -215,7 +211,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         let space = unsafe { &*(self as *const Self) };
         let work_packets = self.chunk_map.generate_sweep_tasks(space, mmtk);
-        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(1000, work_packets);
+        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
 
         self.in_collection.store(false, Ordering::Release);
         if !super::BLOCK_ONLY {
