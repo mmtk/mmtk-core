@@ -7,6 +7,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
 use crate::util::opaque_pointer::*;
+use crate::util::side_metadata::SideMetadataSanity;
 use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -52,8 +53,8 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
-        trace!("initialize_header for object {}", object);
+    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
+        trace!("initialize_object_metadata for object {}", object);
         set_alloc_bit(object);
     }
 }
@@ -126,8 +127,14 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     fn reserved_pages(&self) -> usize {
-        conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst))
-            + self.metadata.reserved_pages()
+        let data_pages = conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst));
+        let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
+        data_pages + meta_pages
+    }
+
+    fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
+        side_metadata_sanity_checker
+            .verify_metadata_context(std::any::type_name::<Self>(), self.metadata.get_context())
     }
 }
 

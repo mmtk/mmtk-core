@@ -1,13 +1,13 @@
 use super::*;
-use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_PAGE};
+use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::heap::PageAccounting;
 use crate::util::memory;
 use crate::util::{constants, Address};
+use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum SideMetadataScope {
     Global,
     PolicySpecific,
@@ -25,17 +25,33 @@ impl SideMetadataScope {
 /// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.
 ///
 /// For performance reasons, objects of this struct should be constants.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SideMetadataSpec {
     pub scope: SideMetadataScope,
     pub offset: usize,
+    /// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.
     pub log_num_of_bits: usize,
+    /// Number of bytes of the region. E.g. 3 = 8 bytes, 12 = 4096 bytes (page).
     pub log_min_obj_size: usize,
 }
 
 impl SideMetadataSpec {
     pub const fn accumulated_size(&self) -> usize {
         self.offset + super::metadata_address_range_size(*self)
+    }
+}
+
+impl fmt::Debug for SideMetadataSpec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!(
+            "SideMetadataSpec {{ \
+            **Scope: {:?} \
+            **offset: 0x{:x} \
+            **log_num_of_bits: 0x{:x} \
+            **log_min_obj_size: 0x{:x} \
+            }}",
+            self.scope, self.offset, self.log_num_of_bits, self.log_min_obj_size
+        ))
     }
 }
 
@@ -61,20 +77,41 @@ impl SideMetadataContext {
 
 pub struct SideMetadata {
     context: SideMetadataContext,
-    accounting: PageAccounting,
 }
 
 impl SideMetadata {
     pub fn new(context: SideMetadataContext) -> SideMetadata {
-        Self {
-            context,
-            accounting: PageAccounting::new(),
-        }
+        Self { context }
     }
 
-    pub fn reserved_pages(&self) -> usize {
-        self.accounting.get_reserved_pages()
+    pub fn get_context(&self) -> &SideMetadataContext {
+        &self.context
     }
+
+    pub fn get_local_specs(&self) -> &[SideMetadataSpec] {
+        &self.context.local
+    }
+
+    /// Return the pages reserved for side metadata based on the data pages we used.
+    // We used to use PageAccouting to count pages used in side metadata. However,
+    // that means we always count pages while we may reserve less than a page each time.
+    // This could lead to overcount. I think the easier way is to not account
+    // when we allocate for sidemetadata, but to calculate the side metadata usage based on
+    // how many data pages we use when reporting.
+    pub fn calculate_reserved_pages(&self, data_pages: usize) -> usize {
+        let mut total = 0;
+        for spec in self.context.global.iter() {
+            let rshift = addr_rshift(spec);
+            total += (data_pages + ((1 << rshift) - 1)) >> rshift;
+        }
+        for spec in self.context.local.iter() {
+            let rshift = addr_rshift(spec);
+            total += (data_pages + ((1 << rshift) - 1)) >> rshift;
+        }
+        total
+    }
+
+    pub fn reset(&self) {}
 
     // ** NOTE: **
     //  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
@@ -122,13 +159,7 @@ impl SideMetadata {
     fn map_metadata_internal(&self, start: Address, size: usize, no_reserve: bool) -> Result<()> {
         for spec in self.context.global.iter() {
             match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
-                Ok(mapped) => {
-                    // We actually reserved memory
-                    if !no_reserve {
-                        self.accounting
-                            .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
-                    }
-                }
+                Ok(_) => {}
                 Err(e) => return Result::Err(e),
             }
         }
@@ -149,13 +180,7 @@ impl SideMetadata {
             #[cfg(target_pointer_width = "64")]
             {
                 match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
-                    Ok(mapped) => {
-                        // We actually reserved memory
-                        if !no_reserve {
-                            self.accounting
-                                .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
-                        }
-                    }
+                    Ok(_) => {}
                     Err(e) => return Result::Err(e),
                 }
             }
@@ -175,13 +200,7 @@ impl SideMetadata {
                 max
             );
             match try_map_per_chunk_metadata_space(start, size, lsize, no_reserve) {
-                Ok(mapped) => {
-                    // We actually reserved memory
-                    if !no_reserve {
-                        self.accounting
-                            .reserve_and_commit(mapped >> LOG_BYTES_IN_PAGE);
-                    }
-                }
+                Ok(_) => {}
                 Err(e) => return Result::Err(e),
             }
         }
@@ -196,26 +215,24 @@ impl SideMetadata {
     /// Note-2: This function uses munmap() which works at page granularity.
     ///     If the corresponding metadata space's size is not a multiple of page size,
     ///     the actual unmapped space will be bigger than what you specify.
+    #[cfg(test)]
     pub fn ensure_unmap_metadata_space(&self, start: Address, size: usize) {
         trace!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
         debug_assert!(size % BYTES_IN_PAGE == 0);
 
         for spec in self.context.global.iter() {
-            let size = ensure_munmap_contiguos_metadata_space(start, size, spec);
-            self.accounting.release(size >> LOG_BYTES_IN_PAGE);
+            ensure_munmap_contiguos_metadata_space(start, size, spec);
         }
 
         for spec in self.context.local.iter() {
             #[cfg(target_pointer_width = "64")]
             {
-                let size = ensure_munmap_contiguos_metadata_space(start, size, spec);
-                self.accounting.release(size >> LOG_BYTES_IN_PAGE);
+                ensure_munmap_contiguos_metadata_space(start, size, spec);
             }
             #[cfg(target_pointer_width = "32")]
             {
-                let size = ensure_munmap_chunked_metadata_space(start, size, spec);
-                self.accounting.release(size >> LOG_BYTES_IN_PAGE);
+                ensure_munmap_chunked_metadata_space(start, size, spec);
             }
         }
     }
@@ -236,6 +253,9 @@ pub fn ensure_metadata_is_mapped(metadata_spec: SideMetadataSpec, data_addr: Add
 
 #[inline(always)]
 pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
+    #[cfg(feature = "extreme_assertions")]
+    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
@@ -243,7 +263,7 @@ pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
 
     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log <= 3 {
+    let res = if bits_num_log <= 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
         let mask = meta_byte_mask(metadata_spec) << lshift;
         let byte_val = unsafe { meta_addr.atomic_load::<AtomicU8>(Ordering::SeqCst) };
@@ -260,10 +280,18 @@ pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
             "side metadata > {}-bits is not supported!",
             constants::BITS_IN_WORD
         );
-    }
+    };
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::verify_load(&metadata_spec, data_addr, res);
+
+    res
 }
 
 pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
+    #[cfg(feature = "extreme_assertions")]
+    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
@@ -293,13 +321,16 @@ pub fn store_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
     } else if bits_num_log == 5 {
         unsafe { meta_addr.atomic_store::<AtomicU32>(metadata as u32, Ordering::SeqCst) };
     } else if bits_num_log == 6 {
-        unsafe { meta_addr.atomic_store::<AtomicUsize>(metadata as usize, Ordering::SeqCst) }
+        unsafe { meta_addr.atomic_store::<AtomicUsize>(metadata as usize, Ordering::SeqCst) };
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
             constants::BITS_IN_WORD
         );
     }
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::verify_store(metadata_spec, data_addr, metadata);
 }
 
 pub fn compare_exchange_atomic(
@@ -308,6 +339,13 @@ pub fn compare_exchange_atomic(
     old_metadata: usize,
     new_metadata: usize,
 ) -> bool {
+    #[cfg(feature = "extreme_assertions")]
+    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
+    debug!(
+        "compare_exchange_atomic({:?}, {}, {}, {})",
+        metadata_spec, data_addr, old_metadata, new_metadata
+    );
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
@@ -315,7 +353,8 @@ pub fn compare_exchange_atomic(
 
     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log < 3 {
+    #[allow(clippy::let_and_return)]
+    let res = if bits_num_log < 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
         let mask = meta_byte_mask(metadata_spec) << lshift;
 
@@ -382,11 +421,21 @@ pub fn compare_exchange_atomic(
             "side metadata > {}-bits is not supported!",
             constants::BITS_IN_WORD
         );
+    };
+
+    #[cfg(feature = "extreme_assertions")]
+    if res {
+        sanity::verify_store(metadata_spec, data_addr, new_metadata);
     }
+
+    res
 }
 
 // same as Rust atomics, this wraps around on overflow
 pub fn fetch_add_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val: usize) -> usize {
+    #[cfg(feature = "extreme_assertions")]
+    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
@@ -394,7 +443,8 @@ pub fn fetch_add_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
 
     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log < 3 {
+    #[allow(clippy::let_and_return)]
+    let old_val = if bits_num_log < 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
         let mask = meta_byte_mask(metadata_spec) << lshift;
 
@@ -432,11 +482,19 @@ pub fn fetch_add_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
             "side metadata > {}-bits is not supported!",
             constants::BITS_IN_WORD
         );
-    }
+    };
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::verify_add(metadata_spec, data_addr, val, old_val);
+
+    old_val
 }
 
 // same as Rust atomics, this wraps around on overflow
 pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val: usize) -> usize {
+    #[cfg(feature = "extreme_assertions")]
+    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
@@ -444,7 +502,8 @@ pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
 
     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log < 3 {
+    #[allow(clippy::let_and_return)]
+    let old_val = if bits_num_log < 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
         let mask = meta_byte_mask(metadata_spec) << lshift;
 
@@ -482,7 +541,12 @@ pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
             "side metadata > {}-bits is not supported!",
             constants::BITS_IN_WORD
         );
-    }
+    };
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::verify_sub(metadata_spec, data_addr, val, old_val);
+
+    old_val
 }
 
 /// Non-atomic load of metadata.
@@ -495,6 +559,9 @@ pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
 pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
+    #[cfg(feature = "extreme_assertions")]
+    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
@@ -502,7 +569,8 @@ pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
 
     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log <= 3 {
+    #[allow(clippy::let_and_return)]
+    let res = if bits_num_log <= 3 {
         let lshift = meta_byte_lshift(metadata_spec, data_addr);
         let mask = meta_byte_mask(metadata_spec) << lshift;
         let byte_val = meta_addr.load::<u8>();
@@ -519,7 +587,12 @@ pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
             "side metadata > {}-bits is not supported!",
             constants::BITS_IN_WORD
         );
-    }
+    };
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::verify_load(&metadata_spec, data_addr, res);
+
+    res
 }
 
 /// Non-atomic store of metadata.
@@ -532,6 +605,9 @@ pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
 pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
+    #[cfg(feature = "extreme_assertions")]
+    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
@@ -561,6 +637,9 @@ pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
             constants::BITS_IN_WORD
         );
     }
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::verify_store(metadata_spec, data_addr, metadata);
 }
 
 /// Bulk-zero a specific metadata for a chunk.
@@ -572,9 +651,15 @@ pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
 /// * `chunk_start` - The starting address of the chunk whose metadata is being zeroed.
 ///
 pub fn bzero_metadata(metadata_spec: SideMetadataSpec, start: Address, size: usize) {
+    #[cfg(feature = "extreme_assertions")]
+    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
     debug_assert!(
         start.is_aligned_to(BYTES_IN_PAGE) && meta_byte_lshift(metadata_spec, start) == 0
     );
+
+    #[cfg(feature = "extreme_assertions")]
+    sanity::verify_bzero(metadata_spec, start, size);
 
     let meta_start = address_to_meta_address(metadata_spec, start);
     if cfg!(target_pointer_width = "64") || metadata_spec.scope.is_global() {
@@ -621,5 +706,57 @@ pub fn bzero_metadata(metadata_spec: SideMetadataSpec, start: Address, size: usi
                 next_data_chunk += BYTES_IN_CHUNK;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn calculate_reserved_pages_one_spec() {
+        // 1 bit per 8 bytes - 1:64
+        let spec = SideMetadataSpec {
+            scope: SideMetadataScope::Global,
+            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            log_num_of_bits: 0,
+            log_min_obj_size: 3,
+        };
+        let side_metadata = SideMetadata {
+            context: SideMetadataContext {
+                global: vec![spec],
+                local: vec![],
+            },
+        };
+        assert_eq!(side_metadata.calculate_reserved_pages(0), 0);
+        assert_eq!(side_metadata.calculate_reserved_pages(63), 1);
+        assert_eq!(side_metadata.calculate_reserved_pages(64), 1);
+        assert_eq!(side_metadata.calculate_reserved_pages(65), 2);
+        assert_eq!(side_metadata.calculate_reserved_pages(1024), 16);
+    }
+
+    #[test]
+    fn calculate_reserved_pages_multi_specs() {
+        // 1 bit per 8 bytes - 1:64
+        let gspec = SideMetadataSpec {
+            scope: SideMetadataScope::Global,
+            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            log_num_of_bits: 0,
+            log_min_obj_size: 3,
+        };
+        // 2 bits per page - 2 / (4k * 8) = 1:16k
+        let lspec = SideMetadataSpec {
+            scope: SideMetadataScope::PolicySpecific,
+            offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            log_num_of_bits: 1,
+            log_min_obj_size: 12,
+        };
+        let side_metadata = SideMetadata {
+            context: SideMetadataContext {
+                global: vec![gspec],
+                local: vec![lspec],
+            },
+        };
+        assert_eq!(side_metadata.calculate_reserved_pages(1024), 16 + 1);
     }
 }

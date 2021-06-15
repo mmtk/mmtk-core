@@ -6,6 +6,7 @@ use crate::util::side_metadata::*;
 use crate::util::*;
 use crate::MMTK;
 
+/// BarrierSelector describes which barrier to use.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BarrierSelector {
     NoBarrier,

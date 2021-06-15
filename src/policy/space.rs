@@ -1,7 +1,7 @@
-use crate::util::side_metadata::{SideMetadata, SideMetadataContext};
+use crate::util::conversions::*;
+use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSanity};
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::{conversions::*, side_metadata::SideMetadataSpec};
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
@@ -28,33 +28,38 @@ use std::marker::PhantomData;
 
 use downcast_rs::Downcast;
 
-/**
- * Space Function Table (SFT).
- *
- * This trait captures functions that reflect _space-specific per-object
- * semantics_.   These functions are implemented for each object via a special
- * space-based dynamic dispatch mechanism where the semantics are _not_
- * determined by the object's _type_, but rather, are determined by the _space_
- * that the object is in.
- *
- * The underlying mechanism exploits the fact that spaces use the address space
- * at an MMTk chunk granularity with the consequence that each chunk maps to
- * exactluy one space, so knowing the chunk for an object reveals its space.
- * The dispatch then works by performing simple address arithmetic on the object
- * reference to find a chunk index which is used to index a table which returns
- * the space.   The relevant function is then dispatched against that space
- * object.
- *
- * We use the SFT trait to simplify typing for Rust, so our table is a
- * table of SFT rather than Space.
- */
+/// Space Function Table (SFT).
+///
+/// This trait captures functions that reflect _space-specific per-object
+/// semantics_.   These functions are implemented for each object via a special
+/// space-based dynamic dispatch mechanism where the semantics are _not_
+/// determined by the object's _type_, but rather, are determined by the _space_
+/// that the object is in.
+///
+/// The underlying mechanism exploits the fact that spaces use the address space
+/// at an MMTk chunk granularity with the consequence that each chunk maps to
+/// exactluy one space, so knowing the chunk for an object reveals its space.
+/// The dispatch then works by performing simple address arithmetic on the object
+/// reference to find a chunk index which is used to index a table which returns
+/// the space.   The relevant function is then dispatched against that space
+/// object.
+///
+/// We use the SFT trait to simplify typing for Rust, so our table is a
+/// table of SFT rather than Space.
 pub trait SFT {
+    /// The space name
     fn name(&self) -> &str;
+    /// Is the object live, determined by the policy?
     fn is_live(&self, object: ObjectReference) -> bool;
+    /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
+    /// or the object is pinned.
     fn is_movable(&self) -> bool;
+    /// Is the object sane? A policy should return false if there is any abnormality about
+    /// object - the sanity checker will fail if an object is not sane.
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool;
-    fn initialize_header(&self, object: ObjectReference, alloc: bool);
+    /// Initialize object metadata (in the header, or in the side metadata).
+    fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
 }
 
 /// Print debug info for SFT. Should be false when committed.
@@ -91,9 +96,9 @@ impl SFT for EmptySpaceSFT {
         false
     }
 
-    fn initialize_header(&self, object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         panic!(
-            "Called initialize_header() on {:x}, which maps to an empty space",
+            "Called initialize_object_metadata() on {:x}, which maps to an empty space",
             object
         )
     }
@@ -186,6 +191,8 @@ impl<'a> SFTMap<'a> {
         }
     }
 
+    // TODO: We should clear a SFT entry when a space releases a chunk.
+    #[allow(dead_code)]
     pub fn clear(&self, chunk_idx: usize) {
         self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
@@ -269,13 +276,18 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     // adding a space lock here.
                     let bytes = conversions::pages_to_bytes(res.pages);
                     self.grow_space(res.start, bytes, res.new_chunk);
-                    // Mmap the pages and handle error. In case of any error,
+                    // Mmap the pages and the side metadata, and handle error. In case of any error,
                     // we will either call back to the VM for OOM, or simply panic.
-                    if let Err(mmap_error) = self.common().mmapper.ensure_mapped(
-                        res.start,
-                        res.pages,
-                        &self.common().metadata,
-                    ) {
+                    if let Err(mmap_error) = self
+                        .common()
+                        .mmapper
+                        .ensure_mapped(res.start, res.pages)
+                        .and(
+                            self.common()
+                                .metadata
+                                .try_map_metadata_space(res.start, bytes),
+                        )
+                    {
                         memory::handle_mmap_error::<VM>(mmap_error, tls);
                     }
 
@@ -365,7 +377,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn reserved_pages(&self) -> usize {
-        self.get_page_resource().reserved_pages() + self.common().metadata.reserved_pages()
+        let data_pages = self.get_page_resource().reserved_pages();
+        let meta_pages = self.common().metadata.calculate_reserved_pages(data_pages);
+        data_pages + meta_pages
     }
 
     fn get_name(&self) -> &'static str {
@@ -421,8 +435,20 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         println!();
     }
 
-    fn local_side_metadata_specs(&self) -> &[SideMetadataSpec] {
-        &[]
+    /// Ensure that the current space's metadata context does not have any issues.
+    /// Panics with a suitable message if any issue is detected.
+    /// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.
+    /// Internally this calls verify_metadata_context() from `util::side_metadata::sanity`
+    ///
+    /// This function is called once per space by its parent plan but may be called multiple times per policy.
+    ///
+    /// Arguments:
+    /// * `side_metadata_sanity_checker`: The `SideMetadataSanity` object instantiated in the calling plan.
+    fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
+        side_metadata_sanity_checker.verify_metadata_context(
+            std::any::type_name::<Self>(),
+            self.common().metadata.get_context(),
+        )
     }
 }
 

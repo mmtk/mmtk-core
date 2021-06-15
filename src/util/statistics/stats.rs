@@ -155,13 +155,12 @@ impl Stats {
             let c = iter.lock().unwrap();
             if c.merge_phases() {
                 c.print_total(None);
-                print!("\t");
             } else {
                 c.print_total(Some(true));
                 print!("\t");
                 c.print_total(Some(false));
-                print!("\t");
             }
+            print!("\t");
         }
         for value in scheduler_stat.values() {
             print!("{}\t", value);

@@ -1,9 +1,7 @@
 use mmtk::vm::Collection;
 use mmtk::MutatorContext;
 use mmtk::util::opaque_pointer::*;
-use mmtk::MMTK;
 use mmtk::scheduler::*;
-use mmtk::scheduler::gc_work::*;
 use DummyVM;
 
 pub struct VMCollection {}
@@ -21,7 +19,7 @@ impl Collection<DummyVM> for VMCollection {
         unimplemented!();
     }
 
-    fn spawn_worker_thread(_tls: VMThread, _ctx: Option<&Worker<MMTK<DummyVM>>>) {
+    fn spawn_worker_thread(_tls: VMThread, _ctx: Option<&GCWorker<DummyVM>>) {
         unimplemented!();
     }
 

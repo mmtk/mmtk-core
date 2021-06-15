@@ -1,4 +1,4 @@
-use crate::plan::global::CopyContext;
+use crate::plan::CopyContext;
 use crate::plan::Plan;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;

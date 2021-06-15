@@ -19,5 +19,3 @@ pub mod largeobjectspace;
 pub mod lockfreeimmortalspace;
 pub mod mallocspace;
 pub mod immix;
-
-pub const NUMBER_OF_POLICIES_REQUIRING_SIDE_METADATA: usize = 0;

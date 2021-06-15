@@ -1,6 +1,6 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
-use crate::plan::global::GcStatus;
+use crate::plan::GcStatus;
 use crate::util::side_metadata::*;
 use crate::util::*;
 use crate::vm::*;
@@ -130,7 +130,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work_bucket.add(ReleaseCollector::<W>(PhantomData));
+            w.local_work_bucket.add(ReleaseCollector::<W>::new());
         }
         // TODO: Process weak references properly
         mmtk.reference_processors.clear();
@@ -499,7 +499,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
                 compare_exchange_atomic(self.meta, obj.to_address(), 0b0, 0b1);
             }
         }
-        if mmtk.plan.in_nursery() {
+        if mmtk.plan.is_current_gc_nursery() {
             if !self.modbuf.is_empty() {
                 let mut modbuf = vec![];
                 ::std::mem::swap(&mut modbuf, &mut self.modbuf);

@@ -16,6 +16,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
+/// This type implements a simple copying space.
 pub struct CopySpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
@@ -36,7 +37,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     fn is_sane(&self) -> bool {
         !self.from_space()
     }
-    fn initialize_header(&self, _object: ObjectReference, _alloc: bool) {}
+    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {}
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
@@ -114,6 +115,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         unsafe {
             self.pr.reset();
         }
+        self.common.metadata.reset();
         self.from_space.store(false, Ordering::SeqCst);
     }
 
@@ -153,6 +155,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
     }
 
+    #[allow(dead_code)] // Only used with certain features (such as sanity)
     pub fn protect(&self) {
         if !self.common().contiguous {
             panic!(
@@ -167,6 +170,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         trace!("Protect {:x} {:x}", start, start + extent);
     }
 
+    #[allow(dead_code)] // Only used with certain features (such as sanity)
     pub fn unprotect(&self) {
         if !self.common().contiguous {
             panic!(

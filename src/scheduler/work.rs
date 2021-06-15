@@ -23,7 +23,7 @@ pub trait Work<C: Context>: 'static + Send {
 /// For this case, use `WorkBucket::add_with_priority_unsync` instead.
 pub trait CoordinatorWork<C: Context>: 'static + Send + Work<C> {}
 
-pub trait GCWork<VM: VMBinding>: 'static + Send + Sized + Work<MMTK<VM>> {
+pub trait GCWork<VM: VMBinding>: 'static + Send + Work<MMTK<VM>> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>);
 }
 
