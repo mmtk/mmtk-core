@@ -78,14 +78,34 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
     copy_context: &mut CC,
 ) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
-    write_forwarding_pointer::<VM>(object, new_object);
-    VM::VMObjectModel::store_metadata(
-        VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
-        object,
-        FORWARDED,
-        None,
-        Some(Ordering::SeqCst),
-    );
+    // write_forwarding_pointer::<VM>(object, new_object);
+    // VM::VMObjectModel::store_metadata(
+    //     VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+    //     object,
+    //     FORWARDED,
+    //     None,
+    //     Some(Ordering::SeqCst),
+    // );
+    if VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.offset == -64 {
+        VM::VMObjectModel::store_metadata(
+            VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+            object,
+            new_object.to_address().as_usize() | FORWARDED,
+            None,
+            Some(Ordering::SeqCst),
+        )
+    } else if VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.offset == 56 {
+        #[cfg(target_pointer_width = "64")]
+        VM::VMObjectModel::store_metadata(
+            VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+            object,
+            new_object.to_address().as_usize() | (FORWARDED << 56),
+            None,
+            Some(Ordering::SeqCst),
+        )
+    } else {
+        unreachable!()
+    }
     new_object
 }
 
