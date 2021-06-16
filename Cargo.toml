@@ -14,7 +14,7 @@ rust-version = "1.57.0"
 
 [lib]
 name = "mmtk"
-crate-type = ["cdylib"]
+crate-type = ["rlib"]
 doctest = false
 
 [dependencies]
