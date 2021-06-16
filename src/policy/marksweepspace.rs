@@ -1,4 +1,4 @@
-use crate::{TransitiveClosure, util::{Address, ObjectReference, constants::CARD_META_PAGES_PER_REGION, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, side_metadata::{SideMetadataContext, SideMetadataSpec}}, vm::VMBinding};
+use crate::{TransitiveClosure, util::{ObjectReference, constants::CARD_META_PAGES_PER_REGION, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, side_metadata::{SideMetadataContext, SideMetadataSpec}}, vm::VMBinding};
 
 use super::space::{CommonSpace, SFT, Space, SpaceOptions};
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
@@ -33,11 +33,11 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
 
 impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
     fn as_space(&self) -> &dyn Space<VM> {
-        todo!()
+        self
     }
 
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
-        todo!()
+        self
     }
 
     fn get_page_resource(&self) -> &dyn crate::util::heap::PageResource<VM> {
@@ -107,15 +107,4 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     ) {
         todo!()
     }
-
-    pub fn acquire_block(&self) -> Address {
-        // acquire 64kB block from the global pool
-        todo!()
-    }
-
-    pub fn return_block(&self) {
-        // return freed 64kB block
-        todo!()
-    }
-
 }
