@@ -21,6 +21,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
         todo!()
     }
 
+    #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
         todo!()
     }
@@ -83,12 +84,12 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             heap,
         );
         MarkSweepSpace {
-            common,
             pr: if vmrequest.is_discontiguous() {
                 FreeListPageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
             } else {
                 FreeListPageResource::new_contiguous(common.start, common.extent, META_DATA_PAGES_PER_REGION, vm_map)
-            }
+            },
+            common,
         }
     }
 
