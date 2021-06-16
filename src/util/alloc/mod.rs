@@ -18,6 +18,12 @@ pub use self::bumpallocator::BumpAllocator;
 pub use self::large_object_allocator::LargeObjectAllocator;
 pub use self::malloc_allocator::MallocAllocator;
 
-pub use crate::policy::mallocspace::metadata::is_alloced_by_malloc;
-pub use self::mimalloc::do_something;
-pub use self::mimalloc::mimalloc_dzmmap;
+mod malloc_allocator;
+pub use malloc_allocator::MallocAllocator;
+
+mod free_list_allocator;
+pub use free_list_allocator::FreeListAllocator;
+
+pub(crate) mod dump_linear_scan;
+pub(crate) mod embedded_meta_data;
+pub(crate) mod linear_scan;
