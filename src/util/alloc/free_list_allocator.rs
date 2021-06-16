@@ -82,15 +82,31 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
 impl<VM: VMBinding> FreeListAllocator<VM> {
     fn get_size_class(size: usize) -> SizeClass {
-        todo!()
+        // TODO: multiple size classes
+        // assuming largest is 8kB?
+        1 << 13
     }
 
     fn make_free_list(block: Address, size_class: SizeClass) -> LinkedList<Address> {
-        todo!()
+        // cut 64kB block into cells for sizeclass
+        // assumes fresh block, will later be required to recycle blocks based on liveness bitmap
+        let mut cell = block;
+        let mut free_list = LinkedList::new();
+        let block_extent = unsafe { Address::from_usize(block.as_usize() + (1 << 16))}; //+64kB;
+        while cell < block_extent {
+            free_list.push_back(cell);
+        };
+        free_list
     }
 
-    fn init_size_classes() {
-        todo!()
+    fn init_size_classes(&mut self) {
+        // TODO: multiple size classes
+
+        self.available_blocks = HashMap::new();
+        self.exhausted_blocks = HashMap::new();
+
+        self.available_blocks.insert(1 << 13, LinkedList::new());
+        self.exhausted_blocks.insert(1 << 13, LinkedList::new());
     }
 
     fn alloc_to_block(block: &mut Block) -> Address {
