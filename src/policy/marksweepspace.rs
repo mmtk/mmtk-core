@@ -108,12 +108,12 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         todo!()
     }
 
-    pub fn acquire_block() -> Address {
+    pub fn acquire_block(&self) -> Address {
         // acquire 64kB block from the global pool
         todo!()
     }
 
-    pub fn return_block() {
+    pub fn return_block(&self) {
         // return freed 64kB block
         todo!()
     }
