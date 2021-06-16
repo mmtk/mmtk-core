@@ -1,9 +1,8 @@
 use mmtk::vm::Scanning;
 use mmtk::{TransitiveClosure, Mutator};
 use mmtk::util::ObjectReference;
-use mmtk::util::OpaquePointer;
-use mmtk::scheduler::gc_work::*;
-use mmtk::scheduler::GCWorker;
+use mmtk::util::opaque_pointer::*;
+use mmtk::scheduler::*;
 use crate::DummyVM;
 
 pub struct VMScanning {}
@@ -15,16 +14,16 @@ impl Scanning<DummyVM> for VMScanning {
     fn scan_thread_roots<W: ProcessEdgesWork<VM=DummyVM>>() {
         unimplemented!()
     }
-    fn scan_thread_root<W: ProcessEdgesWork<VM=DummyVM>>(_mutator: &'static mut Mutator<DummyVM>, _tls: OpaquePointer) {
+    fn scan_thread_root<W: ProcessEdgesWork<VM=DummyVM>>(_mutator: &'static mut Mutator<DummyVM>, _tls: VMWorkerThread) {
         unimplemented!()
     }
     fn scan_vm_specific_roots<W: ProcessEdgesWork<VM=DummyVM>>() {
         unimplemented!()
     }
-    fn scan_object<T: TransitiveClosure>(_trace: &mut T, _object: ObjectReference, _tls: OpaquePointer) {
+    fn scan_object<T: TransitiveClosure>(_trace: &mut T, _object: ObjectReference, _tls: VMWorkerThread) {
         unimplemented!()
     }
-    fn notify_initial_thread_scan_complete(_partial_scan: bool, _tls: OpaquePointer) {
+    fn notify_initial_thread_scan_complete(_partial_scan: bool, _tls: VMWorkerThread) {
         unimplemented!()
     }
     fn supports_return_barrier() -> bool {

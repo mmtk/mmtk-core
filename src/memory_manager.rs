@@ -12,14 +12,16 @@
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
 use crate::mmtk::MMTK;
-use crate::plan::mutator_context::{Mutator, MutatorContext};
 use crate::plan::AllocationSemantics;
+use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::GCWorker;
+use crate::scheduler::Work;
+use crate::scheduler::WorkBucketStage;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
 use crate::vm::VMBinding;
@@ -30,7 +32,7 @@ use std::sync::atomic::Ordering;
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that will be used as the GC controller.
-pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
+pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMWorkerThread) {
     mmtk.plan.base().control_collector_context.run(tls);
 }
 
@@ -49,7 +51,8 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
         ),
     }
     assert!(heap_size > 0, "Invalid heap size");
-    mmtk.plan.gc_init(heap_size, &mmtk.vm_map, &mmtk.scheduler);
+    mmtk.plan
+        .gc_init(heap_size, &crate::VM_MAP, &mmtk.scheduler);
     info!("Initialized MMTk with {:?}", mmtk.options.plan);
 }
 
@@ -61,9 +64,9 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
 /// * `tls`: The thread that will be associated with the mutator.
 pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
-    tls: OpaquePointer,
+    tls: VMMutatorThread,
 ) -> Box<Mutator<VM>> {
-    crate::plan::global::create_mutator(tls, mmtk)
+    crate::plan::create_mutator(tls, mmtk)
 }
 
 /// Reclaim a mutator that is no longer needed.
@@ -148,7 +151,7 @@ pub fn get_allocator_mapping<VM: VMBinding>(
 /// * `worker`: A reference to the GC worker.
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn start_worker<VM: VMBinding>(
-    tls: OpaquePointer,
+    tls: VMWorkerThread,
     worker: &mut GCWorker<VM>,
     mmtk: &'static MMTK<VM>,
 ) {
@@ -165,7 +168,7 @@ pub fn start_worker<VM: VMBinding>(
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
 ///   Collection::spawn_worker_thread() so that the VM knows the context.
-pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: OpaquePointer) {
+pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
     mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
     VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
@@ -228,7 +231,7 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that triggers this collection request.
-pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
+pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     mmtk.plan.handle_user_collection_request(tls, false);
 }
 
@@ -326,7 +329,7 @@ pub fn add_phantom_candidate<VM: VMBinding>(
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that calls the function (and triggers a collection).
-pub fn harness_begin<VM: VMBinding>(mmtk: &MMTK<VM>, tls: OpaquePointer) {
+pub fn harness_begin<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     mmtk.harness_begin(tls);
 }
 
@@ -371,4 +374,44 @@ pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<Ob
         .lock()
         .unwrap()
         .get_ready_object()
+}
+
+/// Get the number of workers. MMTk spawns worker threads for the 'threads' defined in the options.
+/// So the number of workers is derived from the threads option. Note the feature single_worker overwrites
+/// the threads option, and force one worker thread.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn num_of_workers<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> usize {
+    mmtk.scheduler.num_workers()
+}
+
+/// Add a work packet to the given work bucket. Note that this simply adds the work packet to the given
+/// work bucket, and the scheduler will decide when to execute the work packet.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+/// * `bucket`: Which work bucket to add this packet to.
+/// * `packet`: The work packet to be added.
+pub fn add_work_packet<VM: VMBinding, W: Work<MMTK<VM>>>(
+    mmtk: &'static MMTK<VM>,
+    bucket: WorkBucketStage,
+    packet: W,
+) {
+    mmtk.scheduler.work_buckets[bucket].add(packet)
+}
+
+/// Bulk add a number of work packets to the given work bucket. Note that this simply adds the work packets
+/// to the given work bucket, and the scheduler will decide when to execute the work packets.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+/// * `bucket`: Which work bucket to add these packets to.
+/// * `packet`: The work packets to be added.
+pub fn add_work_packets<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+    bucket: WorkBucketStage,
+    packets: Vec<Box<dyn Work<MMTK<VM>>>>,
+) {
+    mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
 }

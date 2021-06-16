@@ -7,22 +7,23 @@ use std::sync::{Mutex, MutexGuard};
 use crate::util::alloc::embedded_meta_data::*;
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 use crate::util::heap::pageresource::CommonPageResource;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 
 use super::layout::map::Map;
-use super::layout::Mmapper;
+use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::vm::ActivePlan;
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::vm::VMBinding;
-use libc::{c_void, memset};
+use std::marker::PhantomData;
 
 pub struct MonotonePageResource<VM: VMBinding> {
-    common: CommonPageResource<VM>,
+    common: CommonPageResource,
 
     /** Number of pages to reserve at the start of every allocation */
     meta_data_pages_per_region: usize,
     sync: Mutex<MonotonePageResourceSync>,
+    _p: PhantomData<VM>,
 }
 
 struct MonotonePageResourceSync {
@@ -46,25 +47,25 @@ pub enum MonotonePageResourceConditional {
     Discontiguous,
 }
 impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
-    fn common(&self) -> &CommonPageResource<VM> {
+    fn common(&self) -> &CommonPageResource {
         &self.common
     }
-    fn common_mut(&mut self) -> &mut CommonPageResource<VM> {
+    fn common_mut(&mut self) -> &mut CommonPageResource {
         &mut self.common
     }
 
     fn reserve_pages(&self, pages: usize) -> usize {
-        self.common().reserve(pages);
+        self.common().accounting.reserve(pages);
         pages
     }
 
     fn alloc_pages(
         &self,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         immut_required_pages: usize,
-        zeroed: bool,
-        tls: OpaquePointer,
-    ) -> Address {
+        tls: VMThread,
+    ) -> Result<PRAllocResult, PRAllocFail> {
         debug!(
             "In MonotonePageResource, reserved_pages = {}, required_pages = {}",
             reserved_pages, immut_required_pages
@@ -88,7 +89,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
                 || (chunk_align_down(sync.cursor) != sync.current_chunk
                     && chunk_align_down(sync.cursor) != sync.current_chunk + BYTES_IN_CHUNK)
             {
-                self.log_chunk_fields("MonotonePageResource.alloc_pages:fail");
+                self.log_chunk_fields(space_descriptor, "MonotonePageResource.alloc_pages:fail");
             }
             assert!(sync.current_chunk <= sync.cursor);
             assert!(
@@ -117,12 +118,9 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         if !self.common().contiguous && tmp > sync.sentinel {
             /* we're out of virtual memory within our discontiguous region, so ask for more */
             let required_chunks = required_chunks(required_pages);
-            sync.current_chunk = unsafe {
-                self.common()
-                    .space
-                    .unwrap()
-                    .grow_discontiguous_space(required_chunks)
-            }; // Returns zero on failure
+            sync.current_chunk = self
+                .common
+                .grow_discontiguous_space(space_descriptor, required_chunks); // Returns zero on failure
             sync.cursor = sync.current_chunk;
             sync.sentinel = sync.cursor
                 + if sync.current_chunk.is_zero() {
@@ -139,10 +137,9 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         debug_assert!(rtn >= sync.cursor && rtn < sync.cursor + bytes);
         if tmp > sync.sentinel {
             //debug!("tmp={:?} > sync.sentinel={:?}", tmp, sync.sentinel);
-            unsafe { Address::zero() }
+            Result::Err(PRAllocFail)
         } else {
             //debug!("tmp={:?} <= sync.sentinel={:?}", tmp, sync.sentinel);
-            let old = sync.cursor;
             sync.cursor = tmp;
             debug!("update cursor = {}", tmp);
 
@@ -151,35 +148,12 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
                 sync.current_chunk = chunk_align_down(sync.cursor);
             }
             self.commit_pages(reserved_pages, required_pages, tls);
-            self.common()
-                .space
-                .unwrap()
-                .grow_space(old, bytes, new_chunk);
 
-            self.common().space.unwrap().common().mmapper.ensure_mapped(
-                old,
-                required_pages,
-                VM::VMActivePlan::global().global_side_metadata_specs(),
-                self.common().space.unwrap().local_side_metadata_specs(),
-            );
-
-            // FIXME: concurrent zeroing
-            if zeroed {
-                unsafe {
-                    memset(old.to_mut_ptr() as *mut c_void, 0, bytes);
-                }
-            }
-            /*
-            if zeroed {
-                if !self.zero_concurrent {
-                    VM.memory.zero(zeroNT, old, bytes);
-                } else {
-                    while (cursor.GT(zeroingCursor));
-                }
-            }
-            VM.events.tracePageAcquired(space, rtn, requiredPages);
-            */
-            rtn
+            Result::Ok(PRAllocResult {
+                start: rtn,
+                pages: required_pages,
+                new_chunk,
+            })
         }
     }
 
@@ -195,12 +169,12 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         start: Address,
         bytes: usize,
         meta_data_pages_per_region: usize,
-        _vm_map: &'static VMMap,
+        vm_map: &'static VMMap,
     ) -> Self {
         let sentinel = start + bytes;
 
         MonotonePageResource {
-            common: CommonPageResource::new(true, cfg!(target_pointer_width = "64")),
+            common: CommonPageResource::new(true, cfg!(target_pointer_width = "64"), vm_map),
 
             meta_data_pages_per_region,
             sync: Mutex::new(MonotonePageResourceSync {
@@ -213,12 +187,13 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
                     zeroing_sentinel: start,
                 },
             }),
+            _p: PhantomData,
         }
     }
 
-    pub fn new_discontiguous(meta_data_pages_per_region: usize, _vm_map: &'static VMMap) -> Self {
+    pub fn new_discontiguous(meta_data_pages_per_region: usize, vm_map: &'static VMMap) -> Self {
         MonotonePageResource {
-            common: CommonPageResource::new(false, true),
+            common: CommonPageResource::new(false, true, vm_map),
 
             meta_data_pages_per_region,
             sync: Mutex::new(MonotonePageResourceSync {
@@ -227,14 +202,15 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
                 sentinel: unsafe { Address::zero() },
                 conditional: MonotonePageResourceConditional::Discontiguous,
             }),
+            _p: PhantomData,
         }
     }
 
-    fn log_chunk_fields(&self, site: &str) {
+    fn log_chunk_fields(&self, space_descriptor: SpaceDescriptor, site: &str) {
         let sync = self.sync.lock().unwrap();
         debug!(
-            "[{}]{}: cursor={}, current_chunk={}, delta={}",
-            self.common().space.unwrap().common().name,
+            "[{:?}]{}: cursor={}, current_chunk={}, delta={}",
+            space_descriptor,
             site,
             sync.cursor,
             sync.current_chunk,
@@ -250,8 +226,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
     /// TODO: I am not sure why this is unsafe.
     pub unsafe fn reset(&self) {
         let mut guard = self.sync.lock().unwrap();
-        self.common().reset_reserved();
-        self.common().reset_committed();
+        self.common().accounting.reset();
         self.release_pages(&mut guard);
         drop(guard);
     }
@@ -309,7 +284,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
             guard.current_chunk = Address::zero();
             guard.sentinel = Address::zero();
             guard.cursor = Address::zero();
-            self.common().space.as_ref().unwrap().release_all_chunks();
+            self.common.release_all_chunks();
         }
     }
 

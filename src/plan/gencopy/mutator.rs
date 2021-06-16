@@ -6,17 +6,17 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
-use crate::util::OpaquePointer;
+use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn gencopy_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
+pub fn gencopy_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // Do nothing
 }
 
-pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: OpaquePointer) {
+pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // reset nursery allocator
     let bump_allocator = unsafe {
         mutator
@@ -37,7 +37,7 @@ lazy_static! {
 }
 
 pub fn create_gencopy_mutator<VM: VMBinding>(
-    mutator_tls: OpaquePointer,
+    mutator_tls: VMMutatorThread,
     mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
     let gencopy = mmtk.plan.downcast_ref::<GenCopy<VM>>().unwrap();

@@ -72,7 +72,9 @@ impl Sub<Address> for Address {
     fn sub(self, other: Address) -> ByteSize {
         debug_assert!(
             self.0 >= other.0,
-            "for (addr_a - addr_b), a needs to be larger than b"
+            "for (addr_a - addr_b), a({}) needs to be larger than b({})",
+            self,
+            other
         );
         self.0 - other.0
     }
@@ -202,6 +204,15 @@ impl Address {
     #[inline(always)]
     pub const fn add(self, size: usize) -> Address {
         Address(self.0 + size)
+    }
+
+    // We implemented the Sub trait but we still keep this sub function.
+    // The sub() function is const fn, and we can use it to declare Address constants.
+    // The Sub trait function cannot be const.
+    #[allow(clippy::should_implement_trait)]
+    #[inline(always)]
+    pub const fn sub(self, size: usize) -> Address {
+        Address(self.0 - size)
     }
 
     /// loads a value of type T from the address
@@ -391,10 +402,10 @@ mod tests {
     #[test]
     fn is_aligned_to() {
         unsafe {
-            assert_eq!(Address::from_usize(0x10).is_aligned_to(0x10), true);
-            assert_eq!(Address::from_usize(0x11).is_aligned_to(0x10), false);
-            assert_eq!(Address::from_usize(0x10).is_aligned_to(0x8), true);
-            assert_eq!(Address::from_usize(0x10).is_aligned_to(0x20), false);
+            assert!(Address::from_usize(0x10).is_aligned_to(0x10));
+            assert!(!Address::from_usize(0x11).is_aligned_to(0x10));
+            assert!(Address::from_usize(0x10).is_aligned_to(0x8));
+            assert!(!Address::from_usize(0x10).is_aligned_to(0x20));
         }
     }
 

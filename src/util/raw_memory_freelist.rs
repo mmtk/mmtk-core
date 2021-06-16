@@ -194,7 +194,7 @@ impl RawMemoryFreeList {
     }
 
     fn mmap(&self, start: Address, bytes: usize) {
-        if super::memory::dzmmap(start, bytes).is_err() {
+        if super::memory::dzmmap_noreplace(start, bytes).is_err() {
             panic!("Can't get more space with mmap()");
         }
     }
@@ -292,27 +292,27 @@ mod tests {
         assert_eq!(l.get_prev(FIRST_UNIT), -1);
         assert_eq!(l.get_right(FIRST_UNIT), 1);
         assert_eq!(l.get_next(FIRST_UNIT), 1);
-        assert_eq!(l.is_free(FIRST_UNIT), true);
-        assert_eq!(l.is_coalescable(FIRST_UNIT), true);
-        assert_eq!(l.is_multi(FIRST_UNIT), false);
+        assert!(l.is_free(FIRST_UNIT));
+        assert!(l.is_coalescable(FIRST_UNIT));
+        assert!(!l.is_multi(FIRST_UNIT));
 
         assert_eq!(l.get_size(1), 1);
         assert_eq!(l.get_left(1), 0);
         assert_eq!(l.get_prev(1), 0);
         assert_eq!(l.get_right(1), 2);
         assert_eq!(l.get_next(1), 2);
-        assert_eq!(l.is_free(1), true);
-        assert_eq!(l.is_coalescable(1), true);
-        assert_eq!(l.is_multi(1), false);
+        assert!(l.is_free(1));
+        assert!(l.is_coalescable(1));
+        assert!(!l.is_multi(1));
 
         assert_eq!(l.get_size(last_unit), 1);
         assert_eq!(l.get_left(last_unit), last_unit - 1);
         assert_eq!(l.get_prev(last_unit), last_unit - 1);
         assert_eq!(l.get_right(last_unit), bottom_sentinel);
         assert_eq!(l.get_next(last_unit), -1);
-        assert_eq!(l.is_free(last_unit), true);
-        assert_eq!(l.is_coalescable(last_unit), true);
-        assert_eq!(l.is_multi(last_unit), false);
+        assert!(l.is_free(last_unit));
+        assert!(l.is_coalescable(last_unit));
+        assert!(!l.is_multi(last_unit));
 
         assert_eq!(l.get_prev(bottom_sentinel), bottom_sentinel);
         assert_eq!(l.get_next(bottom_sentinel), bottom_sentinel);
@@ -332,27 +332,27 @@ mod tests {
         assert_eq!(l.get_prev(FIRST_UNIT), -1);
         assert_eq!(l.get_right(FIRST_UNIT), 2);
         assert_eq!(l.get_next(FIRST_UNIT), 2);
-        assert_eq!(l.is_free(FIRST_UNIT), true);
-        assert_eq!(l.is_coalescable(FIRST_UNIT), true);
-        assert_eq!(l.is_multi(FIRST_UNIT), true);
+        assert!(l.is_free(FIRST_UNIT));
+        assert!(l.is_coalescable(FIRST_UNIT));
+        assert!(l.is_multi(FIRST_UNIT));
 
         assert_eq!(l.get_size(2), 2);
         assert_eq!(l.get_left(2), 0);
         assert_eq!(l.get_prev(2), 0);
         assert_eq!(l.get_right(2), 4);
         assert_eq!(l.get_next(2), 4);
-        assert_eq!(l.is_free(2), true);
-        assert_eq!(l.is_coalescable(2), true);
-        assert_eq!(l.is_multi(2), true);
+        assert!(l.is_free(2));
+        assert!(l.is_coalescable(2));
+        assert!(l.is_multi(2));
 
         assert_eq!(l.get_size(last_unit), 2);
         assert_eq!(l.get_left(last_unit), last_unit - 2);
         assert_eq!(l.get_prev(last_unit), last_unit - 2);
         assert_eq!(l.get_right(last_unit), bottom_sentinel);
         assert_eq!(l.get_next(last_unit), -1);
-        assert_eq!(l.is_free(last_unit), true);
-        assert_eq!(l.is_coalescable(last_unit), true);
-        assert_eq!(l.is_multi(last_unit), true);
+        assert!(l.is_free(last_unit));
+        assert!(l.is_coalescable(last_unit));
+        assert!(l.is_multi(last_unit));
 
         assert_eq!(l.get_prev(bottom_sentinel), bottom_sentinel);
         assert_eq!(l.get_next(bottom_sentinel), bottom_sentinel);
@@ -382,18 +382,18 @@ mod tests {
         assert_eq!(l.get_prev(FIRST_UNIT), -1);
         assert_eq!(l.get_right(FIRST_UNIT), 2);
         assert_eq!(l.get_next(FIRST_UNIT), 2);
-        assert_eq!(l.is_free(FIRST_UNIT), false); // not free
-        assert_eq!(l.is_coalescable(FIRST_UNIT), true);
-        assert_eq!(l.is_multi(FIRST_UNIT), true);
+        assert!(!l.is_free(FIRST_UNIT)); // not free
+        assert!(l.is_coalescable(FIRST_UNIT));
+        assert!(l.is_multi(FIRST_UNIT));
 
         assert_eq!(l.get_size(2), 2);
         assert_eq!(l.get_left(2), 0);
         assert_eq!(l.get_prev(2), -1); // no prev now
         assert_eq!(l.get_right(2), 4);
         assert_eq!(l.get_next(2), 4);
-        assert_eq!(l.is_free(2), true);
-        assert_eq!(l.is_coalescable(2), true);
-        assert_eq!(l.is_multi(2), true);
+        assert!(l.is_free(2));
+        assert!(l.is_coalescable(2));
+        assert!(l.is_multi(2));
     }
 
     #[test]
@@ -412,27 +412,27 @@ mod tests {
         assert_eq!(l.get_prev(FIRST_UNIT), 1); // prev is 1 now
         assert_eq!(l.get_right(FIRST_UNIT), 1); // right is 1 now
         assert_eq!(l.get_next(FIRST_UNIT), 2);
-        assert_eq!(l.is_free(FIRST_UNIT), false); // not free
-        assert_eq!(l.is_coalescable(FIRST_UNIT), true);
-        assert_eq!(l.is_multi(FIRST_UNIT), false); // not multi
+        assert!(!l.is_free(FIRST_UNIT)); // not free
+        assert!(l.is_coalescable(FIRST_UNIT));
+        assert!(!l.is_multi(FIRST_UNIT)); // not multi
 
         assert_eq!(l.get_size(1), 1);
         assert_eq!(l.get_left(1), 0); // unit1's left is 0
         assert_eq!(l.get_prev(1), -1); // unit1's prev is -1 (no prev, unit1 is removed form the list)
         assert_eq!(l.get_right(1), 2);
         assert_eq!(l.get_next(1), 2);
-        assert_eq!(l.is_free(1), true); // not free
-        assert_eq!(l.is_coalescable(1), true);
-        assert_eq!(l.is_multi(1), false); // not multi
+        assert!(l.is_free(1)); // not free
+        assert!(l.is_coalescable(1));
+        assert!(!l.is_multi(1)); // not multi
 
         assert_eq!(l.get_size(2), 2);
         assert_eq!(l.get_left(2), 1);
         assert_eq!(l.get_prev(2), 1); // uni2's prev is 1 now
         assert_eq!(l.get_right(2), 4);
         assert_eq!(l.get_next(2), 4);
-        assert_eq!(l.is_free(2), true);
-        assert_eq!(l.is_coalescable(2), true);
-        assert_eq!(l.is_multi(2), true);
+        assert!(l.is_free(2));
+        assert!(l.is_coalescable(2));
+        assert!(l.is_multi(2));
     }
 
     #[test]
@@ -460,7 +460,7 @@ mod tests {
         assert_eq!(res2, 2);
 
         // unit1 is still free, and linked with unit4
-        assert_eq!(l.is_free(1), true);
+        assert!(l.is_free(1));
         assert_eq!(l.get_next(1), 4);
         assert_eq!(l.get_prev(4), 1);
     }
@@ -492,7 +492,7 @@ mod tests {
         // Free Unit2
         let freed = l.free(res2, false);
         assert_eq!(freed, res2);
-        assert_eq!(l.is_free(res2), true);
+        assert!(l.is_free(res2));
     }
 
     #[test]
@@ -537,12 +537,12 @@ mod tests {
         // Free Unit2
         let freed = l.free(res2, false);
         assert_eq!(freed, res2);
-        assert_eq!(l.is_free(res2), true);
+        assert!(l.is_free(res2));
 
         // Alloc again
         let res3 = l.alloc(2);
         assert_eq!(res3, 2);
-        assert_eq!(l.is_free(res3), false);
+        assert!(!l.is_free(res3));
 
         let res4 = l.alloc(1);
         assert_eq!(res4, 4);

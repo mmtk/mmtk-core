@@ -2,20 +2,21 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Mutex, MutexGuard};
 
 use super::layout::map::Map;
-use super::layout::Mmapper;
+use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
-use crate::policy::space::Space;
 use crate::util::address::Address;
 use crate::util::alloc::embedded_meta_data::*;
 use crate::util::constants::*;
 use crate::util::conversions;
+use crate::util::generic_freelist;
 use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::pageresource::CommonPageResource;
-use crate::util::OpaquePointer;
-use crate::util::{generic_freelist, memory};
+use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::opaque_pointer::*;
 use crate::vm::*;
+use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 
 pub struct CommonFreeListPageResource {
@@ -34,11 +35,12 @@ impl CommonFreeListPageResource {
 }
 
 pub struct FreeListPageResource<VM: VMBinding> {
-    common: CommonPageResource<VM>,
+    common: CommonPageResource,
     common_flpr: Box<CommonFreeListPageResource>,
     /** Number of pages to reserve at the start of every allocation */
     meta_data_pages_per_region: usize,
     sync: Mutex<FreeListPageResourceSync>,
+    _p: PhantomData<VM>,
 }
 
 struct FreeListPageResourceSync {
@@ -61,20 +63,20 @@ impl<VM: VMBinding> DerefMut for FreeListPageResource<VM> {
 }
 
 impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
-    fn common(&self) -> &CommonPageResource<VM> {
+    fn common(&self) -> &CommonPageResource {
         &self.common
     }
-    fn common_mut(&mut self) -> &mut CommonPageResource<VM> {
+    fn common_mut(&mut self) -> &mut CommonPageResource {
         &mut self.common
     }
 
     fn alloc_pages(
         &self,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
-        zeroed: bool,
-        tls: OpaquePointer,
-    ) -> Address {
+        tls: VMThread,
+    ) -> Result<PRAllocResult, PRAllocFail> {
         debug_assert!(
             self.meta_data_pages_per_region == 0
                 || required_pages <= PAGES_IN_CHUNK - self.meta_data_pages_per_region
@@ -86,11 +88,13 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         let mut new_chunk = false;
         let mut page_offset = self_mut.free_list.alloc(required_pages as _);
         if page_offset == generic_freelist::FAILURE && self.common.growable {
-            page_offset = self_mut.allocate_contiguous_chunks(required_pages, &mut sync);
+            page_offset =
+                self_mut.allocate_contiguous_chunks(space_descriptor, required_pages, &mut sync);
             new_chunk = true;
         }
+
         if page_offset == generic_freelist::FAILURE {
-            return unsafe { Address::zero() };
+            return Result::Err(PRAllocFail);
         } else {
             sync.pages_currently_on_freelist -= required_pages;
             if page_offset > sync.highwater_mark {
@@ -99,32 +103,22 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
                 {
                     let regions = 1 + ((page_offset - sync.highwater_mark) >> LOG_PAGES_IN_REGION);
                     let metapages = regions as usize * self.meta_data_pages_per_region;
-                    self.common.reserve(metapages);
-                    self.common.commit(metapages);
+                    self.common.accounting.reserve_and_commit(metapages);
                     new_chunk = true;
                 }
                 sync.highwater_mark = page_offset;
             }
         }
+
         let rtn = self.start + conversions::pages_to_bytes(page_offset as _);
-        let bytes = conversions::pages_to_bytes(required_pages);
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
-        self.common()
-            .space
-            .unwrap()
-            .grow_space(rtn, bytes, new_chunk);
 
-        self.common().space.unwrap().common().mmapper.ensure_mapped(
-            rtn,
-            required_pages,
-            VM::VMActivePlan::global().global_side_metadata_specs(),
-            self.common().space.unwrap().local_side_metadata_specs(),
-        );
-        if zeroed {
-            memory::zero(rtn, bytes);
-        }
-        rtn
+        Result::Ok(PRAllocResult {
+            start: rtn,
+            pages: required_pages,
+            new_chunk,
+        })
     }
 
     fn adjust_for_metadata(&self, pages: usize) -> usize {
@@ -157,13 +151,14 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         };
         let growable = cfg!(target_pointer_width = "64");
         let mut flpr = FreeListPageResource {
-            common: CommonPageResource::new(true, growable),
+            common: CommonPageResource::new(true, growable, vm_map),
             common_flpr,
             meta_data_pages_per_region,
             sync: Mutex::new(FreeListPageResourceSync {
                 pages_currently_on_freelist: if growable { 0 } else { pages },
                 highwater_mark: 0,
             }),
+            _p: PhantomData,
         };
         if !flpr.common.growable {
             // For non-growable space, we just need to reserve metadata according to the requested size.
@@ -191,18 +186,20 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             common_flpr
         };
         FreeListPageResource {
-            common: CommonPageResource::new(false, true),
+            common: CommonPageResource::new(false, true, vm_map),
             common_flpr,
             meta_data_pages_per_region,
             sync: Mutex::new(FreeListPageResourceSync {
                 pages_currently_on_freelist: 0,
                 highwater_mark: 0,
             }),
+            _p: PhantomData,
         }
     }
 
     fn allocate_contiguous_chunks(
         &mut self,
+        space_descriptor: SpaceDescriptor,
         pages: usize,
         sync: &mut MutexGuard<FreeListPageResourceSync>,
     ) -> i32 {
@@ -212,12 +209,9 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         );
         let mut rtn = generic_freelist::FAILURE;
         let required_chunks = crate::policy::space::required_chunks(pages);
-        let region = unsafe {
-            self.common
-                .space
-                .unwrap()
-                .grow_discontiguous_space(required_chunks)
-        };
+        let region = self
+            .common
+            .grow_discontiguous_space(space_descriptor, required_chunks);
 
         if !region.is_zero() {
             let region_start = conversions::bytes_to_pages(region - self.start);
@@ -271,11 +265,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             }
         }
         /* now return the address space associated with the chunk for global reuse */
-        // FIXME: We need a safe implementation
-        #[allow(clippy::cast_ref_to_mut)]
-        let space: &mut dyn Space<VM> =
-            unsafe { &mut *(self.common.space.unwrap() as *const _ as *mut _) };
-        space.release_discontiguous_chunks(chunk);
+        self.common.release_discontiguous_chunks(chunk);
     }
 
     fn reserve_metadata(&mut self, extent: usize) {
@@ -301,18 +291,20 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         }
     }
 
-    pub fn release_pages(&mut self, first: Address) {
+    pub fn release_pages(&self, first: Address) {
         debug_assert!(conversions::is_page_aligned(first));
         let page_offset = conversions::bytes_to_pages(first - self.start);
         let pages = self.free_list.size(page_offset as _);
         // if (VM.config.ZERO_PAGES_ON_RELEASE)
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
-        debug_assert!(pages as usize <= self.common.get_committed());
-        let me = unsafe { &mut *(self as *mut Self) };
+        debug_assert!(pages as usize <= self.common.accounting.get_committed_pages());
+
+        // FIXME
+        #[allow(clippy::cast_ref_to_mut)]
+        let me = unsafe { &mut *(self as *const _ as *mut Self) };
         let freed = {
             let mut sync = self.sync.lock().unwrap();
-            self.common.release_reserved(pages as _);
-            self.common.release_committed(pages as _);
+            self.common.accounting.release(pages as _);
             let freed = me.free_list.free(page_offset as _, true);
             sync.pages_currently_on_freelist += pages as usize;
             freed

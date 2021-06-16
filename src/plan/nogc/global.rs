@@ -15,8 +15,9 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
+use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::util::OpaquePointer;
+use crate::util::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
@@ -42,7 +43,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn create_worker_local(
         &self,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = NoCopy::new(mmtk);
@@ -62,15 +63,19 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         self.nogc_space.init(&vm_map);
     }
 
+    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
+        self.base.collection_required(self, space_full, space)
+    }
+
     fn base(&self) -> &BasePlan<VM> {
         &self.base
     }
 
-    fn prepare(&self, _tls: OpaquePointer) {
+    fn prepare(&mut self, _tls: VMWorkerThread) {
         unreachable!()
     }
 
-    fn release(&self, _tls: OpaquePointer) {
+    fn release(&mut self, _tls: VMWorkerThread) {
         unreachable!()
     }
 
@@ -86,7 +91,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         self.nogc_space.reserved_pages()
     }
 
-    fn handle_user_collection_request(&self, _tls: OpaquePointer, _force: bool) {
+    fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
         println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
     }
 }
@@ -102,23 +107,44 @@ impl<VM: VMBinding> NoGC<VM> {
         #[cfg(feature = "nogc_lock_free")]
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
 
+        let global_specs = SideMetadataContext::new_global_specs(&[]);
+
         #[cfg(feature = "nogc_lock_free")]
-        let nogc_space =
-            NoGCImmortalSpace::new("nogc_space", cfg!(not(feature = "nogc_no_zeroing")));
+        let nogc_space = NoGCImmortalSpace::new(
+            "nogc_space",
+            cfg!(not(feature = "nogc_no_zeroing")),
+            global_specs.clone(),
+        );
         #[cfg(not(feature = "nogc_lock_free"))]
         let nogc_space = NoGCImmortalSpace::new(
             "nogc_space",
             true,
             VMRequest::discontiguous(),
+            global_specs.clone(),
             vm_map,
             mmapper,
             &mut heap,
             &NOGC_CONSTRAINTS,
         );
 
-        NoGC {
+        let res = NoGC {
             nogc_space,
-            base: BasePlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS),
-        }
+            base: BasePlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                &NOGC_CONSTRAINTS,
+                global_specs,
+            ),
+        };
+
+        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+        res.base
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        res.nogc_space
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+
+        res
     }
 }

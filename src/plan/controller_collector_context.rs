@@ -2,7 +2,7 @@
 
 use crate::scheduler::gc_work::ScheduleCollection;
 use crate::scheduler::*;
-use crate::util::OpaquePointer;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -10,7 +10,6 @@ use std::sync::RwLock;
 use std::sync::{Arc, Condvar, Mutex};
 
 struct RequestSync {
-    tls: OpaquePointer,
     request_count: isize,
     last_request_count: isize,
 }
@@ -34,7 +33,6 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
     pub fn new() -> Self {
         ControllerCollectorContext {
             request_sync: Mutex::new(RequestSync {
-                tls: OpaquePointer::UNINITIALIZED,
                 request_count: 0,
                 last_request_count: -1,
             }),
@@ -51,11 +49,7 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
         *scheduler_guard = Some(scheduler.clone());
     }
 
-    pub fn run(&self, tls: OpaquePointer) {
-        {
-            self.request_sync.lock().unwrap().tls = tls;
-        }
-
+    pub fn run(&self, tls: VMWorkerThread) {
         loop {
             debug!("[STWController: Waiting for request...]");
             self.wait_for_request();

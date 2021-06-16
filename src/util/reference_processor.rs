@@ -2,11 +2,11 @@ use std::cell::UnsafeCell;
 use std::sync::Mutex;
 use std::vec::Vec;
 
-use crate::plan::{MutatorContext, TraceLocal};
-use crate::util::OpaquePointer;
+use crate::plan::TraceLocal;
+use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
+use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
-use crate::vm::{ActivePlan, ReferenceGlue};
 
 pub struct ReferenceProcessors {
     soft: ReferenceProcessor,
@@ -67,19 +67,19 @@ impl ReferenceProcessors {
         self.phantom.forward::<VM, T>(trace, false);
     }
 
-    pub fn scan_weak_refs<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, tls: OpaquePointer) {
+    pub fn scan_weak_refs<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, tls: VMWorkerThread) {
         self.soft.scan::<VM, T>(trace, false, false, tls);
         self.weak.scan::<VM, T>(trace, false, false, tls);
     }
 
-    pub fn scan_soft_refs<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, tls: OpaquePointer) {
+    pub fn scan_soft_refs<VM: VMBinding, T: TraceLocal>(&self, trace: &mut T, tls: VMWorkerThread) {
         self.soft.scan::<VM, T>(trace, false, false, tls);
     }
 
     pub fn scan_phantom_refs<VM: VMBinding, T: TraceLocal>(
         &self,
         trace: &mut T,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
     ) {
         self.phantom.scan::<VM, T>(trace, false, false, tls);
     }
@@ -234,7 +234,7 @@ impl ReferenceProcessor {
         trace: &mut T,
         nursery: bool,
         retain: bool,
-        tls: OpaquePointer,
+        tls: VMWorkerThread,
     ) {
         let sync = unsafe { self.sync_mut() };
         sync.unforwarded_references = Some(sync.references.clone());
@@ -285,10 +285,13 @@ impl ReferenceProcessor {
         }
 
         /* flush out any remset entries generated during the above activities */
-        unsafe { VM::VMActivePlan::mutator(tls) }.flush_remembered_sets();
-        if TRACE {
-            trace!("Ending ReferenceProcessor.scan({:?})", self.semantics);
-        }
+
+        // FIXME: We are calling mutator() for a worker thread
+        panic!("We are calling mutator() for a worker tls. We need to fix this.");
+        // unsafe { VM::VMActivePlan::mutator(tls)) }.flush_remembered_sets();
+        // if TRACE {
+        //     trace!("Ending ReferenceProcessor.scan({:?})", self.semantics);
+        // }
     }
 
     /**
