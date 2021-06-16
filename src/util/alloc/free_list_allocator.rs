@@ -1,8 +1,6 @@
 use std::{collections::{HashMap, LinkedList}};
 
-use atomic_traits::fetch::Add;
-
-use crate::{Plan, policy::marksweepspace::MarkSweepSpace, util::{Address, VMThread}, vm::VMBinding};
+use crate::{Plan, policy::{marksweepspace::MarkSweepSpace, space::Space}, util::{Address, VMThread, constants::{LOG_BYTES_IN_PAGE}}, vm::VMBinding};
 
 use super::Allocator;
 
@@ -72,7 +70,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         assert!(self.available_blocks.contains_key(&size_class));
         assert!(self.exhausted_blocks.contains_key(&size_class));
 
-        let block_start = self.space.acquire_block();
+        let block_start = self.acquire_block();
         let mut free_list = FreeListAllocator::<VM>::make_free_list(block_start, size_class);
         let address = free_list.pop_front().unwrap();
         self.available_blocks.get_mut(&size_class).unwrap().push_back(free_list);
@@ -116,5 +114,32 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 None => Address::zero(),
             }
         }
+    }
+
+    pub fn new(
+        tls: VMThread,
+        space: &'static MarkSweepSpace<VM>,
+        plan: &'static dyn Plan<VM = VM>,
+    ) -> Self {
+        let mut allocator = FreeListAllocator {
+            tls,
+            space,
+            plan,
+            available_blocks: HashMap::new(),
+            exhausted_blocks: HashMap::new(),
+        };
+        allocator.init_size_classes();
+        allocator
+    }
+
+    
+    pub fn acquire_block(&self) -> Address {
+        // acquire 64kB block
+        self.space.acquire(self.tls, (1 << 13) >> LOG_BYTES_IN_PAGE)
+    }
+
+    pub fn return_block(&self) {
+        // return freed 64kB block
+        todo!()
     }
 }
