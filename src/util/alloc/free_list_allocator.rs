@@ -140,8 +140,6 @@ impl BlockList {
     }
 }
 
-unsafe impl<VM: VMBinding> Send for FreeListAllocator<VM> {}
-
 impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     fn get_tls(&self) -> VMThread {
         self.tls
@@ -233,11 +231,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         set_alloc_bit(unsafe { free_list.to_object_reference() });
         debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
 
-        
-        // if *TRACING_OBJECT.lock().unwrap() == 0 {
-        //     *TRACING_OBJECT.lock().unwrap() = free_list.as_usize();
-        //     println!("selected tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
-        // }
         free_list
     }
 }
