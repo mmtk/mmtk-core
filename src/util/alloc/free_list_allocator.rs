@@ -66,7 +66,17 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        todo!()
+        let size_class = FreeListAllocator::<VM>::get_size_class(size);
+
+        // assumes block lists are initialised for all size classes
+        assert!(self.available_blocks.contains_key(&size_class));
+        assert!(self.exhausted_blocks.contains_key(&size_class));
+
+        let block_start = self.space.acquire_block();
+        let mut free_list = FreeListAllocator::<VM>::make_free_list(block_start, size_class);
+        let address = free_list.pop_front().unwrap();
+        self.available_blocks.get_mut(&size_class).unwrap().push_back(free_list);
+        address
     }
 }
 
@@ -75,7 +85,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         todo!()
     }
 
-    fn make_free_list(block: Address, size_class: SizeClass) {
+    fn make_free_list(block: Address, size_class: SizeClass) -> LinkedList<Address> {
         todo!()
     }
 
