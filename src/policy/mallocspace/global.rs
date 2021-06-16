@@ -323,11 +323,28 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 on_page_boundary = false;
             }
 
-            // Check if the address is an object
-            if is_alloced_object_unsafe(address) {
+            // if (alloc bit XOR mark bit == 1) then the object is dead
+            if is_object_dead_unsafe(address) {
+                debug_assert!(
+                    is_alloced_object_unsafe(address),
+                    "Address {} is marked but not allocated",
+                    address
+                );
+
                 let object = address.to_object_reference();
                 let obj_start = VM::VMObjectModel::object_start_ref(object);
                 let bytes = malloc_usable_size(obj_start.to_mut_ptr());
+
+                // Dead object
+                trace!(
+                    "Object {} has alloc bit but no mark bit, it is dead",
+                    object
+                );
+
+                // Free object
+                self.free(obj_start);
+                trace!("free object {}", object);
+                unset_alloc_bit_unsafe(object);
 
                 #[cfg(debug_assertions)]
                 if ASSERT_ALLOCATION {
@@ -344,38 +361,32 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     );
                 }
 
-                if !is_marked_unsafe(object) {
-                    // Dead object
-                    trace!(
-                        "Object {} has alloc bit but no mark bit, it is dead. ",
-                        object
-                    );
+                // Skip to next object
+                address += bytes;
+            } else if is_marked_unsafe(address) {   // This address is necessarily allocated and marked
+                let object = address.to_object_reference();
+                let obj_start = VM::VMObjectModel::object_start_ref(object);
+                let bytes = malloc_usable_size(obj_start.to_mut_ptr());
 
-                    // Free object
-                    self.free(obj_start);
-                    trace!("free object {}", object);
-                    unset_alloc_bit_unsafe(object);
-                } else {
-                    // Live object. Unset mark bit
-                    unset_mark_bit_unsafe(object);
-                    // This chunk is still active.
-                    chunk_is_empty = false;
-                    page_is_empty = false; // XXX: page-bit diff
+                // Live object. Unset mark bit
+                unset_mark_bit_unsafe(object);
+                // This chunk is still active.
+                chunk_is_empty = false;
+                page_is_empty = false; // XXX: page-bit diff
 
-                    if address + bytes - page > BYTES_IN_PAGE {
-                        on_page_boundary = true;
-                    }
+                if address + bytes - page > BYTES_IN_PAGE {
+                    on_page_boundary = true;
+                }
 
-                    #[cfg(debug_assertions)]
-                    {
-                        // Accumulate live bytes
-                        live_bytes += bytes;
-                    }
+                #[cfg(debug_assertions)]
+                {
+                    // Accumulate live bytes
+                    live_bytes += bytes;
                 }
 
                 // Skip to next object
                 address += bytes;
-            } else { // not an object
+            } else {    // not an object
                 address += VM::MIN_ALIGNMENT;
             }
         }
