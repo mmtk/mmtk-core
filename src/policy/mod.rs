@@ -23,3 +23,4 @@ pub mod largeobjectspace;
 pub mod lockfreeimmortalspace;
 pub mod mallocspace;
 pub mod markcompactspace;
+pub mod marksweepspace;

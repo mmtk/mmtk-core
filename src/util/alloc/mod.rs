@@ -34,10 +34,10 @@ mod markcompact_allocator;
 pub use markcompact_allocator::MarkCompactAllocator;
 
 /// Embedded metadata pages
+mod free_list_allocator;
+pub use free_list_allocator::FreeListAllocator;
+
 pub(crate) mod embedded_meta_data;
-pub mod mimalloc;
 
 
 pub use crate::policy::mallocspace::metadata::is_alloced_by_malloc;
-pub use self::mimalloc::do_something;
-pub use self::mimalloc::mimalloc_dzmmap;
