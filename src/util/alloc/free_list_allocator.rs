@@ -229,8 +229,6 @@ impl BlockList {
     }
 }
 
-unsafe impl<VM: VMBinding> Send for FreeListAllocator<VM> {}
-
 impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     fn get_tls(&self) -> VMThread {
         self.tls
@@ -292,14 +290,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         // set allocation bit
         set_alloc_bit(unsafe { free_list.to_object_reference() });
         debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
-
-        let bin = FreeListAllocator::<VM>::mi_bin(size);
-        if bin == 4 {
-            // eprintln!("end of slow, bl = {}", self.available_blocks[4].first);
-        }
-        else {
-            // eprintln!("end of slow not 4, bl = {}",self.available_blocks[4].first)
-        }
 
         free_list
     }
