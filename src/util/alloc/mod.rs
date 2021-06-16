@@ -23,3 +23,5 @@ pub use self::mimalloc::mimalloc_dzmmap;
 
 pub mod immix_allocator;
 pub use self::immix_allocator::ImmixAllocator;
+mod free_list_allocator;
+pub use free_list_allocator::FreeListAllocator;
