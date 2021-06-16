@@ -215,9 +215,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         address
     }
 
-    pub fn free(&self, addr: Address) {
+    pub fn free(&self, addr: Address, bytes: usize) {
         let ptr = addr.to_mut_ptr();
-        let bytes = unsafe { malloc_usable_size(ptr) };
         trace!("Free memory {:?}", ptr);
         unsafe {
             free(ptr);
@@ -342,7 +341,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 );
 
                 // Free object
-                self.free(obj_start);
+                self.free(obj_start, bytes);
                 trace!("free object {}", object);
                 unset_alloc_bit_unsafe(object);
 
