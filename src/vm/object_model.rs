@@ -53,6 +53,7 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.
     ///
+    #[inline(always)]
     fn load_metadata(
         metadata_spec: MetadataSpec,
         object: ObjectReference,
@@ -78,6 +79,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `atomic_ordering`: is an optional atomic ordering for the store operation. An input value of `None` means the store operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic store operation will use the `Ordering::X`.
     ///
+    #[inline(always)]
     fn store_metadata(
         metadata_spec: MetadataSpec,
         object: ObjectReference,
@@ -128,6 +130,7 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// # Returns `true` if the operation is successful, and `false` otherwise.
     ///
+    #[inline(always)]
     fn compare_exchange_metadata(
         metadata_spec: MetadataSpec,
         object: ObjectReference,
@@ -177,6 +180,7 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// # Returns the old metadata value as a word.
     ///
+    #[inline(always)]
     fn fetch_add_metadata(
         metadata_spec: MetadataSpec,
         object: ObjectReference,
@@ -197,6 +201,7 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// # Returns the old metadata value as a word.
     ///
+    #[inline(always)]
     fn fetch_sub_metadata(
         metadata_spec: MetadataSpec,
         object: ObjectReference,
