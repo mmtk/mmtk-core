@@ -43,6 +43,7 @@ pub use transitive_closure::TransitiveClosure;
 mod gencopy;
 mod marksweep;
 mod nogc;
+mod pageprotect;
 mod semispace;
 
 // Expose plan constraints as public. Though a binding can get them from plan.constraints(),

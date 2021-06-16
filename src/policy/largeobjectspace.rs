@@ -1,30 +1,30 @@
-use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
-use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
-use crate::util::gc_byte;
+use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::header_byte::HeaderByte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use crate::util::opaque_pointer::*;
+#[cfg(target_pointer_width = "32")]
+use crate::util::side_metadata::meta_bytes_per_chunk;
+#[cfg(target_pointer_width = "64")]
+use crate::util::side_metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
 use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use crate::{
+    plan::PlanConstraints,
+    util::{
+        constants,
+        side_metadata::{self, SideMetadataScope},
+    },
+};
 
-#[allow(unused)]
-const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
 const MARK_BIT: u8 = 0b01;
-const NURSERY_BIT: u8 = 0b10;
-const LOS_BIT_MASK: u8 = 0b11;
-
-const USE_PRECEEDING_GC_HEADER: bool = true;
-const PRECEEDING_GC_HEADER_WORDS: usize = 1;
-const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTES_IN_WORD;
-
 /// This type implements a policy for large objects. Each instance corresponds
 /// to one Treadmill space.
 pub struct LargeObjectSpace<VM: VMBinding> {
@@ -51,25 +51,13 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
-        let old_value = gc_byte::read_gc_byte::<VM>(object);
-        let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
-        if alloc {
-            new_value |= NURSERY_BIT;
-        }
-        gc_byte::write_gc_byte::<VM>(object, new_value);
-        let cell = VM::VMObjectModel::object_start_ref(object)
-            - if USE_PRECEEDING_GC_HEADER {
-                PRECEEDING_GC_HEADER_BYTES
-            } else {
-                0
-            };
+        let cell = VM::VMObjectModel::object_start_ref(object);
+        side_metadata::store_atomic(Self::NURSERY_STATE, cell, if alloc { 1 } else { 0 });
+        side_metadata::store_atomic(Self::MARK_TABLE, cell, self.mark_state as _);
         self.treadmill.add_to_treadmill(cell, alloc);
-        if self.header_byte.needs_unlogged_bit {
-            gc_byte::write_gc_byte::<VM>(
-                object,
-                gc_byte::read_gc_byte::<VM>(object) | self.header_byte.unlogged_bit,
-            );
-        }
+        // TODO: logging bit should move to (global) side-metadata.
+        debug_assert!(!self.header_byte.needs_unlogged_bit);
+        debug_assert!(object.is_live());
     }
 }
 
@@ -95,6 +83,41 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 }
 
 impl<VM: VMBinding> LargeObjectSpace<VM> {
+    #[cfg(target_pointer_width = "64")]
+    const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
+        scope: SideMetadataScope::PolicySpecific,
+        offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+        log_num_of_bits: 0,
+        log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as _,
+    };
+    #[cfg(target_pointer_width = "64")]
+    const NURSERY_STATE: SideMetadataSpec = SideMetadataSpec {
+        scope: SideMetadataScope::PolicySpecific,
+        offset: Self::MARK_TABLE.offset
+            + side_metadata::metadata_address_range_size(Self::MARK_TABLE),
+        log_num_of_bits: 0,
+        log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as _,
+    };
+
+    #[cfg(target_pointer_width = "32")]
+    pub(super) const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
+        scope: SideMetadataScope::PolicySpecific,
+        offset: 0,
+        log_num_of_bits: 0,
+        log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as _,
+    };
+    #[cfg(target_pointer_width = "32")]
+    pub(super) const NURSERY_STATE: SideMetadataSpec = SideMetadataSpec {
+        scope: SideMetadataScope::PolicySpecific,
+        offset: Self::MARK_TABLE.offset
+            + meta_bytes_per_chunk(
+                Self::MARK_TABLE.log_min_obj_size,
+                Self::MARK_TABLE.log_num_of_bits,
+            ),
+        log_num_of_bits: 0,
+        log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as _,
+    };
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &'static str,
@@ -105,6 +128,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
         constraints: &'static PlanConstraints,
+        protect_memory_on_release: bool,
     ) -> Self {
         let common = CommonSpace::new(
             SpaceOptions {
@@ -115,19 +139,21 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
-                    local: vec![],
+                    local: vec![Self::MARK_TABLE, Self::NURSERY_STATE],
                 },
             },
             vm_map,
             mmapper,
             heap,
         );
+        let mut pr = if vmrequest.is_discontiguous() {
+            FreeListPageResource::new_discontiguous(0, vm_map)
+        } else {
+            FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
+        };
+        pr.protect_memory_on_release = protect_memory_on_release;
         LargeObjectSpace {
-            pr: if vmrequest.is_discontiguous() {
-                FreeListPageResource::new_discontiguous(0, vm_map)
-            } else {
-                FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
-            },
+            pr,
             common,
             mark_state: 0,
             in_nursery_gc: false,
@@ -164,13 +190,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects
             if self.test_and_mark(object, self.mark_state) {
-                let cell = VM::VMObjectModel::object_start_ref(object)
-                    - if USE_PRECEEDING_GC_HEADER {
-                        PRECEEDING_GC_HEADER_BYTES
-                    } else {
-                        0
-                    };
+                let cell = self.get_cell(object);
                 self.treadmill.copy(cell, nursery_object);
+                self.clear_nursery(object);
                 trace.process_node(object);
             }
         }
@@ -194,49 +216,51 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
+    /// Allocate an object
     pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Address {
-        let start = self.acquire(tls, pages);
-        if start.is_zero() {
-            return start;
-        }
-        if USE_PRECEEDING_GC_HEADER {
-            start + PRECEEDING_GC_HEADER_BYTES
-        } else {
-            start
-        }
+        self.acquire(tls, pages)
     }
 
+    /// Attempt to mark the object. Return true on success.
     fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
-        let mask = if self.in_nursery_gc {
-            LOS_BIT_MASK
-        } else {
-            MARK_BIT
-        };
-        let mut old_value = gc_byte::read_gc_byte::<VM>(object);
-        let mut mark_bit = old_value & mask;
-        if mark_bit == value {
+        let cell = self.get_cell(object);
+        let mut old_value = unsafe { side_metadata::load(Self::MARK_TABLE, cell) } as u8;
+        if old_value == value {
             return false;
         }
-        while !gc_byte::compare_exchange_gc_byte::<VM>(
-            object,
-            old_value,
-            old_value & !LOS_BIT_MASK | value,
+        while !side_metadata::compare_exchange_atomic(
+            Self::MARK_TABLE,
+            cell,
+            old_value as _,
+            value as _,
         ) {
-            old_value = gc_byte::read_gc_byte::<VM>(object);
-            mark_bit = old_value & mask;
-            if mark_bit == value {
+            old_value = unsafe { side_metadata::load(Self::MARK_TABLE, cell) } as u8;
+            if old_value == value {
                 return false;
             }
         }
         true
     }
 
+    /// Get the mark bit for a given object
     fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
-        gc_byte::read_gc_byte::<VM>(object) & MARK_BIT == value
+        unsafe { side_metadata::load(Self::MARK_TABLE, self.get_cell(object)) as u8 == value }
     }
 
+    /// Check if a given object is in nursery
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        gc_byte::read_gc_byte::<VM>(object) & NURSERY_BIT == NURSERY_BIT
+        unsafe { side_metadata::load(Self::NURSERY_STATE, self.get_cell(object)) == 1 }
+    }
+
+    /// Move a given object out of nursery
+    fn clear_nursery(&self, object: ObjectReference) {
+        side_metadata::store_atomic(Self::NURSERY_STATE, self.get_cell(object), 0)
+    }
+
+    /// The the cell of an object
+    #[inline(always)]
+    fn get_cell(&self, object: ObjectReference) -> Address {
+        VM::VMObjectModel::object_start_ref(object)
     }
 }
 

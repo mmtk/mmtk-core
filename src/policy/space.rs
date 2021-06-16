@@ -276,13 +276,18 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     // adding a space lock here.
                     let bytes = conversions::pages_to_bytes(res.pages);
                     self.grow_space(res.start, bytes, res.new_chunk);
-                    // Mmap the pages and handle error. In case of any error,
+                    // Mmap the pages and the side metadata, and handle error. In case of any error,
                     // we will either call back to the VM for OOM, or simply panic.
-                    if let Err(mmap_error) = self.common().mmapper.ensure_mapped(
-                        res.start,
-                        res.pages,
-                        &self.common().metadata,
-                    ) {
+                    if let Err(mmap_error) = self
+                        .common()
+                        .mmapper
+                        .ensure_mapped(res.start, res.pages)
+                        .and(
+                            self.common()
+                                .metadata
+                                .try_map_metadata_space(res.start, bytes),
+                        )
+                    {
                         memory::handle_mmap_error::<VM>(mmap_error, tls);
                     }
 
@@ -372,7 +377,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn reserved_pages(&self) -> usize {
-        self.get_page_resource().reserved_pages() + self.common().metadata.reserved_pages()
+        let data_pages = self.get_page_resource().reserved_pages();
+        let meta_pages = self.common().metadata.calculate_reserved_pages(data_pages);
+        data_pages + meta_pages
     }
 
     fn get_name(&self) -> &'static str {
