@@ -55,6 +55,7 @@ pub fn load_atomic(metadata_spec: MetadataSpec, data_addr: Address, order: Order
     res
 }
 
+#[inline(always)]
 pub fn store_atomic(
     metadata_spec: MetadataSpec,
     data_addr: Address,
@@ -105,6 +106,7 @@ pub fn store_atomic(
     sanity::verify_store(metadata_spec, data_addr, metadata);
 }
 
+#[inline(always)]
 pub fn compare_exchange_atomic(
     metadata_spec: MetadataSpec,
     data_addr: Address,
@@ -206,6 +208,7 @@ pub fn compare_exchange_atomic(
 }
 
 // same as Rust atomics, this wraps around on overflow
+#[inline(always)]
 pub fn fetch_add_atomic(
     metadata_spec: MetadataSpec,
     data_addr: Address,
@@ -264,6 +267,7 @@ pub fn fetch_add_atomic(
 }
 
 // same as Rust atomics, this wraps around on overflow
+#[inline(always)]
 pub fn fetch_sub_atomic(
     metadata_spec: MetadataSpec,
     data_addr: Address,
@@ -330,6 +334,7 @@ pub fn fetch_sub_atomic(
 /// 1. Concurrent access to this operation is undefined behaviour.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
+#[inline(always)]
 pub unsafe fn load(metadata_spec: MetadataSpec, data_addr: Address) -> usize {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
@@ -376,6 +381,7 @@ pub unsafe fn load(metadata_spec: MetadataSpec, data_addr: Address) -> usize {
 /// 1. Concurrent access to this operation is undefined behaviour.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
+#[inline(always)]
 pub unsafe fn store(metadata_spec: MetadataSpec, data_addr: Address, metadata: usize) {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
