@@ -352,6 +352,7 @@
 <span id="349">349</span>
 <span id="350">350</span>
 <span id="351">351</span>
+<span id="352">352</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident">std::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
@@ -373,6 +374,8 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
 <span class="kw">use</span> <span class="ident">std::mem::MaybeUninit</span>;
+
+<span class="kw">const</span> <span class="ident">UNINITIALIZED_WATER_MARK</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="op">-</span><span class="number">1</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CommonFreeListPageResource</span> {
     <span class="ident">free_list</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="ident">VMMap</span> <span class="kw">as</span> <span class="ident">Map</span><span class="op">&gt;</span><span class="ident">::FreeList</span><span class="op">&gt;</span>,
@@ -453,7 +456,7 @@
         } <span class="kw">else</span> {
             <span class="ident">sync</span>.<span class="ident">pages_currently_on_freelist</span> <span class="op">-</span><span class="op">=</span> <span class="ident">required_pages</span>;
             <span class="kw">if</span> <span class="ident">page_offset</span> <span class="op">&gt;</span> <span class="ident">sync</span>.<span class="ident">highwater_mark</span> {
-                <span class="kw">if</span> <span class="ident">sync</span>.<span class="ident">highwater_mark</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>
+                <span class="kw">if</span> <span class="ident">sync</span>.<span class="ident">highwater_mark</span> <span class="op">=</span><span class="op">=</span> <span class="ident">UNINITIALIZED_WATER_MARK</span>
                     <span class="op">|</span><span class="op">|</span> (<span class="ident">page_offset</span> <span class="op">^</span> <span class="ident">sync</span>.<span class="ident">highwater_mark</span>) <span class="op">&gt;</span> <span class="ident">PAGES_IN_REGION</span> <span class="kw">as</span> <span class="ident">i32</span>
                 {
                     <span class="kw">let</span> <span class="ident">regions</span> <span class="op">=</span> <span class="number">1</span> <span class="op">+</span> ((<span class="ident">page_offset</span> <span class="op">-</span> <span class="ident">sync</span>.<span class="ident">highwater_mark</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_PAGES_IN_REGION</span>);
@@ -511,7 +514,7 @@
             <span class="ident">meta_data_pages_per_region</span>,
             <span class="ident">sync</span>: <span class="ident">Mutex::new</span>(<span class="ident">FreeListPageResourceSync</span> {
                 <span class="ident">pages_currently_on_freelist</span>: <span class="kw">if</span> <span class="ident">growable</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="ident">pages</span> },
-                <span class="ident">highwater_mark</span>: <span class="number">0</span>,
+                <span class="ident">highwater_mark</span>: <span class="ident">UNINITIALIZED_WATER_MARK</span>,
             }),
             <span class="ident">_p</span>: <span class="ident">PhantomData</span>,
         };
@@ -546,7 +549,7 @@
             <span class="ident">meta_data_pages_per_region</span>,
             <span class="ident">sync</span>: <span class="ident">Mutex::new</span>(<span class="ident">FreeListPageResourceSync</span> {
                 <span class="ident">pages_currently_on_freelist</span>: <span class="number">0</span>,
-                <span class="ident">highwater_mark</span>: <span class="number">0</span>,
+                <span class="ident">highwater_mark</span>: <span class="ident">UNINITIALIZED_WATER_MARK</span>,
             }),
             <span class="ident">_p</span>: <span class="ident">PhantomData</span>,
         }
@@ -624,7 +627,6 @@
     }
 
     <span class="kw">fn</span> <span class="ident">reserve_metadata</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">extent</span>: <span class="ident">usize</span>) {
-        <span class="kw">let</span> <span class="ident">_highwater_mark</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_REGION</span>));
             <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> (<span class="ident">extent</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_REGION</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_REGION</span>;
