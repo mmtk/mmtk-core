@@ -152,7 +152,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    pub fn alloc(&self, tls: VMThread, size: usize) -> Address {
+    pub fn alloc(&self, tls: VMThread, align: usize, size: usize) -> Address {
         // TODO: Should refactor this and Space.acquire()
         if VM::VMActivePlan::global().poll(false, self) {
             assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
@@ -160,8 +160,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
             return unsafe { Address::zero() };
         }
 
-        let raw = unsafe { calloc(1, size) };
+        let raw = unsafe { aligned_alloc(align, size) };
         let address = Address::from_mut_ptr(raw);
+        // zero
+        // malloc+memset is always slower than calloc. But to support alignment, we do not have a better choice.
+        crate::util::memory::zero(address, size);
 
         if !address.is_zero() {
             let actual_size = unsafe { malloc_usable_size(raw) };
