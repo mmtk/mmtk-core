@@ -182,7 +182,7 @@ mod tests {
                         is_global: true,
                         offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
                         log_num_of_bits: 1,
-                        log_min_obj_size: 0,
+                        log_min_obj_size: 1,
                     };
                     #[cfg(target_pointer_width = "64")]
                     let mut lspec = SideMetadataSpec {
@@ -230,7 +230,7 @@ mod tests {
                         constants::BYTES_IN_PAGE,
                     );
 
-                    gspec.log_min_obj_size = 3;
+                    gspec.log_min_obj_size = 4;
                     gspec.log_num_of_bits = 4;
                     lspec.log_min_obj_size = 4;
                     lspec.log_num_of_bits = 4;
