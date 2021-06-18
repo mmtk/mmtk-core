@@ -17,7 +17,8 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::{MetadataContext, SideMetadataSanity};
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+use crate::util::metadata::MetadataSpec;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
@@ -200,15 +201,14 @@ impl<VM: VMBinding> GenCopy<VM> {
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let gencopy_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-            if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_side_metadata {
-                vec![VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC]
-            } else {
-                vec![]
+            match VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                MetadataSpec::OnSide(s) => vec![s],
+                MetadataSpec::InHeader(_) => vec![],
             }
         } else {
             vec![]
         };
-        let global_metadata_specs = MetadataContext::new_global_specs(&gencopy_specs);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&gencopy_specs);
 
         let res = GenCopy {
             nursery: CopySpace::new(

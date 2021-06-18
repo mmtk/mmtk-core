@@ -19,8 +19,8 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::MetadataSpec;
-use crate::util::metadata::SideMetadataSanity;
+use crate::util::metadata::side_metadata::SideMetadataSanity;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
@@ -371,7 +371,7 @@ pub fn create_vm_space<VM: VMBinding>(
     heap: &mut HeapMeta,
     boot_segment_bytes: usize,
     constraints: &'static PlanConstraints,
-    global_side_metadata_specs: Vec<MetadataSpec>,
+    global_side_metadata_specs: Vec<SideMetadataSpec>,
 ) -> ImmortalSpace<VM> {
     use crate::util::constants::LOG_BYTES_IN_MBYTE;
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
@@ -403,7 +403,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
-        global_side_metadata_specs: Vec<MetadataSpec>,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> BasePlan<VM> {
         let stats = Stats::new();
         // Initializing the analysis manager and routines
@@ -711,7 +711,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         options: Arc<UnsafeOptionsWrapper>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
-        global_side_metadata_specs: Vec<MetadataSpec>,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> CommonPlan<VM> {
         CommonPlan {
             immortal: ImmortalSpace::new(

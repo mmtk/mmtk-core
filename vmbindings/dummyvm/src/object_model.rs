@@ -1,4 +1,4 @@
-use mmtk::util::metadata::MetadataSpec;
+use mmtk::util::metadata::{HeaderMetadataSpec, MetadataSpec};
 use mmtk::util::{Address, ObjectReference};
 use mmtk::vm::ObjectModel;
 use mmtk::AllocationSemantics;
@@ -8,29 +8,18 @@ use DummyVM;
 
 pub struct VMObjectModel {}
 
-const DUMMY_GLOBAL_METADATA: MetadataSpec = MetadataSpec {
-    is_side_metadata: false,
-    is_global: true,
-    offset: 0,
-    num_of_bits: 1,
-    log_min_obj_size: 10,
-};
-
-const DUMMY_LOCAL_METADATA: MetadataSpec = MetadataSpec {
-    is_side_metadata: false,
-    is_global: false,
-    offset: 0,
-    num_of_bits: 1,
-    log_min_obj_size: 10,
-};
+const DUMMY_METADATA: MetadataSpec = MetadataSpec::InHeader(HeaderMetadataSpec {
+    bit_offset: 0,
+    num_of_bits: 0,
+});
 
 impl ObjectModel<DummyVM> for VMObjectModel {
-    const GLOBAL_LOG_BIT_SPEC: MetadataSpec = DUMMY_GLOBAL_METADATA;
-    const LOCAL_FORWARDING_POINTER_SPEC: MetadataSpec = DUMMY_LOCAL_METADATA;
-    const LOCAL_FORWARDING_BITS_SPEC: MetadataSpec = DUMMY_LOCAL_METADATA;
-    const LOCAL_MARK_BIT_SPEC: MetadataSpec = DUMMY_LOCAL_METADATA;
-    const LOCAL_LOS_MARK_NURSERY_SPEC: MetadataSpec = DUMMY_LOCAL_METADATA;
-    const LOCAL_UNLOGGED_BIT_SPEC: MetadataSpec = DUMMY_LOCAL_METADATA;
+    const GLOBAL_LOG_BIT_SPEC: MetadataSpec = DUMMY_METADATA;
+    const LOCAL_FORWARDING_POINTER_SPEC: MetadataSpec = DUMMY_METADATA;
+    const LOCAL_FORWARDING_BITS_SPEC: MetadataSpec = DUMMY_METADATA;
+    const LOCAL_MARK_BIT_SPEC: MetadataSpec = DUMMY_METADATA;
+    const LOCAL_LOS_MARK_NURSERY_SPEC: MetadataSpec = DUMMY_METADATA;
+    const LOCAL_UNLOGGED_BIT_SPEC: MetadataSpec = DUMMY_METADATA;
 
     fn load_metadata(
         _metadata_spec: MetadataSpec,

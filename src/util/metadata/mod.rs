@@ -222,4 +222,3 @@ mod global;
 pub mod side_metadata;
 
 pub use global::*;
-pub use side_metadata::SideMetadataSanity;

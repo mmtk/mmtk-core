@@ -1,4 +1,4 @@
-use crate::util::metadata::MetadataSpec;
+use super::SideMetadataSpec;
 use crate::util::{
     constants::{self, LOG_BITS_IN_BYTE},
     heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK},
@@ -18,10 +18,10 @@ use crate::MMAPPER;
 
 #[inline(always)]
 pub(super) fn address_to_chunked_meta_address(
-    metadata_spec: MetadataSpec,
+    metadata_spec: SideMetadataSpec,
     data_addr: Address,
 ) -> Address {
-    let log_bits_num = metadata_spec.num_of_bits.trailing_zeros() as i32;
+    let log_bits_num = metadata_spec.log_num_of_bits as i32;
     let log_min_obj_size = metadata_spec.log_min_obj_size as usize;
 
     let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
@@ -43,7 +43,7 @@ pub(super) fn address_to_chunked_meta_address(
 pub(crate) fn ensure_munmap_chunked_metadata_space(
     start: Address,
     size: usize,
-    spec: &MetadataSpec,
+    spec: &SideMetadataSpec,
 ) -> usize {
     use super::address_to_meta_address;
     use crate::util::constants::BYTES_IN_PAGE;
@@ -75,7 +75,7 @@ pub(crate) fn ensure_munmap_chunked_metadata_space(
         let mut next_data_chunk = second_data_chunk;
         // unmap all chunks in the middle
         while next_data_chunk != last_data_chunk {
-            let to_unmap = metadata_bytes_per_chunk(spec.log_min_obj_size, spec.num_of_bits);
+            let to_unmap = metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
             ensure_munmap_metadata(address_to_meta_address(*spec, next_data_chunk), to_unmap);
             total_unmapped += to_unmap;
             next_data_chunk += BYTES_IN_CHUNK;
@@ -92,10 +92,10 @@ pub(crate) fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
 }
 
 #[inline(always)]
-pub const fn metadata_bytes_per_chunk(log_min_obj_size: usize, num_of_bits: usize) -> usize {
+pub const fn metadata_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bits: usize) -> usize {
     1usize
         << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) - log_min_obj_size
-            + num_of_bits.trailing_zeros() as usize)
+            + log_num_of_bits)
 }
 
 /// Unmaps the metadata for a single chunk starting at `start`

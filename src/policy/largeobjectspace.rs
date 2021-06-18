@@ -8,7 +8,9 @@ use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
-use crate::util::metadata::{MetadataContext, MetadataSpec};
+use crate::util::metadata::side_metadata::SideMetadataContext;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::metadata::MetadataSpec;
 use crate::util::opaque_pointer::*;
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
@@ -116,7 +118,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<MetadataSpec>,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
@@ -129,12 +131,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 immortal: false,
                 zeroed,
                 vmrequest,
-                side_metadata_specs: MetadataContext {
+                side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
-                    local: if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.is_side_metadata {
-                        vec![VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC]
-                    } else {
-                        vec![]
+                    local: match VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC {
+                        MetadataSpec::OnSide(s) => vec![s],
+                        MetadataSpec::InHeader(_) => vec![],
                     },
                 },
             },

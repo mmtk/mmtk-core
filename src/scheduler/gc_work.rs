@@ -1,7 +1,6 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::plan::GcStatus;
-use crate::util::metadata::side_metadata::compare_exchange_atomic;
 use crate::util::metadata::*;
 use crate::util::*;
 use crate::vm::*;
@@ -497,11 +496,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
-                compare_exchange_atomic(
+                <E::VM as VMBinding>::VMObjectModel::compare_exchange_metadata(
                     self.meta,
-                    obj.to_address(),
+                    *obj,
                     0b0,
                     0b1,
+                    None,
                     Ordering::SeqCst,
                     Ordering::SeqCst,
                 );

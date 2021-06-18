@@ -13,7 +13,8 @@ use crate::plan::PlanConstraints;
 use crate::policy::space::SpaceOptions;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
-use crate::util::metadata::{MetadataContext, MetadataSpec};
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
+use crate::util::metadata::MetadataSpec;
 use crate::vm::{ObjectModel, VMBinding};
 
 /// This type implements a simple immortal collection
@@ -89,7 +90,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<MetadataSpec>,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
@@ -102,12 +103,11 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 immortal: true,
                 zeroed,
                 vmrequest,
-                side_metadata_specs: MetadataContext {
+                side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
-                    local: if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_side_metadata {
-                        vec![VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]
-                    } else {
-                        vec![]
+                    local: match VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+                        MetadataSpec::OnSide(s) => vec![s],
+                        MetadataSpec::InHeader(_) => vec![],
                     },
                 },
             },

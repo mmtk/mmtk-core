@@ -1,5 +1,5 @@
 use crate::util::conversions::*;
-use crate::util::metadata::{MetadataContext, SideMetadata, SideMetadataSanity};
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -445,10 +445,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Arguments:
     /// * `side_metadata_sanity_checker`: The `SideMetadataSanity` object instantiated in the calling plan.
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
-        side_metadata_sanity_checker.verify_metadata_context(
-            std::any::type_name::<Self>(),
-            self.common().metadata.get_context(),
-        )
+        side_metadata_sanity_checker
+            .verify_metadata_context(std::any::type_name::<Self>(), &self.common().metadata)
     }
 }
 
@@ -471,7 +469,7 @@ pub struct CommonSpace<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
 
-    pub metadata: SideMetadata,
+    pub metadata: SideMetadataContext,
 
     p: PhantomData<VM>,
 }
@@ -482,7 +480,7 @@ pub struct SpaceOptions {
     pub immortal: bool,
     pub zeroed: bool,
     pub vmrequest: VMRequest,
-    pub side_metadata_specs: MetadataContext,
+    pub side_metadata_specs: SideMetadataContext,
 }
 
 /// Print debug info for SFT. Should be false when committed.
@@ -508,7 +506,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             head_discontiguous_region: unsafe { Address::zero() },
             vm_map,
             mmapper,
-            metadata: SideMetadata::new(opt.side_metadata_specs),
+            metadata: opt.side_metadata_specs,
             p: PhantomData,
         };
 

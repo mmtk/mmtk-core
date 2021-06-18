@@ -4,9 +4,10 @@ use atomic::Ordering;
 
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
-use crate::util::metadata::side_metadata::compare_exchange_atomic;
 use crate::util::metadata::MetadataSpec;
 use crate::util::*;
+use crate::vm::ObjectModel;
+use crate::vm::VMBinding;
 use crate::MMTK;
 
 /// BarrierSelector describes which barrier to use.
@@ -51,12 +52,13 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     }
 
     #[inline(always)]
-    fn enqueue_node(&mut self, obj: ObjectReference) {
-        if compare_exchange_atomic(
+    fn enqueue_node<VM: VMBinding>(&mut self, obj: ObjectReference) {
+        if VM::VMObjectModel::compare_exchange_metadata(
             self.meta,
-            obj.to_address(),
+            obj,
             0b1,
             0b0,
+            None,
             Ordering::SeqCst,
             Ordering::SeqCst,
         ) {
@@ -88,7 +90,7 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     fn post_write_barrier(&mut self, target: WriteTarget) {
         match target {
             WriteTarget::Object(obj) => {
-                self.enqueue_node(obj);
+                self.enqueue_node::<E::VM>(obj);
             }
             _ => unreachable!(),
         }

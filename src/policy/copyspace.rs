@@ -7,7 +7,8 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::metadata::{MetadataContext, MetadataSpec};
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
+use crate::util::metadata::MetadataSpec;
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -70,17 +71,19 @@ impl<VM: VMBinding> CopySpace<VM> {
         from_space: bool,
         zeroed: bool,
         vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<MetadataSpec>,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
         let mut local_specs = vec![];
-        if VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_side_metadata {
-            local_specs.push(VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC);
+        match VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+            MetadataSpec::OnSide(s) => local_specs.push(s),
+            MetadataSpec::InHeader(_) => {}
         }
-        if VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.is_side_metadata {
-            local_specs.push(VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC)
+        match VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC {
+            MetadataSpec::OnSide(s) => local_specs.push(s),
+            MetadataSpec::InHeader(_) => {}
         }
         let common = CommonSpace::new(
             SpaceOptions {
@@ -89,7 +92,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 immortal: false,
                 zeroed,
                 vmrequest,
-                side_metadata_specs: MetadataContext {
+                side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
                     local: local_specs,
                 },

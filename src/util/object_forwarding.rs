@@ -1,3 +1,4 @@
+use crate::util::metadata::MetadataSpec;
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
 use crate::util::{constants, Address, ObjectReference};
 use crate::vm::ObjectModel;
@@ -189,18 +190,19 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
 #[cfg(target_endian = "little")]
 pub(super) fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> Option<isize> {
     // if both forwarding bits and forwarding pointer are in-header
-    if !VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.is_side_metadata
-        && !VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_side_metadata
-    {
-        let maybe_shift = VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.offset
-            - VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.offset;
-        if maybe_shift < constants::BITS_IN_WORD as isize {
-            Some(maybe_shift)
-        } else {
-            None
+    match (
+        VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+        VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+    ) {
+        (MetadataSpec::InHeader(fp), MetadataSpec::InHeader(fb)) => {
+            let maybe_shift = fb.bit_offset - fp.bit_offset;
+            if maybe_shift >= 0 && maybe_shift < constants::BITS_IN_WORD as isize {
+                Some(maybe_shift)
+            } else {
+                None
+            }
         }
-    } else {
-        None
+        _ => None,
     }
 }
 

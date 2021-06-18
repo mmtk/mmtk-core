@@ -6,8 +6,10 @@ use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
-use crate::util::metadata::SideMetadataSanity;
-use crate::util::metadata::{MetadataContext, MetadataSpec, SideMetadata};
+use crate::util::metadata::side_metadata::{
+    SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
+};
+use crate::util::metadata::MetadataSpec;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -31,7 +33,7 @@ const ASSERT_ALLOCATION: bool = false;
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
-    metadata: SideMetadata,
+    metadata: SideMetadataContext,
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
@@ -134,23 +136,22 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
-            .verify_metadata_context(std::any::type_name::<Self>(), self.metadata.get_context())
+            .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
     }
 }
 
 impl<VM: VMBinding> MallocSpace<VM> {
-    pub fn new(global_side_metadata_specs: Vec<MetadataSpec>) -> Self {
+    pub fn new(global_side_metadata_specs: Vec<SideMetadataSpec>) -> Self {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
-            metadata: SideMetadata::new(MetadataContext {
+            metadata: SideMetadataContext {
                 global: global_side_metadata_specs,
-                local: if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_side_metadata {
-                    vec![ALLOC_METADATA_SPEC, VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]
-                } else {
-                    vec![ALLOC_METADATA_SPEC]
+                local: match VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+                    MetadataSpec::OnSide(s) => vec![ALLOC_METADATA_SPEC, s],
+                    MetadataSpec::InHeader(_) => vec![ALLOC_METADATA_SPEC],
                 },
-            }),
+            },
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
         }
