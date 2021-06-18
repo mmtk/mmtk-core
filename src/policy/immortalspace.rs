@@ -104,7 +104,11 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 vmrequest,
                 side_metadata_specs: MetadataContext {
                     global: global_side_metadata_specs,
-                    local: vec![],
+                    local: if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_side_metadata {
+                        vec![VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]
+                    } else {
+                        vec![]
+                    },
                 },
             },
             vm_map,

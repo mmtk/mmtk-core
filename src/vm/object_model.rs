@@ -17,8 +17,46 @@ use crate::vm::VMBinding;
 ///
 /// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.
 pub trait ObjectModel<VM: VMBinding> {
+    // --------------------------------------------------
+    // Per-object Metadata Spec definitions go here
+    //
+    //
+    // NOTE to mmtk binding developers:
+    //
+    // A number of Global and PolicySpecific side metadata specifications are already reserved by mmtk-core.
+    // These are mentioned in their related section as follows.
+    //
+    // Any side metadata offset calculation must consider these to prevent overlaps.
+    //
+    //
+    // NOTE to mmtk-core developers:
+    //
+    // Adding to the list of reserved side metadata specs must consider the offsets currently being used by mmtk bindings to prevent overlaps.
+    //
+    // --------------------------------------------------
+
+    // --------------------------------------------------
+    //
+    // Global Metadata
+    //
+    // MMTk reserved Global side metadata offsets:
+    // [currently empty]
+    //
+    // --------------------------------------------------
+
     /// The metadata specification of the global  log bit.
     const GLOBAL_LOG_BIT_SPEC: MetadataSpec = metadata_defaults::LOGGING_SIDE_METADATA_SPEC;
+
+    // --------------------------------------------------
+    // PolicySpecific Metadata
+    //
+    // MMTk reserved PolicySpecific side metadata offsets:
+    //
+    //  1 - MarkSweep Alloc bit:
+    //      - Offset `0x0` on 32-bits
+    //      - Offset `LOCAL_SIDE_METADATA_BASE_ADDRESS` on 64-bits
+    //
+    // --------------------------------------------------
 
     /// The metadata specification for the forwarding pointer, which is currently specific to the CopySpace policy.
     const LOCAL_FORWARDING_POINTER_SPEC: MetadataSpec =

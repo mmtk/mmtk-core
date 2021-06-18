@@ -75,6 +75,13 @@ impl<VM: VMBinding> CopySpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
+        let mut local_specs = vec![];
+        if VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_side_metadata {
+            local_specs.push(VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC);
+        }
+        if VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.is_side_metadata {
+            local_specs.push(VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC)
+        }
         let common = CommonSpace::new(
             SpaceOptions {
                 name,
@@ -84,7 +91,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 vmrequest,
                 side_metadata_specs: MetadataContext {
                     global: global_side_metadata_specs,
-                    local: vec![],
+                    local: local_specs,
                 },
             },
             vm_map,
