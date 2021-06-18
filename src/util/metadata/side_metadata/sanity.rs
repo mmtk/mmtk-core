@@ -113,7 +113,10 @@ fn verify_local_specs_size(l_specs: &[MetadataSpec]) -> Result<()> {
     if total_size > 1usize << (LOG_BYTES_IN_CHUNK - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO) {
         return Err(Error::new(
             ErrorKind::InvalidInput,
-            format!("Not local metadata space per chunk for: \n{:?}", l_specs),
+            format!(
+                "Not enough local metadata space per chunk for: \n{:?}",
+                l_specs
+            ),
         ));
     }
 
