@@ -165,7 +165,7 @@ So it’s a good idea not to underestimate the difficulty of a NoGC port!</p>
 <li>It may be easier to simply build a static and/or dynamic binary for MMTk and link it to the language directly, manually building new binaries as necessary. 
 <ol>
 <li><code>cd binding_repo/mmtk</code></li>
-<li><code>cargo build --features nogc</code> to build in debug mode or add <code>--release</code> for release mode</li>
+<li><code>cargo build</code> to build in debug mode or add <code>--release</code> for release mode</li>
 <li>Copy the shared or static library from <code>target/debug</code> or <code>target/release</code> to your desired location</li>
 </ol>
 </li>
@@ -182,6 +182,8 @@ So it’s a good idea not to underestimate the difficulty of a NoGC port!</p>
 <ol>
 <li>Create a <code>mmtk.h</code> header file which exposes the functions required to implement NoGC (<code>gc_init</code>, <code>alloc</code>, <code>bind_mutator</code>), and <code>include</code> it. You can use the <a href="https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/api/mmtk.h">DummyVM <code>mmtk.h</code> header file</a> as an example.</li>
 <li>Initialise MMTk by calling <code>gc_init</code>, with the size of the heap. In the future, you may wish to make this value configurable via a command line argument or environment variable.</li>
+<li>You can set <a href="https://www.mmtk.io/mmtk-core/mmtk/util/options/struct.Options.html">options for MMTk</a> by using <code>process</code> to pass options, or simply by setting environtment variables. For example, to
+use the NoGC plan, you can set the env var <code>MMTK_PLAN=NoGC</code>.</li>
 <li>Create a MMTk mutator instance using <code>bind_mutator</code> and pass the return value of <code>gc_init</code>.</li>
 <li>Replace all previous <code>calloc</code> calls with <code>alloc</code> and optionally add a mutex around <code>alloc</code> if the VM is multi-threaded. The MMTk handle is the return value of the <code>bind_mutator</code> call.</li>
 </ol>
