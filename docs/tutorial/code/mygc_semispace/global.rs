@@ -18,7 +18,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::{SideMetadataSanity, MetadataContext};
+use crate::util::metadata::side_metadata::{SideMetadataSanity, SideMetadataContext};
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -173,7 +173,7 @@ impl<VM: VMBinding> MyGC<VM> {
     ) -> Self {
         // Modify
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let global_metadata_specs = MetadataContext::new_global_specs(&[]);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
         let res = MyGC {
             hi: AtomicBool::new(false),

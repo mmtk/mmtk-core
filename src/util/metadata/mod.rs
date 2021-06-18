@@ -4,7 +4,7 @@
 //!
 //! The new metadata design differentiates per-object metadata (e.g. forwarding-bits and marking-bit) from other types of metadata including per-address (e.g. alloc-bit) and per-X (where X != object size), because the per-object metadata can optionally be kept in the object headers.
 //!
-//! MMTk acknowledges the VM-dependant nature of the in-object metadata, and asks the VM bindings to contribute by implementing the related parts in the ['ObjectModel'](crate::vm::VMBinding::ObjectModel).
+//! MMTk acknowledges the VM-dependant nature of the in-object metadata, and asks the VM bindings to contribute by implementing the related parts in the ['ObjectModel'](crate::vm::ObjectModel).
 //!
 //!
 //! # Side Metadata
@@ -121,7 +121,7 @@
 //! For each global metadata bit-set, a constant instance of the `MetadataSpec` struct should be created.
 //!
 //! If the metadata is per-object and may possibly reside in objects, the constant instance should be created in the VM's ObjectModel.
-//! For instance, the forwarding-bits metadata spec should be assigned to `LOCAL_FORWARDING_BITS_SPEC` in [`ObjectModel`](crate::vm::VMBinding::ObjectModel).
+//! For instance, the forwarding-bits metadata spec should be assigned to `LOCAL_FORWARDING_BITS_SPEC` in [`ObjectModel`](crate::vm::ObjectModel).
 //! The VM binding decides whether to put these metadata bit-sets in-objects or on-side.
 //!
 //! For other metadata bit-sets, constant `MetadataSpec` instances, created inside MMTk by plans/policies, are used in conjunction with the access functions from the current module.
@@ -199,7 +199,7 @@
 //! When a space is created by a plan (e.g. SemiSpace::new), the plan can create its global specs by `MetadataContext::new_global_specs(&[GLOBAL_META_1, GLOBAL_META_2])`. Then,
 //! the global specs are passed to each space that the plan creates.
 //!
-//! Each space will then combine the global specs and its own local specs to create a [SideMetadata](crate::util::metadata::SideMetadata).
+//! Each space will then combine the global specs and its own local specs to create a [SideMetadataContext](crate::util::metadata::side_metadata::SideMetadataContext).
 //! Allocating side metadata space and accounting its memory usage is done by `SideMetadata`. If a space uses `CommonSpace`, `CommonSpace` will create `SideMetadata` and manage
 //! reserving and allocating metadata space when necessary. If a space does not use `CommonSpace`, it should create `SideMetadata` itself and manage allocating metadata space
 //! as its own responsibility.
