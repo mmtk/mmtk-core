@@ -18,7 +18,7 @@ You may want to take the following steps.
 2. Change the VM build process to build and/or link MMTk
     - It may be easier to simply build a static and/or dynamic binary for MMTk and link it to the language directly, manually building new binaries as necessary. 
         1. `cd binding_repo/mmtk`
-        2. `cargo build --features nogc` to build in debug mode or add `--release` for release mode
+        2. `cargo build` to build in debug mode or add `--release` for release mode
         3. Copy the shared or static library from `target/debug` or `target/release` to your desired location
     - Later, you can edit the language build process to build MMTk at the same time automatically.
 3. Replace VM allocation with calloc
@@ -27,6 +27,8 @@ You may want to take the following steps.
 4. Single Threaded MMTk Allocation
     1. Create a `mmtk.h` header file which exposes the functions required to implement NoGC (`gc_init`, `alloc`, `bind_mutator`), and `include` it. You can use the [DummyVM `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/api/mmtk.h) as an example.
     2. Initialise MMTk by calling `gc_init`, with the size of the heap. In the future, you may wish to make this value configurable via a command line argument or environment variable.
+    2. You can set [options for MMTk](https://www.mmtk.io/mmtk-core/mmtk/util/options/struct.Options.html) by using `process` to pass options, or simply by setting environtment variables. For example, to
+       use the NoGC plan, you can set the env var `MMTK_PLAN=NoGC`.
     3. Create a MMTk mutator instance using `bind_mutator` and pass the return value of `gc_init`.
     4. Replace all previous `calloc` calls with `alloc` and optionally add a mutex around `alloc` if the VM is multi-threaded. The MMTk handle is the return value of the `bind_mutator` call.
     - In order to perform allocations, you will need to know what object alignment the VM expects. VMs often align allocations at word boundaries (e.g. 4 or 8 bytes) as it allows the CPU to access the data faster at runtime. Additionally, the language may use the unused lowest order bits to store flags (e.g. type information), so it is important that MMTk respects these expectations.
