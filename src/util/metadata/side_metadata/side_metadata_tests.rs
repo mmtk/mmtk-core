@@ -91,8 +91,8 @@ mod tests {
             LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 19
         );
 
-        gspec.log_num_of_bits = 2;
-        lspec.log_num_of_bits = 8;
+        gspec.log_num_of_bits = 1;
+        lspec.log_num_of_bits = 3;
 
         assert_eq!(
             address_to_meta_address(gspec, unsafe { Address::from_usize(0) }).as_usize(),
