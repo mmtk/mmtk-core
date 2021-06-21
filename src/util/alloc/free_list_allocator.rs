@@ -152,7 +152,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
-        eprintln!("get plan {:?}", self.free_lists);
+        // eprintln!("get plan {:?}", self.free_lists);
         self.plan
     }
 
