@@ -5,17 +5,14 @@ use crate::{Plan, policy::{marksweepspace::MarkSweepSpace, space::Space}, util::
 use super::Allocator;
 
 pub struct FreeListAllocator<VM: VMBinding> {
-  pub tls: VMThread,
-  space: &'static MarkSweepSpace<VM>,
-  plan: &'static dyn Plan<VM = VM>,
-  available_blocks: BlockList,
-  exhausted_blocks: BlockList,
-  free_lists: HashMap<Block, FreeList>,
-}
-
+    pub tls: VMThread,
+    space: &'static MarkSweepSpace<VM>,
+    plan: &'static dyn Plan<VM = VM>,
+    available_blocks: Vec<LinkedList<(Block, LinkedList<Block>)>>,
+    exhausted_blocks: Vec<LinkedList<(Block, LinkedList<Block>)>>,
+  }
+  
 type SizeClass = usize;
-type BlockList = HashMap<SizeClass, LinkedList<Block>>;
-type FreeList = LinkedList<Address>;
 type Block = Address;
 
 impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
@@ -28,12 +25,12 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
-        eprintln!("get plan {:?}", self.free_lists);
+        // eprintln!("get plan {:?}", self.free_lists);
         self.plan
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        eprintln!("alloc {:?}", self.free_lists);
+        // eprintln!("alloc {:?}", self.free_lists);
         let size_class = FreeListAllocator::<VM>::get_size_class(size);
 
         // assumes block lists are initialised for all size classes
@@ -41,7 +38,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         // assert!(self.exhausted_blocks.contains_key(&size_class));
 
         // available blocks for given size class
-        let available_blocks = self.available_blocks.get(&size_class).unwrap();
+        let available_blocks = self.available_blocks.get(0).unwrap();
         if available_blocks.is_empty() {
             // no available blocks, go to slow path
             return self.alloc_slow_once(size, align, offset);
@@ -50,9 +47,9 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         let found_cell = false;
 
         while !found_cell {
-            let block = self.available_blocks.get(&size_class).unwrap().front().unwrap();
-            let block = &block.clone();
-            let address = self.attempt_alloc_to_block(block);
+            let block = self.available_blocks.get_mut(0).unwrap().front_mut().unwrap();
+            let (block, free_list) = block;
+            let address = FreeListAllocator::<VM>::attempt_alloc_to_free_list(free_list);
             if address != unsafe {Address::zero()} {
                 return address;
             }
@@ -86,7 +83,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        eprintln!("alloc slow once {:?}", self.free_lists);
+        // eprintln!("alloc slow once {:?}", self.free_lists);
         let size_class = FreeListAllocator::<VM>::get_size_class(size);
 
         // assumes block lists are initialised for all size classes
@@ -95,9 +92,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         let block_start = self.acquire_block();
         let mut free_list = FreeListAllocator::<VM>::make_free_list(block_start, size_class);
         let address = free_list.pop_front().unwrap();
-        self.available_blocks.get_mut(&size_class).unwrap().push_back(block_start);
-        eprintln!("{}, {:?}", address, self.free_lists);
-        // self.free_lists.insert(block_start, free_list);
+        self.available_blocks.get_mut(0).unwrap().push_back((block_start, free_list));
         eprintln!("{}", address);
         address
     }
@@ -124,25 +119,24 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     fn init_size_classes(&mut self) {
-        eprintln!("init size classes {:?}", self.free_lists);
+        // eprintln!("init size classes {:?}", self.free_lists);
         // TODO: multiple size classes
 
-        self.available_blocks = HashMap::new();
-        self.exhausted_blocks = HashMap::new();
-        self.free_lists = HashMap::new();
+        self.available_blocks = vec![];
+        self.exhausted_blocks = vec![];
+        // self.free_lists = HashMap::new();
 
-        self.available_blocks.insert(1 << 13, LinkedList::new());
-        self.exhausted_blocks.insert(1 << 13, LinkedList::new());
+        self.available_blocks.insert(0, LinkedList::new());
+        self.exhausted_blocks.insert(0, LinkedList::new());
     }
 
-    fn attempt_alloc_to_block(&mut self, block: &Block) -> Address {
-        // unsafe {
-        //     match self.free_lists.get_mut(block).unwrap().pop_front() {
-        //         Some(cell) => cell,
-        //         None => Address::zero(),
-        //     }
-        // }
-        todo!()
+    fn attempt_alloc_to_free_list(free_list: &mut LinkedList<Address>) -> Address {
+        unsafe {
+            match free_list.pop_front() {
+                Some(cell) => cell,
+                None => Address::zero(),
+            }
+        }
     }
 
     pub fn new(
@@ -154,9 +148,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             tls,
             space,
             plan,
-            available_blocks: HashMap::new(),
-            exhausted_blocks: HashMap::new(),
-            free_lists: HashMap::new(),
+            available_blocks: vec![],
+            exhausted_blocks: vec![],
         };
         allocator.init_size_classes();
         allocator
