@@ -70,7 +70,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         };
         unsafe {
             self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
+                .get_allocator_mut(super::nogc::mutator::ALLOCATOR_MAPPING[allocator])
         }
         .alloc(size, align, offset)
     }
@@ -79,7 +79,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
     fn post_alloc(&mut self, refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
         unsafe {
             self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
+                .get_allocator_mut(super::nogc::mutator::ALLOCATOR_MAPPING[allocator])
         }
         .get_space()
         .initialize_object_metadata(refer, true)
