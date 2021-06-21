@@ -80,10 +80,6 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         offset: isize,
         allocator: AllocationSemantics,
     ) -> Address {
-        eprintln!("mut context alloc");
-        let allocor = unsafe { self.allocators.free_list[0].assume_init_ref()};
-        eprintln!("{:?}", allocor.free_lists);
-
         unsafe {
             self.allocators
                 .get_allocator_mut(super::nogc::mutator::ALLOCATOR_MAPPING[allocator])
