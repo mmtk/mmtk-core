@@ -3,6 +3,7 @@ use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -26,7 +27,7 @@ use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalS
 
 pub struct NoGC<VM: VMBinding> {
     pub base: BasePlan<VM>,
-    pub nogc_space: NoGCImmortalSpace<VM>,
+    pub nogc_space: MarkSweepSpace<VM>,
 }
 
 pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
@@ -62,6 +63,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
+        eprintln!("nogc::get_alloc_mapping");
         &*ALLOCATOR_MAPPING
     }
 
@@ -94,22 +96,31 @@ impl<VM: VMBinding> NoGC<VM> {
 
         let global_specs = SideMetadataContext::new_global_specs(&[]);
 
-        #[cfg(feature = "nogc_lock_free")]
-        let nogc_space = NoGCImmortalSpace::new(
-            "nogc_space",
-            cfg!(not(feature = "nogc_no_zeroing")),
-            global_specs.clone(),
-        );
-        #[cfg(not(feature = "nogc_lock_free"))]
-        let nogc_space = NoGCImmortalSpace::new(
-            "nogc_space",
+        // #[cfg(feature = "nogc_lock_free")]
+        // let nogc_space = NoGCImmortalSpace::new(
+        //     "nogc_space",
+        //     cfg!(not(feature = "nogc_no_zeroing")),
+        //     global_specs.clone(),
+        // );
+        // #[cfg(not(feature = "nogc_lock_free"))]
+        // let nogc_space = NoGCImmortalSpace::new(
+        //     "nogc_space",
+        //     true,
+        //     VMRequest::discontiguous(),
+        //     global_specs.clone(),
+        //     vm_map,
+        //     mmapper,
+        //     &mut heap,
+        //     &NOGC_CONSTRAINTS,
+        // );
+        let nogc_space = MarkSweepSpace::new(
+            "MSspace",
             true,
             VMRequest::discontiguous(),
             global_specs.clone(),
             vm_map,
             mmapper,
             &mut heap,
-            &NOGC_CONSTRAINTS,
         );
 
         let res = NoGC {
@@ -131,7 +142,7 @@ impl<VM: VMBinding> NoGC<VM> {
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res.nogc_space
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-
+        eprintln!("NoGC plan");
         res
     }
 }
