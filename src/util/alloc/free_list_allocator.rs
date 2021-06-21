@@ -9,8 +9,8 @@ pub struct FreeListAllocator<VM: VMBinding> {
   space: &'static MarkSweepSpace<VM>,
   plan: &'static dyn Plan<VM = VM>,
   available_blocks: BlockList,
-  pub free_lists: BlockList, //HashMap<Block, FreeList>,
   exhausted_blocks: BlockList,
+  free_lists: HashMap<Block, FreeList>,
 }
 
 type SizeClass = usize;
@@ -155,11 +155,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             space,
             plan,
             available_blocks: HashMap::new(),
-            free_lists: HashMap::new(),
             exhausted_blocks: HashMap::new(),
+            free_lists: HashMap::new(),
         };
         allocator.init_size_classes();
-        eprintln!("{:?}", allocator.free_lists);
         allocator
     }
 
