@@ -32,7 +32,7 @@ pub struct Allocators<VM: VMBinding> {
     pub malloc: [MaybeUninit<MallocAllocator<VM>>; MAX_MALLOC_ALLOCATORS],
     pub immix: [MaybeUninit<ImmixAllocator<VM>>; MAX_IMMIX_ALLOCATORS],
     pub markcompact: [MaybeUninit<MarkCompactAllocator<VM>>; MAX_MARK_COMPACT_ALLOCATORS],
-    pub free_list: [MaybeUninit<Box<FreeListAllocator<VM>>>; MAX_FREE_LIST_ALLOCATORS],
+    pub free_list: [MaybeUninit<FreeListAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
 }
 
 impl<VM: VMBinding> Allocators<VM> {
@@ -56,7 +56,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.malloc[index as usize].assume_init_ref()
             }
             AllocatorSelector::FreeList(index) => {
-                &**self.free_list[index as usize].assume_init_ref()
+                self.free_list[index as usize].assume_init_ref()
             }
         }
     }
@@ -75,9 +75,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_mut()
             }
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
-            AllocatorSelector::FreeList(index) => {
-                &mut **self.free_list[index as usize].assume_init_mut()
-            }
+            AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_mut(),
         }
     }
 
@@ -141,6 +139,13 @@ impl<VM: VMBinding> Allocators<VM> {
                     ));
                 }
                 AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
+                AllocatorSelector::FreeList(index) => {
+                    ret.free_list[index as usize].write(FreeListAllocator::new(
+                        mutator_tls.0,
+                        space.downcast_ref::<MarkSweepSpace<VM>>().unwrap(),
+                        plan,
+                    ));
+                }
             }
         }
 
