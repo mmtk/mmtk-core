@@ -10,7 +10,7 @@ pub struct MarkSweepSpace<VM: VMBinding> {
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     fn name(&self) -> &str {
-        todo!()
+        self.common.name
     }
 
     fn is_live(&self, object: crate::util::ObjectReference) -> bool {
@@ -27,7 +27,8 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: crate::util::ObjectReference, alloc: bool) {
-        todo!()
+        // todo!()
+        // do nothing for now
     }
 }
 
@@ -45,7 +46,7 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
     }
 
     fn init(&mut self, vm_map: &'static crate::util::heap::layout::heap_layout::VMMap) {
-        todo!()
+        self.common().init(self.as_space());
     }
 
     fn common(&self) -> &CommonSpace<VM> {
@@ -58,7 +59,7 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
 }
 
 impl<VM: VMBinding> MarkSweepSpace<VM> {
-    fn new(
+    pub fn new(
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
@@ -67,6 +68,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> MarkSweepSpace<VM> {
+        println!("MarkSweepSpace::new");
         let common = CommonSpace::new(
             SpaceOptions {
                 name,
