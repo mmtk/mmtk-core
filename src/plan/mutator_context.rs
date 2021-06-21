@@ -63,14 +63,13 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         offset: isize,
         allocator: AllocationType,
     ) -> Address {
-        let allocator = if size > crate::util::alloc::free_list_allocator::BYTES_IN_BLOCK {
-            AllocationType::Los
-        } else {
-            allocator
-        };
+        eprintln!("mut context alloc");
+        let allocor = unsafe { self.allocators.free_list[0].assume_init_ref()};
+        eprintln!("{:?}", allocor.free_lists);
+
         unsafe {
             self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
+                .get_allocator_mut(super::nogc::mutator::ALLOCATOR_MAPPING[allocator])
         }
         .alloc(size, align, offset)
     }
@@ -79,7 +78,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
     fn post_alloc(&mut self, refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
         unsafe {
             self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
+                .get_allocator_mut(super::nogc::mutator::ALLOCATOR_MAPPING[allocator])
         }
         .get_space()
         .initialize_object_metadata(refer, true)
