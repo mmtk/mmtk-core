@@ -70,5 +70,5 @@ pub trait Collection<VM: VMBinding> {
     fn schedule_finalization(_tls: VMWorkerThread) {}
 
     fn update_object_archive() {}
-    fn process_weak_refs() {}
+    fn process_weak_refs<E: ProcessEdgesWork<VM = VM>>(_worker: &mut GCWorker<VM>) {}
 }

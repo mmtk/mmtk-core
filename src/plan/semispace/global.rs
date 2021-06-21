@@ -89,6 +89,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, SSCopyContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::RefClosure]
+            .add(ProcessWeakRefs::<SSProcessEdges<VM>>::new());
         // Scheduling all the gc hooks of analysis routines. It is generally recommended
         // to take advantage of the scheduling system we have in place for more performance
         #[cfg(feature = "analysis")]

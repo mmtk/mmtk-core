@@ -122,7 +122,6 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
         trace!("Release Global");
         // FIXME: This is only a work-around
         <P::VM as VMBinding>::VMCollection::update_object_archive();
-        <P::VM as VMBinding>::VMCollection::process_weak_refs();
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut P = unsafe { &mut *(self.plan as *const _ as *mut _) };
@@ -271,6 +270,23 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
         mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
     }
 }
+
+#[derive(Default)]
+pub struct ProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
+
+impl<E: ProcessEdgesWork> ProcessWeakRefs<E> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessWeakRefs<E> {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+        trace!("ProcessWeakRefs");
+        <E::VM as VMBinding>::VMCollection::process_weak_refs::<E>(worker);
+    }
+}
+
 
 pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Edges::VM>);
 
