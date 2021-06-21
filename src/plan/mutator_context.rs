@@ -63,9 +63,13 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         offset: isize,
         allocator: AllocationType,
     ) -> Address {
+        eprintln!("mut context alloc");
+        let allocor = unsafe { self.allocators.free_list[0].assume_init_ref()};
+        eprintln!("{:?}", allocor.free_lists);
+
         unsafe {
             self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
+                .get_allocator_mut(super::nogc::mutator::ALLOCATOR_MAPPING[allocator])
         }
         .alloc(size, align, offset)
     }
@@ -74,7 +78,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
     fn post_alloc(&mut self, refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
         unsafe {
             self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
+                .get_allocator_mut(super::nogc::mutator::ALLOCATOR_MAPPING[allocator])
         }
         .get_space()
         .initialize_object_metadata(refer, true)
@@ -86,6 +90,18 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
 
     fn barrier(&mut self) -> &mut dyn Barrier {
         &mut *self.barrier
+    }
+
+    fn flush_remembered_sets(&mut self) {
+        self.barrier().flush();
+    }
+
+    fn flush(&mut self) {
+        self.flush_remembered_sets();
+    }
+
+    fn record_modified_node(&mut self, obj: ObjectReference) {
+        self.barrier().post_write_barrier(WriteTarget::Object(obj));
     }
 }
 
