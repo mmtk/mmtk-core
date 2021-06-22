@@ -522,14 +522,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             bytes,
             new_chunk
         );
-
-        // If this is not a new chunk, the SFT for [start, start + bytes) should alreayd be initialized.
-        #[cfg(debug_assertions)]
-        if !new_chunk {
-            debug_assert!(SFT_MAP.get(start).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})", start, bytes, new_chunk, start, SFT_MAP.get(start).name());
-            debug_assert!(SFT_MAP.get(start + bytes - 1).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {}", start, bytes, new_chunk, start + bytes - 1, SFT_MAP.get(start + bytes - 1).name());
-        }
-
+        debug_assert!(
+            (new_chunk && start.is_aligned_to(BYTES_IN_CHUNK)) || !new_chunk,
+            "should only grow space for new chunks at chunk-aligned start address {:#0x}", (BYTES_IN_CHUNK)
+        );
         if new_chunk {
             SFT_MAP.update(self.as_sft(), start, bytes);
         }
