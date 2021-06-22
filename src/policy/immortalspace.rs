@@ -5,7 +5,7 @@ use crate::util::address::Address;
 use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
 
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
-use crate::util::ObjectReference;
+use crate::util::{metadata, ObjectReference};
 
 use crate::plan::TransitiveClosure;
 
@@ -14,7 +14,6 @@ use crate::policy::space::SpaceOptions;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
-use crate::util::metadata::MetadataSpec;
 use crate::vm::{ObjectModel, VMBinding};
 
 /// This type implements a simple immortal collection
@@ -105,10 +104,9 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
-                    local: match VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
-                        MetadataSpec::OnSide(s) => vec![s],
-                        MetadataSpec::InHeader(_) => vec![],
-                    },
+                    local: metadata::extract_side_metadata(&[
+                        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                    ]),
                 },
             },
             vm_map,
@@ -139,8 +137,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 None,
                 Some(Ordering::SeqCst),
             );
-            let mark_bit = old_value & GC_MARK_BIT_MASK;
-            if mark_bit == value {
+            if old_value == value {
                 return false;
             }
 

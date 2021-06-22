@@ -6,12 +6,12 @@ use crate::util::{
 };
 use std::io::Result;
 
-#[cfg(test)]
-use super::ensure_munmap_metadata;
-use super::{
+use super::constants::{
     CHUNK_MASK, LOCAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_PER_CHUNK,
     LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
+#[cfg(test)]
+use super::ensure_munmap_metadata;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::Mmapper;
 use crate::MMAPPER;

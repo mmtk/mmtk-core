@@ -50,9 +50,6 @@ impl SideMetadataContext {
     pub fn new_global_specs(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
         let mut ret = vec![];
         ret.extend_from_slice(specs);
-        // if cfg!(feature = "side_gc_header") {
-        //     ret.push(crate::util::gc_byte::SIDE_GC_BYTE_SPEC);
-        // }
         ret
     }
 
@@ -160,7 +157,7 @@ impl SideMetadataContext {
 
         #[cfg(target_pointer_width = "32")]
         if lsize > 0 {
-            let max = BYTES_IN_CHUNK >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
+            let max = BYTES_IN_CHUNK >> super::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
             debug_assert!(
                 lsize <= max,
                 "local side metadata per chunk (0x{:x}) must be less than (0x{:x})",

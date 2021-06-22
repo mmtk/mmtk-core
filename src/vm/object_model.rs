@@ -62,8 +62,6 @@ pub trait ObjectModel<VM: VMBinding> {
     const LOCAL_MARK_BIT_SPEC: MetadataSpec;
     /// The metadata specification for the mark-and-nursery bits, which is currently specific to the LargeObjectSpace policy.
     const LOCAL_LOS_MARK_NURSERY_SPEC: MetadataSpec;
-    /// The metadata specification for the unlogged bit, which is currently not used but is specific to the LargeObjectSpace policy.
-    const LOCAL_UNLOGGED_BIT_SPEC: MetadataSpec;
 
     /// A function to load the specified per-object metadata's content.
     ///

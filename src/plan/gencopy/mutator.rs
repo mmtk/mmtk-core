@@ -59,7 +59,6 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
         barrier: box ObjectRememberingBarrier::<GenCopyNurseryProcessEdges<VM>>::new(
             mmtk,
-            // FIXME: the implementation assumes log bit is always on side
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
         ),
         mutator_tls,

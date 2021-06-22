@@ -11,18 +11,17 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
-use crate::util::metadata::MetadataSpec;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::util::VMWorkerThread;
+use crate::util::{conversions, metadata};
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
 use enum_map::EnumMap;
@@ -201,10 +200,7 @@ impl<VM: VMBinding> GenCopy<VM> {
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let gencopy_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-            match VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                MetadataSpec::OnSide(s) => vec![s],
-                MetadataSpec::InHeader(_) => vec![],
-            }
+            metadata::extract_side_metadata(&[VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
         } else {
             vec![]
         };

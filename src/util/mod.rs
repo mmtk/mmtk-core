@@ -38,7 +38,7 @@ pub(crate) mod heap;
 pub(crate) mod logger;
 /// Various malloc implementations (conditionally compiled by features)
 pub(crate) mod malloc;
-/// Side metadata implementation.
+/// Metadata (OnSide or InHeader) implementation.
 pub mod metadata;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;

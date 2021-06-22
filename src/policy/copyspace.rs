@@ -7,8 +7,8 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
+use crate::util::metadata::extract_side_metadata;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
-use crate::util::metadata::MetadataSpec;
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -76,15 +76,10 @@ impl<VM: VMBinding> CopySpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
-        let mut local_specs = vec![];
-        match VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-            MetadataSpec::OnSide(s) => local_specs.push(s),
-            MetadataSpec::InHeader(_) => {}
-        }
-        match VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC {
-            MetadataSpec::OnSide(s) => local_specs.push(s),
-            MetadataSpec::InHeader(_) => {}
-        }
+        let local_specs = extract_side_metadata(&[
+            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+            VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+        ]);
         let common = CommonSpace::new(
             SpaceOptions {
                 name,

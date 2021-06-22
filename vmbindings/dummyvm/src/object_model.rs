@@ -19,7 +19,6 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     const LOCAL_FORWARDING_BITS_SPEC: MetadataSpec = DUMMY_METADATA;
     const LOCAL_MARK_BIT_SPEC: MetadataSpec = DUMMY_METADATA;
     const LOCAL_LOS_MARK_NURSERY_SPEC: MetadataSpec = DUMMY_METADATA;
-    const LOCAL_UNLOGGED_BIT_SPEC: MetadataSpec = DUMMY_METADATA;
 
     fn load_metadata(
         _metadata_spec: MetadataSpec,

@@ -2,17 +2,16 @@ use super::metadata::*;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
-use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
-use crate::util::metadata::MetadataSpec;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
@@ -147,10 +146,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             active_bytes: AtomicUsize::new(0),
             metadata: SideMetadataContext {
                 global: global_side_metadata_specs,
-                local: match VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
-                    MetadataSpec::OnSide(s) => vec![ALLOC_METADATA_SPEC, s],
-                    MetadataSpec::InHeader(_) => vec![ALLOC_METADATA_SPEC],
-                },
+                local: metadata::extract_side_metadata(&[VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
             },
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),

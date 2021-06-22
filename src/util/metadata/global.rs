@@ -20,7 +20,7 @@ impl fmt::Debug for HeaderMetadataSpec {
     }
 }
 
-/// This struct stores the specification of a side metadata bit-set.
+/// This struct stores the specification of a metadata bit-set.
 /// It is used as an input to the (inline) functions provided by the side metadata module.
 ///
 /// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.
@@ -36,4 +36,20 @@ impl MetadataSpec {
     pub fn is_on_side(&self) -> bool {
         matches!(self, &MetadataSpec::OnSide(_))
     }
+}
+
+/// Given a slice of metadata specifications, returns a vector of the specs which are on side.
+///
+/// # Arguments:
+/// * `specs` is the input slice of on-side and/or in-header metadata specifications.
+///
+pub(crate) fn extract_side_metadata(specs: &[MetadataSpec]) -> Vec<SideMetadataSpec> {
+    let mut side_specs = vec![];
+    for spec in specs {
+        if let MetadataSpec::OnSide(ss) = *spec {
+            side_specs.push(ss);
+        }
+    }
+
+    side_specs
 }

@@ -19,12 +19,6 @@ lazy_static! {
     pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
 }
 
-#[cfg(debug_assertions)]
-lazy_static! {
-    pub static ref ALLOC_MAP: RwLock<HashSet<ObjectReference>> = RwLock::default();
-    pub static ref MARK_MAP: RwLock<HashSet<ObjectReference>> = RwLock::default();
-}
-
 /// This is the metadata spec for the alloc-bit.
 ///
 /// An alloc-bit is required per min-object-size aligned address , rather than per object, and can only exist as side metadata.
