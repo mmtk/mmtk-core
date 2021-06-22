@@ -111,6 +111,9 @@ pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
     BlockList::new(MI_LARGE_OBJ_WSIZE_MAX + 1 /* 655360, Huge queue */),
 ];
 
+const BYTES_IN_BLOCK: usize = 1 << LOG_BYTES_IN_BLOCK;
+const LOG_BYTES_IN_BLOCK: usize = 16;
+
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
     space: &'static MarkSweepSpace<VM>,
