@@ -2,7 +2,7 @@ use atomic::Ordering;
 
 use crate::plan::AllocationSemantics;
 use crate::plan::CopyContext;
-use crate::util::metadata::MetadataSpec;
+use crate::util::metadata::{HeaderMetadataSpec, MetadataSpec};
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
@@ -75,7 +75,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.
     ///
     fn load_metadata(
-        metadata_spec: MetadataSpec,
+        metadata_spec: HeaderMetadataSpec,
         object: ObjectReference,
         mask: Option<usize>,
         atomic_ordering: Option<Ordering>,
@@ -92,7 +92,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `atomic_ordering`: is an optional atomic ordering for the store operation. An input value of `None` means the store operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic store operation will use the `Ordering::X`.
     ///
     fn store_metadata(
-        metadata_spec: MetadataSpec,
+        metadata_spec: HeaderMetadataSpec,
         object: ObjectReference,
         val: usize,
         mask: Option<usize>,
@@ -114,7 +114,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// # Returns `true` if the operation is successful, and `false` otherwise.
     ///
     fn compare_exchange_metadata(
-        metadata_spec: MetadataSpec,
+        metadata_spec: HeaderMetadataSpec,
         object: ObjectReference,
         old_val: usize,
         new_val: usize,
@@ -135,7 +135,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// # Returns the old metadata value as a word.
     ///
     fn fetch_add_metadata(
-        metadata_spec: MetadataSpec,
+        metadata_spec: HeaderMetadataSpec,
         object: ObjectReference,
         val: usize,
         order: Ordering,
@@ -153,7 +153,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// # Returns the old metadata value as a word.
     ///
     fn fetch_sub_metadata(
-        metadata_spec: MetadataSpec,
+        metadata_spec: HeaderMetadataSpec,
         object: ObjectReference,
         val: usize,
         order: Ordering,

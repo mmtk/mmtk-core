@@ -496,7 +496,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
-                <E::VM as VMBinding>::VMObjectModel::compare_exchange_metadata(
+                compare_exchange_metadata::<E::VM>(
                     self.meta,
                     *obj,
                     0b0,

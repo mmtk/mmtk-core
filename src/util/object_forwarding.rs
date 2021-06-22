@@ -1,4 +1,6 @@
-use crate::util::metadata::MetadataSpec;
+use crate::util::metadata::{
+    compare_exchange_metadata, load_metadata, store_metadata, MetadataSpec,
+};
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
 use crate::util::{constants, Address, ObjectReference};
 use crate::vm::ObjectModel;
@@ -28,14 +30,14 @@ const FORWARDING_POINTER_MASK: usize = 0xffff_fffc;
 /// The successful worker will set the object forwarding bits to BEING_FORWARDED, preventing other workers from forwarding the same object.
 pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> usize {
     loop {
-        let old_value = VM::VMObjectModel::load_metadata(
+        let old_value = load_metadata::<VM>(
             VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
             object,
             None,
             Some(Ordering::SeqCst),
         );
         if old_value != FORWARDING_NOT_TRIGGERED_YET
-            || VM::VMObjectModel::compare_exchange_metadata(
+            || compare_exchange_metadata::<VM>(
                 VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
                 object,
                 old_value,
@@ -65,7 +67,7 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
 ) -> ObjectReference {
     let mut forwarding_bits = forwarding_bits;
     while forwarding_bits == BEING_FORWARDED {
-        forwarding_bits = VM::VMObjectModel::load_metadata(
+        forwarding_bits = load_metadata::<VM>(
             VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
             object,
             None,
@@ -92,7 +94,7 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
 ) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
-        VM::VMObjectModel::store_metadata(
+        store_metadata::<VM>(
             VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
             object,
             new_object.to_address().as_usize() | (FORWARDED << shift),
@@ -101,7 +103,7 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
         )
     } else {
         write_forwarding_pointer::<VM>(object, new_object);
-        VM::VMObjectModel::store_metadata(
+        store_metadata::<VM>(
             VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
             object,
             FORWARDED,
@@ -113,7 +115,7 @@ pub fn forward_object<VM: VMBinding, CC: CopyContext>(
 }
 
 pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
-    VM::VMObjectModel::load_metadata(
+    load_metadata::<VM>(
         VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
         object,
         None,
@@ -122,7 +124,7 @@ pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
 }
 
 pub fn is_forwarded_or_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
-    VM::VMObjectModel::load_metadata(
+    load_metadata::<VM>(
         VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
         object,
         None,
@@ -141,7 +143,7 @@ pub fn state_is_being_forwarded(forwarding_bits: usize) -> bool {
 /// Zero the forwarding bits of an object.
 /// This function is used on new objects.
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
-    VM::VMObjectModel::store_metadata(
+    store_metadata::<VM>(
         VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
         object,
         0,
@@ -154,7 +156,7 @@ pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
 /// This function is called on forwarded/being_forwarded objects.
 pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> ObjectReference {
     unsafe {
-        Address::from_usize(VM::VMObjectModel::load_metadata(
+        Address::from_usize(load_metadata::<VM>(
             VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
             object,
             Some(FORWARDING_POINTER_MASK),
@@ -171,7 +173,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
     new_object: ObjectReference,
 ) {
     trace!("GCForwardingWord::write({:#?}, {:x})\n", object, new_object);
-    VM::VMObjectModel::store_metadata(
+    store_metadata::<VM>(
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
         object,
         new_object.to_address().as_usize(),

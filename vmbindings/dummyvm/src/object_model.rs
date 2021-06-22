@@ -21,7 +21,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     const LOCAL_LOS_MARK_NURSERY_SPEC: MetadataSpec = DUMMY_METADATA;
 
     fn load_metadata(
-        _metadata_spec: MetadataSpec,
+        _metadata_spec: HeaderMetadataSpec,
         _object: ObjectReference,
         _mask: Option<usize>,
         _atomic_ordering: Option<Ordering>,
@@ -30,7 +30,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     }
 
     fn store_metadata(
-        _metadata_spec: MetadataSpec,
+        _metadata_spec: HeaderMetadataSpec,
         _object: ObjectReference,
         _val: usize,
         _mask: Option<usize>,
@@ -40,7 +40,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     }
 
     fn compare_exchange_metadata(
-        _metadata_spec: MetadataSpec,
+        _metadata_spec: HeaderMetadataSpec,
         _object: ObjectReference,
         _old_val: usize,
         _new_val: usize,
@@ -52,7 +52,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     }
 
     fn fetch_add_metadata(
-        _metadata_spec: MetadataSpec,
+        _metadata_spec: HeaderMetadataSpec,
         _object: ObjectReference,
         _val: usize,
         _order: Ordering,
@@ -61,7 +61,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     }
 
     fn fetch_sub_metadata(
-        _metadata_spec: MetadataSpec,
+        _metadata_spec: HeaderMetadataSpec,
         _object: ObjectReference,
         _val: usize,
         _order: Ordering,

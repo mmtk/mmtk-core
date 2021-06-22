@@ -5,6 +5,7 @@ use crate::util::address::Address;
 use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
 
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
+use crate::util::metadata::{compare_exchange_metadata, load_metadata, store_metadata};
 use crate::util::{metadata, ObjectReference};
 
 use crate::plan::TransitiveClosure;
@@ -44,14 +45,14 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        let old_value = VM::VMObjectModel::load_metadata(
+        let old_value = load_metadata::<VM>(
             VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             object,
             None,
             Some(Ordering::SeqCst),
         );
         let new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
-        VM::VMObjectModel::store_metadata(
+        store_metadata::<VM>(
             VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             object,
             new_value,
@@ -131,7 +132,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
 
     fn test_and_mark(object: ObjectReference, value: usize) -> bool {
         loop {
-            let old_value = VM::VMObjectModel::load_metadata(
+            let old_value = load_metadata::<VM>(
                 VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 object,
                 None,
@@ -141,7 +142,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 return false;
             }
 
-            if VM::VMObjectModel::compare_exchange_metadata(
+            if compare_exchange_metadata::<VM>(
                 VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 object,
                 old_value,

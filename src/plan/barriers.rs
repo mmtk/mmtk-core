@@ -4,9 +4,8 @@ use atomic::Ordering;
 
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
-use crate::util::metadata::MetadataSpec;
+use crate::util::metadata::{compare_exchange_metadata, MetadataSpec};
 use crate::util::*;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::MMTK;
 
@@ -53,7 +52,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
 
     #[inline(always)]
     fn enqueue_node<VM: VMBinding>(&mut self, obj: ObjectReference) {
-        if VM::VMObjectModel::compare_exchange_metadata(
+        if compare_exchange_metadata::<VM>(
             self.meta,
             obj,
             0b1,

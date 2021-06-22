@@ -9,8 +9,11 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use crate::util::metadata;
+use crate::util::metadata::compare_exchange_metadata;
+use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::metadata::store_metadata;
 use crate::util::opaque_pointer::*;
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
@@ -52,7 +55,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
-        let old_value = VM::VMObjectModel::load_metadata(
+        let old_value = load_metadata::<VM>(
             VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             None,
@@ -62,7 +65,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         if alloc {
             new_value |= NURSERY_BIT;
         }
-        VM::VMObjectModel::store_metadata(
+        store_metadata::<VM>(
             VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             new_value,
@@ -77,17 +80,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 0
             };
         self.treadmill.add_to_treadmill(cell, alloc);
-        // This is not used right now.
-        // Future use will need refactoring how mmtk deals with unlogged_bit, e.g. same as any other metadata.
-        // if self.header_byte.needs_unlogged_bit {
-        //     VM::VMObjectModel::store_metadata(
-        //         VM::VMObjectModel::LOCAL_UNLOGGED_BIT_SPEC,
-        //         object,
-        //         1,
-        //         None,
-        //         Some(Ordering::SeqCst),
-        //     );
-        // }
     }
 }
 
@@ -232,7 +224,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             } else {
                 MARK_BIT
             };
-            let old_value = VM::VMObjectModel::load_metadata(
+            let old_value = load_metadata::<VM>(
                 VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
                 object,
                 None,
@@ -242,7 +234,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             if mark_bit == value {
                 return false;
             }
-            if VM::VMObjectModel::compare_exchange_metadata(
+            if compare_exchange_metadata::<VM>(
                 VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
                 object,
                 old_value,
@@ -258,7 +250,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     fn test_mark_bit(&self, object: ObjectReference, value: usize) -> bool {
-        VM::VMObjectModel::load_metadata(
+        load_metadata::<VM>(
             VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             None,
@@ -268,7 +260,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::load_metadata(
+        load_metadata::<VM>(
             VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             None,
