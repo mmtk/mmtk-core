@@ -63,14 +63,11 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         offset: isize,
         allocator: AllocationType,
     ) -> Address {
-        eprintln!("MUTATOR CONTEXT ALLOC");
-        let a  = unsafe {
+        unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
         }
-        .alloc(size, align, offset);
-        eprintln!("DONE");
-        a
+        .alloc(size, align, offset)
     }
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
