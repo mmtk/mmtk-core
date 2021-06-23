@@ -29,7 +29,7 @@ lazy_static! {
 /// Thus, mark-bit is vm-dependant and is part of each VM's ObjectModel.
 ///
 #[cfg(target_pointer_width = "32")]
-pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+pub(super) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
     offset: 0,
     log_num_of_bits: 0,
@@ -37,7 +37,7 @@ pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 };
 
 #[cfg(target_pointer_width = "64")]
-pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+pub(super) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
     offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
     log_num_of_bits: 0,
@@ -73,7 +73,7 @@ pub fn is_alloced(object: ObjectReference) -> bool {
 }
 
 pub fn is_alloced_object(address: Address) -> bool {
-    side_metadata::load_atomic(ALLOC_METADATA_SPEC, address, Ordering::SeqCst) == 1
+    side_metadata::load_atomic(ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference) -> bool {
@@ -87,7 +87,7 @@ pub fn is_marked<VM: VMBinding>(object: ObjectReference) -> bool {
 
 pub fn set_alloc_bit(object: ObjectReference) {
     side_metadata::store_atomic(
-        ALLOC_METADATA_SPEC,
+        ALLOC_SIDE_METADATA_SPEC,
         object.to_address(),
         1,
         Ordering::SeqCst,
@@ -106,7 +106,7 @@ pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference) {
 
 pub fn unset_alloc_bit(object: ObjectReference) {
     side_metadata::store_atomic(
-        ALLOC_METADATA_SPEC,
+        ALLOC_SIDE_METADATA_SPEC,
         object.to_address(),
         0,
         Ordering::SeqCst,

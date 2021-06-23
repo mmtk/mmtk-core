@@ -8,6 +8,7 @@ use crate::util::malloc::*;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
+use crate::util::metadata::MetadataSpec;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -146,7 +147,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
             active_bytes: AtomicUsize::new(0),
             metadata: SideMetadataContext {
                 global: global_side_metadata_specs,
-                local: metadata::extract_side_metadata(&[VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
+                local: metadata::extract_side_metadata(&[
+                    MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
+                    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                ]),
             },
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
