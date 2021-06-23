@@ -45,7 +45,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             // no block for this size, go to slow path
             return self.alloc_slow_once(size, align, offset);
         }
-        trace!("FOUND BLOCK FOR THIS SIZE, DATA = {:?}", unsafe{block_data_address.load::<BlockData>()});
+        trace!("Free List Allocator: found block for size {}, block data = {:?}", size, unsafe{block_data_address.load::<BlockData>()});
         let cell = FreeListAllocator::<VM>::attempt_alloc_to_block(block_data_address);
         if unsafe { cell == Address::zero() } {
             // no cells available for this size, go to slow path
@@ -87,25 +87,28 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let block_data_address = block + BYTES_IN_BLOCK - size_of::<BlockData>();
         let mut old_cell = block;
         let mut new_cell = block + size;
-        while new_cell < block_data_address {
+        let final_cell = loop {
             unsafe {
                 (new_cell + size - size_of::<Address>()).store::<Address>(old_cell);
+                // trace!("Store {} at {}", old_cell, new_cell + size - size_of::<Address>());
             }
             old_cell = new_cell;
             new_cell = old_cell + size;
-        }
+            if new_cell + size >= block_data_address {break old_cell};
+        };
         let block_data = BlockData {
             next: self.blocks_direct[ if size < 129 { size - 1 } else { 128 }],
-            free: new_cell,
-            size: if size < 129 { size } else { 1 << 13 },
+            free: final_cell,
+            size: if size < 129 { size } else { 1 << 14 },
         };
         unsafe {
+            trace!("Acquired block for size {}, block data = {:?}", size, block_data);
             block_data_address.store::<BlockData>(block_data);
         };
 
         self.blocks_direct[if size < 129 { size - 1 } else { 128 }] = block_data_address;
 
-        trace!("Acquired and constructed free list for block starting at {}", block);
+        trace!("Constructed free list for block starting at {}", block);
         block
     }
 
@@ -124,6 +127,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             return FreeListAllocator::<VM>::attempt_alloc_to_block(block_data_address);
         };
         let next_cell = unsafe { (cell + block_data.size - size_of::<Address>()).load::<Address>() };
+        // trace!("Load {} from {}", next_cell, (cell + block_data.size - size_of::<Address>()));
         block_data.free = next_cell;
         unsafe { block_data_address.store::<BlockData>(block_data) };
         cell
