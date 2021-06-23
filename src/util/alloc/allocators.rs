@@ -56,22 +56,20 @@ impl<VM: VMBinding> Allocators<VM> {
         &mut self,
         selector: AllocatorSelector,
     ) -> &mut dyn Allocator<VM> {
-        let rtn = self.free_list[0].assume_init_mut();
-        // match selector {
-        //     AllocatorSelector::BumpPointer(index) => {
-        //         self.bump_pointer[index as usize].assume_init_mut()
-        //     }
-        //     AllocatorSelector::LargeObject(index) => {
-        //         self.large_object[index as usize].assume_init_mut()
-        //     }
-        //     AllocatorSelector::Malloc(index) => {
-        //         self.malloc[index as usize].assume_init_mut()
-        //     }
-        //     AllocatorSelector::FreeList(index) => {
-        //         self.free_list[index as usize].assume_init_mut()
-        //     }
-        // }
-        rtn
+        match selector {
+            AllocatorSelector::BumpPointer(index) => {
+                self.bump_pointer[index as usize].assume_init_mut()
+            }
+            AllocatorSelector::LargeObject(index) => {
+                self.large_object[index as usize].assume_init_mut()
+            }
+            AllocatorSelector::Malloc(index) => {
+                self.malloc[index as usize].assume_init_mut()
+            }
+            AllocatorSelector::FreeList(index) => {
+                self.free_list[index as usize].assume_init_mut()
+            }
+        }
     }
 
     pub fn new(
