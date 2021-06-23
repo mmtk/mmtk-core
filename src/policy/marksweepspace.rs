@@ -68,7 +68,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> MarkSweepSpace<VM> {
-        println!("MarkSweepSpace::new");
         let common = CommonSpace::new(
             SpaceOptions {
                 name,

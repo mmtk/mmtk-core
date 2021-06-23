@@ -4,6 +4,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::immortalspace::ImmortalSpace;
+use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
@@ -66,7 +67,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        eprintln!("nogc::get_alloc_mapping");
         &*ALLOCATOR_MAPPING
     }
 
@@ -120,7 +120,7 @@ impl<VM: VMBinding> NoGC<VM> {
         //     &mut heap,
         //     &NOGC_CONSTRAINTS,
         // );
-        let nogc_space = MarkSweepSpace::new(
+        let ms_space = MarkSweepSpace::new(
             "MSspace",
             true,
             VMRequest::discontiguous(),
@@ -128,6 +128,17 @@ impl<VM: VMBinding> NoGC<VM> {
             vm_map,
             mmapper,
             &mut heap,
+        );
+
+        let im_space = ImmortalSpace::new(
+            "IMspace",
+            true,
+            VMRequest::discontiguous(),
+            global_specs.clone(),
+            vm_map,
+            mmapper,
+            &mut heap,
+            &NOGC_CONSTRAINTS,
         );
 
         let res = NoGC {
@@ -167,9 +178,10 @@ impl<VM: VMBinding> NoGC<VM> {
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         res.base()
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.nogc_space
+        res.ms_space
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        eprintln!("NoGC plan");
+        res.im_space
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res
     }
 }
