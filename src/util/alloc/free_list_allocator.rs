@@ -40,7 +40,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("Free list allocator: allocation request for {} bytes", size);
-        let block_data_address = self.blocks_direct[if size < 129 { size - 1 } else { 128 }];
+        let block_data_address = self.blocks_direct[size - 1];
         if unsafe { block_data_address == Address::zero() } {
             // no block for this size, go to slow path
             return self.alloc_slow_once(size, align, offset);
@@ -76,13 +76,12 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             tls,
             space,
             plan,
-            blocks_direct: vec![unsafe{ Address::zero() }; 129],
+            blocks_direct: vec![unsafe{ Address::zero() }; 128],
         };
         allocator
     }
 
     pub fn acquire_block_for_size(&mut self, size: usize) -> Address {
-        let size = if size < 129 { size } else { 1 << 14 };
         let block = self.acquire_block();
         let block_data_address = block + BYTES_IN_BLOCK - size_of::<BlockData>();
         let mut old_cell = block;
@@ -97,16 +96,16 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             if new_cell + size >= block_data_address {break old_cell};
         };
         let block_data = BlockData {
-            next: self.blocks_direct[ if size < 129 { size - 1 } else { 128 }],
+            next: self.blocks_direct[ size - 1 - size_of::<Address>()],
             free: final_cell,
-            size: if size < 129 { size } else { 1 << 14 },
+            size,
         };
         unsafe {
             trace!("Acquired block for size {}, block data = {:?}", size, block_data);
             block_data_address.store::<BlockData>(block_data);
         };
 
-        self.blocks_direct[if size < 129 { size - 1 } else { 128 }] = block_data_address;
+        self.blocks_direct[size - 1 - size_of::<Address>()] = block_data_address;
 
         trace!("Constructed free list for block starting at {}", block);
         block

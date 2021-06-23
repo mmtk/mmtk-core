@@ -3,6 +3,8 @@ use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::immortalspace::ImmortalSpace;
+use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
@@ -27,7 +29,8 @@ use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalS
 
 pub struct NoGC<VM: VMBinding> {
     pub base: BasePlan<VM>,
-    pub nogc_space: MarkSweepSpace<VM>,
+    pub ms_space: MarkSweepSpace<VM>,
+    pub im_space: ImmortalSpace<VM>,
 }
 
 pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
@@ -43,7 +46,8 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         self.base.gc_init(heap_size, vm_map);
 
         // FIXME correctly initialize spaces based on options
-        self.nogc_space.init(&vm_map);
+        self.ms_space.init(&vm_map);
+        self.im_space.init(&vm_map);
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
@@ -63,7 +67,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        eprintln!("nogc::get_alloc_mapping");
         &*ALLOCATOR_MAPPING
     }
 
@@ -72,7 +75,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        self.nogc_space.reserved_pages()
+        self.im_space.reserved_pages() + self.ms_space.reserved_pages()
     }
 
     fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
@@ -117,7 +120,7 @@ impl<VM: VMBinding> NoGC<VM> {
         //     &mut heap,
         //     &NOGC_CONSTRAINTS,
         // );
-        let nogc_space = MarkSweepSpace::new(
+        let ms_space = MarkSweepSpace::new(
             "MSspace",
             true,
             VMRequest::discontiguous(),
@@ -127,8 +130,20 @@ impl<VM: VMBinding> NoGC<VM> {
             &mut heap,
         );
 
+        let im_space = ImmortalSpace::new(
+            "IMspace",
+            true,
+            VMRequest::discontiguous(),
+            global_specs.clone(),
+            vm_map,
+            mmapper,
+            &mut heap,
+            &NOGC_CONSTRAINTS,
+        );
+
         let res = NoGC {
-            nogc_space,
+            im_space,
+            ms_space,
             base: BasePlan::new(
                 vm_map,
                 mmapper,
@@ -144,9 +159,10 @@ impl<VM: VMBinding> NoGC<VM> {
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         res.base()
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.nogc_space
+        res.ms_space
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        eprintln!("NoGC plan");
+        res.im_space
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res
     }
 }
