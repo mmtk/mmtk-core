@@ -88,7 +88,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        self.nogc_space.reserved_pages()
+        self.im_space.reserved_pages() + self.ms_space.reserved_pages()
     }
 
     fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
@@ -131,8 +131,20 @@ impl<VM: VMBinding> NoGC<VM> {
             &NOGC_CONSTRAINTS,
         );
 
+        let im_space = ImmortalSpace::new(
+            "IMspace",
+            true,
+            VMRequest::discontiguous(),
+            global_specs.clone(),
+            vm_map,
+            mmapper,
+            &mut heap,
+            &NOGC_CONSTRAINTS,
+        );
+
         let res = NoGC {
-            nogc_space,
+            im_space,
+            ms_space,
             base: BasePlan::new(
                 vm_map,
                 mmapper,
@@ -148,9 +160,10 @@ impl<VM: VMBinding> NoGC<VM> {
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         res.base
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.nogc_space
+        res.ms_space
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-
+        res.im_space
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res
     }
 }
