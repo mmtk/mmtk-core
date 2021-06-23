@@ -66,6 +66,9 @@ impl<VM: VMBinding> Allocators<VM> {
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
+            AllocatorSelector::FreeList(index) => {
+                self.free_list[index as usize].assume_init_mut()
+            }
         }
     }
 
