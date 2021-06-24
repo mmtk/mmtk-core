@@ -113,6 +113,7 @@ pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
 
 const BYTES_IN_BLOCK: usize = 1 << LOG_BYTES_IN_BLOCK;
 const LOG_BYTES_IN_BLOCK: usize = 16;
+const MI_BIN_HUGE: u8 = 73;
 
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
