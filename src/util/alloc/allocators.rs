@@ -29,7 +29,7 @@ pub struct Allocators<VM: VMBinding> {
     pub large_object: [MaybeUninit<LargeObjectAllocator<VM>>; MAX_LARGE_OBJECT_ALLOCATORS],
     pub malloc: [MaybeUninit<MallocAllocator<VM>>; MAX_MALLOC_ALLOCATORS],
     pub immix: [MaybeUninit<ImmixAllocator<VM>>; MAX_IMMIX_ALLOCATORS],
-    pub free_list: [MaybeUninit<FreeListAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
+    pub free_list: [MaybeUninit<Box<FreeListAllocator<VM>>>; MAX_FREE_LIST_ALLOCATORS],
 }
 
 impl<VM: VMBinding> Allocators<VM> {
@@ -46,7 +46,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_ref(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_ref(),
             AllocatorSelector::FreeList(index) => {
-                self.free_list[index as usize].assume_init_ref()
+                &**self.free_list[index as usize].assume_init_ref()
             }
         }
     }
@@ -67,7 +67,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
             AllocatorSelector::FreeList(index) => {
-                self.free_list[index as usize].assume_init_mut()
+                &mut **self.free_list[index as usize].assume_init_mut()
             }
         }
     }
@@ -115,11 +115,11 @@ impl<VM: VMBinding> Allocators<VM> {
                         plan,
                         false,
                 AllocatorSelector::FreeList(index) => {
-                    ret.free_list[index as usize].write(FreeListAllocator::new(
+                    ret.free_list[index as usize].write(Box::new(FreeListAllocator::new(
                         mutator_tls.0,
                         space.downcast_ref::<MarkSweepSpace<VM>>().unwrap(),
                         plan,
-                    ));
+                    )));
                 }
             }
         }
