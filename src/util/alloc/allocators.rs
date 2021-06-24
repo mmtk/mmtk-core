@@ -56,7 +56,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.malloc[index as usize].assume_init_ref()
             }
             AllocatorSelector::FreeList(index) => {
-                self.free_list[index as usize].assume_init_ref()
+                &**self.free_list[index as usize].assume_init_ref()
             }
         }
     }
@@ -140,11 +140,11 @@ impl<VM: VMBinding> Allocators<VM> {
                 }
                 AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
                 AllocatorSelector::FreeList(index) => {
-                    ret.free_list[index as usize].write(FreeListAllocator::new(
+                    ret.free_list[index as usize].write(Box::new(FreeListAllocator::new(
                         mutator_tls.0,
                         space.downcast_ref::<MarkSweepSpace<VM>>().unwrap(),
                         plan,
-                    ));
+                    )));
                 }
             }
         }
