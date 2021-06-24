@@ -134,7 +134,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: "0.6.2"
+          ref: "0.6.4"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -263,7 +263,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: "0.6.2"
+          ref: "0.6.4"
           path: ci-perf-kit
           submodules: true
       # setup
