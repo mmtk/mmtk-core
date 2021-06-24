@@ -344,10 +344,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             bytes,
             new_chunk
         );
-        debug_assert!(
-            (new_chunk && start.is_aligned_to(BYTES_IN_CHUNK)) || !new_chunk,
-            "should only grow space for new chunks at chunk-aligned start address {:#0x}", (BYTES_IN_CHUNK)
-        );
+        // debug_assert!(
+        //     (new_chunk && start.is_aligned_to(BYTES_IN_CHUNK)) || !new_chunk,
+        //     "should only grow space for new chunks at chunk-aligned start address {:#0x}", (BYTES_IN_CHUNK)
+        // );
         if new_chunk {
             let chunks = conversions::bytes_to_chunks_up(bytes);
             SFT_MAP.update(self.as_sft(), start, chunks);

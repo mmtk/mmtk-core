@@ -1,4 +1,4 @@
-use std::{collections::{LinkedList}, mem::size_of, ops::BitAnd, ptr::null};
+use std::{mem::size_of, ops::BitAnd};
 
 use crate::{Plan, policy::{marksweepspace::MarkSweepSpace, space::Space}, util::{Address, VMThread, constants::{LOG_BYTES_IN_PAGE}, heap::layout::vm_layout_constants::BYTES_IN_CHUNK}, vm::VMBinding};
 
@@ -6,12 +6,14 @@ use super::Allocator;
 
 const BYTES_IN_BLOCK: usize = 1 << LOG_BYTES_IN_BLOCK;
 const LOG_BYTES_IN_BLOCK: usize = 16;
+const MI_BIN_HUGE: u8 = 73;
 
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
     space: &'static MarkSweepSpace<VM>,
     plan: &'static dyn Plan<VM = VM>,
-    blocks_direct: Vec<Address>
+    blocks_direct: Vec<Address>,
+    blocks: Vec<Address>,
   }
   
 #[derive(Clone, Copy, Debug)]
@@ -39,7 +41,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        trace!("Free list allocator: allocation request for {} bytes", size);
         let block_data_address = self.blocks_direct[size - 1];
         if unsafe { block_data_address == Address::zero() } {
             // no block for this size, go to slow path
@@ -76,7 +77,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             tls,
             space,
             plan,
-            blocks_direct: vec![unsafe{ Address::zero() }; 128],
+            blocks_direct: vec![unsafe{ Address::zero() }; 256],
+            blocks: vec![unsafe{ Address::zero() }; 256],
         };
         allocator
     }
@@ -139,7 +141,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     
     fn acquire_block(&self) -> Address {
         // acquire 64kB block
-        let a = self.space.acquire(self.tls, BYTES_IN_CHUNK >> LOG_BYTES_IN_PAGE);//BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
+        let a = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);//BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
         a
     }
 
@@ -147,4 +149,22 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // return freed 64kB block
         todo!()
     }
+
+
+    fn get_bin(size: usize) -> u8 {
+        let mut wsize: usize = (size + 7) / 8;
+        let bin: u8;
+        if wsize <= 1 {
+          bin = 1;
+        } else if wsize <= 8 {
+            bin = wsize as u8;
+        } else if wsize > 2 << 21 / (1 << 3) {
+          bin = MI_BIN_HUGE;
+        } else {
+          wsize -= 1;
+          let b: u8 = (1 << 3) * 8 - 1 - u64::leading_zeros(wsize as u64) as u8;  // note: wsize != 0
+          bin = ((b << 2) + ((wsize >> (b - 2)) & 0x03) as u8) - 3;
+        }
+        bin
+      }
 }
