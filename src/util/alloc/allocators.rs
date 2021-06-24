@@ -74,7 +74,6 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::LargeObject(index) => {
                 self.large_object[index as usize].assume_init_mut()
             }
-            AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
             AllocatorSelector::MarkCompact(index) => {
                 self.markcompact[index as usize].assume_init_mut()
