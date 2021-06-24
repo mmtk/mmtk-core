@@ -24,6 +24,15 @@ custom_derive! {
     }
 }
 
+/// The default fraction of the heap as nursery. We create the nursery space based on this value.
+pub const NURSERY_FRACTION: f32 = 0.15;
+/// The default min nursery size. This can be set through command line options.
+/// This does not affect the actual space we create as nursery. It is only used in GC trigger check.
+pub const DEFAULT_MIN_NURSERY: usize = 2 << 20;
+/// The default max nursery size. This can be set through command line options.
+/// This does not affect the actual space we create as nursery. It is only used in GC trigger check.
+pub const DEFAULT_MAX_NURSERY: usize = 32 << 20;
+
 pub struct UnsafeOptionsWrapper(UnsafeCell<Options>);
 
 // TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
@@ -111,9 +120,9 @@ options! {
     // Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     ignore_system_g_c:     bool                 [always_valid] = false,
     // The upper bound of nursery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    max_nursery:           usize                [|v| v > 0]    = (32 * 1024 * 1024),
+    max_nursery:           usize                [|v| v > 0 ] = DEFAULT_MIN_NURSERY,
     // The lower bound of nusery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    min_nursery:           usize                [|v| v > 0]    = (32 * 1024 * 1024),
+    min_nursery:           usize                [|v| v > 0 ] = DEFAULT_MAX_NURSERY,
     // Should a major GC be performed when a system GC is required?
     full_heap_system_gc:   bool                 [always_valid] = false,
     // Should we shrink/grow the heap to adjust to application working set? (not supported)

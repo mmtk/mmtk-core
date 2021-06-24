@@ -43,8 +43,6 @@ pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
-    // Test only
-    max_non_los_default_alloc_bytes: 4096,
     ..PlanConstraints::default()
 };
 

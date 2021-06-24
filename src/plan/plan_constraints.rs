@@ -12,9 +12,12 @@ pub struct PlanConstraints {
     pub gc_header_bits: usize,
     pub gc_header_words: usize,
     pub num_specialized_scans: usize,
-    /// Size (in bytes) beyond which new regular objects must be allocated to the LOS
+    /// Size (in bytes) beyond which new regular objects must be allocated to the LOS.
+    /// This usually depends on the restriction of the default allocator, e.g. block size for Immix,
+    /// nursery size, max possible cell for freelist, etc.
     pub max_non_los_default_alloc_bytes: usize,
-    /// Size (in bytes) beyond which copied objects must be copied to the LOS
+    /// Size (in bytes) beyond which copied objects must be copied to the LOS.
+    /// This depends on the copy allocator.
     pub max_non_los_copy_bytes: usize,
     pub needs_log_bit_in_header: bool,
     pub needs_log_bit_in_header_num: usize,

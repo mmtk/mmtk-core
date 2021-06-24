@@ -33,8 +33,6 @@ use std::sync::Arc;
 
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 
-pub const NURSERY_SIZE: usize = 32 * 1024 * 1024;
-
 pub struct GenCopy<VM: VMBinding> {
     pub nursery: CopySpace<VM>,
     pub hi: AtomicBool,
@@ -54,7 +52,9 @@ pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_words: 0,
     num_specialized_scans: 1,
     barrier: super::ACTIVE_BARRIER,
-    max_non_los_default_alloc_bytes: NURSERY_SIZE,
+    max_non_los_default_alloc_bytes: crate::policy::space::get_frac_available(
+        crate::util::options::NURSERY_FRACTION,
+    ),
     ..PlanConstraints::default()
 };
 
@@ -217,7 +217,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 "nursery",
                 false,
                 true,
-                VMRequest::fixed_extent(options.max_nursery, false),
+                VMRequest::fraction(crate::util::options::NURSERY_FRACTION),
                 global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
