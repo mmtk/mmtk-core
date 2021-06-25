@@ -134,53 +134,16 @@ impl WorkCounter for WorkDuration {
     }
 }
 
-pub fn validate_perf_events(events: &str) -> bool {
-    for event in events.split(';').filter(|e| !e.is_empty()) {
-        let e: Vec<&str> = event.split(',').into_iter().collect();
-        if e.len() != 3 {
-            return false;
-        }
-        if e[1].parse::<i32>().is_err() {
-            return false;
-        }
-        if e[2].parse::<i32>().is_err() {
-            return false;
-        }
-    }
-    true
-}
-
-#[cfg(feature = "perf")]
+#[cfg(feature = "perf_counter")]
 mod perf_event {
     //! Measure the perf events of work packets
     //!
     //! This is built on top of libpfm4.
     //! The events to measure are parsed from MMTk option `perf_events`
-    //! The format is
-    //! <event> ::= <event-name> "," <pid> "," <cpu>
-    //! <events> ::= <event> ";" <events> | <event> | ""
     use super::*;
     use libc::{c_int, pid_t};
     use pfm::PerfEvent;
     use std::fmt;
-
-    pub fn parse_perf_events(events: &str) -> Vec<(String, i32, i32)> {
-        events
-            .split(';')
-            .filter(|e| !e.is_empty())
-            .map(|e| {
-                let e: Vec<&str> = e.split(',').into_iter().collect();
-                if e.len() != 3 {
-                    panic!("Please supply (event name, pid, cpu)");
-                }
-                (
-                    e[0].into(),
-                    e[1].parse().expect("Failed to parse pid"),
-                    e[2].parse().expect("Failed to parse cpu"),
-                )
-            })
-            .collect()
-    }
 
     /// Work counter for perf events
     #[derive(Clone)]
@@ -249,5 +212,5 @@ mod perf_event {
     }
 }
 
-#[cfg(feature = "perf")]
-pub use perf_event::{parse_perf_events, WorkPerfEvent};
+#[cfg(feature = "perf_counter")]
+pub(super) use perf_event::WorkPerfEvent;

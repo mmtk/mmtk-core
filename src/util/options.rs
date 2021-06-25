@@ -1,8 +1,8 @@
-use crate::scheduler::work_counter::validate_perf_events;
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use std::cell::UnsafeCell;
 use std::default::Default;
 use std::ops::Deref;
+use std::str::FromStr;
 
 custom_derive! {
     #[derive(Copy, Clone, EnumFromStr, Debug)]
@@ -21,6 +21,50 @@ custom_derive! {
         SemiSpace,
         GenCopy,
         MarkSweep
+    }
+}
+
+/// MMTk option for perf events
+/// 
+/// The format is
+/// ```
+/// <event> ::= <event-name> "," <pid> "," <cpu>
+/// <events> ::= <event> ";" <events> | <event> | ""
+/// ```
+#[derive(Debug, Clone)]
+pub struct PerfEventOptions {
+    pub events: Vec<(String, i32, i32)>,
+}
+
+impl PerfEventOptions {
+    fn parse_perf_events(events: &str) -> Result<Vec<(String, i32, i32)>, String> {
+        events
+            .split(';')
+            .filter(|e| !e.is_empty())
+            .map(|e| {
+                let e: Vec<&str> = e.split(',').into_iter().collect();
+                if e.len() != 3 {
+                    Err("Please supply (event name, pid, cpu)".into())
+                } else {
+                    let event_name = e[0].into();
+                    let pid = e[1]
+                        .parse()
+                        .map_err(|_| String::from("Failed to parse cpu"))?;
+                    let cpu = e[2]
+                        .parse()
+                        .map_err(|_| String::from("Failed to parse cpu"))?;
+                    Ok((event_name, pid, cpu))
+                }
+            })
+            .collect()
+    }
+}
+
+impl FromStr for PerfEventOptions {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        PerfEventOptions::parse_perf_events(s).map(|events| PerfEventOptions { events })
     }
 }
 
@@ -144,7 +188,7 @@ options! {
     // Perf events to measure
     // Semicolons are used to separate events
     // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean)
-    perf_events:           String               [validate_perf_events] = "".to_string(),
+    perf_events:           PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]}
 }
 
 impl Options {

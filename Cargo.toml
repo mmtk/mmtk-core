@@ -44,7 +44,7 @@ default = []
 
 # This feature is only supported on x86-64 for now
 # Not included below so that CI won't fail
-perf = ["pfm"]
+perf_counter = ["pfm"]
 
 # .github/scripts/ci-common.sh extracts features from the following part (including from comments).
 # So be careful when editing or adding stuff to the section below.

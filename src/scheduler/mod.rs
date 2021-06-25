@@ -14,8 +14,8 @@ pub(crate) use scheduler::CoordinatorMessage;
 pub(crate) use scheduler::MMTkScheduler;
 pub(self) use scheduler::Scheduler;
 
-pub(crate) mod stat;
-pub(crate) mod work_counter;
+mod stat;
+pub(self) mod work_counter;
 
 mod work;
 pub use work::CoordinatorWork;
