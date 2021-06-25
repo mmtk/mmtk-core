@@ -40,6 +40,8 @@ impl SharedStats {
 pub struct Stats {
     gc_count: AtomicUsize,
     total_time: Arc<Mutex<Timer>>,
+    // crate `pfm` uses libpfm4 under the hood for parsing perf event names
+    // Initialization of libpfm4 is required before we can use `PerfEvent` types
     #[cfg(feature = "perf")]
     perfmon: Perfmon,
 
@@ -60,18 +62,15 @@ impl Stats {
             true,
             false,
         )));
-        // The following lines are NOT put into a conditionally compiled block
-        // Otherwise, the perfmon variable will not be accessible to the outer
-        // scope
-        #[cfg(feature = "perf")]
-        let mut perfmon: Perfmon = Default::default();
-        #[cfg(feature = "perf")]
-        perfmon.initialize().expect("Perfmon failed to initialize");
         Stats {
             gc_count: AtomicUsize::new(0),
             total_time: t.clone(),
             #[cfg(feature = "perf")]
-            perfmon,
+            perfmon: {
+                let mut perfmon: Perfmon = Default::default();
+                perfmon.initialize().expect("Perfmon failed to initialize");
+                perfmon
+            },
 
             shared,
             counters: Mutex::new(vec![t]),
