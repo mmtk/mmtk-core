@@ -1,3 +1,30 @@
+0.5.0 (2021-06-25)
+===
+
+GC Plans
+---
+* Added a new plan PageProtect, a plan to help debugging. It allocates each object
+  to a separate page, and protects pages when the pages are released.
+
+API
+---
+* Major changes to the ObjectModel trait: now a binding can specify each per-object
+  metadata used by mmtk-core, whether the metadata resides in header bits provided
+  by the runtime or side tables provided by mmtk-core. For in header metadata, a binding
+  can further implement how it can be accessed, in case the bits are not always available
+  to mmtk-core.
+
+Misc
+---
+* Refactoring to metadata to provide unified access to per-object metadata (in-header or side).
+* Refactoring to work packet statistics to allow other types of stats other than execution times.
+* Work packe statistics can collect count data.
+* 'extreme_assertions' now also checks if values stored in side metadata are correct.
+* Supported string type as command line options.
+* Fixed a bug that GenCopy may report OOM without doing a full heap GC.
+* Fixed a bug that existing mmapping of side metadata memory may get overwritten.
+* Fixed a bug that FreeListPageResource may incorrectly return new_chunk for the first allocation.
+
 0.4.1 (2021-05-20)
 ===
 
