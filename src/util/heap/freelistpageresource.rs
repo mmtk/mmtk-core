@@ -214,13 +214,25 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // > the total number of mappings with distinct attributes
         // > (e.g., read versus read/write protection) exceeding the
         // > allowed maximum.
-        let _ = memory::mprotect(start, pages << LOG_BYTES_IN_PAGE);
+        assert!(self.protect_memory_on_release);
+        if let Err(e) = memory::mprotect(start, conversions::pages_to_bytes(pages)) {
+            panic!(
+                "Failed at protecting memory (starting at {}): {:?}",
+                start, e
+            );
+        }
     }
 
     /// Unprotect the memory
     fn munprotect(&self, start: Address, pages: usize) {
         // No `unwrap()` here. See explanation in `mprotect`.
-        let _ = memory::munprotect(start, pages << LOG_BYTES_IN_PAGE);
+        assert!(self.protect_memory_on_release);
+        if let Err(e) = memory::munprotect(start, conversions::pages_to_bytes(pages)) {
+            panic!(
+                "Failed at unprotecting memory (starting at {}): {:?}",
+                start, e
+            );
+        }
     }
 
     fn allocate_contiguous_chunks(

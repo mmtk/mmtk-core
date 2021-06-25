@@ -62,6 +62,17 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
+        // Warn users that the plan may fail due to maximum mapping allowed.
+        warn!(
+            "PageProtect uses a high volume of memory mappings. \
+            If you encounter failures in memory protect/unprotect in this plan,\
+            consider increase the maximum mapping allowed by the OS{}.",
+            if cfg!(target_os = "linux") {
+                " (e.g. sudo sysctl -w vm.max_map_count=655300)"
+            } else {
+                ""
+            }
+        );
         self.common.gc_init(heap_size, vm_map, scheduler);
         self.space.init(&vm_map);
     }
