@@ -66,7 +66,7 @@ For more information on these bindings, please visit their repositories.
 
 MMTk provides a bi-directional interface with the language VM.
 
-1. MMTk exposes a set of [APIs](src/mm/memory_manager.rs). The language VM can call into MMTk by using those APIs.
+1. MMTk exposes a set of [APIs](src/memory_manager.rs). The language VM can call into MMTk by using those APIs.
 2. MMTk provides a trait [`VMBinding`](src/vm/mod.rs) that each language VM must implement. MMTk use `VMBinding` to call into the VM.
 
 To integrate MMTk with your language implementation, you need to provide an implementation of `VMBinding`, and

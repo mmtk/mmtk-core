@@ -19,6 +19,8 @@ use crate::vm::*;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 
+const UNINITIALIZED_WATER_MARK: i32 = -1;
+
 pub struct CommonFreeListPageResource {
     free_list: Box<<VMMap as Map>::FreeList>,
     start: Address,
@@ -98,7 +100,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         } else {
             sync.pages_currently_on_freelist -= required_pages;
             if page_offset > sync.highwater_mark {
-                if sync.highwater_mark == 0
+                if sync.highwater_mark == UNINITIALIZED_WATER_MARK
                     || (page_offset ^ sync.highwater_mark) > PAGES_IN_REGION as i32
                 {
                     let regions = 1 + ((page_offset - sync.highwater_mark) >> LOG_PAGES_IN_REGION);
@@ -156,7 +158,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             meta_data_pages_per_region,
             sync: Mutex::new(FreeListPageResourceSync {
                 pages_currently_on_freelist: if growable { 0 } else { pages },
-                highwater_mark: 0,
+                highwater_mark: UNINITIALIZED_WATER_MARK,
             }),
             _p: PhantomData,
         };
@@ -191,7 +193,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             meta_data_pages_per_region,
             sync: Mutex::new(FreeListPageResourceSync {
                 pages_currently_on_freelist: 0,
-                highwater_mark: 0,
+                highwater_mark: UNINITIALIZED_WATER_MARK,
             }),
             _p: PhantomData,
         }
@@ -269,7 +271,6 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     }
 
     fn reserve_metadata(&mut self, extent: usize) {
-        let _highwater_mark = 0;
         if self.meta_data_pages_per_region > 0 {
             debug_assert!(self.start.is_aligned_to(BYTES_IN_REGION));
             let size = (extent >> LOG_BYTES_IN_REGION) << LOG_BYTES_IN_REGION;
