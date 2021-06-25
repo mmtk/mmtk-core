@@ -53,3 +53,4 @@ pub use gencopy::GENCOPY_CONSTRAINTS;
 pub use marksweep::MS_CONSTRAINTS;
 pub use nogc::NOGC_CONSTRAINTS;
 pub use semispace::SS_CONSTRAINTS;
+pub use pageprotect::PP_CONSTRAINTS;
