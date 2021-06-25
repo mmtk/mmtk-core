@@ -1,29 +1,12 @@
 use crate::util::metadata::side_metadata;
 use crate::vm::ObjectModel;
 use atomic::Ordering;
-use std::fmt;
 
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct HeaderMetadataSpec {
-    pub bit_offset: isize,
-    pub num_of_bits: usize,
-}
-
-impl fmt::Debug for HeaderMetadataSpec {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!(
-            "HeaderMetadataSpec {{ \
-            **bit_offset: 0x{:x} \
-            **num_of_bits: 0x{:x} \
-            }}",
-            self.bit_offset, self.num_of_bits
-        ))
-    }
-}
+use super::header_metadata::HeaderMetadataSpec;
 
 /// This struct stores the specification of a metadata bit-set.
 /// It is used as an input to the (inline) functions provided by the side metadata module.

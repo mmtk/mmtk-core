@@ -219,6 +219,7 @@
 //!
 
 mod global;
+pub mod header_metadata;
 pub mod side_metadata;
 
 pub use global::*;

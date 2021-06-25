@@ -2,7 +2,7 @@ use atomic::Ordering;
 
 use crate::plan::AllocationSemantics;
 use crate::plan::CopyContext;
-use crate::util::metadata::{HeaderMetadataSpec, MetadataSpec};
+use crate::util::metadata::{header_metadata::HeaderMetadataSpec, MetadataSpec};
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
