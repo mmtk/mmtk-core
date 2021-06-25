@@ -218,7 +218,17 @@
 <span id="215">215</span>
 <span id="216">216</span>
 <span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
 </pre><pre class="rust">
+<span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
+
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::global::GenCopy</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::PlanConstraints</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan</span>::{<span class="ident">barriers::BarrierSelector</span>, <span class="ident">CopyContext</span>};
@@ -226,9 +236,9 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::gc_work</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::WorkerLocal</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::alloc</span>::{<span class="ident">Allocator</span>, <span class="ident">BumpAllocator</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::forwarding_word</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::store_metadata</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::object_forwarding</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::MMTK</span>;
@@ -274,9 +284,15 @@
         <span class="ident">_bytes</span>: <span class="ident">usize</span>,
         <span class="ident">_semantics</span>: <span class="kw">crate</span><span class="ident">::AllocationSemantics</span>,
     ) {
-        <span class="ident">forwarding_word::clear_forwarding_bits</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">obj</span>);
+        <span class="ident">object_forwarding::clear_forwarding_bits</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">obj</span>);
         <span class="kw">if</span> <span class="op">!</span><span class="kw">super</span><span class="ident">::NO_SLOW</span> <span class="op">&amp;&amp;</span> <span class="kw">super</span><span class="ident">::ACTIVE_BARRIER</span> <span class="op">=</span><span class="op">=</span> <span class="ident">BarrierSelector::ObjectBarrier</span> {
-            <span class="ident">store_atomic</span>(<span class="kw">super</span><span class="ident">::LOGGING_META</span>, <span class="ident">obj</span>.<span class="ident">to_address</span>(), <span class="number">0b1</span>);
+            <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
+                <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>,
+                <span class="ident">obj</span>,
+                <span class="number">0b1</span>,
+                <span class="prelude-val">None</span>,
+                <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+            );
         }
     }
 }

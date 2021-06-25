@@ -1,1 +1,0 @@
-initSidebarItems({"constant":[["SIDE_GC_BYTE_SPEC",""]],"fn":[["compare_exchange_gc_byte","Atomically performs the compare-and-exchange operation on the GC byte of an object."],["read_gc_byte","Atomically reads the current value of an object’s GC byte."],["write_gc_byte","Atomically writes a new value to the GC byte of an object"]]});

@@ -1,1 +1,0 @@
-initSidebarItems({"constant":[["TOTAL_BITS",""]],"struct":[["HeaderByte",""]]});

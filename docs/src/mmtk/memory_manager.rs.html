@@ -417,7 +417,6 @@
 <span id="414">414</span>
 <span id="415">415</span>
 <span id="416">416</span>
-<span id="417">417</span>
 </pre><pre class="rust">
 <span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
@@ -439,7 +438,7 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::Work</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::alloc::allocators::AllocatorSelector</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants::LOG_BYTES_IN_PAGE</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants</span>::{<span class="ident">LOG_BYTES_IN_PAGE</span>, <span class="ident">MIN_OBJECT_SIZE</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants::HEAP_END</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants::HEAP_START</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
@@ -529,8 +528,7 @@
     <span class="comment">// their object sizes are all larger than MMTk&#39;s min object size, so we simply put an assertion here.</span>
     <span class="comment">// If you plan to use MMTk with a VM with its object size smaller than MMTk&#39;s min object size, you should</span>
     <span class="comment">// meet the min object size in the fastpath.</span>
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
-    <span class="kw">crate</span><span class="ident">::util::forwarding_word::check_alloc_size</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">size</span>);
+    <span class="macro">debug_assert!</span>(<span class="ident">size</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">MIN_OBJECT_SIZE</span>);
     <span class="ident">mutator</span>.<span class="ident">alloc</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="ident">semantics</span>)
 }
 

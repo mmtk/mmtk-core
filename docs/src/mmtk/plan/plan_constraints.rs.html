@@ -40,10 +40,6 @@
 <span id="37">37</span>
 <span id="38">38</span>
 <span id="39">39</span>
-<span id="40">40</span>
-<span id="41">41</span>
-<span id="42">42</span>
-<span id="43">43</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Plan-specific constraints.</span>
 
@@ -60,8 +56,6 @@
     <span class="kw">pub</span> <span class="ident">gc_header_words</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">num_specialized_scans</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">max_non_los_copy_bytes</span>: <span class="ident">usize</span>,
-    <span class="kw">pub</span> <span class="ident">needs_log_bit_in_header</span>: <span class="ident">bool</span>,
-    <span class="kw">pub</span> <span class="ident">needs_log_bit_in_header_num</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">barrier</span>: <span class="ident">BarrierSelector</span>,
     <span class="comment">// the following seems unused for now</span>
     <span class="kw">pub</span> <span class="ident">needs_linear_scan</span>: <span class="ident">bool</span>,
@@ -78,8 +72,6 @@
             <span class="ident">gc_header_words</span>: <span class="number">0</span>,
             <span class="ident">num_specialized_scans</span>: <span class="number">0</span>,
             <span class="ident">max_non_los_copy_bytes</span>: <span class="ident">MAX_INT</span>,
-            <span class="ident">needs_log_bit_in_header</span>: <span class="bool-val">false</span>,
-            <span class="ident">needs_log_bit_in_header_num</span>: <span class="number">0</span>,
             <span class="ident">needs_linear_scan</span>: <span class="ident">SUPPORT_CARD_SCANNING</span> <span class="op">|</span><span class="op">|</span> <span class="ident">LAZY_SWEEP</span>,
             <span class="ident">needs_concurrent_workers</span>: <span class="bool-val">false</span>,
             <span class="ident">generate_gc_trace</span>: <span class="bool-val">false</span>,

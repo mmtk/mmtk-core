@@ -162,7 +162,7 @@ use crate::plan::CopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::alloc::{Allocator, BumpAllocator};
-use crate::util::forwarding_word;
+use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -477,7 +477,7 @@ inline attribute.</p>
         _bytes: usize,
         _semantics: crate::AllocationSemantics,
     ) {
-        forwarding_word::clear_forwarding_bits::&lt;VM&gt;(obj);
+        object_forwarding::clear_forwarding_bits::&lt;VM&gt;(obj);
     }
 <span class="boring">}
 </span></code></pre></pre>

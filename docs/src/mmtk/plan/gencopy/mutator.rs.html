@@ -79,7 +79,7 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::alloc::allocators</span>::{<span class="ident">AllocatorSelector</span>, <span class="ident">Allocators</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::alloc::BumpAllocator</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">VMMutatorThread</span>, <span class="ident">VMWorkerThread</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::VMBinding</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm</span>::{<span class="ident">ObjectModel</span>, <span class="ident">VMBinding</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::MMTK</span>;
 <span class="kw">use</span> <span class="ident">enum_map::enum_map</span>;
 <span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
@@ -131,7 +131,7 @@
         <span class="ident">allocators</span>: <span class="ident">Allocators</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mutator_tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>, <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">space_mapping</span>),
         <span class="ident">barrier</span>: <span class="kw">box</span> <span class="ident">ObjectRememberingBarrier</span>::<span class="op">&lt;</span><span class="ident">GenCopyNurseryProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(
             <span class="ident">mmtk</span>,
-            <span class="kw">super</span><span class="ident">::LOGGING_META</span>,
+            <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>,
         ),
         <span class="ident">mutator_tls</span>,
         <span class="ident">config</span>,

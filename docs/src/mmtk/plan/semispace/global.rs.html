@@ -236,11 +236,11 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::{<span class="ident">HEAP_END</span>, <span class="ident">HEAP_START</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::VMRequest</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::options::UnsafeOptionsWrapper</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::sanity::sanity_checker</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">plan::global::BasePlan</span>, <span class="ident">vm::VMBinding</span>};
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;

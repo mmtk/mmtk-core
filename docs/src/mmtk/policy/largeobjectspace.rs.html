@@ -246,19 +246,54 @@
 <span id="243">243</span>
 <span id="244">244</span>
 <span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
 </pre><pre class="rust">
+<span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
+
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::PlanConstraints</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::TransitiveClosure</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::space::SpaceOptions</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants</span>::{<span class="ident">BYTES_IN_PAGE</span>, <span class="ident">LOG_BYTES_IN_WORD</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::gc_byte</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::header_byte::HeaderByte</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap</span>::{<span class="ident">FreeListPageResource</span>, <span class="ident">PageResource</span>, <span class="ident">VMRequest</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::compare_exchange_metadata</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::load_metadata</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata::SideMetadataContext</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata::SideMetadataSpec</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::store_metadata</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::treadmill::TreadMill</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::ObjectModel</span>;
@@ -266,9 +301,9 @@
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
 <span class="kw">const</span> <span class="ident">PAGE_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="op">!</span>(<span class="ident">BYTES_IN_PAGE</span> <span class="op">-</span> <span class="number">1</span>);
-<span class="kw">const</span> <span class="ident">MARK_BIT</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b01</span>;
-<span class="kw">const</span> <span class="ident">NURSERY_BIT</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b10</span>;
-<span class="kw">const</span> <span class="ident">LOS_BIT_MASK</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b11</span>;
+<span class="kw">const</span> <span class="ident">MARK_BIT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0b01</span>;
+<span class="kw">const</span> <span class="ident">NURSERY_BIT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0b10</span>;
+<span class="kw">const</span> <span class="ident">LOS_BIT_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0b11</span>;
 
 <span class="kw">const</span> <span class="ident">USE_PRECEEDING_GC_HEADER</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
 <span class="kw">const</span> <span class="ident">PRECEEDING_GC_HEADER_WORDS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
@@ -279,10 +314,9 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LargeObjectSpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">common</span>: <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">pr</span>: <span class="ident">FreeListPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">mark_state</span>: <span class="ident">u8</span>,
+    <span class="ident">mark_state</span>: <span class="ident">usize</span>,
     <span class="ident">in_nursery_gc</span>: <span class="ident">bool</span>,
     <span class="ident">treadmill</span>: <span class="ident">TreadMill</span>,
-    <span class="ident">header_byte</span>: <span class="ident">HeaderByte</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">SFT</span> <span class="kw">for</span> <span class="ident">LargeObjectSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -300,12 +334,24 @@
         <span class="bool-val">true</span>
     }
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">alloc</span>: <span class="ident">bool</span>) {
-        <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">gc_byte::read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
+        <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
+            <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+            <span class="ident">object</span>,
+            <span class="prelude-val">None</span>,
+            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+        );
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_value</span> <span class="op">=</span> (<span class="ident">old_value</span> <span class="op">&amp;</span> (<span class="op">!</span><span class="ident">LOS_BIT_MASK</span>)) <span class="op">|</span> <span class="self">self</span>.<span class="ident">mark_state</span>;
         <span class="kw">if</span> <span class="ident">alloc</span> {
             <span class="ident">new_value</span> <span class="op">|</span><span class="op">=</span> <span class="ident">NURSERY_BIT</span>;
         }
-        <span class="ident">gc_byte::write_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">new_value</span>);
+        <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
+            <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+            <span class="ident">object</span>,
+            <span class="ident">new_value</span>,
+            <span class="prelude-val">None</span>,
+            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+        );
+
         <span class="kw">let</span> <span class="ident">cell</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>)
             <span class="op">-</span> <span class="kw">if</span> <span class="ident">USE_PRECEEDING_GC_HEADER</span> {
                 <span class="ident">PRECEEDING_GC_HEADER_BYTES</span>
@@ -313,12 +359,6 @@
                 <span class="number">0</span>
             };
         <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">add_to_treadmill</span>(<span class="ident">cell</span>, <span class="ident">alloc</span>);
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">header_byte</span>.<span class="ident">needs_unlogged_bit</span> {
-            <span class="ident">gc_byte::write_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-                <span class="ident">object</span>,
-                <span class="ident">gc_byte::read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) <span class="op">|</span> <span class="self">self</span>.<span class="ident">header_byte</span>.<span class="ident">unlogged_bit</span>,
-            );
-        }
     }
 }
 
@@ -353,7 +393,7 @@
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
         <span class="ident">heap</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">HeapMeta</span>,
-        <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
+        <span class="ident">_constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(
             <span class="ident">SpaceOptions</span> {
@@ -364,7 +404,9 @@
                 <span class="ident">vmrequest</span>,
                 <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span> {
                     <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
-                    <span class="ident">local</span>: <span class="macro">vec!</span>[],
+                    <span class="ident">local</span>: <span class="ident">metadata::extract_side_metadata</span>(<span class="kw-2">&amp;</span>[
+                        <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+                    ]),
                 },
             },
             <span class="ident">vm_map</span>,
@@ -381,7 +423,6 @@
             <span class="ident">mark_state</span>: <span class="number">0</span>,
             <span class="ident">in_nursery_gc</span>: <span class="bool-val">false</span>,
             <span class="ident">treadmill</span>: <span class="ident">TreadMill::new</span>(),
-            <span class="ident">header_byte</span>: <span class="ident">HeaderByte::new</span>(<span class="ident">constraints</span>),
         }
     }
 
@@ -455,37 +496,56 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">test_and_mark</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">value</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">mask</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">in_nursery_gc</span> {
-            <span class="ident">LOS_BIT_MASK</span>
-        } <span class="kw">else</span> {
-            <span class="ident">MARK_BIT</span>
-        };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">gc_byte::read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">mark_bit</span> <span class="op">=</span> <span class="ident">old_value</span> <span class="op">&amp;</span> <span class="ident">mask</span>;
-        <span class="kw">if</span> <span class="ident">mark_bit</span> <span class="op">=</span><span class="op">=</span> <span class="ident">value</span> {
-            <span class="kw">return</span> <span class="bool-val">false</span>;
-        }
-        <span class="kw">while</span> <span class="op">!</span><span class="ident">gc_byte::compare_exchange_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-            <span class="ident">object</span>,
-            <span class="ident">old_value</span>,
-            <span class="ident">old_value</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">LOS_BIT_MASK</span> <span class="op">|</span> <span class="ident">value</span>,
-        ) {
-            <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">gc_byte::read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
-            <span class="ident">mark_bit</span> <span class="op">=</span> <span class="ident">old_value</span> <span class="op">&amp;</span> <span class="ident">mask</span>;
+    <span class="kw">fn</span> <span class="ident">test_and_mark</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">value</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="kw">loop</span> {
+            <span class="kw">let</span> <span class="ident">mask</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">in_nursery_gc</span> {
+                <span class="ident">LOS_BIT_MASK</span>
+            } <span class="kw">else</span> {
+                <span class="ident">MARK_BIT</span>
+            };
+            <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
+                <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+                <span class="ident">object</span>,
+                <span class="prelude-val">None</span>,
+                <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+            );
+            <span class="kw">let</span> <span class="ident">mark_bit</span> <span class="op">=</span> <span class="ident">old_value</span> <span class="op">&amp;</span> <span class="ident">mask</span>;
             <span class="kw">if</span> <span class="ident">mark_bit</span> <span class="op">=</span><span class="op">=</span> <span class="ident">value</span> {
                 <span class="kw">return</span> <span class="bool-val">false</span>;
+            }
+            <span class="kw">if</span> <span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
+                <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+                <span class="ident">object</span>,
+                <span class="ident">old_value</span>,
+                <span class="ident">old_value</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">LOS_BIT_MASK</span> <span class="op">|</span> <span class="ident">value</span>,
+                <span class="prelude-val">None</span>,
+                <span class="ident">Ordering::SeqCst</span>,
+                <span class="ident">Ordering::SeqCst</span>,
+            ) {
+                <span class="kw">break</span>;
             }
         }
         <span class="bool-val">true</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">test_mark_bit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">value</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="ident">gc_byte::read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) <span class="op">&amp;</span> <span class="ident">MARK_BIT</span> <span class="op">=</span><span class="op">=</span> <span class="ident">value</span>
+    <span class="kw">fn</span> <span class="ident">test_mark_bit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">value</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
+            <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+            <span class="ident">object</span>,
+            <span class="prelude-val">None</span>,
+            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+        ) <span class="op">&amp;</span> <span class="ident">MARK_BIT</span>
+            <span class="op">=</span><span class="op">=</span> <span class="ident">value</span>
     }
 
     <span class="kw">fn</span> <span class="ident">is_in_nursery</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="ident">gc_byte::read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) <span class="op">&amp;</span> <span class="ident">NURSERY_BIT</span> <span class="op">=</span><span class="op">=</span> <span class="ident">NURSERY_BIT</span>
+        <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
+            <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+            <span class="ident">object</span>,
+            <span class="prelude-val">None</span>,
+            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+        ) <span class="op">&amp;</span> <span class="ident">NURSERY_BIT</span>
+            <span class="op">=</span><span class="op">=</span> <span class="ident">NURSERY_BIT</span>
     }
 }
 

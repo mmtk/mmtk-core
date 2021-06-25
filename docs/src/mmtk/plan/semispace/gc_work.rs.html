@@ -146,7 +146,7 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::gc_work</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::WorkerLocal</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::alloc</span>::{<span class="ident">Allocator</span>, <span class="ident">BumpAllocator</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::forwarding_word</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::object_forwarding</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::VMBinding</span>;
@@ -192,7 +192,7 @@
         <span class="ident">_bytes</span>: <span class="ident">usize</span>,
         <span class="ident">_semantics</span>: <span class="kw">crate</span><span class="ident">::AllocationSemantics</span>,
     ) {
-        <span class="ident">forwarding_word::clear_forwarding_bits</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">obj</span>);
+        <span class="ident">object_forwarding::clear_forwarding_bits</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">obj</span>);
     }
 }
 

@@ -158,7 +158,6 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::address::Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::conversions::bytes_to_chunks_up</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::PageResource</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::ObjectReference</span>;
 
@@ -167,6 +166,7 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::{
     <span class="ident">AVAILABLE_BYTES</span>, <span class="ident">AVAILABLE_END</span>, <span class="ident">AVAILABLE_START</span>,
 };
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm</span>::<span class="kw-2">*</span>;
@@ -191,7 +191,7 @@
     <span class="ident">limit</span>: <span class="ident">Address</span>,
     <span class="doccomment">/// Zero memory after slow-path allocation</span>
     <span class="ident">slow_path_zeroing</span>: <span class="ident">bool</span>,
-    <span class="ident">metadata</span>: <span class="ident">SideMetadata</span>,
+    <span class="ident">metadata</span>: <span class="ident">SideMetadataContext</span>,
     <span class="ident">phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
 
@@ -296,10 +296,10 @@
             <span class="ident">cursor</span>: <span class="ident">AtomicUsize::new</span>(<span class="ident">AVAILABLE_START</span>.<span class="ident">as_usize</span>()),
             <span class="ident">limit</span>: <span class="ident">AVAILABLE_END</span>,
             <span class="ident">slow_path_zeroing</span>,
-            <span class="ident">metadata</span>: <span class="ident">SideMetadata::new</span>(<span class="ident">SideMetadataContext</span> {
+            <span class="ident">metadata</span>: <span class="ident">SideMetadataContext</span> {
                 <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
                 <span class="ident">local</span>: <span class="macro">vec!</span>[],
-            }),
+            },
             <span class="ident">phantom</span>: <span class="ident">PhantomData</span>,
         }
     }

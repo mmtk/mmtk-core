@@ -192,18 +192,24 @@
 <span id="189">189</span>
 <span id="190">190</span>
 <span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::TransitiveClosure</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan</span>::{<span class="ident">AllocationSemantics</span>, <span class="ident">CopyContext</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::space::SpaceOptions</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants::CARD_META_PAGES_PER_REGION</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::forwarding_word</span> <span class="kw">as</span> <span class="ident">ForwardingWord</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap</span>::{<span class="ident">MonotonePageResource</span>, <span class="ident">PageResource</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::extract_side_metadata</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::object_forwarding</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">libc</span>::{<span class="ident">mprotect</span>, <span class="ident">PROT_EXEC</span>, <span class="ident">PROT_NONE</span>, <span class="ident">PROT_READ</span>, <span class="ident">PROT_WRITE</span>};
@@ -223,7 +229,7 @@
         <span class="self">self</span>.<span class="ident">get_name</span>()
     }
     <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="op">!</span><span class="self">self</span>.<span class="ident">from_space</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">ForwardingWord::is_forwarded</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
+        <span class="op">!</span><span class="self">self</span>.<span class="ident">from_space</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">object_forwarding::is_forwarded</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
     }
     <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="bool-val">true</span>
@@ -270,6 +276,10 @@
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
         <span class="ident">heap</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">HeapMeta</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="ident">local_specs</span> <span class="op">=</span> <span class="ident">extract_side_metadata</span>(<span class="kw-2">&amp;</span>[
+            <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>,
+            <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>,
+        ]);
         <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(
             <span class="ident">SpaceOptions</span> {
                 <span class="ident">name</span>,
@@ -279,7 +289,7 @@
                 <span class="ident">vmrequest</span>,
                 <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span> {
                     <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
-                    <span class="ident">local</span>: <span class="macro">vec!</span>[],
+                    <span class="ident">local</span>: <span class="ident">local_specs</span>,
                 },
             },
             <span class="ident">vm_map</span>,
@@ -331,21 +341,21 @@
             <span class="kw">return</span> <span class="ident">object</span>;
         }
         <span class="macro">trace!</span>(<span class="string">&quot;attempting to forward&quot;</span>);
-        <span class="kw">let</span> <span class="ident">forwarding_status</span> <span class="op">=</span> <span class="ident">ForwardingWord::attempt_to_forward</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
+        <span class="kw">let</span> <span class="ident">forwarding_status</span> <span class="op">=</span> <span class="ident">object_forwarding::attempt_to_forward</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
         <span class="macro">trace!</span>(<span class="string">&quot;checking if object is being forwarded&quot;</span>);
-        <span class="kw">if</span> <span class="ident">ForwardingWord::state_is_forwarded_or_being_forwarded</span>(<span class="ident">forwarding_status</span>) {
+        <span class="kw">if</span> <span class="ident">object_forwarding::state_is_forwarded_or_being_forwarded</span>(<span class="ident">forwarding_status</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;... yes it is&quot;</span>);
             <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span>
-                <span class="ident">ForwardingWord::spin_and_get_forwarded_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">forwarding_status</span>);
+                <span class="ident">object_forwarding::spin_and_get_forwarded_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">forwarding_status</span>);
             <span class="macro">trace!</span>(<span class="string">&quot;Returning&quot;</span>);
             <span class="ident">new_object</span>
         } <span class="kw">else</span> {
             <span class="macro">trace!</span>(<span class="string">&quot;... no it isn&#39;t. Copying&quot;</span>);
             <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span>
-                <span class="ident">ForwardingWord::forward_object</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="kw">_</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>);
+                <span class="ident">object_forwarding::forward_object</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="kw">_</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>);
             <span class="macro">trace!</span>(<span class="string">&quot;Forwarding pointer&quot;</span>);
             <span class="ident">trace</span>.<span class="ident">process_node</span>(<span class="ident">new_object</span>);
-            <span class="macro">trace!</span>(<span class="string">&quot;Copying [{:?} -&gt; {:?}]&quot;</span>, <span class="ident">object</span>, <span class="ident">new_object</span>);
+            <span class="macro">trace!</span>(<span class="string">&quot;Copied [{:?} -&gt; {:?}]&quot;</span>, <span class="ident">object</span>, <span class="ident">new_object</span>);
             <span class="ident">new_object</span>
         }
     }

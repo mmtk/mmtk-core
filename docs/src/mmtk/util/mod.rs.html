@@ -75,10 +75,6 @@
 <span id="72">72</span>
 <span id="73">73</span>
 <span id="74">74</span>
-<span id="75">75</span>
-<span id="76">76</span>
-<span id="77">77</span>
-<span id="78">78</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.</span>
 
@@ -114,25 +110,21 @@
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">edge_logger</span>;
 <span class="doccomment">/// Finalization implementation.</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">finalizable_processor</span>;
-<span class="doccomment">/// Forwarding word in object copying.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">forwarding_word</span>;
-<span class="doccomment">/// Access to per-object metadata (in GC byte or in side metadata).</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">gc_byte</span>;
-<span class="doccomment">/// Access to per-object metadata with policy-specific configuration.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">header_byte</span>;
 <span class="doccomment">/// Heap implementation, including page resource, mmapper, etc.</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">heap</span>;
 <span class="doccomment">/// Logger initialization</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">logger</span>;
 <span class="doccomment">/// Various malloc implementations (conditionally compiled by features)</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">malloc</span>;
+<span class="doccomment">/// Metadata (OnSide or InHeader) implementation.</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">metadata</span>;
+<span class="doccomment">/// Forwarding word in object copying.</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">object_forwarding</span>;
 <span class="doccomment">/// MMTk command line options.</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">options</span>;
 <span class="doccomment">/// Sanity checker for GC.</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">sanity</span>;
-<span class="doccomment">/// Side metadata implementation.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">side_metadata</span>;
 <span class="doccomment">/// Utils for collecting statistics.</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">statistics</span>;
 <span class="doccomment">/// Test utilities.</span>

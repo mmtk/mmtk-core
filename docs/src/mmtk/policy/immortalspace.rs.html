@@ -162,38 +162,52 @@
 <span id="159">159</span>
 <span id="160">160</span>
 <span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
 </pre><pre class="rust">
+<span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
+
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::address::Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap</span>::{<span class="ident">MonotonePageResource</span>, <span class="ident">PageResource</span>, <span class="ident">VMRequest</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants::CARD_META_PAGES_PER_REGION</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::ObjectReference</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata</span>::{<span class="ident">compare_exchange_metadata</span>, <span class="ident">load_metadata</span>, <span class="ident">store_metadata</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">metadata</span>, <span class="ident">ObjectReference</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::TransitiveClosure</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::header_byte::HeaderByte</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::PlanConstraints</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::space::SpaceOptions</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::gc_byte</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::HeapMeta</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::VMBinding</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm</span>::{<span class="ident">ObjectModel</span>, <span class="ident">VMBinding</span>};
 
 <span class="doccomment">/// This type implements a simple immortal collection</span>
 <span class="doccomment">/// policy. Under this policy all that is required is for the</span>
 <span class="doccomment">/// &quot;collector&quot; to propagate marks in a liveness trace.  It does not</span>
 <span class="doccomment">/// actually collect.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="ident">mark_state</span>: <span class="ident">u8</span>,
+    <span class="ident">mark_state</span>: <span class="ident">usize</span>,
     <span class="ident">common</span>: <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">pr</span>: <span class="ident">MonotonePageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-
-    <span class="ident">header_byte</span>: <span class="ident">HeaderByte</span>,
 }
 
-<span class="kw">const</span> <span class="ident">GC_MARK_BIT_MASK</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span>;
+<span class="kw">const</span> <span class="ident">GC_MARK_BIT_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
 <span class="kw">const</span> <span class="ident">META_DATA_PAGES_PER_REGION</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">CARD_META_PAGES_PER_REGION</span>;
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">SFT</span> <span class="kw">for</span> <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -211,12 +225,20 @@
         <span class="bool-val">true</span>
     }
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
-        <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">gc_byte::read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_value</span> <span class="op">=</span> (<span class="ident">old_value</span> <span class="op">&amp;</span> <span class="ident">GC_MARK_BIT_MASK</span>) <span class="op">|</span> <span class="self">self</span>.<span class="ident">mark_state</span>;
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">header_byte</span>.<span class="ident">needs_unlogged_bit</span> {
-            <span class="ident">new_value</span> <span class="op">|</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">header_byte</span>.<span class="ident">unlogged_bit</span>;
-        }
-        <span class="ident">gc_byte::write_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">new_value</span>);
+        <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
+            <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
+            <span class="ident">object</span>,
+            <span class="prelude-val">None</span>,
+            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+        );
+        <span class="kw">let</span> <span class="ident">new_value</span> <span class="op">=</span> (<span class="ident">old_value</span> <span class="op">&amp;</span> <span class="ident">GC_MARK_BIT_MASK</span>) <span class="op">|</span> <span class="self">self</span>.<span class="ident">mark_state</span>;
+        <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
+            <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
+            <span class="ident">object</span>,
+            <span class="ident">new_value</span>,
+            <span class="prelude-val">None</span>,
+            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+        );
     }
 }
 
@@ -252,7 +274,7 @@
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
         <span class="ident">heap</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">HeapMeta</span>,
-        <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
+        <span class="ident">_constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(
             <span class="ident">SpaceOptions</span> {
@@ -263,7 +285,9 @@
                 <span class="ident">vmrequest</span>,
                 <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span> {
                     <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
-                    <span class="ident">local</span>: <span class="macro">vec!</span>[],
+                    <span class="ident">local</span>: <span class="ident">metadata::extract_side_metadata</span>(<span class="kw-2">&amp;</span>[
+                        <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
+                    ]),
                 },
             },
             <span class="ident">vm_map</span>,
@@ -283,25 +307,31 @@
                 )
             },
             <span class="ident">common</span>,
-            <span class="ident">header_byte</span>: <span class="ident">HeaderByte::new</span>(<span class="ident">constraints</span>),
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">test_and_mark</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">value</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">gc_byte::read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">mark_bit</span> <span class="op">=</span> <span class="ident">old_value</span> <span class="op">&amp;</span> <span class="ident">GC_MARK_BIT_MASK</span>;
-        <span class="kw">if</span> <span class="ident">mark_bit</span> <span class="op">=</span><span class="op">=</span> <span class="ident">value</span> {
-            <span class="kw">return</span> <span class="bool-val">false</span>;
-        }
-        <span class="kw">while</span> <span class="op">!</span><span class="ident">gc_byte::compare_exchange_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-            <span class="ident">object</span>,
-            <span class="ident">old_value</span>,
-            <span class="ident">old_value</span> <span class="op">^</span> <span class="ident">GC_MARK_BIT_MASK</span>,
-        ) {
-            <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">gc_byte::read_gc_byte</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
-            <span class="ident">mark_bit</span> <span class="op">=</span> (<span class="ident">old_value</span> <span class="kw">as</span> <span class="ident">u8</span>) <span class="op">&amp;</span> <span class="ident">GC_MARK_BIT_MASK</span>;
-            <span class="kw">if</span> <span class="ident">mark_bit</span> <span class="op">=</span><span class="op">=</span> <span class="ident">value</span> {
+    <span class="kw">fn</span> <span class="ident">test_and_mark</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">value</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="kw">loop</span> {
+            <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
+                <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
+                <span class="ident">object</span>,
+                <span class="prelude-val">None</span>,
+                <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+            );
+            <span class="kw">if</span> <span class="ident">old_value</span> <span class="op">=</span><span class="op">=</span> <span class="ident">value</span> {
                 <span class="kw">return</span> <span class="bool-val">false</span>;
+            }
+
+            <span class="kw">if</span> <span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
+                <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
+                <span class="ident">object</span>,
+                <span class="ident">old_value</span>,
+                <span class="ident">old_value</span> <span class="op">^</span> <span class="ident">GC_MARK_BIT_MASK</span>,
+                <span class="prelude-val">None</span>,
+                <span class="ident">Ordering::SeqCst</span>,
+                <span class="ident">Ordering::SeqCst</span>,
+            ) {
+                <span class="kw">break</span>;
             }
         }
         <span class="bool-val">true</span>

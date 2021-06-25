@@ -319,20 +319,27 @@
 <span id="316">316</span>
 <span id="317">317</span>
 <span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::TransitiveClosure</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::space::CommonSpace</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::space::SFT</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::conversions</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::heap_layout::VMMap</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::PageResource</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::malloc</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata</span>::{
+    <span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>, <span class="ident">SideMetadataSpec</span>,
+};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::MetadataSpec</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata::SideMetadataSanity</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::side_metadata</span>::{<span class="ident">SideMetadata</span>, <span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::Address</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::ObjectReference</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">conversions</span>, <span class="ident">metadata</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">Collection</span>, <span class="ident">ObjectModel</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">policy::space::Space</span>, <span class="ident">util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>};
@@ -353,7 +360,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MallocSpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">active_bytes</span>: <span class="ident">AtomicUsize</span>,
-    <span class="ident">metadata</span>: <span class="ident">SideMetadata</span>,
+    <span class="ident">metadata</span>: <span class="ident">SideMetadataContext</span>,
     <span class="comment">// Mapping between allocated address and its size - this is used to check correctness.</span>
     <span class="comment">// Size will be set to zero when the memory is freed.</span>
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
@@ -366,7 +373,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="ident">is_marked</span>(<span class="ident">object</span>)
+        <span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
     }
     <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="bool-val">false</span>
@@ -456,7 +463,7 @@
 
     <span class="kw">fn</span> <span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">side_metadata_sanity_checker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SideMetadataSanity</span>) {
         <span class="ident">side_metadata_sanity_checker</span>
-            .<span class="ident">verify_metadata_context</span>(<span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(), <span class="self">self</span>.<span class="ident">metadata</span>.<span class="ident">get_context</span>())
+            .<span class="ident">verify_metadata_context</span>(<span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(), <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">metadata</span>)
     }
 }
 
@@ -465,10 +472,13 @@
         <span class="ident">MallocSpace</span> {
             <span class="ident">phantom</span>: <span class="ident">PhantomData</span>,
             <span class="ident">active_bytes</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
-            <span class="ident">metadata</span>: <span class="ident">SideMetadata::new</span>(<span class="ident">SideMetadataContext</span> {
+            <span class="ident">metadata</span>: <span class="ident">SideMetadataContext</span> {
                 <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
-                <span class="ident">local</span>: <span class="macro">vec!</span>[<span class="ident">ALLOC_METADATA_SPEC</span>, <span class="ident">MARKING_METADATA_SPEC</span>],
-            }),
+                <span class="ident">local</span>: <span class="ident">metadata::extract_side_metadata</span>(<span class="kw-2">&amp;</span>[
+                    <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">ALLOC_SIDE_METADATA_SPEC</span>),
+                    <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
+                ]),
+            },
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
             <span class="ident">active_mem</span>: <span class="ident">Mutex::new</span>(<span class="ident">HashMap::new</span>()),
         }
@@ -537,8 +547,8 @@
             <span class="string">&quot;Cannot mark an object {} that was not alloced by malloc.&quot;</span>,
             <span class="ident">address</span>,
         );
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">is_marked</span>(<span class="ident">object</span>) {
-            <span class="ident">set_mark_bit</span>(<span class="ident">object</span>);
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) {
+            <span class="ident">set_mark_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
             <span class="ident">trace</span>.<span class="ident">process_node</span>(<span class="ident">object</span>);
         }
         <span class="ident">object</span>
@@ -581,7 +591,7 @@
                         <span class="macro">debug_assert_eq!</span>(<span class="self">self</span>.<span class="ident">active_mem</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">obj_start</span>), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">bytes</span>), <span class="string">&quot;Address {} size in active_mem does not match the size from malloc_usable_size&quot;</span>, <span class="ident">obj_start</span>);
                     }
 
-                    <span class="kw">if</span> <span class="op">!</span><span class="ident">is_marked</span>(<span class="ident">object</span>) {
+                    <span class="kw">if</span> <span class="op">!</span><span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) {
                         <span class="comment">// Dead object</span>
                         <span class="macro">trace!</span>(
                             <span class="string">&quot;Object {} has alloc bit but no mark bit, it is dead. &quot;</span>,
@@ -594,7 +604,7 @@
                         <span class="ident">unset_alloc_bit</span>(<span class="ident">object</span>);
                     } <span class="kw">else</span> {
                         <span class="comment">// Live object. Unset mark bit</span>
-                        <span class="ident">unset_mark_bit</span>(<span class="ident">object</span>);
+                        <span class="ident">unset_mark_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
                         <span class="comment">// This chunk is still active.</span>
                         <span class="ident">chunk_is_empty</span> <span class="op">=</span> <span class="bool-val">false</span>;
 
