@@ -59,7 +59,7 @@ pub struct WorkBucket<C: Context> {
     /// A priority queue
     queue: RwLock<BinaryHeap<PrioritizedWork<C>>>,
     monitor: Arc<(Mutex<()>, Condvar)>,
-    can_open: Option<Box<dyn (Fn() -> bool) + Send>>,
+    pub can_open: Option<Box<dyn (Fn() -> bool) + Send>>,
 }
 
 impl<C: Context> WorkBucket<C> {

@@ -348,9 +348,9 @@ impl<E: ProcessEdgesWork> ScanVMSpecificRoots<E> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
-    fn do_work(&mut self, _worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStaticRoots");
-        <E::VM as VMBinding>::VMScanning::scan_vm_specific_roots::<E>();
+        <E::VM as VMBinding>::VMScanning::scan_vm_specific_roots::<E>(worker);
     }
 }
 
