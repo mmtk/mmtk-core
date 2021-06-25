@@ -103,19 +103,6 @@ impl SchedulerStat {
             format!("{:.2}", duration_overall.max),
         );
 
-        stat.insert(
-            "total-work.time.total".to_owned(),
-            format!("{:.2}", duration_overall.total),
-        );
-        stat.insert(
-            "total-work.time.min".to_owned(),
-            format!("{:.2}", duration_overall.min),
-        );
-        stat.insert(
-            "total-work.time.max".to_owned(),
-            format!("{:.2}", duration_overall.max),
-        );
-
         stat
     }
     /// Merge work counters from different worker threads
