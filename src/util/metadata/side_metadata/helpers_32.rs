@@ -1,3 +1,4 @@
+use super::SideMetadataSpec;
 use crate::util::{
     constants::{self, LOG_BITS_IN_BYTE},
     heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK},
@@ -5,12 +6,12 @@ use crate::util::{
 };
 use std::io::Result;
 
-#[cfg(test)]
-use super::ensure_munmap_metadata;
-use super::{
-    SideMetadataSpec, CHUNK_MASK, LOCAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_PER_CHUNK,
+use super::constants::{
+    CHUNK_MASK, LOCAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_PER_CHUNK,
     LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
+#[cfg(test)]
+use super::ensure_munmap_metadata;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::Mmapper;
 use crate::MMAPPER;
@@ -39,7 +40,7 @@ pub(super) fn address_to_chunked_meta_address(
 
 /// Returns the size in bytes that gets munmapped.
 #[cfg(test)]
-pub(super) fn ensure_munmap_chunked_metadata_space(
+pub(crate) fn ensure_munmap_chunked_metadata_space(
     start: Address,
     size: usize,
     spec: &SideMetadataSpec,
@@ -74,7 +75,7 @@ pub(super) fn ensure_munmap_chunked_metadata_space(
         let mut next_data_chunk = second_data_chunk;
         // unmap all chunks in the middle
         while next_data_chunk != last_data_chunk {
-            let to_unmap = meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+            let to_unmap = metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
             ensure_munmap_metadata(address_to_meta_address(*spec, next_data_chunk), to_unmap);
             total_unmapped += to_unmap;
             next_data_chunk += BYTES_IN_CHUNK;
@@ -91,7 +92,7 @@ pub(crate) fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
 }
 
 #[inline(always)]
-pub(crate) const fn meta_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bits: usize) -> usize {
+pub const fn metadata_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bits: usize) -> usize {
     1usize
         << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) - log_min_obj_size
             + log_num_of_bits)

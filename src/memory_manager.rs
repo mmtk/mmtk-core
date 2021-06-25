@@ -18,7 +18,7 @@ use crate::scheduler::GCWorker;
 use crate::scheduler::Work;
 use crate::scheduler::WorkBucketStage;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
@@ -108,8 +108,7 @@ pub fn alloc<VM: VMBinding>(
     // their object sizes are all larger than MMTk's min object size, so we simply put an assertion here.
     // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
     // meet the min object size in the fastpath.
-    #[cfg(debug_assertions)]
-    crate::util::forwarding_word::check_alloc_size::<VM>(size);
+    debug_assert!(size >= MIN_OBJECT_SIZE);
     mutator.alloc(size, align, offset, semantics)
 }
 
