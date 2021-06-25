@@ -237,7 +237,7 @@ impl<C> HasCounterSet for C {
 }
 
 /// Specialization for MMTk to read the options
-#[allow(unused_variables,unused_mut)]
+#[allow(unused_variables, unused_mut)]
 impl<VM: VMBinding> HasCounterSet for MMTK<VM> {
     fn counter_set(mmtk: &'static Self) -> Vec<Box<dyn WorkCounter>> {
         let mut counters: Vec<Box<dyn WorkCounter>> = vec![Box::new(WorkDuration::new())];

@@ -25,13 +25,13 @@ custom_derive! {
 }
 
 /// MMTk option for perf events
-/// 
+///
 /// The format is
 /// ```
 /// <event> ::= <event-name> "," <pid> "," <cpu>
 /// <events> ::= <event> ";" <events> | <event> | ""
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PerfEventOptions {
     pub events: Vec<(String, i32, i32)>,
 }
@@ -222,6 +222,7 @@ impl Options {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::util::constants::DEFAULT_STRESS_FACTOR;
     use crate::util::options::Options;
     use crate::util::test_util::{serial_test, with_cleanup};
@@ -311,7 +312,7 @@ mod tests {
     fn test_str_option_default() {
         serial_test(|| {
             let options = Options::default();
-            assert_eq!(&options.perf_events as &str, "");
+            assert_eq!(&options.perf_events, &PerfEventOptions { events: vec![] });
         })
     }
 
@@ -324,8 +325,10 @@ mod tests {
 
                     let options = Options::default();
                     assert_eq!(
-                        &options.perf_events as &str,
-                        "PERF_COUNT_HW_CPU_CYCLES,0,-1"
+                        &options.perf_events,
+                        &PerfEventOptions {
+                            events: vec![("PERF_COUNT_HW_CPU_CYCLES".into(), 0, -1)]
+                        }
                     );
                 },
                 || {
@@ -345,7 +348,7 @@ mod tests {
 
                     let options = Options::default();
                     // invalid value from env var, use default.
-                    assert_eq!(&options.perf_events as &str, "");
+                    assert_eq!(&options.perf_events, &PerfEventOptions { events: vec![] });
                 },
                 || {
                     std::env::remove_var("MMTK_PERF_EVENTS");
