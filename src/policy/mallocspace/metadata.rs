@@ -25,7 +25,7 @@ use std::sync::RwLock;
 static FIRST_CHUNK: AtomicBool = AtomicBool::new(true);
 
 lazy_static! {
-    static ref CHUNK_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext {
+    pub(super) static ref CHUNK_METADATA: SideMetadata = SideMetadata::new(SideMetadataContext {
         global: vec![ACTIVE_CHUNK_METADATA_SPEC],
         local: vec![],
     });
@@ -225,16 +225,6 @@ pub unsafe fn is_marked_unsafe(address: Address) -> bool {
 }
 
 #[allow(unused)]
-pub fn is_page_marked(page_addr: Address) -> bool {
-    load_atomic(ACTIVE_PAGE_METADATA_SPEC, page_addr) == 1
-}
-
-#[allow(unused)]
-pub unsafe fn is_page_marked_unsafe(page_addr: Address) -> bool {
-    load(ACTIVE_PAGE_METADATA_SPEC, page_addr) == 1
-}
-
-#[allow(unused)]
 pub fn is_chunk_marked(chunk_start: Address) -> bool {
     if FIRST_CHUNK.load(Ordering::Relaxed) {
         return false; // if first chunk has not been mapped, then no chunk is marked
@@ -287,16 +277,6 @@ pub unsafe fn set_mark_bit_unsafe(object: ObjectReference) {
 }
 
 #[allow(unused)]
-pub fn set_page_mark_bit(page_addr: Address) {
-    store_atomic(ACTIVE_PAGE_METADATA_SPEC, page_addr, 1);
-}
-
-#[allow(unused)]
-pub unsafe fn set_page_mark_bit_unsafe(page_addr: Address) {
-    store(ACTIVE_PAGE_METADATA_SPEC, page_addr, 1);
-}
-
-#[allow(unused)]
 pub fn set_chunk_mark_bit(chunk_start: Address) {
     store_atomic(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 1);
 }
@@ -342,16 +322,6 @@ pub fn unset_mark_bit(object: ObjectReference) {
 #[allow(unused)]
 pub unsafe fn unset_mark_bit_unsafe(object: ObjectReference) {
     store(MARKING_METADATA_SPEC, object.to_address(), 0);
-}
-
-#[allow(unused)]
-pub fn unset_page_mark_bit(page_addr: Address) {
-    store_atomic(ACTIVE_PAGE_METADATA_SPEC, page_addr, 0);
-}
-
-#[allow(unused)]
-pub unsafe fn unset_page_mark_bit_unsafe(page_addr: Address) {
-    store(ACTIVE_PAGE_METADATA_SPEC, page_addr, 0);
 }
 
 #[allow(unused)]

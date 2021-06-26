@@ -543,6 +543,15 @@ pub fn fetch_sub_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, val
     old_val
 }
 
+pub unsafe fn load128(metadata_spec: SideMetadataSpec, data_addr: Address) -> u128 {
+    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if cfg!(debug_assertions) {
+        ensure_metadata_is_mapped(metadata_spec, data_addr);
+    }
+
+    meta_addr.load::<u128>() as u128
+}
+
 /// Non-atomic load of metadata.
 ///
 /// # Safety
