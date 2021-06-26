@@ -233,11 +233,27 @@
 <span id="230">230</span>
 <span id="231">231</span>
 <span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::statistics::counter</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::statistics::Timer</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::VMBinding</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;perf_counter&quot;</span>)]</span>
+<span class="kw">use</span> <span class="ident">pfm::Perfmon</span>;
 <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
@@ -273,6 +289,10 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Stats</span> {
     <span class="ident">gc_count</span>: <span class="ident">AtomicUsize</span>,
     <span class="ident">total_time</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Timer</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="comment">// crate `pfm` uses libpfm4 under the hood for parsing perf event names</span>
+    <span class="comment">// Initialization of libpfm4 is required before we can use `PerfEvent` types</span>
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;perf_counter&quot;</span>)]</span>
+    <span class="ident">perfmon</span>: <span class="ident">Perfmon</span>,
 
     <span class="kw">pub</span> <span class="ident">shared</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SharedStats</span><span class="op">&gt;</span>,
     <span class="ident">counters</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Counter</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -294,6 +314,12 @@
         <span class="ident">Stats</span> {
             <span class="ident">gc_count</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
             <span class="ident">total_time</span>: <span class="ident">t</span>.<span class="ident">clone</span>(),
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;perf_counter&quot;</span>)]</span>
+            <span class="ident">perfmon</span>: {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">perfmon</span>: <span class="ident">Perfmon</span> <span class="op">=</span> <span class="ident">Default::default</span>();
+                <span class="ident">perfmon</span>.<span class="ident">initialize</span>().<span class="ident">expect</span>(<span class="string">&quot;Perfmon failed to initialize&quot;</span>);
+                <span class="ident">perfmon</span>
+            },
 
             <span class="ident">shared</span>,
             <span class="ident">counters</span>: <span class="ident">Mutex::new</span>(<span class="macro">vec!</span>[<span class="ident">t</span>]),

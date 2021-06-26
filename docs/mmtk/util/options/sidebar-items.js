@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["NurseryZeroingOptions",""],["PlanSelector",""]],"fn":[["always_valid",""]],"struct":[["Options",""],["UnsafeOptionsWrapper",""]]});
+initSidebarItems({"enum":[["NurseryZeroingOptions",""],["PlanSelector",""]],"fn":[["always_valid",""]],"struct":[["Options",""],["PerfEventOptions","MMTk option for perf events"],["UnsafeOptionsWrapper",""]]});

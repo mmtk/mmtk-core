@@ -438,6 +438,7 @@
 <span id="435">435</span>
 <span id="436">436</span>
 <span id="437">437</span>
+<span id="438">438</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::stat::SchedulerStat</span>;
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::work::Work</span>;
@@ -851,6 +852,7 @@
         <span class="comment">// println!(&quot;Original: {:?}&quot;, data);</span>
 
         <span class="ident">SCHEDULER</span>.<span class="ident">initialize</span>(<span class="ident">NUM_WORKERS</span>, <span class="kw-2">&amp;</span>(), <span class="ident">VMThread::UNINITIALIZED</span>);
+        <span class="ident">SCHEDULER</span>.<span class="ident">enable_stat</span>();
         <span class="ident">SCHEDULER</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Unconstrained</span>]
             .<span class="ident">add</span>(<span class="ident">Sort</span>(<span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="ident">data</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">_</span>) }));
         <span class="ident">SCHEDULER</span>.<span class="ident">wait_for_completion</span>();
