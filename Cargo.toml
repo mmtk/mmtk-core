@@ -69,9 +69,6 @@ nogc_no_zeroing = ["nogc_lock_free"]
 # Q: Why do we need this as a compile time flat? We can always set the number of GC threads through options.
 single_worker = []
 
-# To support VMs that do not provide in-header GC byte
-side_gc_header = []
-
 # To run expensive comprehensive runtime checks, such as checking duplicate edges
 extreme_assertions = []
 

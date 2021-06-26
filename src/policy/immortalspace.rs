@@ -1,34 +1,33 @@
+use atomic::Ordering;
+
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
 use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
 
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
-use crate::util::ObjectReference;
+use crate::util::metadata::{compare_exchange_metadata, load_metadata, store_metadata};
+use crate::util::{metadata, ObjectReference};
 
 use crate::plan::TransitiveClosure;
-use crate::util::header_byte::HeaderByte;
 
 use crate::plan::PlanConstraints;
 use crate::policy::space::SpaceOptions;
-use crate::util::gc_byte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
-use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
-use crate::vm::VMBinding;
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
+use crate::vm::{ObjectModel, VMBinding};
 
 /// This type implements a simple immortal collection
 /// policy. Under this policy all that is required is for the
 /// "collector" to propagate marks in a liveness trace.  It does not
 /// actually collect.
 pub struct ImmortalSpace<VM: VMBinding> {
-    mark_state: u8,
+    mark_state: usize,
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
-
-    header_byte: HeaderByte,
 }
 
-const GC_MARK_BIT_MASK: u8 = 1;
+const GC_MARK_BIT_MASK: usize = 1;
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
@@ -46,12 +45,20 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        let old_value = gc_byte::read_gc_byte::<VM>(object);
-        let mut new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
-        if self.header_byte.needs_unlogged_bit {
-            new_value |= self.header_byte.unlogged_bit;
-        }
-        gc_byte::write_gc_byte::<VM>(object, new_value);
+        let old_value = load_metadata::<VM>(
+            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            object,
+            None,
+            Some(Ordering::SeqCst),
+        );
+        let new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
+        store_metadata::<VM>(
+            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            object,
+            new_value,
+            None,
+            Some(Ordering::SeqCst),
+        );
     }
 }
 
@@ -87,7 +94,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        constraints: &'static PlanConstraints,
+        _constraints: &'static PlanConstraints,
     ) -> Self {
         let common = CommonSpace::new(
             SpaceOptions {
@@ -98,7 +105,9 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
-                    local: vec![],
+                    local: metadata::extract_side_metadata(&[
+                        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                    ]),
                 },
             },
             vm_map,
@@ -118,25 +127,31 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 )
             },
             common,
-            header_byte: HeaderByte::new(constraints),
         }
     }
 
-    fn test_and_mark(object: ObjectReference, value: u8) -> bool {
-        let mut old_value = gc_byte::read_gc_byte::<VM>(object);
-        let mut mark_bit = old_value & GC_MARK_BIT_MASK;
-        if mark_bit == value {
-            return false;
-        }
-        while !gc_byte::compare_exchange_gc_byte::<VM>(
-            object,
-            old_value,
-            old_value ^ GC_MARK_BIT_MASK,
-        ) {
-            old_value = gc_byte::read_gc_byte::<VM>(object);
-            mark_bit = (old_value as u8) & GC_MARK_BIT_MASK;
-            if mark_bit == value {
+    fn test_and_mark(object: ObjectReference, value: usize) -> bool {
+        loop {
+            let old_value = load_metadata::<VM>(
+                VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                object,
+                None,
+                Some(Ordering::SeqCst),
+            );
+            if old_value == value {
                 return false;
+            }
+
+            if compare_exchange_metadata::<VM>(
+                VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                object,
+                old_value,
+                old_value ^ GC_MARK_BIT_MASK,
+                None,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                break;
             }
         }
         true

@@ -1,19 +1,18 @@
+use atomic::Ordering;
+
 use crate::util::constants;
-#[cfg(debug_assertions)]
-use crate::util::constants::BYTES_IN_WORD;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-#[cfg(debug_assertions)]
-use crate::util::side_metadata::address_to_meta_address;
-use crate::util::side_metadata::load_atomic;
-#[cfg(target_pointer_width = "32")]
-use crate::util::side_metadata::meta_bytes_per_chunk;
-use crate::util::side_metadata::store_atomic;
+use crate::util::metadata::load_metadata;
+use crate::util::metadata::side_metadata;
+use crate::util::metadata::side_metadata::SideMetadataContext;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(target_pointer_width = "64")]
-use crate::util::side_metadata::{metadata_address_range_size, LOCAL_SIDE_METADATA_BASE_ADDRESS};
-use crate::util::side_metadata::{SideMetadata, SideMetadataScope, SideMetadataSpec};
+use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
+use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::vm::{ObjectModel, VMBinding};
 
 use std::collections::HashSet;
 use std::sync::RwLock;
@@ -22,46 +21,25 @@ lazy_static! {
     pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
 }
 
-// We use the following hashset to assert if bits are set/unset properly in side metadata.
-#[cfg(debug_assertions)]
-const ASSERT_METADATA: bool = false;
-
-#[cfg(debug_assertions)]
-lazy_static! {
-    pub static ref ALLOC_MAP: RwLock<HashSet<ObjectReference>> = RwLock::default();
-    pub static ref MARK_MAP: RwLock<HashSet<ObjectReference>> = RwLock::default();
-}
-
+/// This is the metadata spec for the alloc-bit.
+///
+/// An alloc-bit is required per min-object-size aligned address , rather than per object, and can only exist as side metadata.
+///
+/// The other metadata used by MallocSpace is mark-bit, which is per-object and can be kept in object header if the VM allows it.
+/// Thus, mark-bit is vm-dependant and is part of each VM's ObjectModel.
+///
 #[cfg(target_pointer_width = "32")]
-pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
+pub(super) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    is_global: false,
     offset: 0,
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
-#[cfg(target_pointer_width = "32")]
-pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
-    offset: ALLOC_METADATA_SPEC.offset
-        + meta_bytes_per_chunk(
-            ALLOC_METADATA_SPEC.log_min_obj_size,
-            ALLOC_METADATA_SPEC.log_num_of_bits,
-        ),
-    log_num_of_bits: 0,
-    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
-};
 
 #[cfg(target_pointer_width = "64")]
-pub(super) const ALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
+pub(super) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    is_global: false,
     offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-    log_num_of_bits: 0,
-    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
-};
-#[cfg(target_pointer_width = "64")]
-pub(super) const MARKING_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    scope: SideMetadataScope::PolicySpecific,
-    offset: ALLOC_METADATA_SPEC.offset + metadata_address_range_size(ALLOC_METADATA_SPEC),
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
@@ -71,7 +49,7 @@ pub fn is_meta_space_mapped(address: Address) -> bool {
     ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
 }
 
-pub fn map_meta_space_for_chunk(metadata: &SideMetadata, chunk_start: Address) {
+pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Address) {
     let mut active_chunks = ACTIVE_CHUNKS.write().unwrap();
     if active_chunks.contains(&chunk_start) {
         return;
@@ -95,95 +73,52 @@ pub fn is_alloced(object: ObjectReference) -> bool {
 }
 
 pub fn is_alloced_object(address: Address) -> bool {
-    #[cfg(debug_assertions)]
-    if ASSERT_METADATA {
-        // Need to make sure we atomically access the side metadata and the map.
-        let lock = ALLOC_MAP.read().unwrap();
-        let check =
-            lock.contains(&unsafe { address.align_down(BYTES_IN_WORD).to_object_reference() });
-        let ret = load_atomic(ALLOC_METADATA_SPEC, address) == 1;
-        debug_assert_eq!(
-            check,
-            ret,
-            "is_alloced_object(): alloc bit does not match alloc map, address = {} (aligned to {}), meta address = {}",
-            address,
-            address.align_down(BYTES_IN_WORD),
-            address_to_meta_address(ALLOC_METADATA_SPEC, address)
-        );
-        return ret;
-    }
-
-    load_atomic(ALLOC_METADATA_SPEC, address) == 1
+    side_metadata::load_atomic(ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
 }
 
-pub fn is_marked(object: ObjectReference) -> bool {
-    #[cfg(debug_assertions)]
-    if ASSERT_METADATA {
-        // Need to make sure we atomically access the side metadata and the map.
-        let lock = MARK_MAP.read().unwrap();
-        let ret = load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1;
-        debug_assert_eq!(
-            lock.contains(&unsafe { object.to_address().align_down(BYTES_IN_WORD).to_object_reference() }),
-            ret,
-            "is_marked(): mark bit does not match mark map, address = {} (aligned to {}), meta address = {}",
-            object.to_address(),
-            object.to_address().align_down(BYTES_IN_WORD),
-            address_to_meta_address(MARKING_METADATA_SPEC, object.to_address())
-        );
-        return ret;
-    }
-
-    load_atomic(MARKING_METADATA_SPEC, object.to_address()) == 1
+pub fn is_marked<VM: VMBinding>(object: ObjectReference) -> bool {
+    load_metadata::<VM>(
+        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        object,
+        None,
+        Some(Ordering::SeqCst),
+    ) == 1
 }
 
 pub fn set_alloc_bit(object: ObjectReference) {
-    #[cfg(debug_assertions)]
-    if ASSERT_METADATA {
-        // Need to make sure we atomically access the side metadata and the map.
-        let mut lock = ALLOC_MAP.write().unwrap();
-        store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 1);
-        lock.insert(object);
-        return;
-    }
-
-    store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 1);
+    side_metadata::store_atomic(
+        ALLOC_SIDE_METADATA_SPEC,
+        object.to_address(),
+        1,
+        Ordering::SeqCst,
+    );
 }
 
-pub fn set_mark_bit(object: ObjectReference) {
-    #[cfg(debug_assertions)]
-    if ASSERT_METADATA {
-        // Need to make sure we atomically access the side metadata and the map.
-        let mut lock = MARK_MAP.write().unwrap();
-        store_atomic(MARKING_METADATA_SPEC, object.to_address(), 1);
-        lock.insert(object);
-        return;
-    }
-
-    store_atomic(MARKING_METADATA_SPEC, object.to_address(), 1);
+pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference) {
+    store_metadata::<VM>(
+        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        object,
+        1,
+        None,
+        Some(Ordering::SeqCst),
+    );
 }
 
 pub fn unset_alloc_bit(object: ObjectReference) {
-    #[cfg(debug_assertions)]
-    if ASSERT_METADATA {
-        // Need to make sure we atomically access the side metadata and the map.
-        let mut lock = ALLOC_MAP.write().unwrap();
-        store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 0);
-        lock.remove(&object);
-        return;
-    }
-
-    store_atomic(ALLOC_METADATA_SPEC, object.to_address(), 0);
+    side_metadata::store_atomic(
+        ALLOC_SIDE_METADATA_SPEC,
+        object.to_address(),
+        0,
+        Ordering::SeqCst,
+    );
 }
 
-pub fn unset_mark_bit(object: ObjectReference) {
-    #[cfg(debug_assertions)]
-    if ASSERT_METADATA {
-        // Need to make sure we atomically access the side metadata and the map.
-        let mut lock = MARK_MAP.write().unwrap();
-        store_atomic(MARKING_METADATA_SPEC, object.to_address(), 0);
-        lock.remove(&object);
-        return;
-    }
-
-    store_atomic(MARKING_METADATA_SPEC, object.to_address(), 0);
+pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference) {
+    store_metadata::<VM>(
+        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        object,
+        0,
+        None,
+        Some(Ordering::SeqCst),
+    );
 }

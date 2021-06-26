@@ -1,15 +1,20 @@
+use atomic::Ordering;
+
 use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
-use crate::util::gc_byte;
-use crate::util::header_byte::HeaderByte;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
+use crate::util::metadata;
+use crate::util::metadata::compare_exchange_metadata;
+use crate::util::metadata::load_metadata;
+use crate::util::metadata::side_metadata::SideMetadataContext;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::metadata::store_metadata;
 use crate::util::opaque_pointer::*;
-use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
@@ -17,9 +22,9 @@ use crate::vm::VMBinding;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
-const MARK_BIT: u8 = 0b01;
-const NURSERY_BIT: u8 = 0b10;
-const LOS_BIT_MASK: u8 = 0b11;
+const MARK_BIT: usize = 0b01;
+const NURSERY_BIT: usize = 0b10;
+const LOS_BIT_MASK: usize = 0b11;
 
 const USE_PRECEEDING_GC_HEADER: bool = true;
 const PRECEEDING_GC_HEADER_WORDS: usize = 1;
@@ -30,10 +35,9 @@ const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTE
 pub struct LargeObjectSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
-    mark_state: u8,
+    mark_state: usize,
     in_nursery_gc: bool,
     treadmill: TreadMill,
-    header_byte: HeaderByte,
 }
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
@@ -51,12 +55,24 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
-        let old_value = gc_byte::read_gc_byte::<VM>(object);
+        let old_value = load_metadata::<VM>(
+            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            object,
+            None,
+            Some(Ordering::SeqCst),
+        );
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
         if alloc {
             new_value |= NURSERY_BIT;
         }
-        gc_byte::write_gc_byte::<VM>(object, new_value);
+        store_metadata::<VM>(
+            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            object,
+            new_value,
+            None,
+            Some(Ordering::SeqCst),
+        );
+
         let cell = VM::VMObjectModel::object_start_ref(object)
             - if USE_PRECEEDING_GC_HEADER {
                 PRECEEDING_GC_HEADER_BYTES
@@ -64,12 +80,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 0
             };
         self.treadmill.add_to_treadmill(cell, alloc);
-        if self.header_byte.needs_unlogged_bit {
-            gc_byte::write_gc_byte::<VM>(
-                object,
-                gc_byte::read_gc_byte::<VM>(object) | self.header_byte.unlogged_bit,
-            );
-        }
     }
 }
 
@@ -104,7 +114,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        constraints: &'static PlanConstraints,
+        _constraints: &'static PlanConstraints,
     ) -> Self {
         let common = CommonSpace::new(
             SpaceOptions {
@@ -115,7 +125,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
-                    local: vec![],
+                    local: metadata::extract_side_metadata(&[
+                        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                    ]),
                 },
             },
             vm_map,
@@ -132,7 +144,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new(),
-            header_byte: HeaderByte::new(constraints),
         }
     }
 
@@ -206,37 +217,56 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
-        let mask = if self.in_nursery_gc {
-            LOS_BIT_MASK
-        } else {
-            MARK_BIT
-        };
-        let mut old_value = gc_byte::read_gc_byte::<VM>(object);
-        let mut mark_bit = old_value & mask;
-        if mark_bit == value {
-            return false;
-        }
-        while !gc_byte::compare_exchange_gc_byte::<VM>(
-            object,
-            old_value,
-            old_value & !LOS_BIT_MASK | value,
-        ) {
-            old_value = gc_byte::read_gc_byte::<VM>(object);
-            mark_bit = old_value & mask;
+    fn test_and_mark(&self, object: ObjectReference, value: usize) -> bool {
+        loop {
+            let mask = if self.in_nursery_gc {
+                LOS_BIT_MASK
+            } else {
+                MARK_BIT
+            };
+            let old_value = load_metadata::<VM>(
+                VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                object,
+                None,
+                Some(Ordering::SeqCst),
+            );
+            let mark_bit = old_value & mask;
             if mark_bit == value {
                 return false;
+            }
+            if compare_exchange_metadata::<VM>(
+                VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                object,
+                old_value,
+                old_value & !LOS_BIT_MASK | value,
+                None,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                break;
             }
         }
         true
     }
 
-    fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
-        gc_byte::read_gc_byte::<VM>(object) & MARK_BIT == value
+    fn test_mark_bit(&self, object: ObjectReference, value: usize) -> bool {
+        load_metadata::<VM>(
+            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            object,
+            None,
+            Some(Ordering::SeqCst),
+        ) & MARK_BIT
+            == value
     }
 
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        gc_byte::read_gc_byte::<VM>(object) & NURSERY_BIT == NURSERY_BIT
+        load_metadata::<VM>(
+            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            object,
+            None,
+            Some(Ordering::SeqCst),
+        ) & NURSERY_BIT
+            == NURSERY_BIT
     }
 }
 
