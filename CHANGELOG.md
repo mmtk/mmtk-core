@@ -16,11 +16,10 @@ API
 
 Misc
 ---
-* Refactoring to metadata to provide unified access to per-object metadata (in-header or side).
-* Refactoring to work packet statistics to allow other types of stats other than execution times.
-* Work packe statistics can collect count data.
+* Refactored metadata to provide unified access to per-object metadata (in-header or side).
+* Refactored work packet statistics to allow other types of stats other than execution times.
+* Added 'perf_counter' which allows collecting data from hardware performance counters for work packets.
 * 'extreme_assertions' now also checks if values stored in side metadata are correct.
-* Supported string type as command line options.
 * Fixed a bug that GenCopy may report OOM without doing a full heap GC.
 * Fixed a bug that existing mmapping of side metadata memory may get overwritten.
 * Fixed a bug that FreeListPageResource may incorrectly return new_chunk for the first allocation.
