@@ -105,7 +105,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        constraints: &'static PlanConstraints,
+        _constraints: &'static PlanConstraints,
         protect_memory_on_release: bool,
     ) -> Self {
         let common = CommonSpace::new(
