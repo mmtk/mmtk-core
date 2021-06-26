@@ -1,7 +1,13 @@
 //! Statistics for work packets
 use super::work_counter::{WorkCounter, WorkCounterBase, WorkDuration};
+#[cfg(feature = "perf_counter")]
+use crate::scheduler::work_counter::WorkPerfEvent;
+use crate::scheduler::Context;
+use crate::vm::VMBinding;
+use crate::MMTK;
 use std::any::TypeId;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Merge and print the work-packet level statistics from all worker threads
@@ -99,7 +105,7 @@ impl SchedulerStat {
         stat
     }
     /// Merge work counters from different worker threads
-    pub fn merge(&mut self, stat: &WorkerLocalStat) {
+    pub fn merge<C>(&mut self, stat: &WorkerLocalStat<C>) {
         // Merge work packet type ID to work packet name mapping
         for (id, name) in &stat.work_id_name_map {
             self.work_id_name_map.insert(*id, *name);
@@ -144,7 +150,7 @@ impl WorkStat {
     /// Stop all work counters for the work packet type of the just executed
     /// work packet
     #[inline(always)]
-    pub fn end_of_work(&self, worker_stat: &mut WorkerLocalStat) {
+    pub fn end_of_work<C: Context>(&self, worker_stat: &mut WorkerLocalStat<C>) {
         if !worker_stat.is_enabled() {
             return;
         };
@@ -165,15 +171,27 @@ impl WorkStat {
 }
 
 /// Worker thread local counterpart of [`SchedulerStat`]
-#[derive(Default)]
-pub struct WorkerLocalStat {
+pub struct WorkerLocalStat<C> {
     work_id_name_map: HashMap<TypeId, &'static str>,
     work_counts: HashMap<TypeId, usize>,
     work_counters: HashMap<TypeId, Vec<Box<dyn WorkCounter>>>,
     enabled: AtomicBool,
+    _phantom: PhantomData<C>,
 }
 
-impl WorkerLocalStat {
+impl<C> Default for WorkerLocalStat<C> {
+    fn default() -> Self {
+        WorkerLocalStat {
+            work_id_name_map: Default::default(),
+            work_counts: Default::default(),
+            work_counters: Default::default(),
+            enabled: AtomicBool::new(false),
+            _phantom: Default::default(),
+        }
+    }
+}
+
+impl<C: Context> WorkerLocalStat<C> {
     #[inline]
     pub fn is_enabled(&self) -> bool {
         self.enabled.load(Ordering::SeqCst)
@@ -185,7 +203,12 @@ impl WorkerLocalStat {
     /// Measure the execution of a work packet by starting all counters for that
     /// type
     #[inline]
-    pub fn measure_work(&mut self, work_id: TypeId, work_name: &'static str) -> WorkStat {
+    pub fn measure_work(
+        &mut self,
+        work_id: TypeId,
+        work_name: &'static str,
+        context: &'static C,
+    ) -> WorkStat {
         let stat = WorkStat {
             type_id: work_id,
             type_name: work_name,
@@ -193,15 +216,35 @@ impl WorkerLocalStat {
         if self.is_enabled() {
             self.work_counters
                 .entry(work_id)
-                .or_insert_with(WorkerLocalStat::counter_set)
+                .or_insert_with(|| C::counter_set(context))
                 .iter_mut()
                 .for_each(|c| c.start());
         }
         stat
     }
+}
 
-    // The set of work counters for all work packet types
-    fn counter_set() -> Vec<Box<dyn WorkCounter>> {
+/// Private trait to let different contexts supply different sets of default
+/// counters
+trait HasCounterSet {
+    fn counter_set(context: &'static Self) -> Vec<Box<dyn WorkCounter>>;
+}
+
+impl<C> HasCounterSet for C {
+    default fn counter_set(_context: &'static Self) -> Vec<Box<dyn WorkCounter>> {
         vec![Box::new(WorkDuration::new())]
+    }
+}
+
+/// Specialization for MMTk to read the options
+#[allow(unused_variables, unused_mut)]
+impl<VM: VMBinding> HasCounterSet for MMTK<VM> {
+    fn counter_set(mmtk: &'static Self) -> Vec<Box<dyn WorkCounter>> {
+        let mut counters: Vec<Box<dyn WorkCounter>> = vec![Box::new(WorkDuration::new())];
+        #[cfg(feature = "perf_counter")]
+        for e in &mmtk.options.perf_events.events {
+            counters.push(box WorkPerfEvent::new(&e.0, e.1, e.2));
+        }
+        counters
     }
 }

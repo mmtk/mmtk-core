@@ -32,25 +32,21 @@ pub(crate) mod analysis;
 pub(crate) mod edge_logger;
 /// Finalization implementation.
 pub(crate) mod finalizable_processor;
-/// Forwarding word in object copying.
-pub(crate) mod forwarding_word;
-/// Access to per-object metadata (in GC byte or in side metadata).
-pub(crate) mod gc_byte;
-/// Access to per-object metadata with policy-specific configuration.
-pub(crate) mod header_byte;
 /// Heap implementation, including page resource, mmapper, etc.
 pub(crate) mod heap;
 /// Logger initialization
 pub(crate) mod logger;
 /// Various malloc implementations (conditionally compiled by features)
 pub(crate) mod malloc;
+/// Metadata (OnSide or InHeader) implementation.
+pub mod metadata;
+/// Forwarding word in object copying.
+pub(crate) mod object_forwarding;
 /// MMTk command line options.
 pub(crate) mod options;
 /// Sanity checker for GC.
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;
-/// Side metadata implementation.
-pub(crate) mod side_metadata;
 /// Utils for collecting statistics.
 pub(crate) mod statistics;
 /// Test utilities.

@@ -1,6 +1,8 @@
-use super::*;
+use super::SideMetadataSpec;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::Mmapper;
+#[cfg(target_pointer_width = "32")]
+use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
 use crate::util::Address;
 use crate::util::{
     constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE},
@@ -22,10 +24,12 @@ pub(crate) fn address_to_contiguous_meta_address(
 
     unsafe {
         if rshift >= 0 {
-            Address::from_usize(metadata_spec.offset + ((data_addr >> log_min_obj_size) >> rshift))
+            Address::from_usize(
+                metadata_spec.offset as usize + ((data_addr >> log_min_obj_size) >> rshift),
+            )
         } else {
             Address::from_usize(
-                metadata_spec.offset + ((data_addr >> log_min_obj_size) << (-rshift)),
+                metadata_spec.offset as usize + ((data_addr >> log_min_obj_size) << (-rshift)),
             )
         }
     }
@@ -43,7 +47,7 @@ pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
 /// Returns the size in bytes that get munmapped.
 #[cfg(test)]
-pub(super) fn ensure_munmap_contiguos_metadata_space(
+pub(crate) fn ensure_munmap_contiguos_metadata_space(
     start: Address,
     size: usize,
     spec: &SideMetadataSpec,
@@ -62,7 +66,7 @@ pub(super) fn ensure_munmap_contiguos_metadata_space(
 /// Tries to mmap the metadata space (`spec`) for the specified data address range (`start` and `size`).
 /// Setting `no_reserve` to true means the function will only map address range, without reserving swap-space/physical memory.
 /// Returns the size in bytes that gets mmapped in the function if success.
-pub(super) fn try_mmap_contiguous_metadata_space(
+pub(crate) fn try_mmap_contiguous_metadata_space(
     start: Address,
     size: usize,
     spec: &SideMetadataSpec,
@@ -96,7 +100,7 @@ pub(crate) fn address_to_meta_address(
 ) -> Address {
     #[cfg(target_pointer_width = "32")]
     let res = {
-        if metadata_spec.scope.is_global() {
+        if metadata_spec.is_global {
             address_to_contiguous_meta_address(metadata_spec, data_addr)
         } else {
             address_to_chunked_meta_address(metadata_spec, data_addr)
@@ -117,15 +121,15 @@ pub(crate) fn address_to_meta_address(
     res
 }
 
-pub(super) const fn addr_rshift(metadata_spec: &SideMetadataSpec) -> i32 {
-    ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_min_obj_size - metadata_spec.log_num_of_bits)
+pub(crate) const fn addr_rshift(metadata_spec: &SideMetadataSpec) -> i32 {
+    ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_min_obj_size - (metadata_spec.log_num_of_bits))
         as i32
 }
 
 #[allow(dead_code)]
 #[inline(always)]
-pub(crate) const fn metadata_address_range_size(metadata_spec: SideMetadataSpec) -> usize {
-    1usize << (LOG_ADDRESS_SPACE - addr_rshift(&metadata_spec) as usize)
+pub const fn metadata_address_range_size(metadata_spec: &SideMetadataSpec) -> usize {
+    1usize << (LOG_ADDRESS_SPACE - addr_rshift(metadata_spec) as usize)
 }
 
 #[inline(always)]

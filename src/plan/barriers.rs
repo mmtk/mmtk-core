@@ -1,9 +1,12 @@
 //! Read/Write barrier implementations.
 
+use atomic::Ordering;
+
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
-use crate::util::side_metadata::*;
+use crate::util::metadata::{compare_exchange_metadata, MetadataSpec};
 use crate::util::*;
+use crate::vm::VMBinding;
 use crate::MMTK;
 
 /// BarrierSelector describes which barrier to use.
@@ -34,12 +37,12 @@ impl Barrier for NoBarrier {
 pub struct ObjectRememberingBarrier<E: ProcessEdgesWork> {
     mmtk: &'static MMTK<E::VM>,
     modbuf: Vec<ObjectReference>,
-    meta: SideMetadataSpec,
+    meta: MetadataSpec,
 }
 
 impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     #[allow(unused)]
-    pub fn new(mmtk: &'static MMTK<E::VM>, meta: SideMetadataSpec) -> Self {
+    pub fn new(mmtk: &'static MMTK<E::VM>, meta: MetadataSpec) -> Self {
         Self {
             mmtk,
             modbuf: vec![],
@@ -48,8 +51,16 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     }
 
     #[inline(always)]
-    fn enqueue_node(&mut self, obj: ObjectReference) {
-        if compare_exchange_atomic(self.meta, obj.to_address(), 0b1, 0b0) {
+    fn enqueue_node<VM: VMBinding>(&mut self, obj: ObjectReference) {
+        if compare_exchange_metadata::<VM>(
+            self.meta,
+            obj,
+            0b1,
+            0b0,
+            None,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
             self.modbuf.push(obj);
             if self.modbuf.len() >= E::CAPACITY {
                 self.flush();
@@ -78,7 +89,7 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     fn post_write_barrier(&mut self, target: WriteTarget) {
         match target {
             WriteTarget::Object(obj) => {
-                self.enqueue_node(obj);
+                self.enqueue_node::<E::VM>(obj);
             }
             _ => unreachable!(),
         }
