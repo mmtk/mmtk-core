@@ -126,6 +126,9 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
         }
+        PlanSelector::PageProtect => {
+            crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
+        }
     })
 }
 
@@ -144,6 +147,9 @@ pub fn create_plan<VM: VMBinding>(
             Box::new(crate::plan::gencopy::GenCopy::new(vm_map, mmapper, options))
         }
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
+            vm_map, mmapper, options,
+        )),
+        PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
             vm_map, mmapper, options,
         )),
     }
@@ -733,6 +739,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 mmapper,
                 &mut heap,
                 constraints,
+                false,
             ),
             base: BasePlan::new(
                 vm_map,

@@ -4,7 +4,7 @@ use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
-use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_WORD};
+use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
@@ -25,10 +25,6 @@ const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
 const MARK_BIT: usize = 0b01;
 const NURSERY_BIT: usize = 0b10;
 const LOS_BIT_MASK: usize = 0b11;
-
-const USE_PRECEEDING_GC_HEADER: bool = true;
-const PRECEEDING_GC_HEADER_WORDS: usize = 1;
-const PRECEEDING_GC_HEADER_BYTES: usize = PRECEEDING_GC_HEADER_WORDS << LOG_BYTES_IN_WORD;
 
 /// This type implements a policy for large objects. Each instance corresponds
 /// to one Treadmill space.
@@ -73,12 +69,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             Some(Ordering::SeqCst),
         );
 
-        let cell = VM::VMObjectModel::object_start_ref(object)
-            - if USE_PRECEEDING_GC_HEADER {
-                PRECEEDING_GC_HEADER_BYTES
-            } else {
-                0
-            };
+        let cell = VM::VMObjectModel::object_start_ref(object);
         self.treadmill.add_to_treadmill(cell, alloc);
     }
 }
@@ -115,6 +106,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
         _constraints: &'static PlanConstraints,
+        protect_memory_on_release: bool,
     ) -> Self {
         let common = CommonSpace::new(
             SpaceOptions {
@@ -134,12 +126,14 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             mmapper,
             heap,
         );
+        let mut pr = if vmrequest.is_discontiguous() {
+            FreeListPageResource::new_discontiguous(0, vm_map)
+        } else {
+            FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
+        };
+        pr.protect_memory_on_release = protect_memory_on_release;
         LargeObjectSpace {
-            pr: if vmrequest.is_discontiguous() {
-                FreeListPageResource::new_discontiguous(0, vm_map)
-            } else {
-                FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
-            },
+            pr,
             common,
             mark_state: 0,
             in_nursery_gc: false,
@@ -175,13 +169,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects
             if self.test_and_mark(object, self.mark_state) {
-                let cell = VM::VMObjectModel::object_start_ref(object)
-                    - if USE_PRECEEDING_GC_HEADER {
-                        PRECEEDING_GC_HEADER_BYTES
-                    } else {
-                        0
-                    };
+                let cell = VM::VMObjectModel::object_start_ref(object);
                 self.treadmill.copy(cell, nursery_object);
+                self.clear_nursery(object);
                 trace.process_node(object);
             }
         }
@@ -205,16 +195,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
+    /// Allocate an object
     pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Address {
-        let start = self.acquire(tls, pages);
-        if start.is_zero() {
-            return start;
-        }
-        if USE_PRECEEDING_GC_HEADER {
-            start + PRECEEDING_GC_HEADER_BYTES
-        } else {
-            start
-        }
+        self.acquire(tls, pages)
     }
 
     fn test_and_mark(&self, object: ObjectReference, value: usize) -> bool {
@@ -259,14 +242,39 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             == value
     }
 
+    /// Check if a given object is in nursery
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
         load_metadata::<VM>(
             VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             None,
-            Some(Ordering::SeqCst),
+            Some(Ordering::Relaxed),
         ) & NURSERY_BIT
             == NURSERY_BIT
+    }
+
+    /// Move a given object out of nursery
+    fn clear_nursery(&self, object: ObjectReference) {
+        loop {
+            let old_val = load_metadata::<VM>(
+                VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                object,
+                None,
+                Some(Ordering::Relaxed),
+            );
+            let new_val = old_val & !NURSERY_BIT;
+            if compare_exchange_metadata::<VM>(
+                VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                object,
+                old_val,
+                new_val,
+                None,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                break;
+            }
+        }
     }
 }
 

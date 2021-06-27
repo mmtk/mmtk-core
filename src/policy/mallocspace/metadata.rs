@@ -29,7 +29,7 @@ lazy_static! {
 /// Thus, mark-bit is vm-dependant and is part of each VM's ObjectModel.
 ///
 #[cfg(target_pointer_width = "32")]
-pub(super) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
     offset: 0,
     log_num_of_bits: 0,
@@ -37,7 +37,7 @@ pub(super) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 };
 
 #[cfg(target_pointer_width = "64")]
-pub(super) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
     offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
     log_num_of_bits: 0,
