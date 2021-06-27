@@ -846,6 +846,13 @@
 <span id="843">843</span>
 <span id="844">844</span>
 <span id="845">845</span>
+<span id="846">846</span>
+<span id="847">847</span>
+<span id="848">848</span>
+<span id="849">849</span>
+<span id="850">850</span>
+<span id="851">851</span>
+<span id="852">852</span>
 </pre><pre class="rust">
 <span class="doccomment">//! The global part of a plan implementation.</span>
 
@@ -975,6 +982,9 @@
         <span class="ident">PlanSelector::MarkSweep</span> <span class="op">=</span><span class="op">&gt;</span> {
             <span class="kw">crate</span><span class="ident">::plan::marksweep::mutator::create_ms_mutator</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>)
         }
+        <span class="ident">PlanSelector::PageProtect</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="kw">crate</span><span class="ident">::plan::pageprotect::mutator::create_pp_mutator</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>)
+        }
     })
 }
 
@@ -993,6 +1003,9 @@
             <span class="ident">Box::new</span>(<span class="kw">crate</span><span class="ident">::plan::gencopy::GenCopy::new</span>(<span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>))
         }
         <span class="ident">PlanSelector::MarkSweep</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Box::new</span>(<span class="kw">crate</span><span class="ident">::plan::marksweep::MarkSweep::new</span>(
+            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
+        )),
+        <span class="ident">PlanSelector::PageProtect</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Box::new</span>(<span class="kw">crate</span><span class="ident">::plan::pageprotect::PageProtect::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
         )),
     }
@@ -1582,6 +1595,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
                 <span class="ident">mmapper</span>,
                 <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">heap</span>,
                 <span class="ident">constraints</span>,
+                <span class="bool-val">false</span>,
             ),
             <span class="ident">base</span>: <span class="ident">BasePlan::new</span>(
                 <span class="ident">vm_map</span>,

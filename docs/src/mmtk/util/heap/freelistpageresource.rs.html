@@ -353,6 +353,47 @@
 <span id="350">350</span>
 <span id="351">351</span>
 <span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident">std::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
@@ -370,6 +411,7 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::pageresource::CommonPageResource</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::space_descriptor::SpaceDescriptor</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::memory</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
@@ -399,6 +441,8 @@
     <span class="ident">meta_data_pages_per_region</span>: <span class="ident">usize</span>,
     <span class="ident">sync</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FreeListPageResourceSync</span><span class="op">&gt;</span>,
     <span class="ident">_p</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Protect memory on release, and unprotect on re-allocate.</span>
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">protect_memory_on_release</span>: <span class="ident">bool</span>,
 }
 
 <span class="kw">struct</span> <span class="ident">FreeListPageResourceSync</span> {
@@ -471,7 +515,9 @@
         <span class="kw">let</span> <span class="ident">rtn</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">page_offset</span> <span class="kw">as</span> <span class="kw">_</span>);
         <span class="comment">// The meta-data portion of reserved Pages was committed above.</span>
         <span class="self">self</span>.<span class="ident">commit_pages</span>(<span class="ident">reserved_pages</span>, <span class="ident">required_pages</span>, <span class="ident">tls</span>);
-
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">protect_memory_on_release</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">new_chunk</span> {
+            <span class="self">self</span>.<span class="ident">munprotect</span>(<span class="ident">rtn</span>, <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">size</span>(<span class="ident">page_offset</span> <span class="kw">as</span> <span class="kw">_</span>) <span class="kw">as</span> <span class="kw">_</span>)
+        };
         <span class="ident">Result::Ok</span>(<span class="ident">PRAllocResult</span> {
             <span class="ident">start</span>: <span class="ident">rtn</span>,
             <span class="ident">pages</span>: <span class="ident">required_pages</span>,
@@ -517,6 +563,7 @@
                 <span class="ident">highwater_mark</span>: <span class="ident">UNINITIALIZED_WATER_MARK</span>,
             }),
             <span class="ident">_p</span>: <span class="ident">PhantomData</span>,
+            <span class="ident">protect_memory_on_release</span>: <span class="bool-val">false</span>,
         };
         <span class="kw">if</span> <span class="op">!</span><span class="ident">flpr</span>.<span class="ident">common</span>.<span class="ident">growable</span> {
             <span class="comment">// For non-growable space, we just need to reserve metadata according to the requested size.</span>
@@ -552,6 +599,37 @@
                 <span class="ident">highwater_mark</span>: <span class="ident">UNINITIALIZED_WATER_MARK</span>,
             }),
             <span class="ident">_p</span>: <span class="ident">PhantomData</span>,
+            <span class="ident">protect_memory_on_release</span>: <span class="bool-val">false</span>,
+        }
+    }
+
+    <span class="doccomment">/// Protect the memory</span>
+    <span class="kw">fn</span> <span class="ident">mprotect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) {
+        <span class="comment">// We may fail here for ENOMEM, especially in PageProtect plan.</span>
+        <span class="comment">// See: https://man7.org/linux/man-pages/man2/mprotect.2.html#ERRORS</span>
+        <span class="comment">// &gt; Changing the protection of a memory region would result in</span>
+        <span class="comment">// &gt; the total number of mappings with distinct attributes</span>
+        <span class="comment">// &gt; (e.g., read versus read/write protection) exceeding the</span>
+        <span class="comment">// &gt; allowed maximum.</span>
+        <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">protect_memory_on_release</span>);
+        <span class="comment">// We are not using mmapper.protect(). mmapper.protect() protects the whole chunk and</span>
+        <span class="comment">// may protect memory that is still in use.</span>
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">memory::mprotect</span>(<span class="ident">start</span>, <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">pages</span>)) {
+            <span class="macro">panic!</span>(
+                <span class="string">&quot;Failed at protecting memory (starting at {}): {:?}&quot;</span>,
+                <span class="ident">start</span>, <span class="ident">e</span>
+            );
+        }
+    }
+
+    <span class="doccomment">/// Unprotect the memory</span>
+    <span class="kw">fn</span> <span class="ident">munprotect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) {
+        <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">protect_memory_on_release</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">memory::munprotect</span>(<span class="ident">start</span>, <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">pages</span>)) {
+            <span class="macro">panic!</span>(
+                <span class="string">&quot;Failed at unprotecting memory (starting at {}): {:?}&quot;</span>,
+                <span class="ident">start</span>, <span class="ident">e</span>
+            );
         }
     }
 
@@ -655,6 +733,10 @@
         <span class="comment">// if (VM.config.ZERO_PAGES_ON_RELEASE)</span>
         <span class="comment">//     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));</span>
         <span class="macro">debug_assert!</span>(<span class="ident">pages</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">accounting</span>.<span class="ident">get_committed_pages</span>());
+
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">protect_memory_on_release</span> {
+            <span class="self">self</span>.<span class="ident">mprotect</span>(<span class="ident">first</span>, <span class="ident">pages</span> <span class="kw">as</span> <span class="kw">_</span>);
+        }
 
         <span class="comment">// FIXME</span>
         <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::cast_ref_to_mut</span>)]</span>

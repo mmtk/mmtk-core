@@ -47,16 +47,48 @@
 <span id="44">44</span>
 <span id="45">45</span>
 <span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants</span>::{<span class="ident">BYTES_IN_CHUNK</span>, <span class="ident">LOG_BYTES_IN_CHUNK</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::Address</span>;
 
+<span class="comment">// This is currently not used in 32-bits targets, but ultimately it is required in 32-bits global side metadata. So, instead of guarding with target_pointer_width, I allow unused_imports for now.</span>
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_imports</span>)]</span>
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::metadata_address_range_size</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) };
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::metadata_bytes_per_chunk</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) };
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
     <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x0000_0600_0000_0000usize</span>) };
 
 <span class="doccomment">/// This constant represents the worst-case ratio of source data size to global side metadata.</span>
@@ -81,7 +113,7 @@
 <span class="comment">// pub(crate) const LOG_MAX_LOCAL_SIDE_METADATA_SIZE: usize =</span>
 <span class="comment">//     1 &lt;&lt; (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO);</span>
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="kw">unsafe</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="kw">unsafe</span> {
     <span class="ident">Address::from_usize</span>(
         <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>()
             <span class="op">+</span> (<span class="number">1usize</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MAX_GLOBAL_SIDE_METADATA_SIZE</span>),
@@ -94,6 +126,26 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const</span> <span class="ident">LOCAL_SIDE_METADATA_PER_CHUNK</span>: <span class="ident">usize</span> <span class="op">=</span>
     <span class="ident">BYTES_IN_CHUNK</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO</span>;
+
+<span class="doccomment">/// The base address for the global side metadata space available to VM bindings, to be used for the per-object metadata.</span>
+<span class="doccomment">/// VM bindings must use this to avoid overlap with core internal global side metadata.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>;
+
+<span class="doccomment">/// The base address for the local side metadata space available to VM bindings, to be used for the per-object metadata.</span>
+<span class="doccomment">/// VM bindings must use this to avoid overlap with core internal local side metadata.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOCAL_SIDE_METADATA_VM_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">add</span>(
+    <span class="ident">metadata_address_range_size</span>(<span class="kw-2">&amp;</span><span class="kw">crate</span><span class="ident">::policy::mallocspace::metadata::ALLOC_SIDE_METADATA_SPEC</span>),
+);
+
+<span class="doccomment">/// The base offset for the local side metadata space available to VM bindings, to be used for the per-object metadata.</span>
+<span class="doccomment">/// VM bindings must use this to avoid overlap with core internal local side metadata.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOCAL_SIDE_METADATA_VM_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
+    <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">add</span>(<span class="ident">metadata_bytes_per_chunk</span>(
+        <span class="kw">crate</span><span class="ident">::policy::mallocspace::metadata::ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">log_min_obj_size</span>,
+        <span class="kw">crate</span><span class="ident">::policy::mallocspace::metadata::ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">log_num_of_bits</span>,
+    ));
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-search-index-js="../../../../../search-index.js" data-search-js="../../../../../search.js"></div>
     <script src="../../../../../main.js"></script><script src="../../../../../source-script.js"></script><script src="../../../../../source-files.js"></script></body></html>

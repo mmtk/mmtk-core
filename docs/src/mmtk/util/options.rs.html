@@ -360,6 +360,7 @@
 <span id="357">357</span>
 <span id="358">358</span>
 <span id="359">359</span>
+<span id="360">360</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants::DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident">std::cell::UnsafeCell</span>;
@@ -383,7 +384,8 @@
         <span class="ident">NoGC</span>,
         <span class="ident">SemiSpace</span>,
         <span class="ident">GenCopy</span>,
-        <span class="ident">MarkSweep</span>
+        <span class="ident">MarkSweep</span>,
+        <span class="ident">PageProtect</span>,
     }
 }
 

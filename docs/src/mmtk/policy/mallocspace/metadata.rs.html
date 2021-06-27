@@ -157,7 +157,7 @@
 <span class="doccomment">/// Thus, mark-bit is vm-dependant and is part of each VM&#39;s ObjectModel.</span>
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const</span> <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
     <span class="ident">is_global</span>: <span class="bool-val">false</span>,
     <span class="ident">offset</span>: <span class="number">0</span>,
     <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
@@ -165,7 +165,7 @@
 };
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const</span> <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
     <span class="ident">is_global</span>: <span class="bool-val">false</span>,
     <span class="ident">offset</span>: <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>(),
     <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,

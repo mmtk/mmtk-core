@@ -145,6 +145,9 @@
 <span id="142">142</span>
 <span id="143">143</span>
 <span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::heap_parameters</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants</span>::<span class="kw-2">*</span>;
@@ -222,7 +225,10 @@
  * HEAP_START and AVAILABLE_START comprises memory directly managed by the VM,
  * and not available to MMTk.
  */</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AVAILABLE_START</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">HEAP_START</span>.<span class="ident">add</span>(<span class="ident">VM_SPACE_SIZE</span>);
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>))]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AVAILABLE_START</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">HEAP_START</span>;
 
 <span class="doccomment">/**
  * Highest virtual address available for MMTk to manage.  The address space between
