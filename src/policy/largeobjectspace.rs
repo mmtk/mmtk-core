@@ -249,7 +249,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             object,
             None,
             Some(Ordering::Relaxed),
-        ) == NURSERY_BIT
+        ) & NURSERY_BIT
+            == NURSERY_BIT
     }
 
     /// Move a given object out of nursery
