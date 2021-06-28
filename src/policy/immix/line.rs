@@ -108,7 +108,7 @@ unsafe impl Step for Line {
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
         debug_assert!(!super::BLOCK_ONLY);
-        if start < end { return None }
+        if start > end { return None }
         Some((end.start() - start.start()) >> Line::LOG_BYTES)
     }
     #[inline(always)]

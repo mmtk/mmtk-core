@@ -187,7 +187,7 @@ unsafe impl Step for Block {
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
         debug_assert!(!super::BLOCK_ONLY);
-        if start < end { return None }
+        if start > end { return None }
         Some((end.start() - start.start()) >> Self::LOG_BYTES)
     }
     #[inline(always)]
