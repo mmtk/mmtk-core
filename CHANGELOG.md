@@ -8,9 +8,9 @@ GC Plans
 
 API
 ---
-* Major changes to the ObjectModel trait: now a binding can specify each per-object
+* Major changes to the ObjectModel trait: now a binding must specify each per-object
   metadata used by mmtk-core, whether the metadata resides in header bits provided
-  by the runtime or side tables provided by mmtk-core. For in header metadata, a binding
+  by the VM or side tables provided by mmtk-core. For in-header metadata, a binding
   can further implement how it can be accessed, in case the bits are not always available
   to mmtk-core.
 
@@ -22,7 +22,7 @@ Misc
 * 'extreme_assertions' now also checks if values stored in side metadata are correct.
 * Fixed a bug that GenCopy may report OOM without doing a full heap GC.
 * Fixed a bug that existing mmapping of side metadata memory may get overwritten.
-* Fixed a bug that FreeListPageResource may incorrectly return new_chunk for the first allocation.
+* Fixed a bug that FreeListPageResource may return an incorrect new_chunk flag for the first allocation.
 
 0.4.1 (2021-05-20)
 ===
