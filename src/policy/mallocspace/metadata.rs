@@ -136,9 +136,10 @@ fn map_chunk_mark_space(chunk_start: Address) {
 }
 
 pub fn map_chunk_meta_space(metadata: &SideMetadata, chunk_start: Address) {
-    if FIRST_CHUNK.load(Ordering::Acquire) {
+    // XXX: is there a race condition here?
+    if FIRST_CHUNK.load(Ordering::SeqCst) {
         map_chunk_mark_space(chunk_start);
-        FIRST_CHUNK.store(false, Ordering::Release);
+        FIRST_CHUNK.store(false, Ordering::SeqCst);
     }
 
     if is_chunk_marked(chunk_start) {
@@ -188,11 +189,6 @@ pub fn is_alloced_object(address: Address) -> bool {
 }
 
 
-#[inline]
-pub unsafe fn is_object_dead_unsafe(address: Address) -> bool {
-    (load(ALLOC_METADATA_SPEC, address) ^ load(MARKING_METADATA_SPEC, address)) == 1
-}
-
 #[allow(unused)]
 pub unsafe fn is_alloced_object_unsafe(address: Address) -> bool {
     load(ALLOC_METADATA_SPEC, address) == 1
@@ -220,8 +216,8 @@ pub fn is_marked(object: ObjectReference) -> bool {
 }
 
 #[allow(unused)]
-pub unsafe fn is_marked_unsafe(address: Address) -> bool {
-    load(MARKING_METADATA_SPEC, address) == 1
+pub unsafe fn is_marked_unsafe(object: ObjectReference) -> bool {
+    load(MARKING_METADATA_SPEC, object.to_address()) == 1
 }
 
 #[allow(unused)]

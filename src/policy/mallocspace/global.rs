@@ -10,7 +10,7 @@ use crate::util::malloc::*;
 use crate::util::opaque_pointer::*;
 use crate::util::side_metadata::SideMetadataSanity;
 use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
-use crate::util::side_metadata::{bzero_metadata, load128};
+use crate::util::side_metadata::{address_to_meta_address, bzero_metadata, load128};
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
@@ -241,7 +241,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
             return object;
         }
         let address = object.to_address();
-        // let page_addr = conversions::page_align_down(address);
         let chunk_start = conversions::chunk_align_down(address);
         assert!(
             self.in_space(object),
@@ -249,9 +248,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
             address,
         );
 
-        if unsafe { !is_marked_unsafe(address) } {
+        if unsafe { !is_marked_unsafe(object) } {
             set_mark_bit(object);
-            // set_page_mark_bit(page_addr);
             set_chunk_mark_bit(chunk_start);
             trace.process_node(object);
         }
@@ -276,7 +274,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 chunk_usize,
                 Ordering::AcqRel,
                 Ordering::Relaxed
-                ) {
+            ) {
                 Ok(_) => break,
                 Err(x) => min = x,
             }
@@ -288,7 +286,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 chunk_usize,
                 Ordering::AcqRel,
                 Ordering::Relaxed
-                ) {
+            ) {
                 Ok(_) => break,
                 Err(x) => max = x,
             }
@@ -310,7 +308,18 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let mut page = conversions::page_align_down(address); // XXX: page-bit diff
         let mut page_is_empty = true; // XXX: page-bit diff
         let mut on_page_boundary = false;
+        #[cfg(target_pointer_width = "32")]
+        let align: usize = 128 * 4;
+        #[cfg(target_pointer_width = "64")]
         let align: usize = 128 * 8;
+
+        trace!(
+            "chunk_start = {}, chunk_end = {}, meta_address_start = {}, meta_address_end = {}",
+            chunk_start,
+            chunk_end,
+            address_to_meta_address(ALLOC_METADATA_SPEC, chunk_start),
+            address_to_meta_address(ALLOC_METADATA_SPEC, chunk_end - 1_usize)
+        );
 
         while address < chunk_end {
             if address - page >= BYTES_IN_PAGE { // XXX: page-bit diff
@@ -325,19 +334,30 @@ impl<VM: VMBinding> MallocSpace<VM> {
             let alloc_128: u128 = load128(ALLOC_METADATA_SPEC, address);
             let mark_128: u128 = load128(MARKING_METADATA_SPEC, address);
 
+            trace!(
+                "address = {}, address + align = {}, meta_address = {}, meta_address_end = {}\nalloc_128 = {:#0130b}\nmark_bit  = {:#0130b}",
+                address,
+                address + align,
+                address_to_meta_address(ALLOC_METADATA_SPEC, address),
+                address_to_meta_address(ALLOC_METADATA_SPEC, address + align),
+                alloc_128,
+                mark_128
+            );
+
             if alloc_128 ^ mark_128 != 0 {
                 let end = address + align;
                 while address < end {
+                    trace!("Checking address = {}, end = {}", address, end);
                     // Check if the address is an object
                     if is_alloced_object_unsafe(address) {
                         let object = address.to_object_reference();
                         let obj_start = VM::VMObjectModel::object_start_ref(object);
                         let bytes = malloc_usable_size(obj_start.to_mut_ptr());
 
-                        if !is_marked_unsafe(address) {
+                        if !is_marked_unsafe(object) {
                             // Dead object
                             trace!(
-                                "Object {} has alloc bit but no mark bit, it is dead",
+                                "Object {} has been allocated but not marked",
                                 object
                             );
 
@@ -356,22 +376,39 @@ impl<VM: VMBinding> MallocSpace<VM> {
                             }
                         }
 
+                        trace!(
+                            "address = {}, address + bytes = {}, meta_address = {}",
+                            address,
+                            address + bytes,
+                            address_to_meta_address(ALLOC_METADATA_SPEC, address)
+                        );
+
                         address += bytes;
-                    } else {
+                    } else {    // not an object
                         address += VM::MIN_ALIGNMENT;
+
+                        trace!(
+                            "address = {}, meta_address = {}",
+                            address,
+                            address_to_meta_address(ALLOC_METADATA_SPEC, address)
+                        );
                     }
                 }
-
-                address.align_down(align);
             } else {
-                chunk_is_empty = false;
-                page_is_empty = false;
+                if alloc_128 != 0 {
+                    chunk_is_empty = false;
+                    page_is_empty = false;
+                }
+
                 address += align;
             }
+
+            address = address.align_down(align);
         }
 
         #[cfg(debug_assertions)]
         {
+            // let mut err = false;
             let mut address = chunk_start;
             while address < chunk_end {
                 // Check if the address is an object
@@ -396,9 +433,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     }
 
                     assert!(
-                        is_marked_unsafe(address),
+                        is_marked_unsafe(object),
                         "Dead object = {} found after sweep",
-                        address
+                        object
                     );
 
                     // Accumulate live bytes
