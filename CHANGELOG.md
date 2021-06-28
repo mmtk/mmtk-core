@@ -18,7 +18,7 @@ Misc
 ---
 * Refactored metadata to provide unified access to per-object metadata (in-header or side).
 * Refactored work packet statistics to allow other types of stats other than execution times.
-* Added 'perf_counter' which allows collecting data from hardware performance counters for work packets.
+* Added the feature 'perf_counter' and the option 'perf_events' to collect data from hardware performance counters for work packets.
 * 'extreme_assertions' now also checks if values stored in side metadata are correct.
 * Fixed a bug that GenCopy may report OOM without doing a full heap GC.
 * Fixed a bug that existing mmapping of side metadata memory may get overwritten.
