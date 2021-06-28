@@ -16,4 +16,5 @@ if [[ $arch == "x86_64" && $os == "linux" ]]; then
     cargo build --target i686-unknown-linux-gnu
     for_all_features "cargo build --target i686-unknown-linux-gnu"
     for_all_features "cargo build --release --target i686-unknown-linux-gnu"
+    cargo build --features perf_counter
 fi

@@ -74,7 +74,10 @@ pub const VM_SPACE_SIZE: usize =
  * HEAP_START and AVAILABLE_START comprises memory directly managed by the VM,
  * and not available to MMTk.
  */
+#[cfg(feature = "vm_space")]
 pub const AVAILABLE_START: Address = HEAP_START.add(VM_SPACE_SIZE);
+#[cfg(not(feature = "vm_space"))]
+pub const AVAILABLE_START: Address = HEAP_START;
 
 /**
  * Highest virtual address available for MMTk to manage.  The address space between

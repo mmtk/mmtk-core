@@ -2,6 +2,7 @@ use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use std::cell::UnsafeCell;
 use std::default::Default;
 use std::ops::Deref;
+use std::str::FromStr;
 
 custom_derive! {
     #[derive(Copy, Clone, EnumFromStr, Debug)]
@@ -19,7 +20,52 @@ custom_derive! {
         NoGC,
         SemiSpace,
         GenCopy,
-        MarkSweep
+        MarkSweep,
+        PageProtect,
+    }
+}
+
+/// MMTk option for perf events
+///
+/// The format is
+/// ```
+/// <event> ::= <event-name> "," <pid> "," <cpu>
+/// <events> ::= <event> ";" <events> | <event> | ""
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PerfEventOptions {
+    pub events: Vec<(String, i32, i32)>,
+}
+
+impl PerfEventOptions {
+    fn parse_perf_events(events: &str) -> Result<Vec<(String, i32, i32)>, String> {
+        events
+            .split(';')
+            .filter(|e| !e.is_empty())
+            .map(|e| {
+                let e: Vec<&str> = e.split(',').into_iter().collect();
+                if e.len() != 3 {
+                    Err("Please supply (event name, pid, cpu)".into())
+                } else {
+                    let event_name = e[0].into();
+                    let pid = e[1]
+                        .parse()
+                        .map_err(|_| String::from("Failed to parse cpu"))?;
+                    let cpu = e[2]
+                        .parse()
+                        .map_err(|_| String::from("Failed to parse cpu"))?;
+                    Ok((event_name, pid, cpu))
+                }
+            })
+            .collect()
+    }
+}
+
+impl FromStr for PerfEventOptions {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        PerfEventOptions::parse_perf_events(s).map(|events| PerfEventOptions { events })
     }
 }
 
@@ -49,6 +95,7 @@ impl Deref for UnsafeOptionsWrapper {
 fn always_valid<T>(_: &T) -> bool {
     true
 }
+
 macro_rules! options {
     ($($name:ident: $type:ty[$validator:expr] = $default:expr),*,) => [
         options!($($name: $type[$validator] = $default),*);
@@ -139,9 +186,10 @@ options! {
     // FIXME: This value is set for JikesRVM. We need a proper way to set options.
     //   We need to set these values programmatically in VM specific code.
     vm_space_size:         usize                [|v: &usize| *v > 0]    = 0x7cc_cccc,
-    // An example string option. Can be deleted when we have other string options.
-    // Make sure to include the string option tests in the unit tests.
-    example_string_option: String                [|v: &str| v.starts_with("hello") ] = "hello world".to_string(),
+    // Perf events to measure
+    // Semicolons are used to separate events
+    // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean)
+    perf_events:           PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]}
 }
 
 impl Options {
@@ -175,6 +223,7 @@ impl Options {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::util::constants::DEFAULT_STRESS_FACTOR;
     use crate::util::options::Options;
     use crate::util::test_util::{serial_test, with_cleanup};
@@ -264,7 +313,7 @@ mod tests {
     fn test_str_option_default() {
         serial_test(|| {
             let options = Options::default();
-            assert_eq!(&options.example_string_option as &str, "hello world");
+            assert_eq!(&options.perf_events, &PerfEventOptions { events: vec![] });
         })
     }
 
@@ -273,13 +322,18 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var("MMTK_EXAMPLE_STRING_OPTION", "hello string");
+                    std::env::set_var("MMTK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
 
                     let options = Options::default();
-                    assert_eq!(&options.example_string_option as &str, "hello string");
+                    assert_eq!(
+                        &options.perf_events,
+                        &PerfEventOptions {
+                            events: vec![("PERF_COUNT_HW_CPU_CYCLES".into(), 0, -1)]
+                        }
+                    );
                 },
                 || {
-                    std::env::remove_var("MMTK_EXAMPLE_STRING_OPTION");
+                    std::env::remove_var("MMTK_PERF_EVENTS");
                 },
             )
         })
@@ -291,14 +345,14 @@ mod tests {
             with_cleanup(
                 || {
                     // The option needs to start with "hello", otherwise it is invalid.
-                    std::env::set_var("MMTK_EXAMPLE_STRING_OPTION", "abc");
+                    std::env::set_var("MMTK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES");
 
                     let options = Options::default();
                     // invalid value from env var, use default.
-                    assert_eq!(&options.example_string_option as &str, "hello world");
+                    assert_eq!(&options.perf_events, &PerfEventOptions { events: vec![] });
                 },
                 || {
-                    std::env::remove_var("MMTK_EXAMPLE_STRING_OPTION");
+                    std::env::remove_var("MMTK_PERF_EVENTS");
                 },
             )
         })
