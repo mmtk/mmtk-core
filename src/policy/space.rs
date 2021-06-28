@@ -1,5 +1,5 @@
 use crate::util::conversions::*;
-use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSanity};
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -437,17 +437,15 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Ensure that the current space's metadata context does not have any issues.
     /// Panics with a suitable message if any issue is detected.
     /// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.
-    /// Internally this calls verify_metadata_context() from `util::side_metadata::sanity`
+    /// Internally this calls verify_metadata_context() from `util::metadata::sanity`
     ///
     /// This function is called once per space by its parent plan but may be called multiple times per policy.
     ///
     /// Arguments:
     /// * `side_metadata_sanity_checker`: The `SideMetadataSanity` object instantiated in the calling plan.
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
-        side_metadata_sanity_checker.verify_metadata_context(
-            std::any::type_name::<Self>(),
-            self.common().metadata.get_context(),
-        )
+        side_metadata_sanity_checker
+            .verify_metadata_context(std::any::type_name::<Self>(), &self.common().metadata)
     }
 }
 
@@ -470,7 +468,7 @@ pub struct CommonSpace<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
 
-    pub metadata: SideMetadata,
+    pub metadata: SideMetadataContext,
 
     p: PhantomData<VM>,
 }
@@ -507,7 +505,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             head_discontiguous_region: unsafe { Address::zero() },
             vm_map,
             mmapper,
-            metadata: SideMetadata::new(opt.side_metadata_specs),
+            metadata: opt.side_metadata_specs,
             p: PhantomData,
         };
 

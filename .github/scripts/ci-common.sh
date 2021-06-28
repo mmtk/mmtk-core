@@ -40,7 +40,7 @@ init_non_exclusive_features() {
 
     while IFS= read -r line; do
         # Only parse non mutally exclusive features
-        if [[ $line == *"-- Non mutally exclusive features --"* ]]; then
+        if [[ $line == *"-- Non mutually exclusive features --"* ]]; then
             parse_features=true
             continue
         fi

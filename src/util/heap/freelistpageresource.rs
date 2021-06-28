@@ -208,19 +208,32 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
 
     /// Protect the memory
     fn mprotect(&self, start: Address, pages: usize) {
-        // No `unwrap()` here since this may cause ENOMEM error and fail to protect the memory.
+        // We may fail here for ENOMEM, especially in PageProtect plan.
         // See: https://man7.org/linux/man-pages/man2/mprotect.2.html#ERRORS
         // > Changing the protection of a memory region would result in
         // > the total number of mappings with distinct attributes
         // > (e.g., read versus read/write protection) exceeding the
         // > allowed maximum.
-        let _ = memory::mprotect(start, pages << LOG_BYTES_IN_PAGE);
+        assert!(self.protect_memory_on_release);
+        // We are not using mmapper.protect(). mmapper.protect() protects the whole chunk and
+        // may protect memory that is still in use.
+        if let Err(e) = memory::mprotect(start, conversions::pages_to_bytes(pages)) {
+            panic!(
+                "Failed at protecting memory (starting at {}): {:?}",
+                start, e
+            );
+        }
     }
 
     /// Unprotect the memory
     fn munprotect(&self, start: Address, pages: usize) {
-        // No `unwrap()` here. See explanation in `mprotect`.
-        let _ = memory::munprotect(start, pages << LOG_BYTES_IN_PAGE);
+        assert!(self.protect_memory_on_release);
+        if let Err(e) = memory::munprotect(start, conversions::pages_to_bytes(pages)) {
+            panic!(
+                "Failed at unprotecting memory (starting at {}): {:?}",
+                start, e
+            );
+        }
     }
 
     fn allocate_contiguous_chunks(
