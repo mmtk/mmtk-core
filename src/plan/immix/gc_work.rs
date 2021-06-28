@@ -6,7 +6,7 @@ use crate::policy::immix::ScanObjectsAndMarkLines;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::{WorkerLocal, WorkBucketStage};
 use crate::util::alloc::{Allocator, ImmixAllocator};
-use crate::util::forwarding_word;
+use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::MMTK;
@@ -50,7 +50,7 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
         _bytes: usize,
         _semantics: crate::AllocationSemantics,
     ) {
-        forwarding_word::clear_forwarding_bits::<VM>(obj);
+        object_forwarding::clear_forwarding_bits::<VM>(obj);
     }
 }
 

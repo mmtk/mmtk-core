@@ -3,7 +3,6 @@ use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
 use crate::util::conversions::bytes_to_chunks_up;
 use crate::util::heap::PageResource;
-use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 
 use crate::util::ObjectReference;
 
@@ -12,6 +11,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{
     AVAILABLE_BYTES, AVAILABLE_END, AVAILABLE_START,
 };
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::vm::*;
@@ -36,7 +36,7 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     limit: Address,
     /// Zero memory after slow-path allocation
     slow_path_zeroing: bool,
-    metadata: SideMetadata,
+    metadata: SideMetadataContext,
     phantom: PhantomData<VM>,
 }
 
@@ -141,10 +141,10 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
             limit: AVAILABLE_END,
             slow_path_zeroing,
-            metadata: SideMetadata::new(SideMetadataContext {
+            metadata: SideMetadataContext {
                 global: global_side_metadata_specs,
                 local: vec![],
-            }),
+            },
             phantom: PhantomData,
         }
     }

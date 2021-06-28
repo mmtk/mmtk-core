@@ -14,8 +14,6 @@ pub struct PlanConstraints {
     pub num_specialized_scans: usize,
     pub max_non_los_copy_bytes: usize,
     pub max_non_los_default_alloc_bytes: usize,
-    pub needs_log_bit_in_header: bool,
-    pub needs_log_bit_in_header_num: usize,
     pub barrier: BarrierSelector,
     // the following seems unused for now
     pub needs_linear_scan: bool,
@@ -33,8 +31,6 @@ impl PlanConstraints {
             num_specialized_scans: 0,
             max_non_los_copy_bytes: MAX_INT,
             max_non_los_default_alloc_bytes: MAX_INT,
-            needs_log_bit_in_header: false,
-            needs_log_bit_in_header_num: 0,
             needs_linear_scan: SUPPORT_CARD_SCANNING || LAZY_SWEEP,
             needs_concurrent_workers: false,
             generate_gc_trace: false,

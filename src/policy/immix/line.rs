@@ -1,6 +1,6 @@
 use std::{iter::Step};
 use crate::{util::{Address, ObjectReference}, vm::*};
-use crate::util::side_metadata::{self, *};
+use crate::util::metadata::side_metadata::{self, *};
 use super::block::Block;
 
 
@@ -17,7 +17,7 @@ impl Line {
     pub const MAX_MARK_STATE: u8 = 127;
 
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        scope: SideMetadataScope::PolicySpecific,
+        is_global: false,
         offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,

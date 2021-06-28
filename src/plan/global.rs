@@ -19,10 +19,10 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::metadata::side_metadata::SideMetadataSanity;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
-use crate::util::side_metadata::SideMetadataSanity;
-use crate::util::side_metadata::SideMetadataSpec;
 use crate::util::statistics::stats::Stats;
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
@@ -127,6 +127,9 @@ pub fn create_mutator<VM: VMBinding>(
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
         },
         PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, &*mmtk.plan),
+        PlanSelector::PageProtect => {
+            crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
+        }
     })
 }
 
@@ -150,6 +153,9 @@ pub fn create_plan<VM: VMBinding>(
         )),
         PlanSelector::Immix => Box::new(crate::plan::immix::Immix::new(
             vm_map, mmapper, options, scheduler,
+        )),
+        PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
+            vm_map, mmapper, options,
         )),
     }
 }
@@ -740,6 +746,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 mmapper,
                 &mut heap,
                 constraints,
+                false,
             ),
             base: BasePlan::new(
                 vm_map,

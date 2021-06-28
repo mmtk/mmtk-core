@@ -1,5 +1,5 @@
 use crate::util::{Address, ObjectReference};
-use crate::util::side_metadata::{self, *};
+use crate::util::metadata::side_metadata::{self, *};
 use crate::util::constants::*;
 use std::{iter::Step, ops::Range, sync::{Mutex, MutexGuard, atomic::{AtomicPtr, AtomicU8, AtomicUsize, Ordering}}};
 use super::line::Line;
@@ -40,14 +40,14 @@ impl Block {
     pub const LINES: usize = 1 << Self::LOG_LINES;
 
     pub const DEFRAG_STATE_TABLE: SideMetadataSpec = SideMetadataSpec {
-        scope: SideMetadataScope::PolicySpecific,
+        is_global: false,
         offset: if super::BLOCK_ONLY { LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize() } else { Line::MARK_TABLE.accumulated_size() },
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,
     };
 
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        scope: SideMetadataScope::PolicySpecific,
+        is_global: false,
         offset: Self::DEFRAG_STATE_TABLE.accumulated_size(),
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,

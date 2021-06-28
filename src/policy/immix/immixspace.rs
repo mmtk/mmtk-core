@@ -1,15 +1,16 @@
 use atomic::Ordering;
-use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorker, WorkBucketStage, gc_work::ProcessEdgesWork}, util::{constants::{LOG_BYTES_IN_WORD}, gc_byte, heap::FreeListPageResource, opaque_pointer::{VMThread, VMWorkerThread}}};
+use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorker, WorkBucketStage, gc_work::ProcessEdgesWork}, util::{constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource, opaque_pointer::{VMThread, VMWorkerThread}}};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
-use crate::util::forwarding_word as ForwardingWord;
+use crate::util::object_forwarding as ForwardingWord;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::PageResource;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use crate::util::side_metadata::{self, *};
+use crate::util::metadata::*;
+use crate::util::metadata::side_metadata::{self, *};
 use std::{cell::UnsafeCell, iter::Step, mem, ops::Range, sync::atomic::{AtomicBool, AtomicU8}};
 use super::{block::*, chunk::{Chunk, ChunkMap, ChunkState}, defrag::Defrag};
 use super::line::*;
@@ -317,7 +318,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     const HEADER_MARK_BITS: bool = cfg!(feature = "immix_header_mark_bits");
 
     const OBJECT_MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        scope: SideMetadataScope::PolicySpecific,
+        is_global: false,
         offset: Block::MARK_TABLE.accumulated_size(),
         log_num_of_bits: 0,
         log_min_obj_size: LOG_BYTES_IN_WORD as usize,
@@ -326,21 +327,23 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     fn attempt_mark(&self, object: ObjectReference) -> bool {
         if Self::HEADER_MARK_BITS {
-            if !self.is_marked(object) {
-                gc_byte::write_gc_byte::<VM>(object, self.mark_state.load(Ordering::Relaxed));
-                true
-            } else {
-                false
-            }
+            unreachable!()
+            // if !self.is_marked(object) {
+            //     gc_byte::write_gc_byte::<VM>(object, self.mark_state.load(Ordering::Relaxed));
+            //     true
+            // } else {
+            //     false
+            // }
         } else {
-            side_metadata::compare_exchange_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object), 0, 1)
+            side_metadata::compare_exchange_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object), 0, 1, Ordering::SeqCst, Ordering::SeqCst)
         }
     }
 
     #[inline(always)]
     fn is_marked(&self, object: ObjectReference) -> bool {
         if Self::HEADER_MARK_BITS {
-            gc_byte::read_gc_byte::<VM>(object) & Self::MARK_MASK == self.mark_state.load(Ordering::Relaxed)
+            // gc_byte::read_gc_byte::<VM>(object) & Self::MARK_MASK == self.mark_state.load(Ordering::Relaxed)
+            unreachable!()
         } else {
             unsafe { side_metadata::load(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object)) == 1 }
         }
