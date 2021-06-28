@@ -109,7 +109,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
                     let regions = 1 + ((page_offset - sync.highwater_mark) >> LOG_PAGES_IN_REGION);
                     let metapages = regions as usize * self.meta_data_pages_per_region;
                     self.common.accounting.reserve_and_commit(metapages);
-                    // new_chunk = true;
+                    new_chunk = true;
                 }
                 sync.highwater_mark = page_offset;
             }

@@ -101,7 +101,7 @@ if system == "Linux":
 
 for plan in PLANS:
     exec_and_redirect(["./test_mmtk"], env={LIBRARY_PATH: ".", "MMTK_PLAN": plan})
-    if system == "Linux" and plan != 'PageProtect': # FIXME: PageProtect for 32bit MMTk does not work yet.
+    if system == "Linux":
         exec_and_redirect(["./test_mmtk_32"], env={LIBRARY_PATH: ".", "MMTK_PLAN": plan})
 
 os.remove("./test_mmtk")
