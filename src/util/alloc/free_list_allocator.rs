@@ -7,6 +7,11 @@ use super::Allocator;
 const BYTES_IN_BLOCK: usize = 1 << LOG_BYTES_IN_BLOCK;
 const LOG_BYTES_IN_BLOCK: usize = 16;
 const MI_BIN_HUGE: u8 = 73;
+const MI_INTPTR_SHIFT: usize = 3;
+const MI_INTPTR_SIZE: usize = 1 << MI_INTPTR_SHIFT;
+const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
+const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX/MI_INTPTR_SIZE;
+const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE*8;
 
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
@@ -41,6 +46,12 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        // let mut s = 0;
+        // loop {
+        //     eprintln!("size = {}, bin = {}", s, FreeListAllocator::<VM>::_mi_bin(s));
+        //     s += 1;
+        //     if s > MI_LARGE_OBJ_SIZE_MAX {panic!()}
+        // }
         let block_data_address = self.blocks_direct[size - 1];
         if unsafe { block_data_address == Address::zero() } {
             // no block for this size, go to slow path
@@ -151,19 +162,29 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
 
-    fn get_bin(size: usize) -> u8 {
-        let mut wsize: usize = (size + 7) / 8;
+    fn _mi_wsize_from_size(size: usize) -> usize {
+        // Align a byte size to a size in machine words
+        // i.e. byte size == `wsize*sizeof(void*)`
+        // adapted from _mi_wsize_from_size in mimalloc
+        (size + size_of::<u32>() - 1) / size_of::<u32>()
+    }
+
+    fn _mi_bin(size: usize) -> u8 {
+        // adapted from _mi_bin in mimalloc
+        let mut wsize: usize = FreeListAllocator::<VM>::_mi_wsize_from_size(size);
         let bin: u8;
         if wsize <= 1 {
-          bin = 1;
+            bin = 1;
         } else if wsize <= 8 {
             bin = wsize as u8;
-        } else if wsize > 2 << 21 / (1 << 3) {
-          bin = MI_BIN_HUGE;
+            // bin = ((wsize + 1) & !1) as u8; // round to double word sizes
+        } else if wsize > MI_LARGE_OBJ_WSIZE_MAX {
+            // bin = MI_BIN_HUGE;
+            panic!(); // this should not be reached, because I'm sending objects bigger than this to the immortal space
         } else {
-          wsize -= 1;
-          let b: u8 = (1 << 3) * 8 - 1 - u64::leading_zeros(wsize as u64) as u8;  // note: wsize != 0
-          bin = ((b << 2) + ((wsize >> (b - 2)) & 0x03) as u8) - 3;
+            wsize -= 1;
+            let b: u8 = MI_INTPTR_BITS as u8 - 1 - u64::leading_zeros(wsize as u64) as u8;  // note: wsize != 0
+            bin = ((b << 2) + ((wsize >> (b - 2)) & 0x03) as u8) - 3;
         }
         bin
       }
