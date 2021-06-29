@@ -24,7 +24,7 @@ use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::util::side_metadata::SideMetadataContext;
-use crate::util::VMWorkerThread;
+use crate::util::{ObjectReference, VMWorkerThread};
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
 use enum_map::EnumMap;
@@ -170,6 +170,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn in_nursery(&self) -> bool {
         self.in_nursery.load(Ordering::SeqCst)
+    }
+
+    fn in_default_space(&self, object: ObjectReference) -> bool {
+        unreachable!()
     }
 }
 

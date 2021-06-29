@@ -17,7 +17,7 @@ pub fn page_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMW
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default | AllocationType::Los => AllocatorSelector::LargeObject(0),
-        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(0),
+        AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(0),
     };
 }
 

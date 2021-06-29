@@ -1,5 +1,5 @@
 use super::gc_work::PageProcessEdges;
-use crate::{plan::global::{CommonPlan, NoCopy}, policy::largeobjectspace::LargeObjectSpace, util::opaque_pointer::VMWorkerThread};
+use crate::{plan::global::{CommonPlan, NoCopy}, policy::largeobjectspace::LargeObjectSpace, util::{ObjectReference, opaque_pointer::VMWorkerThread}};
 use crate::plan::global::GcStatus;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -129,6 +129,10 @@ impl<VM: VMBinding> Plan for Page<VM> {
 
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
+    }
+
+    fn in_default_space(&self, object: ObjectReference) -> bool {
+        self.space.in_space(object)
     }
 }
 
