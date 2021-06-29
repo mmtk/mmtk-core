@@ -1,13 +1,14 @@
-use super::gc_work::PageProcessEdges;
-use crate::{plan::global::{CommonPlan, NoCopy}, policy::largeobjectspace::LargeObjectSpace, util::{ObjectReference, opaque_pointer::VMWorkerThread}};
-use crate::plan::global::GcStatus;
+use super::gc_work::PPProcessEdges;
 use super::mutator::ALLOCATOR_MAPPING;
+use crate::mmtk::MMTK;
+use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
+use crate::util::ObjectReference;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::GcHookWork;
@@ -16,32 +17,30 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::OpaquePointer;
-use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
 use crate::{plan::global::BasePlan, vm::VMBinding};
-use std::sync::Arc;
+use crate::{
+    plan::global::{CommonPlan, NoCopy},
+    policy::largeobjectspace::LargeObjectSpace,
+    util::opaque_pointer::VMWorkerThread,
+};
 use enum_map::EnumMap;
-use crate::util::side_metadata::SideMetadataContext;
+use std::sync::Arc;
 
-
-
-pub struct Page<VM: VMBinding> {
+pub struct PageProtect<VM: VMBinding> {
     pub space: LargeObjectSpace<VM>,
     pub common: CommonPlan<VM>,
 }
 
 pub const CONSTRAINTS: PlanConstraints = PlanConstraints {
-    moves_objects: true,
-    gc_header_bits: 2,
-    gc_header_words: 0,
-    num_specialized_scans: 1,
+    moves_objects: false,
     ..PlanConstraints::default()
 };
 
-impl<VM: VMBinding> Plan for Page<VM> {
+impl<VM: VMBinding> Plan for PageProtect<VM> {
     type VM = VM;
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -64,6 +63,17 @@ impl<VM: VMBinding> Plan for Page<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
+        // Warn users that the plan may fail due to maximum mapping allowed.
+        warn!(
+            "PageProtect uses a high volume of memory mappings. \
+            If you encounter failures in memory protect/unprotect in this plan,\
+            consider increase the maximum mapping allowed by the OS{}.",
+            if cfg!(target_os = "linux") {
+                " (e.g. sudo sysctl -w vm.max_map_count=655300)"
+            } else {
+                ""
+            }
+        );
         self.common.gc_init(heap_size, vm_map, scheduler);
         self.space.init(&vm_map);
     }
@@ -72,10 +82,10 @@ impl<VM: VMBinding> Plan for Page<VM> {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()
-            .schedule_common::<PageProcessEdges<VM>>(&CONSTRAINTS, scheduler);
+            .schedule_common::<PPProcessEdges<VM>>(&CONSTRAINTS, scheduler);
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<PageProcessEdges<VM>>::new());
+            .add(StopMutators::<PPProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, NoCopy<VM>>::new(self));
@@ -83,7 +93,7 @@ impl<VM: VMBinding> Plan for Page<VM> {
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, NoCopy<VM>>::new(self));
         scheduler.work_buckets[WorkBucketStage::RefClosure]
-            .add(ProcessWeakRefs::<PageProcessEdges<VM>>::new());
+            .add(ProcessWeakRefs::<PPProcessEdges<VM>>::new());
         // Scheduling all the gc hooks of analysis routines. It is generally recommended
         // to take advantage of the scheduling system we have in place for more performance
         #[cfg(feature = "analysis")]
@@ -101,14 +111,12 @@ impl<VM: VMBinding> Plan for Page<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        let space = unsafe { &mut *(&self.space as *const LargeObjectSpace<VM> as *mut LargeObjectSpace<VM>) };
-        space.prepare(true);
+        self.space.prepare(true);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
-        let space = unsafe { &mut *(&self.space as *const LargeObjectSpace<VM> as *mut LargeObjectSpace<VM>) };
-        space.release(true);
+        self.space.release(true);
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
@@ -136,7 +144,7 @@ impl<VM: VMBinding> Plan for Page<VM> {
     }
 }
 
-impl<VM: VMBinding> Page<VM> {
+impl<VM: VMBinding> PageProtect<VM> {
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
@@ -145,7 +153,7 @@ impl<VM: VMBinding> Page<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
-        Page {
+        PageProtect {
             space: LargeObjectSpace::new(
                 "los",
                 true,
@@ -155,8 +163,16 @@ impl<VM: VMBinding> Page<VM> {
                 mmapper,
                 &mut heap,
                 &CONSTRAINTS,
+                true,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &CONSTRAINTS, global_metadata_specs.clone()),
+            common: CommonPlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                &CONSTRAINTS,
+                global_metadata_specs,
+            ),
         }
     }
 }

@@ -10,8 +10,7 @@ pub trait Work<C: Context>: 'static + Send {
     fn do_work_with_stat(&mut self, worker: &mut Worker<C>, context: &'static C) {
         let stat = worker
             .stat
-            .measure_work(TypeId::of::<Self>(), type_name::<Self>());
-        // println!("{} START", type_name::<Self>());
+            .measure_work(TypeId::of::<Self>(), type_name::<Self>(), context);
         self.do_work(worker, context);
         // println!("{} END", type_name::<Self>());
         stat.end_of_work(&mut worker.stat);

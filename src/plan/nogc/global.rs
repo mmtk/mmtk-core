@@ -1,4 +1,4 @@
-use crate::{mmtk::MMTK, plan::global::CommonPlan, util::side_metadata::SideMetadataSpec};
+use crate::{mmtk::MMTK, plan::global::CommonPlan};
 use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -15,9 +15,9 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::{ObjectReference, opaque_pointer::*};
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::util::side_metadata::SideMetadataContext;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
@@ -135,9 +135,17 @@ impl<VM: VMBinding> NoGC<VM> {
             &NOGC_CONSTRAINTS,
         );
 
-        NoGC {
+        let res = NoGC {
             nogc_space,
             common: CommonPlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS, vec![]),
-        }
+        };
+
+        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+        res.base()
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        res.nogc_space
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+
+        res
     }
 }

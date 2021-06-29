@@ -1,4 +1,4 @@
-use crate::{plan::MutatorContext, util::Address};
+use crate::{plan::MutatorContext};
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
 use crate::util::opaque_pointer::*;

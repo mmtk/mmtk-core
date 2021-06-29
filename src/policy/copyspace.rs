@@ -3,12 +3,13 @@ use crate::plan::{AllocationSemantics, CopyContext};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
-use crate::util::{forwarding_word as ForwardingWord, gc_byte, side_metadata};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::side_metadata::{SideMetadataContext, SideMetadataSpec};
+use crate::util::metadata::{extract_side_metadata, side_metadata};
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
+use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
@@ -28,7 +29,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         self.get_name()
     }
     fn is_live(&self, object: ObjectReference) -> bool {
-        !self.from_space() || ForwardingWord::is_forwarded::<VM>(object)
+        !self.from_space() || object_forwarding::is_forwarded::<VM>(object)
     }
     fn is_movable(&self) -> bool {
         true
@@ -42,9 +43,8 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         if !self.from_space() {
             return None
         }
-        if ForwardingWord::is_forwarded::<VM>(object) {
-            let old_value = gc_byte::read_gc_byte::<VM>(object);
-            Some(ForwardingWord::spin_and_get_forwarded_object::<VM>(object, old_value))
+        if object_forwarding::is_forwarded::<VM>(object) {
+            Some(object_forwarding::read_forwarding_pointer::<VM>(object))
         } else {
             None
         }
@@ -86,6 +86,11 @@ impl<VM: VMBinding> CopySpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
+        let local_specs = extract_side_metadata(&[
+            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+            VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+        ]);
+        debug_assert_eq!(global_side_metadata_specs.len(), 0);
         let common = CommonSpace::new(
             SpaceOptions {
                 name,
@@ -95,7 +100,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
-                    local: vec![],
+                    local: local_specs,
                 },
             },
             vm_map,
@@ -120,13 +125,14 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn prepare(&self, from_space: bool) {
         self.from_space.store(from_space, Ordering::SeqCst);
-        side_metadata::bzero_metadata(gc_byte::SIDE_GC_BYTE_SPEC, self.common.start, self.pr.cursor() - self.common.start);
+        side_metadata::bzero_metadata(<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC.as_side().unwrap(), self.common.start, self.pr.cursor() - self.common.start);
     }
 
     pub fn release(&self) {
         unsafe {
             self.pr.reset();
         }
+        self.common.metadata.reset();
         self.from_space.store(false, Ordering::SeqCst);
     }
 
@@ -147,21 +153,21 @@ impl<VM: VMBinding> CopySpace<VM> {
             return object;
         }
         trace!("attempting to forward");
-        let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
+        let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
         trace!("checking if object is being forwarded");
-        if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
+        if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
             trace!("... yes it is");
             let new_object =
-                ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
+                object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
             trace!("Returning");
             new_object
         } else {
             trace!("... no it isn't. Copying");
             let new_object =
-                ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context);
+                object_forwarding::forward_object::<VM, _>(object, semantics, copy_context);
             trace!("Forwarding pointer");
             trace.process_node(new_object);
-            trace!("Copying [{:?} -> {:?}]", object, new_object);
+            trace!("Copied [{:?} -> {:?}]", object, new_object);
             new_object
         }
     }

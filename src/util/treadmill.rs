@@ -51,12 +51,20 @@ impl TreadMill {
     pub fn copy(&self, cell: Address, is_in_nursery: bool) {
         if is_in_nursery {
             let mut guard = self.collect_nursery.lock().unwrap();
-            debug_assert!(guard.contains(&cell));
+            debug_assert!(
+                guard.contains(&cell),
+                "copy source cell ({}) must be in collect_nursery",
+                cell
+            );
             guard.remove(&cell);
-        // println!("cn -> ts {}", cell);
+            // println!("cn -> ts {}", cell);
         } else {
             let mut guard = self.from_space.lock().unwrap();
-            debug_assert!(guard.contains(&cell), "Unknown cell {:?}", cell);
+            debug_assert!(
+                guard.contains(&cell),
+                "copy source cell ({}) must be in from_space",
+                cell
+            );
             guard.remove(&cell);
             // println!("fs -> ts {}", cell);
         }

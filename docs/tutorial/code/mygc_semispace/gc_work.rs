@@ -4,14 +4,13 @@ use crate::plan::CopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::alloc::{Allocator, BumpAllocator};
-use crate::util::forwarding_word;
+use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::plan::PlanConstraints;
 use crate::scheduler::WorkerLocal;
-use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 // ANCHOR_END: imports
 
@@ -62,7 +61,7 @@ impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM> {
         _bytes: usize,
         _semantics: crate::AllocationSemantics,
     ) {
-        forwarding_word::clear_forwarding_bits::<VM>(obj);
+        object_forwarding::clear_forwarding_bits::<VM>(obj);
     }
     // ANCHOR_END: copycontext_post_copy
 }

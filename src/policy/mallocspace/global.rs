@@ -2,14 +2,17 @@ use super::metadata::*;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
-use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
+use crate::util::metadata::side_metadata::{
+    SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
+};
+use crate::util::metadata::MetadataSpec;
 use crate::util::opaque_pointer::*;
-use crate::util::side_metadata::{SideMetadata, SideMetadataContext, SideMetadataSpec};
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
@@ -30,7 +33,7 @@ const ASSERT_ALLOCATION: bool = false;
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
-    metadata: SideMetadata,
+    metadata: SideMetadataContext,
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
@@ -43,7 +46,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        is_marked(object)
+        is_marked::<VM>(object)
     }
     fn is_movable(&self) -> bool {
         false
@@ -126,8 +129,14 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     fn reserved_pages(&self) -> usize {
-        conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst))
-            + self.metadata.reserved_pages()
+        let data_pages = conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst));
+        let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
+        data_pages + meta_pages
+    }
+
+    fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
+        side_metadata_sanity_checker
+            .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
     }
 }
 
@@ -136,10 +145,13 @@ impl<VM: VMBinding> MallocSpace<VM> {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
-            metadata: SideMetadata::new(SideMetadataContext {
+            metadata: SideMetadataContext {
                 global: global_side_metadata_specs,
-                local: vec![ALLOC_METADATA_SPEC, MARKING_METADATA_SPEC],
-            }),
+                local: metadata::extract_side_metadata(&[
+                    MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
+                    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                ]),
+            },
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
         }
@@ -208,8 +220,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
             "Cannot mark an object {} that was not alloced by malloc.",
             address,
         );
-        if !is_marked(object) {
-            set_mark_bit(object);
+        if !is_marked::<VM>(object) {
+            set_mark_bit::<VM>(object);
             trace.process_node(object);
         }
         object
@@ -252,7 +264,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                         debug_assert_eq!(self.active_mem.lock().unwrap().get(&obj_start), Some(&bytes), "Address {} size in active_mem does not match the size from malloc_usable_size", obj_start);
                     }
 
-                    if !is_marked(object) {
+                    if !is_marked::<VM>(object) {
                         // Dead object
                         trace!(
                             "Object {} has alloc bit but no mark bit, it is dead. ",
@@ -265,7 +277,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                         unset_alloc_bit(object);
                     } else {
                         // Live object. Unset mark bit
-                        unset_mark_bit(object);
+                        unset_mark_bit::<VM>(object);
                         // This chunk is still active.
                         chunk_is_empty = false;
 

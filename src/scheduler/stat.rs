@@ -1,13 +1,34 @@
+//! Statistics for work packets
+use super::work_counter::{WorkCounter, WorkCounterBase, WorkDuration};
+#[cfg(feature = "perf_counter")]
+use crate::scheduler::work_counter::WorkPerfEvent;
+use crate::scheduler::Context;
+use crate::vm::VMBinding;
+use crate::MMTK;
 use std::any::TypeId;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, SystemTime};
 
+/// Merge and print the work-packet level statistics from all worker threads
 #[derive(Default)]
 pub struct SchedulerStat {
+    /// Map work packet type IDs to work packet names
     work_id_name_map: HashMap<TypeId, &'static str>,
+    /// Count the number of work packets executed for different types
     work_counts: HashMap<TypeId, usize>,
-    work_durations: HashMap<TypeId, Vec<Duration>>,
+    /// Collect work counters from work threads.
+    /// Two dimensional vectors are used, e.g.
+    /// `[[foo_0, ..., foo_n], ..., [bar_0, ..., bar_n]]`.
+    /// The first dimension is for different types of work counters,
+    /// (`foo` and `bar` in the above example).
+    /// The second dimension if for work counters of the same type but from
+    /// different threads (`foo_0` and `bar_0` are from the same thread).
+    /// The order of insertion is determined by when [`SchedulerStat::merge`] is
+    /// called for each [`WorkerLocalStat`].
+    /// We assume different threads have the same set of work counters
+    /// (in the same order).
+    work_counters: HashMap<TypeId, Vec<Vec<Box<dyn WorkCounter>>>>,
 }
 
 impl SchedulerStat {
@@ -22,37 +43,7 @@ impl SchedulerStat {
         }
     }
 
-    fn geomean(&self, values: &[f64]) -> f64 {
-        // Geomean(xs, N=xs.len()) = (PI(xs))^(1/N) = e^{log{PI(xs)^(1/N)}} = e^{ (1/N) * sum_{x \in xs}{ log(x) } }
-        let logs = values.iter().map(|v| v.ln());
-        let sum_logs = logs.sum::<f64>();
-        (sum_logs / values.len() as f64).exp()
-    }
-
-    fn min(&self, values: &[f64]) -> f64 {
-        let mut min = values[0];
-        for v in values {
-            if *v < min {
-                min = *v
-            }
-        }
-        min
-    }
-
-    fn max(&self, values: &[f64]) -> f64 {
-        let mut max = values[0];
-        for v in values {
-            if *v > max {
-                max = *v
-            }
-        }
-        max
-    }
-
-    fn sum(&self, values: &[f64]) -> f64 {
-        values.iter().sum()
-    }
-
+    /// Used during statistics printing at [`crate::memory_manager::harness_end`]
     pub fn harness_stat(&self) -> HashMap<String, String> {
         let mut stat = HashMap::new();
         // Work counts
@@ -67,59 +58,59 @@ impl SchedulerStat {
         }
         stat.insert("total-work.count".to_owned(), format!("{}", total_count));
         // Work execution times
-        let mut total_durations = vec![];
-        for (t, durations) in &self.work_durations {
-            for d in durations {
-                total_durations.push(*d);
-            }
+        let mut duration_overall: WorkCounterBase = Default::default();
+        for (t, vs) in &self.work_counters {
+            // Name of the work packet type
             let n = self.work_id_name_map[t];
-            let geomean = self.geomean(
-                &durations
+            // Iterate through different types of work counters
+            for v in vs.iter() {
+                // Aggregate work counters of the same type but from different
+                // worker threads
+                let fold = v
                     .iter()
-                    .map(|d| d.as_nanos() as f64)
-                    .collect::<Vec<_>>(),
-            );
-            stat.insert(
-                format!("work.{}.time.geomean", self.work_name(n)),
-                format!("{:.2}", geomean),
-            );
-            let sum = self.sum(
-                &durations
-                    .iter()
-                    .map(|d| d.as_nanos() as f64)
-                    .collect::<Vec<_>>(),
-            );
-            stat.insert(
-                format!("work.{}.time.sum", self.work_name(n)),
-                format!("{:.2}", sum),
-            );
+                    .fold(Default::default(), |acc: WorkCounterBase, x| {
+                        acc.merge(x.get_base())
+                    });
+                // Update the overall execution time
+                duration_overall.merge_inplace(&fold);
+                let name = v.first().unwrap().name();
+                stat.insert(
+                    format!("work.{}.{}.total", self.work_name(n), name),
+                    format!("{:.2}", fold.total),
+                );
+                stat.insert(
+                    format!("work.{}.{}.min", self.work_name(n), name),
+                    format!("{:.2}", fold.min),
+                );
+                stat.insert(
+                    format!("work.{}.{}.max", self.work_name(n), name),
+                    format!("{:.2}", fold.max),
+                );
+            }
         }
-        let durations = total_durations
-            .iter()
-            .map(|d| d.as_nanos() as f64)
-            .collect::<Vec<_>>();
-        if !durations.is_empty() {
-            stat.insert(
-                "total-work.time.geomean".to_owned(),
-                format!("{:.2}", self.geomean(&durations)),
-            );
-            stat.insert(
-                "total-work.time.min".to_owned(),
-                format!("{:.2}", self.min(&durations)),
-            );
-            stat.insert(
-                "total-work.time.max".to_owned(),
-                format!("{:.2}", self.max(&durations)),
-            );
-        }
+        // Print out overall execution time
+        stat.insert(
+            "total-work.time.total".to_owned(),
+            format!("{:.2}", duration_overall.total),
+        );
+        stat.insert(
+            "total-work.time.min".to_owned(),
+            format!("{:.2}", duration_overall.min),
+        );
+        stat.insert(
+            "total-work.time.max".to_owned(),
+            format!("{:.2}", duration_overall.max),
+        );
 
         stat
     }
-
-    pub fn merge(&mut self, stat: &WorkerLocalStat) {
+    /// Merge work counters from different worker threads
+    pub fn merge<C>(&mut self, stat: &WorkerLocalStat<C>) {
+        // Merge work packet type ID to work packet name mapping
         for (id, name) in &stat.work_id_name_map {
             self.work_id_name_map.insert(*id, *name);
         }
+        // Merge work count for different work packet types
         for (id, count) in &stat.work_counts {
             if self.work_counts.contains_key(id) {
                 *self.work_counts.get_mut(id).unwrap() += *count;
@@ -127,53 +118,80 @@ impl SchedulerStat {
                 self.work_counts.insert(*id, *count);
             }
         }
-        for (id, durations) in &stat.work_durations {
-            if self.work_durations.contains_key(id) {
-                let work_durations = self.work_durations.get_mut(id).unwrap();
-                for d in durations {
-                    work_durations.push(*d);
-                }
-            } else {
-                self.work_durations.insert(*id, durations.clone());
+        // Merge work counter for different work packet types
+        for (id, counters) in &stat.work_counters {
+            // Initialize the two dimensional vector
+            // [
+            //    [], // foo counter
+            //    [], // bar counter
+            // ]
+            let vs = self
+                .work_counters
+                .entry(*id)
+                .or_insert_with(|| vec![vec![]; counters.len()]);
+            // [
+            //    [counters[0] of type foo],
+            //    [counters[1] of type bar]
+            // ]
+            for (v, c) in vs.iter_mut().zip(counters.iter()) {
+                v.push(c.clone());
             }
         }
     }
 }
 
+/// Describing a single work packet
 pub struct WorkStat {
     type_id: TypeId,
     type_name: &'static str,
-    start_time: SystemTime,
 }
 
 impl WorkStat {
+    /// Stop all work counters for the work packet type of the just executed
+    /// work packet
     #[inline(always)]
-    pub fn end_of_work(&self, worker_stat: &mut WorkerLocalStat) {
+    pub fn end_of_work<C: Context>(&self, worker_stat: &mut WorkerLocalStat<C>) {
         if !worker_stat.is_enabled() {
             return;
         };
+        // Insert type ID, name pair
         worker_stat
             .work_id_name_map
             .insert(self.type_id, self.type_name);
+        // Increment work count
         *worker_stat.work_counts.entry(self.type_id).or_insert(0) += 1;
-        let duration = self.start_time.elapsed().unwrap();
+        // Stop counters
         worker_stat
-            .work_durations
+            .work_counters
             .entry(self.type_id)
-            .or_insert_with(Vec::new)
-            .push(duration);
+            .and_modify(|v| {
+                v.iter_mut().for_each(|c| c.stop());
+            });
     }
 }
 
-#[derive(Default)]
-pub struct WorkerLocalStat {
+/// Worker thread local counterpart of [`SchedulerStat`]
+pub struct WorkerLocalStat<C> {
     work_id_name_map: HashMap<TypeId, &'static str>,
     work_counts: HashMap<TypeId, usize>,
-    work_durations: HashMap<TypeId, Vec<Duration>>,
+    work_counters: HashMap<TypeId, Vec<Box<dyn WorkCounter>>>,
     enabled: AtomicBool,
+    _phantom: PhantomData<C>,
 }
 
-impl WorkerLocalStat {
+impl<C> Default for WorkerLocalStat<C> {
+    fn default() -> Self {
+        WorkerLocalStat {
+            work_id_name_map: Default::default(),
+            work_counts: Default::default(),
+            work_counters: Default::default(),
+            enabled: AtomicBool::new(false),
+            _phantom: Default::default(),
+        }
+    }
+}
+
+impl<C: Context> WorkerLocalStat<C> {
     #[inline]
     pub fn is_enabled(&self) -> bool {
         self.enabled.load(Ordering::SeqCst)
@@ -182,12 +200,51 @@ impl WorkerLocalStat {
     pub fn enable(&self) {
         self.enabled.store(true, Ordering::SeqCst);
     }
+    /// Measure the execution of a work packet by starting all counters for that
+    /// type
     #[inline]
-    pub fn measure_work(&mut self, work_id: TypeId, work_name: &'static str) -> WorkStat {
-        WorkStat {
+    pub fn measure_work(
+        &mut self,
+        work_id: TypeId,
+        work_name: &'static str,
+        context: &'static C,
+    ) -> WorkStat {
+        let stat = WorkStat {
             type_id: work_id,
             type_name: work_name,
-            start_time: SystemTime::now(),
+        };
+        if self.is_enabled() {
+            self.work_counters
+                .entry(work_id)
+                .or_insert_with(|| C::counter_set(context))
+                .iter_mut()
+                .for_each(|c| c.start());
         }
+        stat
+    }
+}
+
+/// Private trait to let different contexts supply different sets of default
+/// counters
+trait HasCounterSet {
+    fn counter_set(context: &'static Self) -> Vec<Box<dyn WorkCounter>>;
+}
+
+impl<C> HasCounterSet for C {
+    default fn counter_set(_context: &'static Self) -> Vec<Box<dyn WorkCounter>> {
+        vec![Box::new(WorkDuration::new())]
+    }
+}
+
+/// Specialization for MMTk to read the options
+#[allow(unused_variables, unused_mut)]
+impl<VM: VMBinding> HasCounterSet for MMTK<VM> {
+    fn counter_set(mmtk: &'static Self) -> Vec<Box<dyn WorkCounter>> {
+        let mut counters: Vec<Box<dyn WorkCounter>> = vec![Box::new(WorkDuration::new())];
+        #[cfg(feature = "perf_counter")]
+        for e in &mmtk.options.perf_events.events {
+            counters.push(box WorkPerfEvent::new(&e.0, e.1, e.2));
+        }
+        counters
     }
 }

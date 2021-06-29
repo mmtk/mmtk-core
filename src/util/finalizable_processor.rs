@@ -110,7 +110,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
 
         let mut w = E::new(vec![], false, mmtk);
         w.set_worker(worker);
-        finalizable_processor.scan(worker.tls, &mut w, mmtk.plan.in_nursery());
+        finalizable_processor.scan(worker.tls, &mut w, mmtk.plan.is_current_gc_nursery());
         debug!(
             "Finished finalization, {} objects in candidates, {} objects ready to finalize",
             finalizable_processor.candidates.len(),
@@ -132,7 +132,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ForwardFinalization<E> {
         trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
         let mut w = E::new(vec![], false, mmtk);
-        finalizable_processor.forward(&mut w, mmtk.plan.in_nursery());
+        finalizable_processor.forward(&mut w, mmtk.plan.is_current_gc_nursery());
         trace!("Finished forwarding finlizable");
     }
 }

@@ -8,7 +8,7 @@ on:
 
 jobs:
   v8-binding-test:
-    runs-on: [self-hosted, linux, freq-scaling-on]
+    runs-on: [self-hosted, linux, freq-scaling-off]
     timeout-minutes: 60
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     steps:
@@ -134,7 +134,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: "0.6.1"
+          ref: "0.6.4"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -263,7 +263,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: "0.6.1"
+          ref: "0.6.4"
           path: ci-perf-kit
           submodules: true
       # setup

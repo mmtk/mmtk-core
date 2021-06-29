@@ -2,6 +2,7 @@
 
 use super::controller_collector_context::ControllerCollectorContext;
 use super::PlanConstraints;
+use crate::mmtk::MMTK;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -18,13 +19,14 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::metadata::side_metadata::SideMetadataSanity;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
-use crate::{mmtk::MMTK, util::side_metadata::SideMetadataSpec};
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::marker::PhantomData;
@@ -123,8 +125,10 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::GenCopy => crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
-        },
-        PlanSelector::Page => crate::plan::page::mutator::create_page_mutator(tls, &*mmtk.plan),
+        }
+        PlanSelector::PageProtect => {
+            crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
+        }
     })
 }
 
@@ -145,7 +149,7 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
             vm_map, mmapper, options,
         )),
-        PlanSelector::Page => Box::new(crate::plan::page::Page::new(
+        PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
             vm_map, mmapper, options,
         )),
     }
@@ -187,7 +191,8 @@ pub trait Plan: 'static + Sync + Downcast {
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
-    fn in_nursery(&self) -> bool {
+    /// Is current GC only collecting objects allocated since last GC?
+    fn is_current_gc_nursery(&self) -> bool {
         false
     }
 
@@ -706,6 +711,22 @@ impl<VM: VMBinding> BasePlan<VM> {
 
         space_full || stress_force_gc || heap_full
     }
+
+    #[allow(unused_variables)] // depending on the enabled features, base may not be used.
+    pub(crate) fn verify_side_metadata_sanity(
+        &self,
+        side_metadata_sanity_checker: &mut SideMetadataSanity,
+    ) {
+        #[cfg(feature = "code_space")]
+        self.code_space
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+        #[cfg(feature = "ro_space")]
+        self.ro_space
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+        #[cfg(feature = "vm_space")]
+        self.vm_space
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+    }
 }
 
 /**
@@ -746,6 +767,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 mmapper,
                 &mut heap,
                 constraints,
+                false,
             ),
             base: BasePlan::new(
                 vm_map,
@@ -829,6 +851,18 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     pub fn get_los(&self) -> &LargeObjectSpace<VM> {
         &self.los
+    }
+
+    pub(crate) fn verify_side_metadata_sanity(
+        &self,
+        side_metadata_sanity_checker: &mut SideMetadataSanity,
+    ) {
+        self.base
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+        self.immortal
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+        self.los
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
     }
 }
 

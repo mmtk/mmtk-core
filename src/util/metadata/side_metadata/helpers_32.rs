@@ -1,15 +1,20 @@
+use super::SideMetadataSpec;
 use crate::util::{
-    constants::{self, BYTES_IN_PAGE, LOG_BITS_IN_BYTE},
+    constants::{self, LOG_BITS_IN_BYTE},
     heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK},
     memory, Address,
 };
 use std::io::Result;
 
-use super::{
-    address_to_meta_address, ensure_munmap_metadata, SideMetadataSpec, CHUNK_MASK,
-    LOCAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_PER_CHUNK,
+use super::constants::{
+    CHUNK_MASK, LOCAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_PER_CHUNK,
     LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
+#[cfg(test)]
+use super::ensure_munmap_metadata;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::heap::layout::Mmapper;
+use crate::MMAPPER;
 
 #[inline(always)]
 pub(super) fn address_to_chunked_meta_address(
@@ -34,11 +39,14 @@ pub(super) fn address_to_chunked_meta_address(
 }
 
 /// Returns the size in bytes that gets munmapped.
-pub(super) fn ensure_munmap_chunked_metadata_space(
+#[cfg(test)]
+pub(crate) fn ensure_munmap_chunked_metadata_space(
     start: Address,
     size: usize,
     spec: &SideMetadataSpec,
 ) -> usize {
+    use super::address_to_meta_address;
+    use crate::util::constants::BYTES_IN_PAGE;
     let meta_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
     // per chunk policy-specific metadata for 32-bits targets
     let chunk_num = ((start + size - 1usize).align_down(BYTES_IN_CHUNK)
@@ -67,7 +75,7 @@ pub(super) fn ensure_munmap_chunked_metadata_space(
         let mut next_data_chunk = second_data_chunk;
         // unmap all chunks in the middle
         while next_data_chunk != last_data_chunk {
-            let to_unmap = meta_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+            let to_unmap = metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
             ensure_munmap_metadata(address_to_meta_address(*spec, next_data_chunk), to_unmap);
             total_unmapped += to_unmap;
             next_data_chunk += BYTES_IN_CHUNK;
@@ -84,13 +92,14 @@ pub(crate) fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
 }
 
 #[inline(always)]
-pub(crate) const fn meta_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bits: usize) -> usize {
+pub const fn metadata_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bits: usize) -> usize {
     1usize
         << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) - log_min_obj_size
             + log_num_of_bits)
 }
 
 /// Unmaps the metadata for a single chunk starting at `start`
+#[cfg(test)]
 pub fn ensure_munmap_metadata_chunk(start: Address, local_per_chunk: usize) {
     if local_per_chunk != 0 {
         let policy_meta_start = address_to_meta_chunk_addr(start);
@@ -124,8 +133,13 @@ pub fn try_map_per_chunk_metadata_space(
                 };
                 // Failure: munmap what has been mmapped before
                 while munmap_start < aligned_start {
-                    ensure_munmap_metadata_chunk(munmap_start, local_per_chunk);
+                    // Commented out the following as we do not have unmap in Mmapper.
+                    // And we cannot guarantee that the memory to be munmapped does not include any useful data.
+                    // However, as we cannot map the address we need for sidemetadata, it is a fatal error
+                    // anyway, we do not need to munmap or anything as we cannot recover from it.
+                    // ensure_munmap_metadata_chunk(munmap_start, local_per_chunk);
                     munmap_start += LOCAL_SIDE_METADATA_PER_CHUNK;
+                    panic!("We have failed mmap");
                 }
             }
             trace!(
@@ -165,8 +179,8 @@ pub fn try_mmap_metadata_chunk(
     let policy_meta_start = address_to_meta_chunk_addr(start);
     if !no_reserve {
         // We have reserved the memory
-        unsafe { memory::dzmmap(policy_meta_start, local_per_chunk) }
+        MMAPPER.ensure_mapped(policy_meta_start, local_per_chunk >> LOG_BYTES_IN_PAGE)
     } else {
-        memory::mmap_noreserve(policy_meta_start, local_per_chunk)
+        MMAPPER.quarantine_address_range(policy_meta_start, local_per_chunk >> LOG_BYTES_IN_PAGE)
     }
 }
