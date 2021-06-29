@@ -75,7 +75,6 @@ impl Stats {
         counters.push(t.clone());
         #[cfg(feature = "perf_counter")]
         for e in &options.perf_events.events {
-            println!("pushed {}", &e.0);
             counters.push(Arc::new(Mutex::new(LongCounter::new(
                 e.0.clone(),
                 shared.clone(),
