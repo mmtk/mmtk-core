@@ -26,6 +26,8 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
+use std::fs::File;
+use std::io::Read;
 
 /// Run the main loop for the GC controller thread. This method does not return.
 ///
@@ -44,6 +46,15 @@ pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMWorkerThre
 /// * `mmtk`: A reference to an MMTk instance to initialize.
 /// * `heap_size`: The heap size for the MMTk instance in bytes.
 pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
+    let mut status = File::open("/proc/self/status").unwrap();
+    let mut contents = String::new();
+    status.read_to_string(&mut contents).unwrap();
+    for line in contents.lines() {
+        let split: Vec<&str> = line.split('\t').collect();
+        if split[0] == "Threads:" {
+            warn!("Total number of threads {}", split[1].parse::<i32>().unwrap());
+        }
+    }
     match crate::util::logger::try_init() {
         Ok(_) => debug!("MMTk initialized the logger."),
         Err(_) => debug!(
