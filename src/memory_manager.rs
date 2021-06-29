@@ -44,6 +44,12 @@ pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMWorkerThre
 /// * `mmtk`: A reference to an MMTk instance to initialize.
 /// * `heap_size`: The heap size for the MMTk instance in bytes.
 pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
+    match crate::util::logger::try_init() {
+        Ok(_) => debug!("MMTk initialized the logger."),
+        Err(_) => debug!(
+            "MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
+        ),
+    }
     #[cfg(feature = "perf_counter")]
     {
         use std::fs::File;
@@ -59,13 +65,6 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
                     warn!("Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this threadas", threads);
                 }
             }
-        }
-    }
-    match crate::util::logger::try_init() {
-        Ok(_) => debug!("MMTk initialized the logger."),
-        Err(_) => debug!(
-            "MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
-        ),
     }
     assert!(heap_size > 0, "Invalid heap size");
     mmtk.plan
