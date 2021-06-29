@@ -11,7 +11,7 @@ use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 
 const MAX_BUMP_ALLOCATORS: usize = 5;
-const MAX_LARGE_OBJECT_ALLOCATORS: usize = 1;
+const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;
 const MAX_MALLOC_ALLOCATORS: usize = 1;
 
 // The allocators set owned by each mutator. We provide a fixed number of allocators for each allocator type in the mutator,
