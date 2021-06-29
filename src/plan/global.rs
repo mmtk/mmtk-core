@@ -418,7 +418,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         constraints: &'static PlanConstraints,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> BasePlan<VM> {
-        let stats = Stats::new();
+        let stats = Stats::new(options.clone());
         // Initializing the analysis manager and routines
         #[cfg(feature = "analysis")]
         let analysis_manager = AnalysisManager::new(&stats);
