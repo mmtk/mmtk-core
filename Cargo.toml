@@ -33,7 +33,7 @@ atomic-traits = "0.2.0"
 atomic = "0.4.6"
 spin = "0.5.2"
 env_logger = "0.8.2"
-pfm = {version = "0.0.7", optional = true}
+pfm = {version = "0.0.7", path="/home/zixianc/pfm", optional = true}
 
 [dev-dependencies]
 crossbeam = "0.7.3"

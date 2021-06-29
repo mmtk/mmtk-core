@@ -3,10 +3,12 @@ use std::time::Instant;
 mod event_counter;
 mod long_counter;
 mod size_counter;
+mod perf_event;
 
 pub use self::event_counter::EventCounter;
 pub use self::long_counter::{LongCounter, Timer};
 pub use self::size_counter::SizeCounter;
+pub use self::perf_event::PerfEventDiffable;
 
 pub trait Counter {
     fn start(&mut self);
@@ -24,8 +26,8 @@ pub trait Counter {
 
 pub trait Diffable {
     type Val;
-    fn current_value() -> Self::Val;
-    fn diff(current: &Self::Val, earlier: &Self::Val) -> u64;
+    fn current_value(&mut self) -> Self::Val;
+    fn diff(&mut self, current: &Self::Val, earlier: &Self::Val) -> u64;
     fn print_diff(val: u64);
 }
 
@@ -34,11 +36,11 @@ pub struct MonotoneNanoTime;
 impl Diffable for MonotoneNanoTime {
     type Val = Instant;
 
-    fn current_value() -> Instant {
+    fn current_value(&mut self) -> Instant {
         Instant::now()
     }
 
-    fn diff(current: &Instant, earlier: &Instant) -> u64 {
+    fn diff(&mut self, current: &Instant, earlier: &Instant) -> u64 {
         let delta = current.duration_since(*earlier);
         delta.as_secs() * 1_000_000_000 + u64::from(delta.subsec_nanos())
     }

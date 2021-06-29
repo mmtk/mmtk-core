@@ -1,3 +1,4 @@
+use crate::util::options::UnsafeOptionsWrapper;
 use crate::mmtk::MMTK;
 use crate::util::statistics::counter::*;
 use crate::util::statistics::Timer;
@@ -51,29 +52,44 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new() -> Self {
+    pub fn new(options: Arc<UnsafeOptionsWrapper>) -> Self {
+        #[cfg(feature = "perf_counter")]
+        let perfmon = {
+            let mut perfmon: Perfmon = Default::default();
+            perfmon.initialize().expect("Perfmon failed to initialize");
+            perfmon
+        };
         let shared = Arc::new(SharedStats {
             phase: AtomicUsize::new(0),
             gathering_stats: AtomicBool::new(false),
         });
+        let mut counters: Vec<Arc<Mutex<dyn Counter + Send>>> = vec![];
         let t = Arc::new(Mutex::new(LongCounter::new(
             "time".to_string(),
             shared.clone(),
             true,
             false,
+            MonotoneNanoTime{}
         )));
+        counters.push(t.clone());
+        for e in &options.perf_events.events {
+            println!("pushed {}", &e.0);
+            counters.push(Arc::new(Mutex::new(LongCounter::new(
+                e.0.clone(),
+                shared.clone(),
+                true,
+                false,
+                PerfEventDiffable::new(&e.0)
+            ))));
+        }
         Stats {
             gc_count: AtomicUsize::new(0),
-            total_time: t.clone(),
+            total_time: t,
             #[cfg(feature = "perf_counter")]
-            perfmon: {
-                let mut perfmon: Perfmon = Default::default();
-                perfmon.initialize().expect("Perfmon failed to initialize");
-                perfmon
-            },
+            perfmon,
 
             shared,
-            counters: Mutex::new(vec![t]),
+            counters: Mutex::new(counters),
             exceeded_phase_limit: AtomicBool::new(false),
         }
     }
@@ -118,6 +134,7 @@ impl Stats {
             self.shared.clone(),
             implicit_start,
             merge_phases,
+            MonotoneNanoTime{}
         )));
         guard.push(counter.clone());
         counter
@@ -235,11 +252,5 @@ impl Stats {
 
     pub fn get_gathering_stats(&self) -> bool {
         self.shared.get_gathering_stats()
-    }
-}
-
-impl Default for Stats {
-    fn default() -> Self {
-        Self::new()
     }
 }
