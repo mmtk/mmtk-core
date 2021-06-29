@@ -8,7 +8,7 @@ pub struct LongCounter<T: Diffable> {
     pub implicitly_start: bool,
     merge_phases: bool,
     count: Box<[u64; MAX_PHASES]>, // FIXME make this resizable
-    diffable: T, 
+    diffable: T,
     start_value: Option<T::Val>,
     total_count: u64,
     running: bool,
@@ -38,7 +38,9 @@ impl<T: Diffable> Counter for LongCounter<T> {
         debug_assert!(self.running);
         self.running = false;
         let current_value = self.diffable.current_value();
-        let delta = self.diffable.diff(&current_value, self.start_value.as_ref().unwrap());
+        let delta = self
+            .diffable
+            .diff(&current_value, self.start_value.as_ref().unwrap());
         self.count[self.stats.get_phase()] += delta;
         self.total_count += delta;
     }
@@ -127,7 +129,7 @@ impl<T: Diffable> LongCounter<T> {
         stats: Arc<SharedStats>,
         implicitly_start: bool,
         merge_phases: bool,
-        diffable: T
+        diffable: T,
     ) -> Self {
         LongCounter {
             name,

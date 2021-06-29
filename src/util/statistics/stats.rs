@@ -1,5 +1,5 @@
-use crate::util::options::UnsafeOptionsWrapper;
 use crate::mmtk::MMTK;
+use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::statistics::counter::*;
 use crate::util::statistics::Timer;
 use crate::vm::VMBinding;
@@ -52,6 +52,7 @@ pub struct Stats {
 }
 
 impl Stats {
+    #[allow(unused)]
     pub fn new(options: Arc<UnsafeOptionsWrapper>) -> Self {
         #[cfg(feature = "perf_counter")]
         let perfmon = {
@@ -69,9 +70,10 @@ impl Stats {
             shared.clone(),
             true,
             false,
-            MonotoneNanoTime{}
+            MonotoneNanoTime {},
         )));
         counters.push(t.clone());
+        #[cfg(feature = "perf_counter")]
         for e in &options.perf_events.events {
             println!("pushed {}", &e.0);
             counters.push(Arc::new(Mutex::new(LongCounter::new(
@@ -79,7 +81,7 @@ impl Stats {
                 shared.clone(),
                 true,
                 false,
-                PerfEventDiffable::new(&e.0)
+                PerfEventDiffable::new(&e.0),
             ))));
         }
         Stats {
@@ -134,7 +136,7 @@ impl Stats {
             self.shared.clone(),
             implicit_start,
             merge_phases,
-            MonotoneNanoTime{}
+            MonotoneNanoTime {},
         )));
         guard.push(counter.clone());
         counter

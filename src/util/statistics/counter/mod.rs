@@ -2,13 +2,15 @@ use std::time::Instant;
 
 mod event_counter;
 mod long_counter;
-mod size_counter;
+#[cfg(feature = "perf_counter")]
 mod perf_event;
+mod size_counter;
 
 pub use self::event_counter::EventCounter;
 pub use self::long_counter::{LongCounter, Timer};
-pub use self::size_counter::SizeCounter;
+#[cfg(feature = "perf_counter")]
 pub use self::perf_event::PerfEventDiffable;
+pub use self::size_counter::SizeCounter;
 
 pub trait Counter {
     fn start(&mut self);
@@ -24,6 +26,8 @@ pub trait Counter {
     fn name(&self) -> &String;
 }
 
+/// A Diffable object could be stateless (e.g. a timer that reads the wall
+/// clock), or stateful (e.g. holds reference to a perf event fd)
 pub trait Diffable {
     type Val;
     fn current_value(&mut self) -> Self::Val;
