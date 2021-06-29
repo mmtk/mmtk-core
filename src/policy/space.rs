@@ -54,6 +54,10 @@ pub trait SFT {
     }
     /// Is the object live, determined by the policy?
     fn is_live(&self, object: ObjectReference) -> bool;
+    #[inline(always)]
+    fn is_reachable(&self, object: ObjectReference) -> bool {
+        self.is_live(object)
+    }
     /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
     /// or the object is pinned.
     fn is_movable(&self) -> bool;

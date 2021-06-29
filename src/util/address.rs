@@ -463,6 +463,14 @@ impl ObjectReference {
     pub fn value(self) -> usize {
         self.0
     }
+    #[inline(always)]
+    pub fn is_reachable(self) -> bool {
+        if self.0 == 0 {
+            false
+        } else {
+            SFT_MAP.get(Address(self.0)).is_reachable(self)
+        }
+    }
 
     pub fn is_live(self) -> bool {
         if self.0 == 0 {

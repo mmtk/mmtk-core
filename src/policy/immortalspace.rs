@@ -38,6 +38,12 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn is_live(&self, _object: ObjectReference) -> bool {
         true
     }
+    #[inline(always)]
+    fn is_reachable(&self, object: ObjectReference) -> bool {
+        let old_value = gc_byte::read_gc_byte::<VM>(object);
+        let mark_bit = old_value & GC_MARK_BIT_MASK;
+        mark_bit == self.mark_state
+    }
     fn is_movable(&self) -> bool {
         false
     }

@@ -39,6 +39,9 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {}
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
+        if !self.from_space() {
+            return None
+        }
         if ForwardingWord::is_forwarded::<VM>(object) {
             let old_value = gc_byte::read_gc_byte::<VM>(object);
             Some(ForwardingWord::spin_and_get_forwarded_object::<VM>(object, old_value))
