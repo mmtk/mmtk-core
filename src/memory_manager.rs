@@ -65,6 +65,7 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
                     warn!("Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this threadas", threads);
                 }
             }
+        }
     }
     assert!(heap_size > 0, "Invalid heap size");
     mmtk.plan
