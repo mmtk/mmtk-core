@@ -189,7 +189,8 @@ options! {
     // Perf events to measure
     // Semicolons are used to separate events
     // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean)
-    perf_events:           PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]}
+    work_perf_events:       PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]},
+    perf_events:            PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]}
 }
 
 impl Options {
