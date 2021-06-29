@@ -25,8 +25,6 @@ use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
 use crate::vm::VMBinding;
-use std::fs::File;
-use std::io::Read;
 use std::sync::atomic::Ordering;
 
 /// Run the main loop for the GC controller thread. This method does not return.
@@ -48,6 +46,8 @@ pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMWorkerThre
 pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
     #[cfg(feature = "perf_counter")]
     {
+        use std::fs::File;
+        use std::io::Read;
         let mut status = File::open("/proc/self/status").unwrap();
         let mut contents = String::new();
         status.read_to_string(&mut contents).unwrap();
