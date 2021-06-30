@@ -61,10 +61,6 @@ code_space  = []
 sanity = []
 # Run analysis
 analysis = []
-# Use a HashSet of chunks for sweep
-chunk_hashset = []
-# Sequential sweep phase
-sweep_seq = []
 # Use lock free variant of NoGC
 nogc_lock_free = []
 # Use lock free with no zeroing NoGC
