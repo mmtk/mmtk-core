@@ -174,9 +174,9 @@ options! {
     // Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     ignore_system_g_c:     bool                 [always_valid] = false,
     // The upper bound of nursery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    max_nursery:           usize                [|v: &usize| *v > 0 ] = DEFAULT_MIN_NURSERY,
+    max_nursery:           usize                [|v: &usize| *v > 0 ] = DEFAULT_MAX_NURSERY,
     // The lower bound of nusery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    min_nursery:           usize                [|v: &usize| *v> 0 ] = DEFAULT_MAX_NURSERY,
+    min_nursery:           usize                [|v: &usize| *v> 0 ] = DEFAULT_MIN_NURSERY,
     // Should a major GC be performed when a system GC is required?
     full_heap_system_gc:   bool                 [always_valid] = false,
     // Should we shrink/grow the heap to adjust to application working set? (not supported)
