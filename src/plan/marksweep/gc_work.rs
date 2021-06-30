@@ -1,13 +1,13 @@
 use crate::plan::global::NoCopy;
 use crate::plan::global::Plan;
-use crate::policy::mallocspace::MallocSpace;
 use crate::policy::mallocspace::metadata::is_chunk_marked_unsafe;
+use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::{GCWork, GCWorker, Work, WorkBucketStage};
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
@@ -63,19 +63,19 @@ impl<VM: VMBinding> DerefMut for MSProcessEdges<VM> {
 pub struct MSSweepChunk<VM: VMBinding> {
     ms: &'static MallocSpace<VM>,
     // starting address of a chunk
-    chunk: Address
+    chunk: Address,
 }
 
 // Simple work packet that just sweeps a single chunk
 impl<VM: VMBinding> GCWork<VM> for MSSweepChunk<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        &self.ms.sweep_chunk(self.chunk);
+        self.ms.sweep_chunk(self.chunk);
     }
 }
 
 pub struct MSSweepChunks<VM: VMBinding> {
-    plan: &'static MarkSweep<VM>
+    plan: &'static MarkSweep<VM>,
 }
 
 impl<VM: VMBinding> MSSweepChunks<VM> {
@@ -91,7 +91,8 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
         let ms = self.plan.ms_space();
         let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
         let mut chunk = unsafe { Address::from_usize(ms.chunk_addr_min.load(Ordering::Relaxed)) }; // XXX: have to use AtomicUsize to represent an Address
-        let end = unsafe { Address::from_usize(ms.chunk_addr_max.load(Ordering::Relaxed)) } + BYTES_IN_CHUNK;
+        let end = unsafe { Address::from_usize(ms.chunk_addr_max.load(Ordering::Relaxed)) }
+            + BYTES_IN_CHUNK;
 
         // Since only a single thread generates the sweep work packets as well as it is a Stop-the-World collector,
         // we can assume that the chunk mark metadata is not being accessed by anything else and hence we use
@@ -107,7 +108,8 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
         info!("Generated {} sweep work packets", work_packets.len());
         #[cfg(debug_assertions)]
         {
-            ms.total_work_packets.store(work_packets.len() as u32, Ordering::SeqCst);
+            ms.total_work_packets
+                .store(work_packets.len() as u32, Ordering::SeqCst);
             ms.completed_work_packets.store(0, Ordering::SeqCst);
             ms.work_live_bytes.store(0, Ordering::SeqCst);
         }

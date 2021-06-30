@@ -17,10 +17,10 @@ use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
+use std::marker::PhantomData;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::marker::PhantomData;
 // only used for debugging
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
@@ -282,7 +282,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 min,
                 chunk_usize,
                 Ordering::AcqRel,
-                Ordering::Relaxed
+                Ordering::Relaxed,
             ) {
                 Ok(_) => break,
                 Err(x) => min = x,
@@ -294,7 +294,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 max,
                 chunk_usize,
                 Ordering::AcqRel,
-                Ordering::Relaxed
+                Ordering::Relaxed,
             ) {
                 Ok(_) => break,
                 Err(x) => max = x,
@@ -322,7 +322,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// unsafe as it uses non-atomic accesses to side metadata (although these
     /// non-atomic accesses should not have race conditions associated with them)
     /// as well as calling libc functions
-    unsafe fn sweep_chunk_mark_on_side(&self, chunk_start: Address, mark_bit_spec: SideMetadataSpec) {
+    unsafe fn sweep_chunk_mark_on_side(
+        &self,
+        chunk_start: Address,
+        mark_bit_spec: SideMetadataSpec,
+    ) {
         #[cfg(debug_assertions)]
         let mut live_bytes = 0;
 
@@ -371,10 +375,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
                         if !is_marked::<VM>(object, None) {
                             // Dead object
-                            trace!(
-                                "Object {} has been allocated but not marked",
-                                object
-                            );
+                            trace!("Object {} has been allocated but not marked", object);
 
                             // Free object
                             self.free(obj_start, bytes);
@@ -393,12 +394,14 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
                         // Skip to next object
                         address += bytes;
-                    } else {    // not an object
+                    } else {
+                        // not an object
                         address += VM::MIN_ALIGNMENT;
                     }
                 }
             } else {
-                if alloc_128 != 0 {     // For the chunk/page to be alive, both alloc128 and mark128 values need to be not zero
+                if alloc_128 != 0 {
+                    // For the chunk/page to be alive, both alloc128 and mark128 values need to be not zero
                     chunk_is_empty = false;
                     page_is_empty = false;
                 }
@@ -446,7 +449,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
                     // Skip to next object
                     address += bytes;
-                } else {    // not an object
+                } else {
+                    // not an object
                     address += VM::MIN_ALIGNMENT;
                 }
             }
@@ -456,7 +460,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         bzero_metadata(mark_bit_spec, chunk_start, BYTES_IN_CHUNK);
 
         if chunk_is_empty {
-            unset_chunk_mark_unsafe(chunk_start);   // Since the chunk mark metadata is a byte, we don't need synchronization
+            // Since the chunk mark metadata is a byte, we don't need synchronization
+            unset_chunk_mark_unsafe(chunk_start);
         }
 
         debug!(
@@ -568,13 +573,15 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
                 // Skip to next object
                 address += bytes;
-            } else { // not an object
+            } else {
+                // not an object
                 address += VM::MIN_ALIGNMENT;
             }
         }
 
         if chunk_is_empty {
-            unset_chunk_mark_unsafe(chunk_start);   // Since the chunk mark metadata is a byte, we don't need synchronization
+            // Since the chunk mark metadata is a byte, we don't need synchronization
+            unset_chunk_mark_unsafe(chunk_start);
         }
 
         debug!(

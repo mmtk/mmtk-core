@@ -63,8 +63,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, NoCopy<VM>>::new(self));
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(MSSweepChunks::<VM>::new(&self));
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(&self));
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, NoCopy<VM>>::new(self));

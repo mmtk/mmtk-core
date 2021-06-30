@@ -1,14 +1,14 @@
-#[cfg(feature = "analysis")]
-use std::sync::atomic::Ordering;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
-use crate::vm::VMBinding;
 #[cfg(feature = "analysis")]
 use crate::vm::ActivePlan;
+use crate::vm::VMBinding;
 use crate::Plan;
+#[cfg(feature = "analysis")]
+use std::sync::atomic::Ordering;
 
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
@@ -40,8 +40,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         #[cfg(feature = "analysis")]
         {
             let base = &self.plan.base();
-            let is_mutator =
-                unsafe { VM::VMActivePlan::is_mutator(self.tls) } && self.plan.is_initialized();
+            let is_mutator = VM::VMActivePlan::is_mutator(self.tls) && self.plan.is_initialized();
 
             if is_mutator
                 && base.allocation_bytes.load(Ordering::SeqCst) > base.options.analysis_factor
