@@ -192,8 +192,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         !self.gc_full_heap.load(Ordering::SeqCst)
     }
 
-    fn in_default_space(&self, _object: ObjectReference) -> bool {
-        unreachable!()
+    fn in_default_space(&self, object: ObjectReference) -> bool {
+        self.nursery.in_space(object) || self.fromspace().in_space(object) || self.tospace().in_space(object)
     }
 }
 

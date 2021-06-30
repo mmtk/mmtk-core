@@ -163,7 +163,7 @@ impl<VM: VMBinding> PageProtect<VM> {
                 mmapper,
                 &mut heap,
                 &CONSTRAINTS,
-                true,
+                false,
             ),
             common: CommonPlan::new(
                 vm_map,

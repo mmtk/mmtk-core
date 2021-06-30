@@ -90,7 +90,6 @@ impl<VM: VMBinding> CopySpace<VM> {
             VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
             VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
         ]);
-        debug_assert_eq!(global_side_metadata_specs.len(), 0);
         let common = CommonSpace::new(
             SpaceOptions {
                 name,

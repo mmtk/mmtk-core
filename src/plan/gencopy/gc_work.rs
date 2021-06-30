@@ -44,7 +44,7 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
         offset: isize,
         _semantics: crate::AllocationSemantics,
     ) -> Address {
-        debug_assert!(VM::VMActivePlan::global().base().gc_in_progress_proper());
+        // debug_assert!(VM::VMActivePlan::global().base().gc_in_progress_proper());
         self.ss.alloc(bytes, align, offset)
     }
     #[inline(always)]
