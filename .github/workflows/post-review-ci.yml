@@ -63,6 +63,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           default_env: 'JIKESRVM_BINDING_REF=master'
+          debug: 'true'
       - name: Checkout JikesRVM Binding
         uses: actions/checkout@v2
         with:

@@ -48,9 +48,13 @@ pub trait ObjectModel<VM: VMBinding> {
     //
     // MMTk reserved PolicySpecific side metadata offsets:
     //
-    //  1 - MarkSweep Alloc bit:
+    //  1 - MarkSweep Chunk Mark byte:
     //      - Offset `0x0` on 32-bits
     //      - Offset `LOCAL_SIDE_METADATA_BASE_ADDRESS` on 64-bits
+    //  2 - MarkSweep Alloc bit:
+    //      - Offset `Chunk Mark`.offset + `Chunk Mark`.metadata_address_range_size()
+    //  3 - MarkSweep Page Mark byte:
+    //      - Offset `Alloc bit`.offset + `Alloc bit`.metadata_address_range_size()
     //
     // --------------------------------------------------
 
@@ -58,7 +62,7 @@ pub trait ObjectModel<VM: VMBinding> {
     const LOCAL_FORWARDING_POINTER_SPEC: MetadataSpec;
     /// The metadata specification for the forwarding status bits, which is currently specific to the CopySpace policy.
     const LOCAL_FORWARDING_BITS_SPEC: MetadataSpec;
-    /// The metadata specification for the mark bit, which is currently specific to the ImmortalSpace policy.
+    /// The metadata specification for the mark bit, which is currently specific to the MallocSpace and ImmortalSpace policy.
     const LOCAL_MARK_BIT_SPEC: MetadataSpec;
     /// The metadata specification for the mark-and-nursery bits, which is currently specific to the LargeObjectSpace policy.
     const LOCAL_LOS_MARK_NURSERY_SPEC: MetadataSpec;
