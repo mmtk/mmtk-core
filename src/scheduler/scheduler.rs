@@ -35,7 +35,7 @@ pub struct Scheduler<C: Context> {
     ),
     startup: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
     finalizer: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
-    closure_end: Mutex<Option<Box<dyn Fn() + Send>>>,
+    closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
 }
 
 // The 'channel' inside Scheduler disallows Sync for Scheduler. We have to make sure we use channel properly:
@@ -146,7 +146,7 @@ impl<C: Context> Scheduler<C> {
         *self.finalizer.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<C>>);
     }
 
-    pub fn on_closure_end(&self, f: Box<dyn Fn() + Send>) {
+    pub fn on_closure_end(&self, f: Box<dyn Send + Fn() -> bool>) {
         *self.closure_end.lock().unwrap() = Some(f);
     }
 
@@ -165,16 +165,17 @@ impl<C: Context> Scheduler<C> {
             if id == WorkBucketStage::Unconstrained {
                 continue;
             }
-            if id == WorkBucketStage::RefClosure {
-                if let Some(can_open) = bucket.can_open.as_ref() {
-                    if !bucket.is_activated() && can_open() {
-                        if let Some(f) = self.closure_end.lock().unwrap().as_ref() {
-                            f();
-                        }
+            buckets_updated |= bucket.update(|| {
+                if id == WorkBucketStage::RefClosure {
+                    if let Some(closure_end) = self.closure_end.lock().unwrap().as_ref() {
+                        !closure_end()
+                    } else {
+                        true
                     }
+                } else {
+                    true
                 }
-            }
-            buckets_updated |= bucket.update();
+            });
         }
         if buckets_updated {
             // Notify the workers for new work

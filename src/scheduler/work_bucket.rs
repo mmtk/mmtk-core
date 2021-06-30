@@ -134,11 +134,13 @@ impl<C: Context> WorkBucket<C> {
     pub fn set_open_condition(&mut self, pred: impl Fn() -> bool + Send + 'static) {
         self.can_open = Some(box pred);
     }
-    pub fn update(&self) -> bool {
+    pub fn update(&self, should_activate: impl Fn() -> bool) -> bool {
         if let Some(can_open) = self.can_open.as_ref() {
             if !self.is_activated() && can_open() {
-                self.activate();
-                return true;
+                if should_activate() {
+                    self.activate();
+                    return true;
+                }
             }
         }
         false
