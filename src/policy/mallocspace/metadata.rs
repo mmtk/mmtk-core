@@ -74,12 +74,12 @@ pub fn is_meta_space_mapped(address: Address) -> bool {
 fn map_chunk_mark_space(chunk_start: Address) {
     // We eagerly map 16Gb worth of space for the chunk mark bytes on 64 bits
     #[cfg(target_pointer_width = "64")]
-    let start = chunk_start - 2048 * BYTES_IN_CHUNK;
+    let start = chunk_start.saturating_sub(2048 * BYTES_IN_CHUNK);
     #[cfg(target_pointer_width = "64")]
     let size = 4096 * BYTES_IN_CHUNK;
 
     #[cfg(target_pointer_width = "32")]
-    let start = chunk_start - 128 * BYTES_IN_CHUNK;
+    let start = chunk_start.saturating_sub(128 * BYTES_IN_CHUNK);
     #[cfg(target_pointer_width = "32")]
     let size = 256 * BYTES_IN_CHUNK;
 
