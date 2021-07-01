@@ -113,12 +113,28 @@ pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
 
 const BYTES_IN_BLOCK: usize = 1 << LOG_BYTES_IN_BLOCK;
 const LOG_BYTES_IN_BLOCK: usize = 16;
-const MI_BIN_HUGE: u8 = 73;
+const MI_BIN_HUGE: usize = 73;
 const MI_INTPTR_SHIFT: usize = 3;
 const MI_INTPTR_SIZE: usize = 1 << MI_INTPTR_SHIFT;
-const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
+pub const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
 const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX/MI_INTPTR_SIZE;
 const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE*8;
+const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
+
+const BLOCK_QUEUES_EMPTY: [BlockQueue; 74] = [
+    BlockQueue::new(     1*8),
+    BlockQueue::new(     1*8), BlockQueue::new(     2*8), BlockQueue::new(     3*8), BlockQueue::new(     4*8), BlockQueue::new(     5*8), BlockQueue::new(     6*8), BlockQueue::new(     7*8), BlockQueue::new(     8), /* 8 */ 
+    BlockQueue::new(    10*8), BlockQueue::new(    12*8), BlockQueue::new(    14*8), BlockQueue::new(    16*8), BlockQueue::new(    20*8), BlockQueue::new(    24*8), BlockQueue::new(    28*8), BlockQueue::new(    32), /* 16 */ 
+    BlockQueue::new(    40*8), BlockQueue::new(    48*8), BlockQueue::new(    56*8), BlockQueue::new(    64*8), BlockQueue::new(    80*8), BlockQueue::new(    96*8), BlockQueue::new(   112*8), BlockQueue::new(   128), /* 24 */ 
+    BlockQueue::new(   160*8), BlockQueue::new(   192*8), BlockQueue::new(   224*8), BlockQueue::new(   256*8), BlockQueue::new(   320*8), BlockQueue::new(   384*8), BlockQueue::new(   448*8), BlockQueue::new(   512), /* 32 */ 
+    BlockQueue::new(   640*8), BlockQueue::new(   768*8), BlockQueue::new(   896*8), BlockQueue::new(  1024*8), BlockQueue::new(  1280*8), BlockQueue::new(  1536*8), BlockQueue::new(  1792*8), BlockQueue::new(  2048), /* 40 */ 
+    BlockQueue::new(  2560*8), BlockQueue::new(  3072*8), BlockQueue::new(  3584*8), BlockQueue::new(  4096*8), BlockQueue::new(  5120*8), BlockQueue::new(  6144*8), BlockQueue::new(  7168*8), BlockQueue::new(  8192), /* 48 */ 
+    BlockQueue::new( 10240*8), BlockQueue::new( 12288*8), BlockQueue::new( 14336*8), BlockQueue::new( 16384*8), BlockQueue::new( 20480*8), BlockQueue::new( 24576*8), BlockQueue::new( 28672*8), BlockQueue::new( 32768), /* 56 */ 
+    BlockQueue::new( 40960*8), BlockQueue::new( 49152*8), BlockQueue::new( 57344*8), BlockQueue::new( 65536*8), BlockQueue::new( 81920*8), BlockQueue::new( 98304*8), BlockQueue::new(114688*8), BlockQueue::new(131072), /* 64 */ 
+    BlockQueue::new(163840*8), BlockQueue::new(196608*8), BlockQueue::new(229376*8), BlockQueue::new(262144*8), BlockQueue::new(327680*8), BlockQueue::new(393216*8), BlockQueue::new(458752*8), BlockQueue::new(524288), /* 72 */ 
+    BlockQueue::new(MI_LARGE_OBJ_WSIZE_MAX + 1  /* 655360, Huge queue */),
+];
+
 
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,

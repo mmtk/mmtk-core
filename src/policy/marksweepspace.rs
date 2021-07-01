@@ -85,9 +85,9 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         );
         MarkSweepSpace {
             pr: if vmrequest.is_discontiguous() {
-                FreeListPageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
+                FreeListPageResource::new_discontiguous(0, vm_map)
             } else {
-                FreeListPageResource::new_contiguous(common.start, common.extent, META_DATA_PAGES_PER_REGION, vm_map)
+                FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
         }
