@@ -14,7 +14,7 @@ pub use large_object_allocator::LargeObjectAllocator;
 mod malloc_allocator;
 pub use malloc_allocator::MallocAllocator;
 
-mod free_list_allocator;
+pub(crate) mod free_list_allocator;
 pub use free_list_allocator::FreeListAllocator;
 
 pub(crate) mod dump_linear_scan;

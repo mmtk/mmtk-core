@@ -63,9 +63,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         offset: isize,
         allocator: AllocationType,
     ) -> Address {
-        let allocator = if size > 256 {AllocationType::Immortal} else {allocator};
-        trace!("Allocation type = {:?}", allocator);
-        trace!("Allocator selector = {:?}", self.config.allocator_mapping[allocator]);
+        let allocator = if size > crate::util::alloc::free_list_allocator::MI_LARGE_OBJ_SIZE_MAX {AllocationType::Immortal} else {allocator};
         unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
