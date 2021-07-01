@@ -17,6 +17,9 @@ cargo clippy --manifest-path=vmbindings/dummyvm/Cargo.toml
 if [[ $arch == "x86_64" && $os == "linux" ]]; then
     for_all_features "cargo clippy --target i686-unknown-linux-gnu"
     for_all_features "cargo clippy --release --target i686-unknown-linux-gnu"
+    cargo clippy --features perf_counter
+    cargo clippy --release --features perf_counter
+    cargo clippy --tests --features perf_counter
 fi 
 
 # check format

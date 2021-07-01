@@ -2,6 +2,9 @@ use crate::mmtk::MMTK;
 use crate::util::statistics::counter::*;
 use crate::util::statistics::Timer;
 use crate::vm::VMBinding;
+
+#[cfg(feature = "perf_counter")]
+use pfm::Perfmon;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -37,6 +40,10 @@ impl SharedStats {
 pub struct Stats {
     gc_count: AtomicUsize,
     total_time: Arc<Mutex<Timer>>,
+    // crate `pfm` uses libpfm4 under the hood for parsing perf event names
+    // Initialization of libpfm4 is required before we can use `PerfEvent` types
+    #[cfg(feature = "perf_counter")]
+    perfmon: Perfmon,
 
     pub shared: Arc<SharedStats>,
     counters: Mutex<Vec<Arc<Mutex<dyn Counter + Send>>>>,
@@ -58,6 +65,12 @@ impl Stats {
         Stats {
             gc_count: AtomicUsize::new(0),
             total_time: t.clone(),
+            #[cfg(feature = "perf_counter")]
+            perfmon: {
+                let mut perfmon: Perfmon = Default::default();
+                perfmon.initialize().expect("Perfmon failed to initialize");
+                perfmon
+            },
 
             shared,
             counters: Mutex::new(vec![t]),

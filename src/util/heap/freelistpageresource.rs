@@ -14,10 +14,13 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::memory;
 use crate::util::opaque_pointer::*;
 use crate::vm::*;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
+
+const UNINITIALIZED_WATER_MARK: i32 = -1;
 
 pub struct CommonFreeListPageResource {
     free_list: Box<<VMMap as Map>::FreeList>,
@@ -41,6 +44,8 @@ pub struct FreeListPageResource<VM: VMBinding> {
     meta_data_pages_per_region: usize,
     sync: Mutex<FreeListPageResourceSync>,
     _p: PhantomData<VM>,
+    /// Protect memory on release, and unprotect on re-allocate.
+    pub(crate) protect_memory_on_release: bool,
 }
 
 struct FreeListPageResourceSync {
@@ -98,7 +103,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         } else {
             sync.pages_currently_on_freelist -= required_pages;
             if page_offset > sync.highwater_mark {
-                if sync.highwater_mark == 0
+                if sync.highwater_mark == UNINITIALIZED_WATER_MARK
                     || (page_offset ^ sync.highwater_mark) > PAGES_IN_REGION as i32
                 {
                     let regions = 1 + ((page_offset - sync.highwater_mark) >> LOG_PAGES_IN_REGION);
@@ -113,7 +118,9 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         let rtn = self.start + conversions::pages_to_bytes(page_offset as _);
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
-
+        if self.protect_memory_on_release && !new_chunk {
+            self.munprotect(rtn, self.free_list.size(page_offset as _) as _)
+        };
         Result::Ok(PRAllocResult {
             start: rtn,
             pages: required_pages,
@@ -156,9 +163,10 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             meta_data_pages_per_region,
             sync: Mutex::new(FreeListPageResourceSync {
                 pages_currently_on_freelist: if growable { 0 } else { pages },
-                highwater_mark: 0,
+                highwater_mark: UNINITIALIZED_WATER_MARK,
             }),
             _p: PhantomData,
+            protect_memory_on_release: false,
         };
         if !flpr.common.growable {
             // For non-growable space, we just need to reserve metadata according to the requested size.
@@ -191,9 +199,40 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             meta_data_pages_per_region,
             sync: Mutex::new(FreeListPageResourceSync {
                 pages_currently_on_freelist: 0,
-                highwater_mark: 0,
+                highwater_mark: UNINITIALIZED_WATER_MARK,
             }),
             _p: PhantomData,
+            protect_memory_on_release: false,
+        }
+    }
+
+    /// Protect the memory
+    fn mprotect(&self, start: Address, pages: usize) {
+        // We may fail here for ENOMEM, especially in PageProtect plan.
+        // See: https://man7.org/linux/man-pages/man2/mprotect.2.html#ERRORS
+        // > Changing the protection of a memory region would result in
+        // > the total number of mappings with distinct attributes
+        // > (e.g., read versus read/write protection) exceeding the
+        // > allowed maximum.
+        assert!(self.protect_memory_on_release);
+        // We are not using mmapper.protect(). mmapper.protect() protects the whole chunk and
+        // may protect memory that is still in use.
+        if let Err(e) = memory::mprotect(start, conversions::pages_to_bytes(pages)) {
+            panic!(
+                "Failed at protecting memory (starting at {}): {:?}",
+                start, e
+            );
+        }
+    }
+
+    /// Unprotect the memory
+    fn munprotect(&self, start: Address, pages: usize) {
+        assert!(self.protect_memory_on_release);
+        if let Err(e) = memory::munprotect(start, conversions::pages_to_bytes(pages)) {
+            panic!(
+                "Failed at unprotecting memory (starting at {}): {:?}",
+                start, e
+            );
         }
     }
 
@@ -269,7 +308,6 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     }
 
     fn reserve_metadata(&mut self, extent: usize) {
-        let _highwater_mark = 0;
         if self.meta_data_pages_per_region > 0 {
             debug_assert!(self.start.is_aligned_to(BYTES_IN_REGION));
             let size = (extent >> LOG_BYTES_IN_REGION) << LOG_BYTES_IN_REGION;
@@ -298,6 +336,10 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // if (VM.config.ZERO_PAGES_ON_RELEASE)
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
         debug_assert!(pages as usize <= self.common.accounting.get_committed_pages());
+
+        if self.protect_memory_on_release {
+            self.mprotect(first, pages as _);
+        }
 
         // FIXME
         #[allow(clippy::cast_ref_to_mut)]

@@ -52,7 +52,7 @@ pub struct Worker<C: Context> {
     local: WorkerLocalPtr,
     pub local_work_bucket: WorkBucket<C>,
     pub sender: Sender<CoordinatorMessage<C>>,
-    pub stat: WorkerLocalStat,
+    pub stat: WorkerLocalStat<C>,
     context: Option<&'static C>,
     is_coordinator: bool,
     local_work_buffer: Vec<(WorkBucketStage, Box<dyn Work<C>>)>,

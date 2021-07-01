@@ -7,7 +7,7 @@ use crate::plan::AllocationSemantics as AllocationType;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
-use crate::vm::VMBinding;
+use crate::vm::{ObjectModel, VMBinding};
 use crate::MMTK;
 use enum_map::enum_map;
 use enum_map::EnumMap;
@@ -59,7 +59,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
         barrier: box ObjectRememberingBarrier::<GenCopyNurseryProcessEdges<VM>>::new(
             mmtk,
-            super::LOGGING_META,
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
         ),
         mutator_tls,
         config,
