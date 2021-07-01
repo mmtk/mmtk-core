@@ -475,7 +475,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             self.work_live_bytes.fetch_add(live_bytes, Ordering::SeqCst);
 
             if completed_packets == self.total_work_packets.load(Ordering::Relaxed) {
-                info!(
+                trace!(
                     "work_live_bytes = {}, live_bytes = {}, active_bytes = {}",
                     self.work_live_bytes.load(Ordering::Relaxed),
                     live_bytes,
