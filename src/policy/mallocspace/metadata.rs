@@ -1,7 +1,10 @@
 use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
 use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
+#[cfg(target_pointer_width = "64")]
 use crate::util::metadata::side_metadata::metadata_address_range_size;
+#[cfg(target_pointer_width = "32")]
+use crate::util::metadata::side_metadata::metadata_bytes_per_chunk;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
@@ -44,10 +47,20 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec
 /// The other metadata used by MallocSpace is mark-bit, which is per-object and can be kept in object header if the VM allows it.
 /// Thus, mark-bit is vm-dependant and is part of each VM's ObjectModel.
 ///
+#[cfg(target_pointer_width = "64")]
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
     offset: ACTIVE_CHUNK_METADATA_SPEC.offset
         + metadata_address_range_size(&ACTIVE_CHUNK_METADATA_SPEC),
+    log_num_of_bits: 0,
+    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
+};
+
+// The + 1 in the offset comes from the metadata bytes per chunk for the Chunk mark metadata
+#[cfg(target_pointer_width = "32")]
+pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    is_global: false,
+    offset: ACTIVE_CHUNK_METADATA_SPEC.offset + 1,
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
@@ -57,10 +70,23 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 /// We use a byte instead of a bit to avoid synchronization costs, i.e. to avoid
 /// the case where two threads try to update different bits in the same byte at
 /// the same time
+#[cfg(target_pointer_width = "64")]
 pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
     offset: ALLOC_SIDE_METADATA_SPEC.offset
         + metadata_address_range_size(&ALLOC_SIDE_METADATA_SPEC),
+    log_num_of_bits: 3,
+    log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
+};
+
+#[cfg(target_pointer_width = "32")]
+pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    is_global: false,
+    offset: ALLOC_SIDE_METADATA_SPEC.offset
+        + metadata_bytes_per_chunk(
+            ALLOC_SIDE_METADATA_SPEC.log_min_obj_size,
+            ALLOC_SIDE_METADATA_SPEC.log_num_of_bits,
+        ),
     log_num_of_bits: 3,
     log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
 };
