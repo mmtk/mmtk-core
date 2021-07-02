@@ -1,7 +1,6 @@
 use crate::util::metadata::side_metadata;
 use crate::vm::ObjectModel;
 use atomic::Ordering;
-
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;

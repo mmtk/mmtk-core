@@ -2,6 +2,7 @@ use atomic::Ordering;
 
 use crate::plan::AllocationSemantics;
 use crate::plan::CopyContext;
+use crate::util::constants::BITS_IN_WORD;
 use crate::util::metadata::{header_metadata::HeaderMetadataSpec, MetadataSpec};
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
@@ -227,4 +228,31 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Arguments:
     /// * `object`: The object to be dumped.
     fn dump_object(object: ObjectReference);
+}
+
+// A list of bits required for each of these specs. The specs are defined in ObjectModel
+pub const NUM_BITS_GLOBAL_LOG_BIT_SPEC: usize = 1;
+pub const NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC: usize = BITS_IN_WORD;
+pub const NUM_BITS_LOCAL_FORWARDING_BITS_SPEC: usize = 2;
+pub const NUM_BITS_LOCAL_MARK_BIT_SPEC: usize = 1;
+pub const NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC: usize = 2;
+
+macro_rules! validate_num_of_bits {
+    ($spec: expr, $expect: expr) => {
+        let num_of_bits = match $spec {
+            MetadataSpec::InHeader(HeaderMetadataSpec{ num_of_bits, .. }) => num_of_bits,
+            MetadataSpec::OnSide(SideMetadataSpec{ log_num_of_bits, .. }) => 1 << log_num_of_bits,
+        };
+        assert_eq!(num_of_bits, $expect, "{} is required to have {} bits ({} bits were given).", stringify!($spec), $expect, num_of_bits);
+    }
+}
+
+/// Validate the metdata specs defined in object model
+pub(crate) fn validate_metadata_spec<VM: VMBinding>() {
+    use crate::util::metadata::side_metadata::SideMetadataSpec;
+    validate_num_of_bits!(VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC, NUM_BITS_GLOBAL_LOG_BIT_SPEC);
+    validate_num_of_bits!(VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC, NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC);
+    validate_num_of_bits!(VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC, NUM_BITS_LOCAL_FORWARDING_BITS_SPEC);
+    validate_num_of_bits!(VM::VMObjectModel::LOCAL_MARK_BIT_SPEC, NUM_BITS_LOCAL_MARK_BIT_SPEC);
+    validate_num_of_bits!(VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC, NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC);
 }

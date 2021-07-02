@@ -25,6 +25,7 @@ mod scanning;
 pub use self::active_plan::ActivePlan;
 pub use self::collection::Collection;
 pub use self::object_model::ObjectModel;
+pub(crate) use self::object_model::validate_metadata_spec;
 pub use self::reference_glue::ReferenceGlue;
 pub use self::scanning::Scanning;
 
