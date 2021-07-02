@@ -2,66 +2,62 @@ use atomic::Ordering;
 
 use crate::plan::AllocationSemantics;
 use crate::plan::CopyContext;
-use crate::util::constants::BITS_IN_WORD;
 use crate::util::metadata::{header_metadata::HeaderMetadataSpec, MetadataSpec};
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
 /// VM-specific methods for object model.
 ///
-/// MMTk does not require but recommands using in-header per-object metadata for better performance.
-/// MMTk requires VMs to announce whether they can provide certain per-object metadata in object headers by overriding the metadata related constants in the ObjectModel trait.
+/// This trait includes 2 parts:
+/// * Specifications for per object metadata: a binding needs to specify the location for per object metadata MMTk needs.
+///   A binding can choose between [`HeaderMetadataSpec`] or [`SideMetadataSpec`].
+///   * [`HeaderMetadataSpec`]: a binding
+///     needs to specify the bit offset to an object reference that can be used for the per object metadata spec. A binding
+///     need to further define the functions with suffix _metadata about how to access the bits in the header. A binding may use
+///     functions in the [`header_metadata`] module if the bits are always available to MMTk, or they could implement their
+///     own routines to access the bits if VM specific treatment is needed (e.g. some bits are not always available to MMTk).
+///   * [`SideMetadataSpec`]: a binding does not need to provide any specific storage for metadata in the header. Instead, MMTk
+///     will use side tables to store the metadata. A binding should define its [`SideMetadataSpec`] starting at the offset of
+///     [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`] or [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`].
+/// * VM-specific object info needed by MMTk: MMTk does not know object info as it is VM specific. However, MMTk needs
+///   some object information for GC. A binding needs to implement them correctly.
 ///
 /// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.
+///
+/// [`HeaderMetadataSpec`]: ../util/metadata/header_metadata/struct.HeaderMetadataSpec.html
+/// [`SideMetadataSpec`]:   ../util/metadata/side_metadata/strutc.SideMetadataSpec.html
+/// [`header_metadata`]:    ../util/metadata/header_metadata/index.html
+/// [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`]: ../util/metadata/side_metadata/constant.GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS.html
+/// [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`]:  ../util/metadata/side_metadata/constant.LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.html
 pub trait ObjectModel<VM: VMBinding> {
-    // --------------------------------------------------
     // Per-object Metadata Spec definitions go here
     //
-    //
-    // NOTE to mmtk binding developers:
-    //
-    // A number of Global and PolicySpecific side metadata specifications are already reserved by mmtk-core.
-    // These are mentioned in their related section as follows.
-    //
-    // Any side metadata offset calculation must consider these to prevent overlaps.
-    //
-    //
-    // NOTE to mmtk-core developers:
-    //
-    // Adding to the list of reserved side metadata specs must consider the offsets currently being used by mmtk bindings to prevent overlaps.
-    //
-    // --------------------------------------------------
+    // Note a number of Global and PolicySpecific side metadata specifications are already reserved by mmtk-core.
+    // Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their
+    // side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.
 
-    // --------------------------------------------------
-    //
-    // Global Metadata
-    //
-    // MMTk reserved Global side metadata offsets:
-    // [currently empty]
-    //
-    // --------------------------------------------------
-
-    /// The metadata specification of the global  log bit.
+    /// The metadata specification of the global log bit. 1 bit (see [`NUM_BITS_GLOBAL_LOG_BIT_SPEC`])
+    ///
+    /// [`NUM_BITS_GLOBAL_LOG_BIT_SPEC`]: ./spec_constants/constant.NUM_BITS_GLOBAL_LOG_BIT_SPEC.html
     const GLOBAL_LOG_BIT_SPEC: MetadataSpec;
 
-    // --------------------------------------------------
-    // PolicySpecific Metadata
-    //
-    // MMTk reserved PolicySpecific side metadata offsets:
-    //
-    //  1 - MarkSweep Alloc bit:
-    //      - Offset `0x0` on 32-bits
-    //      - Offset `LOCAL_SIDE_METADATA_BASE_ADDRESS` on 64-bits
-    //
-    // --------------------------------------------------
-
-    /// The metadata specification for the forwarding pointer, which is currently specific to the CopySpace policy.
+    /// The metadata specification for the forwarding pointer, used by copying plans. Word size (see [`NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC`])
+    ///
+    /// [`NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC.html
     const LOCAL_FORWARDING_POINTER_SPEC: MetadataSpec;
-    /// The metadata specification for the forwarding status bits, which is currently specific to the CopySpace policy.
+    /// The metadata specification for the forwarding status bits, used by copying plans. 2 bits (see [`NUM_BITS_LOCAL_FORWARDING_BITS_SPEC`])
+    ///
+    /// [`NUM_BITS_LOCAL_FORWARDING_BITS_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_FORWARDING_BITS_SPEC.html
     const LOCAL_FORWARDING_BITS_SPEC: MetadataSpec;
-    /// The metadata specification for the mark bit, which is currently specific to the ImmortalSpace policy.
+
+    /// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit (see [`NUM_BITS_LOCAL_MARK_BIT_SPEC`])
+    ///
+    /// [`NUM_BITS_LOCAL_MARK_BIT_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_MARK_BIT_SPEC.html
     const LOCAL_MARK_BIT_SPEC: MetadataSpec;
-    /// The metadata specification for the mark-and-nursery bits, which is currently specific to the LargeObjectSpace policy.
+
+    /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits (see [`NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC`])
+    ///
+    /// [`NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC.html
     const LOCAL_LOS_MARK_NURSERY_SPEC: MetadataSpec;
 
     /// A function to load the specified per-object metadata's content.
@@ -231,11 +227,18 @@ pub trait ObjectModel<VM: VMBinding> {
 }
 
 // A list of bits required for each of these specs. The specs are defined in ObjectModel
-pub const NUM_BITS_GLOBAL_LOG_BIT_SPEC: usize = 1;
-pub const NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC: usize = BITS_IN_WORD;
-pub const NUM_BITS_LOCAL_FORWARDING_BITS_SPEC: usize = 2;
-pub const NUM_BITS_LOCAL_MARK_BIT_SPEC: usize = 1;
-pub const NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC: usize = 2;
+pub mod spec_constants {
+    use crate::util::constants::BITS_IN_WORD;
+
+    pub use crate::util::metadata::side_metadata::GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS;
+    pub use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_VM_BASE_ADDRESS;
+
+    pub const NUM_BITS_GLOBAL_LOG_BIT_SPEC: usize = 1;
+    pub const NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC: usize = BITS_IN_WORD;
+    pub const NUM_BITS_LOCAL_FORWARDING_BITS_SPEC: usize = 2;
+    pub const NUM_BITS_LOCAL_MARK_BIT_SPEC: usize = 1;
+    pub const NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC: usize = 2;
+}
 
 macro_rules! validate_num_of_bits {
     ($spec: expr, $expect: expr) => {
@@ -250,6 +253,7 @@ macro_rules! validate_num_of_bits {
 /// Validate the metdata specs defined in object model
 pub(crate) fn validate_metadata_spec<VM: VMBinding>() {
     use crate::util::metadata::side_metadata::SideMetadataSpec;
+    use self::spec_constants::*;
     validate_num_of_bits!(VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC, NUM_BITS_GLOBAL_LOG_BIT_SPEC);
     validate_num_of_bits!(VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC, NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC);
     validate_num_of_bits!(VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC, NUM_BITS_LOCAL_FORWARDING_BITS_SPEC);
