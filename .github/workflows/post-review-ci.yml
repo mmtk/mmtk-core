@@ -87,6 +87,11 @@ jobs:
           cd mmtk-jikesrvm
           ./.github/scripts/ci-test.sh
           ./.github/scripts/ci-style.sh
+      - uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: jikesrvm-build
+          path: dist/
   jikesrvm-perf-compare:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
@@ -216,6 +221,11 @@ jobs:
           cd mmtk-openjdk
           ./.github/scripts/ci-test.sh
           ./.github/scripts/ci-style.sh
+      - uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: openjdk-build
+          path: build/
   openjdk-perf-compare:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
