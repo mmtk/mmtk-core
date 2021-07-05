@@ -191,10 +191,11 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
 ///
 #[cfg(target_endian = "little")]
 pub(super) fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> Option<isize> {
+    use std::ops::Deref;
     // if both forwarding bits and forwarding pointer are in-header
     match (
-        VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
-        VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+        VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.deref(),
+        VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.deref(),
     ) {
         (MetadataSpec::InHeader(fp), MetadataSpec::InHeader(fb)) => {
             let maybe_shift = fb.bit_offset - fp.bit_offset;

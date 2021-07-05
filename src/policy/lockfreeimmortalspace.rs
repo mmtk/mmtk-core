@@ -128,10 +128,6 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         }
         start
     }
-
-    fn vm_metadata_used(&self) -> &[&MetadataSpec] {
-        &[]
-    }
 }
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {

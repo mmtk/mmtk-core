@@ -94,10 +94,6 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn release_multiple_pages(&mut self, start: Address) {
         self.pr.release_pages(start);
     }
-
-    fn vm_metadata_used(&self) -> &[&MetadataSpec] {
-        &[&VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC]
-    }
 }
 
 impl<VM: VMBinding> LargeObjectSpace<VM> {
@@ -123,7 +119,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
                     local: metadata::extract_side_metadata(&[
-                        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                        *VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
                     ]),
                 },
             },

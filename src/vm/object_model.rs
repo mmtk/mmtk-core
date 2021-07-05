@@ -40,26 +40,26 @@ pub trait ObjectModel<VM: VMBinding> {
     /// The metadata specification of the global log bit. 1 bit (see [`NUM_BITS_GLOBAL_LOG_BIT_SPEC`])
     ///
     /// [`NUM_BITS_GLOBAL_LOG_BIT_SPEC`]: ./spec_constants/constant.NUM_BITS_GLOBAL_LOG_BIT_SPEC.html
-    const GLOBAL_LOG_BIT_SPEC: MetadataSpec;
+    const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec;
 
     /// The metadata specification for the forwarding pointer, used by copying plans. Word size (see [`NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC`])
     ///
     /// [`NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC.html
-    const LOCAL_FORWARDING_POINTER_SPEC: MetadataSpec;
+    const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec;
     /// The metadata specification for the forwarding status bits, used by copying plans. 2 bits (see [`NUM_BITS_LOCAL_FORWARDING_BITS_SPEC`])
     ///
     /// [`NUM_BITS_LOCAL_FORWARDING_BITS_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_FORWARDING_BITS_SPEC.html
-    const LOCAL_FORWARDING_BITS_SPEC: MetadataSpec;
+    const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec;
 
     /// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit (see [`NUM_BITS_LOCAL_MARK_BIT_SPEC`])
     ///
     /// [`NUM_BITS_LOCAL_MARK_BIT_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_MARK_BIT_SPEC.html
-    const LOCAL_MARK_BIT_SPEC: MetadataSpec;
+    const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec;
 
     /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits (see [`NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC`])
     ///
     /// [`NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC.html
-    const LOCAL_LOS_MARK_NURSERY_SPEC: MetadataSpec;
+    const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
 
     /// A function to load the specified per-object metadata's content.
     ///

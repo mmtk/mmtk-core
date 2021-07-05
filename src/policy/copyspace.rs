@@ -63,10 +63,6 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("copyspace only releases pages enmasse")
     }
-
-    fn vm_metadata_used(&self) -> &[&MetadataSpec] {
-        &[&VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC, &VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC]
-    }
 }
 
 impl<VM: VMBinding> CopySpace<VM> {
@@ -82,8 +78,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         heap: &mut HeapMeta,
     ) -> Self {
         let local_specs = extract_side_metadata(&[
-            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
-            VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+            *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+            *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
         ]);
         let common = CommonSpace::new(
             SpaceOptions {

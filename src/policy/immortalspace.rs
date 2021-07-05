@@ -83,10 +83,6 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")
     }
-
-    fn vm_metadata_used(&self) -> &[&MetadataSpec] {
-        &[&VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]
-    }
 }
 
 impl<VM: VMBinding> ImmortalSpace<VM> {
@@ -111,7 +107,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
                     local: metadata::extract_side_metadata(&[
-                        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                        *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                     ]),
                 },
             },
