@@ -15,7 +15,6 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::vm::*;
-use crate::util::metadata::MetadataSpec;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
 

@@ -1,9 +1,9 @@
 use atomic::Ordering;
 
+use self::specs::*;
 use crate::plan::AllocationSemantics;
 use crate::plan::CopyContext;
-use crate::util::constants::LOG_BITS_IN_WORD;
-use crate::util::metadata::{header_metadata::HeaderMetadataSpec, side_metadata::SideMetadataSpec, MetadataSpec};
+use crate::util::metadata::header_metadata::HeaderMetadataSpec;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
@@ -227,86 +227,48 @@ pub trait ObjectModel<VM: VMBinding> {
     fn dump_object(object: ObjectReference);
 }
 
-pub enum VMMetadataSpec {
-    GlobalLogBit,
-    LocalForwardingPointer,
-    LocalForwardingBits,
-    LocalMarkBit,
-    LocalLOSMarkNursery,
-}
+pub mod specs {
+    use crate::util::constants::LOG_BITS_IN_WORD;
+    use crate::util::metadata::{
+        header_metadata::HeaderMetadataSpec, side_metadata::SideMetadataSpec, MetadataSpec,
+    };
 
-macro_rules! new_vm_metadata_spec {
-    ($spec_name: ident, $log_num_bits: expr, $is_global: expr) => {
-        pub struct $spec_name(MetadataSpec);
-        impl $spec_name {
-            const LOG_NUM_BITS: usize = $log_num_bits;
-            const IS_GLOBAL: bool = $is_global;
-            pub fn in_header(bit_offset: isize) -> Self {
-                Self(MetadataSpec::InHeader(HeaderMetadataSpec{ bit_offset, num_of_bits: 1 << Self::LOG_NUM_BITS }))
+    macro_rules! define_vm_metadata_spec {
+        ($spec_name: ident, $log_num_bits: expr, $is_global: expr) => {
+            pub struct $spec_name(MetadataSpec);
+            impl $spec_name {
+                const LOG_NUM_BITS: usize = $log_num_bits;
+                const IS_GLOBAL: bool = $is_global;
+                pub const fn in_header(bit_offset: isize) -> Self {
+                    Self(MetadataSpec::InHeader(HeaderMetadataSpec {
+                        bit_offset,
+                        num_of_bits: 1 << Self::LOG_NUM_BITS,
+                    }))
+                }
+                pub const fn side(offset: usize, log_min_obj_size: usize) -> Self {
+                    Self(MetadataSpec::OnSide(SideMetadataSpec {
+                        is_global: Self::IS_GLOBAL,
+                        offset,
+                        log_num_of_bits: Self::LOG_NUM_BITS,
+                        log_min_obj_size,
+                    }))
+                }
+                pub const fn num_bits(&self) -> usize {
+                    1 << $log_num_bits
+                }
             }
-            pub fn side(offset: usize, log_min_obj_size: usize) -> Self {
-                Self(MetadataSpec::OnSide(SideMetadataSpec{ is_global: Self::IS_GLOBAL, offset, log_num_of_bits: Self::LOG_NUM_BITS, log_min_obj_size }))
+            impl std::ops::Deref for $spec_name {
+                type Target = MetadataSpec;
+                fn deref(&self) -> &Self::Target {
+                    &self.0
+                }
             }
-        }
-        impl std::ops::Deref for $spec_name {
-            type Target = MetadataSpec;
-            fn deref(&self) -> &Self::Target {
-                &self.0
-            }
-        }
+        };
     }
+
+    define_vm_metadata_spec!(VMGlobalLogBitSpec, 0, true);
+    define_vm_metadata_spec!(VMLocalForwardingPointerSpec, LOG_BITS_IN_WORD, false);
+    define_vm_metadata_spec!(VMLocalForwardingBitsSpec, 1, false);
+    define_vm_metadata_spec!(VMLocalMarkBitSpec, 0, false);
+    define_vm_metadata_spec!(VMLocalLOSMarkNurserySpec, 1, false);
 }
-
-new_vm_metadata_spec!(VMGlobalLogBitSpec, 0, true);
-new_vm_metadata_spec!(VMLocalForwardingPointerSpec, LOG_BITS_IN_WORD, false);
-new_vm_metadata_spec!(VMLocalForwardingBitsSpec, 1, false);
-new_vm_metadata_spec!(VMLocalMarkBitSpec, 0, false);
-new_vm_metadata_spec!(VMLocalLOSMarkNurserySpec, 1, false);
-
-// pub struct VMGlobalLogBitSpec(MetadataSpec);
-// impl VMGlobalLogBitSpec {
-//     const LOG_NUM_BITS: usize = 0;
-//     const IS_GLOBAL: bool = true;
-
-//     pub fn in_header(bit_offset: isize) -> Self {
-//         Self(MetadataSpec::InHeader(HeaderMetadataSpec{ bit_offset, num_of_bits: 1 << Self::LOG_NUM_BITS }))
-//     }
-//     pub fn side(offset: usize, log_min_obj_size: usize) -> Self {
-//         Self(MetadataSpec::OnSide(SideMetadataSpec{ is_global: Self::IS_GLOBAL, offset, log_num_of_bits: Self::LOG_NUM_BITS, log_min_obj_size }))
-//     }
-// }
-
-// A list of bits required for each of these specs. The specs are defined in ObjectModel
-pub mod spec_constants {
-    use crate::util::constants::BITS_IN_WORD;
-
-    pub use crate::util::metadata::side_metadata::GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS;
-    pub use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_VM_BASE_ADDRESS;
-
-    pub const NUM_BITS_GLOBAL_LOG_BIT_SPEC: usize = 1;
-    pub const NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC: usize = BITS_IN_WORD;
-    pub const NUM_BITS_LOCAL_FORWARDING_BITS_SPEC: usize = 2;
-    pub const NUM_BITS_LOCAL_MARK_BIT_SPEC: usize = 1;
-    pub const NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC: usize = 2;
-}
-
-// macro_rules! validate_num_of_bits {
-//     ($spec: expr, $expect: expr) => {
-//         let num_of_bits = match $spec {
-//             MetadataSpec::InHeader(HeaderMetadataSpec{ num_of_bits, .. }) => num_of_bits,
-//             MetadataSpec::OnSide(SideMetadataSpec{ log_num_of_bits, .. }) => 1 << log_num_of_bits,
-//         };
-//         assert_eq!(num_of_bits, $expect, "{} is required to have {} bits ({} bits were given).", stringify!($spec), $expect, num_of_bits);
-//     }
-// }
-
-// /// Validate the metdata specs defined in object model
-// pub(crate) fn validate_metadata_spec<VM: VMBinding>() {
-//     use crate::util::metadata::side_metadata::SideMetadataSpec;
-//     use self::spec_constants::*;
-//     validate_num_of_bits!(VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC, NUM_BITS_GLOBAL_LOG_BIT_SPEC);
-//     validate_num_of_bits!(VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC, NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC);
-//     validate_num_of_bits!(VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC, NUM_BITS_LOCAL_FORWARDING_BITS_SPEC);
-//     validate_num_of_bits!(VM::VMObjectModel::LOCAL_MARK_BIT_SPEC, NUM_BITS_LOCAL_MARK_BIT_SPEC);
-//     validate_num_of_bits!(VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC, NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC);
-// }

@@ -1,9 +1,9 @@
 use crate::util::metadata::side_metadata;
-use crate::vm::ObjectModel;
-use atomic::Ordering;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::ObjectReference;
+use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use atomic::Ordering;
 
 use super::header_metadata::HeaderMetadataSpec;
 
@@ -23,8 +23,6 @@ impl MetadataSpec {
     pub fn is_on_side(&self) -> bool {
         matches!(self, &MetadataSpec::OnSide(_))
     }
-
-
 }
 
 /// A function to load the specified metadata's content.

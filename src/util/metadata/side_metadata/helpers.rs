@@ -53,10 +53,10 @@ pub(crate) fn ensure_munmap_contiguos_metadata_space(
     spec: &SideMetadataSpec,
 ) -> usize {
     // nearest page-aligned starting address
-    let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
+    let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
     let mmap_size =
-        address_to_meta_address(*spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
+        address_to_meta_address(spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
     if mmap_size > 0 {
         ensure_munmap_metadata(mmap_start, mmap_size);
     }

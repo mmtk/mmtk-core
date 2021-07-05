@@ -16,7 +16,6 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::vm::{ObjectModel, VMBinding};
-use crate::util::metadata::MetadataSpec;
 
 /// This type implements a simple immortal collection
 /// policy. Under this policy all that is required is for the

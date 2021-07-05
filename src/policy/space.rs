@@ -22,7 +22,6 @@ use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory;
-use crate::util::metadata::MetadataSpec;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
