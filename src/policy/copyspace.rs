@@ -14,6 +14,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
+use crate::util::metadata::MetadataSpec;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -61,6 +62,10 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("copyspace only releases pages enmasse")
+    }
+
+    fn vm_metadata_used(&self) -> &[&MetadataSpec] {
+        &[&VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC, &VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC]
     }
 }
 

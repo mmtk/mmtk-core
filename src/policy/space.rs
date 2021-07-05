@@ -22,6 +22,7 @@ use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory;
+use crate::util::metadata::MetadataSpec;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -448,6 +449,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.common().metadata)
     }
+
+    fn vm_metadata_used(&self) -> &[&MetadataSpec];
 }
 
 impl_downcast!(Space<VM> where VM: VMBinding);

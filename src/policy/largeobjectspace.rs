@@ -19,6 +19,7 @@ use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use crate::util::metadata::MetadataSpec;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -92,6 +93,10 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 
     fn release_multiple_pages(&mut self, start: Address) {
         self.pr.release_pages(start);
+    }
+
+    fn vm_metadata_used(&self) -> &[&MetadataSpec] {
+        &[&VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC]
     }
 }
 

@@ -138,6 +138,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
     }
+
+    fn vm_metadata_used(&self) -> &[&MetadataSpec] {
+        &[&VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]
+    }
 }
 
 impl<VM: VMBinding> MallocSpace<VM> {
