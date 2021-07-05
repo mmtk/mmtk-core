@@ -9,17 +9,20 @@ use crate::vm::VMBinding;
 
 /// VM-specific methods for object model.
 ///
-/// This trait includes 2 parts:
-/// * Specifications for per object metadata: a binding needs to specify the location for per object metadata MMTk needs.
-///   A binding can choose between [`HeaderMetadataSpec`] or [`SideMetadataSpec`].
-///   * [`HeaderMetadataSpec`]: a binding
-///     needs to specify the bit offset to an object reference that can be used for the per object metadata spec. A binding
+/// This trait includes 3 parts:
+///
+/// * Specifications for per object metadata: a binding needs to specify the location for each per object metadata spec.
+///   A binding can choose between `in_header()` or `side()`, e.g. `VMGlobalLogBitSpec::side()`.
+///   * in_header: a binding needs to specify the bit offset to an object reference that can be used for the per object metadata spec.
+///     The actual number of bits required for a spec can be obtained from the `num_bits()` method of the spec type.
+///   * side: a binding does not need to provide any specific storage for metadata in the header. Instead, MMTk
+///     will use side tables to store the metadata. A binding should use the offset from
+///     [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`] or [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`], and lay out all the side specs one after
+///     another.
+/// * In header metadata access: A binding
 ///     need to further define the functions with suffix _metadata about how to access the bits in the header. A binding may use
 ///     functions in the [`header_metadata`] module if the bits are always available to MMTk, or they could implement their
 ///     own routines to access the bits if VM specific treatment is needed (e.g. some bits are not always available to MMTk).
-///   * [`SideMetadataSpec`]: a binding does not need to provide any specific storage for metadata in the header. Instead, MMTk
-///     will use side tables to store the metadata. A binding should define its [`SideMetadataSpec`] starting at the offset of
-///     [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`] or [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`].
 /// * VM-specific object info needed by MMTk: MMTk does not know object info as it is VM specific. However, MMTk needs
 ///   some object information for GC. A binding needs to implement them correctly.
 ///
@@ -37,28 +40,18 @@ pub trait ObjectModel<VM: VMBinding> {
     // Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their
     // side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.
 
-    /// The metadata specification of the global log bit. 1 bit (see [`NUM_BITS_GLOBAL_LOG_BIT_SPEC`])
-    ///
-    /// [`NUM_BITS_GLOBAL_LOG_BIT_SPEC`]: ./spec_constants/constant.NUM_BITS_GLOBAL_LOG_BIT_SPEC.html
+    /// The metadata specification of the global log bit. 1 bit.
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec;
 
-    /// The metadata specification for the forwarding pointer, used by copying plans. Word size (see [`NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC`])
-    ///
-    /// [`NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_FORWARDING_POINTER_SPEC.html
+    /// The metadata specification for the forwarding pointer, used by copying plans. Word size.
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec;
-    /// The metadata specification for the forwarding status bits, used by copying plans. 2 bits (see [`NUM_BITS_LOCAL_FORWARDING_BITS_SPEC`])
-    ///
-    /// [`NUM_BITS_LOCAL_FORWARDING_BITS_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_FORWARDING_BITS_SPEC.html
+    /// The metadata specification for the forwarding status bits, used by copying plans. 2 bits.
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec;
 
-    /// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit (see [`NUM_BITS_LOCAL_MARK_BIT_SPEC`])
-    ///
-    /// [`NUM_BITS_LOCAL_MARK_BIT_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_MARK_BIT_SPEC.html
+    /// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit.
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec;
 
-    /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits (see [`NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC`])
-    ///
-    /// [`NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC`]: ./spec_constants/constant.NUM_BITS_LOCAL_LOS_MARK_NURSERY_SPEC.html
+    /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
 
     /// A function to load the specified per-object metadata's content.
