@@ -269,7 +269,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     fn map_meta_space_for_chunk(&self, chunk_start: Address) {
         // Map the metadata space for chunk
-        map_chunk_meta_space(&self.metadata, chunk_start);
+        map_meta_space_for_chunk(&self.metadata, chunk_start);
 
         // Update the bounds of the max and min chunk addresses seen -- this is used later in the sweep
         // Lockless compare-and-swap loops perform better than a locking variant
@@ -544,10 +544,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
                 if !is_marked::<VM>(object, None) {
                     // Dead object
-                    trace!(
-                        "Object {} has alloc bit but no mark bit, it is dead. ",
-                        object
-                    );
+                    trace!("Object {} has been allocated but not marked", object);
 
                     // Free object
                     self.free(obj_start, bytes);
@@ -595,7 +592,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             self.work_live_bytes.fetch_add(live_bytes, Ordering::SeqCst);
 
             if completed_packets == self.total_work_packets.load(Ordering::Relaxed) {
-                info!(
+                trace!(
                     "work_live_bytes = {}, live_bytes = {}, active_bytes = {}",
                     self.work_live_bytes.load(Ordering::Relaxed),
                     live_bytes,
