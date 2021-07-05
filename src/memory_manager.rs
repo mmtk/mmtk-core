@@ -51,7 +51,6 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
         ),
     }
     assert!(heap_size > 0, "Invalid heap size");
-    // crate::vm::validate_metadata_spec::<VM>();
     mmtk.plan
         .gc_init(heap_size, &crate::VM_MAP, &mmtk.scheduler);
     info!("Initialized MMTk with {:?}", mmtk.options.plan);
