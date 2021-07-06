@@ -259,14 +259,14 @@ pub mod specs {
         };
     }
 
-    /// Log bit, 1 bit, global
+    // Log bit, 1 bit, global
     define_vm_metadata_spec!(VMGlobalLogBitSpec, 0, true);
-    /// Forwarding pointer, word size, local
+    // Forwarding pointer, word size, local
     define_vm_metadata_spec!(VMLocalForwardingPointerSpec, LOG_BITS_IN_WORD, false);
-    /// Forwarding bits, 2 bits, local
+    // Forwarding bits, 2 bits, local
     define_vm_metadata_spec!(VMLocalForwardingBitsSpec, 1, false);
-    /// Mark bit, 1 bit, local
+    // Mark bit, 1 bit, local
     define_vm_metadata_spec!(VMLocalMarkBitSpec, 0, false);
-    /// Mark&nursery bits for LOS, 2 bit, local
+    // Mark&nursery bits for LOS, 2 bit, local
     define_vm_metadata_spec!(VMLocalLOSMarkNurserySpec, 1, false);
 }
