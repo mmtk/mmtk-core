@@ -25,7 +25,6 @@ lazy_static! {
         )]),
         local: vec![],
     };
-
     static ref CHUNK_MAP_LOCK: Mutex<()> = Mutex::new(());
 }
 

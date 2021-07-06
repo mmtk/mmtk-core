@@ -1,5 +1,6 @@
 use crate::plan::global::NoCopy;
 use crate::plan::global::Plan;
+use crate::policy::mallocspace::metadata::is_chunk_mapped;
 use crate::policy::mallocspace::metadata::is_chunk_marked_unsafe;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
@@ -98,7 +99,7 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
         // we can assume that the chunk mark metadata is not being accessed by anything else and hence we use
         // non-atomic accesses
         while chunk < end {
-            if unsafe { is_chunk_marked_unsafe(chunk) } {
+            if is_chunk_mapped(chunk) && unsafe { is_chunk_marked_unsafe(chunk) } {
                 work_packets.push(box MSSweepChunk { ms, chunk });
             }
 
