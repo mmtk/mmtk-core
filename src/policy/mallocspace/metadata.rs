@@ -15,19 +15,7 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{constants, conversions, metadata};
 use crate::vm::{ObjectModel, VMBinding};
-use std::sync::atomic::{AtomicU32, Ordering};
-
-// We use a pattern for the current mmap state of the active chunk metadata which is similar
-// to the forwarding word wherein we have three states:
-//   1. NOT_MAPPED: This is the initial state where the active chunk metadata has not been mmapped
-//   2. MAP_IN_PROGRESS: A mutator thread has successfully atomically acquired the lock for the
-//        active chunk metadata and is now in the process of mmapping its space
-//   3. MAPPED: The aforementioned mutator has successfully mmapped the active chunk metadata space
-const NOT_MAPPED: u32 = 0b00;
-const MAP_IN_PROGRESS: u32 = 0b10;
-const MAPPED: u32 = 0b11;
-
-static FIRST_CHUNK: AtomicU32 = AtomicU32::new(NOT_MAPPED);
+use std::sync::atomic::Ordering;
 
 lazy_static! {
     pub(super) static ref CHUNK_METADATA: SideMetadataContext = SideMetadataContext {
@@ -99,9 +87,7 @@ pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec 
 
 pub fn is_meta_space_mapped(address: Address) -> bool {
     let chunk_start = conversions::chunk_align_down(address);
-    FIRST_CHUNK.load(Ordering::Relaxed) == MAPPED
-        && is_chunk_mapped(chunk_start)
-        && is_chunk_marked(chunk_start)
+    is_chunk_mapped(chunk_start) && is_chunk_marked(chunk_start)
 }
 
 fn map_chunk_mark_space(chunk_start: Address) {
@@ -130,22 +116,11 @@ fn map_chunk_mark_space(chunk_start: Address) {
 }
 
 pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Address) {
-    // XXX: is there a better way to do this?
-    #[allow(clippy::collapsible_if)]
-    if FIRST_CHUNK.load(Ordering::SeqCst) == NOT_MAPPED {
-        if FIRST_CHUNK.compare_exchange(
-            NOT_MAPPED,
-            MAP_IN_PROGRESS,
-            Ordering::SeqCst,
-            Ordering::Relaxed,
-        ) == Ok(NOT_MAPPED)
-        {
-            map_chunk_mark_space(chunk_start);
-            FIRST_CHUNK.store(MAPPED, Ordering::SeqCst);
-        }
+    // XXX: is this safe? there is a race condition here where multiple mutators can
+    // map the active chunk metadata space
+    if !is_chunk_mapped(chunk_start) {
+        map_chunk_mark_space(chunk_start);
     }
-
-    while FIRST_CHUNK.load(Ordering::Relaxed) != MAPPED {}
 
     if is_chunk_marked(chunk_start) {
         return;
@@ -202,7 +177,7 @@ pub(super) unsafe fn is_page_marked_unsafe(page_addr: Address) -> bool {
 
 #[allow(unused)]
 pub fn is_chunk_mapped(chunk_start: Address) -> bool {
-    side_metadata::address_to_meta_address(ALLOC_SIDE_METADATA_SPEC, chunk_start).is_mapped()
+    side_metadata::address_to_meta_address(ACTIVE_CHUNK_METADATA_SPEC, chunk_start).is_mapped()
 }
 
 #[allow(unused)]
