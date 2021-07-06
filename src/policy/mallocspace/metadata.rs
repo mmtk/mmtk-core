@@ -99,7 +99,8 @@ pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec 
 
 pub fn is_meta_space_mapped(address: Address) -> bool {
     let chunk_start = conversions::chunk_align_down(address);
-    FIRST_CHUNK.load(Ordering::Relaxed) == MAPPED && is_chunk_marked(chunk_start)
+    FIRST_CHUNK.load(Ordering::Relaxed) == MAPPED && is_chunk_mapped(chunk_start)
+        && is_chunk_marked(chunk_start)
 }
 
 fn map_chunk_mark_space(chunk_start: Address) {
@@ -196,6 +197,14 @@ pub(super) fn is_page_marked(page_addr: Address) -> bool {
 #[allow(unused)]
 pub(super) unsafe fn is_page_marked_unsafe(page_addr: Address) -> bool {
     side_metadata::load(ACTIVE_PAGE_METADATA_SPEC, page_addr) == 1
+}
+
+#[allow(unused)]
+pub fn is_chunk_mapped(chunk_start: Address) -> bool {
+    side_metadata::address_to_meta_address(
+        ALLOC_SIDE_METADATA_SPEC,
+        chunk_start,
+    ).is_mapped()
 }
 
 #[allow(unused)]
