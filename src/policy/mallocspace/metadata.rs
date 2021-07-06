@@ -16,6 +16,7 @@ use crate::util::ObjectReference;
 use crate::util::{constants, conversions, metadata};
 use crate::vm::{ObjectModel, VMBinding};
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 
 lazy_static! {
     pub(super) static ref CHUNK_METADATA: SideMetadataContext = SideMetadataContext {
@@ -24,6 +25,8 @@ lazy_static! {
         )]),
         local: vec![],
     };
+
+    static ref CHUNK_MAP_LOCK: Mutex<()> = Mutex::new(());
 }
 
 /// Metadata spec for the active chunk byte
@@ -116,10 +119,11 @@ fn map_chunk_mark_space(chunk_start: Address) {
 }
 
 pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Address) {
-    // XXX: is this safe? there is a race condition here where multiple mutators can
-    // map the active chunk metadata space
-    if !is_chunk_mapped(chunk_start) {
-        map_chunk_mark_space(chunk_start);
+    {
+        let _lock = CHUNK_MAP_LOCK.lock().unwrap();
+        if !is_chunk_mapped(chunk_start) {
+            map_chunk_mark_space(chunk_start);
+        }
     }
 
     if is_chunk_marked(chunk_start) {
