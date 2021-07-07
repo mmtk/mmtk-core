@@ -18,7 +18,7 @@ use crate::vm::VMBinding;
 ///    * side: a binding does not need to provide any specific storage for metadata in the header. Instead, MMTk
 ///      will use side tables to store the metadata. A binding should use the offset from
 ///      [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`] or [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`], and lay out all the side specs one after
-///      another.
+///      another (see the following section - Side Specs Layout).
 /// 2. In header metadata access: A binding
 ///    need to further define the functions with suffix _metadata about how to access the bits in the header. A binding may use
 ///    functions in the [`header_metadata`] module if the bits are always available to MMTk, or they could implement their
@@ -27,6 +27,26 @@ use crate::vm::VMBinding;
 ///    some object information for GC. A binding needs to implement them correctly.
 ///
 /// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.
+///
+/// Side Specs Layout
+///
+/// There are two types of side metadata layout in MMTk:
+///
+/// 1. Contiguous layout: is the layout in which the whole metadata space for a SideMetadataSpec is contiguous.
+/// 2. Chunked layout: is the layout in which the whole metadata memory space, that is shared between MMTk policies, is divided into metadata-chunks. Each metadata-chunk stores all of the metadata for all `SideMetadataSpec`s which apply to a source-data chunk.
+///
+/// In 64-bits targets, both Global and PolicySpecific side metadata are contiguous.
+/// Also, in 32-bits targets, the Global side metadata is contiguous.
+/// This means if the starting address (variable named `offset`) of the metadata space for a SideMetadataSpec (`SPEC1`) is `BASE1`, the starting address (`offset`) of the next SideMetadataSpec (`SPEC2`) will be `BASE1 + total_metadata_space_size(SPEC1)`, which is located immediately after the end of the whole metadata space of `SPEC1`.
+/// Now, if we add a third SideMetadataSpec (`SPEC3`), its starting address (`offset`) will be `BASE2 + total_metadata_space_size(SPEC2)`, which is located immediately after the end of the whole metadata space of `SPEC2`.
+///
+/// In 32-bits targets, the PolicySpecific side metadata is chunked.
+/// This means for each chunk (2^22 Bytes) of data, which, by definition, is managed by exactly one MMTk policy, there is a metadata chunk (2^22 * some_fixed_ratio Bytes) that contains all of its PolicySpecific metadata.
+/// This means if a policy has one SideMetadataSpec (`LS1`), the `offset` of that spec will be `0` (= at the start of a metadata chunk).
+/// If there is a second SideMetadataSpec (`LS2`) for this specific policy, the `offset` for that spec will be `0 + required_metadata_space_per_chunk(LS1)`,
+/// and for a third SideMetadataSpec (`LS3`), the `offset` will be `BASE(LS2) + required_metadata_space_per_chunk(LS2)`.
+///
+/// For all other policies, the `offset` starts from zero. This is safe because no two policies ever manage one chunk, so there will be no overlap.
 ///
 /// [`HeaderMetadataSpec`]: ../util/metadata/header_metadata/struct.HeaderMetadataSpec.html
 /// [`SideMetadataSpec`]:   ../util/metadata/side_metadata/strutc.SideMetadataSpec.html
