@@ -15,7 +15,7 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+use crate::util::metadata::side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataSanity, SideMetadataSpec, metadata_address_range_size};
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
@@ -102,6 +102,32 @@ impl<VM: VMBinding> NoGC<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         let global_specs = SideMetadataContext::new_global_specs(&[]);
+        let heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let side_metadata_next = SideMetadataSpec {
+            is_global: false,
+            offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
+        let side_metadata_free = SideMetadataSpec {
+            is_global: false,
+            offset: metadata_address_range_size(&side_metadata_next),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
+        let side_metadata_size = SideMetadataSpec {
+            is_global: false,
+            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
+        let local_specs = {
+            vec![
+                side_metadata_next,
+                side_metadata_free,
+                side_metadata_size,
+            ]
+        };
 
         // #[cfg(feature = "nogc_lock_free")]
         // let nogc_space = NoGCImmortalSpace::new(
@@ -124,11 +150,12 @@ impl<VM: VMBinding> NoGC<VM> {
             "MSspace",
             true,
             VMRequest::discontiguous(),
-            global_specs.clone(),
+            local_specs.clone(),
             vm_map,
             mmapper,
             &mut heap,
         );
+        let global_specs = SideMetadataContext::new_global_specs(&[]);
 
         let im_space = ImmortalSpace::new(
             "IMspace",
