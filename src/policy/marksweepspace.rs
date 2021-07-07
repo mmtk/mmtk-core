@@ -1,10 +1,9 @@
 use crate::{TransitiveClosure, util::{Address, ObjectReference, constants::CARD_META_PAGES_PER_REGION, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, side_metadata::{SideMetadataContext, SideMetadataSpec}}, vm::VMBinding};
 
 use super::space::{CommonSpace, SFT, Space, SpaceOptions};
-const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 pub struct MarkSweepSpace<VM: VMBinding> {
-    common: CommonSpace<VM>,
+    pub common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>    
 }
 
