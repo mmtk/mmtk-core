@@ -317,10 +317,10 @@ impl SideMetadataContext {
 pub fn ensure_metadata_is_mapped(metadata_spec: &SideMetadataSpec, data_addr: Address) {
     let meta_start = address_to_meta_address(metadata_spec, data_addr).align_down(BYTES_IN_PAGE);
 
-    debug!(
-        "ensure_metadata_is_mapped({}).meta_start({})",
-        data_addr, meta_start
-    );
+    // debug!(
+    //     "ensure_metadata_is_mapped({}).meta_start({})",
+    //     data_addr, meta_start
+    // );
 
     memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
 }
@@ -371,8 +371,9 @@ pub fn store_atomic(
 ) {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
-
+    trace!("addr = {}", data_addr);
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    trace!("addr = {}, meta_addr = {}", data_addr, meta_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
