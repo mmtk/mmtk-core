@@ -13,26 +13,86 @@ use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 /// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.
 ///
 /// For performance reasons, objects of this struct should be constants.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct SideMetadataSpec {
     pub is_global: bool,
-    pub offset: usize,
+    pub offset: SideMetadataOffset,
     /// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.
     pub log_num_of_bits: usize,
     /// Number of bytes of the region. E.g. 3 = 8 bytes, 12 = 4096 bytes (page).
     pub log_min_obj_size: usize,
 }
 
+impl SideMetadataSpec {
+    pub fn is_addr_offset(&self) -> bool {
+        self.is_global || cfg!(target_pointer_width = "64")
+    }
+    pub fn is_rel_offset(&self) -> bool {
+        !self.is_addr_offset()
+    }
+}
+
+impl PartialEq for SideMetadataSpec {
+    fn eq(&self, other: &Self) -> bool {
+        if self.is_global != other.is_global || self.log_num_of_bits != other.log_num_of_bits || self.log_min_obj_size != other.log_min_obj_size {
+            return false;
+        }
+        unsafe {
+            if self.is_addr_offset() && self.offset.addr != other.offset.addr {
+                return false;
+            }
+            if self.is_rel_offset() && self.offset.rel_offset != other.offset.rel_offset {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+impl Eq for SideMetadataSpec {}
+
+impl std::hash::Hash for SideMetadataSpec {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.is_global.hash(state);
+        if self.is_addr_offset() {
+            unsafe { self.offset.addr }.hash(state);
+        } else {
+            unsafe { self.offset.rel_offset }.hash(state);
+        }
+        self.log_num_of_bits.hash(state);
+        self.log_min_obj_size.hash(state);
+    }
+}
+
+#[derive(Clone, Copy)]
+pub union SideMetadataOffset { pub addr: Address, pub rel_offset: usize }
+
+// #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+// pub enum SideMetadataScope {
+//     Global{ offset: Address },
+//     #[cfg(target_pointer_width = "64")]
+//     Local{ offset: Address },
+//     #[cfg(target_pointer_width = "32")]
+//     Local{ offset: usize },
+// }
+
 impl fmt::Debug for SideMetadataSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
             "SideMetadataSpec {{ \
             **is_global: {:?} \
-            **offset: 0x{:x} \
+            **offset: {} \
             **log_num_of_bits: 0x{:x} \
             **log_min_obj_size: 0x{:x} \
             }}",
-            self.is_global, self.offset, self.log_num_of_bits, self.log_min_obj_size
+            self.is_global,
+            unsafe {
+                if self.is_addr_offset() {
+                    format!("0x{:x}", self.offset.addr)
+                } else {
+                    format!("0x{:x}", self.offset.rel_offset)
+                }
+            },
+            self.log_num_of_bits, self.log_min_obj_size
         ))
     }
 }

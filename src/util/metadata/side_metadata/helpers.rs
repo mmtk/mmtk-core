@@ -22,15 +22,12 @@ pub(crate) fn address_to_contiguous_meta_address(
 
     let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
+    debug_assert!(metadata_spec.is_addr_offset());
     unsafe {
         if rshift >= 0 {
-            Address::from_usize(
-                metadata_spec.offset as usize + ((data_addr >> log_min_obj_size) >> rshift),
-            )
+            metadata_spec.offset.addr + ((data_addr >> log_min_obj_size) >> rshift)
         } else {
-            Address::from_usize(
-                metadata_spec.offset as usize + ((data_addr >> log_min_obj_size) << (-rshift)),
-            )
+            metadata_spec.offset.addr + ((data_addr >> log_min_obj_size) << (-rshift))
         }
     }
 }
@@ -110,11 +107,9 @@ pub(crate) fn address_to_meta_address(
     let res = { address_to_contiguous_meta_address(metadata_spec, data_addr) };
 
     trace!(
-        "address_to_meta_address(addr: {}, off: 0x{:x}, lbits: {}, lmin: {}) -> 0x{:x}",
+        "address_to_meta_address({:?}, addr: {}) -> 0x{:x}",
+        metadata_spec,
         data_addr,
-        metadata_spec.offset,
-        metadata_spec.log_num_of_bits,
-        metadata_spec.log_min_obj_size,
         res
     );
 

@@ -13,7 +13,7 @@ use super::header_metadata::HeaderMetadataSpec;
 /// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.
 ///
 /// For performance reasons, objects of this struct should be constants.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug)]
 pub enum MetadataSpec {
     InHeader(HeaderMetadataSpec),
     OnSide(SideMetadataSpec),
