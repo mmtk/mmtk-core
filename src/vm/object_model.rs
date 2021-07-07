@@ -222,8 +222,8 @@ pub trait ObjectModel<VM: VMBinding> {
 
 pub mod specs {
     use crate::util::constants::LOG_BITS_IN_WORD;
-    use crate::util::constants::LOG_MIN_OBJECT_SIZE;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
+    use crate::util::constants::LOG_MIN_OBJECT_SIZE;
     use crate::util::metadata::{
         header_metadata::HeaderMetadataSpec, side_metadata::SideMetadataSpec, MetadataSpec,
     };
@@ -264,7 +264,12 @@ pub mod specs {
     // Log bit: 1 bit per object, global
     define_vm_metadata_spec!(VMGlobalLogBitSpec, 0, true, LOG_MIN_OBJECT_SIZE);
     // Forwarding pointer: word size per object, local
-    define_vm_metadata_spec!(VMLocalForwardingPointerSpec, LOG_BITS_IN_WORD, false, LOG_MIN_OBJECT_SIZE);
+    define_vm_metadata_spec!(
+        VMLocalForwardingPointerSpec,
+        LOG_BITS_IN_WORD,
+        false,
+        LOG_MIN_OBJECT_SIZE
+    );
     // Forwarding bits: 2 bits per object, local
     define_vm_metadata_spec!(VMLocalForwardingBitsSpec, 1, false, LOG_MIN_OBJECT_SIZE);
     // Mark bit: 1 bit per object, local
