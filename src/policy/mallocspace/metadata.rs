@@ -126,6 +126,8 @@ fn map_active_chunk_metadata(chunk_start: Address) {
     }
 }
 
+// We map the active chunk metadata (if not previously mapped), as well as the alloc bit metadata
+// and active page metadata here
 pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Address) {
     {
         // In order to prevent race conditions, we synchronize on the lock first and then
