@@ -164,7 +164,6 @@ pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
     fn constraints(&self) -> &'static PlanConstraints;
-    // fn vm_metadata_used(&self) -> &[&MetadataSpec];
     fn create_worker_local(
         &self,
         tls: VMWorkerThread,
