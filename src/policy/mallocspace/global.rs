@@ -306,10 +306,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // Call the relevant sweep function depending on the location of the mark bits
         match VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
             MetadataSpec::OnSide(local_mark_bit_side_spec) => {
-                unsafe { self.sweep_chunk_mark_on_side(chunk_start, local_mark_bit_side_spec) };
+                self.sweep_chunk_mark_on_side(chunk_start, local_mark_bit_side_spec);
             }
             _ => {
-                unsafe { self.sweep_chunk_mark_in_header(chunk_start) };
+                self.sweep_chunk_mark_in_header(chunk_start);
             }
         }
     }
@@ -318,15 +318,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// This has been optimized with the use of bulk loading and bulk zeroing of
     /// metadata.
     ///
-    /// # Safety
-    /// unsafe as it uses non-atomic accesses to side metadata (although these
+    /// This function uses non-atomic accesses to side metadata (although these
     /// non-atomic accesses should not have race conditions associated with them)
-    /// as well as calling libc functions
-    unsafe fn sweep_chunk_mark_on_side(
-        &self,
-        chunk_start: Address,
-        mark_bit_spec: SideMetadataSpec,
-    ) {
+    /// as well as calls libc functions (`malloc_usable_size()`, `free()`)
+    fn sweep_chunk_mark_on_side(&self, chunk_start: Address, mark_bit_spec: SideMetadataSpec) {
         #[cfg(debug_assertions)]
         let mut live_bytes = 0;
 
@@ -353,25 +348,25 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // wherein the performance of the hot loop decreased if more work was done in the loop.
             if address - page >= BYTES_IN_PAGE {
                 if page_is_empty {
-                    unset_page_mark_unsafe(page);
+                    unsafe { unset_page_mark_unsafe(page) };
                 }
                 page = conversions::page_align_down(address);
                 page_is_empty = !on_page_boundary;
                 on_page_boundary = false;
             }
 
-            let alloc_128: u128 = load128(ALLOC_SIDE_METADATA_SPEC, address);
-            let mark_128: u128 = load128(mark_bit_spec, address);
+            let alloc_128: u128 = unsafe { load128(ALLOC_SIDE_METADATA_SPEC, address) };
+            let mark_128: u128 = unsafe { load128(mark_bit_spec, address) };
 
             if alloc_128 ^ mark_128 != 0 {
                 let end = address + align;
                 while address < end {
                     trace!("Checking address = {}, end = {}", address, end);
                     // Check if the address is an object
-                    if is_alloced_object_unsafe(address) {
-                        let object = address.to_object_reference();
+                    if unsafe { is_alloced_object_unsafe(address) } {
+                        let object = unsafe { address.to_object_reference() };
                         let obj_start = VM::VMObjectModel::object_start_ref(object);
-                        let bytes = malloc_usable_size(obj_start.to_mut_ptr());
+                        let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
 
                         if !is_marked::<VM>(object, None) {
                             // Dead object
@@ -380,7 +375,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                             // Free object
                             self.free(obj_start, bytes);
                             trace!("free object {}", object);
-                            unset_alloc_bit_unsafe(object);
+                            unsafe { unset_alloc_bit_unsafe(object) };
                         } else {
                             // Live object
                             // This chunk and page are still active.
@@ -419,10 +414,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
             let mut address = chunk_start;
             while address < chunk_end {
                 // Check if the address is an object
-                if is_alloced_object_unsafe(address) {
-                    let object = address.to_object_reference();
+                if unsafe { is_alloced_object_unsafe(address) } {
+                    let object = unsafe { address.to_object_reference() };
                     let obj_start = VM::VMObjectModel::object_start_ref(object);
-                    let bytes = malloc_usable_size(obj_start.to_mut_ptr());
+                    let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
 
                     #[cfg(debug_assertions)]
                     if ASSERT_ALLOCATION {
@@ -461,7 +456,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
         if chunk_is_empty {
             // Since the chunk mark metadata is a byte, we don't need synchronization
-            unset_chunk_mark_unsafe(chunk_start);
+            unsafe { unset_chunk_mark_unsafe(chunk_start) };
         }
 
         debug!(
@@ -492,11 +487,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     /// This sweep function is called when the mark bit sits in the object header
     ///
-    /// # Safety
-    /// unsafe as it uses non-atomic accesses to side metadata (although these
+    /// This function uses non-atomic accesses to side metadata (although these
     /// non-atomic accesses should not have race conditions associated with them)
-    /// as well as calling libc functions
-    unsafe fn sweep_chunk_mark_in_header(&self, chunk_start: Address) {
+    /// as well as calls libc functions (`malloc_usable_size()`, `free()`)
+    fn sweep_chunk_mark_in_header(&self, chunk_start: Address) {
         #[cfg(debug_assertions)]
         let mut live_bytes = 0;
 
@@ -514,7 +508,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
             if address - page >= BYTES_IN_PAGE {
                 if page_is_empty {
-                    unset_page_mark_unsafe(page);
+                    unsafe { unset_page_mark_unsafe(page) };
                 }
                 page = conversions::page_align_down(address);
                 page_is_empty = !on_page_boundary;
@@ -522,10 +516,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
             }
 
             // Check if the address is an object
-            if is_alloced_object_unsafe(address) {
-                let object = address.to_object_reference();
+            if unsafe { is_alloced_object_unsafe(address) } {
+                let object = unsafe { address.to_object_reference() };
                 let obj_start = VM::VMObjectModel::object_start_ref(object);
-                let bytes = malloc_usable_size(obj_start.to_mut_ptr());
+                let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
 
                 #[cfg(debug_assertions)]
                 if ASSERT_ALLOCATION {
@@ -549,7 +543,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     // Free object
                     self.free(obj_start, bytes);
                     trace!("free object {}", object);
-                    unset_alloc_bit_unsafe(object);
+                    unsafe { unset_alloc_bit_unsafe(object) };
                 } else {
                     // Live object. Unset mark bit
                     unset_mark_bit::<VM>(object, None);
@@ -578,7 +572,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
         if chunk_is_empty {
             // Since the chunk mark metadata is a byte, we don't need synchronization
-            unset_chunk_mark_unsafe(chunk_start);
+            unsafe { unset_chunk_mark_unsafe(chunk_start) };
         }
 
         debug!(

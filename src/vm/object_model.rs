@@ -36,7 +36,9 @@ pub trait ObjectModel<VM: VMBinding> {
     // Global Metadata
     //
     // MMTk reserved Global side metadata offsets:
-    // [currently empty]
+    //
+    //  1 - MarkSweep Active Chunk byte:
+    //      - Offset `GLOBAL_SIDE_METADATA_BASE_ADDRESS`
     //
     // --------------------------------------------------
 
@@ -48,12 +50,10 @@ pub trait ObjectModel<VM: VMBinding> {
     //
     // MMTk reserved PolicySpecific side metadata offsets:
     //
-    //  1 - MarkSweep Chunk Mark byte:
+    //  1 - MarkSweep Alloc bit:
     //      - Offset `0x0` on 32-bits
     //      - Offset `LOCAL_SIDE_METADATA_BASE_ADDRESS` on 64-bits
-    //  2 - MarkSweep Alloc bit:
-    //      - Offset `Chunk Mark`.offset + `Chunk Mark`.metadata_address_range_size()
-    //  3 - MarkSweep Page Mark byte:
+    //  2 - MarkSweep Active Page byte:
     //      - Offset `Alloc bit`.offset + `Alloc bit`.metadata_address_range_size()
     //
     // --------------------------------------------------

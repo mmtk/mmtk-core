@@ -10,25 +10,28 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::side_metadata::GLOBAL_SIDE_METADATA_BASE_ADDRESS;
 use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
 use crate::util::metadata::store_metadata;
-use crate::util::metadata::MetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::{constants, conversions, metadata};
+use crate::util::{constants, conversions};
 use crate::vm::{ObjectModel, VMBinding};
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
 lazy_static! {
     pub(super) static ref CHUNK_METADATA: SideMetadataContext = SideMetadataContext {
-        global: metadata::extract_side_metadata(&[MetadataSpec::OnSide(
-            ACTIVE_CHUNK_METADATA_SPEC
-        )]),
+        global: vec![ACTIVE_CHUNK_METADATA_SPEC],
         local: vec![],
     };
+
+    // lock to synchronize the mapping for the active chunk space
     static ref CHUNK_MAP_LOCK: Mutex<()> = Mutex::new(());
 }
 
 /// Metadata spec for the active chunk byte
+///
+/// The active chunk metadata is used to track what chunks have been allocated by `malloc()`
+/// which is out of our control. We use this metadata later to generate sweep tasks for only
+/// the chunks which have live objects in them.
 ///
 /// This metadata is mapped eagerly (as opposed to lazily like the others),
 /// hence a separate `SideMetadata` instance is required.
@@ -63,6 +66,9 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 
 /// Metadata spec for the active page byte
 ///
+/// The active page metadata is used to accurately track the total number of pages that have
+/// been reserved by `malloc()`.
+///
 /// We use a byte instead of a bit to avoid synchronization costs, i.e. to avoid
 /// the case where two threads try to update different bits in the same byte at
 /// the same time
@@ -92,8 +98,11 @@ pub fn is_meta_space_mapped(address: Address) -> bool {
     is_chunk_mapped(chunk_start) && is_chunk_marked(chunk_start)
 }
 
-fn map_chunk_mark_space(chunk_start: Address) {
+// Eagerly map the active chunk metadata surrounding `chunk_start`
+fn map_active_chunk_metadata(chunk_start: Address) {
     // We eagerly map 16Gb worth of space for the chunk mark bytes on 64-bits
+    // We require saturating subtractions in order to not overflow the chunk_start by
+    // accident when subtracting if we have been allocated a very low base address by `malloc()`
     #[cfg(target_pointer_width = "64")]
     let start = chunk_start.saturating_sub(2048 * BYTES_IN_CHUNK);
     #[cfg(target_pointer_width = "64")]
@@ -119,9 +128,11 @@ fn map_chunk_mark_space(chunk_start: Address) {
 
 pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Address) {
     {
+        // In order to prevent race conditions, we synchronize on the lock first and then
+        // check if we need to map the active chunk metadata for `chunk_start`
         let _lock = CHUNK_MAP_LOCK.lock().unwrap();
         if !is_chunk_mapped(chunk_start) {
-            map_chunk_mark_space(chunk_start);
+            map_active_chunk_metadata(chunk_start);
         }
     }
 
@@ -148,17 +159,14 @@ pub fn is_alloced(object: ObjectReference) -> bool {
     is_alloced_object(object.to_address())
 }
 
-#[allow(unused)]
 pub fn is_alloced_object(address: Address) -> bool {
     side_metadata::load_atomic(ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
 }
 
-#[allow(unused)]
 pub unsafe fn is_alloced_object_unsafe(address: Address) -> bool {
     side_metadata::load(ALLOC_SIDE_METADATA_SPEC, address) == 1
 }
 
-#[allow(unused)]
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) -> bool {
     load_metadata::<VM>(
         VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
@@ -178,22 +186,18 @@ pub(super) unsafe fn is_page_marked_unsafe(page_addr: Address) -> bool {
     side_metadata::load(ACTIVE_PAGE_METADATA_SPEC, page_addr) == 1
 }
 
-#[allow(unused)]
 pub fn is_chunk_mapped(chunk_start: Address) -> bool {
     side_metadata::address_to_meta_address(ACTIVE_CHUNK_METADATA_SPEC, chunk_start).is_mapped()
 }
 
-#[allow(unused)]
 pub fn is_chunk_marked(chunk_start: Address) -> bool {
     side_metadata::load_atomic(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, Ordering::SeqCst) == 1
 }
 
-#[allow(unused)]
 pub unsafe fn is_chunk_marked_unsafe(chunk_start: Address) -> bool {
     side_metadata::load(ACTIVE_CHUNK_METADATA_SPEC, chunk_start) == 1
 }
 
-#[allow(unused)]
 pub fn set_alloc_bit(object: ObjectReference) {
     side_metadata::store_atomic(
         ALLOC_SIDE_METADATA_SPEC,
@@ -203,7 +207,6 @@ pub fn set_alloc_bit(object: ObjectReference) {
     );
 }
 
-#[allow(unused)]
 pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
     store_metadata::<VM>(
         VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
@@ -214,42 +217,18 @@ pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ord
     );
 }
 
-#[allow(unused)]
 pub(super) fn set_page_mark(page_addr: Address) {
     side_metadata::store_atomic(ACTIVE_PAGE_METADATA_SPEC, page_addr, 1, Ordering::SeqCst);
 }
 
-#[allow(unused)]
-pub(super) unsafe fn set_page_mark_unsafe(page_addr: Address) {
-    side_metadata::store(ACTIVE_PAGE_METADATA_SPEC, page_addr, 1);
-}
-
-#[allow(unused)]
 pub(super) fn set_chunk_mark(chunk_start: Address) {
     side_metadata::store_atomic(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 1, Ordering::SeqCst);
 }
 
-#[allow(unused)]
-pub(super) unsafe fn set_chunk_mark_unsafe(chunk_start: Address) {
-    side_metadata::store(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 1);
-}
-
-#[allow(unused)]
-pub fn unset_alloc_bit(object: ObjectReference) {
-    side_metadata::store_atomic(
-        ALLOC_SIDE_METADATA_SPEC,
-        object.to_address(),
-        0,
-        Ordering::SeqCst,
-    );
-}
-
-#[allow(unused)]
 pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
     side_metadata::store(ALLOC_SIDE_METADATA_SPEC, object.to_address(), 0);
 }
 
-#[allow(unused)]
 pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
     store_metadata::<VM>(
         VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
@@ -260,22 +239,10 @@ pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<O
     );
 }
 
-#[allow(unused)]
-pub(super) fn unset_page_mark(page_addr: Address) {
-    side_metadata::store_atomic(ACTIVE_PAGE_METADATA_SPEC, page_addr, 0, Ordering::SeqCst);
-}
-
-#[allow(unused)]
 pub(super) unsafe fn unset_page_mark_unsafe(page_addr: Address) {
     side_metadata::store(ACTIVE_PAGE_METADATA_SPEC, page_addr, 0);
 }
 
-#[allow(unused)]
-pub(super) fn unset_chunk_mark(chunk_start: Address) {
-    side_metadata::store_atomic(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 0, Ordering::SeqCst);
-}
-
-#[allow(unused)]
 pub(super) unsafe fn unset_chunk_mark_unsafe(chunk_start: Address) {
     side_metadata::store(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 0);
 }
