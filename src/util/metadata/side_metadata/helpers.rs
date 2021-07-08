@@ -22,13 +22,10 @@ pub(crate) fn address_to_contiguous_meta_address(
 
     let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
-    debug_assert!(metadata_spec.is_addr_offset());
-    unsafe {
-        if rshift >= 0 {
-            metadata_spec.offset.addr + ((data_addr >> log_min_obj_size) >> rshift)
-        } else {
-            metadata_spec.offset.addr + ((data_addr >> log_min_obj_size) << (-rshift))
-        }
+    if rshift >= 0 {
+        metadata_spec.get_addr_offset() + ((data_addr >> log_min_obj_size) >> rshift)
+    } else {
+        metadata_spec.get_addr_offset() + ((data_addr >> log_min_obj_size) << (-rshift))
     }
 }
 

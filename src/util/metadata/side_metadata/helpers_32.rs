@@ -35,8 +35,7 @@ pub(super) fn address_to_chunked_meta_address(
         effective_addr << (-rshift)
     };
 
-    debug_assert!(metadata_spec.is_rel_offset());
-    meta_chunk_addr + unsafe { metadata_spec.offset.rel_offset } + second_offset
+    meta_chunk_addr + metadata_spec.get_rel_offset() + second_offset
 }
 
 /// Returns the size in bytes that gets munmapped.

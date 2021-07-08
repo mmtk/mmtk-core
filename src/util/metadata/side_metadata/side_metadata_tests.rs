@@ -14,14 +14,14 @@ mod tests {
     fn test_side_metadata_address_to_meta_address() {
         let mut gspec = SideMetadataSpec {
             is_global: true,
-            offset: SideMetadataOffset { addr: GLOBAL_SIDE_METADATA_BASE_ADDRESS },
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
             log_num_of_bits: 0,
             log_min_obj_size: 0,
         };
         #[cfg(target_pointer_width = "64")]
         let mut lspec = SideMetadataSpec {
             is_global: false,
-            offset: SideMetadataOffset { addr: LOCAL_SIDE_METADATA_BASE_ADDRESS },
+            offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
             log_num_of_bits: 0,
             log_min_obj_size: 0,
         };
@@ -29,7 +29,7 @@ mod tests {
         #[cfg(target_pointer_width = "32")]
         let mut lspec = SideMetadataSpec {
             is_global: false,
-            offset: SideMetadataOffset { rel_offset: 0 },
+            offset: SideMetadataOffset::rel(0),
             log_num_of_bits: 0,
             log_min_obj_size: 0,
         };
@@ -126,7 +126,7 @@ mod tests {
     fn test_side_metadata_meta_byte_mask() {
         let mut spec = SideMetadataSpec {
             is_global: true,
-            offset: SideMetadataOffset { addr: GLOBAL_SIDE_METADATA_BASE_ADDRESS },
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
             log_num_of_bits: 0,
             log_min_obj_size: 0,
         };
@@ -145,7 +145,7 @@ mod tests {
     fn test_side_metadata_meta_byte_lshift() {
         let mut spec = SideMetadataSpec {
             is_global: true,
-            offset: SideMetadataOffset { addr: GLOBAL_SIDE_METADATA_BASE_ADDRESS },
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
             log_num_of_bits: 0,
             log_min_obj_size: 0,
         };
@@ -192,21 +192,21 @@ mod tests {
                     // sanity::reset();
                     let mut gspec = SideMetadataSpec {
                         is_global: true,
-                        offset: SideMetadataOffset { addr: GLOBAL_SIDE_METADATA_BASE_ADDRESS },
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
                         log_num_of_bits: 1,
                         log_min_obj_size: 1,
                     };
                     #[cfg(target_pointer_width = "64")]
                     let mut lspec = SideMetadataSpec {
                         is_global: false,
-                        offset: SideMetadataOffset { addr: LOCAL_SIDE_METADATA_BASE_ADDRESS },
+                        offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
                         log_num_of_bits: 1,
                         log_min_obj_size: 1,
                     };
                     #[cfg(target_pointer_width = "32")]
                     let mut lspec = SideMetadataSpec {
                         is_global: false,
-                        offset: SideMetadataOffset { rel_offset: 0 },
+                        offset: SideMetadataOffset::rel(0),
                         log_num_of_bits: 1,
                         log_min_obj_size: 1,
                     };
@@ -306,15 +306,14 @@ mod tests {
 
                     let metadata_1_spec = SideMetadataSpec {
                         is_global: true,
-                        offset: SideMetadataOffset { addr: GLOBAL_SIDE_METADATA_BASE_ADDRESS },
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
                         log_num_of_bits: 4,
                         log_min_obj_size: 6,
                     };
 
                     let metadata_2_spec = SideMetadataSpec {
                         is_global: true,
-                        offset: SideMetadataOffset { addr: unsafe { metadata_1_spec.offset.addr }
-                            + metadata_address_range_size(&metadata_1_spec) },
+                        offset: SideMetadataOffset::layout_after(&metadata_1_spec),
                         log_num_of_bits: 3,
                         log_min_obj_size: 7,
                     };
@@ -379,7 +378,7 @@ mod tests {
 
                     let metadata_1_spec = SideMetadataSpec {
                         is_global: true,
-                        offset: SideMetadataOffset { addr: GLOBAL_SIDE_METADATA_BASE_ADDRESS },
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
                         log_num_of_bits: 1,
                         log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
                     };
@@ -433,15 +432,14 @@ mod tests {
                     #[cfg(target_pointer_width = "64")]
                     let metadata_1_spec = SideMetadataSpec {
                         is_global: false,
-                        offset: SideMetadataOffset { addr: LOCAL_SIDE_METADATA_BASE_ADDRESS },
+                        offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
                         log_num_of_bits: 4,
                         log_min_obj_size: 9,
                     };
                     #[cfg(target_pointer_width = "64")]
                     let metadata_2_spec = SideMetadataSpec {
                         is_global: false,
-                        offset: SideMetadataOffset { addr: unsafe { metadata_1_spec.offset.addr }
-                            + metadata_address_range_size(&metadata_1_spec) },
+                        offset: SideMetadataOffset::layout_after(&metadata_1_spec),
                         log_num_of_bits: 3,
                         log_min_obj_size: 7,
                     };
@@ -449,18 +447,14 @@ mod tests {
                     #[cfg(target_pointer_width = "32")]
                     let metadata_1_spec = SideMetadataSpec {
                         is_global: false,
-                        offset: SideMetadataOffset { rel_offset: 0 },
+                        offset: SideMetadataOffset::rel(0),
                         log_num_of_bits: 4,
                         log_min_obj_size: 9,
                     };
                     #[cfg(target_pointer_width = "32")]
                     let metadata_2_spec = SideMetadataSpec {
                         is_global: false,
-                        offset: SideMetadataOffset { rel_offset: unsafe { metadata_1_spec.offset.rel_offset }
-                            + metadata_bytes_per_chunk(
-                                metadata_1_spec.log_min_obj_size,
-                                metadata_1_spec.log_num_of_bits,
-                            ) },
+                        offset: SideMetadataOffset::layout_after(&metadata_1_spec),
                         log_num_of_bits: 3,
                         log_min_obj_size: 7,
                     };

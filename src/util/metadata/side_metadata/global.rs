@@ -24,11 +24,25 @@ pub struct SideMetadataSpec {
 }
 
 impl SideMetadataSpec {
-    pub fn is_addr_offset(&self) -> bool {
+    /// Is offset for this spec Address? (contiguous side metadata for 64 bits, and global specs in 32 bits)
+    pub const fn is_addr_offset(&self) -> bool {
         self.is_global || cfg!(target_pointer_width = "64")
     }
-    pub fn is_rel_offset(&self) -> bool {
+    /// If offset for this spec relative? (chunked side metadata for local specs in 32 bits)
+    pub const fn is_rel_offset(&self) -> bool {
         !self.is_addr_offset()
+    }
+
+    #[inline(always)]
+    pub const fn get_addr_offset(&self) -> Address {
+        debug_assert!(self.is_addr_offset());
+        unsafe { self.offset.addr }
+    }
+
+    #[inline(always)]
+    pub const fn get_rel_offset(&self) -> usize {
+        debug_assert!(self.is_rel_offset());
+        unsafe { self.offset.rel_offset }
     }
 }
 
@@ -64,16 +78,35 @@ impl std::hash::Hash for SideMetadataSpec {
 }
 
 #[derive(Clone, Copy)]
-pub union SideMetadataOffset { pub addr: Address, pub rel_offset: usize }
+pub union SideMetadataOffset { addr: Address, rel_offset: usize }
 
-// #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-// pub enum SideMetadataScope {
-//     Global{ offset: Address },
-//     #[cfg(target_pointer_width = "64")]
-//     Local{ offset: Address },
-//     #[cfg(target_pointer_width = "32")]
-//     Local{ offset: usize },
-// }
+impl SideMetadataOffset {
+    // Get an offset for a fixed address. This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
+    pub const fn addr(addr: Address) -> Self {
+        SideMetadataOffset { addr }
+    }
+
+    // Get an offset for a relative offset (usize). This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
+    pub const fn rel(rel_offset: usize) -> Self {
+        SideMetadataOffset { rel_offset }
+    }
+
+    /// Get an offset after a spec. This is used to layout another spec immediately after this one.
+    #[cfg(target_pointer_width = "64")]
+    pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
+        debug_assert!(spec.is_addr_offset());
+        SideMetadataOffset { addr: unsafe { spec.offset.addr }.add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)) }
+    }
+    /// Get an offset after a spec. This is used to layout another spec immediately after this one.
+    #[cfg(target_pointer_width = "32")]
+    pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
+        if spec.is_addr_offset() {
+            SideMetadataOffset { addr: unsafe { spec.offset.addr }.add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)) }
+        } else {
+            SideMetadataOffset { rel_offset: unsafe { spec.offset.rel_offset } + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits) }
+        }
+    }
+}
 
 impl fmt::Debug for SideMetadataSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

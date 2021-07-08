@@ -32,7 +32,7 @@ lazy_static! {
 #[cfg(target_pointer_width = "32")]
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
-    offset: SideMetadataOffset { rel_offset: 0 },
+    offset: SideMetadataOffset::rel(0),
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
@@ -40,7 +40,7 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 #[cfg(target_pointer_width = "64")]
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
-    offset: SideMetadataOffset { addr: LOCAL_SIDE_METADATA_BASE_ADDRESS },
+    offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };

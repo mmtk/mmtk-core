@@ -281,7 +281,7 @@ pub mod specs {
                 pub const fn side(offset: Address, log_min_obj_size: usize) -> Self {
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         is_global: true,
-                        offset: SideMetadataOffset { addr: offset },
+                        offset: SideMetadataOffset::addr(offset),
                         log_num_of_bits: Self::LOG_NUM_BITS,
                         log_min_obj_size,
                     }))
@@ -299,7 +299,7 @@ pub mod specs {
                 pub const fn side(offset: Address) -> Self {
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         is_global: false,
-                        offset: SideMetadataOffset { addr: offset },
+                        offset: SideMetadataOffset::addr(offset),
                         log_num_of_bits: Self::LOG_NUM_BITS,
                         log_min_obj_size: $side_min_obj_size as usize,
                     }))
@@ -308,7 +308,7 @@ pub mod specs {
                 pub const fn side(offset: usize) -> Self {
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         is_global: false,
-                        offset: SideMetadataOffset { rel_offset: offset },
+                        offset: SideMetadataOffset::rel(offset),
                         log_num_of_bits: Self::LOG_NUM_BITS,
                         log_min_obj_size: $side_min_obj_size as usize,
                     }))
