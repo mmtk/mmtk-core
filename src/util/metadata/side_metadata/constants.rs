@@ -55,7 +55,7 @@ pub(super) const LOCAL_SIDE_METADATA_PER_CHUNK: usize =
 // If we add any new side metadata internal to mmtk-core, we need to update this accordingly.
 
 // TODO: We should think if it is possible to update this when we create a new side metadata spec.
-// One issue is that these need to be constants. Possibley we need to use macros or custom build scripts.
+// One issue is that these need to be constants. Possibly we need to use macros or custom build scripts.
 
 // --------------------------------------------------
 //
