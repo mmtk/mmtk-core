@@ -748,15 +748,17 @@ pub fn bzero_metadata(metadata_spec: &SideMetadataSpec, start: Address, size: us
 #[cfg(test)]
 mod tests {
     use crate::util::metadata::side_metadata::SideMetadataContext;
-
     use super::*;
+
+    // offset is not used in these tests.
+    pub const ZERO_OFFSET: SideMetadataOffset = SideMetadataOffset { rel_offset: 0 };
 
     #[test]
     fn calculate_reserved_pages_one_spec() {
         // 1 bit per 8 bytes - 1:64
         let spec = SideMetadataSpec {
             is_global: true,
-            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            offset: ZERO_OFFSET,
             log_num_of_bits: 0,
             log_min_obj_size: 3,
         };
@@ -776,14 +778,14 @@ mod tests {
         // 1 bit per 8 bytes - 1:64
         let gspec = SideMetadataSpec {
             is_global: true,
-            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            offset: ZERO_OFFSET,
             log_num_of_bits: 0,
             log_min_obj_size: 3,
         };
         // 2 bits per page - 2 / (4k * 8) = 1:16k
         let lspec = SideMetadataSpec {
             is_global: false,
-            offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            offset: ZERO_OFFSET,
             log_num_of_bits: 1,
             log_min_obj_size: 12,
         };

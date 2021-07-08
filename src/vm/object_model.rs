@@ -241,12 +241,11 @@ pub trait ObjectModel<VM: VMBinding> {
 }
 
 pub mod specs {
-<<<<<<< HEAD
-    use crate::util::Address;
     use crate::util::constants::LOG_BITS_IN_WORD;
     use crate::util::metadata::{
-        header_metadata::HeaderMetadataSpec, side_metadata::{SideMetadataSpec, SideMetadataOffset}, MetadataSpec,
+        header_metadata::HeaderMetadataSpec, side_metadata::{SideMetadataOffset, SideMetadataSpec}, MetadataSpec,
     };
+    use crate::util::Address;
 
     // Use define_vm_metadata_global_spec or define_vm_metadata_local_spec.
     macro_rules! define_vm_metadata_spec_internal {
@@ -255,38 +254,12 @@ pub mod specs {
             impl $spec_name {
                 pub const LOG_NUM_BITS: usize = $log_num_bits;
                 pub const IS_GLOBAL: bool = $is_global;
-=======
-    use crate::util::constants::LOG_BITS_IN_WORD;
-    use crate::util::constants::LOG_BYTES_IN_PAGE;
-    use crate::util::constants::LOG_MIN_OBJECT_SIZE;
-    use crate::util::metadata::{
-        header_metadata::HeaderMetadataSpec, side_metadata::SideMetadataSpec, MetadataSpec,
-    };
-
-    macro_rules! define_vm_metadata_spec {
-        ($spec_name: ident, $log_num_bits: expr, $is_global: expr, $side_min_obj_size: expr) => {
-            pub struct $spec_name(MetadataSpec);
-            impl $spec_name {
-                const LOG_NUM_BITS: usize = $log_num_bits;
-                const IS_GLOBAL: bool = $is_global;
->>>>>>> master
                 pub const fn in_header(bit_offset: isize) -> Self {
                     Self(MetadataSpec::InHeader(HeaderMetadataSpec {
                         bit_offset,
                         num_of_bits: 1 << Self::LOG_NUM_BITS,
                     }))
                 }
-<<<<<<< HEAD
-=======
-                pub const fn side(offset: usize) -> Self {
-                    Self(MetadataSpec::OnSide(SideMetadataSpec {
-                        is_global: Self::IS_GLOBAL,
-                        offset,
-                        log_num_of_bits: Self::LOG_NUM_BITS,
-                        log_min_obj_size: $side_min_obj_size as usize,
-                    }))
-                }
->>>>>>> master
                 pub const fn num_bits(&self) -> usize {
                     1 << $log_num_bits
                 }
@@ -300,10 +273,9 @@ pub mod specs {
         };
     }
 
-<<<<<<< HEAD
     // Generate a type for a global spec for vm metadata
     macro_rules! define_vm_metadata_global_spec {
-        ($spec_name: ident, $log_num_bits: expr) => {
+        ($spec_name: ident, $log_num_bits: expr, $side_min_obj_size: expr) => {
             define_vm_metadata_spec_internal!($spec_name, $log_num_bits, true);
             impl $spec_name {
                 pub const fn side(offset: Address, log_min_obj_size: usize) -> Self {
@@ -320,56 +292,43 @@ pub mod specs {
 
     // Generate a type for a local spec for vm metadata
     macro_rules! define_vm_metadata_local_spec {
-        ($spec_name: ident, $log_num_bits: expr) => {
+        ($spec_name: ident, $log_num_bits: expr, $side_min_obj_size: expr) => {
             define_vm_metadata_spec_internal!($spec_name, $log_num_bits, false);
             impl $spec_name {
                 #[cfg(target_poiner_width = "64")]
-                pub const fn side(offset: Address, log_min_obj_size: usize) -> Self {
+                pub const fn side(offset: Address) -> Self {
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         is_global: false,
                         offset: SideMetadataOffset { addr: offset },
                         log_num_of_bits: Self::LOG_NUM_BITS,
-                        log_min_obj_size,
+                        log_min_obj_size: $side_min_obj_size as usize,
                     }))
                 }
                 #[cfg(target_poiner_width = "32")]
-                pub const fn side(offset: usize, log_min_obj_size: usize) -> Self {
+                pub const fn side(offset: usize) -> Self {
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         is_global: false,
                         offset: SideMetadataOffset { rel_offset: offset },
                         log_num_of_bits: Self::LOG_NUM_BITS,
-                        log_min_obj_size,
+                        log_min_obj_size: $side_min_obj_size as usize,
                     }))
                 }
             }
         };
     }
 
-    // Log bit, 1 bit, global
-    define_vm_metadata_global_spec!(VMGlobalLogBitSpec, 0);
-    // Forwarding pointer, word size, local
-    define_vm_metadata_local_spec!(VMLocalForwardingPointerSpec, LOG_BITS_IN_WORD);
-    // Forwarding bits, 2 bits, local
-    define_vm_metadata_local_spec!(VMLocalForwardingBitsSpec, 1);
-    // Mark bit, 1 bit, local
-    define_vm_metadata_local_spec!(VMLocalMarkBitSpec, 0);
-    // Mark&nursery bits for LOS, 2 bit, local
-    define_vm_metadata_local_spec!(VMLocalLOSMarkNurserySpec, 1);
-=======
     // Log bit: 1 bit per object, global
-    define_vm_metadata_spec!(VMGlobalLogBitSpec, 0, true, LOG_MIN_OBJECT_SIZE);
+    define_vm_metadata_global_spec!(VMGlobalLogBitSpec, 0, LOG_MIN_OBJECT_SIZE);
     // Forwarding pointer: word size per object, local
-    define_vm_metadata_spec!(
+    define_vm_metadata_local_spec!(
         VMLocalForwardingPointerSpec,
         LOG_BITS_IN_WORD,
-        false,
         LOG_MIN_OBJECT_SIZE
     );
     // Forwarding bits: 2 bits per object, local
-    define_vm_metadata_spec!(VMLocalForwardingBitsSpec, 1, false, LOG_MIN_OBJECT_SIZE);
+    define_vm_metadata_local_spec!(VMLocalForwardingBitsSpec, 1, LOG_MIN_OBJECT_SIZE);
     // Mark bit: 1 bit per object, local
-    define_vm_metadata_spec!(VMLocalMarkBitSpec, 0, false, LOG_MIN_OBJECT_SIZE);
+    define_vm_metadata_local_spec!(VMLocalMarkBitSpec, 0, LOG_MIN_OBJECT_SIZE);
     // Mark&nursery bits for LOS: 2 bit per page, local
-    define_vm_metadata_spec!(VMLocalLOSMarkNurserySpec, 1, false, LOG_BYTES_IN_PAGE);
->>>>>>> master
+    define_vm_metadata_local_spec!(VMLocalLOSMarkNurserySpec, 1, LOG_BYTES_IN_PAGE);
 }
