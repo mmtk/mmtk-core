@@ -4,6 +4,7 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
+use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
 use crate::util::heap::{PageResource, VMRequest};
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 
@@ -592,11 +593,17 @@ impl<VM: VMBinding> CommonSpace<VM> {
     }
 }
 
-pub(crate) const fn get_frac_available(frac: f32) -> usize {
+fn get_frac_available(frac: f32) -> usize {
+    trace!("AVAILABLE_START={}", AVAILABLE_START);
+    trace!("AVAILABLE_END={}", AVAILABLE_END);
     let bytes = (frac * AVAILABLE_BYTES as f32) as usize;
+    trace!("bytes={}*{}={}", frac, AVAILABLE_BYTES, bytes);
     let mb = bytes >> LOG_BYTES_IN_MBYTE;
     let rtn = mb << LOG_BYTES_IN_MBYTE;
-    raw_align_up(rtn, BYTES_IN_CHUNK)
+    trace!("rtn={}", rtn);
+    let aligned_rtn = raw_align_up(rtn, BYTES_IN_CHUNK);
+    trace!("aligned_rtn={}", aligned_rtn);
+    aligned_rtn
 }
 
 pub fn required_chunks(pages: usize) -> usize {

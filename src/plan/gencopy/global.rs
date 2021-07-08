@@ -212,7 +212,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 "nursery",
                 false,
                 true,
-                VMRequest::fraction(crate::util::options::NURSERY_FRACTION),
+                VMRequest::fixed_extent(crate::util::options::NURSERY_SIZE, false),
                 global_metadata_specs.clone(),
                 vm_map,
                 mmapper,

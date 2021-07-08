@@ -12,7 +12,6 @@
 #![feature(associated_type_defaults)]
 #![feature(specialization)]
 #![feature(trait_alias)]
-#![feature(const_fn_floating_point_arithmetic)]
 // TODO: We should fix missing docs for public items and turn this on (Issue #309).
 // #![deny(missing_docs)]
 

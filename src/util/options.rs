@@ -1,4 +1,5 @@
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
+use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use std::cell::UnsafeCell;
 use std::default::Default;
 use std::ops::Deref;
@@ -69,14 +70,14 @@ impl FromStr for PerfEventOptions {
     }
 }
 
-/// The default fraction of the heap as nursery. We create the nursery space based on this value.
-pub const NURSERY_FRACTION: f32 = 0.15;
+/// The default nursery space size.
+pub const NURSERY_SIZE: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// The default min nursery size. This can be set through command line options.
 /// This does not affect the actual space we create as nursery. It is only used in GC trigger check.
-pub const DEFAULT_MIN_NURSERY: usize = 2 << 20;
+pub const DEFAULT_MIN_NURSERY: usize = 2 << LOG_BYTES_IN_MBYTE;
 /// The default max nursery size. This can be set through command line options.
 /// This does not affect the actual space we create as nursery. It is only used in GC trigger check.
-pub const DEFAULT_MAX_NURSERY: usize = 32 << 20;
+pub const DEFAULT_MAX_NURSERY: usize = 32 << LOG_BYTES_IN_MBYTE;
 
 pub struct UnsafeOptionsWrapper(UnsafeCell<Options>);
 
