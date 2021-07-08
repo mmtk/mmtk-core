@@ -154,7 +154,7 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">enqueue_node</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
         <span class="kw">if</span> <span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-            <span class="self">self</span>.<span class="ident">meta</span>,
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>,
             <span class="ident">obj</span>,
             <span class="number">0b1</span>,
             <span class="number">0b0</span>,

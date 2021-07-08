@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["ObjectModel","VM-specific methods for object model."]]});
+initSidebarItems({"mod":[["specs",""]],"trait":[["ObjectModel","VM-specific methods for object model."]]});

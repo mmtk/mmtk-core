@@ -1096,7 +1096,7 @@
 <span class="doccomment">/// * `size`: size of the source data</span>
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_bzero</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_bzero</span>(<span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
     <span class="kw">let</span> <span class="ident">sanity_map</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CONTENT_SANITY_MAP</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
     <span class="kw">match</span> <span class="ident">sanity_map</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_spec</span>) {
         <span class="prelude-val">Some</span>(<span class="ident">spec_sanity_map</span>) <span class="op">=</span><span class="op">&gt;</span> {
@@ -1159,7 +1159,7 @@
 <span class="doccomment">/// * `metadata`: the metadata content to store</span>
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_store</span>(<span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>, <span class="ident">metadata</span>: <span class="ident">usize</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_store</span>(<span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>, <span class="ident">metadata</span>: <span class="ident">usize</span>) {
     <span class="kw">let</span> <span class="ident">sanity_map</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CONTENT_SANITY_MAP</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
     <span class="kw">match</span> <span class="ident">sanity_map</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_spec</span>) {
         <span class="prelude-val">Some</span>(<span class="ident">spec_sanity_map</span>) <span class="op">=</span><span class="op">&gt;</span> {
@@ -1174,7 +1174,7 @@
 <span class="doccomment">/// A helper function encapsulating the common parts of addition and subtraction</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
 <span class="kw">fn</span> <span class="ident">do_math</span>(
-    <span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>,
+    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>,
     <span class="ident">data_addr</span>: <span class="ident">Address</span>,
     <span class="ident">val</span>: <span class="ident">usize</span>,
     <span class="ident">math_op</span>: <span class="ident">MathOp</span>,
@@ -1211,7 +1211,7 @@
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_add</span>(
-    <span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>,
+    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>,
     <span class="ident">data_addr</span>: <span class="ident">Address</span>,
     <span class="ident">val_to_add</span>: <span class="ident">usize</span>,
     <span class="ident">actual_old_val</span>: <span class="ident">usize</span>,
@@ -1242,7 +1242,7 @@
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_sub</span>(
-    <span class="ident">metadata_spec</span>: <span class="ident">SideMetadataSpec</span>,
+    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>,
     <span class="ident">data_addr</span>: <span class="ident">Address</span>,
     <span class="ident">val_to_sub</span>: <span class="ident">usize</span>,
     <span class="ident">actual_old_val</span>: <span class="ident">usize</span>,

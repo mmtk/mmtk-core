@@ -476,7 +476,7 @@
                 <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
                 <span class="ident">local</span>: <span class="ident">metadata::extract_side_metadata</span>(<span class="kw-2">&amp;</span>[
                     <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">ALLOC_SIDE_METADATA_SPEC</span>),
-                    <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
+                    <span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
                 ]),
             },
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>

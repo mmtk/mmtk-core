@@ -210,15 +210,13 @@
 <span id="207">207</span>
 <span id="208">208</span>
 <span id="209">209</span>
-<span id="210">210</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::ObjectModel</span>;
-<span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
-
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata::SideMetadataSpec</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::ObjectReference</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::ObjectModel</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::VMBinding</span>;
+<span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::header_metadata::HeaderMetadataSpec</span>;
 
@@ -253,7 +251,7 @@
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="ident">MetadataSpec</span>,
+    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>,
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
     <span class="ident">atomic_ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>,
@@ -284,7 +282,7 @@
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="ident">MetadataSpec</span>,
+    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>,
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">val</span>: <span class="ident">usize</span>,
     <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
@@ -322,7 +320,7 @@
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compare_exchange_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="ident">MetadataSpec</span>,
+    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>,
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">old_val</span>: <span class="ident">usize</span>,
     <span class="ident">new_val</span>: <span class="ident">usize</span>,
@@ -364,7 +362,7 @@
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_add_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="ident">MetadataSpec</span>,
+    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>,
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">val</span>: <span class="ident">usize</span>,
     <span class="ident">order</span>: <span class="ident">Ordering</span>,
@@ -392,7 +390,7 @@
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_sub_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="ident">MetadataSpec</span>,
+    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>,
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">val</span>: <span class="ident">usize</span>,
     <span class="ident">order</span>: <span class="ident">Ordering</span>,
