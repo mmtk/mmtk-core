@@ -80,6 +80,9 @@ impl std::hash::Hash for SideMetadataSpec {
     }
 }
 
+/// A union of Address or relative offset (usize) used to store offset for a side metadata spec.
+/// If a spec is contiguous side metadata, it uses address. Othrewise it uses usize.
+// The fields are made private on purpose. They can only be accessed from SideMetadata which knows whether it is Address or usize.
 #[derive(Clone, Copy)]
 pub union SideMetadataOffset {
     addr: Address,
