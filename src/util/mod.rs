@@ -43,7 +43,7 @@ pub mod metadata;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
 /// MMTk command line options.
-pub(crate) mod options;
+pub mod options;
 /// Sanity checker for GC.
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;

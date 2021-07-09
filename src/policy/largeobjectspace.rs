@@ -51,25 +51,19 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
-        let old_value = load_metadata::<VM>(
-            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
-            object,
-            None,
-            Some(Ordering::SeqCst),
-        );
-        let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
+        let mut meta = self.mark_state;
         if alloc {
-            new_value |= NURSERY_BIT;
+            meta |= NURSERY_BIT;
         }
         store_metadata::<VM>(
             VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
-            new_value,
+            meta,
             None,
             Some(Ordering::SeqCst),
         );
 
-        let cell = VM::VMObjectModel::object_start_ref(object);
+        let cell = get_cell::<VM>(object);
         self.treadmill.add_to_treadmill(cell, alloc);
     }
 }
@@ -169,7 +163,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects
             if self.test_and_mark(object, self.mark_state) {
-                let cell = VM::VMObjectModel::object_start_ref(object);
+                let cell = get_cell::<VM>(object);
                 self.treadmill.copy(cell, nursery_object);
                 self.clear_nursery(object);
                 trace.process_node(object);
@@ -248,6 +242,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     /// Check if a given object is in nursery
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
+        let object = get_page_aligned_object::<VM>(object);
         load_metadata::<VM>(
             VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
@@ -259,6 +254,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     /// Move a given object out of nursery
     fn clear_nursery(&self, object: ObjectReference) {
+        let object = get_page_aligned_object::<VM>(object);
         loop {
             let old_val = load_metadata::<VM>(
                 VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
@@ -280,6 +276,14 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             }
         }
     }
+}
+
+fn get_cell<VM: VMBinding>(object: ObjectReference) -> Address {
+    get_super_page(VM::VMObjectModel::object_start_ref(object))
+}
+
+fn get_page_aligned_object<VM: VMBinding>(object: ObjectReference) -> ObjectReference {
+    unsafe { get_cell::<VM>(object).to_object_reference() }
 }
 
 fn get_super_page(cell: Address) -> Address {

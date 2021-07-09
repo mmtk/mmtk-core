@@ -870,7 +870,7 @@ use enum_map::Enum;
 /// Allocation semantics that MMTk provides.
 /// Each allocation request requires a desired semantic for the object to allocate.
 #[repr(i32)]
-#[derive(Clone, Copy, Debug, Enum)]
+#[derive(Clone, Copy, Debug, Enum, PartialEq, Eq)]
 pub enum AllocationSemantics {
     Default = 0,
     Immortal = 1,
