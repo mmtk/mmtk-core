@@ -48,7 +48,10 @@ impl SideMetadataSpec {
 
 impl PartialEq for SideMetadataSpec {
     fn eq(&self, other: &Self) -> bool {
-        if self.is_global != other.is_global || self.log_num_of_bits != other.log_num_of_bits || self.log_min_obj_size != other.log_min_obj_size {
+        if self.is_global != other.is_global
+            || self.log_num_of_bits != other.log_num_of_bits
+            || self.log_min_obj_size != other.log_min_obj_size
+        {
             return false;
         }
         unsafe {
@@ -59,7 +62,7 @@ impl PartialEq for SideMetadataSpec {
                 return false;
             }
         }
-        return true;
+        true
     }
 }
 impl Eq for SideMetadataSpec {}
@@ -78,7 +81,10 @@ impl std::hash::Hash for SideMetadataSpec {
 }
 
 #[derive(Clone, Copy)]
-pub union SideMetadataOffset { addr: Address, rel_offset: usize }
+pub union SideMetadataOffset {
+    addr: Address,
+    rel_offset: usize,
+}
 
 impl SideMetadataOffset {
     // Get an offset for a fixed address. This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
@@ -95,15 +101,27 @@ impl SideMetadataOffset {
     #[cfg(target_pointer_width = "64")]
     pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
         debug_assert!(spec.is_addr_offset());
-        SideMetadataOffset { addr: unsafe { spec.offset.addr }.add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)) }
+        SideMetadataOffset {
+            addr: unsafe { spec.offset.addr }
+                .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),
+        }
     }
     /// Get an offset after a spec. This is used to layout another spec immediately after this one.
     #[cfg(target_pointer_width = "32")]
     pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
         if spec.is_addr_offset() {
-            SideMetadataOffset { addr: unsafe { spec.offset.addr }.add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)) }
+            SideMetadataOffset {
+                addr: unsafe { spec.offset.addr }
+                    .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),
+            }
         } else {
-            SideMetadataOffset { rel_offset: unsafe { spec.offset.rel_offset } + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits) }
+            SideMetadataOffset {
+                rel_offset: unsafe { spec.offset.rel_offset }
+                    + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
+                        spec.log_min_obj_size,
+                        spec.log_num_of_bits,
+                    ),
+            }
         }
     }
 }
@@ -125,7 +143,8 @@ impl fmt::Debug for SideMetadataSpec {
                     format!("0x{:x}", self.offset.rel_offset)
                 }
             },
-            self.log_num_of_bits, self.log_min_obj_size
+            self.log_num_of_bits,
+            self.log_min_obj_size
         ))
     }
 }
@@ -780,8 +799,8 @@ pub fn bzero_metadata(metadata_spec: &SideMetadataSpec, start: Address, size: us
 
 #[cfg(test)]
 mod tests {
-    use crate::util::metadata::side_metadata::SideMetadataContext;
     use super::*;
+    use crate::util::metadata::side_metadata::SideMetadataContext;
 
     // offset is not used in these tests.
     pub const ZERO_OFFSET: SideMetadataOffset = SideMetadataOffset { rel_offset: 0 };

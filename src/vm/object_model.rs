@@ -252,12 +252,14 @@ pub trait ObjectModel<VM: VMBinding> {
 
 pub mod specs {
     use crate::util::constants::LOG_BITS_IN_WORD;
-    use crate::util::constants::LOG_MIN_OBJECT_SIZE;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
-    use crate::util::metadata::{
-        header_metadata::HeaderMetadataSpec, side_metadata::{SideMetadataOffset, SideMetadataSpec}, MetadataSpec,
-    };
+    use crate::util::constants::LOG_MIN_OBJECT_SIZE;
     use crate::util::metadata::side_metadata::*;
+    use crate::util::metadata::{
+        header_metadata::HeaderMetadataSpec,
+        side_metadata::{SideMetadataOffset, SideMetadataSpec},
+        MetadataSpec,
+    };
 
     // This macro is invoked in define_vm_metadata_global_spec or define_vm_metadata_local_spec.
     // Use those two to define a new VM metadata spec.

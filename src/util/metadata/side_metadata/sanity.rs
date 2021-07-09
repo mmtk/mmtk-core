@@ -641,7 +641,9 @@ mod tests {
         let spec_2 = SideMetadataSpec {
             is_global: true,
             // We specifically make up an invalid offset
-            offset: SideMetadataOffset::addr(spec_1.get_addr_offset() + metadata_address_range_size(&spec_1) - 1),
+            offset: SideMetadataOffset::addr(
+                spec_1.get_addr_offset() + metadata_address_range_size(&spec_1) - 1,
+            ),
             log_num_of_bits: 0,
             log_min_obj_size: 0,
         };
@@ -686,7 +688,11 @@ mod tests {
         let spec_2 = SideMetadataSpec {
             is_global: false,
             // We make up an invalid offset
-            offset: SideMetadataOffset::rel(spec_1.get_rel_offset() + metadata_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.log_num_of_bits) - 1),
+            offset: SideMetadataOffset::rel(
+                spec_1.get_rel_offset()
+                    + metadata_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.log_num_of_bits)
+                    - 1,
+            ),
             log_num_of_bits: 0,
             log_min_obj_size: 0,
         };
