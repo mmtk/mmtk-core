@@ -1,10 +1,9 @@
 use crate::util::metadata::side_metadata;
-use crate::vm::ObjectModel;
-use atomic::Ordering;
-
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::ObjectReference;
+use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use atomic::Ordering;
 
 use super::header_metadata::HeaderMetadataSpec;
 
@@ -39,7 +38,7 @@ impl MetadataSpec {
 ///
 #[inline(always)]
 pub fn load_metadata<VM: VMBinding>(
-    metadata_spec: MetadataSpec,
+    metadata_spec: &MetadataSpec,
     object: ObjectReference,
     mask: Option<usize>,
     atomic_ordering: Option<Ordering>,
@@ -70,7 +69,7 @@ pub fn load_metadata<VM: VMBinding>(
 ///
 #[inline(always)]
 pub fn store_metadata<VM: VMBinding>(
-    metadata_spec: MetadataSpec,
+    metadata_spec: &MetadataSpec,
     object: ObjectReference,
     val: usize,
     mask: Option<usize>,
@@ -108,7 +107,7 @@ pub fn store_metadata<VM: VMBinding>(
 ///
 #[inline(always)]
 pub fn compare_exchange_metadata<VM: VMBinding>(
-    metadata_spec: MetadataSpec,
+    metadata_spec: &MetadataSpec,
     object: ObjectReference,
     old_val: usize,
     new_val: usize,
@@ -150,7 +149,7 @@ pub fn compare_exchange_metadata<VM: VMBinding>(
 ///
 #[inline(always)]
 pub fn fetch_add_metadata<VM: VMBinding>(
-    metadata_spec: MetadataSpec,
+    metadata_spec: &MetadataSpec,
     object: ObjectReference,
     val: usize,
     order: Ordering,
@@ -178,7 +177,7 @@ pub fn fetch_add_metadata<VM: VMBinding>(
 ///
 #[inline(always)]
 pub fn fetch_sub_metadata<VM: VMBinding>(
-    metadata_spec: MetadataSpec,
+    metadata_spec: &MetadataSpec,
     object: ObjectReference,
     val: usize,
     order: Ordering,

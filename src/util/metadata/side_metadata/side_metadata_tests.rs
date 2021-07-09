@@ -35,29 +35,29 @@ mod tests {
         };
 
         assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(0) }).as_usize(),
+            address_to_meta_address(&gspec, unsafe { Address::from_usize(0) }).as_usize(),
             GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
         );
         assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(0) }).as_usize(),
+            address_to_meta_address(&lspec, unsafe { Address::from_usize(0) }).as_usize(),
             LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
         );
 
         assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(7) }).as_usize(),
+            address_to_meta_address(&gspec, unsafe { Address::from_usize(7) }).as_usize(),
             GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
         );
         assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(7) }).as_usize(),
+            address_to_meta_address(&lspec, unsafe { Address::from_usize(7) }).as_usize(),
             LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
         );
 
         assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(27) }).as_usize(),
+            address_to_meta_address(&gspec, unsafe { Address::from_usize(27) }).as_usize(),
             GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 3
         );
         assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(129) }).as_usize(),
+            address_to_meta_address(&lspec, unsafe { Address::from_usize(129) }).as_usize(),
             LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 16
         );
 
@@ -65,29 +65,29 @@ mod tests {
         lspec.log_min_obj_size = 1;
 
         assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(0) }).as_usize(),
+            address_to_meta_address(&gspec, unsafe { Address::from_usize(0) }).as_usize(),
             GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
         );
         assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(0) }).as_usize(),
+            address_to_meta_address(&lspec, unsafe { Address::from_usize(0) }).as_usize(),
             LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
         );
 
         assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(32) }).as_usize(),
+            address_to_meta_address(&gspec, unsafe { Address::from_usize(32) }).as_usize(),
             GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 1
         );
         assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(32) }).as_usize(),
+            address_to_meta_address(&lspec, unsafe { Address::from_usize(32) }).as_usize(),
             LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 2
         );
 
         assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(316) }).as_usize(),
+            address_to_meta_address(&gspec, unsafe { Address::from_usize(316) }).as_usize(),
             GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 9
         );
         assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(316) }).as_usize(),
+            address_to_meta_address(&lspec, unsafe { Address::from_usize(316) }).as_usize(),
             LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 19
         );
 
@@ -95,29 +95,29 @@ mod tests {
         lspec.log_num_of_bits = 3;
 
         assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(0) }).as_usize(),
+            address_to_meta_address(&gspec, unsafe { Address::from_usize(0) }).as_usize(),
             GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
         );
         assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(0) }).as_usize(),
+            address_to_meta_address(&lspec, unsafe { Address::from_usize(0) }).as_usize(),
             LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
         );
 
         assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(32) }).as_usize(),
+            address_to_meta_address(&gspec, unsafe { Address::from_usize(32) }).as_usize(),
             GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 2
         );
         assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(32) }).as_usize(),
+            address_to_meta_address(&lspec, unsafe { Address::from_usize(32) }).as_usize(),
             LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 16
         );
 
         assert_eq!(
-            address_to_meta_address(gspec, unsafe { Address::from_usize(316) }).as_usize(),
+            address_to_meta_address(&gspec, unsafe { Address::from_usize(316) }).as_usize(),
             GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 19
         );
         assert_eq!(
-            address_to_meta_address(lspec, unsafe { Address::from_usize(318) }).as_usize(),
+            address_to_meta_address(&lspec, unsafe { Address::from_usize(318) }).as_usize(),
             LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + 159
         );
     }
@@ -131,14 +131,14 @@ mod tests {
             log_min_obj_size: 0,
         };
 
-        assert_eq!(meta_byte_mask(spec), 1);
+        assert_eq!(meta_byte_mask(&spec), 1);
 
         spec.log_num_of_bits = 1;
-        assert_eq!(meta_byte_mask(spec), 3);
+        assert_eq!(meta_byte_mask(&spec), 3);
         spec.log_num_of_bits = 2;
-        assert_eq!(meta_byte_mask(spec), 15);
+        assert_eq!(meta_byte_mask(&spec), 15);
         spec.log_num_of_bits = 3;
-        assert_eq!(meta_byte_mask(spec), 255);
+        assert_eq!(meta_byte_mask(&spec), 255);
     }
 
     #[test]
@@ -150,23 +150,35 @@ mod tests {
             log_min_obj_size: 0,
         };
 
-        assert_eq!(meta_byte_lshift(spec, unsafe { Address::from_usize(0) }), 0);
-        assert_eq!(meta_byte_lshift(spec, unsafe { Address::from_usize(5) }), 5);
         assert_eq!(
-            meta_byte_lshift(spec, unsafe { Address::from_usize(15) }),
+            meta_byte_lshift(&spec, unsafe { Address::from_usize(0) }),
+            0
+        );
+        assert_eq!(
+            meta_byte_lshift(&spec, unsafe { Address::from_usize(5) }),
+            5
+        );
+        assert_eq!(
+            meta_byte_lshift(&spec, unsafe { Address::from_usize(15) }),
             7
         );
 
         spec.log_num_of_bits = 2;
 
-        assert_eq!(meta_byte_lshift(spec, unsafe { Address::from_usize(0) }), 0);
-        assert_eq!(meta_byte_lshift(spec, unsafe { Address::from_usize(5) }), 4);
         assert_eq!(
-            meta_byte_lshift(spec, unsafe { Address::from_usize(15) }),
+            meta_byte_lshift(&spec, unsafe { Address::from_usize(0) }),
+            0
+        );
+        assert_eq!(
+            meta_byte_lshift(&spec, unsafe { Address::from_usize(5) }),
             4
         );
         assert_eq!(
-            meta_byte_lshift(spec, unsafe { Address::from_usize(0x10010) }),
+            meta_byte_lshift(&spec, unsafe { Address::from_usize(15) }),
+            4
+        );
+        assert_eq!(
+            meta_byte_lshift(&spec, unsafe { Address::from_usize(0x10010) }),
             0
         );
     }
@@ -214,14 +226,14 @@ mod tests {
                         )
                         .is_ok());
 
-                    ensure_metadata_is_mapped(gspec, vm_layout_constants::HEAP_START);
-                    ensure_metadata_is_mapped(lspec, vm_layout_constants::HEAP_START);
+                    ensure_metadata_is_mapped(&gspec, vm_layout_constants::HEAP_START);
+                    ensure_metadata_is_mapped(&lspec, vm_layout_constants::HEAP_START);
                     ensure_metadata_is_mapped(
-                        gspec,
+                        &gspec,
                         vm_layout_constants::HEAP_START + constants::BYTES_IN_PAGE - 1,
                     );
                     ensure_metadata_is_mapped(
-                        lspec,
+                        &lspec,
                         vm_layout_constants::HEAP_START + constants::BYTES_IN_PAGE - 1,
                     );
 
@@ -253,20 +265,20 @@ mod tests {
                         .is_ok());
 
                     ensure_metadata_is_mapped(
-                        gspec,
+                        &gspec,
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                     );
                     ensure_metadata_is_mapped(
-                        lspec,
+                        &lspec,
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                     );
                     ensure_metadata_is_mapped(
-                        gspec,
+                        &gspec,
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * 2
                             - 8,
                     );
                     ensure_metadata_is_mapped(
-                        lspec,
+                        &lspec,
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * 2
                             - 16,
                     );
@@ -319,30 +331,30 @@ mod tests {
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
                         .is_ok());
 
-                    let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5, Ordering::SeqCst);
+                    let zero = fetch_add_atomic(&metadata_1_spec, data_addr, 5, Ordering::SeqCst);
                     assert_eq!(zero, 0);
 
-                    let five = load_atomic(metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let five = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
 
-                    let zero = fetch_add_atomic(metadata_2_spec, data_addr, 5, Ordering::SeqCst);
+                    let zero = fetch_add_atomic(&metadata_2_spec, data_addr, 5, Ordering::SeqCst);
                     assert_eq!(zero, 0);
 
-                    let five = load_atomic(metadata_2_spec, data_addr, Ordering::SeqCst);
+                    let five = load_atomic(&metadata_2_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
 
                     let another_five =
-                        fetch_sub_atomic(metadata_1_spec, data_addr, 2, Ordering::SeqCst);
+                        fetch_sub_atomic(&metadata_1_spec, data_addr, 2, Ordering::SeqCst);
                     assert_eq!(another_five, 5);
 
-                    let three = load_atomic(metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let three = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(three, 3);
 
                     let another_five =
-                        fetch_sub_atomic(metadata_2_spec, data_addr, 2, Ordering::SeqCst);
+                        fetch_sub_atomic(&metadata_2_spec, data_addr, 2, Ordering::SeqCst);
                     assert_eq!(another_five, 5);
 
-                    let three = load_atomic(metadata_2_spec, data_addr, Ordering::SeqCst);
+                    let three = load_atomic(&metadata_2_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(three, 3);
 
                     metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
@@ -384,17 +396,17 @@ mod tests {
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
                         .is_ok());
 
-                    let zero = fetch_add_atomic(metadata_1_spec, data_addr, 2, Ordering::SeqCst);
+                    let zero = fetch_add_atomic(&metadata_1_spec, data_addr, 2, Ordering::SeqCst);
                     assert_eq!(zero, 0);
 
-                    let two = load_atomic(metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let two = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(two, 2);
 
                     let another_two =
-                        fetch_sub_atomic(metadata_1_spec, data_addr, 1, Ordering::SeqCst);
+                        fetch_sub_atomic(&metadata_1_spec, data_addr, 1, Ordering::SeqCst);
                     assert_eq!(another_two, 2);
 
-                    let one = load_atomic(metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let one = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(one, 1);
 
                     metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
@@ -465,30 +477,30 @@ mod tests {
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
                         .is_ok());
 
-                    let zero = fetch_add_atomic(metadata_1_spec, data_addr, 5, Ordering::SeqCst);
+                    let zero = fetch_add_atomic(&metadata_1_spec, data_addr, 5, Ordering::SeqCst);
                     assert_eq!(zero, 0);
 
-                    let five = load_atomic(metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let five = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
 
-                    let zero = fetch_add_atomic(metadata_2_spec, data_addr, 5, Ordering::SeqCst);
+                    let zero = fetch_add_atomic(&metadata_2_spec, data_addr, 5, Ordering::SeqCst);
                     assert_eq!(zero, 0);
 
-                    let five = load_atomic(metadata_2_spec, data_addr, Ordering::SeqCst);
+                    let five = load_atomic(&metadata_2_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
 
-                    bzero_metadata(metadata_2_spec, data_addr, constants::BYTES_IN_PAGE);
+                    bzero_metadata(&metadata_2_spec, data_addr, constants::BYTES_IN_PAGE);
 
-                    let five = load_atomic(metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let five = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
-                    let five = load_atomic(metadata_2_spec, data_addr, Ordering::SeqCst);
+                    let five = load_atomic(&metadata_2_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(five, 0);
 
-                    bzero_metadata(metadata_1_spec, data_addr, constants::BYTES_IN_PAGE);
+                    bzero_metadata(&metadata_1_spec, data_addr, constants::BYTES_IN_PAGE);
 
-                    let five = load_atomic(metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let five = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(five, 0);
-                    let five = load_atomic(metadata_2_spec, data_addr, Ordering::SeqCst);
+                    let five = load_atomic(&metadata_2_spec, data_addr, Ordering::SeqCst);
                     assert_eq!(five, 0);
 
                     metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);

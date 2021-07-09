@@ -205,7 +205,7 @@ impl SideMetadataContext {
 
 // Used only for debugging
 // Panics in the required metadata for data_addr is not mapped
-pub fn ensure_metadata_is_mapped(metadata_spec: SideMetadataSpec, data_addr: Address) {
+pub fn ensure_metadata_is_mapped(metadata_spec: &SideMetadataSpec, data_addr: Address) {
     let meta_start = address_to_meta_address(metadata_spec, data_addr).align_down(BYTES_IN_PAGE);
 
     debug!(
@@ -217,7 +217,7 @@ pub fn ensure_metadata_is_mapped(metadata_spec: SideMetadataSpec, data_addr: Add
 }
 
 #[inline(always)]
-pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, order: Ordering) -> usize {
+pub fn load_atomic(metadata_spec: &SideMetadataSpec, data_addr: Address, order: Ordering) -> usize {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
@@ -255,7 +255,7 @@ pub fn load_atomic(metadata_spec: SideMetadataSpec, data_addr: Address, order: O
 
 #[inline(always)]
 pub fn store_atomic(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: &SideMetadataSpec,
     data_addr: Address,
     metadata: usize,
     order: Ordering,
@@ -306,7 +306,7 @@ pub fn store_atomic(
 
 #[inline(always)]
 pub fn compare_exchange_atomic(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: &SideMetadataSpec,
     data_addr: Address,
     old_metadata: usize,
     new_metadata: usize,
@@ -408,7 +408,7 @@ pub fn compare_exchange_atomic(
 // same as Rust atomics, this wraps around on overflow
 #[inline(always)]
 pub fn fetch_add_atomic(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: &SideMetadataSpec,
     data_addr: Address,
     val: usize,
     order: Ordering,
@@ -467,7 +467,7 @@ pub fn fetch_add_atomic(
 // same as Rust atomics, this wraps around on overflow
 #[inline(always)]
 pub fn fetch_sub_atomic(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: &SideMetadataSpec,
     data_addr: Address,
     val: usize,
     order: Ordering,
@@ -533,7 +533,7 @@ pub fn fetch_sub_atomic(
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
 #[inline(always)]
-pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize {
+pub unsafe fn load(metadata_spec: &SideMetadataSpec, data_addr: Address) -> usize {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
@@ -580,7 +580,7 @@ pub unsafe fn load(metadata_spec: SideMetadataSpec, data_addr: Address) -> usize
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
 #[inline(always)]
-pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
+pub unsafe fn store(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: usize) {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
@@ -626,7 +626,7 @@ pub unsafe fn store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
 ///
 /// * `chunk_start` - The starting address of the chunk whose metadata is being zeroed.
 ///
-pub fn bzero_metadata(metadata_spec: SideMetadataSpec, start: Address, size: usize) {
+pub fn bzero_metadata(metadata_spec: &SideMetadataSpec, start: Address, size: usize) {
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
