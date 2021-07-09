@@ -30,6 +30,17 @@ use crate::vm::VMBinding;
 ///
 /// Side Specs Layout
 ///
+/// Short version
+///
+/// * For global side metadata:
+///   * The first spec: VMGlobalXXXSpec::side(GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS)
+///   * The following specs: VMGlobalXXXSpec::side_with_offset_after(FIRST_GLOAL.as_spec())
+/// * For local side metadata:
+///   * The first spec: VMLocalXXXSpec::side(LOCAL_SIDE_METADATA_VM_BASE_ADDRESS)
+///   * The following specs: VMLocalXXXSpec::side_with_offset_after(FIRST_LOCAL.as_spec())
+///
+/// Detailed explanation
+///
 /// There are two types of side metadata layout in MMTk:
 ///
 /// 1. Contiguous layout: is the layout in which the whole metadata space for a SideMetadataSpec is contiguous.
@@ -242,14 +253,17 @@ pub trait ObjectModel<VM: VMBinding> {
 
 pub mod specs {
     use crate::util::constants::LOG_BITS_IN_WORD;
+    use crate::util::constants::LOG_MIN_OBJECT_SIZE;
+    use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::metadata::{
         header_metadata::HeaderMetadataSpec, side_metadata::{SideMetadataOffset, SideMetadataSpec}, MetadataSpec,
     };
     use crate::util::Address;
 
-    // Use define_vm_metadata_global_spec or define_vm_metadata_local_spec.
+    // This macro is invoked in define_vm_metadata_global_spec or define_vm_metadata_local_spec.
+    // Use those two to define a new VM metadata spec.
     macro_rules! define_vm_metadata_spec_internal {
-        ($spec_name: ident, $log_num_bits: expr, $is_global: expr) => {
+        ($spec_name: ident, $log_num_bits: expr, $is_global: expr, $side_min_obj_size: expr) => {
             pub struct $spec_name(MetadataSpec);
             impl $spec_name {
                 pub const LOG_NUM_BITS: usize = $log_num_bits;
@@ -260,6 +274,20 @@ pub mod specs {
                         num_of_bits: 1 << Self::LOG_NUM_BITS,
                     }))
                 }
+                pub const fn side_with_offset_after(spec: &MetadataSpec) -> Self {
+                    debug_assert!(spec.is_on_side());
+                    let side_spec = spec.extract_side_spec();
+                    debug_assert!(side_spec.is_global == Self::IS_GLOBAL);
+                    Self(MetadataSpec::OnSide(SideMetadataSpec {
+                        is_global: Self::IS_GLOBAL,
+                        offset: SideMetadataOffset::layout_after(side_spec),
+                        log_num_of_bits: Self::LOG_NUM_BITS,
+                        log_min_obj_size: $side_min_obj_size as usize,
+                    }))
+                }
+                pub const fn as_spec(&self) -> &MetadataSpec {
+                    &self.0
+                }
                 pub const fn num_bits(&self) -> usize {
                     1 << $log_num_bits
                 }
@@ -267,7 +295,7 @@ pub mod specs {
             impl std::ops::Deref for $spec_name {
                 type Target = MetadataSpec;
                 fn deref(&self) -> &Self::Target {
-                    &self.0
+                    self.as_spec()
                 }
             }
         };
@@ -276,14 +304,14 @@ pub mod specs {
     // Generate a type for a global spec for vm metadata
     macro_rules! define_vm_metadata_global_spec {
         ($spec_name: ident, $log_num_bits: expr, $side_min_obj_size: expr) => {
-            define_vm_metadata_spec_internal!($spec_name, $log_num_bits, true);
+            define_vm_metadata_spec_internal!($spec_name, $log_num_bits, true, $side_min_obj_size);
             impl $spec_name {
-                pub const fn side(offset: Address, log_min_obj_size: usize) -> Self {
+                pub const fn side(offset: Address) -> Self {
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         is_global: true,
                         offset: SideMetadataOffset::addr(offset),
                         log_num_of_bits: Self::LOG_NUM_BITS,
-                        log_min_obj_size,
+                        log_min_obj_size: $side_min_obj_size as usize,
                     }))
                 }
             }
@@ -293,9 +321,9 @@ pub mod specs {
     // Generate a type for a local spec for vm metadata
     macro_rules! define_vm_metadata_local_spec {
         ($spec_name: ident, $log_num_bits: expr, $side_min_obj_size: expr) => {
-            define_vm_metadata_spec_internal!($spec_name, $log_num_bits, false);
+            define_vm_metadata_spec_internal!($spec_name, $log_num_bits, false, $side_min_obj_size);
             impl $spec_name {
-                #[cfg(target_poiner_width = "64")]
+                #[cfg(target_pointer_width = "64")]
                 pub const fn side(offset: Address) -> Self {
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         is_global: false,
@@ -304,7 +332,7 @@ pub mod specs {
                         log_min_obj_size: $side_min_obj_size as usize,
                     }))
                 }
-                #[cfg(target_poiner_width = "32")]
+                #[cfg(target_pointer_width = "32")]
                 pub const fn side(offset: usize) -> Self {
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         is_global: false,

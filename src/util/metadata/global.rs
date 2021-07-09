@@ -20,8 +20,15 @@ pub enum MetadataSpec {
 }
 
 impl MetadataSpec {
-    pub fn is_on_side(&self) -> bool {
+    pub const fn is_on_side(&self) -> bool {
         matches!(self, &MetadataSpec::OnSide(_))
+    }
+
+    pub const fn extract_side_spec(&self) -> &SideMetadataSpec {
+        match self {
+            MetadataSpec::OnSide(spec) => spec,
+            MetadataSpec::InHeader(_) => panic!("Expect a side spec"),
+        }
     }
 }
 
