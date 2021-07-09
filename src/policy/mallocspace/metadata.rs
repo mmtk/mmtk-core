@@ -7,9 +7,7 @@ use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::side_metadata::SideMetadataOffset;
-#[cfg(target_pointer_width = "64")]
-use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
+use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -29,18 +27,9 @@ lazy_static! {
 /// The other metadata used by MallocSpace is mark-bit, which is per-object and can be kept in object header if the VM allows it.
 /// Thus, mark-bit is vm-dependant and is part of each VM's ObjectModel.
 ///
-#[cfg(target_pointer_width = "32")]
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
-    offset: SideMetadataOffset::rel(0),
-    log_num_of_bits: 0,
-    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
-};
-
-#[cfg(target_pointer_width = "64")]
-pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    is_global: false,
-    offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
+    offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
