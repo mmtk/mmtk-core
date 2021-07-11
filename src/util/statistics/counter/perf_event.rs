@@ -29,7 +29,7 @@ impl Diffable for PerfEventDiffable {
         val
     }
 
-    fn diff(&mut self, current: &Self::Val, _earlier: &Self::Val) -> u64 {
+    fn diff(current: &Self::Val, _earlier: &Self::Val) -> u64 {
         // earlier value is not used as the counter is reset after each use
         assert_eq!(current.time_enabled, current.time_running);
         current.value as u64

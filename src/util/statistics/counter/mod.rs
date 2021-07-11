@@ -31,7 +31,7 @@ pub trait Counter {
 pub trait Diffable {
     type Val;
     fn current_value(&mut self) -> Self::Val;
-    fn diff(&mut self, current: &Self::Val, earlier: &Self::Val) -> u64;
+    fn diff(current: &Self::Val, earlier: &Self::Val) -> u64;
     fn print_diff(val: u64);
 }
 
@@ -44,7 +44,7 @@ impl Diffable for MonotoneNanoTime {
         Instant::now()
     }
 
-    fn diff(&mut self, current: &Instant, earlier: &Instant) -> u64 {
+    fn diff(current: &Instant, earlier: &Instant) -> u64 {
         let delta = current.duration_since(*earlier);
         delta.as_secs() * 1_000_000_000 + u64::from(delta.subsec_nanos())
     }

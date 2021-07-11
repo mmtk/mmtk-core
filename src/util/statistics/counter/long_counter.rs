@@ -38,9 +38,7 @@ impl<T: Diffable> Counter for LongCounter<T> {
         debug_assert!(self.running);
         self.running = false;
         let current_value = self.diffable.current_value();
-        let delta = self
-            .diffable
-            .diff(&current_value, self.start_value.as_ref().unwrap());
+        let delta = T::diff(&current_value, self.start_value.as_ref().unwrap());
         self.count[self.stats.get_phase()] += delta;
         self.total_count += delta;
     }
@@ -48,7 +46,7 @@ impl<T: Diffable> Counter for LongCounter<T> {
     fn phase_change(&mut self, old_phase: usize) {
         if self.running {
             let now = self.diffable.current_value();
-            let delta = self.diffable.diff(&now, self.start_value.as_ref().unwrap());
+            let delta = T::diff(&now, self.start_value.as_ref().unwrap());
             self.count[old_phase] += delta;
             self.total_count += delta;
             self.start_value = Some(now);
