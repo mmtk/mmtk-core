@@ -317,7 +317,7 @@ mod tests {
     fn test_str_option_default() {
         serial_test(|| {
             let options = Options::default();
-            assert_eq!(&options.perf_events, &PerfEventOptions { events: vec![] });
+            assert_eq!(&options.work_perf_events, &PerfEventOptions { events: vec![] });
         })
     }
 
@@ -326,18 +326,18 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var("MMTK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
+                    std::env::set_var("MMTK_WORK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
 
                     let options = Options::default();
                     assert_eq!(
-                        &options.perf_events,
+                        &options.work_perf_events,
                         &PerfEventOptions {
                             events: vec![("PERF_COUNT_HW_CPU_CYCLES".into(), 0, -1)]
                         }
                     );
                 },
                 || {
-                    std::env::remove_var("MMTK_PERF_EVENTS");
+                    std::env::remove_var("MMTK_WORK_PERF_EVENTS");
                 },
             )
         })
@@ -349,14 +349,14 @@ mod tests {
             with_cleanup(
                 || {
                     // The option needs to start with "hello", otherwise it is invalid.
-                    std::env::set_var("MMTK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES");
+                    std::env::set_var("MMTK_WORK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES");
 
                     let options = Options::default();
                     // invalid value from env var, use default.
-                    assert_eq!(&options.perf_events, &PerfEventOptions { events: vec![] });
+                    assert_eq!(&options.work_perf_events, &PerfEventOptions { events: vec![] });
                 },
                 || {
-                    std::env::remove_var("MMTK_PERF_EVENTS");
+                    std::env::remove_var("MMTK_WORK_PERF_EVENTS");
                 },
             )
         })
