@@ -1,5 +1,5 @@
 use crate::mmtk::MMTK;
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::util::statistics::counter::*;
 use crate::util::statistics::Timer;
 use crate::vm::VMBinding;
@@ -53,7 +53,7 @@ pub struct Stats {
 
 impl Stats {
     #[allow(unused)]
-    pub fn new(options: Arc<UnsafeOptionsWrapper>) -> Self {
+    pub fn new(options: &Options) -> Self {
         #[cfg(feature = "perf_counter")]
         let perfmon = {
             let mut perfmon: Perfmon = Default::default();
