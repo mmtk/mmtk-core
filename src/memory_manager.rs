@@ -50,7 +50,7 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
             "MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
         ),
     }
-    #[cfg(feature = "perf_counter")]
+    #[cfg(all(feature = "perf_counter", target_os = "linux"))]
     {
         use std::fs::File;
         use std::io::Read;
