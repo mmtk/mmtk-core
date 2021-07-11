@@ -51,9 +51,35 @@ pub(super) const CHUNK_MASK: usize = (1 << LOG_BYTES_IN_CHUNK) - 1;
 pub(super) const LOCAL_SIDE_METADATA_PER_CHUNK: usize =
     BYTES_IN_CHUNK >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
 
+// The constants _VM_BASE_ADDRESS depends on the side metadata we use inside mmtk-core.
+// If we add any new side metadata internal to mmtk-core, we need to update this accordingly.
+
+// TODO: We should think if it is possible to update this when we create a new side metadata spec.
+// One issue is that these need to be constants. Possibly we need to use macros or custom build scripts.
+
+// --------------------------------------------------
+//
+// Global Metadata
+//
+// MMTk reserved Global side metadata offsets:
+// [currently empty]
+//
+// --------------------------------------------------
+
 /// The base address for the global side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal global side metadata.
 pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_BASE_ADDRESS;
+
+// --------------------------------------------------
+// PolicySpecific Metadata
+//
+// MMTk reserved PolicySpecific side metadata offsets:
+//
+//  1 - MarkSweep Alloc bit:
+//      - Offset `0x0` on 32-bits
+//      - Offset `LOCAL_SIDE_METADATA_BASE_ADDRESS` on 64-bits
+//
+// --------------------------------------------------
 
 /// The base address for the local side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal local side metadata.
