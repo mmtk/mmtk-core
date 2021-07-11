@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["event_counter",""],["long_counter",""],["size_counter",""]],"struct":[["MonotoneNanoTime",""]],"trait":[["Counter",""],["Diffable",""]]});
+initSidebarItems({"mod":[["event_counter",""],["long_counter",""],["size_counter",""]],"struct":[["MonotoneNanoTime",""]],"trait":[["Counter",""],["Diffable","A Diffable object could be stateless (e.g. a timer that reads the wall clock), or stateful (e.g. holds reference to a perf event fd)"]]});

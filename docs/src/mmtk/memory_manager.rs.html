@@ -417,6 +417,23 @@
 <span id="414">414</span>
 <span id="415">415</span>
 <span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
 </pre><pre class="rust">
 <span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
@@ -469,6 +486,23 @@
         <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">debug!</span>(
             <span class="string">&quot;MMTk failed to initialize the logger. Possibly a logger has been initialized by user.&quot;</span>
         ),
+    }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;perf_counter&quot;</span>, <span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>))]</span>
+    {
+        <span class="kw">use</span> <span class="ident">std::fs::File</span>;
+        <span class="kw">use</span> <span class="ident">std::io::Read</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">File::open</span>(<span class="string">&quot;/proc/self/status&quot;</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">contents</span> <span class="op">=</span> <span class="ident">String::new</span>();
+        <span class="ident">status</span>.<span class="ident">read_to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">contents</span>).<span class="ident">unwrap</span>();
+        <span class="kw">for</span> <span class="ident">line</span> <span class="kw">in</span> <span class="ident">contents</span>.<span class="ident">lines</span>() {
+            <span class="kw">let</span> <span class="ident">split</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">line</span>.<span class="ident">split</span>(<span class="string">&#39;\t&#39;</span>).<span class="ident">collect</span>();
+            <span class="kw">if</span> <span class="ident">split</span>[<span class="number">0</span>] <span class="op">=</span><span class="op">=</span> <span class="string">&quot;Threads:&quot;</span> {
+                <span class="kw">let</span> <span class="ident">threads</span> <span class="op">=</span> <span class="ident">split</span>[<span class="number">1</span>].<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
+                <span class="kw">if</span> <span class="ident">threads</span> <span class="op">!</span><span class="op">=</span> <span class="number">1</span> {
+                    <span class="macro">warn!</span>(<span class="string">&quot;Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this threadas&quot;</span>, <span class="ident">threads</span>);
+                }
+            }
+        }
     }
     <span class="macro">assert!</span>(<span class="ident">heap_size</span> <span class="op">&gt;</span> <span class="number">0</span>, <span class="string">&quot;Invalid heap size&quot;</span>);
     <span class="ident">mmtk</span>.<span class="ident">plan</span>
