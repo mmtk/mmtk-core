@@ -189,7 +189,7 @@ options! {
     // Perf events to measure
     // Semicolons are used to separate events
     // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean)
-    // 
+    //
     // Measuring perf events for work packets
     work_perf_events:       PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]},
     // Measuring perf events for GC and mutators
