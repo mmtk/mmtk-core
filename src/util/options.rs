@@ -317,7 +317,10 @@ mod tests {
     fn test_str_option_default() {
         serial_test(|| {
             let options = Options::default();
-            assert_eq!(&options.work_perf_events, &PerfEventOptions { events: vec![] });
+            assert_eq!(
+                &options.work_perf_events,
+                &PerfEventOptions { events: vec![] }
+            );
         })
     }
 
@@ -353,7 +356,10 @@ mod tests {
 
                     let options = Options::default();
                     // invalid value from env var, use default.
-                    assert_eq!(&options.work_perf_events, &PerfEventOptions { events: vec![] });
+                    assert_eq!(
+                        &options.work_perf_events,
+                        &PerfEventOptions { events: vec![] }
+                    );
                 },
                 || {
                     std::env::remove_var("MMTK_WORK_PERF_EVENTS");
