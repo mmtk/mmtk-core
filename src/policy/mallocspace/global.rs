@@ -174,7 +174,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 local: metadata::extract_side_metadata(&[
                     MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
                     MetadataSpec::OnSide(ACTIVE_PAGE_METADATA_SPEC),
-                    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                    *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 ]),
             },
             #[cfg(debug_assertions)]
@@ -362,8 +362,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 last_on_page_boundary = false;
             }
 
-            let alloc_128: u128 = unsafe { load128(ALLOC_SIDE_METADATA_SPEC, address) };
-            let mark_128: u128 = unsafe { load128(mark_bit_spec, address) };
+            let alloc_128: u128 = unsafe { load128(&ALLOC_SIDE_METADATA_SPEC, address) };
+            let mark_128: u128 = unsafe { load128(&mark_bit_spec, address) };
 
             // Check if there are dead objects in the bulk loaded region
             if alloc_128 ^ mark_128 != 0 {

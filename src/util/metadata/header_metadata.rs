@@ -44,7 +44,7 @@ impl fmt::Debug for HeaderMetadataSpec {
 /// This function provides a default implementation for the `load_metadata` method from the `ObjectModel` trait.
 #[inline(always)]
 pub fn load_metadata(
-    metadata_spec: HeaderMetadataSpec,
+    metadata_spec: &HeaderMetadataSpec,
     object: ObjectReference,
     optional_mask: Option<usize>,
     atomic_ordering: Option<Ordering>,
@@ -151,7 +151,7 @@ pub fn load_metadata(
 /// This function provides a default implementation for the `store_metadata` method from the `ObjectModel` trait.
 #[inline(always)]
 pub fn store_metadata(
-    metadata_spec: HeaderMetadataSpec,
+    metadata_spec: &HeaderMetadataSpec,
     object: ObjectReference,
     val: usize,
     optional_mask: Option<usize>,
@@ -353,7 +353,7 @@ pub fn store_metadata(
 /// This function provides a default implementation for the `compare_exchange_metadata` method from the `ObjectModel` trait.
 #[inline(always)]
 pub fn compare_exchange_metadata(
-    metadata_spec: HeaderMetadataSpec,
+    metadata_spec: &HeaderMetadataSpec,
     object: ObjectReference,
     old_metadata: usize,
     new_metadata: usize,
@@ -510,7 +510,7 @@ pub fn compare_exchange_metadata(
 /// This function provides a default implementation for the `fetch_add_metadata` method from the `ObjectModel` trait.
 #[inline(always)]
 pub fn fetch_add_metadata(
-    metadata_spec: HeaderMetadataSpec,
+    metadata_spec: &HeaderMetadataSpec,
     object: ObjectReference,
     val: usize,
     order: Ordering,
@@ -602,7 +602,7 @@ pub fn fetch_add_metadata(
 /// This function provides a default implementation for the `fetch_sub_metadata` method from the `ObjectModel` trait.
 #[inline(always)]
 pub fn fetch_sub_metadata(
-    metadata_spec: HeaderMetadataSpec,
+    metadata_spec: &HeaderMetadataSpec,
     object: ObjectReference,
     val: usize,
     order: Ordering,

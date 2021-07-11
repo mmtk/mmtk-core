@@ -162,16 +162,16 @@ pub fn is_alloced(object: ObjectReference) -> bool {
 }
 
 pub fn is_alloced_object(address: Address) -> bool {
-    side_metadata::load_atomic(ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
+    side_metadata::load_atomic(&ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
 }
 
 pub unsafe fn is_alloced_object_unsafe(address: Address) -> bool {
-    side_metadata::load(ALLOC_SIDE_METADATA_SPEC, address) == 1
+    side_metadata::load(&ALLOC_SIDE_METADATA_SPEC, address) == 1
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) -> bool {
     load_metadata::<VM>(
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
         object,
         None,
         ordering,
@@ -180,29 +180,29 @@ pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Option<Orderi
 
 #[allow(unused)]
 pub(super) fn is_page_marked(page_addr: Address) -> bool {
-    side_metadata::load_atomic(ACTIVE_PAGE_METADATA_SPEC, page_addr, Ordering::SeqCst) == 1
+    side_metadata::load_atomic(&ACTIVE_PAGE_METADATA_SPEC, page_addr, Ordering::SeqCst) == 1
 }
 
 #[allow(unused)]
 pub(super) unsafe fn is_page_marked_unsafe(page_addr: Address) -> bool {
-    side_metadata::load(ACTIVE_PAGE_METADATA_SPEC, page_addr) == 1
+    side_metadata::load(&ACTIVE_PAGE_METADATA_SPEC, page_addr) == 1
 }
 
 pub fn is_chunk_mapped(chunk_start: Address) -> bool {
-    side_metadata::address_to_meta_address(ACTIVE_CHUNK_METADATA_SPEC, chunk_start).is_mapped()
+    side_metadata::address_to_meta_address(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start).is_mapped()
 }
 
 pub fn is_chunk_marked(chunk_start: Address) -> bool {
-    side_metadata::load_atomic(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, Ordering::SeqCst) == 1
+    side_metadata::load_atomic(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start, Ordering::SeqCst) == 1
 }
 
 pub unsafe fn is_chunk_marked_unsafe(chunk_start: Address) -> bool {
-    side_metadata::load(ACTIVE_CHUNK_METADATA_SPEC, chunk_start) == 1
+    side_metadata::load(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start) == 1
 }
 
 pub fn set_alloc_bit(object: ObjectReference) {
     side_metadata::store_atomic(
-        ALLOC_SIDE_METADATA_SPEC,
+        &ALLOC_SIDE_METADATA_SPEC,
         object.to_address(),
         1,
         Ordering::SeqCst,
@@ -211,7 +211,7 @@ pub fn set_alloc_bit(object: ObjectReference) {
 
 pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
     store_metadata::<VM>(
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
         object,
         1,
         None,
@@ -220,20 +220,19 @@ pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ord
 }
 
 pub(super) fn set_page_mark(page_addr: Address) {
-    side_metadata::store_atomic(ACTIVE_PAGE_METADATA_SPEC, page_addr, 1, Ordering::SeqCst);
+    side_metadata::store_atomic(&ACTIVE_PAGE_METADATA_SPEC, page_addr, 1, Ordering::SeqCst);
 }
 
 pub(super) fn set_chunk_mark(chunk_start: Address) {
-    side_metadata::store_atomic(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 1, Ordering::SeqCst);
-}
+    side_metadata::store_atomic(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 1, Ordering::SeqCst);
 
 pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
-    side_metadata::store(ALLOC_SIDE_METADATA_SPEC, object.to_address(), 0);
+    side_metadata::store(&ALLOC_SIDE_METADATA_SPEC, object.to_address(), 0);
 }
 
 pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
     store_metadata::<VM>(
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
         object,
         0,
         None,
@@ -242,18 +241,18 @@ pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<O
 }
 
 pub(super) unsafe fn unset_page_mark_unsafe(page_addr: Address) {
-    side_metadata::store(ACTIVE_PAGE_METADATA_SPEC, page_addr, 0);
+    side_metadata::store(&ACTIVE_PAGE_METADATA_SPEC, page_addr, 0);
 }
 
 pub(super) unsafe fn unset_chunk_mark_unsafe(chunk_start: Address) {
-    side_metadata::store(ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 0);
+    side_metadata::store(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 0);
 }
 
 /// Load u128 bits of side metadata
 ///
 /// # Safety
 /// unsafe as it can segfault if one tries to read outside the bounds of the mapped side metadata
-pub(super) unsafe fn load128(metadata_spec: SideMetadataSpec, data_addr: Address) -> u128 {
+pub(super) unsafe fn load128(metadata_spec: &SideMetadataSpec, data_addr: Address) -> u128 {
     let meta_addr = side_metadata::address_to_meta_address(metadata_spec, data_addr);
     if cfg!(debug_assertions) {
         side_metadata::ensure_metadata_is_mapped(metadata_spec, data_addr);

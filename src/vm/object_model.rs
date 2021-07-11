@@ -1,35 +1,64 @@
 use atomic::Ordering;
 
+use self::specs::*;
 use crate::plan::AllocationSemantics;
 use crate::plan::CopyContext;
-use crate::util::metadata::{header_metadata::HeaderMetadataSpec, MetadataSpec};
+use crate::util::metadata::header_metadata::HeaderMetadataSpec;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
 /// VM-specific methods for object model.
 ///
-/// MMTk does not require but recommands using in-header per-object metadata for better performance.
-/// MMTk requires VMs to announce whether they can provide certain per-object metadata in object headers by overriding the metadata related constants in the ObjectModel trait.
+/// This trait includes 3 parts:
+///
+/// 1. Specifications for per object metadata: a binding needs to specify the location for each per object metadata spec.
+///    A binding can choose between `in_header()` or `side()`, e.g. `VMGlobalLogBitSpec::side()`.
+///    * in_header: a binding needs to specify the bit offset to an object reference that can be used for the per object metadata spec.
+///      The actual number of bits required for a spec can be obtained from the `num_bits()` method of the spec type.
+///    * side: a binding does not need to provide any specific storage for metadata in the header. Instead, MMTk
+///      will use side tables to store the metadata. A binding should use the offset from
+///      [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`] or [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`], and lay out all the side specs one after
+///      another (see the following section - Side Specs Layout).
+/// 2. In header metadata access: A binding
+///    need to further define the functions with suffix _metadata about how to access the bits in the header. A binding may use
+///    functions in the [`header_metadata`] module if the bits are always available to MMTk, or they could implement their
+///    own routines to access the bits if VM specific treatment is needed (e.g. some bits are not always available to MMTk).
+/// 3. VM-specific object info needed by MMTk: MMTk does not know object info as it is VM specific. However, MMTk needs
+///    some object information for GC. A binding needs to implement them correctly.
 ///
 /// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.
+///
+/// Side Specs Layout
+///
+/// There are two types of side metadata layout in MMTk:
+///
+/// 1. Contiguous layout: is the layout in which the whole metadata space for a SideMetadataSpec is contiguous.
+/// 2. Chunked layout: is the layout in which the whole metadata memory space, that is shared between MMTk policies, is divided into metadata-chunks. Each metadata-chunk stores all of the metadata for all `SideMetadataSpec`s which apply to a source-data chunk.
+///
+/// In 64-bits targets, both Global and PolicySpecific side metadata are contiguous.
+/// Also, in 32-bits targets, the Global side metadata is contiguous.
+/// This means if the starting address (variable named `offset`) of the metadata space for a SideMetadataSpec (`SPEC1`) is `BASE1`, the starting address (`offset`) of the next SideMetadataSpec (`SPEC2`) will be `BASE1 + total_metadata_space_size(SPEC1)`, which is located immediately after the end of the whole metadata space of `SPEC1`.
+/// Now, if we add a third SideMetadataSpec (`SPEC3`), its starting address (`offset`) will be `BASE2 + total_metadata_space_size(SPEC2)`, which is located immediately after the end of the whole metadata space of `SPEC2`.
+///
+/// In 32-bits targets, the PolicySpecific side metadata is chunked.
+/// This means for each chunk (2^22 Bytes) of data, which, by definition, is managed by exactly one MMTk policy, there is a metadata chunk (2^22 * some_fixed_ratio Bytes) that contains all of its PolicySpecific metadata.
+/// This means if a policy has one SideMetadataSpec (`LS1`), the `offset` of that spec will be `0` (= at the start of a metadata chunk).
+/// If there is a second SideMetadataSpec (`LS2`) for this specific policy, the `offset` for that spec will be `0 + required_metadata_space_per_chunk(LS1)`,
+/// and for a third SideMetadataSpec (`LS3`), the `offset` will be `BASE(LS2) + required_metadata_space_per_chunk(LS2)`.
+///
+/// For all other policies, the `offset` starts from zero. This is safe because no two policies ever manage one chunk, so there will be no overlap.
+///
+/// [`HeaderMetadataSpec`]: ../util/metadata/header_metadata/struct.HeaderMetadataSpec.html
+/// [`SideMetadataSpec`]:   ../util/metadata/side_metadata/strutc.SideMetadataSpec.html
+/// [`header_metadata`]:    ../util/metadata/header_metadata/index.html
+/// [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`]: ../util/metadata/side_metadata/constant.GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS.html
+/// [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`]:  ../util/metadata/side_metadata/constant.LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.html
 pub trait ObjectModel<VM: VMBinding> {
-    // --------------------------------------------------
     // Per-object Metadata Spec definitions go here
     //
-    //
-    // NOTE to mmtk binding developers:
-    //
-    // A number of Global and PolicySpecific side metadata specifications are already reserved by mmtk-core.
-    // These are mentioned in their related section as follows.
-    //
-    // Any side metadata offset calculation must consider these to prevent overlaps.
-    //
-    //
-    // NOTE to mmtk-core developers:
-    //
-    // Adding to the list of reserved side metadata specs must consider the offsets currently being used by mmtk bindings to prevent overlaps.
-    //
-    // --------------------------------------------------
+    // Note a number of Global and PolicySpecific side metadata specifications are already reserved by mmtk-core.
+    // Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their
+    // side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.
 
     // --------------------------------------------------
     //
@@ -42,8 +71,13 @@ pub trait ObjectModel<VM: VMBinding> {
     //
     // --------------------------------------------------
 
-    /// The metadata specification of the global  log bit.
-    const GLOBAL_LOG_BIT_SPEC: MetadataSpec;
+    /// The metadata specification of the global log bit. 1 bit.
+    const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec;
+
+    /// The metadata specification for the forwarding pointer, used by copying plans. Word size.
+    const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec;
+    /// The metadata specification for the forwarding status bits, used by copying plans. 2 bits.
+    const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec;
 
     // --------------------------------------------------
     // PolicySpecific Metadata
@@ -62,10 +96,10 @@ pub trait ObjectModel<VM: VMBinding> {
     const LOCAL_FORWARDING_POINTER_SPEC: MetadataSpec;
     /// The metadata specification for the forwarding status bits, which is currently specific to the CopySpace policy.
     const LOCAL_FORWARDING_BITS_SPEC: MetadataSpec;
-    /// The metadata specification for the mark bit, which is currently specific to the MallocSpace and ImmortalSpace policy.
-    const LOCAL_MARK_BIT_SPEC: MetadataSpec;
-    /// The metadata specification for the mark-and-nursery bits, which is currently specific to the LargeObjectSpace policy.
-    const LOCAL_LOS_MARK_NURSERY_SPEC: MetadataSpec;
+    /// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit.
+    const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec;
+    /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.
+    const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
 
     /// A function to load the specified per-object metadata's content.
     ///
@@ -79,7 +113,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.
     ///
     fn load_metadata(
-        metadata_spec: HeaderMetadataSpec,
+        metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
         mask: Option<usize>,
         atomic_ordering: Option<Ordering>,
@@ -96,7 +130,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `atomic_ordering`: is an optional atomic ordering for the store operation. An input value of `None` means the store operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic store operation will use the `Ordering::X`.
     ///
     fn store_metadata(
-        metadata_spec: HeaderMetadataSpec,
+        metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
         val: usize,
         mask: Option<usize>,
@@ -118,7 +152,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// # Returns `true` if the operation is successful, and `false` otherwise.
     ///
     fn compare_exchange_metadata(
-        metadata_spec: HeaderMetadataSpec,
+        metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
         old_val: usize,
         new_val: usize,
@@ -139,7 +173,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// # Returns the old metadata value as a word.
     ///
     fn fetch_add_metadata(
-        metadata_spec: HeaderMetadataSpec,
+        metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
         val: usize,
         order: Ordering,
@@ -157,7 +191,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// # Returns the old metadata value as a word.
     ///
     fn fetch_sub_metadata(
-        metadata_spec: HeaderMetadataSpec,
+        metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
         val: usize,
         order: Ordering,
@@ -231,4 +265,62 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Arguments:
     /// * `object`: The object to be dumped.
     fn dump_object(object: ObjectReference);
+}
+
+pub mod specs {
+    use crate::util::constants::LOG_BITS_IN_WORD;
+    use crate::util::constants::LOG_BYTES_IN_PAGE;
+    use crate::util::constants::LOG_MIN_OBJECT_SIZE;
+    use crate::util::metadata::{
+        header_metadata::HeaderMetadataSpec, side_metadata::SideMetadataSpec, MetadataSpec,
+    };
+
+    macro_rules! define_vm_metadata_spec {
+        ($spec_name: ident, $log_num_bits: expr, $is_global: expr, $side_min_obj_size: expr) => {
+            pub struct $spec_name(MetadataSpec);
+            impl $spec_name {
+                const LOG_NUM_BITS: usize = $log_num_bits;
+                const IS_GLOBAL: bool = $is_global;
+                pub const fn in_header(bit_offset: isize) -> Self {
+                    Self(MetadataSpec::InHeader(HeaderMetadataSpec {
+                        bit_offset,
+                        num_of_bits: 1 << Self::LOG_NUM_BITS,
+                    }))
+                }
+                pub const fn side(offset: usize) -> Self {
+                    Self(MetadataSpec::OnSide(SideMetadataSpec {
+                        is_global: Self::IS_GLOBAL,
+                        offset,
+                        log_num_of_bits: Self::LOG_NUM_BITS,
+                        log_min_obj_size: $side_min_obj_size as usize,
+                    }))
+                }
+                pub const fn num_bits(&self) -> usize {
+                    1 << $log_num_bits
+                }
+            }
+            impl std::ops::Deref for $spec_name {
+                type Target = MetadataSpec;
+                fn deref(&self) -> &Self::Target {
+                    &self.0
+                }
+            }
+        };
+    }
+
+    // Log bit: 1 bit per object, global
+    define_vm_metadata_spec!(VMGlobalLogBitSpec, 0, true, LOG_MIN_OBJECT_SIZE);
+    // Forwarding pointer: word size per object, local
+    define_vm_metadata_spec!(
+        VMLocalForwardingPointerSpec,
+        LOG_BITS_IN_WORD,
+        false,
+        LOG_MIN_OBJECT_SIZE
+    );
+    // Forwarding bits: 2 bits per object, local
+    define_vm_metadata_spec!(VMLocalForwardingBitsSpec, 1, false, LOG_MIN_OBJECT_SIZE);
+    // Mark bit: 1 bit per object, local
+    define_vm_metadata_spec!(VMLocalMarkBitSpec, 0, false, LOG_MIN_OBJECT_SIZE);
+    // Mark&nursery bits for LOS: 2 bit per page, local
+    define_vm_metadata_spec!(VMLocalLOSMarkNurserySpec, 1, false, LOG_BYTES_IN_PAGE);
 }
