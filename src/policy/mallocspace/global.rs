@@ -2,7 +2,7 @@ use super::metadata::*;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
-use crate::util::constants::{BYTES_IN_PAGE, LOG_MIN_OBJECT_SIZE};
+use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
@@ -152,8 +152,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn reserved_pages(&self) -> usize {
         // TODO: figure out a better way to get the total number of active pages from the metadata
         let data_pages = conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst));
-        let meta_pages = self.metadata.calculate_reserved_pages(data_pages)
-            + CHUNK_METADATA.calculate_reserved_pages(data_pages);
+        let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
         data_pages + meta_pages
     }
 
@@ -210,7 +209,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     chunk_start + BYTES_IN_CHUNK
                 );
                 // Map the metadata space for the associated chunk
-                self.map_meta_space_for_chunk(chunk_start);
+                self.map_metadata_and_update_bound(chunk_start);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
@@ -267,7 +266,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         object
     }
 
-    fn map_meta_space_for_chunk(&self, chunk_start: Address) {
+    fn map_metadata_and_update_bound(&self, chunk_start: Address) {
         // Map the metadata space for chunk
         map_meta_space_for_chunk(&self.metadata, chunk_start);
 
@@ -331,8 +330,16 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let chunk_end = chunk_start + BYTES_IN_CHUNK;
         let mut page = conversions::page_align_down(address);
         let mut page_is_empty = true;
-        let mut on_page_boundary = false;
-        let align: usize = 128 * (1 << LOG_MIN_OBJECT_SIZE);
+        let mut last_on_page_boundary = false;
+
+        debug_assert!(
+            ALLOC_SIDE_METADATA_SPEC.log_min_obj_size == mark_bit_spec.log_min_obj_size,
+            "Alloc-bit and mark-bit metadata have different minimum object sizes!"
+        );
+
+        // For bulk xor'ing 128-bit vectors on architectures with vector instructions
+        // Each bit represents an object of LOG_MIN_OBJ_SIZE size
+        let bulk_load_size: usize = 128 * (1 << ALLOC_SIDE_METADATA_SPEC.log_min_obj_size);
 
         while address < chunk_end {
             // We extensively tested the performance of the following if-statement and were
@@ -351,17 +358,28 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     unsafe { unset_page_mark_unsafe(page) };
                 }
                 page = conversions::page_align_down(address);
-                page_is_empty = !on_page_boundary;
-                on_page_boundary = false;
+                page_is_empty = !last_on_page_boundary;
+                last_on_page_boundary = false;
             }
 
             let alloc_128: u128 = unsafe { load128(ALLOC_SIDE_METADATA_SPEC, address) };
             let mark_128: u128 = unsafe { load128(mark_bit_spec, address) };
 
+            // Check if there are dead objects in the bulk loaded region
             if alloc_128 ^ mark_128 != 0 {
-                let end = address + align;
+                let end = address + bulk_load_size;
+                // Linearly scan through region to free dead objects
                 while address < end {
                     trace!("Checking address = {}, end = {}", address, end);
+                    if address - page >= BYTES_IN_PAGE {
+                        if page_is_empty {
+                            unsafe { unset_page_mark_unsafe(page) };
+                        }
+                        page = conversions::page_align_down(address);
+                        page_is_empty = !last_on_page_boundary;
+                        last_on_page_boundary = false;
+                    }
+
                     // Check if the address is an object
                     if unsafe { is_alloced_object_unsafe(address) } {
                         let object = unsafe { address.to_object_reference() };
@@ -383,7 +401,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                             page_is_empty = false;
 
                             if address + bytes - page > BYTES_IN_PAGE {
-                                on_page_boundary = true;
+                                last_on_page_boundary = true;
                             }
                         }
 
@@ -395,18 +413,20 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     }
                 }
             } else {
+                // TODO we aren't actually accounting for the case where an object is alive and spans
+                // a page boundary as we don't know what the object sizes are/what is alive in the bulk region
                 if alloc_128 != 0 {
                     // For the chunk/page to be alive, both alloc128 and mark128 values need to be not zero
                     chunk_is_empty = false;
                     page_is_empty = false;
                 }
 
-                address += align;
+                address += bulk_load_size;
             }
 
-            // Aligning addresses to `align` just makes life easier, even though
+            // Aligning addresses to `bulk_load_size` just makes life easier, even though
             // we may be processing some addresses twice
-            address = address.align_down(align);
+            address = address.align_down(bulk_load_size);
         }
 
         #[cfg(debug_assertions)]
@@ -500,7 +520,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let chunk_end = chunk_start + BYTES_IN_CHUNK;
         let mut page = conversions::page_align_down(address);
         let mut page_is_empty = true;
-        let mut on_page_boundary = false;
+        let mut last_on_page_boundary = false;
 
         // Linear scan through the chunk
         while address < chunk_end {
@@ -511,8 +531,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     unsafe { unset_page_mark_unsafe(page) };
                 }
                 page = conversions::page_align_down(address);
-                page_is_empty = !on_page_boundary;
-                on_page_boundary = false;
+                page_is_empty = !last_on_page_boundary;
+                last_on_page_boundary = false;
             }
 
             // Check if the address is an object
@@ -552,7 +572,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     page_is_empty = false;
 
                     if address + bytes - page > BYTES_IN_PAGE {
-                        on_page_boundary = true;
+                        last_on_page_boundary = true;
                     }
 
                     #[cfg(debug_assertions)]
