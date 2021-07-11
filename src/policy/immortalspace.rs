@@ -40,7 +40,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     #[inline(always)]
     fn is_reachable(&self, object: ObjectReference) -> bool {
         let old_value = load_metadata::<VM>(
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             object,
             None,
             Some(Ordering::SeqCst),

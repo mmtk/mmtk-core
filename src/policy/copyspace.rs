@@ -124,7 +124,7 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn prepare(&self, from_space: bool) {
         self.from_space.store(from_space, Ordering::SeqCst);
-        side_metadata::bzero_metadata(<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC.as_side().unwrap(), self.common.start, self.pr.cursor() - self.common.start);
+        side_metadata::bzero_metadata(&<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC.as_side().unwrap(), self.common.start, self.pr.cursor() - self.common.start);
     }
 
     pub fn release(&self) {

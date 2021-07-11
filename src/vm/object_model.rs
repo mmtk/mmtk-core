@@ -243,6 +243,7 @@ pub trait ObjectModel<VM: VMBinding> {
 pub mod specs {
     use crate::util::constants::LOG_BITS_IN_WORD;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
+    use crate::util::constants::LOG_BYTES_IN_WORD;
     use crate::util::constants::LOG_MIN_OBJECT_SIZE;
     use crate::util::metadata::{
         header_metadata::HeaderMetadataSpec, side_metadata::SideMetadataSpec, MetadataSpec,
@@ -271,6 +272,9 @@ pub mod specs {
                 pub const fn num_bits(&self) -> usize {
                     1 << $log_num_bits
                 }
+                pub const fn spec(&self) -> MetadataSpec {
+                    self.0
+                }
             }
             impl std::ops::Deref for $spec_name {
                 type Target = MetadataSpec;
@@ -295,5 +299,5 @@ pub mod specs {
     // Mark bit: 1 bit per object, local
     define_vm_metadata_spec!(VMLocalMarkBitSpec, 0, false, LOG_MIN_OBJECT_SIZE);
     // Mark&nursery bits for LOS: 2 bit per page, local
-    define_vm_metadata_spec!(VMLocalLOSMarkNurserySpec, 1, false, LOG_BYTES_IN_PAGE);
+    define_vm_metadata_spec!(VMLocalLOSMarkNurserySpec, 1, false, LOG_BYTES_IN_WORD);
 }
