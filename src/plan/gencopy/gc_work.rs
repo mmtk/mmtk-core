@@ -58,7 +58,7 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
         object_forwarding::clear_forwarding_bits::<VM>(obj);
         if !super::NO_SLOW && super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
             store_metadata::<VM>(
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+                &VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
                 obj,
                 0b1,
                 None,

@@ -24,6 +24,7 @@ mod reference_glue;
 mod scanning;
 pub use self::active_plan::ActivePlan;
 pub use self::collection::Collection;
+pub use self::object_model::specs::*;
 pub use self::object_model::ObjectModel;
 pub use self::reference_glue::ReferenceGlue;
 pub use self::scanning::Scanning;

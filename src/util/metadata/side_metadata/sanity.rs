@@ -383,7 +383,7 @@ impl SideMetadataSanity {
 /// * `size`: size of the source data
 ///
 #[cfg(feature = "extreme_assertions")]
-pub fn verify_bzero(metadata_spec: SideMetadataSpec, start: Address, size: usize) {
+pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usize) {
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
@@ -446,7 +446,7 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
 /// * `metadata`: the metadata content to store
 ///
 #[cfg(feature = "extreme_assertions")]
-pub fn verify_store(metadata_spec: SideMetadataSpec, data_addr: Address, metadata: usize) {
+pub fn verify_store(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: usize) {
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(&metadata_spec) {
         Some(spec_sanity_map) => {
@@ -461,7 +461,7 @@ pub fn verify_store(metadata_spec: SideMetadataSpec, data_addr: Address, metadat
 /// A helper function encapsulating the common parts of addition and subtraction
 #[cfg(feature = "extreme_assertions")]
 fn do_math(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: &SideMetadataSpec,
     data_addr: Address,
     val: usize,
     math_op: MathOp,
@@ -498,7 +498,7 @@ fn do_math(
 ///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_add(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: &SideMetadataSpec,
     data_addr: Address,
     val_to_add: usize,
     actual_old_val: usize,
@@ -529,7 +529,7 @@ pub fn verify_add(
 ///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_sub(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: &SideMetadataSpec,
     data_addr: Address,
     val_to_sub: usize,
     actual_old_val: usize,

@@ -53,7 +53,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     #[inline(always)]
     fn enqueue_node<VM: VMBinding>(&mut self, obj: ObjectReference) {
         if compare_exchange_metadata::<VM>(
-            self.meta,
+            &self.meta,
             obj,
             0b1,
             0b0,

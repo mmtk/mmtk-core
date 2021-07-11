@@ -56,14 +56,14 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     }
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         let old_value = load_metadata::<VM>(
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             object,
             None,
             Some(Ordering::SeqCst),
         );
         let new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
         store_metadata::<VM>(
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             object,
             new_value,
             None,
@@ -116,7 +116,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
                     local: metadata::extract_side_metadata(&[
-                        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                        *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                     ]),
                 },
             },
@@ -143,7 +143,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
     fn test_and_mark(object: ObjectReference, value: usize) -> bool {
         loop {
             let old_value = load_metadata::<VM>(
-                VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 object,
                 None,
                 Some(Ordering::SeqCst),
@@ -153,7 +153,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
             }
 
             if compare_exchange_metadata::<VM>(
-                VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 object,
                 old_value,
                 old_value ^ GC_MARK_BIT_MASK,

@@ -520,7 +520,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
                 compare_exchange_metadata::<E::VM>(
-                    self.meta,
+                    &self.meta,
                     *obj,
                     0b0,
                     0b1,

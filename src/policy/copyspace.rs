@@ -87,8 +87,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         heap: &mut HeapMeta,
     ) -> Self {
         let local_specs = extract_side_metadata(&[
-            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
-            VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+            *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+            *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
         ]);
         let common = CommonSpace::new(
             SpaceOptions {

@@ -242,7 +242,7 @@ impl<VM: VMBinding> HasCounterSet for MMTK<VM> {
     fn counter_set(mmtk: &'static Self) -> Vec<Box<dyn WorkCounter>> {
         let mut counters: Vec<Box<dyn WorkCounter>> = vec![Box::new(WorkDuration::new())];
         #[cfg(feature = "perf_counter")]
-        for e in &mmtk.options.perf_events.events {
+        for e in &mmtk.options.work_perf_events.events {
             counters.push(box WorkPerfEvent::new(&e.0, e.1, e.2));
         }
         counters

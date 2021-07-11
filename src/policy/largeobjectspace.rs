@@ -56,7 +56,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             meta |= NURSERY_BIT;
         }
         store_metadata::<VM>(
-            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             meta,
             None,
@@ -112,7 +112,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
                     local: metadata::extract_side_metadata(&[
-                        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                        *VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
                     ]),
                 },
             },
@@ -206,7 +206,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 MARK_BIT
             };
             let old_value = load_metadata::<VM>(
-                VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
                 object,
                 None,
                 Some(Ordering::SeqCst),
@@ -216,7 +216,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 return false;
             }
             if compare_exchange_metadata::<VM>(
-                VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
                 object,
                 old_value,
                 old_value & !LOS_BIT_MASK | value,
@@ -232,7 +232,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     fn test_mark_bit(&self, object: ObjectReference, value: usize) -> bool {
         load_metadata::<VM>(
-            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             None,
             Some(Ordering::SeqCst),
@@ -244,7 +244,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
         let object = get_page_aligned_object::<VM>(object);
         load_metadata::<VM>(
-            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             None,
             Some(Ordering::Relaxed),
@@ -257,14 +257,14 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         let object = get_page_aligned_object::<VM>(object);
         loop {
             let old_val = load_metadata::<VM>(
-                VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
                 object,
                 None,
                 Some(Ordering::Relaxed),
             );
             let new_val = old_val & !NURSERY_BIT;
             if compare_exchange_metadata::<VM>(
-                VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
                 object,
                 old_val,
                 new_val,
