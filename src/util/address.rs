@@ -464,6 +464,18 @@ impl ObjectReference {
         self.0
     }
 
+    /// Is the object reachable, determined by the policy?
+    /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
+    #[inline(always)]
+    pub fn is_reachable(self) -> bool {
+        if self.is_null() {
+            false
+        } else {
+            SFT_MAP.get(Address(self.0)).is_reachable(self)
+        }
+    }
+
+    /// Is the object live, determined by the policy?
     pub fn is_live(self) -> bool {
         if self.0 == 0 {
             false
@@ -474,6 +486,12 @@ impl ObjectReference {
 
     pub fn is_movable(self) -> bool {
         SFT_MAP.get(Address(self.0)).is_movable()
+    }
+
+    /// Get forwarding pointer if the object is forwarded.
+    #[inline(always)]
+    pub fn get_forwarded_object(self) -> Option<Self> {
+        SFT_MAP.get(Address(self.0)).get_forwarded_object(self)
     }
 
     pub fn is_mapped(self) -> bool {
