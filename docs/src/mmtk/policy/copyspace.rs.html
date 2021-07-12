@@ -197,6 +197,17 @@
 <span id="194">194</span>
 <span id="195">195</span>
 <span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::TransitiveClosure</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan</span>::{<span class="ident">AllocationSemantics</span>, <span class="ident">CopyContext</span>};
@@ -239,6 +250,17 @@
         <span class="op">!</span><span class="self">self</span>.<span class="ident">from_space</span>()
     }
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {}
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">get_forwarded_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">from_space</span>() {
+            <span class="kw">return</span> <span class="prelude-val">None</span>;
+        }
+        <span class="kw">if</span> <span class="ident">object_forwarding::is_forwarded</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) {
+            <span class="prelude-val">Some</span>(<span class="ident">object_forwarding::read_forwarding_pointer</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>))
+        } <span class="kw">else</span> {
+            <span class="prelude-val">None</span>
+        }
+    }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
