@@ -51,6 +51,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
                     base.options.analysis_factor
                 );
 
+                base.allocation_bytes.store(O, Ordering::SeqCst);
                 base.analysis_manager.alloc_hook(size, align, offset);
             }
         }

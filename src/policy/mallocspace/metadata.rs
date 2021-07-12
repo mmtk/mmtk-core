@@ -224,7 +224,13 @@ pub(super) fn set_page_mark(page_addr: Address) {
 }
 
 pub(super) fn set_chunk_mark(chunk_start: Address) {
-    side_metadata::store_atomic(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 1, Ordering::SeqCst);
+    side_metadata::store_atomic(
+        &ACTIVE_CHUNK_METADATA_SPEC,
+        chunk_start,
+        1,
+        Ordering::SeqCst,
+    );
+}
 
 pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
     side_metadata::store(&ALLOC_SIDE_METADATA_SPEC, object.to_address(), 0);

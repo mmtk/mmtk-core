@@ -303,7 +303,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     pub fn sweep_chunk(&self, chunk_start: Address) {
         // Call the relevant sweep function depending on the location of the mark bits
-        match VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+        match *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
             MetadataSpec::OnSide(local_mark_bit_side_spec) => {
                 self.sweep_chunk_mark_on_side(chunk_start, local_mark_bit_side_spec);
             }
@@ -472,7 +472,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
 
         // Clear all the mark bits
-        bzero_metadata(mark_bit_spec, chunk_start, BYTES_IN_CHUNK);
+        bzero_metadata(&mark_bit_spec, chunk_start, BYTES_IN_CHUNK);
 
         if chunk_is_empty {
             // Since the chunk mark metadata is a byte, we don't need synchronization
