@@ -7,8 +7,8 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::metadata::extract_side_metadata;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
+use crate::util::metadata::{extract_side_metadata, side_metadata, MetadataSpec};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -114,6 +114,15 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn prepare(&self, from_space: bool) {
         self.from_space.store(from_space, Ordering::SeqCst);
+        if let MetadataSpec::OnSide(side_forwarding_status_table) =
+            *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
+        {
+            side_metadata::bzero_metadata(
+                &side_forwarding_status_table,
+                self.common.start,
+                self.pr.cursor() - self.common.start,
+            );
+        }
     }
 
     pub fn release(&self) {
