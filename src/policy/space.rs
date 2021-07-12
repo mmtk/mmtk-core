@@ -49,8 +49,19 @@ use downcast_rs::Downcast;
 pub trait SFT {
     /// The space name
     fn name(&self) -> &str;
+    /// Get forwarding pointer if the object is forwarded.
+    #[inline(always)]
+    fn get_forwarded_object(&self, _object: ObjectReference) -> Option<ObjectReference> {
+        None
+    }
     /// Is the object live, determined by the policy?
     fn is_live(&self, object: ObjectReference) -> bool;
+    /// Is the object reachable, determined by the policy?
+    /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
+    #[inline(always)]
+    fn is_reachable(&self, object: ObjectReference) -> bool {
+        self.is_live(object)
+    }
     /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
     /// or the object is pinned.
     fn is_movable(&self) -> bool;
