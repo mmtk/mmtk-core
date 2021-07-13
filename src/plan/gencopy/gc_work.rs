@@ -120,6 +120,10 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
                     unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
                 );
         }
+        // We may alloc large object into LOS as nursery objects. Trace them here.
+        if self.gencopy().common.get_los().in_space(object) {
+            return self.gencopy().common.get_los().trace_object::<Self>(self, object);
+        }
         debug_assert!(!self.gencopy().fromspace().in_space(object));
         debug_assert!(self.gencopy().tospace().in_space(object));
         object
