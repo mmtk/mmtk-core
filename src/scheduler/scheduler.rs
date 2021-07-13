@@ -35,6 +35,16 @@ pub struct Scheduler<C: Context> {
     ),
     startup: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
     finalizer: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
+    /// A callback to be fired after the `Closure` bucket is drained.
+    /// This callback should return `true` if it adds more work packets to the
+    /// `Closure` bucket. `WorkBucket::can_open` then consult this return value
+    /// to prevent the GC from proceeding to the next stage, if we still have
+    /// `Closure` work to do.
+    ///
+    /// We use this callback to process ephemeron objects. `closure_end` can re-enable
+    /// the `Closure` bucket multiple times to iteratively discover and process
+    /// more ephemeron objects.
+    closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
 }
 
 // The 'channel' inside Scheduler disallows Sync for Scheduler. We have to make sure we use channel properly:
@@ -65,6 +75,7 @@ impl<C: Context> Scheduler<C> {
             channel: channel(),
             startup: Mutex::new(None),
             finalizer: Mutex::new(None),
+            closure_end: Mutex::new(None),
         })
     }
 
@@ -114,7 +125,18 @@ impl<C: Context> Scheduler<C> {
             let mut open_next = |s: WorkBucketStage| {
                 let cur_stages = open_stages.clone();
                 self_mut.work_buckets[s].set_open_condition(move || {
-                    self.are_buckets_drained(&cur_stages) && self.worker_group().all_parked()
+                    let should_open =
+                        self.are_buckets_drained(&cur_stages) && self.worker_group().all_parked();
+                    // Additional check before the `RefClosure` bucket opens.
+                    if should_open && s == WorkBucketStage::RefClosure {
+                        if let Some(closure_end) = self.closure_end.lock().unwrap().as_ref() {
+                            if closure_end() {
+                                // Don't open `RefClosure` if `closure_end` added more works to `Closure`.
+                                return false;
+                            }
+                        }
+                    }
+                    should_open
                 });
                 open_stages.push(s);
             };
@@ -142,6 +164,10 @@ impl<C: Context> Scheduler<C> {
 
     pub fn set_finalizer<W: CoordinatorWork<C>>(&self, w: Option<W>) {
         *self.finalizer.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<C>>);
+    }
+
+    pub fn on_closure_end(&self, f: Box<dyn Send + Fn() -> bool>) {
+        *self.closure_end.lock().unwrap() = Some(f);
     }
 
     pub fn worker_group(&self) -> Arc<WorkerGroup<C>> {
