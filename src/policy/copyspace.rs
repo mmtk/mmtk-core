@@ -39,6 +39,17 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         !self.from_space()
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {}
+    #[inline(always)]
+    fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
+        if !self.from_space() {
+            return None;
+        }
+        if object_forwarding::is_forwarded::<VM>(object) {
+            Some(object_forwarding::read_forwarding_pointer::<VM>(object))
+        } else {
+            None
+        }
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
@@ -77,8 +88,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         heap: &mut HeapMeta,
     ) -> Self {
         let local_specs = extract_side_metadata(&[
-            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
-            VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+            *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+            *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
         ]);
         let common = CommonSpace::new(
             SpaceOptions {

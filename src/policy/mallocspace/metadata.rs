@@ -73,12 +73,12 @@ pub fn is_alloced(object: ObjectReference) -> bool {
 }
 
 pub fn is_alloced_object(address: Address) -> bool {
-    side_metadata::load_atomic(ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
+    side_metadata::load_atomic(&ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference) -> bool {
     load_metadata::<VM>(
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
         object,
         None,
         Some(Ordering::SeqCst),
@@ -87,7 +87,7 @@ pub fn is_marked<VM: VMBinding>(object: ObjectReference) -> bool {
 
 pub fn set_alloc_bit(object: ObjectReference) {
     side_metadata::store_atomic(
-        ALLOC_SIDE_METADATA_SPEC,
+        &ALLOC_SIDE_METADATA_SPEC,
         object.to_address(),
         1,
         Ordering::SeqCst,
@@ -96,7 +96,7 @@ pub fn set_alloc_bit(object: ObjectReference) {
 
 pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference) {
     store_metadata::<VM>(
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
         object,
         1,
         None,
@@ -106,7 +106,7 @@ pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference) {
 
 pub fn unset_alloc_bit(object: ObjectReference) {
     side_metadata::store_atomic(
-        ALLOC_SIDE_METADATA_SPEC,
+        &ALLOC_SIDE_METADATA_SPEC,
         object.to_address(),
         0,
         Ordering::SeqCst,
@@ -115,7 +115,7 @@ pub fn unset_alloc_bit(object: ObjectReference) {
 
 pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference) {
     store_metadata::<VM>(
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
         object,
         0,
         None,
