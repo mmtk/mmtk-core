@@ -68,4 +68,9 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The thread pointer for the current GC thread.
     fn schedule_finalization(_tls: VMWorkerThread) {}
+
+    /// Inform the VM to do its VM-specific release work at the end of a GC.
+    fn vm_release() {}
+
+    fn process_weak_refs<E: ProcessEdgesWork<VM = VM>>(_worker: &mut GCWorker<VM>) {}
 }
