@@ -670,6 +670,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
         self.store_block_tls(block);
         trace!("Constructed free list for block starting at {}", block);
+        // unreachable!();
         block
     }
 
