@@ -12,7 +12,6 @@ pub trait Work<C: Context>: 'static + Send {
             .stat
             .measure_work(TypeId::of::<Self>(), type_name::<Self>(), context);
         self.do_work(worker, context);
-        // println!("{} END", type_name::<Self>());
         stat.end_of_work(&mut worker.stat);
     }
 }
