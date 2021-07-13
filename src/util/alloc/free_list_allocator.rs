@@ -111,7 +111,7 @@ pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
     BlockList::new(MI_LARGE_OBJ_WSIZE_MAX + 1 /* 655360, Huge queue */),
 ];
 
-const BYTES_IN_BLOCK: usize = 1 << LOG_BYTES_IN_BLOCK;
+pub(crate) const BYTES_IN_BLOCK: usize = 1 << LOG_BYTES_IN_BLOCK;
 const LOG_BYTES_IN_BLOCK: usize = 16;
 const MI_BIN_HUGE: usize = 73;
 const MI_INTPTR_SHIFT: usize = 3;
@@ -121,17 +121,18 @@ const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX/MI_INTPTR_SIZE;
 const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE*8;
 const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
 
+// mimalloc init.c:46
 const BLOCK_QUEUES_EMPTY: [BlockQueue; 74] = [
-    BlockQueue::new(     1*8),
-    BlockQueue::new(     1*8), BlockQueue::new(     2*8), BlockQueue::new(     3*8), BlockQueue::new(     4*8), BlockQueue::new(     5*8), BlockQueue::new(     6*8), BlockQueue::new(     7*8), BlockQueue::new(     8), /* 8 */ 
-    BlockQueue::new(    10*8), BlockQueue::new(    12*8), BlockQueue::new(    14*8), BlockQueue::new(    16*8), BlockQueue::new(    20*8), BlockQueue::new(    24*8), BlockQueue::new(    28*8), BlockQueue::new(    32), /* 16 */ 
-    BlockQueue::new(    40*8), BlockQueue::new(    48*8), BlockQueue::new(    56*8), BlockQueue::new(    64*8), BlockQueue::new(    80*8), BlockQueue::new(    96*8), BlockQueue::new(   112*8), BlockQueue::new(   128), /* 24 */ 
-    BlockQueue::new(   160*8), BlockQueue::new(   192*8), BlockQueue::new(   224*8), BlockQueue::new(   256*8), BlockQueue::new(   320*8), BlockQueue::new(   384*8), BlockQueue::new(   448*8), BlockQueue::new(   512), /* 32 */ 
-    BlockQueue::new(   640*8), BlockQueue::new(   768*8), BlockQueue::new(   896*8), BlockQueue::new(  1024*8), BlockQueue::new(  1280*8), BlockQueue::new(  1536*8), BlockQueue::new(  1792*8), BlockQueue::new(  2048), /* 40 */ 
-    BlockQueue::new(  2560*8), BlockQueue::new(  3072*8), BlockQueue::new(  3584*8), BlockQueue::new(  4096*8), BlockQueue::new(  5120*8), BlockQueue::new(  6144*8), BlockQueue::new(  7168*8), BlockQueue::new(  8192), /* 48 */ 
-    BlockQueue::new( 10240*8), BlockQueue::new( 12288*8), BlockQueue::new( 14336*8), BlockQueue::new( 16384*8), BlockQueue::new( 20480*8), BlockQueue::new( 24576*8), BlockQueue::new( 28672*8), BlockQueue::new( 32768), /* 56 */ 
-    BlockQueue::new( 40960*8), BlockQueue::new( 49152*8), BlockQueue::new( 57344*8), BlockQueue::new( 65536*8), BlockQueue::new( 81920*8), BlockQueue::new( 98304*8), BlockQueue::new(114688*8), BlockQueue::new(131072), /* 64 */ 
-    BlockQueue::new(163840*8), BlockQueue::new(196608*8), BlockQueue::new(229376*8), BlockQueue::new(262144*8), BlockQueue::new(327680*8), BlockQueue::new(393216*8), BlockQueue::new(458752*8), BlockQueue::new(524288), /* 72 */ 
+    BlockQueue::new(     1*4),
+    BlockQueue::new(     1*4), BlockQueue::new(     2*4), BlockQueue::new(     3*4), BlockQueue::new(     4*4), BlockQueue::new(     5*4), BlockQueue::new(     6*4), BlockQueue::new(     7*4), BlockQueue::new(     8*4), /* 8 */ 
+    BlockQueue::new(    10*4), BlockQueue::new(    12*4), BlockQueue::new(    14*4), BlockQueue::new(    16*4), BlockQueue::new(    20*4), BlockQueue::new(    24*4), BlockQueue::new(    28*4), BlockQueue::new(    32*4), /* 16 */ 
+    BlockQueue::new(    40*4), BlockQueue::new(    48*4), BlockQueue::new(    56*4), BlockQueue::new(    64*4), BlockQueue::new(    80*4), BlockQueue::new(    96*4), BlockQueue::new(   112*4), BlockQueue::new(   128*4), /* 24 */ 
+    BlockQueue::new(   160*4), BlockQueue::new(   192*4), BlockQueue::new(   224*4), BlockQueue::new(   256*4), BlockQueue::new(   320*4), BlockQueue::new(   384*4), BlockQueue::new(   448*4), BlockQueue::new(   512*4), /* 32 */ 
+    BlockQueue::new(   640*4), BlockQueue::new(   768*4), BlockQueue::new(   896*4), BlockQueue::new(  1024*4), BlockQueue::new(  1280*4), BlockQueue::new(  1536*4), BlockQueue::new(  1792*4), BlockQueue::new(  2048*4), /* 40 */ 
+    BlockQueue::new(  2560*4), BlockQueue::new(  3072*4), BlockQueue::new(  3584*4), BlockQueue::new(  4096*4), BlockQueue::new(  5120*4), BlockQueue::new(  6144*4), BlockQueue::new(  7168*4), BlockQueue::new(  8192*4), /* 48 */ 
+    BlockQueue::new( 10240*4), BlockQueue::new( 12288*4), BlockQueue::new( 14336*4), BlockQueue::new( 16384*4), BlockQueue::new( 20480*4), BlockQueue::new( 24576*4), BlockQueue::new( 28672*4), BlockQueue::new( 32768*4), /* 56 */ 
+    BlockQueue::new( 40960*4), BlockQueue::new( 49152*4), BlockQueue::new( 57344*4), BlockQueue::new( 65536*4), BlockQueue::new( 81920*4), BlockQueue::new( 98304*4), BlockQueue::new(114688*4), BlockQueue::new(131072*4), /* 64 */ 
+    BlockQueue::new(163840*4), BlockQueue::new(196608*4), BlockQueue::new(229376*4), BlockQueue::new(262144*4), BlockQueue::new(327680*4), BlockQueue::new(393216*4), BlockQueue::new(458752*4), BlockQueue::new(524288*4), /* 72 */ 
     BlockQueue::new(MI_LARGE_OBJ_WSIZE_MAX + 1  /* 655360, Huge queue */),
 ];
 
@@ -585,6 +586,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
         self.store_block_tls(block);
         trace!("Constructed free list for block starting at {}", block);
+        // unreachable!();
         block
     }
 
