@@ -70,19 +70,19 @@ impl Line {
     #[inline]
     pub fn mark(&self, state: u8) {
         debug_assert!(!super::BLOCK_ONLY);
-        unsafe { side_metadata::store(Self::MARK_TABLE, self.start(), state as _); }
+        unsafe { side_metadata::store(&Self::MARK_TABLE, self.start(), state as _); }
     }
 
     #[inline(always)]
     pub fn mark_byte_address(&self) -> Address {
         debug_assert!(!super::BLOCK_ONLY);
-        side_metadata::address_to_meta_address(Self::MARK_TABLE, self.start())
+        side_metadata::address_to_meta_address(&Self::MARK_TABLE, self.start())
     }
 
     #[inline(always)]
     pub fn is_marked(&self, state: u8) -> bool {
         debug_assert!(!super::BLOCK_ONLY);
-        unsafe { side_metadata::load(Self::MARK_TABLE, self.start()) as u8 == state }
+        unsafe { side_metadata::load(&Self::MARK_TABLE, self.start()) as u8 == state }
     }
 
     #[inline]

@@ -9,7 +9,6 @@ use crate::util::heap::VMRequest;
 use crate::util::heap::PageResource;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use crate::util::metadata::*;
 use crate::util::metadata::side_metadata::{self, *};
 use std::{cell::UnsafeCell, iter::Step, mem, ops::Range, sync::atomic::{AtomicBool, AtomicU8}};
 use super::{block::*, chunk::{Chunk, ChunkMap, ChunkState}, defrag::Defrag};
@@ -335,7 +334,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             //     false
             // }
         } else {
-            side_metadata::compare_exchange_atomic(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object), 0, 1, Ordering::SeqCst, Ordering::SeqCst)
+            side_metadata::compare_exchange_atomic(&Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object), 0, 1, Ordering::SeqCst, Ordering::SeqCst)
         }
     }
 
@@ -345,7 +344,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // gc_byte::read_gc_byte::<VM>(object) & Self::MARK_MASK == self.mark_state.load(Ordering::Relaxed)
             unreachable!()
         } else {
-            unsafe { side_metadata::load(Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object)) == 1 }
+            unsafe { side_metadata::load(&Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object)) == 1 }
         }
     }
 
@@ -400,7 +399,7 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
     #[inline(always)]
     fn reset_object_mark(chunk: Chunk) {
         if !ImmixSpace::<VM>::HEADER_MARK_BITS {
-            side_metadata::bzero_metadata(ImmixSpace::<VM>::OBJECT_MARK_TABLE, chunk.start(), Chunk::BYTES);
+            side_metadata::bzero_metadata(&ImmixSpace::<VM>::OBJECT_MARK_TABLE, chunk.start(), Chunk::BYTES);
         }
     }
 }
