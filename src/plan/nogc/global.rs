@@ -121,11 +121,18 @@ impl<VM: VMBinding> NoGC<VM> {
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
+        let side_metadata_local_free = SideMetadataSpec {
+            is_global: false,
+            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
         let local_specs = {
             vec![
                 side_metadata_next,
                 side_metadata_free,
                 side_metadata_size,
+                side_metadata_local_free
             ]
         };
 
