@@ -525,6 +525,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         FreeListAllocator::<VM>::push_onto_block_list(block_list, block);
         self.store_block_tls(block);
         trace!("Constructed free list for block starting at {}", block);
+        // unreachable!();
         block
     }
 
