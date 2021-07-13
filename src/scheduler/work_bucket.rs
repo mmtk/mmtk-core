@@ -59,7 +59,7 @@ pub struct WorkBucket<C: Context> {
     /// A priority queue
     queue: RwLock<BinaryHeap<PrioritizedWork<C>>>,
     monitor: Arc<(Mutex<()>, Condvar)>,
-    pub can_open: Option<Box<dyn (Fn() -> bool) + Send>>,
+    can_open: Option<Box<dyn (Fn() -> bool) + Send>>,
 }
 
 impl<C: Context> WorkBucket<C> {
@@ -134,13 +134,11 @@ impl<C: Context> WorkBucket<C> {
     pub fn set_open_condition(&mut self, pred: impl Fn() -> bool + Send + 'static) {
         self.can_open = Some(box pred);
     }
-    pub fn update(&self, should_activate: impl Fn() -> bool) -> bool {
+    pub fn update(&self) -> bool {
         if let Some(can_open) = self.can_open.as_ref() {
             if !self.is_activated() && can_open() {
-                if should_activate() {
-                    self.activate();
-                    return true;
-                }
+                self.activate();
+                return true;
             }
         }
         false

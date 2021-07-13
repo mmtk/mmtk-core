@@ -116,7 +116,15 @@ impl<C: Context> Scheduler<C> {
             let mut open_next = |s: WorkBucketStage| {
                 let cur_stages = open_stages.clone();
                 self_mut.work_buckets[s].set_open_condition(move || {
-                    self.are_buckets_drained(&cur_stages) && self.worker_group().all_parked()
+                    let should_open = self.are_buckets_drained(&cur_stages) && self.worker_group().all_parked();
+                    if should_open && s == WorkBucketStage::RefClosure {
+                        if let Some(closure_end) = self.closure_end.lock().unwrap().as_ref() {
+                            if closure_end() {
+                                return false;
+                            }
+                        }
+                    }
+                    should_open
                 });
                 open_stages.push(s);
             };
@@ -165,17 +173,7 @@ impl<C: Context> Scheduler<C> {
             if id == WorkBucketStage::Unconstrained {
                 continue;
             }
-            buckets_updated |= bucket.update(|| {
-                if id == WorkBucketStage::RefClosure {
-                    if let Some(closure_end) = self.closure_end.lock().unwrap().as_ref() {
-                        !closure_end()
-                    } else {
-                        true
-                    }
-                } else {
-                    true
-                }
-            });
+            buckets_updated |= bucket.update();
         }
         if buckets_updated {
             // Notify the workers for new work
