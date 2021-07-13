@@ -125,6 +125,9 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn prepare(&self, from_space: bool) {
         self.from_space.store(from_space, Ordering::SeqCst);
+        // Clear the metadata if we are using side forwarding status table. Otherwise
+        // objects may inherit forwarding status from the previous GC.
+        // TODO: Fix performance.
         if let MetadataSpec::OnSide(side_forwarding_status_table) =
             *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
         {
