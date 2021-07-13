@@ -7,8 +7,8 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::metadata::{extract_side_metadata, side_metadata};
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
+use crate::util::metadata::{extract_side_metadata, side_metadata, MetadataSpec};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -39,9 +39,10 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         !self.from_space()
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {}
+    #[inline(always)]
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
         if !self.from_space() {
-            return None
+            return None;
         }
         if object_forwarding::is_forwarded::<VM>(object) {
             Some(object_forwarding::read_forwarding_pointer::<VM>(object))
@@ -124,7 +125,18 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn prepare(&self, from_space: bool) {
         self.from_space.store(from_space, Ordering::SeqCst);
-        side_metadata::bzero_metadata(&<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC.as_side().unwrap(), self.common.start, self.pr.cursor() - self.common.start);
+        // Clear the metadata if we are using side forwarding status table. Otherwise
+        // objects may inherit forwarding status from the previous GC.
+        // TODO: Fix performance.
+        if let MetadataSpec::OnSide(side_forwarding_status_table) =
+            *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
+        {
+            side_metadata::bzero_metadata(
+                &side_forwarding_status_table,
+                self.common.start,
+                self.pr.cursor() - self.common.start,
+            );
+        }
     }
 
     pub fn release(&self) {
