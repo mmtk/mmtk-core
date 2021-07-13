@@ -21,6 +21,6 @@ macro_rules! validate {
     ($x: expr => $y: expr) => { if $x { assert!($y, stringify!($x implies $y)) } };
 }
 
-const fn validate_features() {
+fn validate_features() {
     validate!(DEFRAG => !BLOCK_ONLY);
 }

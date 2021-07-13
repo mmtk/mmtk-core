@@ -23,12 +23,14 @@ impl Line {
         log_min_obj_size: Self::LOG_BYTES,
     };
 
-    pub const fn align(address: Address) -> Address {
+    #[inline(always)]
+    pub fn align(address: Address) -> Address {
         debug_assert!(!super::BLOCK_ONLY);
         address.align_down(Self::BYTES)
     }
 
-    pub const fn is_aligned(address: Address) -> bool {
+    #[inline(always)]
+    pub fn is_aligned(address: Address) -> bool {
         debug_assert!(!super::BLOCK_ONLY);
         Self::align(address).as_usize() == address.as_usize()
     }
@@ -52,17 +54,20 @@ impl Line {
         Block::from(Block::align(self.0))
     }
 
-    pub const fn start(&self) -> Address {
+    #[inline(always)]
+    pub fn start(&self) -> Address {
         debug_assert!(!super::BLOCK_ONLY);
         self.0
     }
 
-    pub const fn end(&self) -> Address {
+    #[inline(always)]
+    pub fn end(&self) -> Address {
         debug_assert!(!super::BLOCK_ONLY);
         unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
     }
 
-    pub const fn get_index_within_block(&self) -> usize {
+    #[inline(always)]
+    pub fn get_index_within_block(&self) -> usize {
         let addr = self.start();
         (addr.as_usize() - Block::align(addr).as_usize()) >> Line::LOG_BYTES
     }
