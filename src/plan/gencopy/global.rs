@@ -123,6 +123,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::RefClosure]
+            .add(ProcessWeakRefs::<GenCopyMatureProcessEdges<VM>>::new());
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, GenCopyCopyContext<VM>>::new(self));

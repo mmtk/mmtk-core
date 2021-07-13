@@ -249,6 +249,22 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for EndOfGC {}
 
 #[derive(Default)]
+pub struct ProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
+
+impl<E: ProcessEdgesWork> ProcessWeakRefs<E> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessWeakRefs<E> {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+        trace!("ProcessWeakRefs");
+        <E::VM as VMBinding>::VMCollection::process_weak_refs::<E>(worker);
+    }
+}
+
+#[derive(Default)]
 pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
 
 impl<E: ProcessEdgesWork> ScanStackRoots<E> {
