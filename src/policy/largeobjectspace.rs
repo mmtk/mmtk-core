@@ -75,10 +75,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
 }
 
 impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
-    #[cfg(target_pointer_width = "32")]
-    fn local_side_metadata_per_chunk(&self) -> usize {
-        super::immix::ImmixSpace::<VM>::LOCAL_SIDE_METADATA_PER_CHUNK
-    }
     fn as_space(&self) -> &dyn Space<VM> {
         self
     }
