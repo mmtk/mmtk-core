@@ -249,6 +249,11 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
 impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for EndOfGC {}
 
+/// Delegate to the VM binding for reference processing.
+///
+/// Some VMs (e.g. v8) do not have a Java-like global weak reference storage, and the
+/// processing of those weakrefs may be more complex. For such case, we delegate to the
+/// VM binding to process weak references.
 #[derive(Default)]
 pub struct ProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
 
