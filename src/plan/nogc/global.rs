@@ -16,7 +16,7 @@ use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
-use crate::util::{ObjectReference, opaque_pointer::*};
+use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -97,10 +97,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
         println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
-    }
-
-    fn in_default_space(&self, object: ObjectReference) -> bool {
-        self.nogc_space.in_space(object)
     }
 }
 

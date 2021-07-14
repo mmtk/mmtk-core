@@ -10,7 +10,6 @@ use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
-use crate::util::ObjectReference;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::GcHookWork;
@@ -142,10 +141,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
-    }
-
-    fn in_default_space(&self, object: ObjectReference) -> bool {
-        self.fromspace().in_space(object) || self.tospace().in_space(object)
     }
 }
 

@@ -316,8 +316,6 @@ pub trait Plan: 'static + Sync + Downcast {
             );
         }
     }
-
-    fn in_default_space(&self, object: ObjectReference) -> bool;
 }
 
 impl_downcast!(Plan assoc VM);

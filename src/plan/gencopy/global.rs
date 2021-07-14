@@ -20,7 +20,7 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSani
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::{ObjectReference, VMWorkerThread};
+use crate::util::VMWorkerThread;
 use crate::util::{conversions, metadata};
 use crate::vm::*;
 use crate::{mmtk::MMTK, plan::barriers::BarrierSelector};
@@ -190,10 +190,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn is_current_gc_nursery(&self) -> bool {
         !self.gc_full_heap.load(Ordering::SeqCst)
-    }
-
-    fn in_default_space(&self, object: ObjectReference) -> bool {
-        self.nursery.in_space(object) || self.fromspace().in_space(object) || self.tospace().in_space(object)
     }
 }
 

@@ -21,7 +21,7 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSani
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
-use crate::util::{ObjectReference, VMWorkerThread};
+use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use std::sync::Arc;
 
@@ -118,10 +118,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         let mut c = NoCopy::new(mmtk);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
-    }
-
-    fn in_default_space(&self, object: ObjectReference) -> bool {
-        self.ms.in_space(object)
     }
 }
 
