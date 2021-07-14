@@ -266,6 +266,10 @@ pub mod specs {
     use crate::util::constants::LOG_BITS_IN_WORD;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::constants::LOG_MIN_OBJECT_SIZE;
+    #[cfg(target_pointer_width = "64")]
+    use crate::util::metadata::side_metadata::metadata_address_range_size;
+    #[cfg(target_pointer_width = "32")]
+    use crate::util::metadata::side_metadata::metadata_bytes_per_chunk;
     use crate::util::metadata::{
         header_metadata::HeaderMetadataSpec, side_metadata::SideMetadataSpec, MetadataSpec,
     };
@@ -292,6 +296,25 @@ pub mod specs {
                 }
                 pub const fn num_bits(&self) -> usize {
                     1 << $log_num_bits
+                }
+                pub const fn offset(&self) -> usize {
+                    match self.0 {
+                        MetadataSpec::InHeader(s) => s.bit_offset as usize,
+                        MetadataSpec::OnSide(s) => {
+                            #[cfg(target_pointer_width = "64")]
+                            {
+                                s.offset + metadata_address_range_size(&s)
+                            }
+                            #[cfg(target_pointer_width = "32")]
+                            {
+                                s.offset
+                                    + metadata_bytes_per_chunk(
+                                        &s.log_min_obj_size,
+                                        &s.log_num_of_bits,
+                                    )
+                            }
+                        }
+                    }
                 }
             }
             impl std::ops::Deref for $spec_name {
