@@ -431,3 +431,7 @@ pub fn add_work_packets<VM: VMBinding>(
 ) {
     mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
 }
+
+pub fn on_closure_end<VM: VMBinding>(mmtk: &'static MMTK<VM>, f: Box<dyn Send + Fn() -> bool>) {
+    mmtk.scheduler.on_closure_end(f)
+}
