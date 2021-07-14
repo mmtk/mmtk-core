@@ -138,7 +138,7 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
-    scheduler: &'static MMTkScheduler<VM>,
+    scheduler: Arc<MMTkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
         PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
@@ -220,8 +220,8 @@ pub trait Plan: 'static + Sync + Downcast {
         self.base().initialized.load(Ordering::SeqCst)
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<Self::VM>);
-    fn release(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<Self::VM>);
+    fn prepare(&mut self, tls: VMWorkerThread);
+    fn release(&mut self, tls: VMWorkerThread);
 
     fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
         if self.collection_required(space_full, space) {

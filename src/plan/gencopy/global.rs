@@ -137,7 +137,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread, _mmtk: &'static MMTK<VM>) {
+    fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
         self.nursery.prepare(true);
         if !self.is_current_gc_nursery() {
@@ -149,7 +149,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.copyspace1.prepare(!hi);
     }
 
-    fn release(&mut self, tls: VMWorkerThread, _mmtk: &'static MMTK<VM>) {
+    fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         self.nursery.release();
         if !self.is_current_gc_nursery() {

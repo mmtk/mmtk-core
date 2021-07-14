@@ -207,13 +207,13 @@ impl ChunkMap {
         work_packets
     }
 
-    pub fn generate_sweep_tasks<VM: VMBinding>(&self, space: &'static ImmixSpace<VM>, mmtk: &'static MMTK<VM>) -> Vec<Box<dyn Work<MMTK<VM>>>> {
+    pub fn generate_sweep_tasks<VM: VMBinding>(&self, space: &'static ImmixSpace<VM>, scheduler: &MMTkScheduler<VM>) -> Vec<Box<dyn Work<MMTK<VM>>>> {
         for table in &space.defrag.spill_mark_histograms {
             for entry in table {
                 entry.store(0, Ordering::Release);
             }
         }
-        self.generate_tasks(mmtk.scheduler.worker_group().worker_count(), |chunks| {
+        self.generate_tasks(scheduler.num_workers(), |chunks| {
             box SweepChunks(space, chunks)
         })
     }

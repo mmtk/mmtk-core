@@ -1,5 +1,5 @@
 use atomic::Ordering;
-use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorker, WorkBucketStage, gc_work::ProcessEdgesWork}, util::{constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource, opaque_pointer::{VMThread, VMWorkerThread}}};
+use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorker, MMTkScheduler, WorkBucketStage, gc_work::ProcessEdgesWork}, util::{constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource, opaque_pointer::{VMThread, VMWorkerThread}}};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::object_forwarding as ForwardingWord;
@@ -10,7 +10,7 @@ use crate::util::heap::PageResource;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::util::metadata::side_metadata::{self, *};
-use std::{cell::UnsafeCell, iter::Step, mem, ops::Range, sync::atomic::{AtomicBool, AtomicU8}};
+use std::{cell::UnsafeCell, iter::Step, mem, ops::Range, sync::{Arc, Weak, atomic::{AtomicBool, AtomicU8}}};
 use super::{block::*, chunk::{Chunk, ChunkMap, ChunkState}, defrag::Defrag};
 use super::line::*;
 
@@ -26,6 +26,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     pub reusable_blocks: BlockList,
     pub(super) defrag: Defrag,
     mark_state: AtomicU8,
+    scheduler: Weak<MMTkScheduler<VM>>,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -96,6 +97,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
+        scheduler: Arc<MMTkScheduler<VM>>,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> Self {
         let common = CommonSpace::new(
@@ -132,6 +134,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             reusable_blocks: BlockList::new(),
             defrag: Defrag::new(),
             mark_state: AtomicU8::new(Self::MARK_BASE_VALUE),
+            scheduler: Arc::downgrade(&scheduler),
         }
     }
 
@@ -172,7 +175,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         return rtn;
     }
 
-    pub fn prepare(&mut self, mmtk: &'static MMTK<VM>) {
+    fn scheduler(&self) -> Arc<MMTkScheduler<VM>> {
+        self.scheduler.upgrade().unwrap()
+    }
+
+    pub fn prepare(&mut self) {
         if Self::HEADER_MARK_BITS {
             self.mark_state.store(Self::delta_mark_state(self.mark_state.load(Ordering::Acquire)), Ordering::Release);
         }
@@ -182,14 +189,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
         let space = unsafe { &*(self as *const Self) };
-        let work_packets = self.chunk_map.generate_tasks(mmtk.scheduler.num_workers(), |chunks| {
+        let work_packets = self.chunk_map.generate_tasks(self.scheduler().num_workers(), |chunks| {
             box PrepareBlockState {
                 space: space,
                 chunks,
                 defrag_threshold: if space.in_defrag() { Some(threshold) } else { None },
             }
         });
-        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
+        self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
 
         if !super::BLOCK_ONLY {
             self.line_mark_state.fetch_add(1, Ordering::AcqRel);
@@ -200,7 +207,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.in_collection.store(true, Ordering::Release);
     }
 
-    pub fn release(&mut self, mmtk: &'static MMTK<VM>) {
+    pub fn release(&mut self) {
         if !super::BLOCK_ONLY {
             self.line_unavail_state.store(self.line_mark_state.load(Ordering::Acquire), Ordering::Release);
         }
@@ -210,8 +217,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
 
         let space = unsafe { &*(self as *const Self) };
-        let work_packets = self.chunk_map.generate_sweep_tasks(space, mmtk);
-        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+        let work_packets = self.chunk_map.generate_sweep_tasks(space, &self.scheduler());
+        self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
 
         self.in_collection.store(false, Ordering::Release);
         if !super::BLOCK_ONLY {

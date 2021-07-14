@@ -104,15 +104,15 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
+    fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.immix_space.prepare(mmtk);
+        self.immix_space.prepare();
     }
 
-    fn release(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
+    fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         // release the collected region
-        self.immix_space.release(mmtk);
+        self.immix_space.release();
     }
 
     fn get_collection_reserve(&self) -> usize {
@@ -141,12 +141,12 @@ impl<VM: VMBinding> Immix<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<VM>,
+        scheduler: Arc<MMTkScheduler<VM>>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         Immix {
-            immix_space: ImmixSpace::new("immix", vm_map, mmapper, &mut heap, vec![]),
+            immix_space: ImmixSpace::new("immix", vm_map, mmapper, &mut heap, scheduler, vec![]),
             common: CommonPlan::new(vm_map, mmapper, options, heap, &IMMIX_CONSTRAINTS, vec![]),
         }
     }

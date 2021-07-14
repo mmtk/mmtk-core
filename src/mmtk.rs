@@ -53,7 +53,7 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
         let scheduler = MMTkScheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = crate::plan::create_plan(options.plan, &VM_MAP, &MMAPPER, options.clone(), unsafe { &*(scheduler.as_ref() as *const MMTkScheduler<VM>) });
+        let plan = crate::plan::create_plan(options.plan, &VM_MAP, &MMAPPER, options.clone(), scheduler.clone());
         MMTK {
             plan,
             reference_processors: ReferenceProcessors::new(),

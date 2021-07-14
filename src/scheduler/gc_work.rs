@@ -47,7 +47,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Prepare<P, W> {
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut P = unsafe { &mut *(self.plan as *const _ as *mut _) };
-        plan_mut.prepare(worker.tls, mmtk);
+        plan_mut.prepare(worker.tls);
 
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
@@ -123,7 +123,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut P = unsafe { &mut *(self.plan as *const _ as *mut _) };
-        plan_mut.release(worker.tls, mmtk);
+        plan_mut.release(worker.tls);
 
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Release]
@@ -338,7 +338,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
 pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
     pub edges: Vec<Address>,
     pub nodes: Vec<ObjectReference>,
-    pub mmtk: &'static MMTK<E::VM>,
+    mmtk: &'static MMTK<E::VM>,
     // Use raw pointer for fast pointer dereferencing, instead of using `Option<&'static mut GCWorker<E::VM>>`.
     // Because a copying gc will dereference this pointer at least once for every object copy.
     worker: *mut GCWorker<E::VM>,

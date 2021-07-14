@@ -73,6 +73,7 @@ pub struct ImmixProcessEdges<VM: VMBinding> {
     // downcast for each traced object.
     plan: &'static Immix<VM>,
     base: ProcessEdgesBase<ImmixProcessEdges<VM>>,
+    mmtk: &'static MMTK<VM>,
 }
 
 impl<VM: VMBinding> ImmixProcessEdges<VM> {
@@ -106,7 +107,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<Immix<VM>>().unwrap();
-        Self { base, plan }
+        Self { base, plan, mmtk }
     }
 
     #[cold]
@@ -117,7 +118,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
         if Self::SCAN_OBJECTS_IMMEDIATELY {
             self.worker().do_work(scan_objects_work);
         } else {
-            self.base.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);
         }
     }
 
