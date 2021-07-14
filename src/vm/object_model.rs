@@ -309,8 +309,8 @@ pub mod specs {
                             {
                                 s.offset
                                     + metadata_bytes_per_chunk(
-                                        &s.log_min_obj_size,
-                                        &s.log_num_of_bits,
+                                        s.log_min_obj_size,
+                                        s.log_num_of_bits,
                                     )
                             }
                         }
