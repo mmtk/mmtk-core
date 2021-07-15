@@ -43,6 +43,8 @@ pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
+    max_non_los_default_alloc_bytes:
+        crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
     ..PlanConstraints::default()
 };
 

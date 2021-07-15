@@ -49,6 +49,14 @@ pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_words: 0,
     num_specialized_scans: 1,
     barrier: super::ACTIVE_BARRIER,
+    // TODO: We should use MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN which will allocate
+    // large objects directly to LOS. However, there are bugs in gencopy that prevents us doing it.
+    // I will do a separate PR to fix it.
+    // max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(
+    //     crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
+    //     crate::util::options::NURSERY_SIZE,
+    // ),
+    max_non_los_default_alloc_bytes: crate::util::options::NURSERY_SIZE,
     ..PlanConstraints::default()
 };
 
@@ -218,7 +226,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 "nursery",
                 false,
                 true,
-                VMRequest::fixed_extent(options.max_nursery, false),
+                VMRequest::fixed_extent(crate::util::options::NURSERY_SIZE, false),
                 global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
