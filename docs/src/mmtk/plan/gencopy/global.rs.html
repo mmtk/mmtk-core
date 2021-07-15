@@ -306,6 +306,13 @@
 <span id="303">303</span>
 <span id="304">304</span>
 <span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::gc_work</span>::{<span class="ident">GenCopyCopyContext</span>, <span class="ident">GenCopyMatureProcessEdges</span>, <span class="ident">GenCopyNurseryProcessEdges</span>};
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::mutator::ALLOCATOR_MAPPING</span>;
@@ -432,6 +439,13 @@
         <span class="comment">// Prepare global/collectors/mutators</span>
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
             .<span class="ident">add</span>(<span class="ident">Prepare</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">GenCopyCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
+        <span class="kw">if</span> <span class="ident">is_full_heap</span> {
+            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefClosure</span>]
+                .<span class="ident">add</span>(<span class="ident">ProcessWeakRefs</span>::<span class="op">&lt;</span><span class="ident">GenCopyMatureProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
+        } <span class="kw">else</span> {
+            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefClosure</span>]
+                .<span class="ident">add</span>(<span class="ident">ProcessWeakRefs</span>::<span class="op">&lt;</span><span class="ident">GenCopyNurseryProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
+        }
         <span class="comment">// Release global/collectors/mutators</span>
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>]
             .<span class="ident">add</span>(<span class="ident">Release</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">GenCopyCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));

@@ -439,6 +439,32 @@
 <span id="436">436</span>
 <span id="437">437</span>
 <span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::stat::SchedulerStat</span>;
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::work::Work</span>;
@@ -477,6 +503,16 @@
     ),
     <span class="ident">startup</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">finalizer</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// A callback to be fired after the `Closure` bucket is drained.</span>
+    <span class="doccomment">/// This callback should return `true` if it adds more work packets to the</span>
+    <span class="doccomment">/// `Closure` bucket. `WorkBucket::can_open` then consult this return value</span>
+    <span class="doccomment">/// to prevent the GC from proceeding to the next stage, if we still have</span>
+    <span class="doccomment">/// `Closure` work to do.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// We use this callback to process ephemeron objects. `closure_end` can re-enable</span>
+    <span class="doccomment">/// the `Closure` bucket multiple times to iteratively discover and process</span>
+    <span class="doccomment">/// more ephemeron objects.</span>
+    <span class="ident">closure_end</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Fn</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="comment">// The &#39;channel&#39; inside Scheduler disallows Sync for Scheduler. We have to make sure we use channel properly:</span>
@@ -507,6 +543,7 @@
             <span class="ident">channel</span>: <span class="ident">channel</span>(),
             <span class="ident">startup</span>: <span class="ident">Mutex::new</span>(<span class="prelude-val">None</span>),
             <span class="ident">finalizer</span>: <span class="ident">Mutex::new</span>(<span class="prelude-val">None</span>),
+            <span class="ident">closure_end</span>: <span class="ident">Mutex::new</span>(<span class="prelude-val">None</span>),
         })
     }
 
@@ -556,7 +593,18 @@
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">open_next</span> <span class="op">=</span> <span class="op">|</span><span class="ident">s</span>: <span class="ident">WorkBucketStage</span><span class="op">|</span> {
                 <span class="kw">let</span> <span class="ident">cur_stages</span> <span class="op">=</span> <span class="ident">open_stages</span>.<span class="ident">clone</span>();
                 <span class="ident">self_mut</span>.<span class="ident">work_buckets</span>[<span class="ident">s</span>].<span class="ident">set_open_condition</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-                    <span class="self">self</span>.<span class="ident">are_buckets_drained</span>(<span class="kw-2">&amp;</span><span class="ident">cur_stages</span>) <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">worker_group</span>().<span class="ident">all_parked</span>()
+                    <span class="kw">let</span> <span class="ident">should_open</span> <span class="op">=</span>
+                        <span class="self">self</span>.<span class="ident">are_buckets_drained</span>(<span class="kw-2">&amp;</span><span class="ident">cur_stages</span>) <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">worker_group</span>().<span class="ident">all_parked</span>();
+                    <span class="comment">// Additional check before the `RefClosure` bucket opens.</span>
+                    <span class="kw">if</span> <span class="ident">should_open</span> <span class="op">&amp;&amp;</span> <span class="ident">s</span> <span class="op">=</span><span class="op">=</span> <span class="ident">WorkBucketStage::RefClosure</span> {
+                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">closure_end</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">closure_end</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">as_ref</span>() {
+                            <span class="kw">if</span> <span class="ident">closure_end</span>() {
+                                <span class="comment">// Don&#39;t open `RefClosure` if `closure_end` added more works to `Closure`.</span>
+                                <span class="kw">return</span> <span class="bool-val">false</span>;
+                            }
+                        }
+                    }
+                    <span class="ident">should_open</span>
                 });
                 <span class="ident">open_stages</span>.<span class="ident">push</span>(<span class="ident">s</span>);
             };
@@ -584,6 +632,10 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_finalizer</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">w</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>) {
         <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">finalizer</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">=</span> <span class="ident">w</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="kw">box</span> <span class="ident">w</span> <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>);
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_closure_end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Fn</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span><span class="op">&gt;</span>) {
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">closure_end</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">worker_group</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span> {

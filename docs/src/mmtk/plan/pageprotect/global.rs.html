@@ -172,6 +172,8 @@
 <span id="169">169</span>
 <span id="170">170</span>
 <span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::gc_work::PPProcessEdges</span>;
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::mutator::ALLOCATOR_MAPPING</span>;
@@ -263,6 +265,8 @@
         <span class="comment">// Prepare global/collectors/mutators</span>
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
             .<span class="ident">add</span>(<span class="ident">Prepare</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
+        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefClosure</span>]
+            .<span class="ident">add</span>(<span class="ident">ProcessWeakRefs</span>::<span class="op">&lt;</span><span class="ident">PPProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
         <span class="comment">// Release global/collectors/mutators</span>
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>]
             .<span class="ident">add</span>(<span class="ident">Release</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
