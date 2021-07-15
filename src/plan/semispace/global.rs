@@ -86,6 +86,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, SSCopyContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::RefClosure]
+            .add(ProcessWeakRefs::<SSProcessEdges<VM>>::new());
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, SSCopyContext<VM>>::new(self));
