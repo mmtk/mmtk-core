@@ -120,6 +120,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> Release<P, W> {
 impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Release Global");
+        <P::VM as VMBinding>::VMCollection::vm_release();
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut P = unsafe { &mut *(self.plan as *const _ as *mut _) };
@@ -247,6 +248,27 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 }
 
 impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for EndOfGC {}
+
+/// Delegate to the VM binding for reference processing.
+///
+/// Some VMs (e.g. v8) do not have a Java-like global weak reference storage, and the
+/// processing of those weakrefs may be more complex. For such case, we delegate to the
+/// VM binding to process weak references.
+#[derive(Default)]
+pub struct ProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
+
+impl<E: ProcessEdgesWork> ProcessWeakRefs<E> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessWeakRefs<E> {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+        trace!("ProcessWeakRefs");
+        <E::VM as VMBinding>::VMCollection::process_weak_refs::<E>(worker);
+    }
+}
 
 #[derive(Default)]
 pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
