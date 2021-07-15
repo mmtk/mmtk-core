@@ -107,7 +107,7 @@
 <span class="macro">lazy_static!</span> {
     <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">ALLOCATOR_MAPPING</span>: <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationType</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">enum_map!</span> {
         <span class="ident">AllocationType::Default</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>),
-        <span class="ident">AllocationType::Immortal</span> <span class="op">|</span> <span class="ident">AllocationType::Code</span> <span class="op">|</span> <span class="ident">AllocationType::ReadOnly</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">1</span>),
+        <span class="ident">AllocationType::Immortal</span> <span class="op">|</span> <span class="ident">AllocationType::Code</span> <span class="op">|</span> <span class="ident">AllocationType::LargeCode</span> <span class="op">|</span> <span class="ident">AllocationType::ReadOnly</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">1</span>),
         <span class="ident">AllocationType::Los</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AllocatorSelector::LargeObject</span>(<span class="number">0</span>),
     };
 }

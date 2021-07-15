@@ -852,7 +852,7 @@ For example, for <code>Default</code>, we allocate using the first bump pointer 
 </span>lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap&lt;AllocationType, AllocatorSelector&gt; = enum_map! {
         AllocationType::Default =&gt; AllocatorSelector::BumpPointer(0),
-        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly =&gt; AllocatorSelector::BumpPointer(1),
+        AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly =&gt; AllocatorSelector::BumpPointer(1),
         AllocationType::Los =&gt; AllocatorSelector::LargeObject(0),
     };
 }

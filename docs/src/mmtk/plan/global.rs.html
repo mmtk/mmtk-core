@@ -853,6 +853,33 @@
 <span id="850">850</span>
 <span id="851">851</span>
 <span id="852">852</span>
+<span id="853">853</span>
+<span id="854">854</span>
+<span id="855">855</span>
+<span id="856">856</span>
+<span id="857">857</span>
+<span id="858">858</span>
+<span id="859">859</span>
+<span id="860">860</span>
+<span id="861">861</span>
+<span id="862">862</span>
+<span id="863">863</span>
+<span id="864">864</span>
+<span id="865">865</span>
+<span id="866">866</span>
+<span id="867">867</span>
+<span id="868">868</span>
+<span id="869">869</span>
+<span id="870">870</span>
+<span id="871">871</span>
+<span id="872">872</span>
+<span id="873">873</span>
+<span id="874">874</span>
+<span id="875">875</span>
+<span id="876">876</span>
+<span id="877">877</span>
+<span id="878">878</span>
+<span id="879">879</span>
 </pre><pre class="rust">
 <span class="doccomment">//! The global part of a plan implementation.</span>
 
@@ -1220,6 +1247,8 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="comment">// Spaces in base plan</span>
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="ident">code_space</span>: <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
+    <span class="kw">pub</span> <span class="ident">code_lo_space</span>: <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="ident">ro_space</span>: <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
@@ -1275,6 +1304,17 @@ BasePlan should contain all plan-related state and functions that are _fundament
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
             <span class="ident">code_space</span>: <span class="ident">ImmortalSpace::new</span>(
                 <span class="string">&quot;code_space&quot;</span>,
+                <span class="bool-val">true</span>,
+                <span class="ident">VMRequest::discontiguous</span>(),
+                <span class="ident">global_side_metadata_specs</span>.<span class="ident">clone</span>(),
+                <span class="ident">vm_map</span>,
+                <span class="ident">mmapper</span>,
+                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">heap</span>,
+                <span class="ident">constraints</span>,
+            ),
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
+            <span class="ident">code_lo_space</span>: <span class="ident">ImmortalSpace::new</span>(
+                <span class="string">&quot;code_lo_space&quot;</span>,
                 <span class="bool-val">true</span>,
                 <span class="ident">VMRequest::discontiguous</span>(),
                 <span class="ident">global_side_metadata_specs</span>.<span class="ident">clone</span>(),
@@ -1347,6 +1387,8 @@ BasePlan should contain all plan-related state and functions that are _fundament
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
         <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
+        <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
         <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
@@ -1365,6 +1407,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
         {
             <span class="ident">pages</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">reserved_pages</span>();
+            <span class="ident">pages</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">reserved_pages</span>();
         }
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
         {
@@ -1387,6 +1430,12 @@ BasePlan should contain all plan-related state and functions that are _fundament
             <span class="kw">return</span> <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">_trace</span>, <span class="ident">_object</span>);
         }
 
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">in_space</span>(<span class="ident">_object</span>) {
+            <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in large code space&quot;</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">_trace</span>, <span class="ident">_object</span>);
+        }
+
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">in_space</span>(<span class="ident">_object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in ro_space space&quot;</span>);
@@ -1404,6 +1453,8 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">_primary</span>: <span class="ident">bool</span>) {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
         <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">prepare</span>();
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
+        <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">prepare</span>();
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
         <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">prepare</span>();
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
@@ -1413,6 +1464,8 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">_primary</span>: <span class="ident">bool</span>) {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
         <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">release</span>();
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
+        <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">release</span>();
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
         <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">release</span>();
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
@@ -1698,13 +1751,14 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 <span class="doccomment">/// Allocation semantics that MMTk provides.</span>
 <span class="doccomment">/// Each allocation request requires a desired semantic for the object to allocate.</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">i32</span>)]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">Enum</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">Enum</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AllocationSemantics</span> {
     <span class="ident">Default</span> <span class="op">=</span> <span class="number">0</span>,
     <span class="ident">Immortal</span> <span class="op">=</span> <span class="number">1</span>,
     <span class="ident">Los</span> <span class="op">=</span> <span class="number">2</span>,
     <span class="ident">Code</span> <span class="op">=</span> <span class="number">3</span>,
     <span class="ident">ReadOnly</span> <span class="op">=</span> <span class="number">4</span>,
+    <span class="ident">LargeCode</span> <span class="op">=</span> <span class="number">5</span>,
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
