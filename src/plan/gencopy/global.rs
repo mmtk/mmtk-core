@@ -119,6 +119,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             scheduler.work_buckets[WorkBucketStage::Unconstrained]
                 .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
         }
+
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
