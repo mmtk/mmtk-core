@@ -1,4 +1,6 @@
-use crate::{mmtk::MMTK, plan::global::CommonPlan};
+use crate::mmtk::MMTK;
+#[cfg(feature = "nogc_common_plan")]
+use crate::plan::global::CommonPlan;
 use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -28,7 +30,10 @@ use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
 use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
 
 pub struct NoGC<VM: VMBinding> {
+    #[cfg(feature = "nogc_common_plan")]
     pub common: CommonPlan<VM>,
+    #[cfg(not(feature = "nogc_common_plan"))]
+    pub base: BasePlan<VM>,
     pub nogc_space: NoGCImmortalSpace<VM>,
 }
 
@@ -57,7 +62,10 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
+        #[cfg(feature = "nogc_common_plan")]
         self.common.gc_init(heap_size, vm_map, scheduler);
+        #[cfg(not(feature = "nogc_common_plan"))]
+        self.base.gc_init(heap_size, vm_map, scheduler);
 
         // FIXME correctly initialize spaces based on options
         self.nogc_space.init(&vm_map);
@@ -67,10 +75,17 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         self.base().collection_required(self, space_full, space)
     }
 
+    #[cfg(feature = "nogc_common_plan")]
     fn base(&self) -> &BasePlan<VM> {
         &self.common.base
     }
 
+    #[cfg(not(feature = "nogc_common_plan"))]
+    fn base(&self) -> &BasePlan<VM> {
+        &self.base
+    }
+
+    #[cfg(feature = "nogc_common_plan")]
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
@@ -133,7 +148,17 @@ impl<VM: VMBinding> NoGC<VM> {
 
         let res = NoGC {
             nogc_space,
+            #[cfg(feature = "nogc_common_plan")]
             common: CommonPlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS, vec![]),
+            #[cfg(not(feature = "nogc_common_plan"))]
+            base: BasePlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                &NOGC_CONSTRAINTS,
+                global_specs,
+            ),
         };
 
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();

@@ -18,13 +18,23 @@ fn pp_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerT
 /// Release mutator. Do nothing.
 fn pp_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
+#[cfg(not(feature = "force_vm_spaces"))]
+lazy_static! {
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
+        AllocationType::Default | AllocationType::Los => AllocatorSelector::LargeObject(0),
+        // Temporarily put code and readonly objects to immortal space, for v8 support.
+        AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(0),
+    };
+}
+
+#[cfg(feature = "force_vm_spaces")]
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::LargeObject(0),
-        AllocationType::Immortal => AllocatorSelector::BumpPointer(0),
-        AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
-        AllocationType::Code => AllocatorSelector::BumpPointer(2),
-        AllocationType::LargeCode => AllocatorSelector::BumpPointer(3),
+        AllocationType::Immortal => AllocatorSelector::BumpPointer(1),
+        AllocationType::ReadOnly => AllocatorSelector::BumpPointer(2),
+        AllocationType::Code => AllocatorSelector::BumpPointer(3),
+        AllocationType::LargeCode => AllocatorSelector::BumpPointer(4),
         AllocationType::Los => AllocatorSelector::LargeObject(1),
     };
 }
@@ -38,14 +48,13 @@ pub fn create_pp_mutator<VM: VMBinding>(
     let page = plan.downcast_ref::<PageProtect<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box vec![
-            (AllocatorSelector::LargeObject(0), &page.space),
-            (AllocatorSelector::BumpPointer(0), page.common.get_immortal()),
-            (AllocatorSelector::BumpPointer(1), &page.base().ro_space),
-            (AllocatorSelector::BumpPointer(2), &page.base().code_space),
-            (AllocatorSelector::BumpPointer(3), &page.base().code_lo_space),
-            (AllocatorSelector::LargeObject(1), page.common.get_los()),
-        ],
+        space_mapping: box plan.with_vm_space_mapping(vec![
+            (
+                AllocatorSelector::BumpPointer(1),
+                page.common.get_immortal(),
+            ),
+            (AllocatorSelector::LargeObject(1), &page.space),
+        ]),
         prepare_func: &pp_mutator_prepare,
         release_func: &pp_mutator_release,
     };
