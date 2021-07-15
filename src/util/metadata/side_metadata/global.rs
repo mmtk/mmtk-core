@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 /// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.
 ///
 /// For performance reasons, objects of this struct should be constants.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SideMetadataSpec {
     pub is_global: bool,
     pub offset: SideMetadataOffset,
@@ -48,37 +48,26 @@ impl SideMetadataSpec {
     }
 }
 
-impl PartialEq for SideMetadataSpec {
-    fn eq(&self, other: &Self) -> bool {
-        if self.is_global != other.is_global
-            || self.log_num_of_bits != other.log_num_of_bits
-            || self.log_min_obj_size != other.log_min_obj_size
-        {
-            return false;
-        }
-        unsafe {
-            if self.is_addr_offset() && self.offset.addr != other.offset.addr {
-                return false;
-            }
-            if self.is_rel_offset() && self.offset.rel_offset != other.offset.rel_offset {
-                return false;
-            }
-        }
-        true
-    }
-}
-impl Eq for SideMetadataSpec {}
-
-impl std::hash::Hash for SideMetadataSpec {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.is_global.hash(state);
-        if self.is_addr_offset() {
-            unsafe { self.offset.addr }.hash(state);
-        } else {
-            unsafe { self.offset.rel_offset }.hash(state);
-        }
-        self.log_num_of_bits.hash(state);
-        self.log_min_obj_size.hash(state);
+impl fmt::Debug for SideMetadataSpec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!(
+            "SideMetadataSpec {{ \
+            **is_global: {:?} \
+            **offset: {} \
+            **log_num_of_bits: 0x{:x} \
+            **log_min_obj_size: 0x{:x} \
+            }}",
+            self.is_global,
+            unsafe {
+                if self.is_addr_offset() {
+                    format!("0x{:x}", self.offset.addr)
+                } else {
+                    format!("0x{:x}", self.offset.rel_offset)
+                }
+            },
+            self.log_num_of_bits,
+            self.log_min_obj_size
+        ))
     }
 }
 
@@ -131,26 +120,18 @@ impl SideMetadataOffset {
     }
 }
 
-impl fmt::Debug for SideMetadataSpec {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!(
-            "SideMetadataSpec {{ \
-            **is_global: {:?} \
-            **offset: {} \
-            **log_num_of_bits: 0x{:x} \
-            **log_min_obj_size: 0x{:x} \
-            }}",
-            self.is_global,
-            unsafe {
-                if self.is_addr_offset() {
-                    format!("0x{:x}", self.offset.addr)
-                } else {
-                    format!("0x{:x}", self.offset.rel_offset)
-                }
-            },
-            self.log_num_of_bits,
-            self.log_min_obj_size
-        ))
+// Address and usize has the same layout, so we use usize for implementing these traits.
+
+impl PartialEq for SideMetadataOffset {
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { self.rel_offset == other.rel_offset }
+    }
+}
+impl Eq for SideMetadataOffset {}
+
+impl std::hash::Hash for SideMetadataOffset {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        unsafe { self.rel_offset }.hash(state);
     }
 }
 
