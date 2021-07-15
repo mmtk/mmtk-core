@@ -44,8 +44,6 @@ pub mod metadata;
 pub(crate) mod object_forwarding;
 /// MMTk command line options.
 pub(crate) mod options;
-/// Utilities funcitons for Rust
-pub(crate) mod rust_util;
 /// Sanity checker for GC.
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;
