@@ -25,10 +25,12 @@ pub struct SideMetadataSpec {
 
 impl SideMetadataSpec {
     /// Is offset for this spec Address? (contiguous side metadata for 64 bits, and global specs in 32 bits)
+    #[inline(always)]
     pub const fn is_addr_offset(&self) -> bool {
         self.is_global || cfg!(target_pointer_width = "64")
     }
     /// If offset for this spec relative? (chunked side metadata for local specs in 32 bits)
+    #[inline(always)]
     pub const fn is_rel_offset(&self) -> bool {
         !self.is_addr_offset()
     }

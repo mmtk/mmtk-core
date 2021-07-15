@@ -303,6 +303,7 @@ pub mod specs {
                         log_min_obj_size: $side_min_obj_size as usize,
                     }))
                 }
+                #[inline(always)]
                 pub const fn as_spec(&self) -> &MetadataSpec {
                     &self.0
                 }
@@ -312,6 +313,7 @@ pub mod specs {
             }
             impl std::ops::Deref for $spec_name {
                 type Target = MetadataSpec;
+                #[inline(always)]
                 fn deref(&self) -> &Self::Target {
                     self.as_spec()
                 }
