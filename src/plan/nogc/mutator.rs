@@ -10,6 +10,19 @@ use crate::vm::VMBinding;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
+#[cfg(feature = "force_vm_spaces")]
+lazy_static! {
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
+        AllocationType::Default => AllocatorSelector::BumpPointer(0),
+        AllocationType::Immortal => AllocatorSelector::BumpPointer(1),
+        AllocationType::ReadOnly => AllocatorSelector::BumpPointer(2),
+        AllocationType::Code => AllocatorSelector::BumpPointer(3),
+        AllocationType::LargeCode => AllocatorSelector::BumpPointer(4),
+        AllocationType::Los => AllocatorSelector::LargeObject(0),
+    };
+}
+
+#[cfg(not(feature = "force_vm_spaces"))]
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::BumpPointer(0),
@@ -32,14 +45,10 @@ pub fn create_nogc_mutator<VM: VMBinding>(
     let nogc = plan.downcast_ref::<NoGC<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), &nogc.nogc_space),
-            (AllocatorSelector::BumpPointer(1), nogc.common.get_immortal()),
-            (AllocatorSelector::BumpPointer(2), &nogc.base().ro_space),
-            (AllocatorSelector::BumpPointer(3), &nogc.base().code_space),
-            (AllocatorSelector::BumpPointer(4), &nogc.base().code_lo_space),
-            (AllocatorSelector::LargeObject(0), nogc.common.get_los()),
-        ],
+        space_mapping: box plan.with_vm_space_mapping(vec![(
+            AllocatorSelector::BumpPointer(0),
+            &plan.downcast_ref::<NoGC<VM>>().unwrap().nogc_space,
+        )]),
         prepare_func: &nogc_mutator_noop,
         release_func: &nogc_mutator_noop,
     };
