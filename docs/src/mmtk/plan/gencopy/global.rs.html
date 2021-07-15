@@ -313,6 +313,14 @@
 <span id="310">310</span>
 <span id="311">311</span>
 <span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::gc_work</span>::{<span class="ident">GenCopyCopyContext</span>, <span class="ident">GenCopyMatureProcessEdges</span>, <span class="ident">GenCopyNurseryProcessEdges</span>};
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::mutator::ALLOCATOR_MAPPING</span>;
@@ -365,6 +373,14 @@
     <span class="ident">gc_header_words</span>: <span class="number">0</span>,
     <span class="ident">num_specialized_scans</span>: <span class="number">1</span>,
     <span class="ident">barrier</span>: <span class="kw">super</span><span class="ident">::ACTIVE_BARRIER</span>,
+    <span class="comment">// TODO: We should use MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN which will allocate</span>
+    <span class="comment">// large objects directly to LOS. However, there are bugs in gencopy that prevents us doing it.</span>
+    <span class="comment">// I will do a separate PR to fix it.</span>
+    <span class="comment">// max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(</span>
+    <span class="comment">//     crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,</span>
+    <span class="comment">//     crate::util::options::NURSERY_SIZE,</span>
+    <span class="comment">// ),</span>
+    <span class="ident">max_non_los_default_alloc_bytes</span>: <span class="kw">crate</span><span class="ident">::util::options::NURSERY_SIZE</span>,
     ..<span class="ident">PlanConstraints::default</span>()
 };
 
@@ -534,7 +550,7 @@
                 <span class="string">&quot;nursery&quot;</span>,
                 <span class="bool-val">false</span>,
                 <span class="bool-val">true</span>,
-                <span class="ident">VMRequest::fixed_extent</span>(<span class="ident">options</span>.<span class="ident">max_nursery</span>, <span class="bool-val">false</span>),
+                <span class="ident">VMRequest::fixed_extent</span>(<span class="kw">crate</span><span class="ident">::util::options::NURSERY_SIZE</span>, <span class="bool-val">false</span>),
                 <span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>(),
                 <span class="ident">vm_map</span>,
                 <span class="ident">mmapper</span>,

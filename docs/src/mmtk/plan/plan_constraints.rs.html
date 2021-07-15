@@ -40,6 +40,16 @@
 <span id="37">37</span>
 <span id="38">38</span>
 <span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Plan-specific constraints.</span>
 
@@ -55,6 +65,12 @@
     <span class="kw">pub</span> <span class="ident">gc_header_bits</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">gc_header_words</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">num_specialized_scans</span>: <span class="ident">usize</span>,
+    <span class="doccomment">/// Size (in bytes) beyond which new regular objects must be allocated to the LOS.</span>
+    <span class="doccomment">/// This usually depends on the restriction of the default allocator, e.g. block size for Immix,</span>
+    <span class="doccomment">/// nursery size, max possible cell for freelist, etc.</span>
+    <span class="kw">pub</span> <span class="ident">max_non_los_default_alloc_bytes</span>: <span class="ident">usize</span>,
+    <span class="doccomment">/// Size (in bytes) beyond which copied objects must be copied to the LOS.</span>
+    <span class="doccomment">/// This depends on the copy allocator.</span>
     <span class="kw">pub</span> <span class="ident">max_non_los_copy_bytes</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">barrier</span>: <span class="ident">BarrierSelector</span>,
     <span class="comment">// the following seems unused for now</span>
@@ -71,6 +87,7 @@
             <span class="ident">gc_header_bits</span>: <span class="number">0</span>,
             <span class="ident">gc_header_words</span>: <span class="number">0</span>,
             <span class="ident">num_specialized_scans</span>: <span class="number">0</span>,
+            <span class="ident">max_non_los_default_alloc_bytes</span>: <span class="ident">MAX_INT</span>,
             <span class="ident">max_non_los_copy_bytes</span>: <span class="ident">MAX_INT</span>,
             <span class="ident">needs_linear_scan</span>: <span class="ident">SUPPORT_CARD_SCANNING</span> <span class="op">|</span><span class="op">|</span> <span class="ident">LAZY_SWEEP</span>,
             <span class="ident">needs_concurrent_workers</span>: <span class="bool-val">false</span>,
@@ -80,6 +97,9 @@
         }
     }
 }
+
+<span class="comment">// Use 16 pages as the size limit for non-LOS objects to avoid copying large objects</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">16</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>;
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
     <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>

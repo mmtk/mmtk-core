@@ -217,6 +217,8 @@
 <span id="214">214</span>
 <span id="215">215</span>
 <span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::gc_work</span>::{<span class="ident">SSCopyContext</span>, <span class="ident">SSProcessEdges</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::mmtk::MMTK</span>;
@@ -263,6 +265,8 @@
     <span class="ident">gc_header_bits</span>: <span class="number">2</span>,
     <span class="ident">gc_header_words</span>: <span class="number">0</span>,
     <span class="ident">num_specialized_scans</span>: <span class="number">1</span>,
+    <span class="ident">max_non_los_default_alloc_bytes</span>:
+        <span class="kw">crate</span><span class="ident">::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN</span>,
     ..<span class="ident">PlanConstraints::default</span>()
 };
 
