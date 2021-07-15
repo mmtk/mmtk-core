@@ -119,11 +119,16 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             scheduler.work_buckets[WorkBucketStage::Unconstrained]
                 .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
         }
-        scheduler.work_buckets[WorkBucketStage::RefClosure]
-            .add(ProcessWeakRefs::<GenCopyMatureProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
+        if is_full_heap {
+            scheduler.work_buckets[WorkBucketStage::RefClosure]
+                .add(ProcessWeakRefs::<GenCopyMatureProcessEdges<VM>>::new());
+        } else {
+            scheduler.work_buckets[WorkBucketStage::RefClosure]
+                .add(ProcessWeakRefs::<GenCopyNurseryProcessEdges<VM>>::new());
+        }
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, GenCopyCopyContext<VM>>::new(self));

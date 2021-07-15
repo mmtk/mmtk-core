@@ -249,6 +249,27 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
 impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for EndOfGC {}
 
+/// Delegate to the VM binding for reference processing.
+///
+/// Some VMs (e.g. v8) do not have a Java-like global weak reference storage, and the
+/// processing of those weakrefs may be more complex. For such case, we delegate to the
+/// VM binding to process weak references.
+#[derive(Default)]
+pub struct ProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
+
+impl<E: ProcessEdgesWork> ProcessWeakRefs<E> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessWeakRefs<E> {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+        trace!("ProcessWeakRefs");
+        <E::VM as VMBinding>::VMCollection::process_weak_refs::<E>(worker);
+    }
+}
+
 #[derive(Default)]
 pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
 
@@ -269,23 +290,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
         mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
     }
 }
-
-#[derive(Default)]
-pub struct ProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
-
-impl<E: ProcessEdgesWork> ProcessWeakRefs<E> {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessWeakRefs<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
-        trace!("ProcessWeakRefs");
-        <E::VM as VMBinding>::VMCollection::process_weak_refs::<E>(worker);
-    }
-}
-
 
 pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Edges::VM>);
 
