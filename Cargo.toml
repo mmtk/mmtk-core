@@ -70,7 +70,7 @@ nogc_no_zeroing = ["nogc_lock_free"]
 single_worker = []
 nogc_common_plan = []
 # Always allocate special objects into their corresponding vm spaces.
-force_vm_spaces = ["vm_space", "nogc_common_plan"]
+force_vm_spaces = ["nogc_common_plan"]
 
 # To run expensive comprehensive runtime checks, such as checking duplicate edges
 extreme_assertions = []
