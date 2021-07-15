@@ -11,6 +11,7 @@ use crate::vm::{ObjectModel, VMBinding};
 use crate::MMTK;
 use enum_map::enum_map;
 use enum_map::EnumMap;
+use crate::plan::global::Plan;
 
 pub fn gencopy_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // Do nothing
@@ -31,7 +32,10 @@ pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: V
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::BumpPointer(0),
-        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
+        AllocationType::Immortal => AllocatorSelector::BumpPointer(1),
+        AllocationType::ReadOnly => AllocatorSelector::BumpPointer(2),
+        AllocationType::Code => AllocatorSelector::BumpPointer(3),
+        AllocationType::LargeCode => AllocatorSelector::BumpPointer(4),
         AllocationType::Los => AllocatorSelector::LargeObject(0),
     };
 }
@@ -45,10 +49,10 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
             (AllocatorSelector::BumpPointer(0), &gencopy.nursery),
-            (
-                AllocatorSelector::BumpPointer(1),
-                gencopy.common.get_immortal(),
-            ),
+            (AllocatorSelector::BumpPointer(1), gencopy.common.get_immortal()),
+            (AllocatorSelector::BumpPointer(2), &gencopy.base().ro_space),
+            (AllocatorSelector::BumpPointer(3), &gencopy.base().code_space),
+            (AllocatorSelector::BumpPointer(4), &gencopy.base().code_lo_space),
             (AllocatorSelector::LargeObject(0), gencopy.common.get_los()),
         ],
         prepare_func: &gencopy_mutator_prepare,
