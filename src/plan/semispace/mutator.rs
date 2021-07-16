@@ -61,11 +61,23 @@ pub fn create_ss_mutator<VM: VMBinding>(
     let ss = plan.downcast_ref::<SemiSpace<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box ss.with_vm_space_mapping(vec![
+        space_mapping: box vec![
             (AllocatorSelector::BumpPointer(0), ss.tospace()),
             (AllocatorSelector::BumpPointer(1), ss.common.get_immortal()),
             (AllocatorSelector::LargeObject(0), ss.common.get_los()),
-        ]),
+            #[cfg(all(feature = "force_vm_spaces", feature = "ro_space"))]
+            (AllocatorSelector::BumpPointer(2), &ss.common.base.ro_space),
+            #[cfg(all(feature = "force_vm_spaces", feature = "code_space"))]
+            (
+                AllocatorSelector::BumpPointer(3),
+                &ss.common.base.code_space,
+            ),
+            #[cfg(all(feature = "force_vm_spaces", feature = "code_space"))]
+            (
+                AllocatorSelector::BumpPointer(4),
+                &ss.common.base.code_lo_space,
+            ),
+        ],
         prepare_func: &ss_mutator_prepare,
         release_func: &ss_mutator_release,
     };

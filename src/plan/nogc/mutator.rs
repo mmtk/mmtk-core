@@ -13,19 +13,19 @@ use enum_map::EnumMap;
 #[cfg(feature = "force_vm_spaces")]
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default => AllocatorSelector::BumpPointer(0),
-        AllocationType::Immortal => AllocatorSelector::BumpPointer(1),
-        AllocationType::ReadOnly => AllocatorSelector::BumpPointer(2),
-        AllocationType::Code => AllocatorSelector::BumpPointer(3),
-        AllocationType::LargeCode => AllocatorSelector::BumpPointer(4),
-        AllocationType::Los => AllocatorSelector::LargeObject(0),
+        AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::BumpPointer(0),
     };
 }
 
 #[cfg(not(feature = "force_vm_spaces"))]
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::BumpPointer(0),
+        AllocationType::Default => AllocatorSelector::BumpPointer(0),
+        AllocationType::Immortal => AllocatorSelector::BumpPointer(1),
+        AllocationType::ReadOnly => AllocatorSelector::BumpPointer(2),
+        AllocationType::Code => AllocatorSelector::BumpPointer(3),
+        AllocationType::LargeCode => AllocatorSelector::BumpPointer(4),
+        AllocationType::Los => AllocatorSelector::LargeObject(0),
     };
 }
 
@@ -39,10 +39,28 @@ pub fn create_nogc_mutator<VM: VMBinding>(
 ) -> Mutator<VM> {
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box plan.with_vm_space_mapping(vec![(
-            AllocatorSelector::BumpPointer(0),
-            &plan.downcast_ref::<NoGC<VM>>().unwrap().nogc_space,
-        )]),
+        space_mapping: box vec![
+            (
+                AllocatorSelector::BumpPointer(0),
+                &plan.downcast_ref::<NoGC<VM>>().unwrap().nogc_space,
+            ),
+            #[cfg(feature = "force_vm_spaces")]
+            (
+                AllocatorSelector::BumpPointer(1),
+                plan.common().get_immortal(),
+            ),
+            #[cfg(all(feature = "force_vm_spaces", feature = "ro_space"))]
+            (AllocatorSelector::BumpPointer(2), &plan.base().ro_space),
+            #[cfg(all(feature = "force_vm_spaces", feature = "code_space"))]
+            (AllocatorSelector::BumpPointer(3), &plan.base().code_space),
+            #[cfg(all(feature = "force_vm_spaces", feature = "code_space"))]
+            (
+                AllocatorSelector::BumpPointer(4),
+                &plan.base().code_lo_space,
+            ),
+            #[cfg(feature = "force_vm_spaces")]
+            (AllocatorSelector::LargeObject(0), plan.common().get_los()),
+        ],
         prepare_func: &nogc_mutator_noop,
         release_func: &nogc_mutator_noop,
     };
