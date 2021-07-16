@@ -206,6 +206,11 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         }
     }
 
+    /// Get highwater mark of current monotone space.
+    pub fn cursor(&self) -> Address {
+        self.sync.lock().unwrap().cursor
+    }
+
     fn log_chunk_fields(&self, space_descriptor: SpaceDescriptor, site: &str) {
         let sync = self.sync.lock().unwrap();
         debug!(

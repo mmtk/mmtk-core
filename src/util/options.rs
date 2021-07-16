@@ -1,4 +1,5 @@
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
+use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use std::cell::UnsafeCell;
 use std::default::Default;
 use std::ops::Deref;
@@ -69,6 +70,15 @@ impl FromStr for PerfEventOptions {
         PerfEventOptions::parse_perf_events(s).map(|events| PerfEventOptions { events })
     }
 }
+
+/// The default nursery space size.
+pub const NURSERY_SIZE: usize = 32 << LOG_BYTES_IN_MBYTE;
+/// The default min nursery size. This can be set through command line options.
+/// This does not affect the actual space we create as nursery. It is only used in GC trigger check.
+pub const DEFAULT_MIN_NURSERY: usize = 32 << LOG_BYTES_IN_MBYTE;
+/// The default max nursery size. This can be set through command line options.
+/// This does not affect the actual space we create as nursery. It is only used in GC trigger check.
+pub const DEFAULT_MAX_NURSERY: usize = 32 << LOG_BYTES_IN_MBYTE;
 
 pub struct UnsafeOptionsWrapper(UnsafeCell<Options>);
 
@@ -166,9 +176,9 @@ options! {
     // Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     ignore_system_g_c:     bool                 [always_valid] = false,
     // The upper bound of nursery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    max_nursery:           usize                [|v: &usize| *v > 0]    = (32 * 1024 * 1024),
+    max_nursery:           usize                [|v: &usize| *v > 0 ] = DEFAULT_MAX_NURSERY,
     // The lower bound of nusery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    min_nursery:           usize                [|v: &usize| *v > 0]    = (32 * 1024 * 1024),
+    min_nursery:           usize                [|v: &usize| *v > 0 ] = DEFAULT_MIN_NURSERY,
     // Should a major GC be performed when a system GC is required?
     full_heap_system_gc:   bool                 [always_valid] = false,
     // Should we shrink/grow the heap to adjust to application working set? (not supported)
