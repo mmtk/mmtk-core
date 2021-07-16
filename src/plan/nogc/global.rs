@@ -149,7 +149,7 @@ impl<VM: VMBinding> NoGC<VM> {
         let res = NoGC {
             nogc_space,
             #[cfg(feature = "nogc_common_plan")]
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS, vec![]),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &NOGC_CONSTRAINTS, global_specs),
             #[cfg(not(feature = "nogc_common_plan"))]
             base: BasePlan::new(
                 vm_map,
