@@ -10,6 +10,7 @@ use std::iter::Step;
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Eq)]
 pub struct Line(Address);
 
+#[allow(clippy::assertions_on_constants)]
 impl Line {
     pub const LOG_BYTES: usize = 8;
     pub const BYTES: usize = 1 << Self::LOG_BYTES;
@@ -110,10 +111,11 @@ impl Line {
             }
             line.mark(state)
         }
-        return marked_lines;
+        marked_lines
     }
 }
 
+#[allow(clippy::assertions_on_constants)]
 unsafe impl Step for Line {
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {

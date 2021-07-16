@@ -99,6 +99,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     };
 
+    #[allow(clippy::assertions_on_constants)]
     fn side_metadata_specs() -> &'static [SideMetadataSpec] {
         debug_assert!(!Self::HEADER_MARK_BITS);
         if super::BLOCK_ONLY {
@@ -156,7 +157,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
             in_collection: AtomicBool::new(false),
-            reusable_blocks: BlockList::new(),
+            reusable_blocks: BlockList::default(),
             defrag: Defrag::new(),
             mark_state: AtomicU8::new(Self::MARK_BASE_VALUE),
             scheduler: Arc::downgrade(&scheduler),
@@ -191,6 +192,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     const MARK_MASK: u8 = ((1 << Self::MAX_MARKCOUNT_BITS) - 1) << Self::MARK_BASE;
     const MARK_BASE_VALUE: u8 = Self::MARK_INCREMENT;
 
+    #[allow(clippy::assertions_on_constants)]
     pub fn delta_mark_state(state: u8) -> u8 {
         debug_assert!(Self::HEADER_MARK_BITS);
         let mut rtn = state;
@@ -201,7 +203,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
         }
         debug_assert_ne!(rtn, state);
-        return rtn;
+        rtn
     }
 
     fn scheduler(&self) -> Arc<MMTkScheduler<VM>> {
@@ -225,7 +227,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.chunk_map
                 .generate_tasks(self.scheduler().num_workers(), |chunks| {
                     box PrepareBlockState {
-                        space: space,
+                        space,
                         chunks,
                         defrag_threshold: if space.in_defrag() {
                             Some(threshold)
@@ -344,6 +346,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object
     }
 
+    #[allow(clippy::assertions_on_constants)]
     #[inline(always)]
     pub fn trace_object_with_opportunistic_copy(
         &self,
@@ -356,34 +359,33 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
+        } else if self.is_marked(object) {
+            ForwardingWord::clear_forwarding_bits::<VM>(object);
+            object
         } else {
-            if self.is_marked(object) {
+            let new_object = if Self::is_pinned(object) || self.defrag.space_exhausted() {
+                self.attempt_mark(object);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
-                return object;
+                Block::containing::<VM>(object).set_state(BlockState::Marked);
+                object
             } else {
-                let new_object = if Self::is_pinned(object) || self.defrag.space_exhausted() {
-                    self.attempt_mark(object);
-                    ForwardingWord::clear_forwarding_bits::<VM>(object);
-                    Block::containing::<VM>(object).set_state(BlockState::Marked);
-                    object
-                } else {
-                    ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context)
-                };
-                if !super::MARK_LINE_AT_SCAN_TIME {
-                    self.mark_lines(new_object);
-                }
-                debug_assert_eq!(
-                    Block::containing::<VM>(new_object).get_state(),
-                    BlockState::Marked
-                );
-                trace.process_node(new_object);
-                new_object
+                ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context)
+            };
+            if !super::MARK_LINE_AT_SCAN_TIME {
+                self.mark_lines(new_object);
             }
+            debug_assert_eq!(
+                Block::containing::<VM>(new_object).get_state(),
+                BlockState::Marked
+            );
+            trace.process_node(new_object);
+            new_object
         }
     }
 
     /* Line marking */
 
+    #[allow(clippy::assertions_on_constants)]
     #[inline]
     pub fn mark_lines(&self, object: ObjectReference) {
         debug_assert!(!super::BLOCK_ONLY);
@@ -446,6 +448,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /* Line searching */
 
+    #[allow(clippy::assertions_on_constants)]
     pub fn get_next_available_lines(&self, search_start: Line) -> Option<Range<Line>> {
         debug_assert!(!super::BLOCK_ONLY);
         let unavail_state = self.line_unavail_state.load(Ordering::Acquire);
@@ -460,7 +463,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             if mark != unavail_state && mark != current_state {
                 break;
             }
-            mark_byte_cursor = mark_byte_cursor + 1usize;
+            mark_byte_cursor += 1usize;
         }
         if mark_byte_cursor == mark_byte_end {
             return None;
@@ -472,12 +475,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             if mark == unavail_state || mark == current_state {
                 break;
             }
-            mark_byte_cursor = mark_byte_cursor + 1usize;
+            mark_byte_cursor += 1usize;
         }
         let end = Line::forward(search_start, mark_byte_cursor - mark_byte_start);
         debug_assert!((start..end)
             .all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
-        return Some(start..end);
+        Some(start..end)
     }
 }
 
@@ -541,7 +544,7 @@ pub struct ObjectsClosure<'a, E: ProcessEdgesWork>(
 impl<'a, E: ProcessEdgesWork> TransitiveClosure for ObjectsClosure<'a, E> {
     #[inline(always)]
     fn process_edge(&mut self, slot: Address) {
-        if self.1.len() == 0 {
+        if self.1.is_empty() {
             self.1.reserve(E::CAPACITY);
         }
         self.1.push(slot);

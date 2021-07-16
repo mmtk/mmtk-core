@@ -60,8 +60,8 @@ impl Chunk {
     }
 
     pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>, mark_histogram: &[AtomicUsize]) {
+        let mut allocated_blocks = 0;
         if super::BLOCK_ONLY {
-            let mut allocated_blocks = 0;
             for block in self.blocks() {
                 match block.get_state() {
                     BlockState::Unallocated => {}
@@ -77,13 +77,8 @@ impl Chunk {
                     space.release_block(block);
                 }
             }
-            // Remove this chunk if there are no live blocks
-            if allocated_blocks == 0 {
-                space.chunk_map.set(*self, ChunkState::Free)
-            }
         } else {
             let line_mark_state = space.line_mark_state.load(Ordering::Acquire);
-            let mut allocated_blocks = 0;
             for block in self
                 .blocks()
                 .filter(|block| block.get_state() != BlockState::Unallocated)
@@ -121,10 +116,10 @@ impl Chunk {
                     block.set_holes(holes);
                 }
             }
-            // Remove this chunk if there are no live blocks
-            if allocated_blocks == 0 {
-                space.chunk_map.set(*self, ChunkState::Free)
-            }
+        }
+        // Remove this chunk if there are no live blocks
+        if allocated_blocks == 0 {
+            space.chunk_map.set(*self, ChunkState::Free)
         }
     }
 }
@@ -202,7 +197,7 @@ impl ChunkMap {
         start..end
     }
 
-    pub fn allocated_chunks<'a>(&'a self) -> impl Iterator<Item = Chunk> + 'a {
+    pub fn allocated_chunks(&'_ self) -> impl Iterator<Item = Chunk> + '_ {
         AllocatedChunksIter {
             table: &self.table,
             start: self.start,
@@ -237,7 +232,7 @@ impl ChunkMap {
         space: &'static ImmixSpace<VM>,
         scheduler: &MMTkScheduler<VM>,
     ) -> Vec<Box<dyn Work<MMTK<VM>>>> {
-        for table in &space.defrag.spill_mark_histograms {
+        for table in space.defrag.spill_mark_histograms() {
             for entry in table {
                 entry.store(0, Ordering::Release);
             }
@@ -278,7 +273,10 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunks<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         for chunk in self.1.start..self.1.end {
             if self.0.chunk_map.get(chunk) == ChunkState::Allocated {
-                chunk.sweep(self.0, &self.0.defrag.spill_mark_histograms[worker.ordinal]);
+                chunk.sweep(
+                    self.0,
+                    &self.0.defrag.spill_mark_histograms()[worker.ordinal],
+                );
             }
         }
     }

@@ -23,10 +23,7 @@ pub enum BlockState {
 
 impl BlockState {
     pub const fn is_reusable(&self) -> bool {
-        match self {
-            BlockState::Reusable { .. } => true,
-            _ => false,
-        }
+        matches!(self, BlockState::Reusable { .. })
     }
 }
 
@@ -100,6 +97,7 @@ impl Block {
         Chunk::from(Chunk::align(self.0))
     }
 
+    #[allow(clippy::assertions_on_constants)]
     #[inline(always)]
     pub fn line_mark_table(&self) -> Range<Address> {
         debug_assert!(!super::BLOCK_ONLY);
@@ -198,6 +196,7 @@ impl Block {
         self.set_state(BlockState::Unallocated);
     }
 
+    #[allow(clippy::assertions_on_constants)]
     #[inline(always)]
     pub fn lines(&self) -> Range<Line> {
         debug_assert!(!super::BLOCK_ONLY);
@@ -207,6 +206,7 @@ impl Block {
 
 unsafe impl Step for Block {
     #[inline(always)]
+    #[allow(clippy::assertions_on_constants)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
         debug_assert!(!super::BLOCK_ONLY);
         if start > end {
@@ -229,6 +229,7 @@ struct Node<T> {
     next: AtomicPtr<Node<T>>,
 }
 
+#[derive(Default)]
 pub struct BlockList {
     head: AtomicPtr<Node<Block>>,
     len: AtomicUsize,
@@ -236,14 +237,6 @@ pub struct BlockList {
 }
 
 impl BlockList {
-    pub fn new() -> Self {
-        Self {
-            head: AtomicPtr::default(),
-            len: AtomicUsize::default(),
-            sync: Mutex::new(()),
-        }
-    }
-
     #[inline]
     pub fn len(&self) -> usize {
         self.len.load(Ordering::SeqCst)

@@ -5,13 +5,16 @@ use super::{
 };
 use crate::policy::space::Space;
 use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*, MMTK};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::{
+    cell::UnsafeCell,
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+};
 
 #[derive(Debug, Default)]
 pub struct Defrag {
     in_defrag_collection: AtomicBool,
     defrag_space_exhausted: AtomicBool,
-    pub spill_mark_histograms: Vec<Vec<AtomicUsize>>,
+    spill_mark_histograms: UnsafeCell<Vec<Vec<AtomicUsize>>>,
     spill_avail_histograms: Vec<AtomicUsize>,
     pub defrag_spill_threshold: AtomicUsize,
     available_clean_pages_for_defrag: AtomicUsize,
@@ -26,17 +29,20 @@ impl Defrag {
     pub fn new() -> Self {
         Self {
             spill_avail_histograms: (0..Self::NUM_BINS).map(|_| Default::default()).collect(),
+            spill_mark_histograms: UnsafeCell::new(vec![]),
             ..Default::default()
         }
     }
 
+    pub fn spill_mark_histograms(&self) -> &Vec<Vec<AtomicUsize>> {
+        unsafe { &*self.spill_mark_histograms.get() }
+    }
+
     pub fn prepare_histograms<VM: VMBinding>(&self, mmtk: &MMTK<VM>) {
-        let self_mut = unsafe { &mut *(self as *const _ as *mut Self) };
-        self_mut
-            .spill_mark_histograms
-            .resize_with(mmtk.options.threads, || {
-                (0..Self::NUM_BINS).map(|_| Default::default()).collect()
-            });
+        let spill_mark_histograms = unsafe { &mut *self.spill_mark_histograms.get() };
+        spill_mark_histograms.resize_with(mmtk.options.threads, || {
+            (0..Self::NUM_BINS).map(|_| Default::default()).collect()
+        });
     }
 
     #[inline(always)]
@@ -87,6 +93,7 @@ impl Defrag {
         }
     }
 
+    #[allow(clippy::assertions_on_constants)]
     pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
         debug_assert!(!super::BLOCK_ONLY);
         self.defrag_space_exhausted.store(false, Ordering::Release);
@@ -146,7 +153,7 @@ impl Defrag {
         for index in (Self::MIN_SPILL_THRESHOLD..Self::NUM_BINS).rev() {
             threshold = index;
             let this_bucket_mark = self
-                .spill_mark_histograms
+                .spill_mark_histograms()
                 .iter()
                 .map(|v| v[threshold].load(Ordering::Acquire) as isize)
                 .sum::<isize>();
@@ -164,6 +171,7 @@ impl Defrag {
             .store(threshold, Ordering::Release);
     }
 
+    #[allow(clippy::assertions_on_constants)]
     pub fn release<VM: VMBinding>(&self, _space: &ImmixSpace<VM>) {
         debug_assert!(!super::BLOCK_ONLY);
         self.in_defrag_collection.store(false, Ordering::Release);

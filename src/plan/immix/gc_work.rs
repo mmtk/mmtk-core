@@ -118,7 +118,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<Immix<VM>>().unwrap();
-        Self { base, plan, mmtk }
+        Self { plan, base, mmtk }
     }
 
     #[cold]
