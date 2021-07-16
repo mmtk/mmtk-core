@@ -19,7 +19,6 @@ pub struct PlanConstraints {
     /// Size (in bytes) beyond which copied objects must be copied to the LOS.
     /// This depends on the copy allocator.
     pub max_non_los_copy_bytes: usize,
-    pub max_non_los_default_alloc_bytes: usize,
     pub barrier: BarrierSelector,
     // the following seems unused for now
     pub needs_linear_scan: bool,
@@ -37,7 +36,6 @@ impl PlanConstraints {
             num_specialized_scans: 0,
             max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
-            max_non_los_default_alloc_bytes: MAX_INT,
             needs_linear_scan: SUPPORT_CARD_SCANNING || LAZY_SWEEP,
             needs_concurrent_workers: false,
             generate_gc_trace: false,

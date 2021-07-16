@@ -87,19 +87,6 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
     fn barrier(&mut self) -> &mut dyn Barrier {
         &mut *self.barrier
     }
-
-    fn check_allocator(&self, bytes: usize, align: usize, semantics: AllocationType) -> AllocationType {
-        let large = crate::util::alloc::allocator::get_maximum_aligned_size::<VM>(
-            bytes,
-            align,
-            VM::MIN_ALIGNMENT,
-        ) > self.plan.constraints().max_non_los_default_alloc_bytes;
-        if large {
-            AllocationType::Los
-        } else {
-            semantics
-        }
-    }
 }
 
 /// Each GC plan should provide their implementation of a MutatorContext. *Note that this trait is no longer needed as we removed
@@ -130,6 +117,4 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn record_modified_node(&mut self, obj: ObjectReference) {
         self.barrier().post_write_barrier(WriteTarget::Object(obj));
     }
-
-    fn check_allocator(&self, bytes: usize, align: usize, semantics: AllocationType) -> AllocationType;
 }
