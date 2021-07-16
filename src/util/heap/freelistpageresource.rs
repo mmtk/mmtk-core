@@ -329,20 +329,6 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         }
     }
 
-    pub fn release_and_zap_pages(&self, first: Address) {
-        debug_assert!(conversions::is_page_aligned(first));
-        let page_offset = conversions::bytes_to_pages(first - self.start);
-        let pages = self.free_list.size(page_offset as _);
-        let bytes = (pages as usize) << 12;
-        for i in (0..bytes).step_by(8) {
-            unsafe { (first + i).store(0xdeadbeefdeadbeefusize) }
-        }
-        if self.protect_memory_on_release {
-            self.mprotect(first, pages as _);
-        }
-        self.release_pages(first)
-    }
-
     pub fn release_pages(&self, first: Address) {
         debug_assert!(conversions::is_page_aligned(first));
         let page_offset = conversions::bytes_to_pages(first - self.start);

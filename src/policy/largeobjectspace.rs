@@ -179,18 +179,14 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
-                self.release_pages(get_super_page(cell));
+                self.pr.release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
-                self.release_pages(get_super_page(cell));
+                self.pr.release_pages(get_super_page(cell));
             }
         }
-    }
-
-    fn release_pages(&mut self, start: Address) {
-        self.pr.release_and_zap_pages(start);
     }
 
     /// Allocate an object
