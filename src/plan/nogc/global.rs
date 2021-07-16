@@ -82,7 +82,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     #[cfg(not(feature = "nogc_common_plan"))]
     fn base(&self) -> &BasePlan<VM> {
-        &self.common
+        &self.base
     }
 
     #[cfg(feature = "nogc_common_plan")]

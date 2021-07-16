@@ -181,38 +181,6 @@ pub trait Plan: 'static + Sync + Downcast {
         &self.base().options
     }
 
-    #[cfg(not(feature = "force_vm_spaces"))]
-    fn with_vm_space_mapping(
-        &'static self,
-        mappings: Vec<(AllocatorSelector, &'static dyn Space<Self::VM>)>,
-    ) -> Vec<(AllocatorSelector, &'static dyn Space<Self::VM>)> {
-        mappings
-    }
-
-    #[cfg(feature = "force_vm_spaces")]
-    fn with_vm_space_mapping(
-        &'static self,
-        mut mappings: Vec<(AllocatorSelector, &'static dyn Space<Self::VM>)>,
-    ) -> Vec<(AllocatorSelector, &'static dyn Space<Self::VM>)> {
-        mappings.append(&mut vec![
-            (
-                AllocatorSelector::BumpPointer(1),
-                self.common().get_immortal(),
-            ),
-            #[cfg(feature = "ro_space")]
-            (AllocatorSelector::BumpPointer(2), &self.base().ro_space),
-            #[cfg(feature = "code_space")]
-            (AllocatorSelector::BumpPointer(3), &self.base().code_space),
-            #[cfg(feature = "code_space")]
-            (
-                AllocatorSelector::BumpPointer(4),
-                &self.base().code_lo_space,
-            ),
-            (AllocatorSelector::LargeObject(0), self.common().get_los()),
-        ]);
-        mappings
-    }
-
     // unsafe because this can only be called once by the init thread
     fn gc_init(
         &mut self,

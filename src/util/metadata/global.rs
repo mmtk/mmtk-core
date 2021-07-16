@@ -24,15 +24,15 @@ impl MetadataSpec {
         matches!(self, &MetadataSpec::OnSide(_))
     }
     pub const fn as_header(self) -> Option<HeaderMetadataSpec> {
-        match self{
+        match self {
             Self::InHeader(h) => Some(h),
-            _ => None
+            _ => None,
         }
     }
     pub const fn as_side(self) -> Option<SideMetadataSpec> {
-        match self{
+        match self {
             Self::OnSide(s) => Some(s),
-            _ => None
+            _ => None,
         }
     }
 }
