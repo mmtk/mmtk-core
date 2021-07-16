@@ -12,7 +12,7 @@ use enum_map::EnumMap;
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::BumpPointer(0),
+        AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::BumpPointer(0),
     };
 }
 
