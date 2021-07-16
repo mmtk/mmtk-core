@@ -1,20 +1,40 @@
-use atomic::Ordering;
-use crate::{AllocationSemantics, CopyContext, MMTK, plan::TransitiveClosure, scheduler::{GCWork, GCWorker, MMTkScheduler, WorkBucketStage, gc_work::ProcessEdgesWork}, util::{constants::{LOG_BYTES_IN_WORD}, heap::FreeListPageResource, opaque_pointer::{VMThread, VMWorkerThread}}};
+use super::line::*;
+use super::{
+    block::*,
+    chunk::{Chunk, ChunkMap, ChunkState},
+    defrag::Defrag,
+};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
-use crate::util::object_forwarding as ForwardingWord;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
-use crate::util::heap::VMRequest;
 use crate::util::heap::PageResource;
+use crate::util::heap::VMRequest;
+use crate::util::metadata::side_metadata::{self, *};
+use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use crate::util::metadata::side_metadata::{self, *};
-use std::{cell::UnsafeCell, iter::Step, mem, ops::Range, sync::{Arc, Weak, atomic::{AtomicBool, AtomicU8}}};
-use super::{block::*, chunk::{Chunk, ChunkMap, ChunkState}, defrag::Defrag};
-use super::line::*;
-
-
+use crate::{
+    plan::TransitiveClosure,
+    scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorker, MMTkScheduler, WorkBucketStage},
+    util::{
+        constants::LOG_BYTES_IN_WORD,
+        heap::FreeListPageResource,
+        opaque_pointer::{VMThread, VMWorkerThread},
+    },
+    AllocationSemantics, CopyContext, MMTK,
+};
+use atomic::Ordering;
+use std::{
+    cell::UnsafeCell,
+    iter::Step,
+    mem,
+    ops::Range,
+    sync::{
+        atomic::{AtomicBool, AtomicU8},
+        Arc, Weak,
+    },
+};
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
@@ -83,11 +103,16 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!Self::HEADER_MARK_BITS);
         if super::BLOCK_ONLY {
             &[
-                Block::DEFRAG_STATE_TABLE, Block::MARK_TABLE, Self::OBJECT_MARK_TABLE
+                Block::DEFRAG_STATE_TABLE,
+                Block::MARK_TABLE,
+                Self::OBJECT_MARK_TABLE,
             ]
         } else {
             &[
-                Line::MARK_TABLE, Block::DEFRAG_STATE_TABLE, Block::MARK_TABLE, Self::OBJECT_MARK_TABLE
+                Line::MARK_TABLE,
+                Block::DEFRAG_STATE_TABLE,
+                Block::MARK_TABLE,
+                Self::OBJECT_MARK_TABLE,
             ]
         }
     }
@@ -152,7 +177,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn decide_whether_to_defrag(&self, emergency_collection: bool, collection_attempts: usize) {
-        self.defrag.decide_whether_to_defrag(emergency_collection, collection_attempts, self.reusable_blocks.len() == 0)
+        self.defrag.decide_whether_to_defrag(
+            emergency_collection,
+            collection_attempts,
+            self.reusable_blocks.len() == 0,
+        )
     }
 
     const AVAILABLE_LOCAL_BITS: usize = 7;
@@ -181,7 +210,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn prepare(&mut self) {
         if Self::HEADER_MARK_BITS {
-            self.mark_state.store(Self::delta_mark_state(self.mark_state.load(Ordering::Acquire)), Ordering::Release);
+            self.mark_state.store(
+                Self::delta_mark_state(self.mark_state.load(Ordering::Acquire)),
+                Ordering::Release,
+            );
         }
         if !super::BLOCK_ONLY {
             self.defrag.prepare(self);
@@ -189,19 +221,26 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
         let space = unsafe { &*(self as *const Self) };
-        let work_packets = self.chunk_map.generate_tasks(self.scheduler().num_workers(), |chunks| {
-            box PrepareBlockState {
-                space: space,
-                chunks,
-                defrag_threshold: if space.in_defrag() { Some(threshold) } else { None },
-            }
-        });
+        let work_packets =
+            self.chunk_map
+                .generate_tasks(self.scheduler().num_workers(), |chunks| {
+                    box PrepareBlockState {
+                        space: space,
+                        chunks,
+                        defrag_threshold: if space.in_defrag() {
+                            Some(threshold)
+                        } else {
+                            None
+                        },
+                    }
+                });
         self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
 
         if !super::BLOCK_ONLY {
             self.line_mark_state.fetch_add(1, Ordering::AcqRel);
             if self.line_mark_state.load(Ordering::Acquire) > Line::MAX_MARK_STATE {
-                self.line_mark_state.store(Line::RESET_MARK_STATE, Ordering::Release);
+                self.line_mark_state
+                    .store(Line::RESET_MARK_STATE, Ordering::Release);
             }
         }
         self.in_collection.store(true, Ordering::Release);
@@ -209,7 +248,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn release(&mut self) {
         if !super::BLOCK_ONLY {
-            self.line_unavail_state.store(self.line_mark_state.load(Ordering::Acquire), Ordering::Release);
+            self.line_unavail_state.store(
+                self.line_mark_state.load(Ordering::Acquire),
+                Ordering::Release,
+            );
         }
 
         if !super::BLOCK_ONLY {
@@ -217,7 +259,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
 
         let space = unsafe { &*(self as *const Self) };
-        let work_packets = self.chunk_map.generate_sweep_tasks(space, &self.scheduler());
+        let work_packets = self
+            .chunk_map
+            .generate_sweep_tasks(space, &self.scheduler());
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
 
         self.in_collection.store(false, Ordering::Release);
@@ -233,7 +277,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn get_clean_block(&self, tls: VMThread, copy: bool) -> Option<Block> {
         let block_address = self.acquire(tls, Block::PAGES);
-        if block_address.is_zero() { return None }
+        if block_address.is_zero() {
+            return None;
+        }
         self.defrag.notify_new_clean_block(copy);
         let block = Block::from(block_address);
         block.init(copy);
@@ -242,7 +288,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn get_reusable_block(&self, copy: bool) -> Option<Block> {
-        if super::BLOCK_ONLY { return None }
+        if super::BLOCK_ONLY {
+            return None;
+        }
         let result = self.reusable_blocks.pop();
         if let Some(block) = result {
             // println!("Reuse {:?}", block);
@@ -252,12 +300,22 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     #[inline(always)]
-    pub fn fast_trace_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference) -> ObjectReference {
+    pub fn fast_trace_object(
+        &self,
+        trace: &mut impl TransitiveClosure,
+        object: ObjectReference,
+    ) -> ObjectReference {
         self.trace_object_without_moving(trace, object)
     }
 
     #[inline(always)]
-    pub fn trace_object(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
+    pub fn trace_object(
+        &self,
+        trace: &mut impl TransitiveClosure,
+        object: ObjectReference,
+        semantics: AllocationSemantics,
+        copy_context: &mut impl CopyContext,
+    ) -> ObjectReference {
         if Block::containing::<VM>(object).is_defrag_source() {
             self.trace_object_with_opportunistic_copy(trace, object, semantics, copy_context)
         } else {
@@ -266,7 +324,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     #[inline(always)]
-    pub fn trace_object_without_moving(&self, trace: &mut impl TransitiveClosure, object: ObjectReference) -> ObjectReference {
+    pub fn trace_object_without_moving(
+        &self,
+        trace: &mut impl TransitiveClosure,
+        object: ObjectReference,
+    ) -> ObjectReference {
         if self.attempt_mark(object) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
@@ -283,7 +345,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     #[inline(always)]
-    pub fn trace_object_with_opportunistic_copy(&self, trace: &mut impl TransitiveClosure, object: ObjectReference, semantics: AllocationSemantics, copy_context: &mut impl CopyContext) -> ObjectReference {
+    pub fn trace_object_with_opportunistic_copy(
+        &self,
+        trace: &mut impl TransitiveClosure,
+        object: ObjectReference,
+        semantics: AllocationSemantics,
+        copy_context: &mut impl CopyContext,
+    ) -> ObjectReference {
         debug_assert!(!super::BLOCK_ONLY);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
@@ -304,7 +372,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 if !super::MARK_LINE_AT_SCAN_TIME {
                     self.mark_lines(new_object);
                 }
-                debug_assert_eq!(Block::containing::<VM>(new_object).get_state(), BlockState::Marked);
+                debug_assert_eq!(
+                    Block::containing::<VM>(new_object).get_state(),
+                    BlockState::Marked
+                );
                 trace.process_node(new_object);
                 new_object
             }
@@ -341,7 +412,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             //     false
             // }
         } else {
-            side_metadata::compare_exchange_atomic(&Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object), 0, 1, Ordering::SeqCst, Ordering::SeqCst)
+            side_metadata::compare_exchange_atomic(
+                &Self::OBJECT_MARK_TABLE,
+                VM::VMObjectModel::ref_to_address(object),
+                0,
+                1,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
         }
     }
 
@@ -351,7 +429,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // gc_byte::read_gc_byte::<VM>(object) & Self::MARK_MASK == self.mark_state.load(Ordering::Relaxed)
             unreachable!()
         } else {
-            unsafe { side_metadata::load(&Self::OBJECT_MARK_TABLE, VM::VMObjectModel::ref_to_address(object)) == 1 }
+            unsafe {
+                side_metadata::load(
+                    &Self::OBJECT_MARK_TABLE,
+                    VM::VMObjectModel::ref_to_address(object),
+                ) == 1
+            }
         }
     }
 
@@ -379,7 +462,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
             mark_byte_cursor = mark_byte_cursor + 1usize;
         }
-        if mark_byte_cursor == mark_byte_end { return None }
+        if mark_byte_cursor == mark_byte_end {
+            return None;
+        }
         let start = Line::forward(search_start, mark_byte_cursor - mark_byte_start);
         // Find limit
         while mark_byte_cursor < mark_byte_end {
@@ -390,11 +475,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mark_byte_cursor = mark_byte_cursor + 1usize;
         }
         let end = Line::forward(search_start, mark_byte_cursor - mark_byte_start);
-        debug_assert!((start..end).all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
-        return Some(start..end)
+        debug_assert!((start..end)
+            .all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
+        return Some(start..end);
     }
 }
-
 
 pub struct PrepareBlockState<VM: VMBinding> {
     pub space: &'static ImmixSpace<VM>,
@@ -406,7 +491,11 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
     #[inline(always)]
     fn reset_object_mark(chunk: Chunk) {
         if !ImmixSpace::<VM>::HEADER_MARK_BITS {
-            side_metadata::bzero_metadata(&ImmixSpace::<VM>::OBJECT_MARK_TABLE, chunk.start(), Chunk::BYTES);
+            side_metadata::bzero_metadata(
+                &ImmixSpace::<VM>::OBJECT_MARK_TABLE,
+                chunk.start(),
+                Chunk::BYTES,
+            );
         }
     }
 }
@@ -415,12 +504,22 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         let defrag_threshold = self.defrag_threshold.unwrap_or(0);
-        for chunk in self.chunks.clone().filter(|c| self.space.chunk_map.get(*c) == ChunkState::Allocated) {
+        for chunk in self
+            .chunks
+            .clone()
+            .filter(|c| self.space.chunk_map.get(*c) == ChunkState::Allocated)
+        {
             Self::reset_object_mark(chunk);
             for block in chunk.blocks() {
                 let state = block.get_state();
-                if state == BlockState::Unallocated { continue; }
-                if super::DEFRAG && defrag_threshold != 0 && !state.is_reusable() && block.get_holes() > defrag_threshold {
+                if state == BlockState::Unallocated {
+                    continue;
+                }
+                if super::DEFRAG
+                    && defrag_threshold != 0
+                    && !state.is_reusable()
+                    && block.get_holes() > defrag_threshold
+                {
                     block.set_as_defrag_source(true);
                 } else {
                     block.set_as_defrag_source(false);
@@ -433,7 +532,11 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     }
 }
 
-pub struct ObjectsClosure<'a, E: ProcessEdgesWork>(&'static MMTK<E::VM>, Vec<Address>, &'a mut GCWorker<E::VM>);
+pub struct ObjectsClosure<'a, E: ProcessEdgesWork>(
+    &'static MMTK<E::VM>,
+    Vec<Address>,
+    &'a mut GCWorker<E::VM>,
+);
 
 impl<'a, E: ProcessEdgesWork> TransitiveClosure for ObjectsClosure<'a, E> {
     #[inline(always)]
@@ -459,7 +562,8 @@ impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
     fn drop(&mut self) {
         let mut new_edges = Vec::new();
         mem::swap(&mut new_edges, &mut self.1);
-        self.2.add_work(WorkBucketStage::Closure, E::new(new_edges, false, self.0));
+        self.2
+            .add_work(WorkBucketStage::Closure, E::new(new_edges, false, self.0));
     }
 }
 
@@ -471,7 +575,11 @@ pub struct ScanObjectsAndMarkLines<Edges: ProcessEdgesWork> {
 }
 
 impl<Edges: ProcessEdgesWork> ScanObjectsAndMarkLines<Edges> {
-    pub fn new(buffer: Vec<ObjectReference>, concurrent: bool, immix_space: &'static ImmixSpace<Edges::VM>) -> Self {
+    pub fn new(
+        buffer: Vec<ObjectReference>,
+        concurrent: bool,
+        immix_space: &'static ImmixSpace<Edges::VM>,
+    ) -> Self {
         Self {
             buffer,
             concurrent,
@@ -485,8 +593,15 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
         trace!("ScanObjectsAndMarkLines");
         let mut closure = ObjectsClosure::<E>(mmtk, vec![], worker);
         for object in &self.buffer {
-            <E::VM as VMBinding>::VMScanning::scan_object(&mut closure, *object, VMWorkerThread(VMThread::UNINITIALIZED));
-            if super::MARK_LINE_AT_SCAN_TIME && !super::BLOCK_ONLY && self.immix_space.in_space(*object) {
+            <E::VM as VMBinding>::VMScanning::scan_object(
+                &mut closure,
+                *object,
+                VMWorkerThread(VMThread::UNINITIALIZED),
+            );
+            if super::MARK_LINE_AT_SCAN_TIME
+                && !super::BLOCK_ONLY
+                && self.immix_space.in_space(*object)
+            {
                 self.immix_space.mark_lines(*object);
             }
         }

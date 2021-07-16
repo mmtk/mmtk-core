@@ -1,12 +1,17 @@
-use crate::util::{Address, ObjectReference};
-use crate::util::metadata::side_metadata::{self, *};
-use crate::util::constants::*;
-use std::{iter::Step, ops::Range, sync::{Mutex, MutexGuard, atomic::{AtomicPtr, AtomicU8, AtomicUsize, Ordering}}};
-use super::line::Line;
 use super::chunk::Chunk;
+use super::line::Line;
+use crate::util::constants::*;
+use crate::util::metadata::side_metadata::{self, *};
+use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-
-
+use std::{
+    iter::Step,
+    ops::Range,
+    sync::{
+        atomic::{AtomicPtr, AtomicU8, AtomicUsize, Ordering},
+        Mutex, MutexGuard,
+    },
+};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BlockState {
@@ -19,7 +24,7 @@ pub enum BlockState {
 impl BlockState {
     pub const fn is_reusable(&self) -> bool {
         match self {
-            BlockState::Reusable {..} => true,
+            BlockState::Reusable { .. } => true,
             _ => false,
         }
     }
@@ -41,7 +46,11 @@ impl Block {
 
     pub const DEFRAG_STATE_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
-        offset: if super::BLOCK_ONLY { LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize() } else { Line::MARK_TABLE.accumulated_size() },
+        offset: if super::BLOCK_ONLY {
+            LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
+        } else {
+            Line::MARK_TABLE.accumulated_size()
+        },
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,
     };
@@ -105,7 +114,10 @@ impl Block {
 
     #[inline(always)]
     fn mark_byte(&self) -> &AtomicU8 {
-        unsafe { &*side_metadata::address_to_meta_address(&Self::MARK_TABLE, self.start()).to_mut_ptr::<AtomicU8>() }
+        unsafe {
+            &*side_metadata::address_to_meta_address(&Self::MARK_TABLE, self.start())
+                .to_mut_ptr::<AtomicU8>()
+        }
     }
 
     #[inline(always)]
@@ -135,7 +147,10 @@ impl Block {
 
     #[inline(always)]
     fn defrag_byte(&self) -> &AtomicU8 {
-        unsafe { &*side_metadata::address_to_meta_address(&Self::DEFRAG_STATE_TABLE, self.start()).to_mut_ptr::<AtomicU8>() }
+        unsafe {
+            &*side_metadata::address_to_meta_address(&Self::DEFRAG_STATE_TABLE, self.start())
+                .to_mut_ptr::<AtomicU8>()
+        }
     }
 
     #[inline(always)]
@@ -150,7 +165,10 @@ impl Block {
         if cfg!(debug_assertions) && defrag {
             debug_assert!(!self.get_state().is_reusable());
         }
-        self.defrag_byte().store(if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 }, Ordering::Release);
+        self.defrag_byte().store(
+            if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 },
+            Ordering::Release,
+        );
     }
 
     #[inline(always)]
@@ -167,7 +185,11 @@ impl Block {
 
     #[inline]
     pub fn init(&self, copy: bool) {
-        self.set_state(if copy { BlockState::Marked } else { BlockState::Unmarked });
+        self.set_state(if copy {
+            BlockState::Marked
+        } else {
+            BlockState::Unmarked
+        });
         self.defrag_byte().store(0, Ordering::Release);
     }
 
@@ -179,7 +201,7 @@ impl Block {
     #[inline(always)]
     pub fn lines(&self) -> Range<Line> {
         debug_assert!(!super::BLOCK_ONLY);
-        Line::from(self.start()) .. Line::from(self.end())
+        Line::from(self.start())..Line::from(self.end())
     }
 }
 
@@ -187,7 +209,9 @@ unsafe impl Step for Block {
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
         debug_assert!(!super::BLOCK_ONLY);
-        if start > end { return None }
+        if start > end {
+            return None;
+        }
         Some((end.start() - start.start()) >> Self::LOG_BYTES)
     }
     #[inline(always)]
@@ -199,7 +223,6 @@ unsafe impl Step for Block {
         Some(Self::from(start.start() - (count << Self::LOG_BYTES)))
     }
 }
-
 
 struct Node<T> {
     value: T,
@@ -228,12 +251,19 @@ impl BlockList {
 
     #[inline]
     pub fn push(&self, block: Block) {
-        let node = Box::leak(box Node { value: block, next: AtomicPtr::default() });
+        let node = Box::leak(box Node {
+            value: block,
+            next: AtomicPtr::default(),
+        });
         loop {
             let next = self.head.load(Ordering::SeqCst);
             node.next.store(next, Ordering::SeqCst);
-            if self.head.compare_exchange(next, node, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
-                break
+            if self
+                .head
+                .compare_exchange(next, node, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
+                break;
             }
         }
         self.len.fetch_add(1, Ordering::SeqCst);
@@ -243,9 +273,15 @@ impl BlockList {
     pub fn pop(&self) -> Option<Block> {
         loop {
             let head = self.head.load(Ordering::SeqCst);
-            if head.is_null() { return None }
+            if head.is_null() {
+                return None;
+            }
             let next = unsafe { (*head).next.load(Ordering::SeqCst) };
-            if self.head.compare_exchange(head, next, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+            if self
+                .head
+                .compare_exchange(head, next, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
                 let block = unsafe { (*head).value };
                 unsafe { Box::from_raw(head) };
                 self.len.fetch_sub(1, Ordering::SeqCst);
@@ -260,21 +296,28 @@ impl BlockList {
         self.len.store(0, Ordering::SeqCst);
         loop {
             let head = self.head.load(Ordering::SeqCst);
-            if head.is_null() { return }
-            self.head.store(unsafe { (*head).next.load(Ordering::SeqCst) }, Ordering::SeqCst);
+            if head.is_null() {
+                return;
+            }
+            self.head.store(
+                unsafe { (*head).next.load(Ordering::SeqCst) },
+                Ordering::SeqCst,
+            );
             unsafe { Box::from_raw(head) };
         }
     }
 
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item=Block> {
-        BlockListIter { head: self.head.load(Ordering::SeqCst) }
+    pub fn iter(&self) -> impl Iterator<Item = Block> {
+        BlockListIter {
+            head: self.head.load(Ordering::SeqCst),
+        }
     }
 }
 
 impl<'a> IntoIterator for &'a BlockList {
     type Item = Block;
-    type IntoIter = impl Iterator<Item=Self::Item>;
+    type IntoIter = impl Iterator<Item = Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -319,7 +362,8 @@ impl<'a, F: 'a + FnMut(&mut Block) -> bool> Iterator for DrainFilter<'a, F> {
                 let node = unsafe { &mut *node_ptr };
                 if (self.predicate)(&mut node.value) {
                     let block = node.value;
-                    self.head.store(node.next.load(Ordering::SeqCst), Ordering::SeqCst);
+                    self.head
+                        .store(node.next.load(Ordering::SeqCst), Ordering::SeqCst);
                     unsafe { Box::from_raw(node_ptr) };
                     return Some(block);
                 } else {

@@ -39,9 +39,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_ref()
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_ref(),
-            AllocatorSelector::Immix(index) => {
-                self.immix[index as usize].assume_init_ref()
-            }
+            AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_ref(),
         }
     }
 
@@ -59,9 +57,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_mut()
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
-            AllocatorSelector::Immix(index) => {
-                self.immix[index as usize].assume_init_mut()
-            }
+            AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
         }
     }
 

@@ -1,9 +1,10 @@
-use std::{iter::Step};
-use crate::{util::{Address, ObjectReference}, vm::*};
-use crate::util::metadata::side_metadata::{self, *};
 use super::block::Block;
-
-
+use crate::util::metadata::side_metadata::{self, *};
+use crate::{
+    util::{Address, ObjectReference},
+    vm::*,
+};
+use std::iter::Step;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Eq)]
@@ -75,7 +76,9 @@ impl Line {
     #[inline]
     pub fn mark(&self, state: u8) {
         debug_assert!(!super::BLOCK_ONLY);
-        unsafe { side_metadata::store(&Self::MARK_TABLE, self.start(), state as _); }
+        unsafe {
+            side_metadata::store(&Self::MARK_TABLE, self.start(), state as _);
+        }
     }
 
     #[inline(always)]
@@ -94,12 +97,14 @@ impl Line {
     pub fn mark_lines_for_object<VM: VMBinding>(object: ObjectReference, state: u8) -> usize {
         debug_assert!(!super::BLOCK_ONLY);
         let start = VM::VMObjectModel::object_start_ref(object);
-        let end  = start + VM::VMObjectModel::get_current_size(object);
+        let end = start + VM::VMObjectModel::get_current_size(object);
         let start_line = Line::from(Line::align(start));
         let mut end_line = Line::from(Line::align(end));
-        if !Line::is_aligned(end) { end_line = Line::forward(end_line, 1) }
+        if !Line::is_aligned(end) {
+            end_line = Line::forward(end_line, 1)
+        }
         let mut marked_lines = 0;
-        for line in start_line .. end_line {
+        for line in start_line..end_line {
             if !line.is_marked(state) {
                 marked_lines += 1;
             }
@@ -113,7 +118,9 @@ unsafe impl Step for Line {
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
         debug_assert!(!super::BLOCK_ONLY);
-        if start > end { return None }
+        if start > end {
+            return None;
+        }
         Some((end.start() - start.start()) >> Line::LOG_BYTES)
     }
     #[inline(always)]

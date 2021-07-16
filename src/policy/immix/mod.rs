@@ -1,8 +1,8 @@
-pub mod immixspace;
 pub mod block;
-pub mod line;
 pub mod chunk;
 pub mod defrag;
+pub mod immixspace;
+pub mod line;
 
 pub use immixspace::*;
 

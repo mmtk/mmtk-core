@@ -1,14 +1,13 @@
-use crate::{policy::immix::ImmixSpace};
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
-use crate::util::Address;
-use crate::util::alloc::Allocator;
 use crate::plan::Plan;
-use crate::policy::space::Space;
 use crate::policy::immix::block::*;
 use crate::policy::immix::line::*;
+use crate::policy::immix::ImmixSpace;
+use crate::policy::space::Space;
+use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::VMThread;
+use crate::util::Address;
 use crate::vm::*;
-
 
 #[repr(C)]
 pub struct ImmixAllocator<VM: VMBinding> {
@@ -92,7 +91,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
             None => {
                 self.line_use_count = 0;
                 Address::ZERO
-            },
+            }
             Some(block) => {
                 self.line_use_count = Block::LINES as _;
                 trace!("Acquired a new block {:?}", block);
@@ -175,11 +174,22 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             if let Some(lines) = self.immix_space().get_next_available_lines(line) {
                 self.cursor = lines.start.start();
                 self.limit = lines.end.start();
-                trace!("acquire_recycable_lines -> {:?} {:?} {:?}", self.line, lines, self.tls);
+                trace!(
+                    "acquire_recycable_lines -> {:?} {:?} {:?}",
+                    self.line,
+                    lines,
+                    self.tls
+                );
                 crate::util::memory::zero(self.cursor, self.limit - self.cursor);
-                debug_assert!(align_allocation_no_fill::<VM>(self.cursor, align, offset) + size <= self.limit);
+                debug_assert!(
+                    align_allocation_no_fill::<VM>(self.cursor, align, offset) + size <= self.limit
+                );
                 let block = line.block();
-                self.line = if lines.end == block.lines().end { None } else { Some(lines.end) };
+                self.line = if lines.end == block.lines().end {
+                    None
+                } else {
+                    Some(lines.end)
+                };
                 return true;
             } else {
                 self.line = None;

@@ -1,16 +1,22 @@
 use super::global::Immix;
-use crate::{plan::CopyContext, util::opaque_pointer::{VMThread, VMWorkerThread}};
 use crate::plan::PlanConstraints;
-use crate::policy::space::Space;
 use crate::policy::immix::ScanObjectsAndMarkLines;
+use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::{WorkerLocal, WorkBucketStage};
+use crate::scheduler::{WorkBucketStage, WorkerLocal};
 use crate::util::alloc::{Allocator, ImmixAllocator};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::MMTK;
-use std::{mem, ops::{Deref, DerefMut}};
+use crate::{
+    plan::CopyContext,
+    util::opaque_pointer::{VMThread, VMWorkerThread},
+};
+use std::{
+    mem,
+    ops::{Deref, DerefMut},
+};
 
 pub struct ImmixCopyContext<VM: VMBinding> {
     immix: ImmixAllocator<VM>,
@@ -57,7 +63,12 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
 impl<VM: VMBinding> ImmixCopyContext<VM> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
-            immix: ImmixAllocator::new(VMThread::UNINITIALIZED, Some(&mmtk.plan.downcast_ref::<Immix<VM>>().unwrap().immix_space), &*mmtk.plan, true),
+            immix: ImmixAllocator::new(
+                VMThread::UNINITIALIZED,
+                Some(&mmtk.plan.downcast_ref::<Immix<VM>>().unwrap().immix_space),
+                &*mmtk.plan,
+                true,
+            ),
         }
     }
 }
@@ -114,7 +125,8 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
     fn flush(&mut self) {
         let mut new_nodes = vec![];
         mem::swap(&mut new_nodes, &mut self.nodes);
-        let scan_objects_work = ScanObjectsAndMarkLines::<Self>::new(new_nodes, false, &self.immix().immix_space);
+        let scan_objects_work =
+            ScanObjectsAndMarkLines::<Self>::new(new_nodes, false, &self.immix().immix_space);
         if Self::SCAN_OBJECTS_IMMEDIATELY {
             self.worker().do_work(scan_objects_work);
         } else {
@@ -128,7 +140,12 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
             return object;
         }
         if self.immix().immix_space.in_space(object) {
-            self.immix().immix_space.trace_object(self, object, super::global::ALLOC_IMMIX, unsafe { self.worker().local::<ImmixCopyContext<VM>>() })
+            self.immix().immix_space.trace_object(
+                self,
+                object,
+                super::global::ALLOC_IMMIX,
+                unsafe { self.worker().local::<ImmixCopyContext<VM>>() },
+            )
         } else {
             self.immix()
                 .common

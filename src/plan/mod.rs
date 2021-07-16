@@ -41,18 +41,18 @@ mod transitive_closure;
 pub use transitive_closure::TransitiveClosure;
 
 mod gencopy;
+mod immix;
 mod marksweep;
 mod nogc;
 mod pageprotect;
 mod semispace;
-mod immix;
 
 // Expose plan constraints as public. Though a binding can get them from plan.constraints(),
 // it is possible for performance reasons that they want the constraints as constants.
 
 pub use gencopy::GENCOPY_CONSTRAINTS;
+pub use immix::IMMIX_CONSTRAINTS;
 pub use marksweep::MS_CONSTRAINTS;
 pub use nogc::NOGC_CONSTRAINTS;
 pub use pageprotect::PP_CONSTRAINTS;
 pub use semispace::SS_CONSTRAINTS;
-pub use immix::IMMIX_CONSTRAINTS;

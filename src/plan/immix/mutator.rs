@@ -1,5 +1,4 @@
 use super::Immix;
-use crate::{plan::barriers::NoBarrier, util::opaque_pointer::{VMMutatorThread, VMWorkerThread}};
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
@@ -7,6 +6,10 @@ use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::ImmixAllocator;
 use crate::vm::VMBinding;
+use crate::{
+    plan::barriers::NoBarrier,
+    util::opaque_pointer::{VMMutatorThread, VMWorkerThread},
+};
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
@@ -51,7 +54,10 @@ pub fn create_immix_mutator<VM: VMBinding>(
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
             (AllocatorSelector::Immix(0), &immix.immix_space),
-            (AllocatorSelector::BumpPointer(0), immix.common.get_immortal()),
+            (
+                AllocatorSelector::BumpPointer(0),
+                immix.common.get_immortal(),
+            ),
             (AllocatorSelector::LargeObject(0), immix.common.get_los()),
         ],
         prepare_func: &immix_mutator_prepare,

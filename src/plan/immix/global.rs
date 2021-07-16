@@ -1,9 +1,8 @@
 use super::gc_work::{ImmixCopyContext, ImmixProcessEdges};
-use crate::{mmtk::MMTK, policy::immix::{ImmixSpace, block::Block}, util::opaque_pointer::VMWorkerThread};
+use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -21,6 +20,11 @@ use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::vm::VMBinding;
+use crate::{
+    mmtk::MMTK,
+    policy::immix::{block::Block, ImmixSpace},
+    util::opaque_pointer::VMWorkerThread,
+};
 use std::sync::Arc;
 
 use atomic::Ordering;
@@ -79,7 +83,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
-        self.immix_space.decide_whether_to_defrag(self.is_emergency_collection(), self.base().cur_collection_attempts.load(Ordering::SeqCst));
+        self.immix_space.decide_whether_to_defrag(
+            self.is_emergency_collection(),
+            self.base().cur_collection_attempts.load(Ordering::SeqCst),
+        );
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<ImmixProcessEdges<VM>>::new());
