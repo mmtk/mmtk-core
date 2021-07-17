@@ -31,8 +31,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         // TODO: We currently ignore the offset field. This is wrong.
         // assert!(offset == 0);
-        assert!(align <= 16);
-        let ret = self.space.alloc(self.tls, size);
+        let ret = self.space.alloc(self.tls, align, size);
         trace!(
             "MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}",
             size,
