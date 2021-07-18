@@ -18,8 +18,7 @@ pub enum BarrierSelector {
 
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address
 pub enum WriteTarget {
-    Object(ObjectReference),
-    Slot(Address),
+    Field(ObjectReference, Address, ObjectReference),
 }
 
 pub trait Barrier: 'static + Send {
@@ -86,12 +85,12 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     }
 
     #[inline(always)]
-    fn post_write_barrier(&mut self, target: WriteTarget) {
-        match target {
-            WriteTarget::Object(obj) => {
-                self.enqueue_node::<E::VM>(obj);
-            }
-            _ => unreachable!(),
-        }
+    fn post_write_barrier(&mut self, _target: WriteTarget) {
+        // match target {
+        //     WriteTarget::Object(obj) => {
+        //         self.enqueue_node::<E::VM>(obj);
+        //     }
+        //     _ => unreachable!(),
+        // }
     }
 }
