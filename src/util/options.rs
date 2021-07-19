@@ -22,6 +22,7 @@ custom_derive! {
         GenCopy,
         MarkSweep,
         PageProtect,
+        FreeListMarkSweep
     }
 }
 
@@ -153,7 +154,7 @@ macro_rules! options {
 }
 options! {
     // The plan to use. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    plan:                  PlanSelector         [always_valid] = PlanSelector::NoGC,
+    plan:                  PlanSelector         [always_valid] = PlanSelector::FreeListMarkSweep,
     // Number of GC threads.
     threads:               usize                [|v: &usize| *v > 0]    = num_cpus::get(),
     // Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
