@@ -44,7 +44,8 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
-    max_non_los_default_alloc_bytes: Block::BYTES,
+    /// Max immix object size is half of a block.
+    max_non_los_default_alloc_bytes: Block::BYTES >> 1,
     ..PlanConstraints::default()
 };
 
@@ -76,7 +77,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
-
         self.immix_space.init(&vm_map);
     }
 
@@ -140,6 +140,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         &self.common
     }
 
+    /// Initialize defrag histograms
     fn pre_worker_spawn(&self, mmtk: &MMTK<VM>) {
         self.immix_space.initialize_defrag(mmtk)
     }

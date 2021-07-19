@@ -14,7 +14,6 @@ use enum_map::enum_map;
 use enum_map::EnumMap;
 
 pub fn immix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    // rebind the allocation bump pointer to the appropriate semispace
     let immix_allocator = unsafe {
         mutator
             .allocators
@@ -26,7 +25,6 @@ pub fn immix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMW
 }
 
 pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    // rebind the allocation bump pointer to the appropriate semispace
     let immix_allocator = unsafe {
         mutator
             .allocators
