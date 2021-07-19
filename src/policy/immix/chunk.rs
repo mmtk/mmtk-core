@@ -15,43 +15,57 @@ use std::{
     sync::atomic::{AtomicU8, AtomicUsize, Ordering},
 };
 
+/// Data structure to reference a MMTk 4 MB chunk.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Eq)]
 pub struct Chunk(Address);
 
 impl Chunk {
+    /// Log bytes in chunk
     pub const LOG_BYTES: usize = LOG_BYTES_IN_CHUNK;
+    /// Bytes in chunk
     pub const BYTES: usize = 1 << Self::LOG_BYTES;
+    /// Log blocks in chunk
     pub const LOG_BLOCKS: usize = Self::LOG_BYTES - Block::LOG_BYTES;
+    /// Blocks in chunk
     pub const BLOCKS: usize = 1 << Self::LOG_BLOCKS;
 
+    /// Align the give address to the chunk boundary.
     pub const fn align(address: Address) -> Address {
         address.align_down(Self::BYTES)
     }
 
+    /// Test if the given address is chunk-aligned
     pub const fn is_aligned(address: Address) -> bool {
         Self::align(address).as_usize() == address.as_usize()
     }
 
+    /// Get the chunk from a given address.
+    /// The address must be chunk-aligned.
     #[inline(always)]
     pub fn from(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
 
+    /// Get the chunk containing the given address.
+    /// The input address does not need to be aligned.
     #[inline(always)]
     pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
         Self(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
     }
 
+    /// Get chunk start address
     pub const fn start(&self) -> Address {
         self.0
     }
 
+    /// Get chunk end address
     pub const fn end(&self) -> Address {
         unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
     }
 
+    /// Get a range of blocks within this chunk.
     #[inline(always)]
     pub fn blocks(&self) -> Range<Block> {
         let start = Block::from(Block::align(self.0));
@@ -59,30 +73,33 @@ impl Chunk {
         start..end
     }
 
+    /// Sweep this chunk.
     pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>, mark_histogram: &[AtomicUsize]) {
-        let mut allocated_blocks = 0;
+        let mut allocated_blocks = 0; // number of allocated blocks.
         if super::BLOCK_ONLY {
+            // Iterate over all blocks in this chunk.
             for block in self.blocks() {
                 match block.get_state() {
                     BlockState::Unallocated => {}
                     BlockState::Unmarked => {
+                        // Release the block if it is allocated but not marked by the current GC.
                         space.release_block(block);
                     }
                     BlockState::Marked => {
+                        // The block is live. Update counter.
                         allocated_blocks += 1;
                     }
                     _ => unreachable!(),
                 }
-                if block.get_state() == BlockState::Unmarked {
-                    space.release_block(block);
-                }
             }
         } else {
             let line_mark_state = space.line_mark_state.load(Ordering::Acquire);
+            // Iterate over all allocated blocks in this chunk.
             for block in self
                 .blocks()
                 .filter(|block| block.get_state() != BlockState::Unallocated)
             {
+                // Calculate number of marked lines and holes.
                 let mut marked_lines = 0;
                 let mut holes = 0;
                 let mut prev_line_is_marked = true;
@@ -100,24 +117,30 @@ impl Chunk {
                 }
 
                 if marked_lines == 0 {
+                    // Release the block if non of its lines are marked.
                     space.release_block(block);
                 } else {
+                    // There are some marked lines. Keep the block live and update counter.
                     allocated_blocks += 1;
                     if marked_lines != Block::LINES {
+                        // There are holes. Mark the block as reusable.
                         block.set_state(BlockState::Reusable {
                             unavailable_lines: marked_lines as _,
                         });
                         space.reusable_blocks.push(block)
                     } else {
+                        // Clear mark state.
                         block.set_state(BlockState::Unmarked);
                     }
+                    // Update mark_histogram
                     let old_value = mark_histogram[holes].load(Ordering::Acquire);
                     mark_histogram[holes].store(old_value + marked_lines, Ordering::Release);
+                    // Record number of holes in block side metadata.
                     block.set_holes(holes);
                 }
             }
         }
-        // Remove this chunk if there are no live blocks
+        // Set this chunk as free if there is not live blocks.
         if allocated_blocks == 0 {
             space.chunk_map.set(*self, ChunkState::Free)
         }
@@ -125,6 +148,7 @@ impl Chunk {
 }
 
 unsafe impl Step for Chunk {
+    /// Get the number of chunks between the given two chunks.
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
         if start > end {
@@ -132,23 +156,29 @@ unsafe impl Step for Chunk {
         }
         Some((end.start() - start.start()) >> Self::LOG_BYTES)
     }
+    /// result = chunk_address + count * chunk_size
     #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
         Some(Self::from(start.start() + (count << Self::LOG_BYTES)))
     }
+    /// result = chunk_address - count * chunk_size
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
         Some(Self::from(start.start() - (count << Self::LOG_BYTES)))
     }
 }
 
+/// Chunk allocation state
 #[repr(u8)]
 #[derive(Debug, PartialEq)]
 pub enum ChunkState {
+    /// The chunk is not allocated.
     Free = 0,
+    /// The chunk is allocated.
     Allocated = 1,
 }
 
+/// A byte-map to record all the allocated chunks
 pub struct ChunkMap {
     table: Vec<AtomicU8>,
     start: Address,
@@ -164,11 +194,13 @@ impl ChunkMap {
         }
     }
 
+    /// Get the index of the chunk.
     const fn get_index(&self, chunk: Chunk) -> usize {
         // let space_start = chunk.start().as_usize() & ((1 << LOG_SPACE_EXTENT) - 1);
         (chunk.start().as_usize() - self.start.as_usize()) >> Chunk::LOG_BYTES
     }
 
+    /// Set chunk state
     pub fn set(&self, chunk: Chunk, state: ChunkState) {
         let index = self.get_index(chunk);
         if state == ChunkState::Allocated {
@@ -185,18 +217,21 @@ impl ChunkMap {
         self.table[index].store(state as _, Ordering::Release);
     }
 
+    /// Get chunk state
     pub fn get(&self, chunk: Chunk) -> ChunkState {
         let index = self.get_index(chunk);
         let byte = self.table[index].load(Ordering::Acquire);
         unsafe { std::mem::transmute(byte) }
     }
 
+    /// A range of all chunks in the heap.
     pub fn all_chunks(&self) -> Range<Chunk> {
         let start = Chunk::from(self.start);
         let end = Chunk::forward(start, self.limit.load(Ordering::Acquire));
         start..end
     }
 
+    /// A iterator of all the *allocated* chunks.
     pub fn allocated_chunks(&'_ self) -> impl Iterator<Item = Chunk> + '_ {
         AllocatedChunksIter {
             table: &self.table,
@@ -205,6 +240,7 @@ impl ChunkMap {
         }
     }
 
+    /// Helper function to create per-chunk processing work packets.
     pub fn generate_tasks<VM: VMBinding>(
         &self,
         workers: usize,
@@ -227,6 +263,7 @@ impl ChunkMap {
         work_packets
     }
 
+    /// Generate chunk sweep work packets.
     pub fn generate_sweep_tasks<VM: VMBinding>(
         &self,
         space: &'static ImmixSpace<VM>,
@@ -243,6 +280,7 @@ impl ChunkMap {
     }
 }
 
+/// Iterator to iterate over all allocated chunks.
 struct AllocatedChunksIter<'a> {
     table: &'a [AtomicU8],
     start: Address,
@@ -266,6 +304,7 @@ impl<'a> Iterator for AllocatedChunksIter<'a> {
     }
 }
 
+/// Chunk sweeping work packet.
 pub struct SweepChunks<VM: VMBinding>(pub &'static ImmixSpace<VM>, pub Range<Chunk>);
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunks<VM> {
