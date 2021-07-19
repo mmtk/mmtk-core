@@ -378,6 +378,31 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             None,
         );
     }
+    
+    #[inline]
+    pub fn cas_thread_free_list(&self, block: Address, old_thread_free: Address, new_thread_free: Address) -> bool {
+        compare_exchange_metadata::<VM>(
+            MetadataSpec::OnSide(self.space.get_thread_free_metadata_spec()),
+            unsafe{block.to_object_reference()}, 
+            old_thread_free.as_usize(),
+            new_thread_free.as_usize(),
+            None,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        )
+    }
+    
+    #[inline]
+    pub fn get_block_tls(block: Address) -> VMThread {
+        unsafe {
+            block.load()
+        }
+    }
+
+    #[inline]
+    pub fn set_block_tls(&self, block: Address) {
+        unsafe { block.store(self.tls) }
+    }
 
     fn pop_from_block_list(block_list: &mut BlockList) -> Address {
         let rtn = block_list.first;
@@ -525,7 +550,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         FreeListAllocator::<VM>::push_onto_block_list(block_list, block);
         self.store_block_tls(block);
         trace!("Constructed free list for block starting at {}", block);
-        // unreachable!();
         block
     }
 
