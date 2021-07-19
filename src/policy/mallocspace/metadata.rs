@@ -72,6 +72,8 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 /// We use a byte instead of a bit to avoid synchronization costs, i.e. to avoid
 /// the case where two threads try to update different bits in the same byte at
 /// the same time
+// XXX: This metadata spec is currently unused as we need to add a performant way to calculate
+// how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers
 #[cfg(target_pointer_width = "64")]
 pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
