@@ -241,7 +241,7 @@ pub trait Plan: 'static + Sync + Downcast {
         }
 
         // FIXME
-        /*if self.concurrent_collection_required() {
+        if self.concurrent_collection_required() {
             // FIXME
             /*if space == self.common().meta_data_space {
                 self.log_poll(space, "Triggering async concurrent collection");
@@ -249,9 +249,9 @@ pub trait Plan: 'static + Sync + Downcast {
                 return false;
             } else {*/
             self.log_poll(space, "Triggering concurrent collection");
-            Self::trigger_internal_collection_request();
+            self.base().trigger_internal_collection_request();
             return true;
-        }*/
+        }
 
         false
     }
@@ -269,6 +269,10 @@ pub trait Plan: 'static + Sync + Downcast {
      * @return <code>true</code> if a collection is requested by the plan.
      */
     fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool;
+
+    fn concurrent_collection_required(&self) -> bool {
+        false
+    }
 
     fn get_pages_reserved(&self) -> usize {
         self.get_pages_used() + self.get_collection_reserve()
@@ -658,6 +662,13 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
 
         self.max_collection_attempts.load(Ordering::Relaxed)
+    }
+
+    fn trigger_internal_collection_request(&self) {
+        // Mark this as a user triggered collection
+        // internalTriggeredCollection = lastInternalTriggeredCollection = true;
+        // Request the collection
+        self.control_collector_context.request();
     }
 
     fn is_internal_triggered_collection(&self) -> bool {

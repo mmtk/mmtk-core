@@ -54,6 +54,16 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
         self.base().collection_required(self, space_full, space)
+        // let stress_force_gc = self.stress_test_gc_required();
+        // debug!(
+        //     "self.get_pages_reserved()={}, self.get_total_pages()={}",
+        //     plan.get_pages_reserved(),
+        //     plan.get_total_pages()
+        // );
+    }
+
+    fn concurrent_collection_required(&self) -> bool {
+        self.get_pages_reserved() * 10 / 3 > self.get_total_pages()
     }
 
     fn constraints(&self) -> &'static PlanConstraints {
