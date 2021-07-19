@@ -133,12 +133,7 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
         }
-        PlanSelector::FreeListMarkSweep => {
-            crate::plan::freelistmarksweep::mutator::create_freelistmarksweep_mutator(
-                tls,
-                &*mmtk.plan,
-            )
-        }
+        PlanSelector::FreeListMarkSweep => crate::plan::freelistmarksweep::mutator::create_freelistmarksweep_mutator(tls, &*mmtk.plan)
     })
 }
 
