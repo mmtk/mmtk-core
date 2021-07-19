@@ -24,6 +24,7 @@ pub struct SideMetadataSpec {
 }
 
 impl SideMetadataSpec {
+    /// Calculate the total size for the given spec and the previous specs.
     pub const fn accumulated_size(&self) -> usize {
         self.offset + super::metadata_address_range_size(self)
     }
