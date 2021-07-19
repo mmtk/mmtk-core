@@ -364,6 +364,8 @@ pub struct BasePlan<VM: VMBinding> {
     // Spaces in base plan
     #[cfg(feature = "code_space")]
     pub code_space: ImmortalSpace<VM>,
+    #[cfg(feature = "code_space")]
+    pub code_lo_space: ImmortalSpace<VM>,
     #[cfg(feature = "ro_space")]
     pub ro_space: ImmortalSpace<VM>,
     #[cfg(feature = "vm_space")]
@@ -419,6 +421,17 @@ impl<VM: VMBinding> BasePlan<VM> {
             #[cfg(feature = "code_space")]
             code_space: ImmortalSpace::new(
                 "code_space",
+                true,
+                VMRequest::discontiguous(),
+                global_side_metadata_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                constraints,
+            ),
+            #[cfg(feature = "code_space")]
+            code_lo_space: ImmortalSpace::new(
+                "code_lo_space",
                 true,
                 VMRequest::discontiguous(),
                 global_side_metadata_specs.clone(),
@@ -491,6 +504,8 @@ impl<VM: VMBinding> BasePlan<VM> {
 
         #[cfg(feature = "code_space")]
         self.code_space.init(vm_map);
+        #[cfg(feature = "code_space")]
+        self.code_lo_space.init(vm_map);
         #[cfg(feature = "ro_space")]
         self.ro_space.init(vm_map);
         #[cfg(feature = "vm_space")]
@@ -509,6 +524,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         #[cfg(feature = "code_space")]
         {
             pages += self.code_space.reserved_pages();
+            pages += self.code_lo_space.reserved_pages();
         }
         #[cfg(feature = "ro_space")]
         {
@@ -531,6 +547,12 @@ impl<VM: VMBinding> BasePlan<VM> {
             return self.code_space.trace_object::<T>(_trace, _object);
         }
 
+        #[cfg(feature = "code_space")]
+        if self.code_lo_space.in_space(_object) {
+            trace!("trace_object: object in large code space");
+            return self.code_lo_space.trace_object::<T>(_trace, _object);
+        }
+
         #[cfg(feature = "ro_space")]
         if self.ro_space.in_space(_object) {
             trace!("trace_object: object in ro_space space");
@@ -548,6 +570,8 @@ impl<VM: VMBinding> BasePlan<VM> {
     pub fn prepare(&mut self, _tls: VMWorkerThread, _primary: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.prepare();
+        #[cfg(feature = "code_space")]
+        self.code_lo_space.prepare();
         #[cfg(feature = "ro_space")]
         self.ro_space.prepare();
         #[cfg(feature = "vm_space")]
@@ -557,6 +581,8 @@ impl<VM: VMBinding> BasePlan<VM> {
     pub fn release(&mut self, _tls: VMWorkerThread, _primary: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.release();
+        #[cfg(feature = "code_space")]
+        self.code_lo_space.release();
         #[cfg(feature = "ro_space")]
         self.ro_space.release();
         #[cfg(feature = "vm_space")]
@@ -842,11 +868,12 @@ use enum_map::Enum;
 /// Allocation semantics that MMTk provides.
 /// Each allocation request requires a desired semantic for the object to allocate.
 #[repr(i32)]
-#[derive(Clone, Copy, Debug, Enum)]
+#[derive(Clone, Copy, Debug, Enum, PartialEq, Eq)]
 pub enum AllocationSemantics {
     Default = 0,
     Immortal = 1,
     Los = 2,
     Code = 3,
     ReadOnly = 4,
+    LargeCode = 5,
 }
