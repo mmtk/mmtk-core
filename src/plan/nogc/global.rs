@@ -60,8 +60,8 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!()
     }
 
-    fn release(&mut self, _tls: VMWorkerThread) {
-        unreachable!()
+    fn release(&mut self, tls: VMWorkerThread) {
+        self.ms_space.sweep(tls);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -122,12 +122,25 @@ impl<VM: VMBinding> NoGC<VM> {
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
+        let side_metadata_thread_free = SideMetadataSpec {
+            is_global: false,
+            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&side_metadata_local_free),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
+        // let side_metadata_tls = SideMetadataSpec {
+        //     is_global: false,
+        //     offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&side_metadata_local_free) + metadata_address_range_size(&side_metadata_thread_free),
+        //     log_num_of_bits: 6,
+        //     log_min_obj_size: 16,
+        // };
         let local_specs = {
             vec![
                 side_metadata_next,
                 side_metadata_free,
                 side_metadata_size,
-                side_metadata_local_free
+                side_metadata_local_free,
+                side_metadata_thread_free,
             ]
         };
 
