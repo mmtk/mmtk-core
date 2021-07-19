@@ -33,16 +33,6 @@ pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWork
     );
 }
 
-#[cfg(not(feature = "force_vm_spaces"))]
-lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default => AllocatorSelector::BumpPointer(0),
-        AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
-        AllocationType::Los => AllocatorSelector::LargeObject(0),
-    };
-}
-
-#[cfg(feature = "force_vm_spaces")]
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::BumpPointer(0),
@@ -65,14 +55,14 @@ pub fn create_ss_mutator<VM: VMBinding>(
             (AllocatorSelector::BumpPointer(0), ss.tospace()),
             (AllocatorSelector::BumpPointer(1), ss.common.get_immortal()),
             (AllocatorSelector::LargeObject(0), ss.common.get_los()),
-            #[cfg(all(feature = "force_vm_spaces", feature = "ro_space"))]
+            #[cfg(feature = "ro_space")]
             (AllocatorSelector::BumpPointer(2), &ss.common.base.ro_space),
-            #[cfg(all(feature = "force_vm_spaces", feature = "code_space"))]
+            #[cfg(feature = "code_space")]
             (
                 AllocatorSelector::BumpPointer(3),
                 &ss.common.base.code_space,
             ),
-            #[cfg(all(feature = "force_vm_spaces", feature = "code_space"))]
+            #[cfg(feature = "code_space")]
             (
                 AllocatorSelector::BumpPointer(4),
                 &ss.common.base.code_lo_space,

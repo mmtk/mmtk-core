@@ -22,8 +22,11 @@ pub fn ms_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWor
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::Malloc(0),
-        AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(0),
+        AllocationType::Immortal => AllocatorSelector::BumpPointer(0),
         AllocationType::Los => AllocatorSelector::LargeObject(0),
+        AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
+        AllocationType::Code => AllocatorSelector::BumpPointer(2),
+        AllocationType::LargeCode => AllocatorSelector::BumpPointer(3),
     };
 }
 
@@ -41,6 +44,21 @@ pub fn create_ms_mutator<VM: VMBinding>(
                 ms.common().get_immortal(),
             ),
             (AllocatorSelector::LargeObject(0), ms.common().get_los()),
+            #[cfg(feature = "ro_space")]
+            (
+                AllocatorSelector::BumpPointer(1),
+                &ms.common().base.ro_space,
+            ),
+            #[cfg(feature = "code_space")]
+            (
+                AllocatorSelector::BumpPointer(2),
+                &ms.common().base.code_space,
+            ),
+            #[cfg(feature = "code_space")]
+            (
+                AllocatorSelector::BumpPointer(3),
+                &ms.common().base.code_lo_space,
+            ),
         ],
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,

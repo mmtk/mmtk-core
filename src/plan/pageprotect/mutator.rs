@@ -18,14 +18,6 @@ fn pp_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerT
 /// Release mutator. Do nothing.
 fn pp_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
-#[cfg(not(feature = "force_vm_spaces"))]
-lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default | AllocationType::Los | AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly  => AllocatorSelector::LargeObject(0),
-    };
-}
-
-#[cfg(feature = "force_vm_spaces")]
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::LargeObject(0),
@@ -48,21 +40,19 @@ pub fn create_pp_mutator<VM: VMBinding>(
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
             (AllocatorSelector::LargeObject(0), &page.space),
-            #[cfg(feature = "force_vm_spaces")]
             (
                 AllocatorSelector::BumpPointer(0),
                 plan.common().get_immortal(),
             ),
-            #[cfg(all(feature = "force_vm_spaces", feature = "ro_space"))]
+            #[cfg(feature = "ro_space")]
             (AllocatorSelector::BumpPointer(1), &plan.base().ro_space),
-            #[cfg(all(feature = "force_vm_spaces", feature = "code_space"))]
+            #[cfg(feature = "code_space")]
             (AllocatorSelector::BumpPointer(2), &plan.base().code_space),
-            #[cfg(all(feature = "force_vm_spaces", feature = "code_space"))]
+            #[cfg(feature = "code_space")]
             (
                 AllocatorSelector::BumpPointer(3),
                 &plan.base().code_lo_space,
             ),
-            #[cfg(feature = "force_vm_spaces")]
             (AllocatorSelector::LargeObject(1), plan.common().get_los()),
         ],
         prepare_func: &pp_mutator_prepare,
