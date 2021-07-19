@@ -58,6 +58,7 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::MarkCompact => {
             crate::plan::markcompact::mutator::create_markcompact_mutator(tls, &*mmtk.plan)
         }
+        PlanSelector::FreeListMarkSweep => crate::plan::freelistmarksweep::mutator::create_freelistmarksweep_mutator(tls, &*mmtk.plan)
     })
 }
 
@@ -89,6 +90,9 @@ pub fn create_plan<VM: VMBinding>(
             vm_map, mmapper, options,
         )),
         PlanSelector::MarkCompact => Box::new(crate::plan::markcompact::MarkCompact::new(
+            vm_map, mmapper, options,
+        )),
+        PlanSelector::FreeListMarkSweep => Box::new(crate::plan::freelistmarksweep::FreeListMarkSweep::new(
             vm_map, mmapper, options,
         )),
     }

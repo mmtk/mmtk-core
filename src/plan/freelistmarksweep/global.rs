@@ -1,13 +1,15 @@
-use crate::plan::global::BasePlan;
-use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
+use crate::mmtk::MMTK;
+use crate::plan::global::{BasePlan, NoCopy};
+use crate::plan::freelistmarksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::immortalspace::ImmortalSpace;
-use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::policy::space::Space;
-use crate::scheduler::GCWorkScheduler;
+use crate::scheduler::GCWorkerLocal;
+use crate::scheduler::GCWorkerLocalPtr;
+use crate::scheduler::MMTkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -22,36 +24,46 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
 
-#[cfg(not(feature = "nogc_lock_free"))]
-use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
-#[cfg(feature = "nogc_lock_free")]
-use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
-
-pub struct NoGC<VM: VMBinding> {
+pub struct FreeListMarkSweep<VM: VMBinding> {
     pub base: BasePlan<VM>,
-    pub immortal: ImmortalSpace<VM>,
-    pub los: ImmortalSpace<VM>,
-    pub nogc_space: MarkSweepSpace<VM>,
+    pub ms_space: MarkSweepSpace<VM>,
+    pub im_space: ImmortalSpace<VM>,
 }
 
-pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
+pub const FLMS_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
 
-impl<VM: VMBinding> Plan for NoGC<VM> {
+impl<VM: VMBinding> Plan for FreeListMarkSweep<VM> {
     type VM = VM;
 
     fn constraints(&self) -> &'static PlanConstraints {
-        &NOGC_CONSTRAINTS
+        &FLMS_CONSTRAINTS
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.base.gc_init(heap_size, vm_map);
+    fn create_worker_local(
+        &self,
+        tls: VMWorkerThread,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> GCWorkerLocalPtr {
+        let mut c = NoCopy::new(mmtk);
+        c.init(tls);
+        GCWorkerLocalPtr::new(c)
+    }
+
+    fn gc_init(
+        &mut self,
+        heap_size: usize,
+        vm_map: &'static VMMap,
+        scheduler: &Arc<MMTkScheduler<VM>>,
+    ) {
+        self.base.gc_init(heap_size, vm_map, scheduler);
 
         // FIXME correctly initialize spaces based on options
-        self.nogc_space.init(vm_map);
+        self.ms_space.init(&vm_map);
+        self.im_space.init(&vm_map);
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        self.base().collection_required(self, space_full, space)
+        self.base.collection_required(self, space_full, space)
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -70,19 +82,16 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<VM>) {
-        unreachable!("GC triggered in nogc")
+    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<VM>) {
+        unreachable!("GC triggered in freelistmarksweep")
     }
 
-    fn get_used_pages(&self) -> usize {
-        self.nogc_space.reserved_pages()
-            + self.immortal.reserved_pages()
-            + self.los.reserved_pages()
-            + self.base.get_used_pages()
+    fn get_pages_used(&self) -> usize {
+        self.im_space.reserved_pages() + self.ms_space.reserved_pages()
     }
 
     fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
-        println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
+        println!("Warning: User attempted a collection request, but it is not supported in FreeListMarkSweep. The request is ignored.");
     }
 
     fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
@@ -90,18 +99,15 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 }
 
-impl<VM: VMBinding> NoGC<VM> {
+impl<VM: VMBinding> FreeListMarkSweep<VM> {
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
-        #[cfg(not(feature = "nogc_lock_free"))]
+        #[cfg(not(feature = "freelistmarksweep_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        #[cfg(feature = "nogc_lock_free")]
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-
-        let global_specs = SideMetadataContext::new_global_specs(&[]);
+        #[cfg(feature = "freelistmarksweep_lock_free")]
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
         let side_metadata_next = SideMetadataSpec {
             is_global: false,
@@ -148,24 +154,6 @@ impl<VM: VMBinding> NoGC<VM> {
                 side_metadata_thread_free,
             ]
         };
-
-        // #[cfg(feature = "nogc_lock_free")]
-        // let nogc_space = NoGCImmortalSpace::new(
-        //     "nogc_space",
-        //     cfg!(not(feature = "nogc_no_zeroing")),
-        //     global_specs.clone(),
-        // );
-        // #[cfg(not(feature = "nogc_lock_free"))]
-        // let nogc_space = NoGCImmortalSpace::new(
-        //     "nogc_space",
-        //     true,
-        //     VMRequest::discontiguous(),
-        //     global_specs.clone(),
-        //     vm_map,
-        //     mmapper,
-        //     &mut heap,
-        //     &NOGC_CONSTRAINTS,
-        // );
         let ms_space = MarkSweepSpace::new(
             "MSspace",
             true,
@@ -185,45 +173,24 @@ impl<VM: VMBinding> NoGC<VM> {
             vm_map,
             mmapper,
             &mut heap,
-            &NOGC_CONSTRAINTS,
+            &FLMS_CONSTRAINTS,
         );
 
-        let res = NoGC {
-            nogc_space,
-            immortal: ImmortalSpace::new(
-                "immortal",
-                true,
-                VMRequest::discontiguous(),
-                global_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                &NOGC_CONSTRAINTS,
-            ),
-            los: ImmortalSpace::new(
-                "los",
-                true,
-                VMRequest::discontiguous(),
-                global_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                &NOGC_CONSTRAINTS,
-            ),
+        let res = FreeListMarkSweep {
+            im_space,
+            ms_space,
             base: BasePlan::new(
                 vm_map,
                 mmapper,
                 options,
                 heap,
-                &NOGC_CONSTRAINTS,
+                &FLMS_CONSTRAINTS,
                 global_specs,
             ),
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        res.base()
+        res.base
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res.ms_space
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);

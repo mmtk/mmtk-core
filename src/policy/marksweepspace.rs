@@ -1,4 +1,4 @@
-use crate::{TransitiveClosure, util::{ObjectReference, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::side_metadata::{SideMetadataContext, SideMetadataSpec}}, vm::VMBinding};
+use crate::{TransitiveClosure, util::{ObjectReference, VMThread, VMWorkerThread, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::side_metadata::{SideMetadataContext, SideMetadataSpec}}, vm::VMBinding};
 
 use super::space::{CommonSpace, SFT, Space, SpaceOptions};
 
@@ -106,5 +106,34 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         object: ObjectReference,
     ) {
         todo!()
+    }
+
+    #[inline]
+    pub fn get_next_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[0]
+    }
+
+    #[inline]
+    pub fn get_free_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[1]
+    }
+
+    #[inline]
+    pub fn get_size_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[2]
+    }
+
+    #[inline]
+    pub fn get_local_free_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[3]
+    }
+
+    #[inline]
+    pub fn get_thread_free_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[4]
+    }
+
+    pub fn sweep(&self, tls: VMWorkerThread) {
+        unreachable!()
     }
 }

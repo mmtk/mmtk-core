@@ -26,6 +26,7 @@ custom_derive! {
         PageProtect,
         Immix,
         MarkCompact,
+        FreeListMarkSweep
     }
 }
 
