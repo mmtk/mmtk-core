@@ -16,9 +16,12 @@ lazy_static! {
         AllocationType::Los | AllocationType::Immortal => AllocatorSelector::BumpPointer(0),
     };
 }
+pub fn flms_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+    // Do nothing
+}
 
-pub fn freelistmarksweep_mutator_noop<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    unreachable!();
+pub fn flms_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+    // Do nothing
 }
 
 pub fn create_freelistmarksweep_mutator<VM: VMBinding>(
@@ -35,8 +38,8 @@ pub fn create_freelistmarksweep_mutator<VM: VMBinding>(
             AllocatorSelector::BumpPointer(0),
             &plan.downcast_ref::<FreeListMarkSweep<VM>>().unwrap().im_space,
         )],
-        prepare_func: &freelistmarksweep_mutator_noop,
-        release_func: &freelistmarksweep_mutator_noop,
+        prepare_func: &flms_mutator_prepare,
+        release_func: &flms_mutator_release,
     };
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
