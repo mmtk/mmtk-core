@@ -1,24 +1,12 @@
-use std::{
-    sync::{Arc},
-};
-
 use atomic::Ordering;
 
-use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockState}, chunks::Chunk, metadata::{is_marked, set_mark_bit}}, space::SpaceOptions}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, FreeListAllocator, BLOCK_LISTS_EMPTY, BYTES_IN_BLOCK}, alloc_bit::{ALLOC_SIDE_METADATA_SPEC, bzero_alloc_bit}, constants::LOG_BYTES_IN_PAGE, heap::{
-            layout::heap_layout::{Mmapper, VMMap},
-            FreeListPageResource, HeapMeta, VMRequest,
-        }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
+use crate::{TransitiveClosure, policy::marksweepspace::metadata::{is_marked, set_mark_bit}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{MetadataSpec, load_metadata, side_metadata::{SideMetadataContext, SideMetadataSpec}}}, vm::VMBinding};
 
-use super::{super::space::{CommonSpace, Space, SFT}, chunks::{ChunkMap, ChunkState}};
-use crate::vm::ObjectModel;
+use super::super::space::{CommonSpace, SFT, Space, SpaceOptions};
 
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub common: CommonSpace<VM>,
-    pr: FreeListPageResource<VM>,
-    /// Allocation status for all chunks in MS space
-    pub chunk_map: ChunkMap,
-    /// Work packet scheduler
-    scheduler: Arc<GCWorkScheduler<VM>>,
+    pr: FreeListPageResource<VM>    
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
@@ -36,11 +24,12 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
 
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
-        true
+        todo!()
     }
 
     fn initialize_object_metadata(&self, object: crate::util::ObjectReference, alloc: bool) {
-        // do nothing
+        // todo!()
+        // do nothing for now
     }
 }
 
@@ -71,60 +60,25 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
 }
 
 impl<VM: VMBinding> MarkSweepSpace<VM> {
-    /// Get work packet scheduler
-    fn scheduler(&self) -> &GCWorkScheduler<VM> {
-        &self.scheduler
-    }
-
     pub fn new(
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
-        // local_side_metadata_specs: Vec<SideMetadataSpec>,
+        local_side_metadata_specs: Vec<SideMetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> MarkSweepSpace<VM> {
-        let alloc_bits = &mut metadata::extract_side_metadata(&[
-            MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
-        ]);
-
-        let mark_bits = &mut metadata::extract_side_metadata(&[
-            *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-        ]);
-
-        let mut local_specs = {
-            metadata::extract_side_metadata(
-            &vec![
-                MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
-                MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
-                MetadataSpec::OnSide(Block::FREE_LIST_TABLE),
-                MetadataSpec::OnSide(Block::SIZE_TABLE),
-                MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
-                MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-                MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
-                MetadataSpec::OnSide(Block::TLS_TABLE),
-                MetadataSpec::OnSide(Block::MARK_TABLE),
-                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
-                *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-            ]
-            )
-        };
-
-        local_specs.append(mark_bits);
-
         let common = CommonSpace::new(
             SpaceOptions {
                 name,
                 movable: false,
                 immortal: false,
-                needs_log_bit: false,
                 zeroed,
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
-                    global: alloc_bits.to_vec(),
-                    local: local_specs,
+                    global: vec![],
+                    local: local_side_metadata_specs
                 },
             },
             vm_map,
@@ -138,8 +92,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
-            chunk_map: ChunkMap::new(),
-            scheduler,
         }
     }
 
@@ -157,69 +109,60 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             "Cannot mark an object {} that was not alloced by free list allocator.",
             address,
         );
-        if !is_marked::<VM>(object, Some(Ordering::SeqCst)) {
-            set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
-            let block = FreeListAllocator::<VM>::get_block(address);
-            block.set_state(BlockState::Marked);
+        if !is_marked::<VM>(object) {
+            set_mark_bit::<VM>(object);
             trace.process_node(object);
         }
         object
     }
-        
-    pub fn zero_mark_bits(&self) {
-        // todo: concurrent zeroing
-        use crate::vm::*;
-        for chunk in self.chunk_map.all_chunks() {
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
-                side_metadata::bzero_metadata(&side, chunk.start(), Chunk::BYTES);
-            }
-        }
-    }
-
-    pub fn record_new_block(&self, block: Block) {
-        block.init();
-        self.chunk_map.set(block.chunk(), ChunkState::Allocated);
-        // eprintln!("b > {}", block.start());
-    }
 
     #[inline]
     pub fn get_next_metadata_spec(&self) -> SideMetadataSpec {
-        Block::NEXT_BLOCK_TABLE
+        self.common.metadata.local[0]
     }
 
-    pub fn reset(&mut self) {
-        // do nothing
-        self.zero_mark_bits();
+    #[inline]
+    pub fn get_free_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[1]
     }
 
-    pub fn block_level_sweep(&self) {
-        let space = unsafe { &*(self as *const Self) };
-        // for chunk in self.chunk_map.all_chunks() {
-        //     chunk.sweep(space);
-        // }
-        let work_packets = self.chunk_map.generate_sweep_tasks(space);
-        self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+    #[inline]
+    pub fn get_size_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[2]
     }
 
-    /// Release a block.
-    pub fn release_block(&self, block: Block) {
-        // eprintln!("b < {}", block.start());
-        self.block_clear_metadata(block);
-
-        block.deinit();
-        self.pr.release_pages(block.start());
+    #[inline]
+    pub fn get_local_free_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[3]
     }
 
-    pub fn block_clear_metadata(&self, block: Block) {
-        for metadata_spec in &self.common.metadata.local {
-            store_metadata::<VM>(
-                &MetadataSpec::OnSide(*metadata_spec),
-                unsafe { block.start().to_object_reference() },
-                0,
-                None,
-                Some(Ordering::SeqCst),
-            )
+    #[inline]
+    pub fn get_thread_free_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[4]
+    }
+
+    #[inline]
+    pub fn get_tls_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[5]
+    }
+
+    pub fn eager_sweep(&self, tls: VMWorkerThread) {
+        let mut block = self.common.start;
+        while block < self.common.start + self.common.extent {
+
         }
-        bzero_alloc_bit(block.start(), BYTES_IN_BLOCK);
+
+        unreachable!("start = {}, extent = {}", &self.common.start, &self.common.extent)
+    }
+    
+    pub fn load_block_tls(&self, block: Address) -> OpaquePointer {
+        let tls = load_metadata::<VM>(
+            MetadataSpec::OnSide(self.get_tls_metadata_spec()), 
+            unsafe {block.to_object_reference()},
+            None,
+            Some(Ordering::SeqCst));
+        unsafe {
+            std::mem::transmute::<usize, OpaquePointer>(tls)
+        }
     }
 }
