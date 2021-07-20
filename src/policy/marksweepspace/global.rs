@@ -27,30 +27,13 @@ use crate::{
     TransitiveClosure,
 };
 
-use super::{
-    super::space::{CommonSpace, Space, SpaceOptions, SFT},
-    chunks::ChunkMap,
-    metadata::{is_alloced, unset_alloc_bit_unsafe},
-};
-use crate::vm::ObjectModel;
+use crate::{TransitiveClosure, policy::marksweepspace::metadata::{is_marked, set_mark_bit}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{MetadataSpec, load_metadata, side_metadata::{SideMetadataContext, SideMetadataSpec}}}, vm::VMBinding};
 
-// const NATIVE_MALLOC_SPECS: Vec<SideMetadataSpec> = [
-//     SideMetadataSpec {
-//         is_global: false,
-//         offset:
-//         log_num_of_bits: 6,
-//         log_min_obj_size: 16,
-//     },
-// ].to_vec();
+use super::super::space::{CommonSpace, SFT, Space, SpaceOptions};
 
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub common: CommonSpace<VM>,
-    pr: FreeListPageResource<VM>,
-    // pub marked_blocks: Mutex<HashMap<usize, Vec<free_list_allocator::BlockList>>>,
-    /// Allocation status for all chunks in immix space
-    pub chunk_map: ChunkMap,
-    /// Work packet scheduler
-    scheduler: Arc<MMTkScheduler<VM>>,
+    pr: FreeListPageResource<VM>    
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
@@ -107,32 +90,11 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
-        // local_side_metadata_specs: Vec<SideMetadataSpec>,
+        local_side_metadata_specs: Vec<SideMetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        scheduler: Arc<MMTkScheduler<VM>>,
     ) -> MarkSweepSpace<VM> {
-        let alloc_mark_bits = &mut metadata::extract_side_metadata(&[
-            MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
-            *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-        ]);
-
-        let mut local_specs = {
-            vec![
-                Block::NEXT_BLOCK_TABLE,
-                Block::FREE_LIST_TABLE,
-                Block::SIZE_TABLE,
-                Block::LOCAL_FREE_LIST_TABLE,
-                Block::THREAD_FREE_LIST_TABLE,
-                Block::TLS_TABLE,
-                Block::MARK_TABLE,
-                ChunkMap::ALLOC_TABLE,
-            ]
-        };
-
-        local_specs.append(alloc_mark_bits);
-
         let common = CommonSpace::new(
             SpaceOptions {
                 name,
@@ -142,7 +104,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: vec![],
-                    local: local_specs,
+                    local: local_side_metadata_specs
                 },
             },
             vm_map,
@@ -156,8 +118,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
-            chunk_map: ChunkMap::new(),
-            scheduler,
         }
     }
 
@@ -175,15 +135,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             "Cannot mark an object {} that was not alloced by free list allocator.",
             address,
         );
-        // use crate::util::alloc::free_list_allocator::TRACING_OBJECT;
-        // if *TRACING_OBJECT.lock().unwrap() == address.as_usize() {
-        //     println!("marking tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
-        // }
-        if !is_marked::<VM>(object, None) {
-            set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
-            let block = Block::from(FreeListAllocator::<VM>::get_block(address));
-            block.set_state(BlockState::Marked);
-            // self.mark_block(block);
+        if !is_marked::<VM>(object) {
+            set_mark_bit::<VM>(object);
             trace.process_node(object);
         }
         object
