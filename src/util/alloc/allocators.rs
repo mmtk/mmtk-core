@@ -1,7 +1,7 @@
 use std::mem::MaybeUninit;
 
-use crate::plan::Plan;
 use crate::plan::AllocationSemantics;
+use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
@@ -143,9 +143,18 @@ pub(crate) struct ReservedAllocators {
 impl ReservedAllocators {
     /// check if the number of each allocators is okay. Panics if any allocator exceeds the max number.
     fn validate(&self) {
-        assert!(self.n_bump_pointer as usize <= MAX_BUMP_ALLOCATORS, "Allocator mapping declared more bump pointer allocators than the max allowed.");
-        assert!(self.n_large_object as usize<= MAX_LARGE_OBJECT_ALLOCATORS, "Allocator mapping declared more large object allocators than the max allowed.");
-        assert!(self.n_malloc as usize <= MAX_MALLOC_ALLOCATORS, "Allocator mapping declared more malloc allocators than the max allowed.");
+        assert!(
+            self.n_bump_pointer as usize <= MAX_BUMP_ALLOCATORS,
+            "Allocator mapping declared more bump pointer allocators than the max allowed."
+        );
+        assert!(
+            self.n_large_object as usize <= MAX_LARGE_OBJECT_ALLOCATORS,
+            "Allocator mapping declared more large object allocators than the max allowed."
+        );
+        assert!(
+            self.n_malloc as usize <= MAX_MALLOC_ALLOCATORS,
+            "Allocator mapping declared more malloc allocators than the max allowed."
+        );
     }
 }
 
@@ -155,7 +164,9 @@ impl ReservedAllocators {
 /// # Arguments
 /// * `reserved`: the number of reserved allocators for the plan specific policies.
 #[allow(unused_mut)] // allow unused mut as some spaces are conditionally compiled
-pub(crate) fn base_allocator_mapping(mut reserved: ReservedAllocators) -> EnumMap<AllocationSemantics, AllocatorSelector> {
+pub(crate) fn base_allocator_mapping(
+    mut reserved: ReservedAllocators,
+) -> EnumMap<AllocationSemantics, AllocatorSelector> {
     let mut base = EnumMap::<AllocationSemantics, AllocatorSelector>::default();
 
     #[cfg(feature = "code_space")]
@@ -164,15 +175,20 @@ pub(crate) fn base_allocator_mapping(mut reserved: ReservedAllocators) -> EnumMa
         base[AllocationSemantics::Code] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
         reserved.n_bump_pointer += 1;
 
-        assert_eq!(base[AllocationSemantics::LargeCode], AllocatorSelector::None);
-        base[AllocationSemantics::LargeCode] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+        assert_eq!(
+            base[AllocationSemantics::LargeCode],
+            AllocatorSelector::None
+        );
+        base[AllocationSemantics::LargeCode] =
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
         reserved.n_bump_pointer += 1;
     }
 
     #[cfg(feature = "ro_space")]
     {
         assert_eq!(base[AllocationSemantics::ReadOnly], AllocatorSelector::None);
-        base[AllocationSemantics::ReadOnly] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+        base[AllocationSemantics::ReadOnly] =
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
         reserved.n_bump_pointer += 1;
     }
 
@@ -184,14 +200,19 @@ pub(crate) fn base_allocator_mapping(mut reserved: ReservedAllocators) -> EnumMa
 ///
 /// # Arguments
 /// * `reserved`: the number of reserved allocators for the plan specific policies.
-pub(crate) fn common_allocator_mapping(reserved: ReservedAllocators) -> EnumMap<AllocationSemantics, AllocatorSelector> {
+pub(crate) fn common_allocator_mapping(
+    reserved: ReservedAllocators,
+) -> EnumMap<AllocationSemantics, AllocatorSelector> {
     let mut common = base_allocator_mapping(ReservedAllocators {
         n_bump_pointer: reserved.n_bump_pointer + 1,
         n_large_object: reserved.n_large_object + 1,
-        n_malloc: reserved.n_malloc
+        n_malloc: reserved.n_malloc,
     });
 
-    assert_eq!(common[AllocationSemantics::Immortal], AllocatorSelector::None);
+    assert_eq!(
+        common[AllocationSemantics::Immortal],
+        AllocatorSelector::None
+    );
     common[AllocationSemantics::Immortal] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
 
     assert_eq!(common[AllocationSemantics::Los], AllocatorSelector::None);
@@ -202,20 +223,32 @@ pub(crate) fn common_allocator_mapping(reserved: ReservedAllocators) -> EnumMap<
 
 #[allow(unused_mut)] // allow unused mut as some spaces are conditionally compiled
 #[allow(unused_variables)]
-pub(crate) fn base_space_mapping<VM: VMBinding>(mut reserved: ReservedAllocators, plan: &'static dyn Plan<VM=VM>) -> Vec<(AllocatorSelector, &'static dyn Space<VM>)> {
-    let mut base = vec![];
+pub(crate) fn base_space_mapping<VM: VMBinding>(
+    mut reserved: ReservedAllocators,
+    plan: &'static dyn Plan<VM = VM>,
+) -> Vec<(AllocatorSelector, &'static dyn Space<VM>)> {
+    let mut base: Vec<(AllocatorSelector, &'static dyn Space<VM>)> = vec![];
 
     #[cfg(feature = "code_space")]
     {
-        base.push((AllocatorSelector::BumpPointer(reserved.n_bump_pointer), plan.base().code_space));
+        base.push((
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            &plan.base().code_space,
+        ));
         reserved.n_bump_pointer += 1;
-        base.push((AllocatorSelector::BumpPointer(reserved.n_bump_pointer), plan.base().code_lo_space));
+        base.push((
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            &plan.base().code_lo_space,
+        ));
         reserved.n_bump_pointer += 1;
     }
 
     #[cfg(feature = "ro_space")]
     {
-        base.push((AllocatorSelector::BumpPointer(reserved.n_bump_pointer), plan.base().ro_space));
+        base.push((
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            &plan.base().ro_space,
+        ));
         reserved.n_bump_pointer += 1;
     }
 
@@ -223,15 +256,27 @@ pub(crate) fn base_space_mapping<VM: VMBinding>(mut reserved: ReservedAllocators
     base
 }
 
-pub(crate) fn common_space_mapping<VM: VMBinding>(reserved: ReservedAllocators, plan: &'static dyn Plan<VM=VM>) -> Vec<(AllocatorSelector, &'static dyn Space<VM>)> {
-    let mut common = base_space_mapping(ReservedAllocators {
-        n_bump_pointer: reserved.n_bump_pointer + 1,
-        n_large_object: reserved.n_large_object + 1,
-        n_malloc: reserved.n_malloc
-    }, plan);
+pub(crate) fn common_space_mapping<VM: VMBinding>(
+    reserved: ReservedAllocators,
+    plan: &'static dyn Plan<VM = VM>,
+) -> Vec<(AllocatorSelector, &'static dyn Space<VM>)> {
+    let mut common = base_space_mapping(
+        ReservedAllocators {
+            n_bump_pointer: reserved.n_bump_pointer + 1,
+            n_large_object: reserved.n_large_object + 1,
+            n_malloc: reserved.n_malloc,
+        },
+        plan,
+    );
 
-    common.push((AllocatorSelector::BumpPointer(reserved.n_bump_pointer), plan.common().get_immortal()));
-    common.push((AllocatorSelector::LargeObject(reserved.n_large_object), plan.common().get_los()));
+    common.push((
+        AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+        plan.common().get_immortal(),
+    ));
+    common.push((
+        AllocatorSelector::LargeObject(reserved.n_large_object),
+        plan.common().get_los(),
+    ));
 
     common
 }

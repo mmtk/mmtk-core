@@ -5,7 +5,9 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::allocators::Allocators;
-use crate::util::alloc::allocators::{ReservedAllocators, common_allocator_mapping, common_space_mapping};
+use crate::util::alloc::allocators::{
+    common_allocator_mapping, common_space_mapping, ReservedAllocators,
+};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::Plan;
@@ -22,7 +24,7 @@ pub fn ms_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWor
 const MS_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
     n_bump_pointer: 0,
     n_large_object: 0,
-    n_malloc: 1
+    n_malloc: 1,
 };
 
 lazy_static! {

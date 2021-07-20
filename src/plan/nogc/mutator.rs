@@ -4,8 +4,11 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::nogc::NoGC;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
+use crate::util::alloc::allocators::{
+    base_allocator_mapping, base_space_mapping, common_allocator_mapping, common_space_mapping,
+    ReservedAllocators,
+};
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::allocators::{ReservedAllocators, base_allocator_mapping, common_allocator_mapping, base_space_mapping, common_space_mapping};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -13,7 +16,7 @@ use enum_map::EnumMap;
 const NOGC_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
     n_bump_pointer: 1,
     n_large_object: 0,
-    n_malloc: 0
+    n_malloc: 0,
 };
 
 lazy_static! {

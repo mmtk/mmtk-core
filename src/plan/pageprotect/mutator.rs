@@ -3,8 +3,10 @@ use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
+use crate::util::alloc::allocators::{
+    common_allocator_mapping, common_space_mapping, ReservedAllocators,
+};
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::allocators::{ReservedAllocators, common_allocator_mapping, common_space_mapping};
 use crate::vm::VMBinding;
 use crate::{
     plan::barriers::NoBarrier,
@@ -21,7 +23,7 @@ fn pp_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerT
 const PP_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
     n_bump_pointer: 0,
     n_large_object: 1,
-    n_malloc: 0
+    n_malloc: 0,
 };
 
 lazy_static! {
