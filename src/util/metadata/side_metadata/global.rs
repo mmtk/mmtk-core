@@ -23,6 +23,13 @@ pub struct SideMetadataSpec {
     pub log_min_obj_size: usize,
 }
 
+impl SideMetadataSpec {
+    /// Calculate the total size for the given spec and the previous specs.
+    pub const fn accumulated_size(&self) -> usize {
+        self.offset + super::metadata_address_range_size(self)
+    }
+}
+
 impl fmt::Debug for SideMetadataSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(

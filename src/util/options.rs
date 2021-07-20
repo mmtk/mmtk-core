@@ -23,6 +23,7 @@ custom_derive! {
         GenCopy,
         MarkSweep,
         PageProtect,
+        Immix,
     }
 }
 
