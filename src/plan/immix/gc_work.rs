@@ -18,6 +18,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+/// Immix copy allocator
 pub struct ImmixCopyContext<VM: VMBinding> {
     immix: ImmixAllocator<VM>,
 }
@@ -106,6 +107,7 @@ impl<VM: VMBinding> ImmixProcessEdges<VM> {
         }
     }
 
+    /// Trace objects without evacuation.
     #[inline(always)]
     fn fast_process_edge(&mut self, slot: Address) {
         let object = unsafe { slot.load::<ObjectReference>() };
@@ -115,6 +117,8 @@ impl<VM: VMBinding> ImmixProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
     type VM = VM;
+    const OVERWRITE_REFERENCE: bool = crate::policy::immix::DEFRAG;
+
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<Immix<VM>>().unwrap();
@@ -134,6 +138,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
         }
     }
 
+    /// Trace  and evacuate objects.
     #[inline(always)]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
@@ -166,6 +171,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
     fn process_edges(&mut self) {
         if !self.plan.immix_space.in_defrag() {
             for i in 0..self.edges.len() {
+                // Use fast_process_edge since we don't need to forward any objects.
                 self.fast_process_edge(self.edges[i])
             }
         } else {

@@ -39,13 +39,21 @@ use std::{
 pub struct ImmixSpace<VM: VMBinding> {
     common: UnsafeCell<CommonSpace<VM>>,
     pr: FreeListPageResource<VM>,
+    /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
+    /// Current line mark state
     pub line_mark_state: AtomicU8,
+    /// Line mark state in previous GC
     line_unavail_state: AtomicU8,
+    /// Is in a GC?
     in_collection: AtomicBool,
+    /// A list of all reusable blocks
     pub reusable_blocks: BlockList,
+    /// Defrag utilities
     pub(super) defrag: Defrag,
+    /// Object mark state
     mark_state: AtomicU8,
+    /// Work packet scheduler
     scheduler: Weak<MMTkScheduler<VM>>,
 }
 
@@ -91,14 +99,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 }
 
 impl<VM: VMBinding> ImmixSpace<VM> {
-    pub const LOCAL_SIDE_METADATA_PER_CHUNK: usize = {
-        if Self::HEADER_MARK_BITS {
-            Block::MARK_TABLE.accumulated_size()
-        } else {
-            Self::OBJECT_MARK_TABLE.accumulated_size()
-        }
-    };
-
+    /// Get side metadata specs
     #[allow(clippy::assertions_on_constants)]
     fn side_metadata_specs() -> &'static [SideMetadataSpec] {
         debug_assert!(!Self::HEADER_MARK_BITS);
@@ -164,19 +165,23 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
+    /// Get the number of defrag headroom pages.
     pub fn defrag_headroom_pages(&self) -> usize {
         self.defrag.defrag_headroom_pages(self)
     }
 
+    /// Check if current GC is a defrag GC.
     #[inline(always)]
     pub fn in_defrag(&self) -> bool {
         self.defrag.in_defrag()
     }
 
+    /// Initialize defrag data
     pub fn initialize_defrag(&self, mmtk: &MMTK<VM>) {
         self.defrag.prepare_histograms(mmtk);
     }
 
+    /// check if the current GC should do defragmentation.
     pub fn decide_whether_to_defrag(&self, emergency_collection: bool, collection_attempts: usize) {
         self.defrag.decide_whether_to_defrag(
             emergency_collection,
@@ -192,8 +197,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     const MARK_MASK: u8 = ((1 << Self::MAX_MARKCOUNT_BITS) - 1) << Self::MARK_BASE;
     const MARK_BASE_VALUE: u8 = Self::MARK_INCREMENT;
 
+    /// Update mark state
     #[allow(clippy::assertions_on_constants)]
-    pub fn delta_mark_state(state: u8) -> u8 {
+    fn delta_mark_state(state: u8) -> u8 {
         debug_assert!(Self::HEADER_MARK_BITS);
         let mut rtn = state;
         loop {
@@ -206,21 +212,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         rtn
     }
 
+    /// Get work packet scheduler
     fn scheduler(&self) -> Arc<MMTkScheduler<VM>> {
         self.scheduler.upgrade().unwrap()
     }
 
     pub fn prepare(&mut self) {
+        // Update mark_state
         if Self::HEADER_MARK_BITS {
             self.mark_state.store(
                 Self::delta_mark_state(self.mark_state.load(Ordering::Acquire)),
                 Ordering::Release,
             );
         }
+        // Prepare defrag info
         if !super::BLOCK_ONLY {
             self.defrag.prepare(self);
         }
-
+        // Prepare each block for GC
         let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
         let space = unsafe { &*(self as *const Self) };
         let work_packets =
@@ -237,7 +246,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     }
                 });
         self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
-
+        // Update line mark state
         if !super::BLOCK_ONLY {
             self.line_mark_state.fetch_add(1, Ordering::AcqRel);
             if self.line_mark_state.load(Ordering::Acquire) > Line::MAX_MARK_STATE {
@@ -249,34 +258,37 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn release(&mut self) {
+        // Update line_unavail_state for hole searching afte this GC.
         if !super::BLOCK_ONLY {
             self.line_unavail_state.store(
                 self.line_mark_state.load(Ordering::Acquire),
                 Ordering::Release,
             );
         }
-
+        // Clear reusable blocks list
         if !super::BLOCK_ONLY {
             self.reusable_blocks.reset();
         }
-
+        // Sweep chunks and blocks
         let space = unsafe { &*(self as *const Self) };
         let work_packets = self
             .chunk_map
             .generate_sweep_tasks(space, &self.scheduler());
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
-
+        // Update states
         self.in_collection.store(false, Ordering::Release);
         if !super::BLOCK_ONLY {
             self.defrag.release(self)
         }
     }
 
+    /// Release a block.
     pub fn release_block(&self, block: Block) {
         block.deinit();
         self.pr.release_pages(block.start());
     }
 
+    /// Allocate a clean block.
     pub fn get_clean_block(&self, tls: VMThread, copy: bool) -> Option<Block> {
         let block_address = self.acquire(tls, Block::PAGES);
         if block_address.is_zero() {
@@ -289,6 +301,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         Some(block)
     }
 
+    /// Pop a reusable block from the reusable block list.
     pub fn get_reusable_block(&self, copy: bool) -> Option<Block> {
         if super::BLOCK_ONLY {
             return None;
@@ -301,6 +314,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         result
     }
 
+    /// Trace and mark objects without evacuation.
     #[inline(always)]
     pub fn fast_trace_object(
         &self,
@@ -310,6 +324,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.trace_object_without_moving(trace, object)
     }
 
+    /// Trace and mark objects. If the current object is in defrag block, then do evacuation as well.
     #[inline(always)]
     pub fn trace_object(
         &self,
@@ -325,6 +340,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
+    /// Trace and mark objects without evacuation.
     #[inline(always)]
     pub fn trace_object_without_moving(
         &self,
@@ -346,6 +362,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object
     }
 
+    /// Trace object and do evacuation if required.
     #[allow(clippy::assertions_on_constants)]
     #[inline(always)]
     pub fn trace_object_with_opportunistic_copy(
@@ -383,8 +400,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
-    /* Line marking */
-
+    /// Mark all the lines that the given object spans.
     #[allow(clippy::assertions_on_constants)]
     #[inline]
     pub fn mark_lines(&self, object: ObjectReference) {
@@ -392,10 +408,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::Acquire));
     }
 
-    /* Object Marking */
-
+    /// A flag to enable in-header mark bits.
     const HEADER_MARK_BITS: bool = cfg!(feature = "immix_header_mark_bits");
 
+    /// Side per-object mark table.
     const OBJECT_MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
         offset: Block::MARK_TABLE.accumulated_size(),
@@ -403,6 +419,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         log_min_obj_size: LOG_BYTES_IN_WORD as usize,
     };
 
+    /// Atomically mark an object.
     #[inline(always)]
     fn attempt_mark(&self, object: ObjectReference) -> bool {
         if Self::HEADER_MARK_BITS {
@@ -425,6 +442,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
+    /// Check if an object is marked.
     #[inline(always)]
     fn is_marked(&self, object: ObjectReference) -> bool {
         if Self::HEADER_MARK_BITS {
@@ -440,14 +458,19 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
+    /// Check if an object is pinned.
     #[inline(always)]
     fn is_pinned(_object: ObjectReference) -> bool {
         // TODO(wenyuzhao): Object pinning not supported yet.
         false
     }
 
-    /* Line searching */
-
+    /// Hole searching.
+    ///
+    /// Linearly scan lines in a block to search for the next
+    /// hole, starting from the given line.
+    ///
+    /// Returns None if the search could not find any more holes.
     #[allow(clippy::assertions_on_constants)]
     pub fn get_next_available_lines(&self, search_start: Line) -> Option<Range<Line>> {
         debug_assert!(!super::BLOCK_ONLY);
@@ -484,6 +507,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 }
 
+/// A work packet to prepare each block for GC.
+/// Performs the action on a range of chunks.
 pub struct PrepareBlockState<VM: VMBinding> {
     pub space: &'static ImmixSpace<VM>,
     pub chunks: Range<Chunk>,
@@ -491,6 +516,7 @@ pub struct PrepareBlockState<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> PrepareBlockState<VM> {
+    /// Clear object mark table
     #[inline(always)]
     fn reset_object_mark(chunk: Chunk) {
         if !ImmixSpace::<VM>::HEADER_MARK_BITS {
@@ -512,12 +538,16 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             .clone()
             .filter(|c| self.space.chunk_map.get(*c) == ChunkState::Allocated)
         {
+            // Clear object mark table for this chunk
             Self::reset_object_mark(chunk);
+            // Iterate over all blocks in this chunk
             for block in chunk.blocks() {
                 let state = block.get_state();
+                // Skip unallocated blocks.
                 if state == BlockState::Unallocated {
                     continue;
                 }
+                // Check if this block needs to be defragmented.
                 if super::DEFRAG
                     && defrag_threshold != 0
                     && !state.is_reusable()
@@ -527,6 +557,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 } else {
                     block.set_as_defrag_source(false);
                 }
+                // Clear block mark data.
                 block.set_state(BlockState::Unmarked);
                 debug_assert!(!block.get_state().is_reusable());
                 debug_assert_ne!(block.get_state(), BlockState::Marked);
@@ -535,6 +566,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     }
 }
 
+/// A transitive closure visitor to collect all the edges of an object.
 pub struct ObjectsClosure<'a, E: ProcessEdgesWork>(
     &'static MMTK<E::VM>,
     Vec<Address>,
@@ -570,6 +602,7 @@ impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
     }
 }
 
+/// A work packet to scan the fields of each objects and mark lines.
 pub struct ScanObjectsAndMarkLines<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
     #[allow(unused)]

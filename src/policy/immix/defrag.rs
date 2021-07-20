@@ -12,11 +12,15 @@ use std::{
 
 #[derive(Debug, Default)]
 pub struct Defrag {
+    /// Is current GC a defrag GC?
     in_defrag_collection: AtomicBool,
+    /// Is defrag space exhausted?
     defrag_space_exhausted: AtomicBool,
+    /// per-worker mark histograms
     spill_mark_histograms: UnsafeCell<Vec<Vec<AtomicUsize>>>,
     spill_avail_histograms: Vec<AtomicUsize>,
     pub defrag_spill_threshold: AtomicUsize,
+    /// The number of remaining clean pages in defrag space.
     available_clean_pages_for_defrag: AtomicUsize,
 }
 
@@ -34,10 +38,12 @@ impl Defrag {
         }
     }
 
+    /// Get spill mark histograms
     pub fn spill_mark_histograms(&self) -> &Vec<Vec<AtomicUsize>> {
         unsafe { &*self.spill_mark_histograms.get() }
     }
 
+    /// Prepare spill mark histograms
     pub fn prepare_histograms<VM: VMBinding>(&self, mmtk: &MMTK<VM>) {
         let spill_mark_histograms = unsafe { &mut *self.spill_mark_histograms.get() };
         spill_mark_histograms.resize_with(mmtk.options.threads, || {
@@ -45,11 +51,13 @@ impl Defrag {
         });
     }
 
+    /// Check if the current GC is a defrag GC.
     #[inline(always)]
     pub fn in_defrag(&self) -> bool {
         self.in_defrag_collection.load(Ordering::Acquire)
     }
 
+    /// Determine whether the current GC should do defragmentation.
     pub fn decide_whether_to_defrag(
         &self,
         emergency_collection: bool,
@@ -66,15 +74,18 @@ impl Defrag {
             .store(in_defrag, Ordering::Release)
     }
 
+    /// Get the number of defrag headroom pages.
     pub fn defrag_headroom_pages<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> usize {
         space.get_page_resource().reserved_pages() * 2 / 100
     }
 
+    /// Check if the defrag space is exhausted.
     #[inline(always)]
     pub fn space_exhausted(&self) -> bool {
         self.defrag_space_exhausted.load(Ordering::Acquire)
     }
 
+    /// Update available_clean_pages_for_defrag counter when a clean block is allocated.
     pub fn notify_new_clean_block(&self, copy: bool) {
         if copy {
             let available_clean_pages_for_defrag = self
@@ -93,10 +104,13 @@ impl Defrag {
         }
     }
 
+    /// Release work. Should be called in ImmixSpace::prepare.
     #[allow(clippy::assertions_on_constants)]
     pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
         debug_assert!(!super::BLOCK_ONLY);
         self.defrag_space_exhausted.store(false, Ordering::Release);
+
+        // Calculate available free space for defragmentation.
 
         let mut available_clean_pages_for_defrag = VM::VMActivePlan::global().get_total_pages()
             as isize
@@ -120,6 +134,7 @@ impl Defrag {
         );
     }
 
+    /// Get the numebr of all the recyclable lines in all the reusable blocks.
     fn get_available_lines<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> usize {
         for entry in &self.spill_avail_histograms {
             entry.store(0, Ordering::Relaxed);
@@ -139,6 +154,7 @@ impl Defrag {
         total_available_lines
     }
 
+    /// Calculate the defrag threshold.
     fn establish_defrag_spill_threshold<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
         let clean_lines = self.get_available_lines(space);
         let available_lines = clean_lines
@@ -171,6 +187,7 @@ impl Defrag {
             .store(threshold, Ordering::Release);
     }
 
+    /// Release work. Should be called in ImmixSpace::release.
     #[allow(clippy::assertions_on_constants)]
     pub fn release<VM: VMBinding>(&self, _space: &ImmixSpace<VM>) {
         debug_assert!(!super::BLOCK_ONLY);
