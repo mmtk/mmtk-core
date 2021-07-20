@@ -29,6 +29,23 @@ pub struct MutatorConfig<VM: VMBinding> {
     pub release_func: &'static (dyn Fn(&mut Mutator<VM>, VMWorkerThread) + Send + Sync),
 }
 
+impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("MutatorConfig: ").unwrap();
+        f.write_str("allocator_mapping = ").unwrap();
+        f.debug_set()
+            .entries(self.allocator_mapping.iter())
+            .finish()
+            .unwrap();
+        f.write_str(", space_mapping = ").unwrap();
+        f.debug_set()
+            .entries(self.space_mapping.iter().map(|e| (e.0, e.1.name())))
+            .finish()
+            .unwrap();
+        Ok(())
+    }
+}
+
 /// A mutator is a per-thread data structure that manages allocations and barriers. It is usually highly coupled with the language VM.
 /// It is recommended for MMTk users 1) to have a mutator struct of the same layout in the thread local storage that can be accessed efficiently,
 /// and 2) to implement fastpath allocation and barriers for the mutator in the VM side.
