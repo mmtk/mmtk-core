@@ -4,12 +4,12 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::{ReservedAllocators, common_allocator_mapping};
 use crate::vm::VMBinding;
 use crate::{
     plan::barriers::NoBarrier,
     util::opaque_pointer::{VMMutatorThread, VMWorkerThread},
 };
-use enum_map::enum_map;
 use enum_map::EnumMap;
 
 /// Prepare mutator. Do nothing.
@@ -19,13 +19,10 @@ fn pp_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerT
 fn pp_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
 lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default => AllocatorSelector::LargeObject(0),
-        AllocationType::Immortal => AllocatorSelector::BumpPointer(0),
-        AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
-        AllocationType::Code => AllocatorSelector::BumpPointer(2),
-        AllocationType::LargeCode => AllocatorSelector::BumpPointer(3),
-        AllocationType::Los => AllocatorSelector::LargeObject(1),
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
+        let mut map = common_allocator_mapping(ReservedAllocators { n_large_object: 1, ..ReservedAllocators::default() });
+        map[AllocationType::Default] = AllocatorSelector::LargeObject(0);
+        map
     };
 }
 

@@ -5,30 +5,21 @@ use crate::plan::nogc::NoGC;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::{ReservedAllocators, base_allocator_mapping, common_allocator_mapping};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
-use enum_map::enum_map;
 use enum_map::EnumMap;
 
-#[cfg(feature = "nogc_common_plan")]
 lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default => AllocatorSelector::BumpPointer(0),
-        AllocationType::Immortal => AllocatorSelector::BumpPointer(1),
-        AllocationType::ReadOnly => AllocatorSelector::BumpPointer(2),
-        AllocationType::Code => AllocatorSelector::BumpPointer(3),
-        AllocationType::LargeCode => AllocatorSelector::BumpPointer(4),
-        AllocationType::Los => AllocatorSelector::LargeObject(0),
-    };
-}
-
-#[cfg(not(feature = "nogc_common_plan"))]
-lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default | AllocationType::Immortal | AllocationType::Los => AllocatorSelector::BumpPointer(0),
-        AllocationType::ReadOnly => AllocatorSelector::BumpPointer(2),
-        AllocationType::Code => AllocatorSelector::BumpPointer(3),
-        AllocationType::LargeCode => AllocatorSelector::BumpPointer(4),
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
+        let reserved = ReservedAllocators { n_bump_pointer: 1, ..ReservedAllocators::default() };
+        let mut map = if cfg!(feature = "nogc_common_plan") {
+            common_allocator_mapping(reserved)
+        } else {
+            base_allocator_mapping(reserved)
+        };
+        map[AllocationType::Default] = AllocatorSelector::BumpPointer(0);
+        map
     };
 }
 

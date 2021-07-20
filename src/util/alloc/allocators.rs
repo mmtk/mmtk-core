@@ -1,6 +1,7 @@
 use std::mem::MaybeUninit;
 
 use crate::plan::Plan;
+use crate::plan::AllocationSemantics;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
@@ -9,6 +10,8 @@ use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
+
+use enum_map::EnumMap;
 
 const MAX_BUMP_ALLOCATORS: usize = 5;
 const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;
@@ -37,6 +40,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_ref()
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_ref(),
+            AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
 
@@ -54,6 +58,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_mut()
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
+            AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
 
@@ -91,6 +96,7 @@ impl<VM: VMBinding> Allocators<VM> {
                         plan,
                     ));
                 }
+                AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
             }
         }
 
@@ -111,9 +117,65 @@ impl<VM: VMBinding> Allocators<VM> {
 //   LargeObject,
 // }
 #[repr(C, u8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum AllocatorSelector {
     BumpPointer(u8),
     LargeObject(u8),
     Malloc(u8),
+    None,
+}
+
+impl Default for AllocatorSelector {
+    fn default() -> Self {
+        AllocatorSelector::None
+    }
+}
+
+/// This is used for plans to indicate the number of allocators reserved for the plan.
+/// This is used as a parameter to base_allocator_mapping() or common_allocator_mapping().
+#[derive(Default)]
+pub(crate) struct ReservedAllocators {
+    pub n_bump_pointer: u8,
+    pub n_large_object: u8,
+    pub n_malloc: u8,
+}
+
+impl ReservedAllocators {
+    /// check if the number of each allocators is okay. Panics if any allocator exceeds the max number.
+    fn validate(&self) {
+        assert!(self.n_bump_pointer as usize <= MAX_BUMP_ALLOCATORS, "Allocator mapping declared more bump pointer allocators than the max allowed.");
+        assert!(self.n_large_object as usize<= MAX_LARGE_OBJECT_ALLOCATORS, "Allocator mapping declared more large object allocators than the max allowed.");
+        assert!(self.n_malloc as usize <= MAX_MALLOC_ALLOCATORS, "Allocator mapping declared more malloc allocators than the max allowed.");
+    }
+}
+
+/// Create a default allocator mapping for BasePlan spaces. Only plans that use BasePlan instead of CommonPlan should use this (e.g. NoGC).
+/// Other plans should use common_allocator_mapping().
+///
+/// # Arguments
+/// * `reserved`: the number of reserved allocators for the plan specific policies.
+#[allow(unused_mut)] // allow unused mut as some spaces are conditionally compiled
+pub(crate) fn base_allocator_mapping(mut reserved: ReservedAllocators) -> EnumMap<AllocationSemantics, AllocatorSelector> {
+    let mut base = EnumMap::<AllocationSemantics, AllocatorSelector>::default();
+
+    #[cfg(feature = "code_space")]
+    {
+        assert_eq!(base[AllocationSemantics::Code], AllocatorSelector::None);
+        base[AllocationSemantics::Code] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+        reserved.n_bump_pointer += 1;
+
+        assert_eq!(base[AllocationSemantics::LargeCode], AllocatorSelector::None);
+        base[AllocationSemantics::LargeCode] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+        reserved.n_bump_pointer += 1;
+    }
+
+    #[cfg(feature = "ro_space")]
+    {
+        assert_eq!(base[AllocationSemantics::ReadOnly], AllocatorSelector::None);
+        base[AllocationSemantics::ReadOnly] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+        reserved.n_bump_pointer += 1;
+    }
+
+    reserved.validate();
+    base
 }
