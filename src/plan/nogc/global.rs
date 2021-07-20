@@ -79,7 +79,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        self.ms_space.sweep(tls);
+        self.ms_space.eager_sweep(tls);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
