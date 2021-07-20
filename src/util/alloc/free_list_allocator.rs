@@ -361,18 +361,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             Ordering::SeqCst,
         )
     }
-    
-    #[inline]
-    pub fn get_block_tls(block: Address) -> VMThread {
-        unsafe {
-            block.load()
-        }
-    }
-
-    #[inline]
-    pub fn set_block_tls(&self, block: Address) {
-        unsafe { block.store(self.tls) }
-    }
 
     #[inline]
     pub fn store_thread_free_list(block: Address, thread_free: Address) {
