@@ -398,18 +398,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             Ordering::SeqCst,
         )
     }
-    
-    #[inline]
-    pub fn get_block_tls(block: Address) -> VMThread {
-        unsafe {
-            block.load()
-        }
-    }
-
-    #[inline]
-    pub fn set_block_tls(&self, block: Address) {
-        unsafe { block.store(self.tls) }
-    }
 
     fn pop_from_block_list(block_list: &mut BlockList) -> Address {
         let rtn = block_list.first;
