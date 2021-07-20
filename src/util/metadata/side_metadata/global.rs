@@ -26,18 +26,18 @@ pub struct SideMetadataSpec {
 impl SideMetadataSpec {
     /// Is offset for this spec Address? (contiguous side metadata for 64 bits, and global specs in 32 bits)
     #[inline(always)]
-    pub const fn is_addr_offset(&self) -> bool {
+    pub const fn is_absolute_offset(&self) -> bool {
         self.is_global || cfg!(target_pointer_width = "64")
     }
     /// If offset for this spec relative? (chunked side metadata for local specs in 32 bits)
     #[inline(always)]
     pub const fn is_rel_offset(&self) -> bool {
-        !self.is_addr_offset()
+        !self.is_absolute_offset()
     }
 
     #[inline(always)]
-    pub const fn get_addr_offset(&self) -> Address {
-        debug_assert!(self.is_addr_offset());
+    pub const fn get_absolute_offset(&self) -> Address {
+        debug_assert!(self.is_absolute_offset());
         unsafe { self.offset.addr }
     }
 
@@ -59,7 +59,7 @@ impl fmt::Debug for SideMetadataSpec {
             }}",
             self.is_global,
             unsafe {
-                if self.is_addr_offset() {
+                if self.is_absolute_offset() {
                     format!("0x{:x}", self.offset.addr)
                 } else {
                     format!("0x{:x}", self.offset.rel_offset)
@@ -94,7 +94,7 @@ impl SideMetadataOffset {
     /// Get an offset after a spec. This is used to layout another spec immediately after this one.
     #[cfg(target_pointer_width = "64")]
     pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
-        debug_assert!(spec.is_addr_offset());
+        debug_assert!(spec.is_absolute_offset());
         SideMetadataOffset {
             addr: unsafe { spec.offset.addr }
                 .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),
@@ -103,7 +103,7 @@ impl SideMetadataOffset {
     /// Get an offset after a spec. This is used to layout another spec immediately after this one.
     #[cfg(target_pointer_width = "32")]
     pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
-        if spec.is_addr_offset() {
+        if spec.is_absolute_offset() {
             SideMetadataOffset {
                 addr: unsafe { spec.offset.addr }
                     .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),

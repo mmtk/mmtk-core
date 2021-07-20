@@ -24,6 +24,7 @@ impl MetadataSpec {
         matches!(self, &MetadataSpec::OnSide(_))
     }
 
+    /// Extract SideMetadataSpec from a MetadataSpec. Panics if this is not side metadata.
     pub const fn extract_side_spec(&self) -> &SideMetadataSpec {
         match self {
             MetadataSpec::OnSide(spec) => spec,

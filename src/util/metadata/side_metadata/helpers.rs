@@ -23,9 +23,9 @@ pub(crate) fn address_to_contiguous_meta_address(
     let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
     if rshift >= 0 {
-        metadata_spec.get_addr_offset() + ((data_addr >> log_min_obj_size) >> rshift)
+        metadata_spec.get_absolute_offset() + ((data_addr >> log_min_obj_size) >> rshift)
     } else {
-        metadata_spec.get_addr_offset() + ((data_addr >> log_min_obj_size) << (-rshift))
+        metadata_spec.get_absolute_offset() + ((data_addr >> log_min_obj_size) << (-rshift))
     }
 }
 

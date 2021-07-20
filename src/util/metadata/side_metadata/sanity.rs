@@ -134,10 +134,10 @@ fn verify_no_overlap_contiguous(
     spec_1: &SideMetadataSpec,
     spec_2: &SideMetadataSpec,
 ) -> Result<()> {
-    let end_1 = spec_1.get_addr_offset() + super::metadata_address_range_size(spec_1);
-    let end_2 = spec_2.get_addr_offset() + super::metadata_address_range_size(spec_2);
+    let end_1 = spec_1.get_absolute_offset() + super::metadata_address_range_size(spec_1);
+    let end_2 = spec_2.get_absolute_offset() + super::metadata_address_range_size(spec_2);
 
-    if !(spec_1.get_addr_offset() >= end_2 || spec_2.get_addr_offset() >= end_1) {
+    if !(spec_1.get_absolute_offset() >= end_2 || spec_2.get_absolute_offset() >= end_1) {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             format!(
@@ -642,7 +642,7 @@ mod tests {
             is_global: true,
             // We specifically make up an invalid offset
             offset: SideMetadataOffset::addr(
-                spec_1.get_addr_offset() + metadata_address_range_size(&spec_1) - 1,
+                spec_1.get_absolute_offset() + metadata_address_range_size(&spec_1) - 1,
             ),
             log_num_of_bits: 0,
             log_min_obj_size: 0,
