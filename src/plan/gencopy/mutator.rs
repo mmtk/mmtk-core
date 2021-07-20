@@ -3,10 +3,10 @@ use super::GenCopy;
 use crate::plan::barriers::*;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
-use crate::plan::AllocationSemantics as AllocationType;
-use crate::util::alloc::allocators::{
-    common_allocator_mapping, common_space_mapping, ReservedAllocators,
+use crate::plan::mutator_context::{
+    create_allocator_mapping, create_space_mapping, ReservedAllocators,
 };
+use crate::plan::AllocationSemantics as AllocationType;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
@@ -38,7 +38,7 @@ const GENCOPY_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
-        let mut map = common_allocator_mapping(GENCOPY_RESERVED_ALLOCATOR);
+        let mut map = create_allocator_mapping(GENCOPY_RESERVED_ALLOCATOR, true);
         map[AllocationType::Default] = AllocatorSelector::BumpPointer(0);
         map
     };
@@ -52,7 +52,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box {
-            let mut vec = common_space_mapping(GENCOPY_RESERVED_ALLOCATOR, &*mmtk.plan);
+            let mut vec = create_space_mapping(GENCOPY_RESERVED_ALLOCATOR, true, &*mmtk.plan);
             vec.push((AllocatorSelector::BumpPointer(0), &gencopy.nursery));
             vec
         },

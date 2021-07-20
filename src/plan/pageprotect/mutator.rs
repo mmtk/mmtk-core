@@ -1,11 +1,11 @@
 use super::PageProtect;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
+use crate::plan::mutator_context::{
+    create_allocator_mapping, create_space_mapping, ReservedAllocators,
+};
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
-use crate::util::alloc::allocators::{
-    common_allocator_mapping, common_space_mapping, ReservedAllocators,
-};
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::vm::VMBinding;
 use crate::{
@@ -28,7 +28,7 @@ const PP_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
-        let mut map = common_allocator_mapping(PP_RESERVED_ALLOCATOR);
+        let mut map = create_allocator_mapping(PP_RESERVED_ALLOCATOR, true);
         map[AllocationType::Default] = AllocatorSelector::LargeObject(0);
         map
     };
@@ -44,7 +44,7 @@ pub fn create_pp_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box {
-            let mut vec = common_space_mapping(PP_RESERVED_ALLOCATOR, plan);
+            let mut vec = create_space_mapping(PP_RESERVED_ALLOCATOR, true, plan);
             vec.push((AllocatorSelector::LargeObject(0), &page.space));
             vec
         },

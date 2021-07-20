@@ -1,13 +1,12 @@
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
+use crate::plan::mutator_context::{
+    create_allocator_mapping, create_space_mapping, ReservedAllocators,
+};
 use crate::plan::nogc::NoGC;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
-use crate::util::alloc::allocators::{
-    base_allocator_mapping, base_space_mapping, common_allocator_mapping, common_space_mapping,
-    ReservedAllocators,
-};
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
@@ -21,11 +20,8 @@ const NOGC_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
-        let mut map = if cfg!(feature = "nogc_common_plan") {
-            common_allocator_mapping(NOGC_RESERVED_ALLOCATOR)
-        } else {
-            base_allocator_mapping(NOGC_RESERVED_ALLOCATOR)
-        };
+        let mut map =
+            create_allocator_mapping(NOGC_RESERVED_ALLOCATOR, cfg!(feature = "nogc_common_plan"));
         map[AllocationType::Default] = AllocatorSelector::BumpPointer(0);
         map
     };
@@ -42,11 +38,11 @@ pub fn create_nogc_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box {
-            let mut vec = if cfg!(feature = "nogc_common_plan") {
-                common_space_mapping(NOGC_RESERVED_ALLOCATOR, plan)
-            } else {
-                base_space_mapping(NOGC_RESERVED_ALLOCATOR, plan)
-            };
+            let mut vec = create_space_mapping(
+                NOGC_RESERVED_ALLOCATOR,
+                cfg!(feature = "nogc_common_plan"),
+                plan,
+            );
             vec.push((
                 AllocatorSelector::BumpPointer(0),
                 &plan.downcast_ref::<NoGC<VM>>().unwrap().nogc_space,
