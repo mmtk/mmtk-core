@@ -5,7 +5,7 @@ use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::allocators::{ReservedAllocators, common_allocator_mapping};
+use crate::util::alloc::allocators::{ReservedAllocators, common_allocator_mapping, common_space_mapping};
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::{ObjectModel, VMBinding};
@@ -28,9 +28,15 @@ pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: V
     bump_allocator.reset();
 }
 
+const GENCOPY_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
+    n_bump_pointer: 1,
+    n_large_object: 0,
+    n_malloc: 0
+};
+
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
-        let mut map = common_allocator_mapping(ReservedAllocators { n_bump_pointer: 1, ..ReservedAllocators::default() });
+        let mut map = common_allocator_mapping(GENCOPY_RESERVED_ALLOCATOR);
         map[AllocationType::Default] = AllocatorSelector::BumpPointer(0);
         map
     };
@@ -43,29 +49,11 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
     let gencopy = mmtk.plan.downcast_ref::<GenCopy<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), &gencopy.nursery),
-            (
-                AllocatorSelector::BumpPointer(1),
-                gencopy.common.get_immortal(),
-            ),
-            (AllocatorSelector::LargeObject(0), gencopy.common.get_los()),
-            #[cfg(feature = "ro_space")]
-            (
-                AllocatorSelector::BumpPointer(2),
-                &gencopy.common.base.ro_space,
-            ),
-            #[cfg(feature = "code_space")]
-            (
-                AllocatorSelector::BumpPointer(3),
-                &gencopy.common.base.code_space,
-            ),
-            #[cfg(feature = "code_space")]
-            (
-                AllocatorSelector::BumpPointer(4),
-                &gencopy.common.base.code_lo_space,
-            ),
-        ],
+        space_mapping: box {
+            let mut vec = common_space_mapping(GENCOPY_RESERVED_ALLOCATOR, &*mmtk.plan);
+            vec.push((AllocatorSelector::BumpPointer(0), &gencopy.nursery));
+            vec
+        },
         prepare_func: &gencopy_mutator_prepare,
         release_func: &gencopy_mutator_release,
     };

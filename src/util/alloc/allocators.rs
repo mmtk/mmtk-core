@@ -179,3 +179,59 @@ pub(crate) fn base_allocator_mapping(mut reserved: ReservedAllocators) -> EnumMa
     reserved.validate();
     base
 }
+
+/// Create a default allocator mapping for CommonPlan spaces. Most plans that use CommonPlan should use this to create allocator mapping.
+///
+/// # Arguments
+/// * `reserved`: the number of reserved allocators for the plan specific policies.
+pub(crate) fn common_allocator_mapping(reserved: ReservedAllocators) -> EnumMap<AllocationSemantics, AllocatorSelector> {
+    let mut common = base_allocator_mapping(ReservedAllocators {
+        n_bump_pointer: reserved.n_bump_pointer + 1,
+        n_large_object: reserved.n_large_object + 1,
+        n_malloc: reserved.n_malloc
+    });
+
+    assert_eq!(common[AllocationSemantics::Immortal], AllocatorSelector::None);
+    common[AllocationSemantics::Immortal] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+
+    assert_eq!(common[AllocationSemantics::Los], AllocatorSelector::None);
+    common[AllocationSemantics::Los] = AllocatorSelector::LargeObject(reserved.n_large_object);
+
+    common
+}
+
+#[allow(unused_mut)] // allow unused mut as some spaces are conditionally compiled
+#[allow(unused_variables)]
+pub(crate) fn base_space_mapping<VM: VMBinding>(mut reserved: ReservedAllocators, plan: &'static dyn Plan<VM=VM>) -> Vec<(AllocatorSelector, &'static dyn Space<VM>)> {
+    let mut base = vec![];
+
+    #[cfg(feature = "code_space")]
+    {
+        base.push((AllocatorSelector::BumpPointer(reserved.n_bump_pointer), plan.base().code_space));
+        reserved.n_bump_pointer += 1;
+        base.push((AllocatorSelector::BumpPointer(reserved.n_bump_pointer), plan.base().code_lo_space));
+        reserved.n_bump_pointer += 1;
+    }
+
+    #[cfg(feature = "ro_space")]
+    {
+        base.push((AllocatorSelector::BumpPointer(reserved.n_bump_pointer), plan.base().ro_space));
+        reserved.n_bump_pointer += 1;
+    }
+
+    reserved.validate();
+    base
+}
+
+pub(crate) fn common_space_mapping<VM: VMBinding>(reserved: ReservedAllocators, plan: &'static dyn Plan<VM=VM>) -> Vec<(AllocatorSelector, &'static dyn Space<VM>)> {
+    let mut common = base_space_mapping(ReservedAllocators {
+        n_bump_pointer: reserved.n_bump_pointer + 1,
+        n_large_object: reserved.n_large_object + 1,
+        n_malloc: reserved.n_malloc
+    }, plan);
+
+    common.push((AllocatorSelector::BumpPointer(reserved.n_bump_pointer), plan.common().get_immortal()));
+    common.push((AllocatorSelector::LargeObject(reserved.n_large_object), plan.common().get_los()));
+
+    common
+}

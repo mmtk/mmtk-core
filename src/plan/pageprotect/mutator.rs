@@ -4,7 +4,7 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::allocators::{ReservedAllocators, common_allocator_mapping};
+use crate::util::alloc::allocators::{ReservedAllocators, common_allocator_mapping, common_space_mapping};
 use crate::vm::VMBinding;
 use crate::{
     plan::barriers::NoBarrier,
@@ -18,9 +18,15 @@ fn pp_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerT
 /// Release mutator. Do nothing.
 fn pp_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
+const PP_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
+    n_bump_pointer: 0,
+    n_large_object: 1,
+    n_malloc: 0
+};
+
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
-        let mut map = common_allocator_mapping(ReservedAllocators { n_large_object: 1, ..ReservedAllocators::default() });
+        let mut map = common_allocator_mapping(PP_RESERVED_ALLOCATOR);
         map[AllocationType::Default] = AllocatorSelector::LargeObject(0);
         map
     };
@@ -35,23 +41,11 @@ pub fn create_pp_mutator<VM: VMBinding>(
     let page = plan.downcast_ref::<PageProtect<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box vec![
-            (AllocatorSelector::LargeObject(0), &page.space),
-            (
-                AllocatorSelector::BumpPointer(0),
-                plan.common().get_immortal(),
-            ),
-            #[cfg(feature = "ro_space")]
-            (AllocatorSelector::BumpPointer(1), &plan.base().ro_space),
-            #[cfg(feature = "code_space")]
-            (AllocatorSelector::BumpPointer(2), &plan.base().code_space),
-            #[cfg(feature = "code_space")]
-            (
-                AllocatorSelector::BumpPointer(3),
-                &plan.base().code_lo_space,
-            ),
-            (AllocatorSelector::LargeObject(1), plan.common().get_los()),
-        ],
+        space_mapping: box {
+            let mut vec = common_space_mapping(PP_RESERVED_ALLOCATOR, plan);
+            vec.push((AllocatorSelector::LargeObject(0), &page.space));
+            vec
+        },
         prepare_func: &pp_mutator_prepare,
         release_func: &pp_mutator_release,
     };
