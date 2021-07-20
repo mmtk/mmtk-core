@@ -300,6 +300,51 @@
 <span id="297">297</span>
 <span id="298">298</span>
 <span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
@@ -363,17 +408,39 @@
     <span class="comment">// Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their</span>
     <span class="comment">// side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.</span>
 
+    <span class="comment">// --------------------------------------------------</span>
+    <span class="comment">//</span>
+    <span class="comment">// Global Metadata</span>
+    <span class="comment">//</span>
+    <span class="comment">// MMTk reserved Global side metadata offsets:</span>
+    <span class="comment">//</span>
+    <span class="comment">//  1 - MarkSweep Active Chunk byte:</span>
+    <span class="comment">//      - Offset `GLOBAL_SIDE_METADATA_BASE_ADDRESS`</span>
+    <span class="comment">//</span>
+    <span class="comment">// --------------------------------------------------</span>
+
     <span class="doccomment">/// The metadata specification of the global log bit. 1 bit.</span>
     <span class="kw">const</span> <span class="ident">GLOBAL_LOG_BIT_SPEC</span>: <span class="ident">VMGlobalLogBitSpec</span>;
+
+    <span class="comment">// --------------------------------------------------</span>
+    <span class="comment">// PolicySpecific Metadata</span>
+    <span class="comment">//</span>
+    <span class="comment">// MMTk reserved PolicySpecific side metadata offsets:</span>
+    <span class="comment">//</span>
+    <span class="comment">//  1 - MarkSweep Alloc bit:</span>
+    <span class="comment">//      - Offset `0x0` on 32-bits</span>
+    <span class="comment">//      - Offset `LOCAL_SIDE_METADATA_BASE_ADDRESS` on 64-bits</span>
+    <span class="comment">//  2 - MarkSweep Active Page byte:</span>
+    <span class="comment">//      - Offset `Alloc bit`.offset + `Alloc bit`.metadata_address_range_size()</span>
+    <span class="comment">//</span>
+    <span class="comment">// --------------------------------------------------</span>
 
     <span class="doccomment">/// The metadata specification for the forwarding pointer, used by copying plans. Word size.</span>
     <span class="kw">const</span> <span class="ident">LOCAL_FORWARDING_POINTER_SPEC</span>: <span class="ident">VMLocalForwardingPointerSpec</span>;
     <span class="doccomment">/// The metadata specification for the forwarding status bits, used by copying plans. 2 bits.</span>
     <span class="kw">const</span> <span class="ident">LOCAL_FORWARDING_BITS_SPEC</span>: <span class="ident">VMLocalForwardingBitsSpec</span>;
-
     <span class="doccomment">/// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit.</span>
     <span class="kw">const</span> <span class="ident">LOCAL_MARK_BIT_SPEC</span>: <span class="ident">VMLocalMarkBitSpec</span>;
-
     <span class="doccomment">/// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.</span>
     <span class="kw">const</span> <span class="ident">LOCAL_LOS_MARK_NURSERY_SPEC</span>: <span class="ident">VMLocalLOSMarkNurserySpec</span>;
 
@@ -547,6 +614,10 @@
     <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants::LOG_BITS_IN_WORD</span>;
     <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants::LOG_BYTES_IN_PAGE</span>;
     <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::constants::LOG_MIN_OBJECT_SIZE</span>;
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata::metadata_address_range_size</span>;
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata::metadata_bytes_per_chunk</span>;
     <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata</span>::{
         <span class="ident">header_metadata::HeaderMetadataSpec</span>, <span class="ident">side_metadata::SideMetadataSpec</span>, <span class="ident">MetadataSpec</span>,
     };
@@ -573,6 +644,25 @@
                 }
                 <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">num_bits</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
                     <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_bits</span>
+                }
+                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">offset</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+                    <span class="kw">match</span> <span class="self">self</span>.<span class="number">0</span> {
+                        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">s</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">s</span>.<span class="ident">bit_offset</span> <span class="kw">as</span> <span class="ident">usize</span>,
+                        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">s</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+                            {
+                                <span class="ident">s</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="ident">metadata_address_range_size</span>(<span class="kw-2">&amp;</span><span class="ident">s</span>)
+                            }
+                            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+                            {
+                                <span class="ident">s</span>.<span class="ident">offset</span>
+                                    <span class="op">+</span> <span class="ident">metadata_bytes_per_chunk</span>(
+                                        <span class="ident">s</span>.<span class="ident">log_min_obj_size</span>,
+                                        <span class="ident">s</span>.<span class="ident">log_num_of_bits</span>,
+                                    )
+                            }
+                        }
+                    }
                 }
             }
             <span class="kw">impl</span> <span class="ident">std::ops::Deref</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">spec_name</span> {

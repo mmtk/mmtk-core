@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["MSProcessEdges",""]]});
+initSidebarItems({"struct":[["MSProcessEdges",""],["MSSweepChunk","Simple work packet that just sweeps a single chunk"],["MSSweepChunks","Work packet that generates sweep jobs for gc workers. Each chunk is given its own work packet"]]});

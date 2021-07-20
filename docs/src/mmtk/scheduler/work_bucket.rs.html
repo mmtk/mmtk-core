@@ -160,6 +160,7 @@
 <span id="157">157</span>
 <span id="158">158</span>
 <span id="159">159</span>
+<span id="160">160</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::work::Work</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -226,6 +227,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Context</span><span class="op">&gt;</span> <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT_PRIORITY</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1000</span>;
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">active</span>: <span class="ident">bool</span>, <span class="ident">monitor</span>: <span class="ident">Arc</span><span class="op">&lt;</span>(<span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">Condvar</span>)<span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">active</span>: <span class="ident">AtomicBool::new</span>(<span class="ident">active</span>),
@@ -273,7 +275,7 @@
     }
     <span class="doccomment">/// Add a work packet to this bucket, with a default priority (1000)</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">Work</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">work</span>: <span class="ident">W</span>) {
-        <span class="self">self</span>.<span class="ident">add_with_priority</span>(<span class="number">1000</span>, <span class="kw">box</span> <span class="ident">work</span>);
+        <span class="self">self</span>.<span class="ident">add_with_priority</span>(<span class="self">Self</span><span class="ident">::DEFAULT_PRIORITY</span>, <span class="kw">box</span> <span class="ident">work</span>);
     }
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bulk_add_with_priority</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">priority</span>: <span class="ident">usize</span>, <span class="ident">work_vec</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Work</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
         {
