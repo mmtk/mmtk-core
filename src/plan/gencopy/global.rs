@@ -49,14 +49,10 @@ pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_words: 0,
     num_specialized_scans: 1,
     barrier: super::ACTIVE_BARRIER,
-    // TODO: We should use MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN which will allocate
-    // large objects directly to LOS. However, there are bugs in gencopy that prevents us doing it.
-    // I will do a separate PR to fix it.
-    // max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(
-    //     crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
-    //     crate::util::options::NURSERY_SIZE,
-    // ),
-    max_non_los_default_alloc_bytes: crate::util::options::NURSERY_SIZE,
+    max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(
+        crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
+        crate::util::options::NURSERY_SIZE,
+    ),
     ..PlanConstraints::default()
 };
 
@@ -153,9 +149,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
-        self.common.prepare(tls, true);
+        let full_heap = !self.is_current_gc_nursery();
+        self.common.prepare(tls, full_heap);
         self.nursery.prepare(true);
-        if !self.is_current_gc_nursery() {
+        if full_heap {
             self.hi
                 .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
         }
@@ -165,9 +162,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        self.common.release(tls, true);
+        let full_heap = !self.is_current_gc_nursery();
+        self.common.release(tls, full_heap);
         self.nursery.release();
-        if !self.is_current_gc_nursery() {
+        if full_heap {
             self.fromspace().release();
         }
 
