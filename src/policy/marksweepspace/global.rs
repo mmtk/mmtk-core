@@ -1,6 +1,8 @@
-use crate::{TransitiveClosure, util::{ObjectReference, VMThread, VMWorkerThread, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::side_metadata::{SideMetadataContext, SideMetadataSpec}}, vm::VMBinding};
+use atomic::Ordering;
 
-use super::space::{CommonSpace, SFT, Space, SpaceOptions};
+use crate::{TransitiveClosure, policy::marksweepspace::metadata::{is_marked, set_mark_bit}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{MetadataSpec, load_metadata, side_metadata::{SideMetadataContext, SideMetadataSpec}}}, vm::VMBinding};
+
+use super::super::space::{CommonSpace, SFT, Space, SpaceOptions};
 
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub common: CommonSpace<VM>,
@@ -98,14 +100,20 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
-        todo!()
-    }
-
-    fn mark_object(
-        &self,
-        object: ObjectReference,
-    ) {
-        todo!()
+        if object.is_null() {
+            return object;
+        }
+        let address = object.to_address();
+        assert!(
+            self.in_space(object),
+            "Cannot mark an object {} that was not alloced by free list allocator.",
+            address,
+        );
+        if !is_marked::<VM>(object) {
+            set_mark_bit::<VM>(object);
+            trace.process_node(object);
+        }
+        object
     }
 
     #[inline]
@@ -133,7 +141,28 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         self.common.metadata.local[4]
     }
 
-    pub fn sweep(&self, tls: VMWorkerThread) {
-        unreachable!()
+    #[inline]
+    pub fn get_tls_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[5]
+    }
+
+    pub fn eager_sweep(&self, tls: VMWorkerThread) {
+        let mut block = self.common.start;
+        while block < self.common.start + self.common.extent {
+
+        }
+
+        unreachable!("start = {}, extent = {}", &self.common.start, &self.common.extent)
+    }
+    
+    pub fn load_block_tls(&self, block: Address) -> OpaquePointer {
+        let tls = load_metadata::<VM>(
+            MetadataSpec::OnSide(self.get_tls_metadata_spec()), 
+            unsafe {block.to_object_reference()},
+            None,
+            Some(Ordering::SeqCst));
+        unsafe {
+            std::mem::transmute::<usize, OpaquePointer>(tls)
+        }
     }
 }
