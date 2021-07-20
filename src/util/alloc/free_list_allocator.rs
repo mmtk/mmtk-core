@@ -1,8 +1,9 @@
 use std::{mem::size_of, ops::BitAnd};
 
 use atomic::Ordering;
+use libc::c_void;
 
-use crate::{Plan, policy::{marksweepspace::MarkSweepSpace, space::Space}, util::{Address, VMThread, VMWorkerThread, constants::{LOG_BYTES_IN_PAGE}, metadata::{MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::SideMetadataSpec, store_metadata}}, vm::VMBinding};
+use crate::{Plan, policy::{marksweepspace::MarkSweepSpace, space::Space}, util::{Address, OpaquePointer, VMThread, VMWorkerThread, constants::{LOG_BYTES_IN_PAGE}, metadata::{MetadataSpec, compare_exchange_metadata, load_metadata, store_metadata}}, vm::VMBinding};
 
 use super::Allocator;
 
@@ -114,7 +115,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        // first, do frees from other threads (not yet)
+        // first, do frees from other threads (todo)
 
 
         // try to find an existing block with free cells
@@ -132,10 +133,10 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             )
         };
 
-        if free_list == unsafe { Address::zero() } {
-            // first block has no empty cells, go to slow path
-            return self.alloc_slow_once(size, align, offset);
-        }
+        // if free_list == unsafe { Address::zero() } {
+        //     // first block has no empty cells, go to slow path
+        //     return self.alloc_slow_once(size, align, offset);
+        // }
         
         // update free list
         let next_cell = unsafe { free_list.load::<Address>() };
@@ -162,11 +163,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             blocks: BLOCK_QUEUES_EMPTY.to_vec(),
         }
     }
-
-    // #[inline]
-    // pub fn get_tls_metadata_spec(&self) -> SideMetadataSpec {
-    //     self.space.common.metadata.local[5]
-    // }
 
     #[inline]
     pub fn get_free_list(&self, block: Address) -> Address {
@@ -243,18 +239,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             Ordering::SeqCst,
             Ordering::SeqCst,
         )
-    }
-    
-    #[inline]
-    pub fn get_block_tls(block: Address) -> VMThread {
-        unsafe {
-            block.load()
-        }
-    }
-
-    #[inline]
-    pub fn set_block_tls(&self, block: Address) {
-        unsafe { block.store(self.tls) }
     }
 
     pub fn find_free_block(&mut self, size: usize) -> Address {
@@ -386,7 +370,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // construct free list
         let block_end = block + BYTES_IN_BLOCK;
         let mut old_cell = unsafe { Address::zero() };
-        let mut new_cell = block + size_of::<VMThread>(); // room for tls
+        let mut new_cell = block;
         let block_queue = self.blocks.get_mut(FreeListAllocator::<VM>::mi_bin(size) as usize).unwrap();
         trace!("Asked for size {}, make free list with size {}", size, block_queue.size);
         assert!(size <= block_queue.size);
@@ -405,7 +389,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         store_metadata::<VM>(MetadataSpec::OnSide(self.space.get_free_metadata_spec()), unsafe{ block.to_object_reference() }, final_cell.as_usize(), None, None);
         store_metadata::<VM>(MetadataSpec::OnSide(self.space.get_size_metadata_spec()), unsafe{ block.to_object_reference() }, size, None, None);
         self.set_local_free_list(block, unsafe{Address::zero()});
-        self.set_block_tls(block);
+        self.store_block_tls(block);
         trace!("Constructed free list for block starting at {}", block);
         block
     }
@@ -426,11 +410,24 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         todo!()
     }
 
+    pub fn store_block_tls(&self, block: Address) {
+        let tls = unsafe { std::mem::transmute::<OpaquePointer, usize>(self.tls.0) };
+        store_metadata::<VM>(
+            MetadataSpec::OnSide(self.space.get_tls_metadata_spec()),
+            unsafe{block.to_object_reference()}, 
+            tls,
+            None, 
+            None
+        );
+    } 
+
+
     pub fn free(space: &'static MarkSweepSpace<VM>, addr: Address, tls: VMWorkerThread) {
 
         let block = FreeListAllocator::<VM>::get_owning_block(addr);
-        let block_tls = FreeListAllocator::<VM>::get_block_tls(block);
-        if tls == VMWorkerThread(block_tls) {
+        let block_tls = space.load_block_tls(block);
+
+        if tls.0.0 == block_tls {
             // same thread that allocated
             let local_free = unsafe {
                 Address::from_usize(
