@@ -10,8 +10,12 @@ use super::metadata_address_range_size;
 
 // Global side metadata start address
 
+// XXX: We updated the base address to start from the second 4Mb chunk for 32-bit architectures,
+// as otherwise for side metadatas with a large `min_obj_size`, we were overlapping with system
+// reserved addresses such as 0x0.
 #[cfg(target_pointer_width = "32")]
-pub(crate) const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address = unsafe { Address::from_usize(0) };
+pub(crate) const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
+    unsafe { Address::from_usize(BYTES_IN_CHUNK) };
 #[cfg(target_pointer_width = "64")]
 pub(crate) const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
     unsafe { Address::from_usize(0x0000_0600_0000_0000usize) };
@@ -72,13 +76,16 @@ pub(super) const LOCAL_SIDE_METADATA_PER_CHUNK: usize =
 // Global Metadata
 //
 // MMTk reserved Global side metadata offsets:
-// [currently empty]
+//
+//  1 - MarkSweep Active Chunk byte: 1 byte per chunk, used by malloc marksweep.
 //
 // --------------------------------------------------
 
 /// The base address for the global side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal global side metadata.
-pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_BASE_ADDRESS;
+pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_BASE_ADDRESS.add(
+    metadata_address_range_size(&crate::policy::mallocspace::metadata::ACTIVE_CHUNK_METADATA_SPEC),
+);
 pub const GLOBAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
     SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS);
 
@@ -89,11 +96,13 @@ pub const GLOBAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
 //
 //  1 - MarkSweep Alloc bit:
 //      - Offset LOCAL_SIDE_METADATA_BASE_OFFSET
+//  2 - MarkSweep Active Page byte:
+//      - Offset after Alloc bit
 //
 // --------------------------------------------------
 
 /// The base address for the local side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal local side metadata.
 pub const LOCAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset = SideMetadataOffset::layout_after(
-    &crate::policy::mallocspace::metadata::ALLOC_SIDE_METADATA_SPEC,
+    &crate::policy::mallocspace::metadata::ACTIVE_PAGE_METADATA_SPEC,
 );

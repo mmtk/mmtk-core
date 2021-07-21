@@ -12,6 +12,12 @@ pub struct PlanConstraints {
     pub gc_header_bits: usize,
     pub gc_header_words: usize,
     pub num_specialized_scans: usize,
+    /// Size (in bytes) beyond which new regular objects must be allocated to the LOS.
+    /// This usually depends on the restriction of the default allocator, e.g. block size for Immix,
+    /// nursery size, max possible cell for freelist, etc.
+    pub max_non_los_default_alloc_bytes: usize,
+    /// Size (in bytes) beyond which copied objects must be copied to the LOS.
+    /// This depends on the copy allocator.
     pub max_non_los_copy_bytes: usize,
     pub barrier: BarrierSelector,
     // the following seems unused for now
@@ -28,6 +34,7 @@ impl PlanConstraints {
             gc_header_bits: 0,
             gc_header_words: 0,
             num_specialized_scans: 0,
+            max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
             needs_linear_scan: SUPPORT_CARD_SCANNING || LAZY_SWEEP,
             needs_concurrent_workers: false,
@@ -37,3 +44,6 @@ impl PlanConstraints {
         }
     }
 }
+
+// Use 16 pages as the size limit for non-LOS objects to avoid copying large objects
+pub const MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN: usize = 16 << LOG_BYTES_IN_PAGE;

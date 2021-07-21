@@ -70,17 +70,39 @@ pub trait ObjectModel<VM: VMBinding> {
     // Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their
     // side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.
 
+    // --------------------------------------------------
+    //
+    // Global Metadata
+    //
+    // MMTk reserved Global side metadata offsets:
+    //
+    //  1 - MarkSweep Active Chunk byte:
+    //      - Offset `GLOBAL_SIDE_METADATA_BASE_ADDRESS`
+    //
+    // --------------------------------------------------
+
     /// The metadata specification of the global log bit. 1 bit.
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec;
+
+    // --------------------------------------------------
+    // PolicySpecific Metadata
+    //
+    // MMTk reserved PolicySpecific side metadata offsets:
+    //
+    //  1 - MarkSweep Alloc bit:
+    //      - Offset `0x0` on 32-bits
+    //      - Offset `LOCAL_SIDE_METADATA_BASE_ADDRESS` on 64-bits
+    //  2 - MarkSweep Active Page byte:
+    //      - Offset `Alloc bit`.offset + `Alloc bit`.metadata_address_range_size()
+    //
+    // --------------------------------------------------
 
     /// The metadata specification for the forwarding pointer, used by copying plans. Word size.
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec;
     /// The metadata specification for the forwarding status bits, used by copying plans. 2 bits.
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec;
-
     /// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit.
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec;
-
     /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
 

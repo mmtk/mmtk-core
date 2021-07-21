@@ -1,4 +1,5 @@
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
+use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use std::cell::UnsafeCell;
 use std::default::Default;
 use std::ops::Deref;
@@ -68,6 +69,15 @@ impl FromStr for PerfEventOptions {
         PerfEventOptions::parse_perf_events(s).map(|events| PerfEventOptions { events })
     }
 }
+
+/// The default nursery space size.
+pub const NURSERY_SIZE: usize = 32 << LOG_BYTES_IN_MBYTE;
+/// The default min nursery size. This can be set through command line options.
+/// This does not affect the actual space we create as nursery. It is only used in GC trigger check.
+pub const DEFAULT_MIN_NURSERY: usize = 32 << LOG_BYTES_IN_MBYTE;
+/// The default max nursery size. This can be set through command line options.
+/// This does not affect the actual space we create as nursery. It is only used in GC trigger check.
+pub const DEFAULT_MAX_NURSERY: usize = 32 << LOG_BYTES_IN_MBYTE;
 
 pub struct UnsafeOptionsWrapper(UnsafeCell<Options>);
 
@@ -165,9 +175,9 @@ options! {
     // Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     ignore_system_g_c:     bool                 [always_valid] = false,
     // The upper bound of nursery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    max_nursery:           usize                [|v: &usize| *v > 0]    = (32 * 1024 * 1024),
+    max_nursery:           usize                [|v: &usize| *v > 0 ] = DEFAULT_MAX_NURSERY,
     // The lower bound of nusery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    min_nursery:           usize                [|v: &usize| *v > 0]    = (32 * 1024 * 1024),
+    min_nursery:           usize                [|v: &usize| *v > 0 ] = DEFAULT_MIN_NURSERY,
     // Should a major GC be performed when a system GC is required?
     full_heap_system_gc:   bool                 [always_valid] = false,
     // Should we shrink/grow the heap to adjust to application working set? (not supported)
@@ -189,7 +199,11 @@ options! {
     // Perf events to measure
     // Semicolons are used to separate events
     // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean)
-    perf_events:           PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]}
+    //
+    // Measuring perf events for work packets
+    work_perf_events:       PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]},
+    // Measuring perf events for GC and mutators
+    phase_perf_events:      PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]}
 }
 
 impl Options {
@@ -313,7 +327,10 @@ mod tests {
     fn test_str_option_default() {
         serial_test(|| {
             let options = Options::default();
-            assert_eq!(&options.perf_events, &PerfEventOptions { events: vec![] });
+            assert_eq!(
+                &options.work_perf_events,
+                &PerfEventOptions { events: vec![] }
+            );
         })
     }
 
@@ -322,18 +339,18 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var("MMTK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
+                    std::env::set_var("MMTK_WORK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
 
                     let options = Options::default();
                     assert_eq!(
-                        &options.perf_events,
+                        &options.work_perf_events,
                         &PerfEventOptions {
                             events: vec![("PERF_COUNT_HW_CPU_CYCLES".into(), 0, -1)]
                         }
                     );
                 },
                 || {
-                    std::env::remove_var("MMTK_PERF_EVENTS");
+                    std::env::remove_var("MMTK_WORK_PERF_EVENTS");
                 },
             )
         })
@@ -345,14 +362,17 @@ mod tests {
             with_cleanup(
                 || {
                     // The option needs to start with "hello", otherwise it is invalid.
-                    std::env::set_var("MMTK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES");
+                    std::env::set_var("MMTK_WORK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES");
 
                     let options = Options::default();
                     // invalid value from env var, use default.
-                    assert_eq!(&options.perf_events, &PerfEventOptions { events: vec![] });
+                    assert_eq!(
+                        &options.work_perf_events,
+                        &PerfEventOptions { events: vec![] }
+                    );
                 },
                 || {
-                    std::env::remove_var("MMTK_PERF_EVENTS");
+                    std::env::remove_var("MMTK_WORK_PERF_EVENTS");
                 },
             )
         })
