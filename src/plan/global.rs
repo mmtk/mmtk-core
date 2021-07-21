@@ -126,7 +126,7 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
         }
-        PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, &*mmtk.plan),
+        PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, mmtk),
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
         }

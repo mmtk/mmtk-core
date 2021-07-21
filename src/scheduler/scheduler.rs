@@ -189,7 +189,11 @@ impl<C: Context> Scheduler<C> {
             if id == WorkBucketStage::Unconstrained {
                 continue;
             }
-            buckets_updated |= bucket.update();
+            let x = bucket.update();
+            if x {
+                println!("Activate WorkBucketStage::{:?}", id);
+            }
+            buckets_updated |= x;
         }
         if buckets_updated {
             // Notify the workers for new work
@@ -231,6 +235,7 @@ impl<C: Context> Scheduler<C> {
                 self.process_coordinator_work(work);
             }
         }
+        println!("Deactivate All Work Buckers");
         self.deactivate_all();
         // Finalization: Resume mutators, reset gc states
         // Note: Resume-mutators must happen after all work buckets are closed.
@@ -241,7 +246,9 @@ impl<C: Context> Scheduler<C> {
             self.process_coordinator_work(finalizer);
         }
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::PreClosure].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::PostClosure].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::RefClosure].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::RefForwarding].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Release].is_activated());
@@ -250,7 +257,9 @@ impl<C: Context> Scheduler<C> {
 
     pub fn deactivate_all(&self) {
         self.work_buckets[WorkBucketStage::Prepare].deactivate();
+        self.work_buckets[WorkBucketStage::PreClosure].deactivate();
         self.work_buckets[WorkBucketStage::Closure].deactivate();
+        self.work_buckets[WorkBucketStage::PostClosure].deactivate();
         self.work_buckets[WorkBucketStage::RefClosure].deactivate();
         self.work_buckets[WorkBucketStage::RefForwarding].deactivate();
         self.work_buckets[WorkBucketStage::Release].deactivate();
@@ -461,6 +470,7 @@ impl<VM: VMBinding> MMTkScheduler<VM> {
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.plan.base().control_collector_context.clear_request();
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
+        println!("Activate WorkBucketStage::Prepare");
         self.work_buckets[WorkBucketStage::Prepare].activate();
         let _guard = self.worker_monitor.0.lock().unwrap();
         self.worker_monitor.1.notify_all();

@@ -1,4 +1,7 @@
 use super::Immix;
+use crate::MMTK;
+use crate::plan::barriers::ObjectRememberingBarrier;
+use crate::plan::immix::gc_work::ImmixProcessEdges;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
@@ -12,6 +15,7 @@ use crate::{
 };
 use enum_map::enum_map;
 use enum_map::EnumMap;
+use crate::vm::ObjectModel;
 
 pub fn immix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     let immix_allocator = unsafe {
@@ -45,9 +49,9 @@ lazy_static! {
 
 pub fn create_immix_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
-    plan: &'static dyn Plan<VM = VM>,
+    mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
-    let immix = plan.downcast_ref::<Immix<VM>>().unwrap();
+    let immix = mmtk.plan.downcast_ref::<Immix<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
@@ -63,10 +67,13 @@ pub fn create_immix_mutator<VM: VMBinding>(
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
-        barrier: box NoBarrier,
+        allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
+        barrier: box ObjectRememberingBarrier::<ImmixProcessEdges<VM>>::new(
+            mmtk,
+            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+        ),
         mutator_tls,
         config,
-        plan,
+        plan: &*mmtk.plan,
     }
 }

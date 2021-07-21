@@ -54,7 +54,8 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     type VM = VM;
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        self.base().collection_required(self, space_full, space)
+        false
+        // self.base().collection_required(self, space_full, space)
         // let stress_force_gc = self.stress_test_gc_required();
         // debug!(
         //     "self.get_pages_reserved()={}, self.get_total_pages()={}",

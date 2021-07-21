@@ -16,7 +16,8 @@ pub enum BarrierSelector {
     ObjectBarrier,
 }
 
-/// For field writes in HotSpot, we cannot always get the source object pointer and the field address
+/// For field writes in HotSpot, we cannot always get the source object pointer and the field address\
+#[derive(Debug)]
 pub enum WriteTarget {
     Field(ObjectReference, Address, ObjectReference),
 }
@@ -30,7 +31,9 @@ pub struct NoBarrier;
 
 impl Barrier for NoBarrier {
     fn flush(&mut self) {}
-    fn write_barrier(&mut self, _target: WriteTarget) {}
+    fn write_barrier(&mut self, _target: WriteTarget) {
+        unreachable!("write_barrier called on NoBarrier")
+    }
 }
 
 pub struct ObjectRememberingBarrier<E: ProcessEdgesWork> {
@@ -71,6 +74,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
 impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     #[cold]
     fn flush(&mut self) {
+        println!("BARRIE FLUSH");
         let mut modbuf = vec![];
         std::mem::swap(&mut modbuf, &mut self.modbuf);
         debug_assert!(
@@ -79,21 +83,22 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
             self as *const _
         );
         if !modbuf.is_empty() {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure]
                 .add(ProcessModBuf::<E>::new(modbuf, self.meta));
         }
     }
 
     #[inline(always)]
     fn write_barrier(&mut self, target: WriteTarget) {
+        // println!("write_barrier {:?}\n", target);
         match target {
             WriteTarget::Field(obj, slot, val) => {
+                // println!("{:?}.{:?} = {:?}", obj, slot, val);
                 let deleted = unsafe { slot.load::<ObjectReference>() };
                 if !deleted.is_null() {
                     self.enqueue_node(deleted);
                 }
             }
-            _ => unreachable!(),
         }
     }
 }
