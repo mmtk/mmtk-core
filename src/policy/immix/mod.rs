@@ -22,5 +22,6 @@ macro_rules! validate {
 }
 
 fn validate_features() {
+    // Block-only immix cannot do defragmentation
     validate!(DEFRAG => !BLOCK_ONLY);
 }

@@ -226,7 +226,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             );
         }
         // Prepare defrag info
-        if !super::BLOCK_ONLY {
+        if super::DEFRAG {
             self.defrag.prepare(self);
         }
         // Prepare each block for GC
@@ -277,7 +277,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
         // Update states
         self.in_collection.store(false, Ordering::Release);
-        if !super::BLOCK_ONLY {
+        if super::DEFRAG {
             self.defrag.release(self)
         }
     }
