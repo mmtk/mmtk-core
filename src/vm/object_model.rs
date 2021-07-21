@@ -16,9 +16,8 @@ use crate::vm::VMBinding;
 ///    * in_header: a binding needs to specify the bit offset to an object reference that can be used for the per object metadata spec.
 ///      The actual number of bits required for a spec can be obtained from the `num_bits()` method of the spec type.
 ///    * side: a binding does not need to provide any specific storage for metadata in the header. Instead, MMTk
-///      will use side tables to store the metadata. A binding should use the offset from
-///      [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`] or [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`], and lay out all the side specs one after
-///      another (see the following section - Side Specs Layout).
+///      will use side tables to store the metadata. The following section Side Specs Layout will discuss how to correctly create
+///      side metadata specs.
 /// 2. In header metadata access: A binding
 ///    need to further define the functions with suffix _metadata about how to access the bits in the header. A binding may use
 ///    functions in the [`header_metadata`] module if the bits are always available to MMTk, or they could implement their
@@ -29,6 +28,17 @@ use crate::vm::VMBinding;
 /// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.
 ///
 /// Side Specs Layout
+///
+/// Short version
+///
+/// * For *global* side metadata:
+///   * The first spec: VMGlobalXXXSpec::side_first()
+///   * The following specs: VMGlobalXXXSpec::side_after(FIRST_GLOAL.as_spec())
+/// * For *local* side metadata:
+///   * The first spec: VMLocalXXXSpec::side_first()
+///   * The following specs: VMLocalXXXSpec::side_after(FIRST_LOCAL.as_spec())
+///
+/// Detailed explanation
 ///
 /// There are two types of side metadata layout in MMTk:
 ///
@@ -266,79 +276,86 @@ pub mod specs {
     use crate::util::constants::LOG_BITS_IN_WORD;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::constants::LOG_MIN_OBJECT_SIZE;
-    #[cfg(target_pointer_width = "64")]
-    use crate::util::metadata::side_metadata::metadata_address_range_size;
-    #[cfg(target_pointer_width = "32")]
-    use crate::util::metadata::side_metadata::metadata_bytes_per_chunk;
+    use crate::util::metadata::side_metadata::*;
     use crate::util::metadata::{
-        header_metadata::HeaderMetadataSpec, side_metadata::SideMetadataSpec, MetadataSpec,
+        header_metadata::HeaderMetadataSpec,
+        side_metadata::{SideMetadataOffset, SideMetadataSpec},
+        MetadataSpec,
     };
 
+    // This macro is invoked in define_vm_metadata_global_spec or define_vm_metadata_local_spec.
+    // Use those two to define a new VM metadata spec.
     macro_rules! define_vm_metadata_spec {
-        ($spec_name: ident, $log_num_bits: expr, $is_global: expr, $side_min_obj_size: expr) => {
+        ($spec_name: ident, $is_global: expr, $log_num_bits: expr, $side_min_obj_size: expr) => {
             pub struct $spec_name(MetadataSpec);
             impl $spec_name {
-                const LOG_NUM_BITS: usize = $log_num_bits;
-                const IS_GLOBAL: bool = $is_global;
+                pub const LOG_NUM_BITS: usize = $log_num_bits;
+                pub const IS_GLOBAL: bool = $is_global;
                 pub const fn in_header(bit_offset: isize) -> Self {
                     Self(MetadataSpec::InHeader(HeaderMetadataSpec {
                         bit_offset,
                         num_of_bits: 1 << Self::LOG_NUM_BITS,
                     }))
                 }
-                pub const fn side(offset: usize) -> Self {
+                pub const fn side_first() -> Self {
+                    if Self::IS_GLOBAL {
+                        Self(MetadataSpec::OnSide(SideMetadataSpec {
+                            is_global: Self::IS_GLOBAL,
+                            offset: GLOBAL_SIDE_METADATA_VM_BASE_OFFSET,
+                            log_num_of_bits: Self::LOG_NUM_BITS,
+                            log_min_obj_size: $side_min_obj_size as usize,
+                        }))
+                    } else {
+                        Self(MetadataSpec::OnSide(SideMetadataSpec {
+                            is_global: Self::IS_GLOBAL,
+                            offset: LOCAL_SIDE_METADATA_VM_BASE_OFFSET,
+                            log_num_of_bits: Self::LOG_NUM_BITS,
+                            log_min_obj_size: $side_min_obj_size as usize,
+                        }))
+                    }
+                }
+                pub const fn side_after(spec: &MetadataSpec) -> Self {
+                    debug_assert!(spec.is_on_side());
+                    let side_spec = spec.extract_side_spec();
+                    debug_assert!(side_spec.is_global == Self::IS_GLOBAL);
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         is_global: Self::IS_GLOBAL,
-                        offset,
+                        offset: SideMetadataOffset::layout_after(side_spec),
                         log_num_of_bits: Self::LOG_NUM_BITS,
                         log_min_obj_size: $side_min_obj_size as usize,
                     }))
                 }
+                #[inline(always)]
+                pub const fn as_spec(&self) -> &MetadataSpec {
+                    &self.0
+                }
                 pub const fn num_bits(&self) -> usize {
                     1 << $log_num_bits
-                }
-                pub const fn offset(&self) -> usize {
-                    match self.0 {
-                        MetadataSpec::InHeader(s) => s.bit_offset as usize,
-                        MetadataSpec::OnSide(s) => {
-                            #[cfg(target_pointer_width = "64")]
-                            {
-                                s.offset + metadata_address_range_size(&s)
-                            }
-                            #[cfg(target_pointer_width = "32")]
-                            {
-                                s.offset
-                                    + metadata_bytes_per_chunk(
-                                        s.log_min_obj_size,
-                                        s.log_num_of_bits,
-                                    )
-                            }
-                        }
-                    }
                 }
             }
             impl std::ops::Deref for $spec_name {
                 type Target = MetadataSpec;
+                #[inline(always)]
                 fn deref(&self) -> &Self::Target {
-                    &self.0
+                    self.as_spec()
                 }
             }
         };
     }
 
     // Log bit: 1 bit per object, global
-    define_vm_metadata_spec!(VMGlobalLogBitSpec, 0, true, LOG_MIN_OBJECT_SIZE);
+    define_vm_metadata_spec!(VMGlobalLogBitSpec, true, 0, LOG_MIN_OBJECT_SIZE);
     // Forwarding pointer: word size per object, local
     define_vm_metadata_spec!(
         VMLocalForwardingPointerSpec,
-        LOG_BITS_IN_WORD,
         false,
+        LOG_BITS_IN_WORD,
         LOG_MIN_OBJECT_SIZE
     );
     // Forwarding bits: 2 bits per object, local
-    define_vm_metadata_spec!(VMLocalForwardingBitsSpec, 1, false, LOG_MIN_OBJECT_SIZE);
+    define_vm_metadata_spec!(VMLocalForwardingBitsSpec, false, 1, LOG_MIN_OBJECT_SIZE);
     // Mark bit: 1 bit per object, local
-    define_vm_metadata_spec!(VMLocalMarkBitSpec, 0, false, LOG_MIN_OBJECT_SIZE);
+    define_vm_metadata_spec!(VMLocalMarkBitSpec, false, 0, LOG_MIN_OBJECT_SIZE);
     // Mark&nursery bits for LOS: 2 bit per page, local
-    define_vm_metadata_spec!(VMLocalLOSMarkNurserySpec, 1, false, LOG_BYTES_IN_PAGE);
+    define_vm_metadata_spec!(VMLocalLOSMarkNurserySpec, false, 1, LOG_BYTES_IN_PAGE);
 }
