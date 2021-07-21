@@ -26,7 +26,6 @@ use crate::{
 };
 use atomic::Ordering;
 use std::{
-    cell::UnsafeCell,
     iter::Step,
     mem,
     ops::Range,
@@ -37,7 +36,7 @@ use std::{
 };
 
 pub struct ImmixSpace<VM: VMBinding> {
-    common: UnsafeCell<CommonSpace<VM>>,
+    common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
@@ -87,7 +86,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
         &self.pr
     }
     fn common(&self) -> &CommonSpace<VM> {
-        unsafe { &*self.common.get() }
+        &self.common
     }
     fn init(&mut self, _vm_map: &'static VMMap) {
         super::validate_features();
@@ -155,7 +154,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
-            common: UnsafeCell::new(common),
+            common,
             chunk_map: ChunkMap::new(start),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
