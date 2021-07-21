@@ -220,6 +220,8 @@ impl ChunkMap {
     pub fn get(&self, chunk: Chunk) -> ChunkState {
         let index = self.get_index(chunk);
         let byte = self.table[index].load(Ordering::Acquire);
+        // # Safety: byte can only be 0 or 1.
+        debug_assert!(byte == 0 || byte == 1);
         unsafe { std::mem::transmute(byte) }
     }
 

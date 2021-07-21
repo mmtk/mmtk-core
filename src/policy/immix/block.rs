@@ -124,6 +124,8 @@ impl Block {
 
     #[inline(always)]
     fn mark_byte(&self) -> &AtomicU8 {
+        // # Safety
+        // The metadata memory is assumed to be mapped when accessing.
         unsafe {
             &*side_metadata::address_to_meta_address(&Self::MARK_TABLE, self.start())
                 .to_mut_ptr::<AtomicU8>()
@@ -159,6 +161,8 @@ impl Block {
 
     #[inline(always)]
     fn defrag_byte(&self) -> &AtomicU8 {
+        // # Safety
+        // The metadata memory is assumed to be mapped when accessing.
         unsafe {
             &*side_metadata::address_to_meta_address(&Self::DEFRAG_STATE_TABLE, self.start())
                 .to_mut_ptr::<AtomicU8>()
