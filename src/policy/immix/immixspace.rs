@@ -11,6 +11,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{self, *};
+use crate::util::metadata::{self, compare_exchange_metadata, load_metadata, MetadataSpec};
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -18,7 +19,6 @@ use crate::{
     plan::TransitiveClosure,
     scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorker, MMTkScheduler, WorkBucketStage},
     util::{
-        constants::LOG_BYTES_IN_WORD,
         heap::FreeListPageResource,
         opaque_pointer::{VMThread, VMWorkerThread},
     },
@@ -52,7 +52,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     /// Defrag utilities
     pub(super) defrag: Defrag,
     /// Object mark state
-    mark_state: AtomicU8,
+    mark_state: usize,
     /// Work packet scheduler
     scheduler: Weak<MMTkScheduler<VM>>,
 }
@@ -99,24 +99,26 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 }
 
 impl<VM: VMBinding> ImmixSpace<VM> {
+    const UNMARKED_STATE: usize = 0;
+    const MARKED_STATE: usize = 1;
+
     /// Get side metadata specs
     #[allow(clippy::assertions_on_constants)]
-    fn side_metadata_specs() -> &'static [SideMetadataSpec] {
-        debug_assert!(!Self::HEADER_MARK_BITS);
-        if super::BLOCK_ONLY {
-            &[
-                Block::DEFRAG_STATE_TABLE,
-                Block::MARK_TABLE,
-                Self::OBJECT_MARK_TABLE,
+    fn side_metadata_specs() -> Vec<SideMetadataSpec> {
+        metadata::extract_side_metadata(&if super::BLOCK_ONLY {
+            vec![
+                MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
+                MetadataSpec::OnSide(Block::MARK_TABLE),
+                *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ]
         } else {
-            &[
-                Line::MARK_TABLE,
-                Block::DEFRAG_STATE_TABLE,
-                Block::MARK_TABLE,
-                Self::OBJECT_MARK_TABLE,
+            vec![
+                MetadataSpec::OnSide(Line::MARK_TABLE),
+                MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
+                MetadataSpec::OnSide(Block::MARK_TABLE),
+                *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ]
-        }
+        })
     }
 
     pub fn new(
@@ -160,7 +162,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             in_collection: AtomicBool::new(false),
             reusable_blocks: BlockList::default(),
             defrag: Defrag::new(),
-            mark_state: AtomicU8::new(Self::MARK_BASE_VALUE),
+            mark_state: Self::UNMARKED_STATE,
             scheduler: Arc::downgrade(&scheduler),
         }
     }
@@ -200,7 +202,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Update mark state
     #[allow(clippy::assertions_on_constants)]
     fn delta_mark_state(state: u8) -> u8 {
-        debug_assert!(Self::HEADER_MARK_BITS);
+        debug_assert!(!VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side());
         let mut rtn = state;
         loop {
             rtn = (rtn + Self::MARK_INCREMENT) & Self::MARK_MASK;
@@ -219,11 +221,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn prepare(&mut self) {
         // Update mark_state
-        if Self::HEADER_MARK_BITS {
-            self.mark_state.store(
-                Self::delta_mark_state(self.mark_state.load(Ordering::Acquire)),
-                Ordering::Release,
-            );
+        if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
+            // For side metadata, we always use `1` as marked state.
+            // Object mark table will be cleared by `PrepareBlockState` before each GC.
+            //
+            // Note: It is incorrect to flip matk bit between 0 and 1 and remove
+            // the mark-table zeroing step. Because openjdk does not call post_alloc to set up
+            // object initial metadata.
+            self.mark_state = Self::MARKED_STATE;
+        } else {
+            // For header metadata, we use cyclic mark bits.
+            self.mark_state = Self::delta_mark_state(self.mark_state as u8) as usize;
         }
         // Prepare defrag info
         if super::DEFRAG {
@@ -347,7 +355,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         trace: &mut impl TransitiveClosure,
         object: ObjectReference,
     ) -> ObjectReference {
-        if self.attempt_mark(object) {
+        if self.attempt_mark(object, self.mark_state) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
                 if !super::MARK_LINE_AT_SCAN_TIME {
@@ -376,12 +384,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
-        } else if self.is_marked(object) {
+        } else if self.is_marked(object, self.mark_state) {
             ForwardingWord::clear_forwarding_bits::<VM>(object);
             object
         } else {
             let new_object = if Self::is_pinned(object) || self.defrag.space_exhausted() {
-                self.attempt_mark(object);
+                self.attempt_mark(object, self.mark_state);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
                 object
@@ -408,54 +416,45 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::Acquire));
     }
 
-    /// A flag to enable in-header mark bits.
-    const HEADER_MARK_BITS: bool = cfg!(feature = "immix_header_mark_bits");
-
-    /// Side per-object mark table.
-    const OBJECT_MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: Block::MARK_TABLE.accumulated_size(),
-        log_num_of_bits: 0,
-        log_min_obj_size: LOG_BYTES_IN_WORD as usize,
-    };
-
     /// Atomically mark an object.
     #[inline(always)]
-    fn attempt_mark(&self, object: ObjectReference) -> bool {
-        if Self::HEADER_MARK_BITS {
-            unreachable!()
-            // if !self.is_marked(object) {
-            //     gc_byte::write_gc_byte::<VM>(object, self.mark_state.load(Ordering::Relaxed));
-            //     true
-            // } else {
-            //     false
-            // }
-        } else {
-            side_metadata::compare_exchange_atomic(
-                &Self::OBJECT_MARK_TABLE,
-                VM::VMObjectModel::ref_to_address(object),
-                0,
-                1,
+    fn attempt_mark(&self, object: ObjectReference, mark_state: usize) -> bool {
+        loop {
+            let old_value = load_metadata::<VM>(
+                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                object,
+                None,
+                Some(Ordering::SeqCst),
+            );
+            if old_value == mark_state {
+                return false;
+            }
+
+            if compare_exchange_metadata::<VM>(
+                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                object,
+                old_value,
+                mark_state,
+                None,
                 Ordering::SeqCst,
                 Ordering::SeqCst,
-            )
+            ) {
+                break;
+            }
         }
+        true
     }
 
     /// Check if an object is marked.
     #[inline(always)]
-    fn is_marked(&self, object: ObjectReference) -> bool {
-        if Self::HEADER_MARK_BITS {
-            // gc_byte::read_gc_byte::<VM>(object) & Self::MARK_MASK == self.mark_state.load(Ordering::Relaxed)
-            unreachable!()
-        } else {
-            unsafe {
-                side_metadata::load(
-                    &Self::OBJECT_MARK_TABLE,
-                    VM::VMObjectModel::ref_to_address(object),
-                ) == 1
-            }
-        }
+    fn is_marked(&self, object: ObjectReference, mark_state: usize) -> bool {
+        let old_value = load_metadata::<VM>(
+            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            object,
+            None,
+            Some(Ordering::SeqCst),
+        );
+        old_value == mark_state
     }
 
     /// Check if an object is pinned.
@@ -519,12 +518,8 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
     /// Clear object mark table
     #[inline(always)]
     fn reset_object_mark(chunk: Chunk) {
-        if !ImmixSpace::<VM>::HEADER_MARK_BITS {
-            side_metadata::bzero_metadata(
-                &ImmixSpace::<VM>::OBJECT_MARK_TABLE,
-                chunk.start(),
-                Chunk::BYTES,
-            );
+        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+            side_metadata::bzero_metadata(&side, chunk.start(), Chunk::BYTES);
         }
     }
 }

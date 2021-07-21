@@ -268,6 +268,9 @@ pub mod specs {
                         log_min_obj_size: $side_min_obj_size as usize,
                     }))
                 }
+                pub const fn get_spec(&self) -> MetadataSpec {
+                    self.0
+                }
                 pub const fn num_bits(&self) -> usize {
                     1 << $log_num_bits
                 }

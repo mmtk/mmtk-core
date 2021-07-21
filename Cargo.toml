@@ -84,7 +84,5 @@ malloc_mimalloc = ["mimalloc-sys"]
 malloc_jemalloc = ["jemalloc-sys"]
 malloc_hoard = ["hoard-sys"]
 
-immix_header_mark_bits = []
-
 # If there are more groups, they should be inserted above this line
 # Group:end
