@@ -99,7 +99,7 @@ impl Block {
 
     /// Get block end address
     pub const fn end(&self) -> Address {
-        self.0.add( Self::BYTES)
+        self.0.add(Self::BYTES)
     }
 
     /// Get the chunk containing the block.
@@ -116,9 +116,7 @@ impl Block {
         let start = side_metadata::address_to_meta_address(&Line::MARK_TABLE, self.start());
         // # Safety
         // The metadata memory is assumed to be mapped when accessing.
-        unsafe {
-            &*start.to_ptr()
-        }
+        unsafe { &*start.to_ptr() }
     }
 
     const MARK_UNALLOCATED: u8 = 0;

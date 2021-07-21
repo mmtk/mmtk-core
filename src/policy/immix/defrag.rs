@@ -5,9 +5,9 @@ use super::{
 };
 use crate::policy::space::Space;
 use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*, MMTK};
-use std::{
-    cell::UnsafeCell,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc, RwLock,
 };
 
 #[derive(Debug, Default)]
@@ -17,7 +17,7 @@ pub struct Defrag {
     /// Is defrag space exhausted?
     defrag_space_exhausted: AtomicBool,
     /// per-worker mark histograms
-    spill_mark_histograms: UnsafeCell<Vec<Vec<AtomicUsize>>>,
+    pub spill_mark_histograms: RwLock<Vec<Arc<Vec<AtomicUsize>>>>,
     spill_avail_histograms: Vec<AtomicUsize>,
     pub defrag_spill_threshold: AtomicUsize,
     /// The number of remaining clean pages in defrag space.
@@ -33,22 +33,24 @@ impl Defrag {
     pub fn new() -> Self {
         Self {
             spill_avail_histograms: (0..Self::NUM_BINS).map(|_| Default::default()).collect(),
-            spill_mark_histograms: UnsafeCell::new(vec![]),
+            spill_mark_histograms: Default::default(),
             ..Default::default()
         }
     }
 
-    /// Get spill mark histograms
-    pub fn spill_mark_histograms(&self) -> &Vec<Vec<AtomicUsize>> {
-        unsafe { &*self.spill_mark_histograms.get() }
+    /// Get worker-local mark histogram
+    pub fn mark_histogram(&self, index: usize) -> Arc<Vec<AtomicUsize>> {
+        self.spill_mark_histograms.read().unwrap()[index].clone()
     }
 
     /// Prepare spill mark histograms
     pub fn prepare_histograms<VM: VMBinding>(&self, mmtk: &MMTK<VM>) {
-        let spill_mark_histograms = unsafe { &mut *self.spill_mark_histograms.get() };
-        spill_mark_histograms.resize_with(mmtk.options.threads, || {
-            (0..Self::NUM_BINS).map(|_| Default::default()).collect()
-        });
+        self.spill_mark_histograms
+            .write()
+            .unwrap()
+            .resize_with(mmtk.options.threads, || {
+                Arc::new((0..Self::NUM_BINS).map(|_| Default::default()).collect())
+            });
     }
 
     /// Check if the current GC is a defrag GC.
@@ -166,10 +168,10 @@ impl Defrag {
         let mut required_lines = 0isize;
         let mut limit = (available_lines as f32 / Self::DEFRAG_LINE_REUSE_RATIO) as isize;
         let mut threshold = Block::LINES >> 1;
+        let spill_mark_histograms = self.spill_mark_histograms.read().unwrap();
         for index in (Self::MIN_SPILL_THRESHOLD..Self::NUM_BINS).rev() {
             threshold = index;
-            let this_bucket_mark = self
-                .spill_mark_histograms()
+            let this_bucket_mark = spill_mark_histograms
                 .iter()
                 .map(|v| v[threshold].load(Ordering::Acquire) as isize)
                 .sum::<isize>();

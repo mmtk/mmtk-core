@@ -62,7 +62,7 @@ impl Chunk {
 
     /// Get chunk end address
     pub const fn end(&self) -> Address {
-        self.0.add( Self::BYTES)
+        self.0.add(Self::BYTES)
     }
 
     /// Get a range of blocks within this chunk.
@@ -270,8 +270,8 @@ impl ChunkMap {
         space: &'static ImmixSpace<VM>,
         scheduler: &MMTkScheduler<VM>,
     ) -> Vec<Box<dyn Work<MMTK<VM>>>> {
-        for table in space.defrag.spill_mark_histograms() {
-            for entry in table {
+        for table in &*space.defrag.spill_mark_histograms.read().unwrap() {
+            for entry in table.iter() {
                 entry.store(0, Ordering::Release);
             }
         }
@@ -313,10 +313,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunks<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         for chunk in self.1.start..self.1.end {
             if self.0.chunk_map.get(chunk) == ChunkState::Allocated {
-                chunk.sweep(
-                    self.0,
-                    &self.0.defrag.spill_mark_histograms()[worker.ordinal],
-                );
+                chunk.sweep(self.0, &self.0.defrag.mark_histogram(worker.ordinal));
             }
         }
     }

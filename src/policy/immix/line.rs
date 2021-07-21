@@ -78,7 +78,7 @@ impl Line {
     #[inline(always)]
     pub fn end(&self) -> Address {
         debug_assert!(!super::BLOCK_ONLY);
-        self.0.add( Self::BYTES)
+        self.0.add(Self::BYTES)
     }
 
     /// Get line index within its containing block.
