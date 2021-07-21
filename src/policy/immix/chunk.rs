@@ -133,8 +133,8 @@ impl Chunk {
                         block.set_state(BlockState::Unmarked);
                     }
                     // Update mark_histogram
-                    let old_value = mark_histogram[holes].load(Ordering::Acquire);
-                    mark_histogram[holes].store(old_value + marked_lines, Ordering::Release);
+                    let old_value = mark_histogram[holes].load(Ordering::Relaxed);
+                    mark_histogram[holes].store(old_value + marked_lines, Ordering::Relaxed);
                     // Record number of holes in block side metadata.
                     block.set_holes(holes);
                 }
