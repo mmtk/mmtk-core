@@ -14,6 +14,7 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The thread pointer for the GC controller/coordinator.
     fn stop_all_mutators<E: ProcessEdgesWork<VM = VM>>(tls: VMWorkerThread);
+    fn stop_all_mutators2(tls: VMWorkerThread);
 
     /// Resume all the mutator threads, the opposite of the above. When a GC is finished, MMTk calls this method.
     ///

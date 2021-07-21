@@ -249,6 +249,37 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
 impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for EndOfGC {}
 
+pub struct ConcurrentWorkStart;
+
+impl<VM: VMBinding> GCWork<VM> for ConcurrentWorkStart {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        if worker.is_coordinator() {
+            println!("Resume mutators for CM");
+            <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
+        } else {
+            mmtk.scheduler
+                .add_coordinator_work(ConcurrentWorkStart, worker);
+        }
+    }
+}
+
+impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for ConcurrentWorkStart {}
+pub struct ConcurrentWorkEnd;
+
+impl<VM: VMBinding> GCWork<VM> for ConcurrentWorkEnd {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        if worker.is_coordinator() {
+            println!("Stop mutators after CM");
+            <VM as VMBinding>::VMCollection::stop_all_mutators2(worker.tls);
+        } else {
+            mmtk.scheduler
+                .add_coordinator_work(ConcurrentWorkEnd, worker);
+        }
+    }
+}
+
+impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for ConcurrentWorkEnd {}
+
 /// Delegate to the VM binding for reference processing.
 ///
 /// Some VMs (e.g. v8) do not have a Java-like global weak reference storage, and the

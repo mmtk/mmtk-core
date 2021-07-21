@@ -64,7 +64,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn concurrent_collection_required(&self) -> bool {
-        self.get_pages_reserved() * 10 / 3 > self.get_total_pages()
+        self.base().gc_status() == GcStatus::NotInGC && self.get_pages_reserved() * 10 / 3 > self.get_total_pages()
     }
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -102,6 +102,8 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<ImmixProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
+        scheduler.work_buckets[WorkBucketStage::PreClosure].add(ConcurrentWorkStart);
+        scheduler.work_buckets[WorkBucketStage::PostClosure].add(ConcurrentWorkEnd);
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
         scheduler.work_buckets[WorkBucketStage::RefClosure]

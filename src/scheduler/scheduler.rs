@@ -66,6 +66,8 @@ impl<C: Context> Scheduler<C> {
                 WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::PreClosure => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::PostClosure => WorkBucket::new(false, worker_monitor.clone()),
             },
             coordinator_work: WorkBucket::new(true, worker_monitor.clone()),
             worker_group: None,
@@ -141,7 +143,9 @@ impl<C: Context> Scheduler<C> {
                 open_stages.push(s);
             };
 
+            open_next(PreClosure);
             open_next(Closure);
+            open_next(PostClosure);
             open_next(RefClosure);
             open_next(RefForwarding);
             open_next(Release);

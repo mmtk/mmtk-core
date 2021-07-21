@@ -201,12 +201,8 @@ impl Block {
 
     /// Initialize a clean block after acquired from page-resource.
     #[inline]
-    pub fn init(&self, copy: bool) {
-        self.set_state(if copy {
-            BlockState::Marked
-        } else {
-            BlockState::Unmarked
-        });
+    pub fn init(&self, _copy: bool) {
+        self.set_state(BlockState::Marked);
         self.defrag_byte().store(0, Ordering::Release);
     }
 

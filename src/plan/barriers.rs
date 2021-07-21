@@ -23,14 +23,14 @@ pub enum WriteTarget {
 
 pub trait Barrier: 'static + Send {
     fn flush(&mut self);
-    fn post_write_barrier(&mut self, target: WriteTarget);
+    fn write_barrier(&mut self, target: WriteTarget);
 }
 
 pub struct NoBarrier;
 
 impl Barrier for NoBarrier {
     fn flush(&mut self) {}
-    fn post_write_barrier(&mut self, _target: WriteTarget) {}
+    fn write_barrier(&mut self, _target: WriteTarget) {}
 }
 
 pub struct ObjectRememberingBarrier<E: ProcessEdgesWork> {
@@ -50,21 +50,21 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     }
 
     #[inline(always)]
-    fn enqueue_node<VM: VMBinding>(&mut self, obj: ObjectReference) {
-        if compare_exchange_metadata::<VM>(
-            &self.meta,
-            obj,
-            0b1,
-            0b0,
-            None,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
+    fn enqueue_node(&mut self, obj: ObjectReference) {
+        // if compare_exchange_metadata::<E::VM>(
+        //     &self.meta,
+        //     obj,
+        //     0b1,
+        //     0b0,
+        //     None,
+        //     Ordering::SeqCst,
+        //     Ordering::SeqCst,
+        // ) {
             self.modbuf.push(obj);
             if self.modbuf.len() >= E::CAPACITY {
                 self.flush();
             }
-        }
+        // }
     }
 }
 
@@ -85,12 +85,15 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     }
 
     #[inline(always)]
-    fn post_write_barrier(&mut self, _target: WriteTarget) {
-        // match target {
-        //     WriteTarget::Object(obj) => {
-        //         self.enqueue_node::<E::VM>(obj);
-        //     }
-        //     _ => unreachable!(),
-        // }
+    fn write_barrier(&mut self, target: WriteTarget) {
+        match target {
+            WriteTarget::Field(obj, slot, val) => {
+                let deleted = unsafe { slot.load::<ObjectReference>() };
+                if !deleted.is_null() {
+                    self.enqueue_node(deleted);
+                }
+            }
+            _ => unreachable!(),
+        }
     }
 }

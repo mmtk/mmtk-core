@@ -8,7 +8,7 @@ use crate::vm::VMBinding;
 /// VM-specific methods for scanning roots/objects.
 pub trait Scanning<VM: VMBinding> {
     /// Scan stack roots after all mutators are paused.
-    const SCAN_MUTATORS_IN_SAFEPOINT: bool = true;
+    const SCAN_MUTATORS_IN_SAFEPOINT: bool = false;
 
     /// Scan all the mutators within a single work packet.
     ///

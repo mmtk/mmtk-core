@@ -248,6 +248,7 @@ pub trait Plan: 'static + Sync + Downcast {
                 Self::trigger_internal_collection_request();
                 return false;
             } else {*/
+            println!("concurrent_collection_required -> true");
             self.log_poll(space, "Triggering concurrent collection");
             self.base().trigger_internal_collection_request();
             return true;
@@ -332,7 +333,7 @@ pub trait Plan: 'static + Sync + Downcast {
 
 impl_downcast!(Plan assoc VM);
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum GcStatus {
     NotInGC,
     GcPrepare,
@@ -620,6 +621,11 @@ impl<VM: VMBinding> BasePlan<VM> {
         if emergency_collection {
             self.force_full_heap_collection();
         }
+    }
+
+    pub fn gc_status(&self) -> GcStatus {
+        let gc_status = self.gc_status.lock().unwrap();
+        *gc_status
     }
 
     pub fn set_gc_status(&self, s: GcStatus) {

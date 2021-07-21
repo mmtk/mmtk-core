@@ -115,6 +115,6 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn barrier(&mut self) -> &mut dyn Barrier;
 
     fn record_modified_node(&mut self, src: ObjectReference, slot: Address, val: ObjectReference) {
-        self.barrier().post_write_barrier(WriteTarget::Field(src, slot, val));
+        self.barrier().write_barrier(WriteTarget::Field(src, slot, val));
     }
 }
