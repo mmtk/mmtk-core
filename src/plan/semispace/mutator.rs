@@ -2,13 +2,15 @@ use super::SemiSpace;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
+use crate::plan::mutator_context::{
+    create_allocator_mapping, create_space_mapping, ReservedAllocators,
+};
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
-use enum_map::enum_map;
 use enum_map::EnumMap;
 
 pub fn ss_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
@@ -33,14 +35,17 @@ pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWork
     );
 }
 
+const SS_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
+    n_bump_pointer: 1,
+    n_large_object: 0,
+    n_malloc: 0,
+};
+
 lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default => AllocatorSelector::BumpPointer(0),
-        AllocationType::Immortal => AllocatorSelector::BumpPointer(1),
-        AllocationType::ReadOnly => AllocatorSelector::BumpPointer(2),
-        AllocationType::Code => AllocatorSelector::BumpPointer(3),
-        AllocationType::LargeCode => AllocatorSelector::BumpPointer(4),
-        AllocationType::Los => AllocatorSelector::LargeObject(0),
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
+        let mut map = create_allocator_mapping(SS_RESERVED_ALLOCATOR, true);
+        map[AllocationType::Default] = AllocatorSelector::BumpPointer(0);
+        map
     };
 }
 
@@ -51,23 +56,11 @@ pub fn create_ss_mutator<VM: VMBinding>(
     let ss = plan.downcast_ref::<SemiSpace<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), ss.tospace()),
-            (AllocatorSelector::BumpPointer(1), ss.common.get_immortal()),
-            (AllocatorSelector::LargeObject(0), ss.common.get_los()),
-            #[cfg(feature = "ro_space")]
-            (AllocatorSelector::BumpPointer(2), &ss.common.base.ro_space),
-            #[cfg(feature = "code_space")]
-            (
-                AllocatorSelector::BumpPointer(3),
-                &ss.common.base.code_space,
-            ),
-            #[cfg(feature = "code_space")]
-            (
-                AllocatorSelector::BumpPointer(4),
-                &ss.common.base.code_lo_space,
-            ),
-        ],
+        space_mapping: box {
+            let mut vec = create_space_mapping(SS_RESERVED_ALLOCATOR, true, plan);
+            vec.push((AllocatorSelector::BumpPointer(0), ss.tospace()));
+            vec
+        },
         prepare_func: &ss_mutator_prepare,
         release_func: &ss_mutator_release,
     };

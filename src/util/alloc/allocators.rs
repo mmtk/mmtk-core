@@ -10,9 +10,9 @@ use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 
-const MAX_BUMP_ALLOCATORS: usize = 5;
-const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;
-const MAX_MALLOC_ALLOCATORS: usize = 1;
+pub const MAX_BUMP_ALLOCATORS: usize = 5;
+pub const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;
+pub const MAX_MALLOC_ALLOCATORS: usize = 1;
 
 // The allocators set owned by each mutator. We provide a fixed number of allocators for each allocator type in the mutator,
 // and each plan will select part of the allocators to use.
@@ -37,6 +37,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_ref()
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_ref(),
+            AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
 
@@ -54,6 +55,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_mut()
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
+            AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
 
@@ -91,6 +93,7 @@ impl<VM: VMBinding> Allocators<VM> {
                         plan,
                     ));
                 }
+                AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
             }
         }
 
@@ -111,9 +114,16 @@ impl<VM: VMBinding> Allocators<VM> {
 //   LargeObject,
 // }
 #[repr(C, u8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum AllocatorSelector {
     BumpPointer(u8),
     LargeObject(u8),
     Malloc(u8),
+    None,
+}
+
+impl Default for AllocatorSelector {
+    fn default() -> Self {
+        AllocatorSelector::None
+    }
 }
