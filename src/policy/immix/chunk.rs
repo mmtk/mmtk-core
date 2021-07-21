@@ -62,7 +62,7 @@ impl Chunk {
 
     /// Get chunk end address
     pub const fn end(&self) -> Address {
-        unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
+        self.0.add( Self::BYTES)
     }
 
     /// Get a range of blocks within this chunk.
@@ -196,8 +196,7 @@ impl ChunkMap {
 
     /// Get the index of the chunk.
     const fn get_index(&self, chunk: Chunk) -> usize {
-        // let space_start = chunk.start().as_usize() & ((1 << LOG_SPACE_EXTENT) - 1);
-        (chunk.start().as_usize() - self.start.as_usize()) >> Chunk::LOG_BYTES
+        chunk.start().get_extent(self.start) >> Chunk::LOG_BYTES
     }
 
     /// Set chunk state

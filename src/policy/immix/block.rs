@@ -99,7 +99,7 @@ impl Block {
 
     /// Get block end address
     pub const fn end(&self) -> Address {
-        unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
+        self.0.add( Self::BYTES)
     }
 
     /// Get the chunk containing the block.

@@ -78,14 +78,14 @@ impl Line {
     #[inline(always)]
     pub fn end(&self) -> Address {
         debug_assert!(!super::BLOCK_ONLY);
-        unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
+        self.0.add( Self::BYTES)
     }
 
     /// Get line index within its containing block.
     #[inline(always)]
     pub fn get_index_within_block(&self) -> usize {
         let addr = self.start();
-        (addr.as_usize() - Block::align(addr).as_usize()) >> Line::LOG_BYTES
+        addr.get_extent(Block::align(addr)) >> Line::LOG_BYTES
     }
 
     /// Mark the line. This will update the side line mark table.
