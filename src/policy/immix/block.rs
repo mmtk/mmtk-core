@@ -111,11 +111,14 @@ impl Block {
     /// Get the address range of the block's line mark table.
     #[allow(clippy::assertions_on_constants)]
     #[inline(always)]
-    pub fn line_mark_table(&self) -> Range<Address> {
+    pub fn line_mark_table(&self) -> &[AtomicU8; Block::LINES] {
         debug_assert!(!super::BLOCK_ONLY);
         let start = side_metadata::address_to_meta_address(&Line::MARK_TABLE, self.start());
-        let end = start + Block::LINES;
-        start..end
+        // # Safety
+        // The metadata memory is assumed to be mapped when accessing.
+        unsafe {
+            &*start.to_ptr()
+        }
     }
 
     const MARK_UNALLOCATED: u8 = 0;

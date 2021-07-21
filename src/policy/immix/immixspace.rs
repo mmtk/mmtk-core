@@ -474,31 +474,31 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!super::BLOCK_ONLY);
         let unavail_state = self.line_unavail_state.load(Ordering::Acquire);
         let current_state = self.line_mark_state.load(Ordering::Acquire);
-        let mark_data = search_start.block().line_mark_table();
-        let mark_byte_start = mark_data.start + search_start.get_index_within_block();
-        let mark_byte_end = mark_data.end;
-        let mut mark_byte_cursor = mark_byte_start;
+        let block = search_start.block();
+        let mark_data = block.line_mark_table();
+        let start_cursor = search_start.get_index_within_block();
+        let mut cursor = start_cursor;
         // Find start
-        while mark_byte_cursor < mark_byte_end {
-            let mark = unsafe { mark_byte_cursor.load::<u8>() };
+        while cursor < mark_data.len() {
+            let mark = mark_data[cursor].load(Ordering::Relaxed);
             if mark != unavail_state && mark != current_state {
                 break;
             }
-            mark_byte_cursor += 1usize;
+            cursor += 1;
         }
-        if mark_byte_cursor == mark_byte_end {
+        if cursor == mark_data.len() {
             return None;
         }
-        let start = Line::forward(search_start, mark_byte_cursor - mark_byte_start);
+        let start = Line::forward(search_start, cursor - start_cursor);
         // Find limit
-        while mark_byte_cursor < mark_byte_end {
-            let mark = unsafe { mark_byte_cursor.load::<u8>() };
+        while cursor < mark_data.len() {
+            let mark = mark_data[cursor].load(Ordering::Relaxed);
             if mark == unavail_state || mark == current_state {
                 break;
             }
-            mark_byte_cursor += 1usize;
+            cursor += 1;
         }
-        let end = Line::forward(search_start, mark_byte_cursor - mark_byte_start);
+        let end = Line::forward(search_start, cursor - start_cursor);
         debug_assert!((start..end)
             .all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
         Some(start..end)
