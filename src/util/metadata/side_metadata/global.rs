@@ -3,6 +3,7 @@ use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
 use crate::util::{constants, Address};
+use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
@@ -47,6 +48,14 @@ pub struct SideMetadataContext {
 }
 
 impl SideMetadataContext {
+    #[cfg(not(feature = "global_alloc_bit"))]
+    pub fn new_global_specs(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
+        let mut ret = vec![];
+        ret.extend_from_slice(specs);
+        ret
+    }
+
+    #[cfg(feature = "global_alloc_bit")]
     pub fn new_global_specs(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
         let mut ret = vec![];
         ret.extend_from_slice(specs);

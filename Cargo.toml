@@ -57,6 +57,9 @@ vm_space = []
 ro_space = []
 code_space  = []
 
+# metadata
+global_alloc_bit = []
+
 # Run sanity GC
 sanity = []
 # Run analysis

@@ -131,6 +131,9 @@ impl<VM: VMBinding> MarkSweep<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
+        #[cfg(feature = "global_alloc_bit")]
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        #[cfg(not(feature = "global_alloc_bit"))]
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[ALLOC_SIDE_METADATA_SPEC]);
 
         let res = MarkSweep {
@@ -159,4 +162,5 @@ impl<VM: VMBinding> MarkSweep<VM> {
     pub fn ms_space(&self) -> &MallocSpace<VM> {
         &self.ms
     }
+
 }
