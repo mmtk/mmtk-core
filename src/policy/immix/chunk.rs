@@ -1,4 +1,5 @@
 use super::block::{Block, BlockState};
+use super::defrag::MarkHistogram;
 use super::immixspace::ImmixSpace;
 use crate::util::metadata::side_metadata::{self, SideMetadataSpec};
 use crate::{
@@ -54,7 +55,7 @@ impl Chunk {
     }
 
     /// Sweep this chunk.
-    pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>, mark_histogram: &mut [usize]) {
+    pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>, mark_histogram: &mut MarkHistogram) {
         let mut allocated_blocks = 0; // number of allocated blocks.
         if super::BLOCK_ONLY {
             // Iterate over all blocks in this chunk.
@@ -260,7 +261,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunks<VM> {
         let mut histogram = self.0.defrag.new_mark_histogram();
         for chunk in self.1.start..self.1.end {
             if self.0.chunk_map.get(chunk) == ChunkState::Allocated {
-                chunk.sweep(self.0, &mut *histogram);
+                chunk.sweep(self.0, &mut histogram);
             }
         }
         self.0.defrag.add_completed_mark_histogram(histogram);

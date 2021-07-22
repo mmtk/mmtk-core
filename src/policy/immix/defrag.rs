@@ -17,7 +17,7 @@ pub struct Defrag {
     /// Is defrag space exhausted?
     defrag_space_exhausted: AtomicBool,
     /// A list of completed mark histograms reported by workers
-    pub mark_histograms: Mutex<Vec<Box<MarkHistogram>>>,
+    pub mark_histograms: Mutex<Vec<MarkHistogram>>,
     /// Summarised histograms
     spill_avail_histograms: Vec<AtomicUsize>,
     pub defrag_spill_threshold: AtomicUsize,
@@ -39,12 +39,13 @@ impl Defrag {
     }
 
     /// Allocate a new local histogram.
-    pub fn new_mark_histogram(&self) -> Box<MarkHistogram> {
-        box [0; Self::NUM_BINS]
+    pub const fn new_mark_histogram(&self) -> MarkHistogram {
+        [0; Self::NUM_BINS]
     }
 
     /// Report back a completed mark histogram
-    pub fn add_completed_mark_histogram(&self, histogram: Box<MarkHistogram>) {
+    #[inline(always)]
+    pub fn add_completed_mark_histogram(&self, histogram: MarkHistogram) {
         self.mark_histograms.lock().push(histogram)
     }
 
