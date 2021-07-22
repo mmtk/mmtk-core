@@ -108,6 +108,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             vec![
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
+                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ]
         } else {
@@ -115,6 +116,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Line::MARK_TABLE),
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
+                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ]
         })
@@ -144,10 +146,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mmapper,
             heap,
         );
-        #[cfg(target_pointer_width = "64")]
-        let start = common.start;
-        #[cfg(target_pointer_width = "32")]
-        let start = crate::util::heap::layout::vm_layout_constants::HEAP_START;
         ImmixSpace {
             pr: if common.vmrequest.is_discontiguous() {
                 FreeListPageResource::new_discontiguous(0, vm_map)
@@ -155,7 +153,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
-            chunk_map: ChunkMap::new(start),
+            chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
             in_collection: AtomicBool::new(false),

@@ -1,18 +1,18 @@
+use spin::Mutex;
+
 use super::block::{Block, BlockState};
 use super::immixspace::ImmixSpace;
+use crate::util::metadata::side_metadata::{self, SideMetadataSpec};
 use crate::{
     scheduler::*,
-    util::{
-        heap::layout::vm_layout_constants::{LOG_BYTES_IN_CHUNK, MAX_CHUNKS},
-        Address, ObjectReference,
-    },
+    util::{heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK, Address, ObjectReference},
     vm::*,
     MMTK,
 };
 use std::{
     iter::Step,
     ops::Range,
-    sync::atomic::{AtomicU8, AtomicUsize, Ordering},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 /// Data structure to reference a MMTk 4 MB chunk.
@@ -21,6 +21,8 @@ use std::{
 pub struct Chunk(Address);
 
 impl Chunk {
+    /// Chunk constant with zero address
+    const ZERO: Self = Self(Address::ZERO);
     /// Log bytes in chunk
     pub const LOG_BYTES: usize = LOG_BYTES_IN_CHUNK;
     /// Bytes in chunk
@@ -170,7 +172,7 @@ unsafe impl Step for Chunk {
 
 /// Chunk allocation state
 #[repr(u8)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ChunkState {
     /// The chunk is not allocated.
     Free = 0,
@@ -180,65 +182,60 @@ pub enum ChunkState {
 
 /// A byte-map to record all the allocated chunks
 pub struct ChunkMap {
-    table: Vec<AtomicU8>,
-    start: Address,
-    limit: AtomicUsize,
+    chunk_range: Mutex<Range<Chunk>>,
 }
 
 impl ChunkMap {
-    pub fn new(start: Address) -> Self {
-        Self {
-            table: (0..MAX_CHUNKS).map(|_| Default::default()).collect(),
-            start,
-            limit: AtomicUsize::new(0),
-        }
-    }
+    /// Chunk alloc table
+    pub const ALLOC_TABLE: SideMetadataSpec = SideMetadataSpec {
+        is_global: false,
+        offset: Block::MARK_TABLE.accumulated_size(),
+        log_num_of_bits: 3,
+        log_min_obj_size: Chunk::LOG_BYTES,
+    };
 
-    /// Get the index of the chunk.
-    const fn get_index(&self, chunk: Chunk) -> usize {
-        chunk.start().get_extent(self.start) >> Chunk::LOG_BYTES
+    pub fn new() -> Self {
+        Self {
+            chunk_range: Mutex::new(Chunk::ZERO..Chunk::ZERO),
+        }
     }
 
     /// Set chunk state
     pub fn set(&self, chunk: Chunk, state: ChunkState) {
-        let index = self.get_index(chunk);
-        if state == ChunkState::Allocated {
-            let _ = self
-                .limit
-                .fetch_update(Ordering::Release, Ordering::Relaxed, |old| {
-                    if index + 1 > old {
-                        Some(index + 1)
-                    } else {
-                        None
-                    }
-                });
+        // Do nothing if the chunk is already in the expected state.
+        if self.get(chunk) == state {
+            return;
         }
-        self.table[index].store(state as _, Ordering::Release);
+        // Update alloc byte
+        unsafe { side_metadata::store(&Self::ALLOC_TABLE, chunk.start(), state as u8 as _) };
+        // If this is a newly allcoated chunk, then expand the chunk range.
+        if state == ChunkState::Allocated {
+            debug_assert!(!chunk.start().is_zero());
+            let mut range = self.chunk_range.lock();
+            if range.start == Chunk::ZERO {
+                range.start = chunk;
+                range.end = Chunk::forward(chunk, 1);
+            } else if chunk < range.start {
+                range.start = chunk;
+            } else if range.end <= chunk {
+                range.end = Chunk::forward(chunk, 1);
+            }
+        }
     }
 
     /// Get chunk state
     pub fn get(&self, chunk: Chunk) -> ChunkState {
-        let index = self.get_index(chunk);
-        let byte = self.table[index].load(Ordering::Acquire);
-        // # Safety: byte can only be 0 or 1.
-        debug_assert!(byte == 0 || byte == 1);
-        unsafe { std::mem::transmute(byte) }
+        let byte = unsafe { side_metadata::load(&Self::ALLOC_TABLE, chunk.start()) as u8 };
+        match byte {
+            0 => ChunkState::Free,
+            1 => ChunkState::Allocated,
+            _ => unreachable!(),
+        }
     }
 
     /// A range of all chunks in the heap.
     pub fn all_chunks(&self) -> Range<Chunk> {
-        let start = Chunk::from(self.start);
-        let end = Chunk::forward(start, self.limit.load(Ordering::Acquire));
-        start..end
-    }
-
-    /// A iterator of all the *allocated* chunks.
-    pub fn allocated_chunks(&'_ self) -> impl Iterator<Item = Chunk> + '_ {
-        AllocatedChunksIter {
-            table: &self.table,
-            start: self.start,
-            cursor: 0,
-        }
+        self.chunk_range.lock().clone()
     }
 
     /// Helper function to create per-chunk processing work packets.
@@ -278,30 +275,6 @@ impl ChunkMap {
         self.generate_tasks(scheduler.num_workers(), |chunks| {
             box SweepChunks(space, chunks)
         })
-    }
-}
-
-/// Iterator to iterate over all allocated chunks.
-struct AllocatedChunksIter<'a> {
-    table: &'a [AtomicU8],
-    start: Address,
-    cursor: usize,
-}
-
-impl<'a> Iterator for AllocatedChunksIter<'a> {
-    type Item = Chunk;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        while self.cursor < self.table.len() {
-            let state = self.table[self.cursor].load(Ordering::Acquire);
-            let cursor = self.cursor;
-            self.cursor += 1;
-            if state == 1 {
-                return Some(Chunk::from(self.start + (cursor << Chunk::LOG_BYTES)));
-            }
-        }
-        None
     }
 }
 
