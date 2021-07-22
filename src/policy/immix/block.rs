@@ -55,9 +55,9 @@ impl Block {
     pub const DEFRAG_STATE_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
         offset: if super::BLOCK_ONLY {
-            LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
+            LOCAL_SIDE_METADATA_BASE_OFFSET
         } else {
-            Line::MARK_TABLE.accumulated_size()
+            SideMetadataOffset::layout_after(&Line::MARK_TABLE)
         },
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,
@@ -66,7 +66,7 @@ impl Block {
     /// Block mark table (side)
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
-        offset: Self::DEFRAG_STATE_TABLE.accumulated_size(),
+        offset: SideMetadataOffset::layout_after(&Self::DEFRAG_STATE_TABLE),
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,
     };

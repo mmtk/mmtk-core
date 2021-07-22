@@ -3,16 +3,19 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
-use crate::plan::marksweep::gc_work::MSProcessEdges;
+use crate::plan::marksweep::gc_work::{MSProcessEdges, MSSweepChunks};
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::mallocspace::metadata::ACTIVE_CHUNK_METADATA_SPEC;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+#[cfg(feature = "analysis")]
+use crate::util::analysis::GcHookWork;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -61,11 +64,14 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, NoCopy<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(&self));
         scheduler.work_buckets[WorkBucketStage::RefClosure]
             .add(ProcessWeakRefs::<MSProcessEdges<VM>>::new());
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, NoCopy<VM>>::new(self));
+        #[cfg(feature = "analysis")]
+        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
         // Resume mutators
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
@@ -85,7 +91,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         trace!("Marksweep: Release");
         self.common.release(tls, true);
-        self.ms.release_all_chunks();
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
@@ -130,7 +135,8 @@ impl<VM: VMBinding> MarkSweep<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let global_metadata_specs =
+            SideMetadataContext::new_global_specs(&[ACTIVE_CHUNK_METADATA_SPEC]);
 
         let res = MarkSweep {
             ms: MallocSpace::new(global_metadata_specs.clone()),

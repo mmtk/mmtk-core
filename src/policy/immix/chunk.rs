@@ -1,7 +1,7 @@
 use super::block::{Block, BlockState};
 use super::defrag::MarkHistogram;
 use super::immixspace::ImmixSpace;
-use crate::util::metadata::side_metadata::{self, SideMetadataSpec};
+use crate::util::metadata::side_metadata::{self, SideMetadataOffset, SideMetadataSpec};
 use crate::{
     scheduler::*,
     util::{heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK, Address},
@@ -167,7 +167,7 @@ impl ChunkMap {
     /// Chunk alloc table
     pub const ALLOC_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
-        offset: Block::MARK_TABLE.accumulated_size(),
+        offset: SideMetadataOffset::layout_after(&Block::MARK_TABLE),
         log_num_of_bits: 3,
         log_min_obj_size: Chunk::LOG_BYTES,
     };

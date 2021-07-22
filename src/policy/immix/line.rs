@@ -24,7 +24,7 @@ impl Line {
     /// Line mark table (side)
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
-        offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+        offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,
     };
