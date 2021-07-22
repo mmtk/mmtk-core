@@ -219,22 +219,14 @@ impl ChunkMap {
     /// Helper function to create per-chunk processing work packets.
     pub fn generate_tasks<VM: VMBinding>(
         &self,
-        workers: usize,
-        func: impl Fn(Range<Chunk>) -> Box<dyn Work<MMTK<VM>>>,
+        func: impl Fn(Chunk) -> Box<dyn Work<MMTK<VM>>>,
     ) -> Vec<Box<dyn Work<MMTK<VM>>>> {
-        let Range {
-            start: start_chunk,
-            end: end_chunk,
-        } = self.all_chunks();
-        let chunks = Chunk::steps_between(&start_chunk, &end_chunk).unwrap();
-        let chunks_per_packet = (chunks + (workers * 2 - 1)) / workers;
         let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
-        for start in (start_chunk..end_chunk).step_by(chunks_per_packet) {
-            let mut end = Chunk::forward(start, chunks_per_packet);
-            if end > end_chunk {
-                end = end_chunk;
-            }
-            work_packets.push(func(start..end));
+        for chunk in self
+            .all_chunks()
+            .filter(|c| self.get(*c) == ChunkState::Allocated)
+        {
+            work_packets.push(func(chunk));
         }
         work_packets
     }
@@ -243,27 +235,25 @@ impl ChunkMap {
     pub fn generate_sweep_tasks<VM: VMBinding>(
         &self,
         space: &'static ImmixSpace<VM>,
-        scheduler: &MMTkScheduler<VM>,
     ) -> Vec<Box<dyn Work<MMTK<VM>>>> {
         space.defrag.mark_histograms.lock().clear();
-        self.generate_tasks(scheduler.num_workers(), |chunks| {
-            box SweepChunks(space, chunks)
-        })
+        self.generate_tasks(|chunk| box SweepChunk { space, chunk })
     }
 }
 
 /// Chunk sweeping work packet.
-pub struct SweepChunks<VM: VMBinding>(pub &'static ImmixSpace<VM>, pub Range<Chunk>);
+struct SweepChunk<VM: VMBinding> {
+    space: &'static ImmixSpace<VM>,
+    chunk: Chunk,
+}
 
-impl<VM: VMBinding> GCWork<VM> for SweepChunks<VM> {
+impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        let mut histogram = self.0.defrag.new_mark_histogram();
-        for chunk in self.1.start..self.1.end {
-            if self.0.chunk_map.get(chunk) == ChunkState::Allocated {
-                chunk.sweep(self.0, &mut histogram);
-            }
+        let mut histogram = self.space.defrag.new_mark_histogram();
+        if self.space.chunk_map.get(self.chunk) == ChunkState::Allocated {
+            self.chunk.sweep(self.space, &mut histogram);
         }
-        self.0.defrag.add_completed_mark_histogram(histogram);
+        self.space.defrag.add_completed_mark_histogram(histogram);
     }
 }

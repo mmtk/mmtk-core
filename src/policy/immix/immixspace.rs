@@ -233,19 +233,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
         // # Safety: ImmixSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
-        let work_packets =
-            self.chunk_map
-                .generate_tasks(self.scheduler().num_workers(), |chunks| {
-                    box PrepareBlockState {
-                        space,
-                        chunks,
-                        defrag_threshold: if space.in_defrag() {
-                            Some(threshold)
-                        } else {
-                            None
-                        },
-                    }
-                });
+        let work_packets = self
+            .chunk_map
+            .generate_tasks(|chunk| box PrepareBlockState {
+                space,
+                chunk,
+                defrag_threshold: if space.in_defrag() {
+                    Some(threshold)
+                } else {
+                    None
+                },
+            });
         self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
         // Update line mark state
         if !super::BLOCK_ONLY {
@@ -273,9 +271,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         // Sweep chunks and blocks
         // # Safety: ImmixSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
-        let work_packets = self
-            .chunk_map
-            .generate_sweep_tasks(space, &self.scheduler());
+        let work_packets = self.chunk_map.generate_sweep_tasks(space);
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
         // Update states
         self.in_collection.store(false, Ordering::Release);
@@ -504,7 +500,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 /// Performs the action on a range of chunks.
 pub struct PrepareBlockState<VM: VMBinding> {
     pub space: &'static ImmixSpace<VM>,
-    pub chunks: Range<Chunk>,
+    pub chunk: Chunk,
     pub defrag_threshold: Option<usize>,
 }
 
@@ -522,35 +518,29 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         let defrag_threshold = self.defrag_threshold.unwrap_or(0);
-        for chunk in self
-            .chunks
-            .clone()
-            .filter(|c| self.space.chunk_map.get(*c) == ChunkState::Allocated)
-        {
-            // Clear object mark table for this chunk
-            Self::reset_object_mark(chunk);
-            // Iterate over all blocks in this chunk
-            for block in chunk.blocks() {
-                let state = block.get_state();
-                // Skip unallocated blocks.
-                if state == BlockState::Unallocated {
-                    continue;
-                }
-                // Check if this block needs to be defragmented.
-                if super::DEFRAG
-                    && defrag_threshold != 0
-                    && !state.is_reusable()
-                    && block.get_holes() > defrag_threshold
-                {
-                    block.set_as_defrag_source(true);
-                } else {
-                    block.set_as_defrag_source(false);
-                }
-                // Clear block mark data.
-                block.set_state(BlockState::Unmarked);
-                debug_assert!(!block.get_state().is_reusable());
-                debug_assert_ne!(block.get_state(), BlockState::Marked);
+        // Clear object mark table for this chunk
+        Self::reset_object_mark(self.chunk);
+        // Iterate over all blocks in this chunk
+        for block in self.chunk.blocks() {
+            let state = block.get_state();
+            // Skip unallocated blocks.
+            if state == BlockState::Unallocated {
+                continue;
             }
+            // Check if this block needs to be defragmented.
+            if super::DEFRAG
+                && defrag_threshold != 0
+                && !state.is_reusable()
+                && block.get_holes() > defrag_threshold
+            {
+                block.set_as_defrag_source(true);
+            } else {
+                block.set_as_defrag_source(false);
+            }
+            // Clear block mark data.
+            block.set_state(BlockState::Unmarked);
+            debug_assert!(!block.get_state().is_reusable());
+            debug_assert_ne!(block.get_state(), BlockState::Marked);
         }
     }
 }
