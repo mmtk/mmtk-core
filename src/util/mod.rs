@@ -54,6 +54,8 @@ pub(crate) mod statistics;
 pub(crate) mod test_util;
 /// A treadmill implementation.
 pub(crate) mod treadmill;
+/// Alloc bit
+pub(crate) mod alloc_bit;
 
 // These modules are private. They are only used by other util modules.
 

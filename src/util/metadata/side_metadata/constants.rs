@@ -85,7 +85,7 @@ pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_B
 /// VM bindings must use this to avoid overlap with core internal local side metadata.
 #[cfg(target_pointer_width = "64")]
 pub const LOCAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = LOCAL_SIDE_METADATA_BASE_ADDRESS.add(
-    metadata_address_range_size(&crate::policy::mallocspace::metadata::ALLOC_SIDE_METADATA_SPEC),
+    metadata_address_range_size(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC),
 );
 
 /// The base offset for the local side metadata space available to VM bindings, to be used for the per-object metadata.
@@ -93,6 +93,6 @@ pub const LOCAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = LOCAL_SIDE_METADATA_BAS
 #[cfg(target_pointer_width = "32")]
 pub const LOCAL_SIDE_METADATA_VM_BASE_ADDRESS: Address =
     LOCAL_SIDE_METADATA_BASE_ADDRESS.add(metadata_bytes_per_chunk(
-        crate::policy::mallocspace::metadata::ALLOC_SIDE_METADATA_SPEC.log_min_obj_size,
-        crate::policy::mallocspace::metadata::ALLOC_SIDE_METADATA_SPEC.log_num_of_bits,
+        crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_min_obj_size,
+        crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_num_of_bits,
     ));

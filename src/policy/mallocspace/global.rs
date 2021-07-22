@@ -1,4 +1,5 @@
 use super::metadata::*;
+use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
