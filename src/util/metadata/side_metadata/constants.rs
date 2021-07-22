@@ -68,7 +68,17 @@ pub(super) const LOCAL_SIDE_METADATA_PER_CHUNK: usize =
 
 /// The base address for the global side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal global side metadata.
-pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_BASE_ADDRESS;
+#[cfg(target_pointer_width = "64")]
+pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_BASE_ADDRESS.add(
+    metadata_address_range_size(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC),
+);
+
+#[cfg(target_pointer_width = "32")]
+pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address =
+    GLOBAL_SIDE_METADATA_BASE_ADDRESS.add(metadata_bytes_per_chunk(
+        crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_min_obj_size,
+        crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_num_of_bits,
+    ));
 
 // --------------------------------------------------
 // PolicySpecific Metadata
@@ -83,16 +93,5 @@ pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_B
 
 /// The base address for the local side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal local side metadata.
-#[cfg(target_pointer_width = "64")]
-pub const LOCAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = LOCAL_SIDE_METADATA_BASE_ADDRESS.add(
-    metadata_address_range_size(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC),
-);
+pub const LOCAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = LOCAL_SIDE_METADATA_BASE_ADDRESS;
 
-/// The base offset for the local side metadata space available to VM bindings, to be used for the per-object metadata.
-/// VM bindings must use this to avoid overlap with core internal local side metadata.
-#[cfg(target_pointer_width = "32")]
-pub const LOCAL_SIDE_METADATA_VM_BASE_ADDRESS: Address =
-    LOCAL_SIDE_METADATA_BASE_ADDRESS.add(metadata_bytes_per_chunk(
-        crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_min_obj_size,
-        crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_num_of_bits,
-    ));

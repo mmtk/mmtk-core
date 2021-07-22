@@ -14,9 +14,6 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::{ObjectModel, VMBinding};
 
-use std::collections::HashSet;
-use std::sync::RwLock;
-
 
 /// This is the metadata spec for the alloc-bit.
 ///
@@ -24,7 +21,7 @@ use std::sync::RwLock;
 ///
 #[cfg(target_pointer_width = "32")]
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    is_global: false,
+    is_global: true,
     offset: 0,
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
@@ -32,7 +29,7 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 
 #[cfg(target_pointer_width = "64")]
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    is_global: false,
+    is_global: true,
     offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,

@@ -149,7 +149,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             metadata: SideMetadataContext {
                 global: global_side_metadata_specs,
                 local: metadata::extract_side_metadata(&[
-                    MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
+                    // MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
                     *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 ]),
             },
