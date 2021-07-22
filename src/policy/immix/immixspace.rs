@@ -238,6 +238,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
         // Prepare each block for GC
         let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
+        // # Safety: ImmixSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
         let work_packets =
             self.chunk_map
@@ -277,6 +278,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.reusable_blocks.reset();
         }
         // Sweep chunks and blocks
+        // # Safety: ImmixSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
         let work_packets = self
             .chunk_map
