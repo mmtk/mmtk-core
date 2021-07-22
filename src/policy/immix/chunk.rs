@@ -5,7 +5,7 @@ use super::immixspace::ImmixSpace;
 use crate::util::metadata::side_metadata::{self, SideMetadataSpec};
 use crate::{
     scheduler::*,
-    util::{heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK, Address, ObjectReference},
+    util::{heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK, Address},
     vm::*,
     MMTK,
 };
@@ -37,11 +37,6 @@ impl Chunk {
         address.align_down(Self::BYTES)
     }
 
-    /// Test if the given address is chunk-aligned
-    pub const fn is_aligned(address: Address) -> bool {
-        Self::align(address).as_usize() == address.as_usize()
-    }
-
     /// Get the chunk from a given address.
     /// The address must be chunk-aligned.
     #[inline(always)]
@@ -50,21 +45,9 @@ impl Chunk {
         Self(address)
     }
 
-    /// Get the chunk containing the given address.
-    /// The input address does not need to be aligned.
-    #[inline(always)]
-    pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
-    }
-
     /// Get chunk start address
     pub const fn start(&self) -> Address {
         self.0
-    }
-
-    /// Get chunk end address
-    pub const fn end(&self) -> Address {
-        self.0.add(Self::BYTES)
     }
 
     /// Get a range of blocks within this chunk.

@@ -52,14 +52,6 @@ impl Line {
         Self(address)
     }
 
-    /// Get the line containing the given address.
-    /// The input address does not need to be aligned.
-    #[inline(always)]
-    pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        debug_assert!(!super::BLOCK_ONLY);
-        Self(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
-    }
-
     /// Get the block containing the line.
     #[inline(always)]
     pub fn block(&self) -> Block {
@@ -72,13 +64,6 @@ impl Line {
     pub fn start(&self) -> Address {
         debug_assert!(!super::BLOCK_ONLY);
         self.0
-    }
-
-    /// Get line end address
-    #[inline(always)]
-    pub fn end(&self) -> Address {
-        debug_assert!(!super::BLOCK_ONLY);
-        self.0.add(Self::BYTES)
     }
 
     /// Get line index within its containing block.
@@ -95,13 +80,6 @@ impl Line {
         unsafe {
             side_metadata::store(&Self::MARK_TABLE, self.start(), state as _);
         }
-    }
-
-    /// Get the mark byte address of the line. The address points to the side line mark table.
-    #[inline(always)]
-    pub fn mark_byte_address(&self) -> Address {
-        debug_assert!(!super::BLOCK_ONLY);
-        side_metadata::address_to_meta_address(&Self::MARK_TABLE, self.start())
     }
 
     /// Test line mark state.
