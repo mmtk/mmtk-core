@@ -142,7 +142,7 @@ impl Defrag {
             entry.store(0, Ordering::Relaxed);
         }
         let mut total_available_lines = 0;
-        for block in &space.reusable_blocks {
+        for block in space.reusable_blocks.get_blocks() {
             let bucket = block.get_holes();
             let unavailable_lines = match block.get_state() {
                 BlockState::Reusable { unavailable_lines } => unavailable_lines as usize,

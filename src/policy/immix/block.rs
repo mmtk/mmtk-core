@@ -4,13 +4,12 @@ use crate::util::constants::*;
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
+use crossbeam_queue::SegQueue;
+use spin::RwLock;
 use std::{
     iter::Step,
     ops::Range,
-    sync::{
-        atomic::{AtomicPtr, AtomicU8, AtomicUsize, Ordering},
-        Mutex, MutexGuard,
-    },
+    sync::atomic::{AtomicU8, Ordering},
 };
 
 /// The block allocation state.
@@ -253,152 +252,48 @@ unsafe impl Step for Block {
     }
 }
 
-struct Node<T> {
-    value: T,
-    next: AtomicPtr<Node<T>>,
-}
-
 /// A non-block single-linked list to store blocks.
 #[derive(Default)]
 pub struct BlockList {
-    head: AtomicPtr<Node<Block>>,
-    len: AtomicUsize,
-    sync: Mutex<()>,
+    queue: RwLock<SegQueue<Block>>,
 }
 
 impl BlockList {
     /// Get number of blocks in this list.
     #[inline]
     pub fn len(&self) -> usize {
-        self.len.load(Ordering::SeqCst)
+        self.queue.read().len()
     }
 
     /// Add a block to the list.
     #[inline]
     pub fn push(&self, block: Block) {
-        let node = Box::leak(box Node {
-            value: block,
-            next: AtomicPtr::default(),
-        });
-        loop {
-            let next = self.head.load(Ordering::SeqCst);
-            node.next.store(next, Ordering::SeqCst);
-            if self
-                .head
-                .compare_exchange(next, node, Ordering::SeqCst, Ordering::SeqCst)
-                .is_ok()
-            {
-                break;
-            }
-        }
-        self.len.fetch_add(1, Ordering::SeqCst);
+        self.queue.read().push(block)
     }
 
     /// Pop a block out of the list.
     #[inline]
     pub fn pop(&self) -> Option<Block> {
-        loop {
-            let head = self.head.load(Ordering::SeqCst);
-            if head.is_null() {
-                return None;
-            }
-            let next = unsafe { (*head).next.load(Ordering::SeqCst) };
-            if self
-                .head
-                .compare_exchange(head, next, Ordering::SeqCst, Ordering::SeqCst)
-                .is_ok()
-            {
-                let block = unsafe { (*head).value };
-                unsafe { Box::from_raw(head) };
-                self.len.fetch_sub(1, Ordering::SeqCst);
-                return Some(block);
-            }
-        }
+        self.queue.read().pop()
     }
 
     /// Clear the list.
     #[inline]
     pub fn reset(&self) {
-        let _guard = self.sync.lock().unwrap();
-        self.len.store(0, Ordering::SeqCst);
-        loop {
-            let head = self.head.load(Ordering::SeqCst);
-            if head.is_null() {
-                return;
-            }
-            self.head.store(
-                unsafe { (*head).next.load(Ordering::SeqCst) },
-                Ordering::SeqCst,
-            );
-            unsafe { Box::from_raw(head) };
-        }
+        *self.queue.write() = SegQueue::new()
     }
 
-    /// Iterate all blocks in the list.
-    /// Note: this can only be called by a single thread.
+    /// Get an array of all reusable blocks stored in this BlockList.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = Block> {
-        BlockListIter {
-            head: self.head.load(Ordering::SeqCst),
+    pub fn get_blocks(&self) -> Vec<Block> {
+        let mut queue = self.queue.write();
+        let mut blocks = Vec::with_capacity(queue.len());
+        let new_queue = SegQueue::new();
+        while let Some(block) = queue.pop() {
+            new_queue.push(block);
+            blocks.push(block);
         }
-    }
-}
-
-impl<'a> IntoIterator for &'a BlockList {
-    type Item = Block;
-    type IntoIter = impl Iterator<Item = Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-struct BlockListIter {
-    head: *mut Node<Block>,
-}
-
-impl Iterator for BlockListIter {
-    type Item = Block;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.head.is_null() {
-            None
-        } else {
-            let node = unsafe { &mut *self.head };
-            self.head = node.next.load(Ordering::SeqCst);
-            Some(node.value)
-        }
-    }
-}
-
-struct DrainFilter<'a, F: 'a + FnMut(&mut Block) -> bool> {
-    head: &'a AtomicPtr<Node<Block>>,
-    predicate: F,
-    _guard: MutexGuard<'a, ()>,
-}
-
-impl<'a, F: 'a + FnMut(&mut Block) -> bool> Iterator for DrainFilter<'a, F> {
-    type Item = Block;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let node_ptr = self.head.load(Ordering::SeqCst);
-            if node_ptr.is_null() {
-                return None;
-            } else {
-                let node = unsafe { &mut *node_ptr };
-                if (self.predicate)(&mut node.value) {
-                    let block = node.value;
-                    self.head
-                        .store(node.next.load(Ordering::SeqCst), Ordering::SeqCst);
-                    unsafe { Box::from_raw(node_ptr) };
-                    return Some(block);
-                } else {
-                    self.head = &node.next;
-                }
-            }
-        }
+        *queue = new_queue;
+        blocks
     }
 }
