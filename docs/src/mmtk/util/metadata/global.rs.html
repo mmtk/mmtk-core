@@ -210,6 +210,14 @@
 <span id="207">207</span>
 <span id="208">208</span>
 <span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::side_metadata::SideMetadataSpec</span>;
@@ -226,15 +234,23 @@
 <span class="doccomment">/// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// For performance reasons, objects of this struct should be constants.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">MetadataSpec</span> {
     <span class="ident">InHeader</span>(<span class="ident">HeaderMetadataSpec</span>),
     <span class="ident">OnSide</span>(<span class="ident">SideMetadataSpec</span>),
 }
 
 <span class="kw">impl</span> <span class="ident">MetadataSpec</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_on_side</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">is_on_side</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="macro">matches!</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span><span class="ident">MetadataSpec::OnSide</span>(<span class="kw">_</span>))
+    }
+
+    <span class="doccomment">/// Extract SideMetadataSpec from a MetadataSpec. Panics if this is not side metadata.</span>
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">extract_side_spec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">spec</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">spec</span>,
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;Expect a side spec&quot;</span>),
+        }
     }
 }
 

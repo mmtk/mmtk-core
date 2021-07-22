@@ -511,12 +511,6 @@
 <span id="508">508</span>
 <span id="509">509</span>
 <span id="510">510</span>
-<span id="511">511</span>
-<span id="512">512</span>
-<span id="513">513</span>
-<span id="514">514</span>
-<span id="515">515</span>
-<span id="516">516</span>
 </pre><pre class="rust">
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
@@ -534,14 +528,14 @@
     <span class="kw">fn</span> <span class="ident">test_side_metadata_address_to_meta_address</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>(),
+            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
             <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
         };
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-            <span class="ident">offset</span>: <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>(),
+            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
             <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
         };
@@ -549,96 +543,96 @@
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-            <span class="ident">offset</span>: <span class="number">0</span>,
+            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
             <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
         };
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>()
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
+            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>
         );
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>()
-        );
-
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">7</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>()
-        );
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">7</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>()
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
+            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>
         );
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">27</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> <span class="number">3</span>
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">7</span>) }),
+            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>
         );
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">129</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> <span class="number">16</span>
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">7</span>) }),
+            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>
+        );
+
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">27</span>) }),
+            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">3usize</span>
+        );
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">129</span>) }),
+            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">16usize</span>
         );
 
         <span class="ident">gspec</span>.<span class="ident">log_min_obj_size</span> <span class="op">=</span> <span class="number">2</span>;
         <span class="ident">lspec</span>.<span class="ident">log_min_obj_size</span> <span class="op">=</span> <span class="number">1</span>;
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>()
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
+            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>
         );
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>()
-        );
-
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> <span class="number">1</span>
-        );
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> <span class="number">2</span>
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
+            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>
         );
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">316</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> <span class="number">9</span>
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }),
+            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">1usize</span>
         );
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">316</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> <span class="number">19</span>
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }),
+            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">2usize</span>
+        );
+
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">316</span>) }),
+            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">9usize</span>
+        );
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">316</span>) }),
+            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">19usize</span>
         );
 
         <span class="ident">gspec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">1</span>;
         <span class="ident">lspec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">3</span>;
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>()
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
+            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>
         );
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>()
-        );
-
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> <span class="number">2</span>
-        );
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> <span class="number">16</span>
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
+            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>
         );
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">316</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> <span class="number">19</span>
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }),
+            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">2usize</span>
         );
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">318</span>) }).<span class="ident">as_usize</span>(),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>() <span class="op">+</span> <span class="number">159</span>
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }),
+            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">16usize</span>
+        );
+
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">316</span>) }),
+            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">19usize</span>
+        );
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">318</span>) }),
+            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">159usize</span>
         );
     }
 
@@ -646,7 +640,7 @@
     <span class="kw">fn</span> <span class="ident">test_side_metadata_meta_byte_mask</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>(),
+            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
             <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
         };
@@ -665,7 +659,7 @@
     <span class="kw">fn</span> <span class="ident">test_side_metadata_meta_byte_lshift</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>(),
+            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
             <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
         };
@@ -712,21 +706,21 @@
                     <span class="comment">// sanity::reset();</span>
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
                         <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-                        <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>(),
+                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
                         <span class="ident">log_min_obj_size</span>: <span class="number">1</span>,
                     };
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>(),
+                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
                         <span class="ident">log_min_obj_size</span>: <span class="number">1</span>,
                     };
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="number">0</span>,
+                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
                         <span class="ident">log_min_obj_size</span>: <span class="number">1</span>,
                     };
@@ -826,15 +820,14 @@
 
                     <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
                         <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-                        <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>(),
+                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
                         <span class="ident">log_min_obj_size</span>: <span class="number">6</span>,
                     };
 
                     <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
                         <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-                        <span class="ident">offset</span>: <span class="ident">metadata_1_spec</span>.<span class="ident">offset</span>
-                            <span class="op">+</span> <span class="ident">metadata_address_range_size</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>),
+                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
                         <span class="ident">log_min_obj_size</span>: <span class="number">7</span>,
                     };
@@ -899,7 +892,7 @@
 
                     <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
                         <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-                        <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>(),
+                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
                         <span class="ident">log_min_obj_size</span>: <span class="ident">constants::LOG_BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">usize</span>,
                     };
@@ -953,15 +946,14 @@
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>.<span class="ident">as_usize</span>(),
+                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
                         <span class="ident">log_min_obj_size</span>: <span class="number">9</span>,
                     };
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="ident">metadata_1_spec</span>.<span class="ident">offset</span>
-                            <span class="op">+</span> <span class="ident">metadata_address_range_size</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>) <span class="kw">as</span> <span class="ident">usize</span>,
+                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
                         <span class="ident">log_min_obj_size</span>: <span class="number">7</span>,
                     };
@@ -969,18 +961,14 @@
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="number">0</span>,
+                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
                         <span class="ident">log_min_obj_size</span>: <span class="number">9</span>,
                     };
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="ident">metadata_1_spec</span>.<span class="ident">offset</span>
-                            <span class="op">+</span> <span class="ident">metadata_bytes_per_chunk</span>(
-                                <span class="ident">metadata_1_spec</span>.<span class="ident">log_min_obj_size</span>,
-                                <span class="ident">metadata_1_spec</span>.<span class="ident">log_num_of_bits</span>,
-                            ),
+                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
                         <span class="ident">log_min_obj_size</span>: <span class="number">7</span>,
                     };
