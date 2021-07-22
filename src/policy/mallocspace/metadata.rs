@@ -1,14 +1,11 @@
 use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
 use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
-#[cfg(target_pointer_width = "64")]
-use crate::util::metadata::side_metadata::metadata_address_range_size;
-#[cfg(target_pointer_width = "32")]
-use crate::util::metadata::side_metadata::metadata_bytes_per_chunk;
 use crate::util::metadata::side_metadata::SideMetadataContext;
+use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::side_metadata::GLOBAL_SIDE_METADATA_BASE_ADDRESS;
-use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
+use crate::util::metadata::side_metadata::GLOBAL_SIDE_METADATA_BASE_OFFSET;
+use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -41,7 +38,7 @@ lazy_static! {
 /// overwriting the previous mapping.
 pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: true,
-    offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+    offset: GLOBAL_SIDE_METADATA_BASE_OFFSET,
     log_num_of_bits: 3,
     log_min_obj_size: LOG_BYTES_IN_CHUNK as usize,
 };
@@ -55,11 +52,7 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec
 ///
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
-    offset: if cfg!(target_pointer_width = "64") {
-        LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
-    } else {
-        0
-    },
+    offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
@@ -74,23 +67,9 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 /// the same time
 // XXX: This metadata spec is currently unused as we need to add a performant way to calculate
 // how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers
-#[cfg(target_pointer_width = "64")]
 pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
-    offset: ALLOC_SIDE_METADATA_SPEC.offset
-        + metadata_address_range_size(&ALLOC_SIDE_METADATA_SPEC),
-    log_num_of_bits: 3,
-    log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
-};
-
-#[cfg(target_pointer_width = "32")]
-pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    is_global: false,
-    offset: ALLOC_SIDE_METADATA_SPEC.offset
-        + metadata_bytes_per_chunk(
-            ALLOC_SIDE_METADATA_SPEC.log_min_obj_size,
-            ALLOC_SIDE_METADATA_SPEC.log_num_of_bits,
-        ),
+    offset: SideMetadataOffset::layout_after(&ALLOC_SIDE_METADATA_SPEC),
     log_num_of_bits: 3,
     log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
 };
@@ -116,7 +95,7 @@ fn map_active_chunk_metadata(chunk_start: Address) {
     #[cfg(target_pointer_width = "32")]
     let size = 512 * BYTES_IN_CHUNK;
 
-    info!(
+    debug!(
         "chunk_start = {} mapping space for {} -> {}",
         chunk_start,
         start,
