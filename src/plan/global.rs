@@ -321,9 +321,6 @@ pub trait Plan: 'static + Sync + Downcast {
             );
         }
     }
-
-    /// Notify the plan before any worker thread is started.
-    fn pre_worker_spawn(&self, _mmtk: &'static MMTK<Self::VM>) {}
 }
 
 impl_downcast!(Plan assoc VM);

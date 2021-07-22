@@ -1,5 +1,3 @@
-use spin::Mutex;
-
 use super::block::{Block, BlockState};
 use super::immixspace::ImmixSpace;
 use crate::util::metadata::side_metadata::{self, SideMetadataSpec};
@@ -9,11 +7,8 @@ use crate::{
     vm::*,
     MMTK,
 };
-use std::{
-    iter::Step,
-    ops::Range,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use spin::Mutex;
+use std::{iter::Step, ops::Range, sync::atomic::Ordering};
 
 /// Data structure to reference a MMTk 4 MB chunk.
 #[repr(C)]
@@ -59,7 +54,7 @@ impl Chunk {
     }
 
     /// Sweep this chunk.
-    pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>, mark_histogram: &[AtomicUsize]) {
+    pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>, mark_histogram: &mut [usize]) {
         let mut allocated_blocks = 0; // number of allocated blocks.
         if super::BLOCK_ONLY {
             // Iterate over all blocks in this chunk.
@@ -118,8 +113,7 @@ impl Chunk {
                         block.set_state(BlockState::Unmarked);
                     }
                     // Update mark_histogram
-                    let old_value = mark_histogram[holes].load(Ordering::Relaxed);
-                    mark_histogram[holes].store(old_value + marked_lines, Ordering::Relaxed);
+                    mark_histogram[holes] += marked_lines;
                     // Record number of holes in block side metadata.
                     block.set_holes(holes);
                 }
@@ -250,11 +244,7 @@ impl ChunkMap {
         space: &'static ImmixSpace<VM>,
         scheduler: &MMTkScheduler<VM>,
     ) -> Vec<Box<dyn Work<MMTK<VM>>>> {
-        for table in &*space.defrag.spill_mark_histograms.read().unwrap() {
-            for entry in table.iter() {
-                entry.store(0, Ordering::Release);
-            }
-        }
+        space.defrag.mark_histograms.lock().clear();
         self.generate_tasks(scheduler.num_workers(), |chunks| {
             box SweepChunks(space, chunks)
         })
@@ -266,11 +256,13 @@ pub struct SweepChunks<VM: VMBinding>(pub &'static ImmixSpace<VM>, pub Range<Chu
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunks<VM> {
     #[inline]
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        let mut histogram = self.0.defrag.new_mark_histogram();
         for chunk in self.1.start..self.1.end {
             if self.0.chunk_map.get(chunk) == ChunkState::Allocated {
-                chunk.sweep(self.0, &self.0.defrag.mark_histogram(worker.ordinal));
+                chunk.sweep(self.0, &mut *histogram);
             }
         }
+        self.0.defrag.add_completed_mark_histogram(histogram);
     }
 }

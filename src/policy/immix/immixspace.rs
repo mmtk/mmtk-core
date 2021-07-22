@@ -175,11 +175,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.defrag.in_defrag()
     }
 
-    /// Initialize defrag data
-    pub fn initialize_defrag(&self, mmtk: &MMTK<VM>) {
-        self.defrag.prepare_histograms(mmtk);
-    }
-
     /// check if the current GC should do defragmentation.
     pub fn decide_whether_to_defrag(&self, emergency_collection: bool, collection_attempts: usize) {
         self.defrag.decide_whether_to_defrag(
