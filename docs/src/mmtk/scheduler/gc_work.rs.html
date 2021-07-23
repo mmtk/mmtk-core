@@ -645,7 +645,7 @@
 <span class="doccomment">/// The global GC release Work</span>
 <span class="doccomment">/// This work packet invokes release() for the plan (which will invoke release() for each space), and</span>
 <span class="doccomment">/// pushes work packets for releasing mutators and collectors.</span>
-<span class="doccomment">/// We should only have one such work packet per GC, before any actual GC work starts.</span>
+<span class="doccomment">/// We should only have one such work packet per GC, after all actual GC work ends.</span>
 <span class="doccomment">/// We assume this work packet is the only running work packet that accesses plan, and there should</span>
 <span class="doccomment">/// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may</span>
 <span class="doccomment">/// be a race condition.</span>
