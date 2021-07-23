@@ -186,11 +186,15 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
+                #[cfg(feature = "global_alloc_bit")]
+                crate::util::alloc_bit::unset_addr_alloc_bit(cell);
                 self.pr.release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
+                #[cfg(feature = "global_alloc_bit")]
+                crate::util::alloc_bit::unset_addr_alloc_bit(cell);
                 self.pr.release_pages(get_super_page(cell));
             }
         }

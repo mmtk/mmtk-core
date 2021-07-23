@@ -45,11 +45,21 @@ pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Add
     );
 }
 
+
 pub fn set_alloc_bit(object: ObjectReference) {
     side_metadata::store_atomic(
         &ALLOC_SIDE_METADATA_SPEC,
         object.to_address(),
         1,
+        Ordering::SeqCst,
+    );
+}
+
+pub fn unset_addr_alloc_bit(address: Address) {
+    side_metadata::store_atomic(
+        &ALLOC_SIDE_METADATA_SPEC,
+        address,
+        0,
         Ordering::SeqCst,
     );
 }
@@ -69,6 +79,10 @@ pub fn is_alloced(object: ObjectReference) -> bool {
 
 pub fn is_alloced_object(address: Address) -> bool {
     side_metadata::load_atomic(&ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
+}
+
+pub fn bzero_alloc_bit(start: Address, size: usize) {
+    side_metadata::bzero_metadata(&ALLOC_SIDE_METADATA_SPEC, start, size);
 }
 
 
