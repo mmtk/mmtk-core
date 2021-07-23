@@ -4,6 +4,9 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::freelistmarksweep::FreeListMarkSweep;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
+use crate::policy::marksweepspace::MarkSweepSpace;
+use crate::util::alloc::Allocator;
+use crate::util::alloc::FreeListAllocator;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
@@ -16,8 +19,22 @@ lazy_static! {
         AllocationType::Los | AllocationType::Immortal => AllocatorSelector::BumpPointer(0),
     };
 }
-pub fn flms_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    // Do nothing
+pub fn flms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+    eprintln!("flms_mutator_prepare");
+    let free_list_allocator = unsafe {
+        mutator
+            .allocators
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
+    }
+    .downcast_mut::<FreeListAllocator<VM>>()
+    .unwrap();
+    free_list_allocator.rebind(
+        mutator
+                .plan
+                .downcast_ref::<FreeListMarkSweep<VM>>()
+                .unwrap()
+                .ms_space()
+    )
 }
 
 pub fn flms_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
