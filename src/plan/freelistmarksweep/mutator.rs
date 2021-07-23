@@ -20,7 +20,6 @@ lazy_static! {
     };
 }
 pub fn flms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-
 }
 
 pub fn flms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
