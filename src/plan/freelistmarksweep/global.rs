@@ -165,4 +165,8 @@ impl<VM: VMBinding> FreeListMarkSweep<VM> {
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res
     }
+
+    pub fn ms_space(&self) -> &MarkSweepSpace<VM> {
+        &self.ms_space
+    }
 }
