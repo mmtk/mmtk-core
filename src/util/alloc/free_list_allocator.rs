@@ -122,7 +122,7 @@ const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE*8;
 const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
 
 // mimalloc init.c:46
-const BLOCK_QUEUES_EMPTY: [BlockQueue; 74] = [
+pub(crate) const BLOCK_QUEUES_EMPTY: [BlockQueue; 74] = [
     BlockQueue::new(     1*4),
     BlockQueue::new(     1*4), BlockQueue::new(     2*4), BlockQueue::new(     3*4), BlockQueue::new(     4*4), BlockQueue::new(     5*4), BlockQueue::new(     6*4), BlockQueue::new(     7*4), BlockQueue::new(     8*4), /* 8 */ 
     BlockQueue::new(    10*4), BlockQueue::new(    12*4), BlockQueue::new(    14*4), BlockQueue::new(    16*4), BlockQueue::new(    20*4), BlockQueue::new(    24*4), BlockQueue::new(    28*4), BlockQueue::new(    32*4), /* 16 */ 
