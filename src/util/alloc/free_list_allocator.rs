@@ -3,7 +3,7 @@ use std::{mem::size_of, ops::BitAnd};
 use atomic::Ordering;
 use libc::c_void;
 
-use crate::{Plan, policy::{marksweepspace::MarkSweepSpace, space::Space}, util::{Address, OpaquePointer, VMThread, VMWorkerThread, constants::{LOG_BYTES_IN_PAGE}, metadata::{MetadataSpec, compare_exchange_metadata, load_metadata, store_metadata}}, vm::VMBinding};
+use crate::{Plan, policy::{marksweepspace::{MarkSweepSpace, metadata::{set_alloc_bit, unset_alloc_bit}}, space::Space}, util::{Address, OpaquePointer, VMThread, VMWorkerThread, constants::{LOG_BYTES_IN_PAGE}, metadata::{MetadataSpec, compare_exchange_metadata, load_metadata, store_metadata}}, vm::VMBinding};
 
 use super::Allocator;
 
@@ -111,6 +111,10 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             next_cell.as_usize(), None, 
             None
         );
+
+        // set allocation bit
+        set_alloc_bit(unsafe { free_list.to_object_reference() });
+
         free_list
     }
 
@@ -132,11 +136,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                 )
             )
         };
-
-        // if free_list == unsafe { Address::zero() } {
-        //     // first block has no empty cells, go to slow path
-        //     return self.alloc_slow_once(size, align, offset);
-        // }
         
         // update free list
         let next_cell = unsafe { free_list.load::<Address>() };
@@ -145,7 +144,11 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             unsafe{block.to_object_reference()}, 
             next_cell.as_usize(), None, 
             None
-        );
+        ); 
+
+        // set allocation bit
+        set_alloc_bit(unsafe { free_list.to_object_reference() });
+
         free_list
     }
 }
@@ -364,7 +367,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn acquire_block_for_size(&mut self, size: usize) -> Address {
-        // eprintln!("Acquire block for size {}", size);
+        eprintln!("Acquire block for size {}", size);
         let block = self.acquire_block();
 
         // construct free list
@@ -385,6 +388,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         };
         let next = block_queue.first;
         block_queue.first = block;
+        eprintln!("Go go metadata");
         store_metadata::<VM>(MetadataSpec::OnSide(self.space.get_next_metadata_spec()), unsafe{ block.to_object_reference() }, next.as_usize(), None, None);
         store_metadata::<VM>(MetadataSpec::OnSide(self.space.get_free_metadata_spec()), unsafe{ block.to_object_reference() }, final_cell.as_usize(), None, None);
         store_metadata::<VM>(MetadataSpec::OnSide(self.space.get_size_metadata_spec()), unsafe{ block.to_object_reference() }, size, None, None);
@@ -394,15 +398,17 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         block
     }
 
-    fn get_owning_block(addr: Address) -> Address {
-        unsafe { Address::from_usize(addr.bitand(0x10000 as usize)) }
+    pub fn get_owning_block(addr: Address) -> Address {
+        let block = unsafe { Address::from_usize(addr.bitand(!0xFFFF as usize)) };
+        block
     }
 
     
     fn acquire_block(&self) -> Address {
         // acquire 64kB block
-        let a = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
-        a
+        let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
+        self.space.active_blocks.lock().unwrap().insert(block);
+        block
     }
 
     pub fn return_block(&self) {
@@ -422,63 +428,66 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     } 
 
 
-    pub fn free(space: &'static MarkSweepSpace<VM>, addr: Address, tls: VMWorkerThread) {
+    // pub fn free(space: &'static MarkSweepSpace<VM>, addr: Address, tls: VMWorkerThread) {
 
-        let block = FreeListAllocator::<VM>::get_owning_block(addr);
-        let block_tls = space.load_block_tls(block);
+    //     let block = FreeListAllocator::<VM>::get_owning_block(addr);
+    //     let block_tls = space.load_block_tls(block);
 
-        if tls.0.0 == block_tls {
-            // same thread that allocated
-            let local_free = unsafe {
-                Address::from_usize(
-                    load_metadata::<VM>(
-                        MetadataSpec::OnSide(space.get_local_free_metadata_spec()), 
-                        block.to_object_reference(), 
-                        None, 
-                        None,
-                    )
-                )
-            };
-            unsafe {
-                addr.store(local_free);
-            }
-            store_metadata::<VM>(
-                MetadataSpec::OnSide(space.get_free_metadata_spec()),
-                unsafe{block.to_object_reference()}, 
-                addr.as_usize(), None, 
-                None
-            );
-        } else {
-            // different thread to allocator
-            let mut success = false;
-            while !success {
-                let thread_free = unsafe {
-                    Address::from_usize(
-                        load_metadata::<VM>(
-                            MetadataSpec::OnSide(space.get_thread_free_metadata_spec()), 
-                            block.to_object_reference(), 
-                            None, 
-                            Some(Ordering::SeqCst),
-                        )
-                    )
-                };
-                unsafe {
-                    addr.store(thread_free);
-                }
-                success = compare_exchange_metadata::<VM>(
-                    MetadataSpec::OnSide(space.get_free_metadata_spec()),
-                    unsafe{block.to_object_reference()}, 
-                    thread_free.as_usize(), 
-                    addr.as_usize(), 
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst, //?
-                );
-            }
-        }
+    //     if tls.0.0 == block_tls {
+    //         // same thread that allocated
+    //         let local_free = unsafe {
+    //             Address::from_usize(
+    //                 load_metadata::<VM>(
+    //                     MetadataSpec::OnSide(space.get_local_free_metadata_spec()), 
+    //                     block.to_object_reference(), 
+    //                     None, 
+    //                     None,
+    //                 )
+    //             )
+    //         };
+    //         unsafe {
+    //             addr.store(local_free);
+    //         }
+    //         store_metadata::<VM>(
+    //             MetadataSpec::OnSide(space.get_free_metadata_spec()),
+    //             unsafe{block.to_object_reference()}, 
+    //             addr.as_usize(), None, 
+    //             None
+    //         );
+    //     } else {
+    //         // different thread to allocator
+    //         let mut success = false;
+    //         while !success {
+    //             let thread_free = unsafe {
+    //                 Address::from_usize(
+    //                     load_metadata::<VM>(
+    //                         MetadataSpec::OnSide(space.get_thread_free_metadata_spec()), 
+    //                         block.to_object_reference(), 
+    //                         None, 
+    //                         Some(Ordering::SeqCst),
+    //                     )
+    //                 )
+    //             };
+    //             unsafe {
+    //                 addr.store(thread_free);
+    //             }
+    //             success = compare_exchange_metadata::<VM>(
+    //                 MetadataSpec::OnSide(space.get_free_metadata_spec()),
+    //                 unsafe{block.to_object_reference()}, 
+    //                 thread_free.as_usize(), 
+    //                 addr.as_usize(), 
+    //                 None,
+    //                 Ordering::SeqCst,
+    //                 Ordering::SeqCst, //?
+    //             );
+    //         }
+    //     }
+        
 
+    //     // unset allocation bit
+    //     unset_alloc_bit(unsafe { addr.to_object_reference() });
 
-    }
+    // }
 
 
     fn mi_wsize_from_size(size: usize) -> usize {
