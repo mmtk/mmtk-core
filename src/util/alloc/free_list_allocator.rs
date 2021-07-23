@@ -18,7 +18,7 @@ const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE*8;
 const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
 
 // mimalloc init.c:46
-const BLOCK_QUEUES_EMPTY: [BlockQueue; 74] = [
+pub(crate) const BLOCK_QUEUES_EMPTY: [BlockQueue; 74] = [
     BlockQueue::new(     1*4),
     BlockQueue::new(     1*4), BlockQueue::new(     2*4), BlockQueue::new(     3*4), BlockQueue::new(     4*4), BlockQueue::new(     5*4), BlockQueue::new(     6*4), BlockQueue::new(     7*4), BlockQueue::new(     8*4), /* 8 */ 
     BlockQueue::new(    10*4), BlockQueue::new(    12*4), BlockQueue::new(    14*4), BlockQueue::new(    16*4), BlockQueue::new(    20*4), BlockQueue::new(    24*4), BlockQueue::new(    28*4), BlockQueue::new(    32*4), /* 16 */ 
@@ -396,7 +396,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         block
     }
 
-    pub fn get_owning_block(addr: Address) -> Address {
+    pub fn get_block(addr: Address) -> Address {
         let block = unsafe { Address::from_usize(addr.bitand(!0xFFFF as usize)) };
         block
     }
@@ -407,11 +407,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
         self.space.active_blocks.lock().unwrap().insert(block);
         block
-    }
-
-    pub fn return_block(&self) {
-        // return freed 64kB block
-        todo!()
     }
 
     pub fn store_block_tls(&self, block: Address) {
