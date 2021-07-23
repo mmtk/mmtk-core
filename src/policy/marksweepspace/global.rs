@@ -35,7 +35,8 @@ use crate::vm::ObjectModel;
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub active_blocks: Mutex<HashSet<Address>>,
     pub common: CommonSpace<VM>,
-    pr: FreeListPageResource<VM>    
+    pr: FreeListPageResource<VM>,
+    marked_blocks: HashMap<usize, Vec<free_list_allocator::BlockQueue>>
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
@@ -137,6 +138,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
+
+        let side_metadata_marked = SideMetadataSpec {
+            is_global: false,
+            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&side_metadata_local_free) + metadata_address_range_size(&side_metadata_thread_free) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
         let mut local_specs = {
             vec![
                 side_metadata_next,
@@ -145,6 +153,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 side_metadata_local_free,
                 side_metadata_thread_free,
                 side_metadata_tls,
+                side_metadata_marked,
             ]
         };
 
@@ -174,6 +183,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
+            marked_blocks: HashMap::default(),
         }
     }
 
@@ -193,6 +203,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         );
         if !is_marked::<VM>(object) {
             set_mark_bit::<VM>(object);
+            let block = FreeListAllocator::<VM>::get_block(address);
+            self.mark_block(block);
             trace.process_node(object);
         }
         object
