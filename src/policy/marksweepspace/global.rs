@@ -205,14 +205,10 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn eager_sweep(&self, tls: VMWorkerThread) {
-        // eprintln!("Eager sweep");
         let active_blocks = &*self.active_blocks.lock().unwrap();
         for block in active_blocks {
             self.sweep_block(*block, tls)
         }
-        // todo!()
-        // // call sweep_block on all blocks
-        // // how to access all blocks?
     }
 
     pub fn sweep_block(&self, block: Address, tls: VMWorkerThread) {

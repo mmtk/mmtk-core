@@ -367,7 +367,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn acquire_block_for_size(&mut self, size: usize) -> Address {
-        eprintln!("Acquire block for size {}", size);
         let block = self.acquire_block();
 
         // construct free list
@@ -388,7 +387,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         };
         let next = block_queue.first;
         block_queue.first = block;
-        eprintln!("Go go metadata");
         store_metadata::<VM>(MetadataSpec::OnSide(self.space.get_next_metadata_spec()), unsafe{ block.to_object_reference() }, next.as_usize(), None, None);
         store_metadata::<VM>(MetadataSpec::OnSide(self.space.get_free_metadata_spec()), unsafe{ block.to_object_reference() }, final_cell.as_usize(), None, None);
         store_metadata::<VM>(MetadataSpec::OnSide(self.space.get_size_metadata_spec()), unsafe{ block.to_object_reference() }, size, None, None);
@@ -425,7 +423,19 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             None, 
             None
         );
-    } 
+    }
+
+    pub fn reset(&mut self) {
+        trace!("reset");
+        // zero free lists
+        self.blocks = BLOCK_QUEUES_EMPTY.to_vec();
+    }
+
+    pub fn rebind(&mut self, space: &'static MarkSweepSpace<VM>,) {
+        trace!("rebind");
+        self.reset();
+        self.space = space;
+    }
 
 
     // pub fn free(space: &'static MarkSweepSpace<VM>, addr: Address, tls: VMWorkerThread) {
