@@ -69,6 +69,8 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
             None,
             Some(Ordering::SeqCst),
         );
+        #[cfg(feature = "global_alloc_bit")]
+        crate::util::alloc_bit::set_alloc_bit(object);
     }
 }
 

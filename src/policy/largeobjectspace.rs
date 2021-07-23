@@ -68,7 +68,8 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             None,
             Some(Ordering::SeqCst),
         );
-
+        #[cfg(feature = "global_alloc_bit")]
+        crate::util::alloc_bit::set_alloc_bit(object);
         let cell = VM::VMObjectModel::object_start_ref(object);
         self.treadmill.add_to_treadmill(cell, alloc);
     }
