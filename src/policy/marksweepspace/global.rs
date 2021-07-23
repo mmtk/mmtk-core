@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Mutex};
+use std::{collections::{HashMap, HashSet}, sync::Mutex};
 
 use atomic::Ordering;
 
@@ -10,7 +10,8 @@ use crate::vm::ObjectModel;
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub active_blocks: Mutex<HashSet<Address>>,
     pub common: CommonSpace<VM>,
-    pr: FreeListPageResource<VM>    
+    pr: FreeListPageResource<VM>,
+    marked_blocks: HashMap<usize, Vec<free_list_allocator::BlockQueue>>
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
@@ -32,8 +33,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: crate::util::ObjectReference, alloc: bool) {
-        // todo!()
-        // do nothing for now
+        // do nothing
     }
 }
 
@@ -113,6 +113,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
+
+        let side_metadata_marked = SideMetadataSpec {
+            is_global: false,
+            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&side_metadata_local_free) + metadata_address_range_size(&side_metadata_thread_free) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
         let mut local_specs = {
             vec![
                 side_metadata_next,
@@ -121,6 +128,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 side_metadata_local_free,
                 side_metadata_thread_free,
                 side_metadata_tls,
+                side_metadata_marked,
             ]
         };
 
@@ -150,6 +158,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
+            marked_blocks: HashMap::default(),
         }
     }
 
@@ -169,6 +178,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         );
         if !is_marked::<VM>(object) {
             set_mark_bit::<VM>(object);
+            let block = FreeListAllocator::<VM>::get_block(address);
+            self.mark_block(block);
             trace.process_node(object);
         }
         object
@@ -204,6 +215,11 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         self.common.metadata.local[5]
     }
 
+    #[inline]
+    pub fn get_marked_metadata_spec(&self) -> SideMetadataSpec {
+        self.common.metadata.local[6]
+    }
+
     pub fn eager_sweep(&self, tls: VMWorkerThread) {
         let active_blocks = &*self.active_blocks.lock().unwrap();
         for block in active_blocks {
@@ -230,9 +246,79 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             cell += cell_size;
         }
     }
+
+    pub fn reset(&mut self) {
+        // zero marked blocks
+        self.marked_blocks = HashMap::default();
+    }
+
+    pub fn block_level_sweep(&mut self) {
+        let mut block = self.common.start;
+        // safe to assume start is block aligned?
+        while block < self.common.start + self.common.extent {
+            // eprintln!("block level sweep: looking at block {}", &block);
+            if self.alloced_block(block) {
+                if self.marked_block(block) {
+                    let tls = self.load_block_tls(block);
+                    let tls = unsafe { std::mem::transmute::<OpaquePointer, usize>(tls) };
+                    self.marked_blocks.insert(tls, free_list_allocator::BLOCK_QUEUES_EMPTY.to_vec());
+                } else {
+                    self.block_clear_metadata(block);
+                    self.return_block(block);
+                }
+            }
+            block +=  BYTES_IN_BLOCK;
+        }
+        eprintln!("Done with block level sweep!");
+    }
+
+    pub fn return_block(&self, block: Address) {
+        // block entirely freed
+        // todo!
+
+        // not sure how to do this, so for the moment I will ignore it - this space will never be allocated to again
+    }
+
+    pub fn marked_block(&self, block: Address) -> bool {
+        load_metadata::<VM>(
+            MetadataSpec::OnSide(self.get_marked_metadata_spec()), 
+            unsafe {block.to_object_reference()},
+            None,
+            Some(Ordering::SeqCst)) == 1
+    }
+
+    pub fn mark_block(&self, block: Address) {
+        store_metadata::<VM>(
+            MetadataSpec::OnSide(self.get_marked_metadata_spec()),
+            unsafe{block.to_object_reference()}, 
+            1, 
+            None, 
+            None
+        );
+    }
+
+    pub fn alloced_block(&self, block: Address) -> bool {
+        load_metadata::<VM>(
+            MetadataSpec::OnSide(self.get_tls_metadata_spec()), 
+            unsafe {block.to_object_reference()},
+            None,
+            Some(Ordering::SeqCst)) != 0
+    }
+
+    pub fn block_clear_metadata(&self, block: Address) {
+        for metadata_spec in &self.common.metadata.local {
+            store_metadata::<VM>(
+                MetadataSpec::OnSide(*metadata_spec),
+                unsafe{block.to_object_reference()},
+                0,
+                None,
+                Some(Ordering::SeqCst)
+            )
+        }
+    }
     
     pub fn load_block_tls(&self, block: Address) -> OpaquePointer {
-        // eprintln!("Load tls for block {}", block);
+        eprintln!("Load tls for block {}", block);
         let tls = load_metadata::<VM>(
             MetadataSpec::OnSide(self.get_tls_metadata_spec()), 
             unsafe {block.to_object_reference()},
@@ -253,7 +339,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn free(&self, addr: Address, tls: VMWorkerThread) {
 
-        let block = FreeListAllocator::<VM>::get_owning_block(addr);
+        let block = FreeListAllocator::<VM>::get_block(addr);
         let block_tls = self.load_block_tls(block);
 
         if tls.0.0 == block_tls {
