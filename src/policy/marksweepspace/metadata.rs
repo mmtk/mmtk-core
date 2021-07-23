@@ -17,9 +17,9 @@ use crate::vm::{ObjectModel, VMBinding};
 use std::collections::HashSet;
 use std::sync::RwLock;
 
-lazy_static! {
-    pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
-}
+// lazy_static! {
+//     pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
+// }
 
 /// This is the metadata spec for the alloc-bit.
 ///
@@ -44,24 +44,24 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
-pub fn is_meta_space_mapped(address: Address) -> bool {
-    let chunk_start = conversions::chunk_align_down(address);
-    ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
-}
+// pub fn is_meta_space_mapped(address: Address) -> bool {
+//     let chunk_start = conversions::chunk_align_down(address);
+//     ACTIVE_CHUNKS.read().unwrap().contains(&chunk_start)
+// }
 
-pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Address) {
-    let mut active_chunks = ACTIVE_CHUNKS.write().unwrap();
-    if active_chunks.contains(&chunk_start) {
-        return;
-    }
-    active_chunks.insert(chunk_start);
-    let mmap_metadata_result = metadata.try_map_metadata_space(chunk_start, BYTES_IN_CHUNK);
-    debug_assert!(
-        mmap_metadata_result.is_ok(),
-        "mmap sidemetadata failed for chunk_start ({})",
-        chunk_start
-    );
-}
+// pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Address) {
+//     let mut active_chunks = ACTIVE_CHUNKS.write().unwrap();
+//     if active_chunks.contains(&chunk_start) {
+//         return;
+//     }
+//     active_chunks.insert(chunk_start);
+//     let mmap_metadata_result = metadata.try_map_metadata_space(chunk_start, BYTES_IN_CHUNK);
+//     debug_assert!(
+//         mmap_metadata_result.is_ok(),
+//         "mmap sidemetadata failed for chunk_start ({})",
+//         chunk_start
+//     );
+// }
 
 pub fn is_alloced(object: ObjectReference) -> bool {
     is_alloced_object(object.to_address())

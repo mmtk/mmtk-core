@@ -170,7 +170,7 @@ impl<VM: VMBinding> NoGC<VM> {
             "MSspace",
             true,
             VMRequest::discontiguous(),
-            local_specs.clone(),
+            // local_specs.clone(),
             vm_map,
             mmapper,
             &mut heap,

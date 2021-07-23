@@ -121,57 +121,11 @@ impl<VM: VMBinding> FreeListMarkSweep<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         #[cfg(feature = "freelistmarksweep_lock_free")]
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let side_metadata_next = SideMetadataSpec {
-            is_global: false,
-            offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_free = SideMetadataSpec {
-            is_global: false,
-            offset: metadata_address_range_size(&side_metadata_next),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_size = SideMetadataSpec {
-            is_global: false,
-            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_local_free = SideMetadataSpec {
-            is_global: false,
-            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_thread_free = SideMetadataSpec {
-            is_global: false,
-            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&side_metadata_local_free),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_tls = SideMetadataSpec {
-            is_global: false,
-            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&side_metadata_local_free) + metadata_address_range_size(&side_metadata_thread_free),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let local_specs = {
-            vec![
-                side_metadata_next,
-                side_metadata_free,
-                side_metadata_size,
-                side_metadata_local_free,
-                side_metadata_thread_free,
-                side_metadata_tls,
-            ]
-        };
         let ms_space = MarkSweepSpace::new(
             "MSspace",
             true,
             VMRequest::discontiguous(),
-            local_specs.clone(),
+            // local_specs.clone(),
             vm_map,
             mmapper,
             &mut heap,
