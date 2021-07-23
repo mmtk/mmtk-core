@@ -1,4 +1,4 @@
-use super::gc_work::{ImmixCopyContext, ImmixProcessEdges};
+use super::gc_work::{ImmixCopyContext, ImmixProcessEdges, TraceKind};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -83,18 +83,29 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
-        self.immix_space.decide_whether_to_defrag(
+        let in_defrag = self.immix_space.decide_whether_to_defrag(
             self.is_emergency_collection(),
             self.base().cur_collection_attempts.load(Ordering::SeqCst),
         );
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<ImmixProcessEdges<VM>>::new());
+        if in_defrag {
+            scheduler.work_buckets[WorkBucketStage::Unconstrained]
+                .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Defrag }>>::new());
+        } else {
+            scheduler.work_buckets[WorkBucketStage::Unconstrained]
+                .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
+        }
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
-        scheduler.work_buckets[WorkBucketStage::RefClosure]
-            .add(ProcessWeakRefs::<ImmixProcessEdges<VM>>::new());
+        if in_defrag {
+            scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
+                ImmixProcessEdges<VM, { TraceKind::Defrag }>,
+            >::new());
+        } else {
+            scheduler.work_buckets[WorkBucketStage::RefClosure]
+                .add(ProcessWeakRefs::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
+        }
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, ImmixCopyContext<VM>>::new(self));

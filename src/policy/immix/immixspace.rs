@@ -176,12 +176,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// check if the current GC should do defragmentation.
-    pub fn decide_whether_to_defrag(&self, emergency_collection: bool, collection_attempts: usize) {
+    pub fn decide_whether_to_defrag(
+        &self,
+        emergency_collection: bool,
+        collection_attempts: usize,
+    ) -> bool {
         self.defrag.decide_whether_to_defrag(
             emergency_collection,
             collection_attempts,
             self.reusable_blocks.len() == 0,
-        )
+        );
+        self.defrag.in_defrag()
     }
 
     const AVAILABLE_LOCAL_BITS: usize = 7;
