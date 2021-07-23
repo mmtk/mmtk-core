@@ -215,6 +215,11 @@ impl Address {
         Address(self.0 - size)
     }
 
+    // Perform a saturating subtract on the Address
+    pub const fn saturating_sub(self, size: usize) -> Address {
+        Address(self.0.saturating_sub(size))
+    }
+
     /// loads a value of type T from the address
     /// # Safety
     /// This could throw a segment fault if the address is invalid

@@ -13,26 +13,22 @@ use super::header_metadata::HeaderMetadataSpec;
 /// Each plan or policy which uses a metadata bit-set, needs to create an instance of this struct.
 ///
 /// For performance reasons, objects of this struct should be constants.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug)]
 pub enum MetadataSpec {
     InHeader(HeaderMetadataSpec),
     OnSide(SideMetadataSpec),
 }
 
 impl MetadataSpec {
-    pub fn is_on_side(&self) -> bool {
+    pub const fn is_on_side(&self) -> bool {
         matches!(self, &MetadataSpec::OnSide(_))
     }
-    pub const fn as_header(self) -> Option<HeaderMetadataSpec> {
+
+    /// Extract SideMetadataSpec from a MetadataSpec. Panics if this is not side metadata.
+    pub const fn extract_side_spec(&self) -> &SideMetadataSpec {
         match self {
-            Self::InHeader(h) => Some(h),
-            _ => None,
-        }
-    }
-    pub const fn as_side(self) -> Option<SideMetadataSpec> {
-        match self {
-            Self::OnSide(s) => Some(s),
-            _ => None,
+            MetadataSpec::OnSide(spec) => spec,
+            MetadataSpec::InHeader(_) => panic!("Expect a side spec"),
         }
     }
 }
