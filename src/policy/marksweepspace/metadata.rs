@@ -16,15 +16,9 @@ use std::sync::Mutex;
 
 use super::MARKSWEEP_LOCAL_SIDE_METADATA_BASE_OFFSET;
 
-lazy_static! {
-    pub(super) static ref CHUNK_METADATA: SideMetadataContext = SideMetadataContext {
-        global: vec![ACTIVE_CHUNK_METADATA_SPEC],
-        local: vec![],
-    };
-
-    // lock to synchronize the mapping for the active chunk space
-    static ref CHUNK_MAP_LOCK: Mutex<()> = Mutex::new(());
-}
+// lazy_static! {
+//     pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
+// }
 
 /// Metadata spec for the active chunk byte
 ///
