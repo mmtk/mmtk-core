@@ -1,10 +1,12 @@
 use crate::{TransitiveClosure, util::{Address, ObjectReference, constants::CARD_META_PAGES_PER_REGION, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, side_metadata::{SideMetadataContext, SideMetadataSpec}}, vm::VMBinding};
 
-use crate::{TransitiveClosure, policy::marksweepspace::metadata::{is_marked, set_mark_bit}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{MetadataSpec, load_metadata, side_metadata::{SideMetadataContext, SideMetadataSpec}}}, vm::VMBinding};
+use crate::{TransitiveClosure, policy::marksweepspace::metadata::{ALLOC_SIDE_METADATA_SPEC, is_marked, set_mark_bit, unset_mark_bit}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, BYTES_IN_BLOCK, FreeListAllocator}, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{self, MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataSpec, metadata_address_range_size}, store_metadata}}, vm::VMBinding};
 
-use super::super::space::{CommonSpace, SFT, Space, SpaceOptions};
+use super::{super::space::{CommonSpace, SFT, Space, SpaceOptions}, metadata::{is_alloced, unset_alloc_bit}};
+use crate::vm::ObjectModel;
 
 pub struct MarkSweepSpace<VM: VMBinding> {
+    pub active_blocks: Mutex<HashSet<Address>>,
     pub common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>    
 }
@@ -63,11 +65,64 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
-        local_side_metadata_specs: Vec<SideMetadataSpec>,
+        // local_side_metadata_specs: Vec<SideMetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> MarkSweepSpace<VM> {
+        let alloc_mark_bits = &mut metadata::extract_side_metadata(&[
+            MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
+            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        ]);
+        let side_metadata_next = SideMetadataSpec {
+            is_global: false,
+            offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
+        let side_metadata_free = SideMetadataSpec {
+            is_global: false,
+            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
+        let side_metadata_size = SideMetadataSpec {
+            is_global: false,
+            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
+        let side_metadata_local_free = SideMetadataSpec {
+            is_global: false,
+            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
+        let side_metadata_thread_free = SideMetadataSpec {
+            is_global: false,
+            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&side_metadata_local_free) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
+        let side_metadata_tls = SideMetadataSpec {
+            is_global: false,
+            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&side_metadata_local_free) + metadata_address_range_size(&side_metadata_thread_free) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            log_num_of_bits: 6,
+            log_min_obj_size: 16,
+        };
+        let mut local_specs = {
+            vec![
+                side_metadata_next,
+                side_metadata_free,
+                side_metadata_size,
+                side_metadata_local_free,
+                side_metadata_thread_free,
+                side_metadata_tls,
+            ]
+        };
+
+        local_specs.append(alloc_mark_bits);
+
         let common = CommonSpace::new(
             SpaceOptions {
                 name,
@@ -77,7 +132,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: vec![],
-                    local: local_side_metadata_specs
+                    local: local_specs
                 },
             },
             vm_map,
@@ -85,6 +140,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             heap,
         );
         MarkSweepSpace {
+            active_blocks: Mutex::default(),
             pr: if vmrequest.is_discontiguous() {
                 FreeListPageResource::new_discontiguous(0, vm_map)
             } else {
