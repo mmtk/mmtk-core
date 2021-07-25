@@ -56,68 +56,19 @@ impl Chunk {
 
     /// Sweep this chunk.
     pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>, mark_histogram: &mut MarkHistogram) {
-        let mut allocated_blocks = 0; // number of allocated blocks.
-        if super::BLOCK_ONLY {
-            // Iterate over all blocks in this chunk.
-            for block in self.blocks() {
-                match block.get_state() {
-                    BlockState::Unallocated => {}
-                    BlockState::Unmarked => {
-                        // Release the block if it is allocated but not marked by the current GC.
-                        space.release_block(block);
-                    }
-                    BlockState::Marked => {
-                        // The block is live. Update counter.
-                        allocated_blocks += 1;
-                    }
-                    _ => unreachable!(),
-                }
-            }
+        let line_mark_state = if super::BLOCK_ONLY {
+            None
         } else {
-            let line_mark_state = space.line_mark_state.load(Ordering::Acquire);
-            // Iterate over all allocated blocks in this chunk.
-            for block in self
-                .blocks()
-                .filter(|block| block.get_state() != BlockState::Unallocated)
-            {
-                // Calculate number of marked lines and holes.
-                let mut marked_lines = 0;
-                let mut holes = 0;
-                let mut prev_line_is_marked = true;
-
-                for line in block.lines() {
-                    if line.is_marked(line_mark_state) {
-                        marked_lines += 1;
-                        prev_line_is_marked = true;
-                    } else {
-                        if prev_line_is_marked {
-                            holes += 1;
-                        }
-                        prev_line_is_marked = false;
-                    }
-                }
-
-                if marked_lines == 0 {
-                    // Release the block if non of its lines are marked.
-                    space.release_block(block);
-                } else {
-                    // There are some marked lines. Keep the block live and update counter.
-                    allocated_blocks += 1;
-                    if marked_lines != Block::LINES {
-                        // There are holes. Mark the block as reusable.
-                        block.set_state(BlockState::Reusable {
-                            unavailable_lines: marked_lines as _,
-                        });
-                        space.reusable_blocks.push(block)
-                    } else {
-                        // Clear mark state.
-                        block.set_state(BlockState::Unmarked);
-                    }
-                    // Update mark_histogram
-                    mark_histogram[holes] += marked_lines;
-                    // Record number of holes in block side metadata.
-                    block.set_holes(holes);
-                }
+            Some(space.line_mark_state.load(Ordering::Acquire))
+        };
+        let mut allocated_blocks = 0; // number of allocated blocks.
+                                      // Iterate over all allocated blocks in this chunk.
+        for block in self
+            .blocks()
+            .filter(|block| block.get_state() != BlockState::Unallocated)
+        {
+            if block.sweep(space, mark_histogram, line_mark_state) {
+                allocated_blocks += 1;
             }
         }
         // Set this chunk as free if there is not live blocks.
@@ -139,11 +90,17 @@ unsafe impl Step for Chunk {
     /// result = chunk_address + count * chunk_size
     #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
+        if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
+            return None;
+        }
         Some(Self::from(start.start() + (count << Self::LOG_BYTES)))
     }
     /// result = chunk_address - count * chunk_size
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
+        if start.start().as_usize() < (count << Self::LOG_BYTES) {
+            return None;
+        }
         Some(Self::from(start.start() - (count << Self::LOG_BYTES)))
     }
 }

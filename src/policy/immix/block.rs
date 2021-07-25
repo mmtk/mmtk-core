@@ -1,5 +1,7 @@
 use super::chunk::Chunk;
+use super::defrag::MarkHistogram;
 use super::line::Line;
+use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::{Address, ObjectReference};
@@ -23,6 +25,39 @@ pub enum BlockState {
     Marked,
     /// the block is marked as reusable.
     Reusable { unavailable_lines: u8 },
+}
+
+impl BlockState {
+    /// Private constant
+    const MARK_UNALLOCATED: u8 = 0;
+    /// Private constant
+    const MARK_UNMARKED: u8 = u8::MAX;
+    /// Private constant
+    const MARK_MARKED: u8 = u8::MAX - 1;
+}
+
+impl From<u8> for BlockState {
+    #[inline(always)]
+    fn from(state: u8) -> Self {
+        match state {
+            Self::MARK_UNALLOCATED => BlockState::Unallocated,
+            Self::MARK_UNMARKED => BlockState::Unmarked,
+            Self::MARK_MARKED => BlockState::Marked,
+            unavailable_lines => BlockState::Reusable { unavailable_lines },
+        }
+    }
+}
+
+impl Into<u8> for BlockState {
+    #[inline(always)]
+    fn into(self) -> u8 {
+        match self {
+            BlockState::Unallocated => BlockState::MARK_UNALLOCATED,
+            BlockState::Unmarked => BlockState::MARK_UNMARKED,
+            BlockState::Marked => BlockState::MARK_MARKED,
+            BlockState::Reusable { unavailable_lines } => unavailable_lines,
+        }
+    }
 }
 
 impl BlockState {
@@ -55,6 +90,7 @@ impl Block {
     pub const DEFRAG_STATE_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
         offset: if super::BLOCK_ONLY {
+            // If BLOCK_ONLY is set, we do not use any line marktables.
             LOCAL_SIDE_METADATA_BASE_OFFSET
         } else {
             SideMetadataOffset::layout_after(&Line::MARK_TABLE)
@@ -118,10 +154,6 @@ impl Block {
         unsafe { &*start.to_ptr() }
     }
 
-    const MARK_UNALLOCATED: u8 = 0;
-    const MARK_UNMARKED: u8 = u8::MAX;
-    const MARK_MARKED: u8 = u8::MAX - 1;
-
     #[inline(always)]
     fn mark_byte(&self) -> &AtomicU8 {
         // # Safety
@@ -135,24 +167,13 @@ impl Block {
     /// Get block mark state.
     #[inline(always)]
     pub fn get_state(&self) -> BlockState {
-        match self.mark_byte().load(Ordering::Acquire) {
-            Self::MARK_UNALLOCATED => BlockState::Unallocated,
-            Self::MARK_UNMARKED => BlockState::Unmarked,
-            Self::MARK_MARKED => BlockState::Marked,
-            unavailable_lines => BlockState::Reusable { unavailable_lines },
-        }
+        self.mark_byte().load(Ordering::Acquire).into()
     }
 
     /// Set block mark state.
     #[inline(always)]
     pub fn set_state(&self, state: BlockState) {
-        let v = match state {
-            BlockState::Unallocated => Self::MARK_UNALLOCATED,
-            BlockState::Unmarked => Self::MARK_UNMARKED,
-            BlockState::Marked => Self::MARK_MARKED,
-            BlockState::Reusable { unavailable_lines } => unavailable_lines,
-        };
-        self.mark_byte().store(v, Ordering::Release)
+        self.mark_byte().store(state.into(), Ordering::Release)
     }
 
     // Defrag byte
@@ -227,6 +248,73 @@ impl Block {
         debug_assert!(!super::BLOCK_ONLY);
         Line::from(self.start())..Line::from(self.end())
     }
+
+    /// Sweep this block.
+    /// Return true if the block is swept.
+    #[inline(always)]
+    pub fn sweep<VM: VMBinding>(
+        &self,
+        space: &ImmixSpace<VM>,
+        mark_histogram: &mut MarkHistogram,
+        line_mark_state: Option<u8>,
+    ) -> bool {
+        if super::BLOCK_ONLY {
+            match self.get_state() {
+                BlockState::Unallocated => false,
+                BlockState::Unmarked => {
+                    // Release the block if it is allocated but not marked by the current GC.
+                    space.release_block(*self);
+                    true
+                }
+                BlockState::Marked => {
+                    // The block is live.
+                    false
+                }
+                _ => unreachable!(),
+            }
+        } else {
+            // Calculate number of marked lines and holes.
+            let mut marked_lines = 0;
+            let mut holes = 0;
+            let mut prev_line_is_marked = true;
+            let line_mark_state = line_mark_state.unwrap();
+
+            for line in self.lines() {
+                if line.is_marked(line_mark_state) {
+                    marked_lines += 1;
+                    prev_line_is_marked = true;
+                } else {
+                    if prev_line_is_marked {
+                        holes += 1;
+                    }
+                    prev_line_is_marked = false;
+                }
+            }
+
+            if marked_lines == 0 {
+                // Release the block if non of its lines are marked.
+                space.release_block(*self);
+                true
+            } else {
+                // There are some marked lines. Keep the block live.
+                if marked_lines != Block::LINES {
+                    // There are holes. Mark the block as reusable.
+                    self.set_state(BlockState::Reusable {
+                        unavailable_lines: marked_lines as _,
+                    });
+                    space.reusable_blocks.push(*self)
+                } else {
+                    // Clear mark state.
+                    self.set_state(BlockState::Unmarked);
+                }
+                // Update mark_histogram
+                mark_histogram[holes] += marked_lines;
+                // Record number of holes in block side metadata.
+                self.set_holes(holes);
+                false
+            }
+        }
+    }
 }
 
 unsafe impl Step for Block {
@@ -243,11 +331,17 @@ unsafe impl Step for Block {
     /// result = block_address + count * block_size
     #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
+        if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
+            return None;
+        }
         Some(Self::from(start.start() + (count << Self::LOG_BYTES)))
     }
     /// result = block_address - count * block_size
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
+        if start.start().as_usize() < (count << Self::LOG_BYTES) {
+            return None;
+        }
         Some(Self::from(start.start() - (count << Self::LOG_BYTES)))
     }
 }

@@ -164,15 +164,6 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
         }
     }
 
-    #[inline(always)]
-    fn process_edge(&mut self, slot: Address) {
-        let object = unsafe { slot.load::<ObjectReference>() };
-        let new_object = self.trace_object(object);
-        if Self::OVERWRITE_REFERENCE {
-            unsafe { slot.store(new_object) };
-        }
-    }
-
     #[inline]
     fn process_edges(&mut self) {
         if KIND == TraceKind::Fast {

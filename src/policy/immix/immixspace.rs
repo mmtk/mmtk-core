@@ -31,7 +31,7 @@ use std::{
     ops::Range,
     sync::{
         atomic::{AtomicBool, AtomicU8},
-        Arc, Weak,
+        Arc,
     },
 };
 
@@ -53,7 +53,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     /// Object mark state
     mark_state: usize,
     /// Work packet scheduler
-    scheduler: Weak<MMTkScheduler<VM>>,
+    scheduler: Arc<MMTkScheduler<VM>>,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -63,10 +63,10 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         self.get_name()
     }
     fn is_live(&self, object: ObjectReference) -> bool {
-        ForwardingWord::is_forwarded::<VM>(object)
+        self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
     }
     fn is_movable(&self) -> bool {
-        true
+        super::DEFRAG
     }
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
@@ -160,7 +160,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             reusable_blocks: BlockList::default(),
             defrag: Defrag::new(),
             mark_state: Self::UNMARKED_STATE,
-            scheduler: Arc::downgrade(&scheduler),
+            scheduler,
         }
     }
 
@@ -212,8 +212,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Get work packet scheduler
-    fn scheduler(&self) -> Arc<MMTkScheduler<VM>> {
-        self.scheduler.upgrade().unwrap()
+    fn scheduler(&self) -> &MMTkScheduler<VM> {
+        &self.scheduler
     }
 
     pub fn prepare(&mut self) {

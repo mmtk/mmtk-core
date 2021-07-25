@@ -30,6 +30,7 @@ impl Defrag {
     const DEFRAG_LINE_REUSE_RATIO: f32 = 0.99;
     const MIN_SPILL_THRESHOLD: usize = 2;
     const DEFRAG_STRESS: bool = false;
+    const DEFRAG_HEADROOM_PERCENT: usize = 2;
 
     pub fn new() -> Self {
         Self {
@@ -74,7 +75,7 @@ impl Defrag {
 
     /// Get the number of defrag headroom pages.
     pub fn defrag_headroom_pages<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> usize {
-        space.get_page_resource().reserved_pages() * 2 / 100
+        space.get_page_resource().reserved_pages() * Self::DEFRAG_HEADROOM_PERCENT / 100
     }
 
     /// Check if the defrag space is exhausted.
@@ -102,7 +103,7 @@ impl Defrag {
         }
     }
 
-    /// Release work. Should be called in ImmixSpace::prepare.
+    /// Prepare work. Should be called in ImmixSpace::prepare.
     #[allow(clippy::assertions_on_constants)]
     pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
         debug_assert!(super::DEFRAG);

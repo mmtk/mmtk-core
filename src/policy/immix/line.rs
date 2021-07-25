@@ -126,12 +126,18 @@ unsafe impl Step for Line {
     #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
         debug_assert!(!super::BLOCK_ONLY);
+        if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
+            return None;
+        }
         Some(Line::from(start.start() + (count << Line::LOG_BYTES)))
     }
     /// result = line_address - count * line_size
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
         debug_assert!(!super::BLOCK_ONLY);
+        if start.start().as_usize() < (count << Self::LOG_BYTES) {
+            return None;
+        }
         Some(Line::from(start.start() - (count << Line::LOG_BYTES)))
     }
 }
