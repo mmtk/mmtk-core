@@ -133,7 +133,7 @@ impl Block {
     /// Get block mark state.
     #[inline(always)]
     pub fn get_state(&self) -> BlockState {
-        match self.mark_byte().load(Ordering::Acquire) {
+        match self.mark_byte().load(Ordering::SeqCst) {
             Self::MARK_UNALLOCATED => BlockState::Unallocated,
             Self::MARK_UNMARKED => BlockState::Unmarked,
             Self::MARK_MARKED => BlockState::Marked,
@@ -150,7 +150,7 @@ impl Block {
             BlockState::Marked => Self::MARK_MARKED,
             BlockState::Reusable { unavailable_lines } => unavailable_lines,
         };
-        self.mark_byte().store(v, Ordering::Release)
+        self.mark_byte().store(v, Ordering::SeqCst)
     }
 
     // Defrag byte

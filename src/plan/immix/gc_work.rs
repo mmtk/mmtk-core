@@ -163,6 +163,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ImmixProcessEdges<VM> {
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
         if Self::OVERWRITE_REFERENCE {
+            unreachable!();
             unsafe { slot.store(new_object) };
         }
     }

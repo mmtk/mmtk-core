@@ -59,6 +59,7 @@ mod mmtk;
 pub(crate) use mmtk::MMAPPER;
 pub use mmtk::MMTK;
 pub(crate) use mmtk::VM_MAP;
+use spin::Mutex;
 
 mod policy;
 
@@ -72,3 +73,6 @@ pub use crate::plan::{
     AllocationSemantics, BarrierSelector, CopyContext, Mutator, MutatorContext, Plan, TraceLocal,
     TransitiveClosure,
 };
+
+
+static IN_CONCURRENT_GC: Mutex<bool> = Mutex::new(false);

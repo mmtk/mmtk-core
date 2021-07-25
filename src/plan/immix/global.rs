@@ -65,7 +65,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn concurrent_collection_required(&self) -> bool {
-        self.base().gc_status() == GcStatus::NotInGC && self.get_pages_reserved() * 10 / 3 > self.get_total_pages()
+        self.base().gc_status() == GcStatus::NotInGC && self.get_pages_reserved() * 100 / 45 > self.get_total_pages()
     }
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -93,6 +93,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+        scheduler.assert_all_deactivated();
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.immix_space.decide_whether_to_defrag(
@@ -109,6 +110,8 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
         scheduler.work_buckets[WorkBucketStage::RefClosure]
             .add(ProcessWeakRefs::<ImmixProcessEdges<VM>>::new());
+        scheduler.work_buckets[WorkBucketStage::RefClosure]
+            .add(FlushMutators::<VM>::new());
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, ImmixCopyContext<VM>>::new(self));

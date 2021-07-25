@@ -577,7 +577,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             trace!("trace_object: object in boot space");
             return self.vm_space.trace_object(_trace, _object);
         }
-        panic!("No special case for space in trace_object({:?})", _object);
+        _object
+        // panic!("No special case for space in trace_object({:?})", _object);
     }
 
     pub fn prepare(&mut self, _tls: VMWorkerThread, _primary: bool) {

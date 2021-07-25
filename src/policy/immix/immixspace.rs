@@ -284,7 +284,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Release a block.
     pub fn release_block(&self, block: Block) {
-        // println!(" - Release block {:?}", block);
+        println!(" - Release block {:?}", block);
         block.deinit();
         self.pr.release_pages(block.start());
     }
@@ -297,7 +297,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
         self.defrag.notify_new_clean_block(copy);
         let block = Block::from(block_address);
-        // println!(" - Alloc block {:?}", block);
+        println!(" - Alloc block {:?}", block);
         block.init(copy);
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
         Some(block)

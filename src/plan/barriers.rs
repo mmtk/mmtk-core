@@ -9,6 +9,8 @@ use crate::util::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
 
+use super::GcStatus;
+
 /// BarrierSelector describes which barrier to use.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BarrierSelector {
@@ -54,6 +56,9 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
 
     #[inline(always)]
     fn enqueue_node(&mut self, obj: ObjectReference) {
+        if !*crate::IN_CONCURRENT_GC.lock() {
+            return;
+        }
         // if compare_exchange_metadata::<E::VM>(
         //     &self.meta,
         //     obj,
@@ -74,6 +79,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
 impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     #[cold]
     fn flush(&mut self) {
+        if self.modbuf.is_empty() { return }
         println!("BARRIE FLUSH");
         let mut modbuf = vec![];
         std::mem::swap(&mut modbuf, &mut self.modbuf);
@@ -86,6 +92,7 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
             self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure]
                 .add(ProcessModBuf::<E>::new(modbuf, self.meta));
         }
+        // println!("BARRIE FLUSH END");
     }
 
     #[inline(always)]
@@ -93,8 +100,12 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
         // println!("write_barrier {:?}\n", target);
         match target {
             WriteTarget::Field(obj, slot, val) => {
-                // println!("{:?}.{:?} = {:?}", obj, slot, val);
+                if !*crate::IN_CONCURRENT_GC.lock() {
+                    return;
+                }
                 let deleted = unsafe { slot.load::<ObjectReference>() };
+                if deleted.is_null() { return }
+                println!("{:?}.{:?}: {:?} = {:?}", obj, slot, deleted, val);
                 if !deleted.is_null() {
                     self.enqueue_node(deleted);
                 }

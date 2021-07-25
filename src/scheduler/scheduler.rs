@@ -235,7 +235,7 @@ impl<C: Context> Scheduler<C> {
                 self.process_coordinator_work(work);
             }
         }
-        println!("Deactivate All Work Buckers");
+        println!("Deactivate All Work Buckets");
         self.deactivate_all();
         // Finalization: Resume mutators, reset gc states
         // Note: Resume-mutators must happen after all work buckets are closed.
@@ -245,6 +245,17 @@ impl<C: Context> Scheduler<C> {
         if let Some(finalizer) = self.finalizer.lock().unwrap().take() {
             self.process_coordinator_work(finalizer);
         }
+        debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::PreClosure].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::PostClosure].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::RefClosure].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::RefForwarding].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::Release].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::Final].is_activated());
+    }
+
+    pub fn assert_all_deactivated(&self) {
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::PreClosure].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
@@ -267,6 +278,7 @@ impl<C: Context> Scheduler<C> {
     }
 
     pub fn reset_state(&self) {
+        unreachable!();
         // self.work_buckets[WorkBucketStage::Prepare].deactivate();
         self.work_buckets[WorkBucketStage::Closure].deactivate();
         self.work_buckets[WorkBucketStage::RefClosure].deactivate();
