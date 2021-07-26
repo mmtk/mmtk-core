@@ -1,18 +1,14 @@
 use atomic::Ordering;
 
 use crate::util::constants;
-use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(target_pointer_width = "64")]
 use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
-use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::vm::{ObjectModel, VMBinding};
 
 
 /// This is the metadata spec for the alloc-bit.

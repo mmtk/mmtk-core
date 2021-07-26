@@ -1,14 +1,8 @@
 use atomic::Ordering;
 
-use crate::util::constants;
 use crate::util::conversions;
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::metadata::load_metadata;
-use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
-#[cfg(target_pointer_width = "64")]
-use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -22,28 +16,6 @@ lazy_static! {
     pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
 }
 
-// /// This is the metadata spec for the alloc-bit.
-// ///
-// /// An alloc-bit is required per min-object-size aligned address , rather than per object, and can only exist as side metadata.
-// ///
-// /// The other metadata used by MallocSpace is mark-bit, which is per-object and can be kept in object header if the VM allows it.
-// /// Thus, mark-bit is vm-dependant and is part of each VM's ObjectModel.
-// ///
-// #[cfg(target_pointer_width = "32")]
-// pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-//     is_global: false,
-//     offset: 0,
-//     log_num_of_bits: 0,
-//     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
-// };
-
-// #[cfg(target_pointer_width = "64")]
-// pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-//     is_global: false,
-//     offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
-//     log_num_of_bits: 0,
-//     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
-// };
 
 pub fn is_meta_space_mapped(address: Address) -> bool {
     let chunk_start = conversions::chunk_align_down(address);
