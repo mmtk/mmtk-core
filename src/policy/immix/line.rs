@@ -122,22 +122,34 @@ unsafe impl Step for Line {
         }
         Some((end.start() - start.start()) >> Line::LOG_BYTES)
     }
-    /// result = line_address + count * line_size
+    /// result = line_address + count * block_size
+    #[inline(always)]
+    fn forward(start: Self, count: usize) -> Self {
+        debug_assert!(!super::BLOCK_ONLY);
+        Self::from(start.start() + (count << Self::LOG_BYTES))
+    }
+    /// result = line_address + count * block_size
     #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
         debug_assert!(!super::BLOCK_ONLY);
         if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
             return None;
         }
-        Some(Line::from(start.start() + (count << Line::LOG_BYTES)))
+        Some(Self::forward(start, count))
     }
-    /// result = line_address - count * line_size
+    /// result = line_address + count * block_size
+    #[inline(always)]
+    fn backward(start: Self, count: usize) -> Self {
+        debug_assert!(!super::BLOCK_ONLY);
+        Self::from(start.start() - (count << Self::LOG_BYTES))
+    }
+    /// result = line_address - count * block_size
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
         debug_assert!(!super::BLOCK_ONLY);
         if start.start().as_usize() < (count << Self::LOG_BYTES) {
             return None;
         }
-        Some(Line::from(start.start() - (count << Line::LOG_BYTES)))
+        Some(Self::backward(start, count))
     }
 }

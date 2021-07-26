@@ -325,11 +325,21 @@ unsafe impl Step for Block {
     }
     /// result = block_address + count * block_size
     #[inline(always)]
+    fn forward(start: Self, count: usize) -> Self {
+        Self::from(start.start() + (count << Self::LOG_BYTES))
+    }
+    /// result = block_address + count * block_size
+    #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
         if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
             return None;
         }
-        Some(Self::from(start.start() + (count << Self::LOG_BYTES)))
+        Some(Self::forward(start, count))
+    }
+    /// result = block_address + count * block_size
+    #[inline(always)]
+    fn backward(start: Self, count: usize) -> Self {
+        Self::from(start.start() - (count << Self::LOG_BYTES))
     }
     /// result = block_address - count * block_size
     #[inline(always)]
@@ -337,7 +347,7 @@ unsafe impl Step for Block {
         if start.start().as_usize() < (count << Self::LOG_BYTES) {
             return None;
         }
-        Some(Self::from(start.start() - (count << Self::LOG_BYTES)))
+        Some(Self::backward(start, count))
     }
 }
 

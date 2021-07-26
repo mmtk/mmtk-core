@@ -89,21 +89,31 @@ unsafe impl Step for Chunk {
         }
         Some((end.start() - start.start()) >> Self::LOG_BYTES)
     }
-    /// result = chunk_address + count * chunk_size
+    /// result = chunk_address + count * block_size
+    #[inline(always)]
+    fn forward(start: Self, count: usize) -> Self {
+        Self::from(start.start() + (count << Self::LOG_BYTES))
+    }
+    /// result = chunk_address + count * block_size
     #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
         if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
             return None;
         }
-        Some(Self::from(start.start() + (count << Self::LOG_BYTES)))
+        Some(Self::forward(start, count))
     }
-    /// result = chunk_address - count * chunk_size
+    /// result = chunk_address + count * block_size
+    #[inline(always)]
+    fn backward(start: Self, count: usize) -> Self {
+        Self::from(start.start() - (count << Self::LOG_BYTES))
+    }
+    /// result = chunk_address - count * block_size
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
         if start.start().as_usize() < (count << Self::LOG_BYTES) {
             return None;
         }
-        Some(Self::from(start.start() - (count << Self::LOG_BYTES)))
+        Some(Self::backward(start, count))
     }
 }
 
