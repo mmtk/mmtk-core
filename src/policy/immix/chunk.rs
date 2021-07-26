@@ -61,13 +61,15 @@ impl Chunk {
         } else {
             Some(space.line_mark_state.load(Ordering::Acquire))
         };
-        let mut allocated_blocks = 0; // number of allocated blocks.
-                                      // Iterate over all allocated blocks in this chunk.
+        // number of allocated blocks.
+        let mut allocated_blocks = 0;
+        // Iterate over all allocated blocks in this chunk.
         for block in self
             .blocks()
             .filter(|block| block.get_state() != BlockState::Unallocated)
         {
-            if block.sweep(space, mark_histogram, line_mark_state) {
+            if !block.sweep(space, mark_histogram, line_mark_state) {
+                // Block is live. Increment the allocated block count.
                 allocated_blocks += 1;
             }
         }
