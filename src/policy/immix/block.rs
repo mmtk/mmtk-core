@@ -154,46 +154,31 @@ impl Block {
         unsafe { &*start.to_ptr() }
     }
 
-    #[inline(always)]
-    fn mark_byte(&self) -> &AtomicU8 {
-        // # Safety
-        // The metadata memory is assumed to be mapped when accessing.
-        unsafe {
-            &*side_metadata::address_to_meta_address(&Self::MARK_TABLE, self.start())
-                .to_mut_ptr::<AtomicU8>()
-        }
-    }
-
     /// Get block mark state.
     #[inline(always)]
     pub fn get_state(&self) -> BlockState {
-        self.mark_byte().load(Ordering::Acquire).into()
+        let byte =
+            side_metadata::load_atomic(&Self::MARK_TABLE, self.start(), Ordering::SeqCst) as u8;
+        byte.into()
     }
 
     /// Set block mark state.
     #[inline(always)]
     pub fn set_state(&self, state: BlockState) {
-        self.mark_byte().store(state.into(), Ordering::Release)
+        let state = u8::from(state) as usize;
+        side_metadata::store_atomic(&Self::MARK_TABLE, self.start(), state, Ordering::SeqCst);
     }
 
     // Defrag byte
 
     const DEFRAG_SOURCE_STATE: u8 = u8::MAX;
 
-    #[inline(always)]
-    fn defrag_byte(&self) -> &AtomicU8 {
-        // # Safety
-        // The metadata memory is assumed to be mapped when accessing.
-        unsafe {
-            &*side_metadata::address_to_meta_address(&Self::DEFRAG_STATE_TABLE, self.start())
-                .to_mut_ptr::<AtomicU8>()
-        }
-    }
-
     /// Test if the block is marked for defragmentation.
     #[inline(always)]
     pub fn is_defrag_source(&self) -> bool {
-        let byte = self.defrag_byte().load(Ordering::Acquire);
+        let byte =
+            side_metadata::load_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), Ordering::SeqCst)
+                as u8;
         debug_assert!(byte == 0 || byte == Self::DEFRAG_SOURCE_STATE);
         byte == Self::DEFRAG_SOURCE_STATE
     }
@@ -204,22 +189,32 @@ impl Block {
         if cfg!(debug_assertions) && defrag {
             debug_assert!(!self.get_state().is_reusable());
         }
-        self.defrag_byte().store(
-            if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 },
-            Ordering::Release,
+        let byte = if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 };
+        side_metadata::store_atomic(
+            &Self::DEFRAG_STATE_TABLE,
+            self.start(),
+            byte as usize,
+            Ordering::SeqCst,
         );
     }
 
     /// Record the number of holes in the block.
     #[inline(always)]
     pub fn set_holes(&self, holes: usize) {
-        self.defrag_byte().store(holes as _, Ordering::Release);
+        side_metadata::store_atomic(
+            &Self::DEFRAG_STATE_TABLE,
+            self.start(),
+            holes,
+            Ordering::SeqCst,
+        );
     }
 
     /// Get the number of holes.
     #[inline(always)]
     pub fn get_holes(&self) -> usize {
-        let byte = self.defrag_byte().load(Ordering::Acquire);
+        let byte =
+            side_metadata::load_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), Ordering::SeqCst)
+                as u8;
         debug_assert_ne!(byte, Self::DEFRAG_SOURCE_STATE);
         byte as usize
     }
@@ -232,7 +227,7 @@ impl Block {
         } else {
             BlockState::Unmarked
         });
-        self.defrag_byte().store(0, Ordering::Release);
+        side_metadata::store_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), 0, Ordering::SeqCst);
     }
 
     /// Deinitalize a block before releasing.
