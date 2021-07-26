@@ -83,7 +83,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.base().set_gc_status(GcStatus::GcPrepare);
         let in_defrag = self.immix_space.decide_whether_to_defrag(
             self.is_emergency_collection(),
+            true,
             self.base().cur_collection_attempts.load(Ordering::SeqCst),
+            self.base().is_user_triggered_collection(),
+            self.base().options.full_heap_system_gc,
         );
         // Stop & scan mutators (mutator scanning can happen before STW)
         if in_defrag {

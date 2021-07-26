@@ -643,7 +643,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         *self.gc_status.lock().unwrap() == GcStatus::GcProper
     }
 
-    fn is_user_triggered_collection(&self) -> bool {
+    pub fn is_user_triggered_collection(&self) -> bool {
         self.user_triggered_collection.load(Ordering::Relaxed)
     }
 

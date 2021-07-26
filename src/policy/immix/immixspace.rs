@@ -179,12 +179,18 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     pub fn decide_whether_to_defrag(
         &self,
         emergency_collection: bool,
+        collect_whole_heap: bool,
         collection_attempts: usize,
+        user_triggered_collection: bool,
+        full_heap_system_gc: bool,
     ) -> bool {
         self.defrag.decide_whether_to_defrag(
             emergency_collection,
+            collect_whole_heap,
             collection_attempts,
+            user_triggered_collection,
             self.reusable_blocks.len() == 0,
+            full_heap_system_gc,
         );
         self.defrag.in_defrag()
     }
