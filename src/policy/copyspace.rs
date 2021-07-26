@@ -145,10 +145,10 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn release(&self) {
         unsafe {
+            #[cfg(feature = "global_alloc_bit")]
+            self.pr.reset_alloc_bit(self.common.start);
             self.pr.reset();
         }
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::bzero_alloc_bit(self.common.start, self.common.extent);
         self.common.metadata.reset();
         self.from_space.store(false, Ordering::SeqCst);
     }
