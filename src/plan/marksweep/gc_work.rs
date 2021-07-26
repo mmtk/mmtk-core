@@ -106,7 +106,7 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
             chunk += BYTES_IN_CHUNK;
         }
 
-        info!("Generated {} sweep work packets", work_packets.len());
+        debug!("Generated {} sweep work packets", work_packets.len());
         #[cfg(debug_assertions)]
         {
             ms.total_work_packets
