@@ -48,10 +48,10 @@ impl From<u8> for BlockState {
     }
 }
 
-impl Into<u8> for BlockState {
+impl From<BlockState> for u8 {
     #[inline(always)]
-    fn into(self) -> u8 {
-        match self {
+    fn from(state: BlockState) -> Self {
+        match state {
             BlockState::Unallocated => BlockState::MARK_UNALLOCATED,
             BlockState::Unmarked => BlockState::MARK_UNMARKED,
             BlockState::Marked => BlockState::MARK_MARKED,
