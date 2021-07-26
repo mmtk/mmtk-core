@@ -91,18 +91,20 @@ impl Defrag {
     /// Update available_clean_pages_for_defrag counter when a clean block is allocated.
     pub fn notify_new_clean_block(&self, copy: bool) {
         if copy {
-            let available_clean_pages_for_defrag = self
-                .available_clean_pages_for_defrag
-                .load(Ordering::Acquire);
-            if available_clean_pages_for_defrag <= Block::PAGES {
-                self.available_clean_pages_for_defrag
-                    .store(0, Ordering::Release);
-                self.defrag_space_exhausted.store(true, Ordering::Release);
-            } else {
-                self.available_clean_pages_for_defrag.store(
-                    available_clean_pages_for_defrag - Block::PAGES,
-                    Ordering::Release,
+            let available_clean_pages_for_defrag =
+                self.available_clean_pages_for_defrag.fetch_update(
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                    |available_clean_pages_for_defrag| {
+                        if available_clean_pages_for_defrag <= Block::PAGES {
+                            Some(0)
+                        } else {
+                            Some(available_clean_pages_for_defrag - Block::PAGES)
+                        }
+                    },
                 );
+            if available_clean_pages_for_defrag.unwrap() <= Block::PAGES {
+                self.defrag_space_exhausted.store(true, Ordering::SeqCst);
             }
         }
     }
