@@ -1,16 +1,17 @@
 use super::chunk::Chunk;
+use super::defrag::MarkHistogram;
 use super::line::Line;
+use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
+use crossbeam_queue::SegQueue;
+use spin::RwLock;
 use std::{
     iter::Step,
     ops::Range,
-    sync::{
-        atomic::{AtomicPtr, AtomicU8, AtomicUsize, Ordering},
-        Mutex, MutexGuard,
-    },
+    sync::atomic::{AtomicU8, Ordering},
 };
 
 /// The block allocation state.
@@ -24,6 +25,39 @@ pub enum BlockState {
     Marked,
     /// the block is marked as reusable.
     Reusable { unavailable_lines: u8 },
+}
+
+impl BlockState {
+    /// Private constant
+    const MARK_UNALLOCATED: u8 = 0;
+    /// Private constant
+    const MARK_UNMARKED: u8 = u8::MAX;
+    /// Private constant
+    const MARK_MARKED: u8 = u8::MAX - 1;
+}
+
+impl From<u8> for BlockState {
+    #[inline(always)]
+    fn from(state: u8) -> Self {
+        match state {
+            Self::MARK_UNALLOCATED => BlockState::Unallocated,
+            Self::MARK_UNMARKED => BlockState::Unmarked,
+            Self::MARK_MARKED => BlockState::Marked,
+            unavailable_lines => BlockState::Reusable { unavailable_lines },
+        }
+    }
+}
+
+impl From<BlockState> for u8 {
+    #[inline(always)]
+    fn from(state: BlockState) -> Self {
+        match state {
+            BlockState::Unallocated => BlockState::MARK_UNALLOCATED,
+            BlockState::Unmarked => BlockState::MARK_UNMARKED,
+            BlockState::Marked => BlockState::MARK_MARKED,
+            BlockState::Reusable { unavailable_lines } => unavailable_lines,
+        }
+    }
 }
 
 impl BlockState {
@@ -56,9 +90,10 @@ impl Block {
     pub const DEFRAG_STATE_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
         offset: if super::BLOCK_ONLY {
-            LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
+            // If BLOCK_ONLY is set, we do not use any line marktables.
+            LOCAL_SIDE_METADATA_BASE_OFFSET
         } else {
-            Line::MARK_TABLE.accumulated_size()
+            SideMetadataOffset::layout_after(&Line::MARK_TABLE)
         },
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,
@@ -67,7 +102,7 @@ impl Block {
     /// Block mark table (side)
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
-        offset: Self::DEFRAG_STATE_TABLE.accumulated_size(),
+        offset: SideMetadataOffset::layout_after(&Self::DEFRAG_STATE_TABLE),
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,
     };
@@ -99,7 +134,7 @@ impl Block {
 
     /// Get block end address
     pub const fn end(&self) -> Address {
-        unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
+        self.0.add(Self::BYTES)
     }
 
     /// Get the chunk containing the block.
@@ -111,64 +146,39 @@ impl Block {
     /// Get the address range of the block's line mark table.
     #[allow(clippy::assertions_on_constants)]
     #[inline(always)]
-    pub fn line_mark_table(&self) -> Range<Address> {
+    pub fn line_mark_table(&self) -> &[AtomicU8; Block::LINES] {
         debug_assert!(!super::BLOCK_ONLY);
         let start = side_metadata::address_to_meta_address(&Line::MARK_TABLE, self.start());
-        let end = start + Block::LINES;
-        start..end
-    }
-
-    const MARK_UNALLOCATED: u8 = 0;
-    const MARK_UNMARKED: u8 = u8::MAX;
-    const MARK_MARKED: u8 = u8::MAX - 1;
-
-    #[inline(always)]
-    fn mark_byte(&self) -> &AtomicU8 {
-        unsafe {
-            &*side_metadata::address_to_meta_address(&Self::MARK_TABLE, self.start())
-                .to_mut_ptr::<AtomicU8>()
-        }
+        // # Safety
+        // The metadata memory is assumed to be mapped when accessing.
+        unsafe { &*start.to_ptr() }
     }
 
     /// Get block mark state.
     #[inline(always)]
     pub fn get_state(&self) -> BlockState {
-        match self.mark_byte().load(Ordering::SeqCst) {
-            Self::MARK_UNALLOCATED => BlockState::Unallocated,
-            Self::MARK_UNMARKED => BlockState::Unmarked,
-            Self::MARK_MARKED => BlockState::Marked,
-            unavailable_lines => BlockState::Reusable { unavailable_lines },
-        }
+        let byte =
+            side_metadata::load_atomic(&Self::MARK_TABLE, self.start(), Ordering::SeqCst) as u8;
+        byte.into()
     }
 
     /// Set block mark state.
     #[inline(always)]
     pub fn set_state(&self, state: BlockState) {
-        let v = match state {
-            BlockState::Unallocated => Self::MARK_UNALLOCATED,
-            BlockState::Unmarked => Self::MARK_UNMARKED,
-            BlockState::Marked => Self::MARK_MARKED,
-            BlockState::Reusable { unavailable_lines } => unavailable_lines,
-        };
-        self.mark_byte().store(v, Ordering::SeqCst)
+        let state = u8::from(state) as usize;
+        side_metadata::store_atomic(&Self::MARK_TABLE, self.start(), state, Ordering::SeqCst);
     }
 
     // Defrag byte
 
     const DEFRAG_SOURCE_STATE: u8 = u8::MAX;
 
-    #[inline(always)]
-    fn defrag_byte(&self) -> &AtomicU8 {
-        unsafe {
-            &*side_metadata::address_to_meta_address(&Self::DEFRAG_STATE_TABLE, self.start())
-                .to_mut_ptr::<AtomicU8>()
-        }
-    }
-
     /// Test if the block is marked for defragmentation.
     #[inline(always)]
     pub fn is_defrag_source(&self) -> bool {
-        let byte = self.defrag_byte().load(Ordering::Acquire);
+        let byte =
+            side_metadata::load_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), Ordering::SeqCst)
+                as u8;
         debug_assert!(byte == 0 || byte == Self::DEFRAG_SOURCE_STATE);
         byte == Self::DEFRAG_SOURCE_STATE
     }
@@ -179,31 +189,45 @@ impl Block {
         if cfg!(debug_assertions) && defrag {
             debug_assert!(!self.get_state().is_reusable());
         }
-        self.defrag_byte().store(
-            if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 },
-            Ordering::Release,
+        let byte = if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 };
+        side_metadata::store_atomic(
+            &Self::DEFRAG_STATE_TABLE,
+            self.start(),
+            byte as usize,
+            Ordering::SeqCst,
         );
     }
 
     /// Record the number of holes in the block.
     #[inline(always)]
     pub fn set_holes(&self, holes: usize) {
-        self.defrag_byte().store(holes as _, Ordering::Release);
+        side_metadata::store_atomic(
+            &Self::DEFRAG_STATE_TABLE,
+            self.start(),
+            holes,
+            Ordering::SeqCst,
+        );
     }
 
     /// Get the number of holes.
     #[inline(always)]
     pub fn get_holes(&self) -> usize {
-        let byte = self.defrag_byte().load(Ordering::Acquire);
+        let byte =
+            side_metadata::load_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), Ordering::SeqCst)
+                as u8;
         debug_assert_ne!(byte, Self::DEFRAG_SOURCE_STATE);
         byte as usize
     }
 
     /// Initialize a clean block after acquired from page-resource.
     #[inline]
-    pub fn init(&self, _copy: bool) {
-        self.set_state(BlockState::Marked);
-        self.defrag_byte().store(0, Ordering::Release);
+    pub fn init(&self, copy: bool) {
+        self.set_state(if copy {
+            BlockState::Marked
+        } else {
+            BlockState::Unmarked
+        });
+        side_metadata::store_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), 0, Ordering::SeqCst);
     }
 
     /// Deinitalize a block before releasing.
@@ -218,6 +242,73 @@ impl Block {
     pub fn lines(&self) -> Range<Line> {
         debug_assert!(!super::BLOCK_ONLY);
         Line::from(self.start())..Line::from(self.end())
+    }
+
+    /// Sweep this block.
+    /// Return true if the block is swept.
+    #[inline(always)]
+    pub fn sweep<VM: VMBinding>(
+        &self,
+        space: &ImmixSpace<VM>,
+        mark_histogram: &mut MarkHistogram,
+        line_mark_state: Option<u8>,
+    ) -> bool {
+        if super::BLOCK_ONLY {
+            match self.get_state() {
+                BlockState::Unallocated => false,
+                BlockState::Unmarked => {
+                    // Release the block if it is allocated but not marked by the current GC.
+                    space.release_block(*self);
+                    true
+                }
+                BlockState::Marked => {
+                    // The block is live.
+                    false
+                }
+                _ => unreachable!(),
+            }
+        } else {
+            // Calculate number of marked lines and holes.
+            let mut marked_lines = 0;
+            let mut holes = 0;
+            let mut prev_line_is_marked = true;
+            let line_mark_state = line_mark_state.unwrap();
+
+            for line in self.lines() {
+                if line.is_marked(line_mark_state) {
+                    marked_lines += 1;
+                    prev_line_is_marked = true;
+                } else {
+                    if prev_line_is_marked {
+                        holes += 1;
+                    }
+                    prev_line_is_marked = false;
+                }
+            }
+
+            if marked_lines == 0 {
+                // Release the block if non of its lines are marked.
+                space.release_block(*self);
+                true
+            } else {
+                // There are some marked lines. Keep the block live.
+                if marked_lines != Block::LINES {
+                    // There are holes. Mark the block as reusable.
+                    self.set_state(BlockState::Reusable {
+                        unavailable_lines: marked_lines as _,
+                    });
+                    space.reusable_blocks.push(*self)
+                } else {
+                    // Clear mark state.
+                    self.set_state(BlockState::Unmarked);
+                }
+                // Update mark_histogram
+                mark_histogram[holes] += marked_lines;
+                // Record number of holes in block side metadata.
+                self.set_holes(holes);
+                false
+            }
+        }
     }
 }
 
@@ -234,162 +325,74 @@ unsafe impl Step for Block {
     }
     /// result = block_address + count * block_size
     #[inline(always)]
+    fn forward(start: Self, count: usize) -> Self {
+        Self::from(start.start() + (count << Self::LOG_BYTES))
+    }
+    /// result = block_address + count * block_size
+    #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        Some(Self::from(start.start() + (count << Self::LOG_BYTES)))
+        if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
+            return None;
+        }
+        Some(Self::forward(start, count))
+    }
+    /// result = block_address + count * block_size
+    #[inline(always)]
+    fn backward(start: Self, count: usize) -> Self {
+        Self::from(start.start() - (count << Self::LOG_BYTES))
     }
     /// result = block_address - count * block_size
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        Some(Self::from(start.start() - (count << Self::LOG_BYTES)))
+        if start.start().as_usize() < (count << Self::LOG_BYTES) {
+            return None;
+        }
+        Some(Self::backward(start, count))
     }
-}
-
-struct Node<T> {
-    value: T,
-    next: AtomicPtr<Node<T>>,
 }
 
 /// A non-block single-linked list to store blocks.
 #[derive(Default)]
 pub struct BlockList {
-    head: AtomicPtr<Node<Block>>,
-    len: AtomicUsize,
-    sync: Mutex<()>,
+    queue: RwLock<SegQueue<Block>>,
 }
 
 impl BlockList {
     /// Get number of blocks in this list.
     #[inline]
     pub fn len(&self) -> usize {
-        self.len.load(Ordering::SeqCst)
+        self.queue.read().len()
     }
 
     /// Add a block to the list.
     #[inline]
     pub fn push(&self, block: Block) {
-        let node = Box::leak(box Node {
-            value: block,
-            next: AtomicPtr::default(),
-        });
-        loop {
-            let next = self.head.load(Ordering::SeqCst);
-            node.next.store(next, Ordering::SeqCst);
-            if self
-                .head
-                .compare_exchange(next, node, Ordering::SeqCst, Ordering::SeqCst)
-                .is_ok()
-            {
-                break;
-            }
-        }
-        self.len.fetch_add(1, Ordering::SeqCst);
+        self.queue.read().push(block)
     }
 
     /// Pop a block out of the list.
     #[inline]
     pub fn pop(&self) -> Option<Block> {
-        loop {
-            let head = self.head.load(Ordering::SeqCst);
-            if head.is_null() {
-                return None;
-            }
-            let next = unsafe { (*head).next.load(Ordering::SeqCst) };
-            if self
-                .head
-                .compare_exchange(head, next, Ordering::SeqCst, Ordering::SeqCst)
-                .is_ok()
-            {
-                let block = unsafe { (*head).value };
-                unsafe { Box::from_raw(head) };
-                self.len.fetch_sub(1, Ordering::SeqCst);
-                return Some(block);
-            }
-        }
+        self.queue.read().pop()
     }
 
     /// Clear the list.
     #[inline]
     pub fn reset(&self) {
-        let _guard = self.sync.lock().unwrap();
-        self.len.store(0, Ordering::SeqCst);
-        loop {
-            let head = self.head.load(Ordering::SeqCst);
-            if head.is_null() {
-                return;
-            }
-            self.head.store(
-                unsafe { (*head).next.load(Ordering::SeqCst) },
-                Ordering::SeqCst,
-            );
-            unsafe { Box::from_raw(head) };
-        }
+        *self.queue.write() = SegQueue::new()
     }
 
-    /// Iterate all blocks in the list.
-    /// Note: this can only be called by a single thread.
+    /// Get an array of all reusable blocks stored in this BlockList.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = Block> {
-        BlockListIter {
-            head: self.head.load(Ordering::SeqCst),
+    pub fn get_blocks(&self) -> Vec<Block> {
+        let mut queue = self.queue.write();
+        let mut blocks = Vec::with_capacity(queue.len());
+        let new_queue = SegQueue::new();
+        while let Some(block) = queue.pop() {
+            new_queue.push(block);
+            blocks.push(block);
         }
-    }
-}
-
-impl<'a> IntoIterator for &'a BlockList {
-    type Item = Block;
-    type IntoIter = impl Iterator<Item = Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-struct BlockListIter {
-    head: *mut Node<Block>,
-}
-
-impl Iterator for BlockListIter {
-    type Item = Block;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.head.is_null() {
-            None
-        } else {
-            let node = unsafe { &mut *self.head };
-            self.head = node.next.load(Ordering::SeqCst);
-            Some(node.value)
-        }
-    }
-}
-
-struct DrainFilter<'a, F: 'a + FnMut(&mut Block) -> bool> {
-    head: &'a AtomicPtr<Node<Block>>,
-    predicate: F,
-    _guard: MutexGuard<'a, ()>,
-}
-
-impl<'a, F: 'a + FnMut(&mut Block) -> bool> Iterator for DrainFilter<'a, F> {
-    type Item = Block;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let node_ptr = self.head.load(Ordering::SeqCst);
-            if node_ptr.is_null() {
-                return None;
-            } else {
-                let node = unsafe { &mut *node_ptr };
-                if (self.predicate)(&mut node.value) {
-                    let block = node.value;
-                    self.head
-                        .store(node.next.load(Ordering::SeqCst), Ordering::SeqCst);
-                    unsafe { Box::from_raw(node_ptr) };
-                    return Some(block);
-                } else {
-                    self.head = &node.next;
-                }
-            }
-        }
+        *queue = new_queue;
+        blocks
     }
 }

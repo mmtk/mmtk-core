@@ -12,9 +12,11 @@
 #![feature(associated_type_defaults)]
 #![feature(specialization)]
 #![feature(trait_alias)]
+#![feature(const_panic)]
+#![feature(const_fn_union)]
 #![feature(step_trait)]
 #![feature(step_trait_ext)]
-#![feature(min_type_alias_impl_trait)]
+#![feature(const_generics)]
 // TODO: We should fix missing docs for public items and turn this on (Issue #309).
 // #![deny(missing_docs)]
 

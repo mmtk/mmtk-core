@@ -1,4 +1,4 @@
-use super::gc_work::{ImmixCopyContext, ImmixProcessEdges};
+use super::gc_work::{ImmixCopyContext, ImmixProcessEdges, TraceKind};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -36,8 +36,6 @@ pub struct Immix<VM: VMBinding> {
     pub immix_space: ImmixSpace<VM>,
     pub common: CommonPlan<VM>,
 }
-
-unsafe impl<VM: VMBinding> Sync for Immix<VM> {}
 
 pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
@@ -96,20 +94,34 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         scheduler.assert_all_deactivated();
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
-        self.immix_space.decide_whether_to_defrag(
+        let in_defrag = self.immix_space.decide_whether_to_defrag(
             self.is_emergency_collection(),
+            true,
             self.base().cur_collection_attempts.load(Ordering::SeqCst),
+            self.base().is_user_triggered_collection(),
+            self.base().options.full_heap_system_gc,
         );
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<ImmixProcessEdges<VM>>::new());
+        if in_defrag {
+            scheduler.work_buckets[WorkBucketStage::Unconstrained]
+                .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Defrag }>>::new());
+        } else {
+            scheduler.work_buckets[WorkBucketStage::Unconstrained]
+                .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
+        }
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::PreClosure].add(ConcurrentWorkStart);
         scheduler.work_buckets[WorkBucketStage::PostClosure].add(ConcurrentWorkEnd);
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
-        scheduler.work_buckets[WorkBucketStage::RefClosure]
-            .add(ProcessWeakRefs::<ImmixProcessEdges<VM>>::new());
+        if in_defrag {
+            scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
+                ImmixProcessEdges<VM, { TraceKind::Defrag }>,
+            >::new());
+        } else {
+            scheduler.work_buckets[WorkBucketStage::RefClosure]
+                .add(ProcessWeakRefs::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
+        }
         scheduler.work_buckets[WorkBucketStage::RefClosure]
             .add(FlushMutators::<VM>::new());
         // Release global/collectors/mutators
@@ -155,11 +167,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
-    }
-
-    /// Initialize defrag histograms
-    fn pre_worker_spawn(&self, mmtk: &MMTK<VM>) {
-        self.immix_space.initialize_defrag(mmtk)
     }
 }
 

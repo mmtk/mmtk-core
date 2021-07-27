@@ -11,6 +11,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{self, *};
+use crate::util::metadata::{self, compare_exchange_metadata, load_metadata, MetadataSpec};
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -18,7 +19,6 @@ use crate::{
     plan::TransitiveClosure,
     scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorker, MMTkScheduler, WorkBucketStage},
     util::{
-        constants::LOG_BYTES_IN_WORD,
         heap::FreeListPageResource,
         opaque_pointer::{VMThread, VMWorkerThread},
     },
@@ -26,18 +26,17 @@ use crate::{
 };
 use atomic::Ordering;
 use std::{
-    cell::UnsafeCell,
     iter::Step,
     mem,
     ops::Range,
     sync::{
         atomic::{AtomicBool, AtomicU8},
-        Arc, Weak,
+        Arc,
     },
 };
 
 pub struct ImmixSpace<VM: VMBinding> {
-    common: UnsafeCell<CommonSpace<VM>>,
+    common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
@@ -52,9 +51,9 @@ pub struct ImmixSpace<VM: VMBinding> {
     /// Defrag utilities
     pub(super) defrag: Defrag,
     /// Object mark state
-    mark_state: AtomicU8,
+    mark_state: usize,
     /// Work packet scheduler
-    scheduler: Weak<MMTkScheduler<VM>>,
+    scheduler: Arc<MMTkScheduler<VM>>,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -64,10 +63,10 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         self.get_name()
     }
     fn is_live(&self, object: ObjectReference) -> bool {
-        ForwardingWord::is_forwarded::<VM>(object)
+        self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
     }
     fn is_movable(&self) -> bool {
-        true
+        super::DEFRAG
     }
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
@@ -87,7 +86,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
         &self.pr
     }
     fn common(&self) -> &CommonSpace<VM> {
-        unsafe { &*self.common.get() }
+        &self.common
     }
     fn init(&mut self, _vm_map: &'static VMMap) {
         super::validate_features();
@@ -99,24 +98,28 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 }
 
 impl<VM: VMBinding> ImmixSpace<VM> {
+    const UNMARKED_STATE: usize = 0;
+    const MARKED_STATE: usize = 1;
+
     /// Get side metadata specs
     #[allow(clippy::assertions_on_constants)]
-    fn side_metadata_specs() -> &'static [SideMetadataSpec] {
-        debug_assert!(!Self::HEADER_MARK_BITS);
-        if super::BLOCK_ONLY {
-            &[
-                Block::DEFRAG_STATE_TABLE,
-                Block::MARK_TABLE,
-                Self::OBJECT_MARK_TABLE,
+    fn side_metadata_specs() -> Vec<SideMetadataSpec> {
+        metadata::extract_side_metadata(&if super::BLOCK_ONLY {
+            vec![
+                MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
+                MetadataSpec::OnSide(Block::MARK_TABLE),
+                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
+                *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ]
         } else {
-            &[
-                Line::MARK_TABLE,
-                Block::DEFRAG_STATE_TABLE,
-                Block::MARK_TABLE,
-                Self::OBJECT_MARK_TABLE,
+            vec![
+                MetadataSpec::OnSide(Line::MARK_TABLE),
+                MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
+                MetadataSpec::OnSide(Block::MARK_TABLE),
+                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
+                *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ]
-        }
+        })
     }
 
     pub fn new(
@@ -143,25 +146,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mmapper,
             heap,
         );
-        #[cfg(target_pointer_width = "64")]
-        let start = common.start;
-        #[cfg(target_pointer_width = "32")]
-        let start = crate::util::heap::layout::vm_layout_constants::HEAP_START;
         ImmixSpace {
             pr: if common.vmrequest.is_discontiguous() {
                 FreeListPageResource::new_discontiguous(0, vm_map)
             } else {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
-            common: UnsafeCell::new(common),
-            chunk_map: ChunkMap::new(start),
+            common,
+            chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
             in_collection: AtomicBool::new(false),
             reusable_blocks: BlockList::default(),
             defrag: Defrag::new(),
-            mark_state: AtomicU8::new(Self::MARK_BASE_VALUE),
-            scheduler: Arc::downgrade(&scheduler),
+            mark_state: Self::UNMARKED_STATE,
+            scheduler,
         }
     }
 
@@ -176,18 +175,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.defrag.in_defrag()
     }
 
-    /// Initialize defrag data
-    pub fn initialize_defrag(&self, mmtk: &MMTK<VM>) {
-        self.defrag.prepare_histograms(mmtk);
-    }
-
     /// check if the current GC should do defragmentation.
-    pub fn decide_whether_to_defrag(&self, emergency_collection: bool, collection_attempts: usize) {
+    pub fn decide_whether_to_defrag(
+        &self,
+        emergency_collection: bool,
+        collect_whole_heap: bool,
+        collection_attempts: usize,
+        user_triggered_collection: bool,
+        full_heap_system_gc: bool,
+    ) -> bool {
         self.defrag.decide_whether_to_defrag(
             emergency_collection,
+            collect_whole_heap,
             collection_attempts,
+            user_triggered_collection,
             self.reusable_blocks.len() == 0,
-        )
+            full_heap_system_gc,
+        );
+        self.defrag.in_defrag()
     }
 
     const AVAILABLE_LOCAL_BITS: usize = 7;
@@ -200,7 +205,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Update mark state
     #[allow(clippy::assertions_on_constants)]
     fn delta_mark_state(state: u8) -> u8 {
-        debug_assert!(Self::HEADER_MARK_BITS);
+        debug_assert!(!VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side());
         let mut rtn = state;
         loop {
             rtn = (rtn + Self::MARK_INCREMENT) & Self::MARK_MASK;
@@ -213,38 +218,43 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Get work packet scheduler
-    fn scheduler(&self) -> Arc<MMTkScheduler<VM>> {
-        self.scheduler.upgrade().unwrap()
+    fn scheduler(&self) -> &MMTkScheduler<VM> {
+        &self.scheduler
     }
 
     pub fn prepare(&mut self) {
         // Update mark_state
-        if Self::HEADER_MARK_BITS {
-            self.mark_state.store(
-                Self::delta_mark_state(self.mark_state.load(Ordering::Acquire)),
-                Ordering::Release,
-            );
+        if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
+            // For side metadata, we always use `1` as marked state.
+            // Object mark table will be cleared by `PrepareBlockState` before each GC.
+            //
+            // Note: It is incorrect to flip matk bit between 0 and 1 and remove
+            // the mark-table zeroing step. Because openjdk does not call post_alloc to set up
+            // object initial metadata.
+            self.mark_state = Self::MARKED_STATE;
+        } else {
+            // For header metadata, we use cyclic mark bits.
+            self.mark_state = Self::delta_mark_state(self.mark_state as u8) as usize;
         }
         // Prepare defrag info
-        if !super::BLOCK_ONLY {
+        if super::DEFRAG {
             self.defrag.prepare(self);
         }
         // Prepare each block for GC
         let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
+        // # Safety: ImmixSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
-        let work_packets =
-            self.chunk_map
-                .generate_tasks(self.scheduler().num_workers(), |chunks| {
-                    box PrepareBlockState {
-                        space,
-                        chunks,
-                        defrag_threshold: if space.in_defrag() {
-                            Some(threshold)
-                        } else {
-                            None
-                        },
-                    }
-                });
+        let work_packets = self
+            .chunk_map
+            .generate_tasks(|chunk| box PrepareBlockState {
+                space,
+                chunk,
+                defrag_threshold: if space.in_defrag() {
+                    Some(threshold)
+                } else {
+                    None
+                },
+            });
         self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
         // Update line mark state
         if !super::BLOCK_ONLY {
@@ -270,14 +280,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.reusable_blocks.reset();
         }
         // Sweep chunks and blocks
+        // # Safety: ImmixSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
-        let work_packets = self
-            .chunk_map
-            .generate_sweep_tasks(space, &self.scheduler());
+        let work_packets = self.chunk_map.generate_sweep_tasks(space);
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
         // Update states
         self.in_collection.store(false, Ordering::Release);
-        if !super::BLOCK_ONLY {
+        if super::DEFRAG {
             self.defrag.release(self)
         }
     }
@@ -349,7 +358,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         trace: &mut impl TransitiveClosure,
         object: ObjectReference,
     ) -> ObjectReference {
-        if self.attempt_mark(object) {
+        if self.attempt_mark(object, self.mark_state) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
                 if !super::MARK_LINE_AT_SCAN_TIME {
@@ -379,12 +388,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
-        } else if self.is_marked(object) {
+        } else if self.is_marked(object, self.mark_state) {
             ForwardingWord::clear_forwarding_bits::<VM>(object);
             object
         } else {
             let new_object = if Self::is_pinned(object) || self.defrag.space_exhausted() {
-                self.attempt_mark(object);
+                self.attempt_mark(object, self.mark_state);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
                 object
@@ -411,54 +420,45 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::Acquire));
     }
 
-    /// A flag to enable in-header mark bits.
-    const HEADER_MARK_BITS: bool = cfg!(feature = "immix_header_mark_bits");
-
-    /// Side per-object mark table.
-    const OBJECT_MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: Block::MARK_TABLE.accumulated_size(),
-        log_num_of_bits: 0,
-        log_min_obj_size: LOG_BYTES_IN_WORD as usize,
-    };
-
     /// Atomically mark an object.
     #[inline(always)]
-    fn attempt_mark(&self, object: ObjectReference) -> bool {
-        if Self::HEADER_MARK_BITS {
-            unreachable!()
-            // if !self.is_marked(object) {
-            //     gc_byte::write_gc_byte::<VM>(object, self.mark_state.load(Ordering::Relaxed));
-            //     true
-            // } else {
-            //     false
-            // }
-        } else {
-            side_metadata::compare_exchange_atomic(
-                &Self::OBJECT_MARK_TABLE,
-                VM::VMObjectModel::ref_to_address(object),
-                0,
-                1,
+    fn attempt_mark(&self, object: ObjectReference, mark_state: usize) -> bool {
+        loop {
+            let old_value = load_metadata::<VM>(
+                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                object,
+                None,
+                Some(Ordering::SeqCst),
+            );
+            if old_value == mark_state {
+                return false;
+            }
+
+            if compare_exchange_metadata::<VM>(
+                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                object,
+                old_value,
+                mark_state,
+                None,
                 Ordering::SeqCst,
                 Ordering::SeqCst,
-            )
+            ) {
+                break;
+            }
         }
+        true
     }
 
     /// Check if an object is marked.
     #[inline(always)]
-    fn is_marked(&self, object: ObjectReference) -> bool {
-        if Self::HEADER_MARK_BITS {
-            // gc_byte::read_gc_byte::<VM>(object) & Self::MARK_MASK == self.mark_state.load(Ordering::Relaxed)
-            unreachable!()
-        } else {
-            unsafe {
-                side_metadata::load(
-                    &Self::OBJECT_MARK_TABLE,
-                    VM::VMObjectModel::ref_to_address(object),
-                ) == 1
-            }
-        }
+    fn is_marked(&self, object: ObjectReference, mark_state: usize) -> bool {
+        let old_value = load_metadata::<VM>(
+            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            object,
+            None,
+            Some(Ordering::SeqCst),
+        );
+        old_value == mark_state
     }
 
     /// Check if an object is pinned.
@@ -479,31 +479,31 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!super::BLOCK_ONLY);
         let unavail_state = self.line_unavail_state.load(Ordering::Acquire);
         let current_state = self.line_mark_state.load(Ordering::Acquire);
-        let mark_data = search_start.block().line_mark_table();
-        let mark_byte_start = mark_data.start + search_start.get_index_within_block();
-        let mark_byte_end = mark_data.end;
-        let mut mark_byte_cursor = mark_byte_start;
+        let block = search_start.block();
+        let mark_data = block.line_mark_table();
+        let start_cursor = search_start.get_index_within_block();
+        let mut cursor = start_cursor;
         // Find start
-        while mark_byte_cursor < mark_byte_end {
-            let mark = unsafe { mark_byte_cursor.load::<u8>() };
+        while cursor < mark_data.len() {
+            let mark = mark_data[cursor].load(Ordering::Relaxed);
             if mark != unavail_state && mark != current_state {
                 break;
             }
-            mark_byte_cursor += 1usize;
+            cursor += 1;
         }
-        if mark_byte_cursor == mark_byte_end {
+        if cursor == mark_data.len() {
             return None;
         }
-        let start = Line::forward(search_start, mark_byte_cursor - mark_byte_start);
+        let start = Line::forward(search_start, cursor - start_cursor);
         // Find limit
-        while mark_byte_cursor < mark_byte_end {
-            let mark = unsafe { mark_byte_cursor.load::<u8>() };
+        while cursor < mark_data.len() {
+            let mark = mark_data[cursor].load(Ordering::Relaxed);
             if mark == unavail_state || mark == current_state {
                 break;
             }
-            mark_byte_cursor += 1usize;
+            cursor += 1;
         }
-        let end = Line::forward(search_start, mark_byte_cursor - mark_byte_start);
+        let end = Line::forward(search_start, cursor - start_cursor);
         debug_assert!((start..end)
             .all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
         Some(start..end)
@@ -514,7 +514,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 /// Performs the action on a range of chunks.
 pub struct PrepareBlockState<VM: VMBinding> {
     pub space: &'static ImmixSpace<VM>,
-    pub chunks: Range<Chunk>,
+    pub chunk: Chunk,
     pub defrag_threshold: Option<usize>,
 }
 
@@ -522,12 +522,8 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
     /// Clear object mark table
     #[inline(always)]
     fn reset_object_mark(chunk: Chunk) {
-        if !ImmixSpace::<VM>::HEADER_MARK_BITS {
-            side_metadata::bzero_metadata(
-                &ImmixSpace::<VM>::OBJECT_MARK_TABLE,
-                chunk.start(),
-                Chunk::BYTES,
-            );
+        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+            side_metadata::bzero_metadata(&side, chunk.start(), Chunk::BYTES);
         }
     }
 }
@@ -536,35 +532,29 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         let defrag_threshold = self.defrag_threshold.unwrap_or(0);
-        for chunk in self
-            .chunks
-            .clone()
-            .filter(|c| self.space.chunk_map.get(*c) == ChunkState::Allocated)
-        {
-            // Clear object mark table for this chunk
-            Self::reset_object_mark(chunk);
-            // Iterate over all blocks in this chunk
-            for block in chunk.blocks() {
-                let state = block.get_state();
-                // Skip unallocated blocks.
-                if state == BlockState::Unallocated {
-                    continue;
-                }
-                // Check if this block needs to be defragmented.
-                if super::DEFRAG
-                    && defrag_threshold != 0
-                    && !state.is_reusable()
-                    && block.get_holes() > defrag_threshold
-                {
-                    block.set_as_defrag_source(true);
-                } else {
-                    block.set_as_defrag_source(false);
-                }
-                // Clear block mark data.
-                block.set_state(BlockState::Unmarked);
-                debug_assert!(!block.get_state().is_reusable());
-                debug_assert_ne!(block.get_state(), BlockState::Marked);
+        // Clear object mark table for this chunk
+        Self::reset_object_mark(self.chunk);
+        // Iterate over all blocks in this chunk
+        for block in self.chunk.blocks() {
+            let state = block.get_state();
+            // Skip unallocated blocks.
+            if state == BlockState::Unallocated {
+                continue;
             }
+            // Check if this block needs to be defragmented.
+            if super::DEFRAG
+                && defrag_threshold != 0
+                && !state.is_reusable()
+                && block.get_holes() > defrag_threshold
+            {
+                block.set_as_defrag_source(true);
+            } else {
+                block.set_as_defrag_source(false);
+            }
+            // Clear block mark data.
+            block.set_state(BlockState::Unmarked);
+            debug_assert!(!block.get_state().is_reusable());
+            debug_assert_ne!(block.get_state(), BlockState::Marked);
         }
     }
 }

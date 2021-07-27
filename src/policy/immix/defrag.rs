@@ -4,11 +4,11 @@ use super::{
     ImmixSpace,
 };
 use crate::policy::space::Space;
-use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*, MMTK};
-use std::{
-    cell::UnsafeCell,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
-};
+use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*};
+use spin::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+pub type MarkHistogram = [usize; Defrag::NUM_BINS];
 
 #[derive(Debug, Default)]
 pub struct Defrag {
@@ -16,8 +16,9 @@ pub struct Defrag {
     in_defrag_collection: AtomicBool,
     /// Is defrag space exhausted?
     defrag_space_exhausted: AtomicBool,
-    /// per-worker mark histograms
-    spill_mark_histograms: UnsafeCell<Vec<Vec<AtomicUsize>>>,
+    /// A list of completed mark histograms reported by workers
+    pub mark_histograms: Mutex<Vec<MarkHistogram>>,
+    /// Summarised histograms
     spill_avail_histograms: Vec<AtomicUsize>,
     pub defrag_spill_threshold: AtomicUsize,
     /// The number of remaining clean pages in defrag space.
@@ -29,26 +30,24 @@ impl Defrag {
     const DEFRAG_LINE_REUSE_RATIO: f32 = 0.99;
     const MIN_SPILL_THRESHOLD: usize = 2;
     const DEFRAG_STRESS: bool = false;
+    const DEFRAG_HEADROOM_PERCENT: usize = 2;
 
     pub fn new() -> Self {
         Self {
             spill_avail_histograms: (0..Self::NUM_BINS).map(|_| Default::default()).collect(),
-            spill_mark_histograms: UnsafeCell::new(vec![]),
             ..Default::default()
         }
     }
 
-    /// Get spill mark histograms
-    pub fn spill_mark_histograms(&self) -> &Vec<Vec<AtomicUsize>> {
-        unsafe { &*self.spill_mark_histograms.get() }
+    /// Allocate a new local histogram.
+    pub const fn new_mark_histogram(&self) -> MarkHistogram {
+        [0; Self::NUM_BINS]
     }
 
-    /// Prepare spill mark histograms
-    pub fn prepare_histograms<VM: VMBinding>(&self, mmtk: &MMTK<VM>) {
-        let spill_mark_histograms = unsafe { &mut *self.spill_mark_histograms.get() };
-        spill_mark_histograms.resize_with(mmtk.options.threads, || {
-            (0..Self::NUM_BINS).map(|_| Default::default()).collect()
-        });
+    /// Report back a completed mark histogram
+    #[inline(always)]
+    pub fn add_completed_mark_histogram(&self, histogram: MarkHistogram) {
+        self.mark_histograms.lock().push(histogram)
     }
 
     /// Check if the current GC is a defrag GC.
@@ -61,14 +60,18 @@ impl Defrag {
     pub fn decide_whether_to_defrag(
         &self,
         emergency_collection: bool,
+        collect_whole_heap: bool,
         collection_attempts: usize,
+        user_triggered: bool,
         exhausted_reusable_space: bool,
+        full_heap_system_gc: bool,
     ) {
         let in_defrag = super::DEFRAG
             && (emergency_collection
                 || (collection_attempts > 1)
                 || !exhausted_reusable_space
-                || Self::DEFRAG_STRESS);
+                || Self::DEFRAG_STRESS
+                || (collect_whole_heap && user_triggered && full_heap_system_gc));
         // println!("Defrag: {}", in_defrag);
         self.in_defrag_collection
             .store(in_defrag, Ordering::Release)
@@ -76,7 +79,7 @@ impl Defrag {
 
     /// Get the number of defrag headroom pages.
     pub fn defrag_headroom_pages<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> usize {
-        space.get_page_resource().reserved_pages() * 2 / 100
+        space.get_page_resource().reserved_pages() * Self::DEFRAG_HEADROOM_PERCENT / 100
     }
 
     /// Check if the defrag space is exhausted.
@@ -88,26 +91,28 @@ impl Defrag {
     /// Update available_clean_pages_for_defrag counter when a clean block is allocated.
     pub fn notify_new_clean_block(&self, copy: bool) {
         if copy {
-            let available_clean_pages_for_defrag = self
-                .available_clean_pages_for_defrag
-                .load(Ordering::Acquire);
-            if available_clean_pages_for_defrag <= Block::PAGES {
-                self.available_clean_pages_for_defrag
-                    .store(0, Ordering::Release);
-                self.defrag_space_exhausted.store(true, Ordering::Release);
-            } else {
-                self.available_clean_pages_for_defrag.store(
-                    available_clean_pages_for_defrag - Block::PAGES,
-                    Ordering::Release,
+            let available_clean_pages_for_defrag =
+                self.available_clean_pages_for_defrag.fetch_update(
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                    |available_clean_pages_for_defrag| {
+                        if available_clean_pages_for_defrag <= Block::PAGES {
+                            Some(0)
+                        } else {
+                            Some(available_clean_pages_for_defrag - Block::PAGES)
+                        }
+                    },
                 );
+            if available_clean_pages_for_defrag.unwrap() <= Block::PAGES {
+                self.defrag_space_exhausted.store(true, Ordering::SeqCst);
             }
         }
     }
 
-    /// Release work. Should be called in ImmixSpace::prepare.
+    /// Prepare work. Should be called in ImmixSpace::prepare.
     #[allow(clippy::assertions_on_constants)]
     pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
-        debug_assert!(!super::BLOCK_ONLY);
+        debug_assert!(super::DEFRAG);
         self.defrag_space_exhausted.store(false, Ordering::Release);
 
         // Calculate available free space for defragmentation.
@@ -140,7 +145,7 @@ impl Defrag {
             entry.store(0, Ordering::Relaxed);
         }
         let mut total_available_lines = 0;
-        for block in &space.reusable_blocks {
+        for block in space.reusable_blocks.get_blocks() {
             let bucket = block.get_holes();
             let unavailable_lines = match block.get_state() {
                 BlockState::Reusable { unavailable_lines } => unavailable_lines as usize,
@@ -166,12 +171,12 @@ impl Defrag {
         let mut required_lines = 0isize;
         let mut limit = (available_lines as f32 / Self::DEFRAG_LINE_REUSE_RATIO) as isize;
         let mut threshold = Block::LINES >> 1;
+        let mark_histograms = self.mark_histograms.lock();
         for index in (Self::MIN_SPILL_THRESHOLD..Self::NUM_BINS).rev() {
             threshold = index;
-            let this_bucket_mark = self
-                .spill_mark_histograms()
+            let this_bucket_mark = mark_histograms
                 .iter()
-                .map(|v| v[threshold].load(Ordering::Acquire) as isize)
+                .map(|v| v[threshold] as isize)
                 .sum::<isize>();
             let this_bucket_avail =
                 self.spill_avail_histograms[threshold].load(Ordering::Acquire) as isize;
@@ -190,7 +195,7 @@ impl Defrag {
     /// Release work. Should be called in ImmixSpace::release.
     #[allow(clippy::assertions_on_constants)]
     pub fn release<VM: VMBinding>(&self, _space: &ImmixSpace<VM>) {
-        debug_assert!(!super::BLOCK_ONLY);
+        debug_assert!(super::DEFRAG);
         self.in_defrag_collection.store(false, Ordering::Release);
     }
 }

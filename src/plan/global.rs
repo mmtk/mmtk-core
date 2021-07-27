@@ -303,7 +303,7 @@ pub trait Plan: 'static + Sync + Downcast {
 
     fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
         if force || !self.options().ignore_system_g_c {
-            info!("User triggerring collection");
+            info!("User triggering collection");
             self.base()
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
@@ -326,9 +326,6 @@ pub trait Plan: 'static + Sync + Downcast {
             );
         }
     }
-
-    /// Notify the plan before any worker thread is started.
-    fn pre_worker_spawn(&self, _mmtk: &'static MMTK<Self::VM>) {}
 }
 
 impl_downcast!(Plan assoc VM);
@@ -657,7 +654,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         *self.gc_status.lock().unwrap() == GcStatus::GcProper
     }
 
-    fn is_user_triggered_collection(&self) -> bool {
+    pub fn is_user_triggered_collection(&self) -> bool {
         self.user_triggered_collection.load(Ordering::Relaxed)
     }
 

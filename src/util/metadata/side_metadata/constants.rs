@@ -1,19 +1,27 @@
 use crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
+use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::Address;
 
 // This is currently not used in 32-bits targets, but ultimately it is required in 32-bits global side metadata. So, instead of guarding with target_pointer_width, I allow unused_imports for now.
 #[allow(unused_imports)]
 use super::metadata_address_range_size;
-#[cfg(target_pointer_width = "32")]
-use super::metadata_bytes_per_chunk;
 
+// Global side metadata start address
+
+// XXX: We updated the base address to start from the second 4Mb chunk for 32-bit architectures,
+// as otherwise for side metadatas with a large `min_obj_size`, we were overlapping with system
+// reserved addresses such as 0x0.
 #[cfg(target_pointer_width = "32")]
-pub(crate) const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address = unsafe { Address::from_usize(0) };
+pub(crate) const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
+    unsafe { Address::from_usize(BYTES_IN_CHUNK) };
 #[cfg(target_pointer_width = "64")]
 pub(crate) const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
     unsafe { Address::from_usize(0x0000_0600_0000_0000usize) };
+
+pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
+    SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS);
 
 /// This constant represents the worst-case ratio of source data size to global side metadata.
 /// A value of 2 means the space required for global side metadata must be less than 1/4th of the source data.
@@ -37,12 +45,18 @@ const LOG_MAX_GLOBAL_SIDE_METADATA_SIZE: usize =
 // pub(crate) const LOG_MAX_LOCAL_SIDE_METADATA_SIZE: usize =
 //     1 << (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO);
 
-pub(crate) const LOCAL_SIDE_METADATA_BASE_ADDRESS: Address = unsafe {
-    Address::from_usize(
-        GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize()
-            + (1usize << LOG_MAX_GLOBAL_SIDE_METADATA_SIZE),
-    )
-};
+// Local side metadata start address
+
+pub(crate) const LOCAL_SIDE_METADATA_BASE_ADDRESS: Address =
+    GLOBAL_SIDE_METADATA_BASE_ADDRESS.add(1usize << LOG_MAX_GLOBAL_SIDE_METADATA_SIZE);
+
+// Local side metadata start offset
+
+#[cfg(target_pointer_width = "32")]
+pub(crate) const LOCAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset = SideMetadataOffset::rel(0);
+#[cfg(target_pointer_width = "64")]
+pub(crate) const LOCAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
+    SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS);
 
 #[cfg(target_pointer_width = "32")]
 pub(super) const CHUNK_MASK: usize = (1 << LOG_BYTES_IN_CHUNK) - 1;
@@ -62,13 +76,18 @@ pub(super) const LOCAL_SIDE_METADATA_PER_CHUNK: usize =
 // Global Metadata
 //
 // MMTk reserved Global side metadata offsets:
-// [currently empty]
+//
+//  1 - MarkSweep Active Chunk byte: 1 byte per chunk, used by malloc marksweep.
 //
 // --------------------------------------------------
 
 /// The base address for the global side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal global side metadata.
-pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_BASE_ADDRESS;
+pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_BASE_ADDRESS.add(
+    metadata_address_range_size(&crate::policy::mallocspace::metadata::ACTIVE_CHUNK_METADATA_SPEC),
+);
+pub const GLOBAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
+    SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS);
 
 // --------------------------------------------------
 // PolicySpecific Metadata
@@ -76,23 +95,14 @@ pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_B
 // MMTk reserved PolicySpecific side metadata offsets:
 //
 //  1 - MarkSweep Alloc bit:
-//      - Offset `0x0` on 32-bits
-//      - Offset `LOCAL_SIDE_METADATA_BASE_ADDRESS` on 64-bits
+//      - Offset LOCAL_SIDE_METADATA_BASE_OFFSET
+//  2 - MarkSweep Active Page byte:
+//      - Offset after Alloc bit
 //
 // --------------------------------------------------
 
 /// The base address for the local side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal local side metadata.
-#[cfg(target_pointer_width = "64")]
-pub const LOCAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = LOCAL_SIDE_METADATA_BASE_ADDRESS.add(
-    metadata_address_range_size(&crate::policy::mallocspace::metadata::ALLOC_SIDE_METADATA_SPEC),
+pub const LOCAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset = SideMetadataOffset::layout_after(
+    &crate::policy::mallocspace::metadata::ACTIVE_PAGE_METADATA_SPEC,
 );
-
-/// The base offset for the local side metadata space available to VM bindings, to be used for the per-object metadata.
-/// VM bindings must use this to avoid overlap with core internal local side metadata.
-#[cfg(target_pointer_width = "32")]
-pub const LOCAL_SIDE_METADATA_VM_BASE_ADDRESS: Address =
-    LOCAL_SIDE_METADATA_BASE_ADDRESS.add(metadata_bytes_per_chunk(
-        crate::policy::mallocspace::metadata::ALLOC_SIDE_METADATA_SPEC.log_min_obj_size,
-        crate::policy::mallocspace::metadata::ALLOC_SIDE_METADATA_SPEC.log_num_of_bits,
-    ));

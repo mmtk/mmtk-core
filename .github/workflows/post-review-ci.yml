@@ -44,6 +44,7 @@ jobs:
       - name: Test
         run: |
           cd mmtk-v8
+          export RUST_BACKTRACE=1
           export V8_ROOT=$GITHUB_WORKSPACE/v8_deps
           .github/scripts/ci-test.sh
           .github/scripts/ci-style.sh
@@ -85,6 +86,7 @@ jobs:
       - name: Test
         run: |
           cd mmtk-jikesrvm
+          export RUST_BACKTRACE=1
           ./.github/scripts/ci-test.sh
           ./.github/scripts/ci-style.sh
   jikesrvm-perf-compare:
@@ -204,7 +206,7 @@ jobs:
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
       - name: Setup Rust Toolchain
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
       - name: Setup
         run: |
           cd mmtk-openjdk
@@ -214,6 +216,7 @@ jobs:
       - name: Test
         run: |
           cd mmtk-openjdk
+          export RUST_BACKTRACE=1
           ./.github/scripts/ci-test.sh
           ./.github/scripts/ci-style.sh
   openjdk-perf-compare:
@@ -269,7 +272,7 @@ jobs:
       # setup
       # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
       - name: Setup Rust Toolchain
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV      
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
       - name: Setup
         run: |
           mkdir -p ci-perf-kit/running/benchmarks/dacapo

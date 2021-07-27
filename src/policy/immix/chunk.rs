@@ -1,19 +1,15 @@
 use super::block::{Block, BlockState};
+use super::defrag::MarkHistogram;
 use super::immixspace::ImmixSpace;
+use crate::util::metadata::side_metadata::{self, SideMetadataOffset, SideMetadataSpec};
 use crate::{
     scheduler::*,
-    util::{
-        heap::layout::vm_layout_constants::{LOG_BYTES_IN_CHUNK, MAX_CHUNKS},
-        Address, ObjectReference,
-    },
+    util::{heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK, Address},
     vm::*,
     MMTK,
 };
-use std::{
-    iter::Step,
-    ops::Range,
-    sync::atomic::{AtomicU8, AtomicUsize, Ordering},
-};
+use spin::Mutex;
+use std::{iter::Step, ops::Range, sync::atomic::Ordering};
 
 /// Data structure to reference a MMTk 4 MB chunk.
 #[repr(C)]
@@ -21,6 +17,8 @@ use std::{
 pub struct Chunk(Address);
 
 impl Chunk {
+    /// Chunk constant with zero address
+    const ZERO: Self = Self(Address::ZERO);
     /// Log bytes in chunk
     pub const LOG_BYTES: usize = LOG_BYTES_IN_CHUNK;
     /// Bytes in chunk
@@ -35,11 +33,6 @@ impl Chunk {
         address.align_down(Self::BYTES)
     }
 
-    /// Test if the given address is chunk-aligned
-    pub const fn is_aligned(address: Address) -> bool {
-        Self::align(address).as_usize() == address.as_usize()
-    }
-
     /// Get the chunk from a given address.
     /// The address must be chunk-aligned.
     #[inline(always)]
@@ -48,21 +41,9 @@ impl Chunk {
         Self(address)
     }
 
-    /// Get the chunk containing the given address.
-    /// The input address does not need to be aligned.
-    #[inline(always)]
-    pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
-    }
-
     /// Get chunk start address
     pub const fn start(&self) -> Address {
         self.0
-    }
-
-    /// Get chunk end address
-    pub const fn end(&self) -> Address {
-        unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
     }
 
     /// Get a range of blocks within this chunk.
@@ -74,70 +55,22 @@ impl Chunk {
     }
 
     /// Sweep this chunk.
-    pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>, mark_histogram: &[AtomicUsize]) {
-        let mut allocated_blocks = 0; // number of allocated blocks.
-        if super::BLOCK_ONLY {
-            // Iterate over all blocks in this chunk.
-            for block in self.blocks() {
-                match block.get_state() {
-                    BlockState::Unallocated => {}
-                    BlockState::Unmarked => {
-                        // Release the block if it is allocated but not marked by the current GC.
-                        space.release_block(block);
-                    }
-                    BlockState::Marked => {
-                        // The block is live. Update counter.
-                        allocated_blocks += 1;
-                    }
-                    _ => unreachable!(),
-                }
-            }
+    pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>, mark_histogram: &mut MarkHistogram) {
+        let line_mark_state = if super::BLOCK_ONLY {
+            None
         } else {
-            let line_mark_state = space.line_mark_state.load(Ordering::Acquire);
-            // Iterate over all allocated blocks in this chunk.
-            for block in self
-                .blocks()
-                .filter(|block| block.get_state() != BlockState::Unallocated)
-            {
-                // Calculate number of marked lines and holes.
-                let mut marked_lines = 0;
-                let mut holes = 0;
-                let mut prev_line_is_marked = true;
-
-                for line in block.lines() {
-                    if line.is_marked(line_mark_state) {
-                        marked_lines += 1;
-                        prev_line_is_marked = true;
-                    } else {
-                        if prev_line_is_marked {
-                            holes += 1;
-                        }
-                        prev_line_is_marked = false;
-                    }
-                }
-
-                if marked_lines == 0 {
-                    // Release the block if non of its lines are marked.
-                    space.release_block(block);
-                } else {
-                    // There are some marked lines. Keep the block live and update counter.
-                    allocated_blocks += 1;
-                    if marked_lines != Block::LINES {
-                        // There are holes. Mark the block as reusable.
-                        block.set_state(BlockState::Reusable {
-                            unavailable_lines: marked_lines as _,
-                        });
-                        space.reusable_blocks.push(block)
-                    } else {
-                        // Clear mark state.
-                        block.set_state(BlockState::Unmarked);
-                    }
-                    // Update mark_histogram
-                    let old_value = mark_histogram[holes].load(Ordering::Acquire);
-                    mark_histogram[holes].store(old_value + marked_lines, Ordering::Release);
-                    // Record number of holes in block side metadata.
-                    block.set_holes(holes);
-                }
+            Some(space.line_mark_state.load(Ordering::Acquire))
+        };
+        // number of allocated blocks.
+        let mut allocated_blocks = 0;
+        // Iterate over all allocated blocks in this chunk.
+        for block in self
+            .blocks()
+            .filter(|block| block.get_state() != BlockState::Unallocated)
+        {
+            if !block.sweep(space, mark_histogram, line_mark_state) {
+                // Block is live. Increment the allocated block count.
+                allocated_blocks += 1;
             }
         }
         // Set this chunk as free if there is not live blocks.
@@ -156,21 +89,37 @@ unsafe impl Step for Chunk {
         }
         Some((end.start() - start.start()) >> Self::LOG_BYTES)
     }
-    /// result = chunk_address + count * chunk_size
+    /// result = chunk_address + count * block_size
+    #[inline(always)]
+    fn forward(start: Self, count: usize) -> Self {
+        Self::from(start.start() + (count << Self::LOG_BYTES))
+    }
+    /// result = chunk_address + count * block_size
     #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        Some(Self::from(start.start() + (count << Self::LOG_BYTES)))
+        if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
+            return None;
+        }
+        Some(Self::forward(start, count))
     }
-    /// result = chunk_address - count * chunk_size
+    /// result = chunk_address + count * block_size
+    #[inline(always)]
+    fn backward(start: Self, count: usize) -> Self {
+        Self::from(start.start() - (count << Self::LOG_BYTES))
+    }
+    /// result = chunk_address - count * block_size
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        Some(Self::from(start.start() - (count << Self::LOG_BYTES)))
+        if start.start().as_usize() < (count << Self::LOG_BYTES) {
+            return None;
+        }
+        Some(Self::backward(start, count))
     }
 }
 
 /// Chunk allocation state
 #[repr(u8)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ChunkState {
     /// The chunk is not allocated.
     Free = 0,
@@ -180,85 +129,73 @@ pub enum ChunkState {
 
 /// A byte-map to record all the allocated chunks
 pub struct ChunkMap {
-    table: Vec<AtomicU8>,
-    start: Address,
-    limit: AtomicUsize,
+    chunk_range: Mutex<Range<Chunk>>,
 }
 
 impl ChunkMap {
-    pub fn new(start: Address) -> Self {
-        Self {
-            table: (0..MAX_CHUNKS).map(|_| Default::default()).collect(),
-            start,
-            limit: AtomicUsize::new(0),
-        }
-    }
+    /// Chunk alloc table
+    pub const ALLOC_TABLE: SideMetadataSpec = SideMetadataSpec {
+        is_global: false,
+        offset: SideMetadataOffset::layout_after(&Block::MARK_TABLE),
+        log_num_of_bits: 3,
+        log_min_obj_size: Chunk::LOG_BYTES,
+    };
 
-    /// Get the index of the chunk.
-    const fn get_index(&self, chunk: Chunk) -> usize {
-        // let space_start = chunk.start().as_usize() & ((1 << LOG_SPACE_EXTENT) - 1);
-        (chunk.start().as_usize() - self.start.as_usize()) >> Chunk::LOG_BYTES
+    pub fn new() -> Self {
+        Self {
+            chunk_range: Mutex::new(Chunk::ZERO..Chunk::ZERO),
+        }
     }
 
     /// Set chunk state
     pub fn set(&self, chunk: Chunk, state: ChunkState) {
-        let index = self.get_index(chunk);
-        if state == ChunkState::Allocated {
-            let _ = self
-                .limit
-                .fetch_update(Ordering::Release, Ordering::Relaxed, |old| {
-                    if index + 1 > old {
-                        Some(index + 1)
-                    } else {
-                        None
-                    }
-                });
+        // Do nothing if the chunk is already in the expected state.
+        if self.get(chunk) == state {
+            return;
         }
-        self.table[index].store(state as _, Ordering::Release);
+        // Update alloc byte
+        unsafe { side_metadata::store(&Self::ALLOC_TABLE, chunk.start(), state as u8 as _) };
+        // If this is a newly allcoated chunk, then expand the chunk range.
+        if state == ChunkState::Allocated {
+            debug_assert!(!chunk.start().is_zero());
+            let mut range = self.chunk_range.lock();
+            if range.start == Chunk::ZERO {
+                range.start = chunk;
+                range.end = Chunk::forward(chunk, 1);
+            } else if chunk < range.start {
+                range.start = chunk;
+            } else if range.end <= chunk {
+                range.end = Chunk::forward(chunk, 1);
+            }
+        }
     }
 
     /// Get chunk state
     pub fn get(&self, chunk: Chunk) -> ChunkState {
-        let index = self.get_index(chunk);
-        let byte = self.table[index].load(Ordering::Acquire);
-        unsafe { std::mem::transmute(byte) }
+        let byte = unsafe { side_metadata::load(&Self::ALLOC_TABLE, chunk.start()) as u8 };
+        match byte {
+            0 => ChunkState::Free,
+            1 => ChunkState::Allocated,
+            _ => unreachable!(),
+        }
     }
 
     /// A range of all chunks in the heap.
     pub fn all_chunks(&self) -> Range<Chunk> {
-        let start = Chunk::from(self.start);
-        let end = Chunk::forward(start, self.limit.load(Ordering::Acquire));
-        start..end
-    }
-
-    /// A iterator of all the *allocated* chunks.
-    pub fn allocated_chunks(&'_ self) -> impl Iterator<Item = Chunk> + '_ {
-        AllocatedChunksIter {
-            table: &self.table,
-            start: self.start,
-            cursor: 0,
-        }
+        self.chunk_range.lock().clone()
     }
 
     /// Helper function to create per-chunk processing work packets.
     pub fn generate_tasks<VM: VMBinding>(
         &self,
-        workers: usize,
-        func: impl Fn(Range<Chunk>) -> Box<dyn Work<MMTK<VM>>>,
+        func: impl Fn(Chunk) -> Box<dyn Work<MMTK<VM>>>,
     ) -> Vec<Box<dyn Work<MMTK<VM>>>> {
-        let Range {
-            start: start_chunk,
-            end: end_chunk,
-        } = self.all_chunks();
-        let chunks = Chunk::steps_between(&start_chunk, &end_chunk).unwrap();
-        let chunks_per_packet = (chunks + (workers * 2 - 1)) / workers;
         let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
-        for start in (start_chunk..end_chunk).step_by(chunks_per_packet) {
-            let mut end = Chunk::forward(start, chunks_per_packet);
-            if end > end_chunk {
-                end = end_chunk;
-            }
-            work_packets.push(func(start..end));
+        for chunk in self
+            .all_chunks()
+            .filter(|c| self.get(*c) == ChunkState::Allocated)
+        {
+            work_packets.push(func(chunk));
         }
         work_packets
     }
@@ -267,56 +204,25 @@ impl ChunkMap {
     pub fn generate_sweep_tasks<VM: VMBinding>(
         &self,
         space: &'static ImmixSpace<VM>,
-        scheduler: &MMTkScheduler<VM>,
     ) -> Vec<Box<dyn Work<MMTK<VM>>>> {
-        for table in space.defrag.spill_mark_histograms() {
-            for entry in table {
-                entry.store(0, Ordering::Release);
-            }
-        }
-        self.generate_tasks(scheduler.num_workers(), |chunks| {
-            box SweepChunks(space, chunks)
-        })
-    }
-}
-
-/// Iterator to iterate over all allocated chunks.
-struct AllocatedChunksIter<'a> {
-    table: &'a [AtomicU8],
-    start: Address,
-    cursor: usize,
-}
-
-impl<'a> Iterator for AllocatedChunksIter<'a> {
-    type Item = Chunk;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        while self.cursor < self.table.len() {
-            let state = self.table[self.cursor].load(Ordering::Acquire);
-            let cursor = self.cursor;
-            self.cursor += 1;
-            if state == 1 {
-                return Some(Chunk::from(self.start + (cursor << Chunk::LOG_BYTES)));
-            }
-        }
-        None
+        space.defrag.mark_histograms.lock().clear();
+        self.generate_tasks(|chunk| box SweepChunk { space, chunk })
     }
 }
 
 /// Chunk sweeping work packet.
-pub struct SweepChunks<VM: VMBinding>(pub &'static ImmixSpace<VM>, pub Range<Chunk>);
+struct SweepChunk<VM: VMBinding> {
+    space: &'static ImmixSpace<VM>,
+    chunk: Chunk,
+}
 
-impl<VM: VMBinding> GCWork<VM> for SweepChunks<VM> {
+impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
     #[inline]
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        for chunk in self.1.start..self.1.end {
-            if self.0.chunk_map.get(chunk) == ChunkState::Allocated {
-                chunk.sweep(
-                    self.0,
-                    &self.0.defrag.spill_mark_histograms()[worker.ordinal],
-                );
-            }
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        let mut histogram = self.space.defrag.new_mark_histogram();
+        if self.space.chunk_map.get(self.chunk) == ChunkState::Allocated {
+            self.chunk.sweep(self.space, &mut histogram);
         }
+        self.space.defrag.add_completed_mark_histogram(histogram);
     }
 }

@@ -24,7 +24,7 @@ impl Line {
     /// Line mark table (side)
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
-        offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+        offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
         log_num_of_bits: 3,
         log_min_obj_size: Self::LOG_BYTES,
     };
@@ -52,14 +52,6 @@ impl Line {
         Self(address)
     }
 
-    /// Get the line containing the given address.
-    /// The input address does not need to be aligned.
-    #[inline(always)]
-    pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        debug_assert!(!super::BLOCK_ONLY);
-        Self(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
-    }
-
     /// Get the block containing the line.
     #[inline(always)]
     pub fn block(&self) -> Block {
@@ -74,18 +66,11 @@ impl Line {
         self.0
     }
 
-    /// Get line end address
-    #[inline(always)]
-    pub fn end(&self) -> Address {
-        debug_assert!(!super::BLOCK_ONLY);
-        unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
-    }
-
     /// Get line index within its containing block.
     #[inline(always)]
     pub fn get_index_within_block(&self) -> usize {
         let addr = self.start();
-        (addr.as_usize() - Block::align(addr).as_usize()) >> Line::LOG_BYTES
+        addr.get_extent(Block::align(addr)) >> Line::LOG_BYTES
     }
 
     /// Mark the line. This will update the side line mark table.
@@ -95,13 +80,6 @@ impl Line {
         unsafe {
             side_metadata::store(&Self::MARK_TABLE, self.start(), state as _);
         }
-    }
-
-    /// Get the mark byte address of the line. The address points to the side line mark table.
-    #[inline(always)]
-    pub fn mark_byte_address(&self) -> Address {
-        debug_assert!(!super::BLOCK_ONLY);
-        side_metadata::address_to_meta_address(&Self::MARK_TABLE, self.start())
     }
 
     /// Test line mark state.
@@ -144,16 +122,34 @@ unsafe impl Step for Line {
         }
         Some((end.start() - start.start()) >> Line::LOG_BYTES)
     }
-    /// result = line_address + count * line_size
+    /// result = line_address + count * block_size
+    #[inline(always)]
+    fn forward(start: Self, count: usize) -> Self {
+        debug_assert!(!super::BLOCK_ONLY);
+        Self::from(start.start() + (count << Self::LOG_BYTES))
+    }
+    /// result = line_address + count * block_size
     #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
         debug_assert!(!super::BLOCK_ONLY);
-        Some(Line::from(start.start() + (count << Line::LOG_BYTES)))
+        if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
+            return None;
+        }
+        Some(Self::forward(start, count))
     }
-    /// result = line_address - count * line_size
+    /// result = line_address + count * block_size
+    #[inline(always)]
+    fn backward(start: Self, count: usize) -> Self {
+        debug_assert!(!super::BLOCK_ONLY);
+        Self::from(start.start() - (count << Self::LOG_BYTES))
+    }
+    /// result = line_address - count * block_size
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
         debug_assert!(!super::BLOCK_ONLY);
-        Some(Line::from(start.start() - (count << Line::LOG_BYTES)))
+        if start.start().as_usize() < (count << Self::LOG_BYTES) {
+            return None;
+        }
+        Some(Self::backward(start, count))
     }
 }
