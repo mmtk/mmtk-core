@@ -104,7 +104,7 @@ impl<C: Context> Scheduler<C> {
 
         self_mut.context = Some(context);
         self_mut.coordinator_worker = Some(RwLock::new(Worker::new(
-            0,
+            233,
             Arc::downgrade(&self),
             true,
             self.channel.0.clone(),

@@ -305,22 +305,37 @@ impl<VM: VMBinding> GCWork<VM> for ConcurrentWorkStart {
 }
 
 impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for ConcurrentWorkStart {}
-pub struct ConcurrentWorkEnd;
 
-impl<VM: VMBinding> GCWork<VM> for ConcurrentWorkEnd {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+pub struct ConcurrentWorkEnd<E: ProcessEdgesWork>(PhantomData<E>);
+
+impl<E: ProcessEdgesWork> ConcurrentWorkEnd<E> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ConcurrentWorkEnd<E> {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if worker.is_coordinator() {
             println!("Stop mutators after CM");
-            <VM as VMBinding>::VMCollection::stop_all_mutators2(worker.tls);
+            <E::VM as VMBinding>::VMCollection::stop_all_mutators2(worker.tls);
             {*crate::IN_CONCURRENT_GC.lock() = false;}
+
+            mmtk.plan.base().scanned_stacks.store(0, Ordering::SeqCst);
+            for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                    .add(ScanStackRoot::<E>(mutator));
+            }
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                .add(ScanVMSpecificRoots::<E>::new());
         } else {
             mmtk.scheduler
-                .add_coordinator_work(ConcurrentWorkEnd, worker);
+                .add_coordinator_work(ConcurrentWorkEnd::<E>::new(), worker);
         }
     }
 }
 
-impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for ConcurrentWorkEnd {}
+impl<E: ProcessEdgesWork> CoordinatorWork<MMTK<E::VM>> for ConcurrentWorkEnd<E> {}
 
 /// Delegate to the VM binding for reference processing.
 ///

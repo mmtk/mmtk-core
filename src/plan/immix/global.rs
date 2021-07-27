@@ -52,14 +52,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     type VM = VM;
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        false
-        // self.base().collection_required(self, space_full, space)
-        // let stress_force_gc = self.stress_test_gc_required();
-        // debug!(
-        //     "self.get_pages_reserved()={}, self.get_total_pages()={}",
-        //     plan.get_pages_reserved(),
-        //     plan.get_total_pages()
-        // );
+        self.base().collection_required(self, space_full, space)
     }
 
     fn concurrent_collection_required(&self) -> bool {
@@ -111,7 +104,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         }
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::PreClosure].add(ConcurrentWorkStart);
-        scheduler.work_buckets[WorkBucketStage::PostClosure].add(ConcurrentWorkEnd);
+        scheduler.work_buckets[WorkBucketStage::PostClosure].add(ConcurrentWorkEnd::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
         if in_defrag {

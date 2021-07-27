@@ -105,7 +105,7 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
                 }
                 let deleted = unsafe { slot.load::<ObjectReference>() };
                 if deleted.is_null() { return }
-                println!("{:?}.{:?}: {:?} = {:?}", obj, slot, deleted, val);
+                // println!("{:?}.{:?}: {:?} = {:?}", obj, slot, deleted, val);
                 if !deleted.is_null() {
                     self.enqueue_node(deleted);
                 }
