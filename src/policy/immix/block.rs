@@ -222,11 +222,7 @@ impl Block {
     /// Initialize a clean block after acquired from page-resource.
     #[inline]
     pub fn init(&self, copy: bool) {
-        self.set_state(if copy {
-            BlockState::Marked
-        } else {
-            BlockState::Unmarked
-        });
+        self.set_state(BlockState::Marked);
         side_metadata::store_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), 0, Ordering::SeqCst);
     }
 
