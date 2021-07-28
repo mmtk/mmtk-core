@@ -29,10 +29,7 @@ use std::{
     iter::Step,
     mem,
     ops::Range,
-    sync::{
-        atomic::{AtomicBool, AtomicU8},
-        Arc,
-    },
+    sync::{atomic::AtomicU8, Arc},
 };
 
 pub struct ImmixSpace<VM: VMBinding> {
@@ -44,8 +41,6 @@ pub struct ImmixSpace<VM: VMBinding> {
     pub line_mark_state: AtomicU8,
     /// Line mark state in previous GC
     line_unavail_state: AtomicU8,
-    /// Is in a GC?
-    in_collection: AtomicBool,
     /// A list of all reusable blocks
     pub reusable_blocks: BlockList,
     /// Defrag utilities
@@ -156,7 +151,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
-            in_collection: AtomicBool::new(false),
             reusable_blocks: BlockList::default(),
             defrag: Defrag::new(),
             mark_state: Self::UNMARKED_STATE,
@@ -264,7 +258,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     .store(Line::RESET_MARK_STATE, Ordering::Release);
             }
         }
-        self.in_collection.store(true, Ordering::Release);
     }
 
     pub fn release(&mut self) {
@@ -284,8 +277,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let space = unsafe { &*(self as *const Self) };
         let work_packets = self.chunk_map.generate_sweep_tasks(space);
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
-        // Update states
-        self.in_collection.store(false, Ordering::Release);
         if super::DEFRAG {
             self.defrag.release(self)
         }

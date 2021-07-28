@@ -1,6 +1,5 @@
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
 use crate::plan::Plan;
-use crate::policy::immix::block::*;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
@@ -29,19 +28,8 @@ pub struct ImmixAllocator<VM: VMBinding> {
     large_limit: Address,
     /// Is the current request for large or small?
     request_for_large: bool,
-    /// Did the last allocation straddle a line?
-    ///
-    /// *unused*
-    straddle: bool,
-    /// approximation to bytes allocated
-    line_use_count: usize,
-    /// Line mark table
-    mark_table: Address,
-    /// Current recyclable block for allocation
-    recyclable_block: Option<Block>,
     /// Hole-searching cursor
     line: Option<Line>,
-    recyclable_exhausted: bool,
 }
 
 impl<VM: VMBinding> ImmixAllocator<VM> {
@@ -50,12 +38,8 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         self.limit = Address::ZERO;
         self.large_cursor = Address::ZERO;
         self.large_limit = Address::ZERO;
-        self.mark_table = Address::ZERO;
-        self.recyclable_block = None;
         self.request_for_large = false;
-        self.recyclable_exhausted = false;
         self.line = None;
-        self.line_use_count = 0;
     }
 }
 
@@ -101,12 +85,8 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
     /// Acquire a clean block from ImmixSpace for allocation.
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         match self.immix_space().get_clean_block(self.tls, self.copy) {
-            None => {
-                self.line_use_count = 0;
-                Address::ZERO
-            }
+            None => Address::ZERO,
             Some(block) => {
-                self.line_use_count = Block::LINES as _;
                 trace!("Acquired a new block {:?}", block);
                 if self.request_for_large {
                     self.large_cursor = block.start();
@@ -143,12 +123,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             large_cursor: Address::ZERO,
             large_limit: Address::ZERO,
             request_for_large: false,
-            straddle: false,
-            line_use_count: 0,
-            mark_table: Address::ZERO,
-            recyclable_block: None,
             line: None,
-            recyclable_exhausted: false,
         }
     }
 
