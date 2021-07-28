@@ -6,8 +6,7 @@ use crate::util::constants::*;
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use crossbeam_queue::SegQueue;
-use spin::RwLock;
+use spin::{Mutex, MutexGuard};
 use std::{
     iter::Step,
     ops::Range,
@@ -354,45 +353,37 @@ unsafe impl Step for Block {
 /// A non-block single-linked list to store blocks.
 #[derive(Default)]
 pub struct BlockList {
-    queue: RwLock<SegQueue<Block>>,
+    queue: Mutex<Vec<Block>>,
 }
 
 impl BlockList {
     /// Get number of blocks in this list.
     #[inline]
     pub fn len(&self) -> usize {
-        self.queue.read().len()
+        self.queue.lock().len()
     }
 
     /// Add a block to the list.
     #[inline]
     pub fn push(&self, block: Block) {
-        self.queue.read().push(block)
+        self.queue.lock().push(block)
     }
 
     /// Pop a block out of the list.
     #[inline]
     pub fn pop(&self) -> Option<Block> {
-        self.queue.read().pop()
+        self.queue.lock().pop()
     }
 
     /// Clear the list.
     #[inline]
     pub fn reset(&self) {
-        *self.queue.write() = SegQueue::new()
+        *self.queue.lock() = Vec::new()
     }
 
     /// Get an array of all reusable blocks stored in this BlockList.
     #[inline]
-    pub fn get_blocks(&self) -> Vec<Block> {
-        let mut queue = self.queue.write();
-        let mut blocks = Vec::with_capacity(queue.len());
-        let new_queue = SegQueue::new();
-        while let Some(block) = queue.pop() {
-            new_queue.push(block);
-            blocks.push(block);
-        }
-        *queue = new_queue;
-        blocks
+    pub fn get_blocks(&self) -> MutexGuard<Vec<Block>> {
+        self.queue.lock()
     }
 }
