@@ -1,5 +1,5 @@
 use super::chunk::Chunk;
-use super::defrag::MarkHistogram;
+use super::defrag::Histogram;
 use super::line::Line;
 use super::ImmixSpace;
 use crate::util::constants::*;
@@ -249,7 +249,7 @@ impl Block {
     pub fn sweep<VM: VMBinding>(
         &self,
         space: &ImmixSpace<VM>,
-        mark_histogram: &mut MarkHistogram,
+        mark_histogram: &mut Histogram,
         line_mark_state: Option<u8>,
     ) -> bool {
         if super::BLOCK_ONLY {
