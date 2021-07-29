@@ -482,6 +482,12 @@ pub struct CommonSpace<VM: VMBinding> {
 
     pub metadata: SideMetadataContext,
 
+    /// This field equals to needs_log_bit in the plan constraints.
+    // This field was named as 'HeaderByte.NEEDS_UNLOGGED_BIT' in Java MMTk (and still equals to needsLogBitInHeader() in Java MMTk).
+    // I do not know where the name is from. But to avoid confusion, we just call it needs_log_bit.
+    // TODO: This should be a constant for performance.
+    pub needs_log_bit: bool,
+
     p: PhantomData<VM>,
 }
 
@@ -490,6 +496,7 @@ pub struct SpaceOptions {
     pub movable: bool,
     pub immortal: bool,
     pub zeroed: bool,
+    pub needs_log_bit: bool,
     pub vmrequest: VMRequest,
     pub side_metadata_specs: SideMetadataContext,
 }
@@ -517,6 +524,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             head_discontiguous_region: unsafe { Address::zero() },
             vm_map,
             mmapper,
+            needs_log_bit: opt.needs_log_bit,
             metadata: opt.side_metadata_specs,
             p: PhantomData,
         };

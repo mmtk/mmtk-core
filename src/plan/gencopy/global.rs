@@ -48,6 +48,7 @@ pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
+    needs_log_bit: true,
     barrier: super::ACTIVE_BARRIER,
     max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
