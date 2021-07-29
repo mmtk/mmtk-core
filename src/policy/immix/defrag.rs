@@ -18,6 +18,7 @@ pub struct Defrag {
     defrag_space_exhausted: AtomicBool,
     /// A list of completed mark histograms reported by workers
     pub mark_histograms: Mutex<Vec<Histogram>>,
+    /// A block with number of holes greater than this threshold will be defragmented.
     pub defrag_spill_threshold: AtomicUsize,
     /// The number of remaining clean pages in defrag space.
     available_clean_pages_for_defrag: AtomicUsize,
@@ -144,8 +145,7 @@ impl Defrag {
                 s => unreachable!("{:?} {:?}", block, s),
             };
             let available_lines = Block::LINES - unavailable_lines;
-            let old = spill_avail_histograms[bucket];
-            spill_avail_histograms[bucket] = old + available_lines;
+            spill_avail_histograms[bucket] += available_lines;
             total_available_lines += available_lines;
         }
         total_available_lines
@@ -161,19 +161,29 @@ impl Defrag {
                 .load(Ordering::Acquire)
                 << (LOG_BYTES_IN_PAGE as usize - Line::LOG_BYTES));
 
+        // Number of lines we will evacuate.
         let mut required_lines = 0isize;
+        // Number of to-space free lines we can use for defragmentation.
         let mut limit = (available_lines as f32 / Self::DEFRAG_LINE_REUSE_RATIO) as isize;
         let mut threshold = Block::LINES >> 1;
         let mark_histograms = self.mark_histograms.lock();
+        // Blocks are grouped by buckets, indexed by the number of holes in the block.
+        // `mark_histograms` remembers the number of live lines for each bucket.
+        // Here, reversely iterate all the bucket to find a threshold that all buckets above this
+        // threshold can be evacuated, without causing to-space overflow.
         for index in (Self::MIN_SPILL_THRESHOLD..Self::NUM_BINS).rev() {
             threshold = index;
+            // Calculate total number of live lines in this bucket.
             let this_bucket_mark = mark_histograms
                 .iter()
                 .map(|v| v[threshold] as isize)
                 .sum::<isize>();
+            // Calculate the number of free lines in this bucket.
             let this_bucket_avail = spill_avail_histograms[threshold] as isize;
+            // Update counters
             limit -= this_bucket_avail as isize;
             required_lines += this_bucket_mark;
+            // Stop scanning. Lines to evacuate exceeds the free to-space lines.
             if limit < required_lines {
                 break;
             }
