@@ -76,7 +76,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
                 object,
                 1,
                 None,
-                Some(Ordering::SeqCst)
+                Some(Ordering::SeqCst),
             )
         }
     }

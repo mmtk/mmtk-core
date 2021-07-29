@@ -14,11 +14,11 @@ pub struct TreadMill {
 impl std::fmt::Debug for TreadMill {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TreadMill")
-         .field("from", &self.from_space.lock().unwrap())
-         .field("to", &self.to_space.lock().unwrap())
-         .field("collect_nursery", &self.collect_nursery.lock().unwrap())
-         .field("alloc_nursery", &self.alloc_nursery.lock().unwrap())
-         .finish()
+            .field("from", &self.from_space.lock().unwrap())
+            .field("to", &self.to_space.lock().unwrap())
+            .field("collect_nursery", &self.collect_nursery.lock().unwrap())
+            .field("alloc_nursery", &self.alloc_nursery.lock().unwrap())
+            .finish()
     }
 }
 

@@ -75,7 +75,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 object,
                 1,
                 None,
-                Some(Ordering::SeqCst)
+                Some(Ordering::SeqCst),
             )
         }
 
