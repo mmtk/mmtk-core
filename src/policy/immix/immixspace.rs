@@ -46,7 +46,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     /// Defrag utilities
     pub(super) defrag: Defrag,
     /// Object mark state
-    mark_state: usize,
+    mark_state: u8,
     /// Work packet scheduler
     scheduler: Arc<MMTkScheduler<VM>>,
 }
@@ -93,8 +93,8 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 }
 
 impl<VM: VMBinding> ImmixSpace<VM> {
-    const UNMARKED_STATE: usize = 0;
-    const MARKED_STATE: usize = 1;
+    const UNMARKED_STATE: u8 = 0;
+    const MARKED_STATE: u8 = 1;
 
     /// Get side metadata specs
     #[allow(clippy::assertions_on_constants)]
@@ -189,28 +189,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.defrag.in_defrag()
     }
 
-    const AVAILABLE_LOCAL_BITS: usize = 7;
-    const MARK_BASE: usize = 4;
-    const MARK_INCREMENT: u8 = 1 << Self::MARK_BASE;
-    const MAX_MARKCOUNT_BITS: usize = Self::AVAILABLE_LOCAL_BITS - Self::MARK_BASE;
-    const MARK_MASK: u8 = ((1 << Self::MAX_MARKCOUNT_BITS) - 1) << Self::MARK_BASE;
-    const MARK_BASE_VALUE: u8 = Self::MARK_INCREMENT;
-
-    /// Update mark state
-    #[allow(clippy::assertions_on_constants)]
-    fn delta_mark_state(state: u8) -> u8 {
-        debug_assert!(!VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side());
-        let mut rtn = state;
-        loop {
-            rtn = (rtn + Self::MARK_INCREMENT) & Self::MARK_MASK;
-            if rtn >= Self::MARK_BASE_VALUE {
-                break;
-            }
-        }
-        debug_assert_ne!(rtn, state);
-        rtn
-    }
-
     /// Get work packet scheduler
     fn scheduler(&self) -> &MMTkScheduler<VM> {
         &self.scheduler
@@ -219,16 +197,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     pub fn prepare(&mut self) {
         // Update mark_state
         if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
-            // For side metadata, we always use `1` as marked state.
-            // Object mark table will be cleared by `PrepareBlockState` before each GC.
-            //
-            // Note: It is incorrect to flip matk bit between 0 and 1 and remove
-            // the mark-table zeroing step. Because openjdk does not call post_alloc to set up
-            // object initial metadata.
             self.mark_state = Self::MARKED_STATE;
         } else {
             // For header metadata, we use cyclic mark bits.
-            self.mark_state = Self::delta_mark_state(self.mark_state as u8) as usize;
+            unimplemented!("cyclic mark bits is not supported at the moment");
         }
         // Prepare defrag info
         if super::DEFRAG {
@@ -410,14 +382,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Atomically mark an object.
     #[inline(always)]
-    fn attempt_mark(&self, object: ObjectReference, mark_state: usize) -> bool {
+    fn attempt_mark(&self, object: ObjectReference, mark_state: u8) -> bool {
         loop {
             let old_value = load_metadata::<VM>(
                 &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 object,
                 None,
                 Some(Ordering::SeqCst),
-            );
+            ) as u8;
             if old_value == mark_state {
                 return false;
             }
@@ -425,8 +397,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             if compare_exchange_metadata::<VM>(
                 &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 object,
-                old_value,
-                mark_state,
+                old_value as usize,
+                mark_state as usize,
                 None,
                 Ordering::SeqCst,
                 Ordering::SeqCst,
@@ -439,13 +411,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Check if an object is marked.
     #[inline(always)]
-    fn is_marked(&self, object: ObjectReference, mark_state: usize) -> bool {
+    fn is_marked(&self, object: ObjectReference, mark_state: u8) -> bool {
         let old_value = load_metadata::<VM>(
             &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             object,
             None,
             Some(Ordering::SeqCst),
-        );
+        ) as u8;
         old_value == mark_state
     }
 
