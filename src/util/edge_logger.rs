@@ -16,7 +16,7 @@ lazy_static! {
 }
 
 /// Whether we should check duplicate edges. This depends on the actual plan.
-pub fn should_check_duplicate_edges<VM: VMBinding>(plan: &dyn Plan<VM=VM>) -> bool {
+pub fn should_check_duplicate_edges<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> bool {
     // If a plan allows tracing duplicate edges, we should not run this check.
     !plan.constraints().may_trace_duplicate_edges
 }
