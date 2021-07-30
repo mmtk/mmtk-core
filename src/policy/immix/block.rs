@@ -1,7 +1,7 @@
 use super::chunk::Chunk;
 use super::defrag::Histogram;
 use super::line::Line;
-use super::ImmixSpace;
+use super::{ImmixSpace, IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET};
 use crate::util::constants::*;
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::{Address, ObjectReference};
@@ -90,7 +90,7 @@ impl Block {
         is_global: false,
         offset: if super::BLOCK_ONLY {
             // If BLOCK_ONLY is set, we do not use any line marktables.
-            LOCAL_SIDE_METADATA_BASE_OFFSET
+            IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET
         } else {
             SideMetadataOffset::layout_after(&Line::MARK_TABLE)
         },
