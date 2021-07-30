@@ -4,6 +4,7 @@ use super::{
     chunk::{Chunk, ChunkMap, ChunkState},
     defrag::Defrag,
 };
+use crate::plan::ObjectsClosure;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -27,7 +28,6 @@ use crate::{
 use atomic::Ordering;
 use std::{
     iter::Step,
-    mem,
     ops::Range,
     sync::{atomic::AtomicU8, Arc},
 };
@@ -519,42 +519,6 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     }
 }
 
-/// A transitive closure visitor to collect all the edges of an object.
-pub struct ObjectsClosure<'a, E: ProcessEdgesWork>(
-    &'static MMTK<E::VM>,
-    Vec<Address>,
-    &'a mut GCWorker<E::VM>,
-);
-
-impl<'a, E: ProcessEdgesWork> TransitiveClosure for ObjectsClosure<'a, E> {
-    #[inline(always)]
-    fn process_edge(&mut self, slot: Address) {
-        if self.1.is_empty() {
-            self.1.reserve(E::CAPACITY);
-        }
-        self.1.push(slot);
-        if self.1.len() >= E::CAPACITY {
-            let mut new_edges = Vec::new();
-            mem::swap(&mut new_edges, &mut self.1);
-            self.2
-                .add_work(WorkBucketStage::Closure, E::new(new_edges, false, self.0));
-        }
-    }
-    fn process_node(&mut self, _object: ObjectReference) {
-        unreachable!()
-    }
-}
-
-impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
-    #[inline(always)]
-    fn drop(&mut self) {
-        let mut new_edges = Vec::new();
-        mem::swap(&mut new_edges, &mut self.1);
-        self.2
-            .add_work(WorkBucketStage::Closure, E::new(new_edges, false, self.0));
-    }
-}
-
 /// A work packet to scan the fields of each objects and mark lines.
 pub struct ScanObjectsAndMarkLines<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
@@ -580,7 +544,7 @@ impl<Edges: ProcessEdgesWork> ScanObjectsAndMarkLines<Edges> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanObjectsAndMarkLines");
-        let mut closure = ObjectsClosure::<E>(mmtk, vec![], worker);
+        let mut closure = ObjectsClosure::<E>::new(mmtk, vec![], worker);
         for object in &self.buffer {
             <E::VM as VMBinding>::VMScanning::scan_object(
                 &mut closure,
