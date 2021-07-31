@@ -5,8 +5,6 @@
         <meta charset="UTF-8">
         <title>Test the build - MMTk Tutorial</title>
         <!-- Custom HTML head -->
-        
-
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -85,7 +83,6 @@
         <div id="page-wrapper" class="page-wrapper">
 
             <div class="page">
-                
                 <div id="menu-bar-hover-placeholder"></div>
                 <div id="menu-bar" class="menu-bar sticky bordered">
                     <div class="left-buttons">
@@ -157,7 +154,7 @@ in <code>mmtk-openjdk/repos/openjdk</code>:
 <li>Use the command 
 <code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac HelloWorld.java</code>.</li>
 <li>Then, run 
-<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java HelloWorld -XX:+UseThirdPartyHeap</code> 
+<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap HelloWorld</code> 
 to run HelloWorld.</li>
 <li>If your program printed out <code>Hello World!</code> as expected, then congratulations, you have MMTk working with OpenJDK!</li>
 </ol>
@@ -173,7 +170,7 @@ in <code>mmtk-openjdk/repos/openjdk</code>.</li>
 <li>Use the command 
 <code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac fannkuchredux.java</code>.</li>
 <li>Then, run 
-<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java fannkuchredux -XX:+UseThirdPartyHeap</code> 
+<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap fannkuchredux</code> 
 to run fannkuchredux.</li>
 </ol>
 </li>
