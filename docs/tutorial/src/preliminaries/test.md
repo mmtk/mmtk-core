@@ -17,7 +17,7 @@ entered in `repos/openjdk`.
    2. Use the command 
    `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac HelloWorld.java`.
    3. Then, run 
-   `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java HelloWorld -XX:+UseThirdPartyHeap` 
+   `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap HelloWorld` 
    to run HelloWorld.
    4. If your program printed out `Hello World!` as expected, then congratulations, you have MMTk working with OpenJDK!
    
@@ -30,7 +30,7 @@ plan - may not trigger a collection):
    2. Use the command 
    `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac fannkuchredux.java`.
    3. Then, run 
-   `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java fannkuchredux -XX:+UseThirdPartyHeap` 
+   `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap fannkuchredux` 
    to run fannkuchredux.
    
 3. **DaCapo** benchmark suite (most complex, will likely trigger multiple 
