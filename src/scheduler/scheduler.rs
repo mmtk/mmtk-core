@@ -61,6 +61,7 @@ impl<C: Context> Scheduler<C> {
             work_buckets: enum_map! {
                 WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
                 WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::ForwardRoots => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::RefClosure => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
@@ -143,6 +144,7 @@ impl<C: Context> Scheduler<C> {
                 open_stages.push(s);
             };
 
+            open_next(ForwardRoots);
             open_next(PreClosure);
             open_next(Closure);
             open_next(PostClosure);
@@ -246,6 +248,7 @@ impl<C: Context> Scheduler<C> {
             self.process_coordinator_work(finalizer);
         }
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::ForwardRoots].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::PreClosure].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::PostClosure].is_activated());
@@ -257,6 +260,7 @@ impl<C: Context> Scheduler<C> {
 
     pub fn assert_all_deactivated(&self) {
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::ForwardRoots].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::PreClosure].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::PostClosure].is_activated());
@@ -268,6 +272,7 @@ impl<C: Context> Scheduler<C> {
 
     pub fn deactivate_all(&self) {
         self.work_buckets[WorkBucketStage::Prepare].deactivate();
+        self.work_buckets[WorkBucketStage::ForwardRoots].deactivate();
         self.work_buckets[WorkBucketStage::PreClosure].deactivate();
         self.work_buckets[WorkBucketStage::Closure].deactivate();
         self.work_buckets[WorkBucketStage::PostClosure].deactivate();
@@ -278,8 +283,10 @@ impl<C: Context> Scheduler<C> {
     }
 
     pub fn reset_state(&self) {
-        unreachable!();
         // self.work_buckets[WorkBucketStage::Prepare].deactivate();
+        self.work_buckets[WorkBucketStage::ForwardRoots].deactivate();
+        self.work_buckets[WorkBucketStage::PreClosure].deactivate();
+        self.work_buckets[WorkBucketStage::PostClosure].deactivate();
         self.work_buckets[WorkBucketStage::Closure].deactivate();
         self.work_buckets[WorkBucketStage::RefClosure].deactivate();
         self.work_buckets[WorkBucketStage::RefForwarding].deactivate();

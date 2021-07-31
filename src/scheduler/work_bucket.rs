@@ -150,6 +150,7 @@ impl<C: Context> WorkBucket<C> {
 pub enum WorkBucketStage {
     Unconstrained,
     Prepare,
+    ForwardRoots,
     PreClosure,
     Closure,
     // TODO: We only support final reference at the moment. If we have references of multiple strengths,
