@@ -97,7 +97,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     const MARKED_STATE: u8 = 1;
 
     /// Get side metadata specs
-    #[allow(clippy::assertions_on_constants)]
     fn side_metadata_specs() -> Vec<SideMetadataSpec> {
         metadata::extract_side_metadata(&if super::BLOCK_ONLY {
             vec![
@@ -134,7 +133,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 vmrequest: VMRequest::discontiguous(),
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
-                    local: Self::side_metadata_specs().to_vec(),
+                    local: Self::side_metadata_specs(),
                 },
             },
             vm_map,
