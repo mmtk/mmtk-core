@@ -483,8 +483,6 @@ pub struct CommonSpace<VM: VMBinding> {
     pub metadata: SideMetadataContext,
 
     /// This field equals to needs_log_bit in the plan constraints.
-    // This field was named as 'HeaderByte.NEEDS_UNLOGGED_BIT' in Java MMTk (and still equals to needsLogBitInHeader() in Java MMTk).
-    // I do not know where the name is from. But to avoid confusion, we just call it needs_log_bit.
     // TODO: This should be a constant for performance.
     pub needs_log_bit: bool,
 

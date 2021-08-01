@@ -37,6 +37,8 @@ impl Barrier for NoBarrier {
 pub struct ObjectRememberingBarrier<E: ProcessEdgesWork> {
     mmtk: &'static MMTK<E::VM>,
     modbuf: Vec<ObjectReference>,
+    /// The metadata used for log bit. Though this allows taking an arbitrary metadata spec,
+    /// for this field, 0 means logged, and 1 means unlogged (the same as the vm::object_model::VMGlobalLogBitSpec).
     meta: MetadataSpec,
 }
 
@@ -52,6 +54,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
 
     #[inline(always)]
     fn enqueue_node<VM: VMBinding>(&mut self, obj: ObjectReference) {
+        // If the objecct is unlogged, log it and push it to mod buffer
         if compare_exchange_metadata::<VM>(
             &self.meta,
             obj,

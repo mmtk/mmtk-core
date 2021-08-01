@@ -70,13 +70,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         );
 
         if self.common.needs_log_bit {
-            store_metadata::<VM>(
-                &VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
-                object,
-                1,
-                None,
-                Some(Ordering::SeqCst),
-            )
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
 
         let cell = VM::VMObjectModel::object_start_ref(object);
