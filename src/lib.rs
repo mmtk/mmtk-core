@@ -15,6 +15,8 @@
 #![feature(const_panic)]
 #![feature(const_fn_union)]
 #![feature(step_trait)]
+#![feature(const_generics)]
+#![feature(const_fn_union)]
 #![feature(step_trait_ext)]
 // TODO: We should fix missing docs for public items and turn this on (Issue #309).
 // #![deny(missing_docs)]
