@@ -1,8 +1,6 @@
-// all from Wenyu's Immix
-
-use super::block::{Block, BlockState};
 use super::MarkSweepSpace;
-use crate::util::alloc::free_list_allocator::{BYTES_IN_BLOCK, LOG_BYTES_IN_BLOCK};
+use super::block::{Block, BlockState};
+use super::defrag::MarkHistogram;
 use crate::util::metadata::side_metadata::{self, SideMetadataOffset, SideMetadataSpec};
 use crate::{
     scheduler::*,
@@ -11,8 +9,7 @@ use crate::{
     MMTK,
 };
 use spin::Mutex;
-use std::borrow::BorrowMut;
-use std::{iter::Step, ops::Range};
+use std::{iter::Step, ops::Range, sync::atomic::Ordering};
 
 /// Data structure to reference a MMTk 4 MB chunk.
 #[repr(C)]
@@ -27,7 +24,7 @@ impl Chunk {
     /// Bytes in chunk
     pub const BYTES: usize = 1 << Self::LOG_BYTES;
     /// Log blocks in chunk
-    pub const LOG_BLOCKS: usize = Self::LOG_BYTES - LOG_BYTES_IN_BLOCK;
+    pub const LOG_BLOCKS: usize = Self::LOG_BYTES - Block::LOG_BYTES;
     /// Blocks in chunk
     pub const BLOCKS: usize = 1 << Self::LOG_BLOCKS;
 
@@ -52,16 +49,18 @@ impl Chunk {
     /// Get a range of blocks within this chunk.
     #[inline(always)]
     pub fn blocks(&self) -> Range<Block> {
-        let a = Block::align(self.0);
-        let b = Block::from(a);
         let start = Block::from(Block::align(self.0));
-        let end = Block::from(start.start() + (Self::BLOCKS << LOG_BYTES_IN_BLOCK));
+        let end = Block::from(start.start() + (Self::BLOCKS << Block::LOG_BYTES));
         start..end
     }
 
     /// Sweep this chunk.
-    pub fn sweep<VM: VMBinding>(&self, space: &MarkSweepSpace<VM>) {
-        // let line_mark_state = None;
+    pub fn sweep<VM: VMBinding>(&self, space: &MarkSweepSpace<VM>, mark_histogram: &mut MarkHistogram) {
+        let line_mark_state = if super::BLOCK_ONLY {
+            None
+        } else {
+            Some(space.line_mark_state.load(Ordering::Acquire))
+        };
         // number of allocated blocks.
         let mut allocated_blocks = 0;
         // Iterate over all allocated blocks in this chunk.
@@ -69,7 +68,7 @@ impl Chunk {
             .blocks()
             .filter(|block| block.get_state() != BlockState::Unallocated)
         {
-            if !block.sweep(space) {
+            if !block.sweep(space, mark_histogram, line_mark_state) {
                 // Block is live. Increment the allocated block count.
                 allocated_blocks += 1;
             }
@@ -135,9 +134,10 @@ pub struct ChunkMap {
 
 impl ChunkMap {
     /// Chunk alloc table
-    pub const ALLOC_TABLE: SideMetadataSpec = SideMetadataSpec {
+    pub const ALLOC_TABLE: SideMetadataSpec = 
+    SideMetadataSpec {
         is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::TLS_TABLE),
+        offset: SideMetadataOffset::layout_after(&Block::MARK_TABLE),
         log_num_of_bits: 3,
         log_min_obj_size: Chunk::LOG_BYTES,
     };
@@ -186,12 +186,12 @@ impl ChunkMap {
         self.chunk_range.lock().clone()
     }
 
-     /// Helper function to create per-chunk processing work packets.
-     pub fn generate_tasks<VM: VMBinding>(
+    /// Helper function to create per-chunk processing work packets.
+    pub fn generate_tasks<VM: VMBinding>(
         &self,
-        func: impl Fn(Chunk) -> Box<dyn GCWork<VM>>,
-    ) -> Vec<Box<dyn GCWork<VM>>> {
-        let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
+        func: impl Fn(Chunk) -> Box<dyn Work<MMTK<VM>>>,
+    ) -> Vec<Box<dyn Work<MMTK<VM>>>> {
+        let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
         for chunk in self
             .all_chunks()
             .filter(|c| self.get(*c) == ChunkState::Allocated)
@@ -205,7 +205,8 @@ impl ChunkMap {
     pub fn generate_sweep_tasks<VM: VMBinding>(
         &self,
         space: &'static MarkSweepSpace<VM>,
-    ) -> Vec<Box<dyn GCWork<VM>>> {
+    ) -> Vec<Box<dyn Work<MMTK<VM>>>> {
+        space.defrag.mark_histograms.lock().clear();
         self.generate_tasks(|chunk| box SweepChunk { space, chunk })
     }
 }
@@ -219,8 +220,10 @@ struct SweepChunk<VM: VMBinding> {
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        let mut histogram = self.space.defrag.new_mark_histogram();
         if self.space.chunk_map.get(self.chunk) == ChunkState::Allocated {
-            self.chunk.sweep(self.space);
+            self.chunk.sweep(self.space, &mut histogram);
         }
+        self.space.defrag.add_completed_mark_histogram(histogram);
     }
 }

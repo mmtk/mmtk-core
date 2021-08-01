@@ -407,3 +407,4 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     }
 }
+
