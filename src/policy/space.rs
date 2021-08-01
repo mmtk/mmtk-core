@@ -260,7 +260,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.
         let should_poll = VM::VMActivePlan::is_mutator(tls);
         // Is a GC allowed here? enable_collection() has to be called so we know GC is initialized.
-        let allow_poll = should_poll && VM::VMActivePlan::global().is_initialized() && !*crate::IN_CONCURRENT_GC.lock();
+        let allow_poll = should_poll && VM::VMActivePlan::global().is_initialized();
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();

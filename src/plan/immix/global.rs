@@ -83,7 +83,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.immix_space.init(&vm_map);
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>, concurrent: bool) {
         scheduler.assert_all_deactivated();
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
@@ -103,8 +103,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
                 .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
         }
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::PreClosure].add(ConcurrentWorkStart);
-        scheduler.work_buckets[WorkBucketStage::PostClosure].add(ConcurrentWorkEnd::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
+        if concurrent {
+            scheduler.work_buckets[WorkBucketStage::PreClosure].add(ConcurrentWorkStart);
+            scheduler.work_buckets[WorkBucketStage::PostClosure].add(ConcurrentWorkEnd::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
+        }
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
         if in_defrag {

@@ -1,6 +1,6 @@
 //! The GC controller thread.
 
-use crate::scheduler::gc_work::ScheduleCollection;
+use crate::scheduler::gc_work::{ConcurrentWorkEnd, ScheduleCollection};
 use crate::scheduler::*;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -8,6 +8,8 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 use std::sync::{Arc, Condvar, Mutex};
+
+use super::immix::gc_work::{ImmixProcessEdges, TraceKind};
 
 struct RequestSync {
     request_count: isize,
@@ -19,6 +21,7 @@ pub struct ControllerCollectorContext<VM: VMBinding> {
     request_condvar: Condvar,
     scheduler: RwLock<Option<Arc<MMTkScheduler<VM>>>>,
     request_flag: AtomicBool,
+    pub concurrent: AtomicBool,
     phantom: PhantomData<VM>,
 }
 
@@ -39,6 +42,7 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
             request_condvar: Condvar::new(),
             scheduler: RwLock::new(None),
             request_flag: AtomicBool::new(false),
+            concurrent: AtomicBool::new(false),
             phantom: PhantomData,
         }
     }
@@ -53,7 +57,7 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
         loop {
             debug!("[STWController: Waiting for request...]");
             self.wait_for_request();
-            debug!("[STWController: Request recieved.]");
+            println!("[STWController: Request recieved.] {}", self.concurrent.load(Ordering::SeqCst));
 
             // For heap growth logic
             // FIXME: This is not used. However, we probably want to set a 'user_triggered' flag
@@ -63,13 +67,29 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
             let scheduler = self.scheduler.read().unwrap();
             let scheduler = scheduler.as_ref().unwrap();
             scheduler.initialize_worker(tls);
-            scheduler.set_initializer(Some(ScheduleCollection));
+            scheduler.set_initializer(Some(ScheduleCollection(self.concurrent.load(Ordering::SeqCst))));
             scheduler.wait_for_completion();
             debug!("[STWController: Worker threads complete!]");
         }
     }
 
-    pub fn request(&self) {
+    pub fn terminate_concurrent_gc(&self) {
+        println!("terminate_concurrent_gc");
+        // if self.request_flag.load(Ordering::Relaxed) {
+        //     return;
+        // }
+        // let mut guard = self.request_sync.lock().unwrap();
+        // if !self.request_flag.load(Ordering::Relaxed) {
+        //     self.request_flag.store(true, Ordering::Relaxed);
+        //     guard.request_count += 1;
+            // self.request_condvar.notify_all();
+            let scheduler = self.scheduler.read().unwrap();
+            let scheduler = scheduler.as_ref().unwrap();
+            scheduler.work_buckets[WorkBucketStage::PreClosure].add(ConcurrentWorkEnd::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
+        // }
+    }
+
+    pub fn request(&self, concurrent: bool) {
         if self.request_flag.load(Ordering::Relaxed) {
             return;
         }
@@ -77,6 +97,8 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
         let mut guard = self.request_sync.lock().unwrap();
         if !self.request_flag.load(Ordering::Relaxed) {
             self.request_flag.store(true, Ordering::Relaxed);
+            self.concurrent.store(concurrent, Ordering::SeqCst);
+            println!("concurrent = {}", self.concurrent.load(Ordering::SeqCst));
             guard.request_count += 1;
             self.request_condvar.notify_all();
         }

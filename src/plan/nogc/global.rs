@@ -83,7 +83,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<VM>, _: bool) {
         unreachable!("GC triggered in nogc")
     }
 

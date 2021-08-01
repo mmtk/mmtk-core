@@ -175,7 +175,7 @@ pub trait Plan: 'static + Sync + Downcast {
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr;
     fn base(&self) -> &BasePlan<Self::VM>;
-    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
+    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>, _concurrent: bool);
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
@@ -236,12 +236,19 @@ pub trait Plan: 'static + Sync + Downcast {
                 return false;
             }*/
             self.log_poll(space, "Triggering collection");
-            self.base().control_collector_context.request();
+            if *crate::IN_CONCURRENT_GC.lock() {
+                println!("End CONC GC: {} / {}", self.get_pages_reserved(), self.get_total_pages());
+                self.base().control_collector_context.terminate_concurrent_gc();
+            } else {
+                println!("Trigger STW GC: {} / {}", self.get_pages_reserved(), self.get_total_pages());
+                self.base().control_collector_context.request(false);
+            }
             return true;
         }
 
         // FIXME
         if self.concurrent_collection_required() {
+            println!("Trigger CONC GC: {} / {}", self.get_pages_reserved(), self.get_total_pages());
             // FIXME
             /*if space == self.common().meta_data_space {
                 self.log_poll(space, "Triggering async concurrent collection");
@@ -307,7 +314,7 @@ pub trait Plan: 'static + Sync + Downcast {
             self.base()
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
-            self.base().control_collector_context.request();
+            self.base().control_collector_context.request(false);
             <Self::VM as VMBinding>::VMCollection::block_for_gc(tls);
         }
     }
@@ -673,7 +680,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         // Mark this as a user triggered collection
         // internalTriggeredCollection = lastInternalTriggeredCollection = true;
         // Request the collection
-        self.control_collector_context.request();
+        self.control_collector_context.request(true);
     }
 
     fn is_internal_triggered_collection(&self) -> bool {

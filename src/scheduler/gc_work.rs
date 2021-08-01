@@ -10,11 +10,11 @@ use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
 
-pub struct ScheduleCollection;
+pub struct ScheduleCollection(pub bool);
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        mmtk.plan.schedule_collection(worker.scheduler());
+        mmtk.plan.schedule_collection(worker.scheduler(), self.0);
     }
 }
 
@@ -283,6 +283,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         crate::util::edge_logger::reset();
 
         mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
+        println!("End of GC: {} / {}", mmtk.plan.get_pages_reserved(), mmtk.plan.get_total_pages());
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
 }
@@ -317,9 +318,16 @@ impl<E: ProcessEdgesWork> ConcurrentWorkEnd<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ConcurrentWorkEnd<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if worker.is_coordinator() {
+            let mut in_concurrent_gc = crate::IN_CONCURRENT_GC.lock();
+            if !*in_concurrent_gc {
+                return
+            }
+            mem::drop(in_concurrent_gc);
             println!("Stop mutators after CM");
             <E::VM as VMBinding>::VMCollection::stop_all_mutators2(worker.tls);
-            {*crate::IN_CONCURRENT_GC.lock() = false;}
+            let mut in_concurrent_gc = crate::IN_CONCURRENT_GC.lock();
+            *in_concurrent_gc = false;
+            mem::drop(in_concurrent_gc);
 
             mmtk.plan.base().scanned_stacks.store(0, Ordering::SeqCst);
             for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
@@ -616,6 +624,10 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             //         Ordering::SeqCst,
             //     );
             // }
+        }
+        if !mmtk.plan.base().control_collector_context.concurrent.load(Ordering::SeqCst) {
+            println!("Skip REMSET");
+            return
         }
         // if mmtk.plan.is_current_gc_nursery() {
             if !self.modbuf.is_empty() {

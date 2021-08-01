@@ -81,12 +81,12 @@ impl<VM: VMBinding> WorkerLocal for ImmixCopyContext<VM> {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(super) enum TraceKind {
+pub enum TraceKind {
     Fast,
     Defrag,
 }
 
-pub(super) struct ImmixProcessEdges<VM: VMBinding, const KIND: TraceKind> {
+pub struct ImmixProcessEdges<VM: VMBinding, const KIND: TraceKind> {
     // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
     // downcast for each traced object.
     plan: &'static Immix<VM>,

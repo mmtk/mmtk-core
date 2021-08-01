@@ -77,7 +77,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.copyspace1.init(&vm_map);
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>, _: bool) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()

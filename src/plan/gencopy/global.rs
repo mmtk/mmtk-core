@@ -106,7 +106,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.copyspace1.init(&vm_map);
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>, _: bool) {
         let is_full_heap = self.request_full_heap_collection();
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
 
