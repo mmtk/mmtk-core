@@ -31,7 +31,7 @@ pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: V
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default => AllocatorSelector::BumpPointer(0),
-        AllocationType::Immortal | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
+        AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
         AllocationType::Los => AllocatorSelector::LargeObject(0),
     };
 }
@@ -59,7 +59,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
         barrier: box ObjectRememberingBarrier::<GenCopyNurseryProcessEdges<VM>>::new(
             mmtk,
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
         ),
         mutator_tls,
         config,

@@ -99,7 +99,7 @@ impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for PrepareCollecto
 /// The global GC release Work
 /// This work packet invokes release() for the plan (which will invoke release() for each space), and
 /// pushes work packets for releasing mutators and collectors.
-/// We should only have one such work packet per GC, before any actual GC work starts.
+/// We should only have one such work packet per GC, after all actual GC work ends.
 /// We assume this work packet is the only running work packet that accesses plan, and there should
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
@@ -120,6 +120,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> Release<P, W> {
 impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Release Global");
+        <P::VM as VMBinding>::VMCollection::vm_release();
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut P = unsafe { &mut *(self.plan as *const _ as *mut _) };
@@ -247,6 +248,27 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 }
 
 impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for EndOfGC {}
+
+/// Delegate to the VM binding for reference processing.
+///
+/// Some VMs (e.g. v8) do not have a Java-like global weak reference storage, and the
+/// processing of those weakrefs may be more complex. For such case, we delegate to the
+/// VM binding to process weak references.
+#[derive(Default)]
+pub struct ProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
+
+impl<E: ProcessEdgesWork> ProcessWeakRefs<E> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessWeakRefs<E> {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+        trace!("ProcessWeakRefs");
+        <E::VM as VMBinding>::VMCollection::process_weak_refs::<E>(worker);
+    }
+}
 
 #[derive(Default)]
 pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
@@ -497,7 +519,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
                 compare_exchange_metadata::<E::VM>(
-                    self.meta,
+                    &self.meta,
                     *obj,
                     0b0,
                     0b1,

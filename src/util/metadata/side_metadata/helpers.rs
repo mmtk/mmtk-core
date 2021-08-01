@@ -14,7 +14,7 @@ use std::io::Result;
 /// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
 #[inline(always)]
 pub(crate) fn address_to_contiguous_meta_address(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: &SideMetadataSpec,
     data_addr: Address,
 ) -> Address {
     let log_bits_num = metadata_spec.log_num_of_bits as i32;
@@ -22,16 +22,10 @@ pub(crate) fn address_to_contiguous_meta_address(
 
     let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
-    unsafe {
-        if rshift >= 0 {
-            Address::from_usize(
-                metadata_spec.offset as usize + ((data_addr >> log_min_obj_size) >> rshift),
-            )
-        } else {
-            Address::from_usize(
-                metadata_spec.offset as usize + ((data_addr >> log_min_obj_size) << (-rshift)),
-            )
-        }
+    if rshift >= 0 {
+        metadata_spec.get_absolute_offset() + ((data_addr >> log_min_obj_size) >> rshift)
+    } else {
+        metadata_spec.get_absolute_offset() + ((data_addr >> log_min_obj_size) << (-rshift))
     }
 }
 
@@ -53,10 +47,10 @@ pub(crate) fn ensure_munmap_contiguos_metadata_space(
     spec: &SideMetadataSpec,
 ) -> usize {
     // nearest page-aligned starting address
-    let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
+    let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
     let mmap_size =
-        address_to_meta_address(*spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
+        address_to_meta_address(spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
     if mmap_size > 0 {
         ensure_munmap_metadata(mmap_start, mmap_size);
     }
@@ -76,10 +70,10 @@ pub(crate) fn try_mmap_contiguous_metadata_space(
     debug_assert!(size % BYTES_IN_PAGE == 0);
 
     // nearest page-aligned starting address
-    let mmap_start = address_to_meta_address(*spec, start).align_down(BYTES_IN_PAGE);
+    let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
     let mmap_size =
-        address_to_meta_address(*spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
+        address_to_meta_address(spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
     if mmap_size > 0 {
         if !no_reserve {
             MMAPPER.ensure_mapped(mmap_start, mmap_size >> LOG_BYTES_IN_PAGE)
@@ -95,7 +89,7 @@ pub(crate) fn try_mmap_contiguous_metadata_space(
 /// Performs the translation of data address (`data_addr`) to metadata address for the specified metadata (`metadata_spec`).
 #[inline(always)]
 pub(crate) fn address_to_meta_address(
-    metadata_spec: SideMetadataSpec,
+    metadata_spec: &SideMetadataSpec,
     data_addr: Address,
 ) -> Address {
     #[cfg(target_pointer_width = "32")]
@@ -109,14 +103,12 @@ pub(crate) fn address_to_meta_address(
     #[cfg(target_pointer_width = "64")]
     let res = { address_to_contiguous_meta_address(metadata_spec, data_addr) };
 
-    // trace!(
-    //     "address_to_meta_address(addr: {}, off: 0x{:x}, lbits: {}, lmin: {}) -> 0x{:x}",
-    //     data_addr,
-    //     metadata_spec.offset,
-    //     metadata_spec.log_num_of_bits,
-    //     metadata_spec.log_min_obj_size,
-    //     res
-    // );
+    trace!(
+        "address_to_meta_address({:?}, addr: {}) -> 0x{:x}",
+        metadata_spec,
+        data_addr,
+        res
+    );
 
     res
 }
@@ -133,7 +125,7 @@ pub const fn metadata_address_range_size(metadata_spec: &SideMetadataSpec) -> us
 }
 
 #[inline(always)]
-pub(crate) fn meta_byte_lshift(metadata_spec: SideMetadataSpec, data_addr: Address) -> u8 {
+pub(crate) fn meta_byte_lshift(metadata_spec: &SideMetadataSpec, data_addr: Address) -> u8 {
     let bits_num_log = metadata_spec.log_num_of_bits as i32;
     if bits_num_log >= 3 {
         return 0;
@@ -144,7 +136,7 @@ pub(crate) fn meta_byte_lshift(metadata_spec: SideMetadataSpec, data_addr: Addre
 }
 
 #[inline(always)]
-pub(crate) fn meta_byte_mask(metadata_spec: SideMetadataSpec) -> u8 {
+pub(crate) fn meta_byte_mask(metadata_spec: &SideMetadataSpec) -> u8 {
     let bits_num_log = metadata_spec.log_num_of_bits;
     ((1usize << (1usize << bits_num_log)) - 1) as u8
 }
