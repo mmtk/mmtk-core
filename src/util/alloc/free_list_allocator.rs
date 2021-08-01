@@ -389,7 +389,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     #[inline]
     pub fn cas_thread_free_list(&self, block: Address, old_thread_free: Address, new_thread_free: Address) -> bool {
         compare_exchange_metadata::<VM>(
-            MetadataSpec::OnSide(self.space.get_thread_free_metadata_spec()),
+            &MetadataSpec::OnSide(self.space.get_thread_free_metadata_spec()),
             unsafe{block.to_object_reference()}, 
             old_thread_free.as_usize(),
             new_thread_free.as_usize(),
