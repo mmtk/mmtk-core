@@ -14,6 +14,8 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -146,11 +148,22 @@ impl<VM: VMBinding> CopySpace<VM> {
     pub fn release(&self) {
         unsafe {
             #[cfg(feature = "global_alloc_bit")]
-            self.pr.reset_alloc_bit(self.common.start);
+            self.reset_alloc_bit();
             self.pr.reset();
         }
         self.common.metadata.reset();
         self.from_space.store(false, Ordering::SeqCst);
+    }
+
+    #[cfg(feature = "global_alloc_bit")]
+    unsafe fn reset_alloc_bit(&self) {
+        let current_chunk = self.pr.get_current_chunk();
+        if self.common.contiguous {
+            trace!("start: 0x{:x} | current_chunk: 0x{:x}", self.common.start, current_chunk);
+            crate::util::alloc_bit::bzero_alloc_bit(self.common.start, current_chunk + BYTES_IN_CHUNK - self.common.start);
+        } else {
+            unimplemented!();
+        }
     }
 
     fn from_space(&self) -> bool {

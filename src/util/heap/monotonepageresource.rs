@@ -236,15 +236,9 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         drop(guard);
     }
 
-    #[cfg(feature = "global_alloc_bit")]
-    pub unsafe fn reset_alloc_bit(&self, start: Address) {
+    pub unsafe fn get_current_chunk(&self) -> Address {
         let guard = self.sync.lock().unwrap();
-        if self.common.contiguous {
-            trace!("start: 0x{:x} | current_chunk: 0x{:x}", start, guard.current_chunk);
-            crate::util::alloc_bit::bzero_alloc_bit(start, guard.current_chunk + BYTES_IN_CHUNK - start);
-        } else {
-            unimplemented!();
-        }
+        guard.current_chunk
     }
 
     /*/**
