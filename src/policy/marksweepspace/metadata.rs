@@ -13,12 +13,14 @@ use crate::util::{constants, conversions};
 use crate::vm::{ObjectModel, VMBinding};
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
-
 use super::MARKSWEEP_LOCAL_SIDE_METADATA_BASE_OFFSET;
 
-// lazy_static! {
-//     pub static ref ACTIVE_CHUNKS: RwLock<HashSet<Address>> = RwLock::default();
-// }
+pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    is_global: true,
+    offset: GLOBAL_SIDE_METADATA_BASE_OFFSET,
+    log_num_of_bits: 3,
+    log_min_obj_size: LOG_BYTES_IN_CHUNK as usize,
+};
 
 /// Metadata spec for the active chunk byte
 ///
