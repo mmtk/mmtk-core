@@ -6,7 +6,7 @@ use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(target_pointer_width = "64")]
-use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_ADDRESS;
+use crate::util::metadata::side_metadata::GLOBAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -26,7 +26,7 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 #[cfg(target_pointer_width = "64")]
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: true,
-    offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+    offset: GLOBAL_SIDE_METADATA_BASE_OFFSET,
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
@@ -69,12 +69,20 @@ pub fn unset_alloc_bit(object: ObjectReference) {
     );
 }
 
+pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
+    side_metadata::store(&ALLOC_SIDE_METADATA_SPEC, object.to_address(), 0);
+}
+
 pub fn is_alloced(object: ObjectReference) -> bool {
     is_alloced_object(object.to_address())
 }
 
 pub fn is_alloced_object(address: Address) -> bool {
     side_metadata::load_atomic(&ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
+}
+
+pub unsafe fn is_alloced_object_unsafe(address: Address) -> bool {
+    side_metadata::load(&ALLOC_SIDE_METADATA_SPEC, address) == 1
 }
 
 pub fn bzero_alloc_bit(start: Address, size: usize) {

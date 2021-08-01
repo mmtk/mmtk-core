@@ -17,11 +17,36 @@ use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SideMetadataSpec {
     pub is_global: bool,
-    pub offset: usize,
+    pub offset: SideMetadataOffset,
     /// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.
     pub log_num_of_bits: usize,
     /// Number of bytes of the region. E.g. 3 = 8 bytes, 12 = 4096 bytes (page).
     pub log_min_obj_size: usize,
+}
+
+impl SideMetadataSpec {
+    /// Is offset for this spec Address? (contiguous side metadata for 64 bits, and global specs in 32 bits)
+    #[inline(always)]
+    pub const fn is_absolute_offset(&self) -> bool {
+        self.is_global || cfg!(target_pointer_width = "64")
+    }
+    /// If offset for this spec relative? (chunked side metadata for local specs in 32 bits)
+    #[inline(always)]
+    pub const fn is_rel_offset(&self) -> bool {
+        !self.is_absolute_offset()
+    }
+
+    #[inline(always)]
+    pub const fn get_absolute_offset(&self) -> Address {
+        debug_assert!(self.is_absolute_offset());
+        unsafe { self.offset.addr }
+    }
+
+    #[inline(always)]
+    pub const fn get_rel_offset(&self) -> usize {
+        debug_assert!(self.is_rel_offset());
+        unsafe { self.offset.rel_offset }
+    }
 }
 
 impl fmt::Debug for SideMetadataSpec {
@@ -29,12 +54,85 @@ impl fmt::Debug for SideMetadataSpec {
         f.write_fmt(format_args!(
             "SideMetadataSpec {{ \
             **is_global: {:?} \
-            **offset: 0x{:x} \
+            **offset: {} \
             **log_num_of_bits: 0x{:x} \
             **log_min_obj_size: 0x{:x} \
             }}",
-            self.is_global, self.offset, self.log_num_of_bits, self.log_min_obj_size
+            self.is_global,
+            unsafe {
+                if self.is_absolute_offset() {
+                    format!("0x{:x}", self.offset.addr)
+                } else {
+                    format!("0x{:x}", self.offset.rel_offset)
+                }
+            },
+            self.log_num_of_bits,
+            self.log_min_obj_size
         ))
+    }
+}
+
+/// A union of Address or relative offset (usize) used to store offset for a side metadata spec.
+/// If a spec is contiguous side metadata, it uses address. Othrewise it uses usize.
+// The fields are made private on purpose. They can only be accessed from SideMetadata which knows whether it is Address or usize.
+#[derive(Clone, Copy)]
+pub union SideMetadataOffset {
+    addr: Address,
+    rel_offset: usize,
+}
+
+impl SideMetadataOffset {
+    // Get an offset for a fixed address. This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
+    pub const fn addr(addr: Address) -> Self {
+        SideMetadataOffset { addr }
+    }
+
+    // Get an offset for a relative offset (usize). This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
+    pub const fn rel(rel_offset: usize) -> Self {
+        SideMetadataOffset { rel_offset }
+    }
+
+    /// Get an offset after a spec. This is used to layout another spec immediately after this one.
+    #[cfg(target_pointer_width = "64")]
+    pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
+        debug_assert!(spec.is_absolute_offset());
+        SideMetadataOffset {
+            addr: unsafe { spec.offset.addr }
+                .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),
+        }
+    }
+    /// Get an offset after a spec. This is used to layout another spec immediately after this one.
+    #[cfg(target_pointer_width = "32")]
+    pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
+        if spec.is_absolute_offset() {
+            SideMetadataOffset {
+                addr: unsafe { spec.offset.addr }
+                    .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),
+            }
+        } else {
+            SideMetadataOffset {
+                rel_offset: unsafe { spec.offset.rel_offset }
+                    + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
+                        spec.log_min_obj_size,
+                        spec.log_num_of_bits,
+                    ),
+            }
+        }
+    }
+}
+
+// Address and usize has the same layout, so we use usize for implementing these traits.
+
+impl PartialEq for SideMetadataOffset {
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { self.rel_offset == other.rel_offset }
+    }
+}
+impl Eq for SideMetadataOffset {}
+
+impl std::hash::Hash for SideMetadataOffset {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        unsafe { self.rel_offset }.hash(state);
     }
 }
 
@@ -697,16 +795,18 @@ pub fn bzero_metadata(metadata_spec: &SideMetadataSpec, start: Address, size: us
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::util::metadata::side_metadata::SideMetadataContext;
 
-    use super::*;
+    // offset is not used in these tests.
+    pub const ZERO_OFFSET: SideMetadataOffset = SideMetadataOffset { rel_offset: 0 };
 
     #[test]
     fn calculate_reserved_pages_one_spec() {
         // 1 bit per 8 bytes - 1:64
         let spec = SideMetadataSpec {
             is_global: true,
-            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            offset: ZERO_OFFSET,
             log_num_of_bits: 0,
             log_min_obj_size: 3,
         };
@@ -726,14 +826,14 @@ mod tests {
         // 1 bit per 8 bytes - 1:64
         let gspec = SideMetadataSpec {
             is_global: true,
-            offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            offset: ZERO_OFFSET,
             log_num_of_bits: 0,
             log_min_obj_size: 3,
         };
         // 2 bits per page - 2 / (4k * 8) = 1:16k
         let lspec = SideMetadataSpec {
             is_global: false,
-            offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize(),
+            offset: ZERO_OFFSET,
             log_num_of_bits: 1,
             log_min_obj_size: 12,
         };
