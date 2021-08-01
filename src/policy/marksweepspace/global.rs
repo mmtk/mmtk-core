@@ -2,10 +2,19 @@ use std::{collections::{HashMap, HashSet}, sync::Mutex};
 
 use atomic::Ordering;
 
-use crate::{TransitiveClosure, policy::marksweepspace::metadata::{ALLOC_SIDE_METADATA_SPEC, is_marked, set_mark_bit, unset_mark_bit}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, BYTES_IN_BLOCK, FreeListAllocator}, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{self, MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataSpec, metadata_address_range_size}, store_metadata}}, vm::VMBinding};
+use crate::{TransitiveClosure, policy::marksweepspace::metadata::{ALLOC_SIDE_METADATA_SPEC, is_marked, set_mark_bit, unset_mark_bit}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, BYTES_IN_BLOCK, FreeListAllocator}, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{self, MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataOffset, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
 
-use super::{super::space::{CommonSpace, SFT, Space, SpaceOptions}, metadata::{is_alloced, unset_alloc_bit}};
+use super::{super::space::{CommonSpace, SFT, Space, SpaceOptions}, metadata::{is_alloced, unset_alloc_bit_unsafe}};
 use crate::vm::ObjectModel;
+
+// const NATIVE_MALLOC_SPECS: Vec<SideMetadataSpec> = [
+//     SideMetadataSpec {
+//         is_global: false,
+//         offset: 
+//         log_num_of_bits: 6,
+//         log_min_obj_size: 16,
+//     },
+// ].to_vec();
 
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub active_blocks: Mutex<HashSet<Address>>,
@@ -75,48 +84,48 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     ) -> MarkSweepSpace<VM> {
         let alloc_mark_bits = &mut metadata::extract_side_metadata(&[
             MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
         ]);
         let side_metadata_next = SideMetadataSpec {
             is_global: false,
-            offset: LOCAL_SIDE_METADATA_BASE_ADDRESS.as_usize() + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            offset: SideMetadataOffset::layout_after(&*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec()),
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
         let side_metadata_free = SideMetadataSpec {
             is_global: false,
-            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            offset: SideMetadataOffset::layout_after(&side_metadata_next),
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
         let side_metadata_size = SideMetadataSpec {
             is_global: false,
-            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            offset: SideMetadataOffset::layout_after(&side_metadata_free),
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
         let side_metadata_local_free = SideMetadataSpec {
             is_global: false,
-            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            offset: SideMetadataOffset::layout_after(&side_metadata_size),
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
         let side_metadata_thread_free = SideMetadataSpec {
             is_global: false,
-            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&side_metadata_local_free) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            offset: SideMetadataOffset::layout_after(&side_metadata_local_free),
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
         let side_metadata_tls = SideMetadataSpec {
             is_global: false,
-            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&side_metadata_local_free) + metadata_address_range_size(&side_metadata_thread_free) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            offset: SideMetadataOffset::layout_after(&side_metadata_thread_free),
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
 
         let side_metadata_marked = SideMetadataSpec {
             is_global: false,
-            offset: metadata_address_range_size(&side_metadata_next) + metadata_address_range_size(&side_metadata_free) + metadata_address_range_size(&side_metadata_size) + metadata_address_range_size(&side_metadata_local_free) + metadata_address_range_size(&side_metadata_thread_free) + metadata_address_range_size(&alloc_mark_bits[0]) + metadata_address_range_size(&alloc_mark_bits[0]),
+            offset: SideMetadataOffset::layout_after(&side_metadata_tls),
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
@@ -176,8 +185,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             "Cannot mark an object {} that was not alloced by free list allocator.",
             address,
         );
-        if !is_marked::<VM>(object) {
-            set_mark_bit::<VM>(object);
+        if !is_marked::<VM>(object, None) {
+            set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
             let block = FreeListAllocator::<VM>::get_block(address);
             self.mark_block(block);
             trace.process_node(object);
@@ -234,13 +243,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         while cell < block + BYTES_IN_BLOCK {
             // eprintln!("look at cell {}", cell);
             let alloced = is_alloced(unsafe { cell.to_object_reference() });
-            let marked = is_marked::<VM>(unsafe { cell.to_object_reference() });
+            let marked = is_marked::<VM>(unsafe { cell.to_object_reference() }, Some(Ordering::SeqCst));
             if alloced {
                 if !marked {
                     self.free(cell, tls);
                 }
                 else {
-                    unset_mark_bit::<VM>(unsafe{cell.to_object_reference()});
+                    unset_mark_bit::<VM>(unsafe{cell.to_object_reference()}, Some(Ordering::SeqCst));
                 }
             }
             cell += cell_size;
@@ -281,7 +290,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn marked_block(&self, block: Address) -> bool {
         load_metadata::<VM>(
-            MetadataSpec::OnSide(self.get_marked_metadata_spec()), 
+            &MetadataSpec::OnSide(self.get_marked_metadata_spec()), 
             unsafe {block.to_object_reference()},
             None,
             Some(Ordering::SeqCst)) == 1
@@ -289,7 +298,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn mark_block(&self, block: Address) {
         store_metadata::<VM>(
-            MetadataSpec::OnSide(self.get_marked_metadata_spec()),
+            &MetadataSpec::OnSide(self.get_marked_metadata_spec()),
             unsafe{block.to_object_reference()}, 
             1, 
             None, 
@@ -299,7 +308,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn alloced_block(&self, block: Address) -> bool {
         load_metadata::<VM>(
-            MetadataSpec::OnSide(self.get_tls_metadata_spec()), 
+            &MetadataSpec::OnSide(self.get_tls_metadata_spec()), 
             unsafe {block.to_object_reference()},
             None,
             Some(Ordering::SeqCst)) != 0
@@ -308,7 +317,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn block_clear_metadata(&self, block: Address) {
         for metadata_spec in &self.common.metadata.local {
             store_metadata::<VM>(
-                MetadataSpec::OnSide(*metadata_spec),
+                &MetadataSpec::OnSide(*metadata_spec),
                 unsafe{block.to_object_reference()},
                 0,
                 None,
@@ -320,7 +329,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn load_block_tls(&self, block: Address) -> OpaquePointer {
         eprintln!("Load tls for block {}", block);
         let tls = load_metadata::<VM>(
-            MetadataSpec::OnSide(self.get_tls_metadata_spec()), 
+            &MetadataSpec::OnSide(self.get_tls_metadata_spec()), 
             unsafe {block.to_object_reference()},
             None,
             Some(Ordering::SeqCst));
@@ -331,7 +340,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn load_block_cell_size(&self, block: Address) -> usize {
         load_metadata::<VM>(
-            MetadataSpec::OnSide(self.get_size_metadata_spec()), 
+            &MetadataSpec::OnSide(self.get_size_metadata_spec()), 
             unsafe {block.to_object_reference()},
             None,
             Some(Ordering::SeqCst))
@@ -347,7 +356,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             let local_free = unsafe {
                 Address::from_usize(
                     load_metadata::<VM>(
-                        MetadataSpec::OnSide(self.get_local_free_metadata_spec()), 
+                        &MetadataSpec::OnSide(self.get_local_free_metadata_spec()), 
                         block.to_object_reference(), 
                         None, 
                         None,
@@ -358,7 +367,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 addr.store(local_free);
             }
             store_metadata::<VM>(
-                MetadataSpec::OnSide(self.get_free_metadata_spec()),
+                &MetadataSpec::OnSide(self.get_free_metadata_spec()),
                 unsafe{block.to_object_reference()}, 
                 addr.as_usize(), None, 
                 None
@@ -370,7 +379,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 let thread_free = unsafe {
                     Address::from_usize(
                         load_metadata::<VM>(
-                            MetadataSpec::OnSide(self.get_thread_free_metadata_spec()), 
+                            &MetadataSpec::OnSide(self.get_thread_free_metadata_spec()), 
                             block.to_object_reference(), 
                             None, 
                             Some(Ordering::SeqCst),
@@ -381,7 +390,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                     addr.store(thread_free);
                 }
                 success = compare_exchange_metadata::<VM>(
-                    MetadataSpec::OnSide(self.get_thread_free_metadata_spec()),
+                    &MetadataSpec::OnSide(self.get_thread_free_metadata_spec()),
                     unsafe{block.to_object_reference()}, 
                     thread_free.as_usize(), 
                     addr.as_usize(), 
@@ -394,7 +403,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         
 
         // unset allocation bit
-        unset_alloc_bit(unsafe { addr.to_object_reference() });
+        unsafe { unset_alloc_bit_unsafe(unsafe { addr.to_object_reference() }) };
 
     }
 }

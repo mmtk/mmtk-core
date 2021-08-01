@@ -16,7 +16,7 @@ use enum_map::EnumMap;
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
         AllocationType::Default | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::FreeList(0),
-        AllocationType::Los | AllocationType::Immortal => AllocatorSelector::BumpPointer(0),
+        AllocationType::Los | AllocationType::Immortal | AllocationType::LargeCode => AllocatorSelector::BumpPointer(0),
     };
 }
 pub fn flms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
