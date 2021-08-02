@@ -77,6 +77,7 @@ impl<VM: VMBinding> Plan for FreeListMarkSweep<VM> {
 
     fn prepare(&mut self, _tls: VMWorkerThread) {
         self.im_space.prepare();
+        self.ms_space.reset();
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
@@ -117,6 +118,7 @@ impl<VM: VMBinding> FreeListMarkSweep<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
+        scheduler: Arc<MMTkScheduler<VM>>,
     ) -> Self {
         #[cfg(not(feature = "freelistmarksweep_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
@@ -130,6 +132,7 @@ impl<VM: VMBinding> FreeListMarkSweep<VM> {
             vm_map,
             mmapper,
             &mut heap,
+            scheduler,
         );
         let global_specs = SideMetadataContext::new_global_specs(&[]);
 
