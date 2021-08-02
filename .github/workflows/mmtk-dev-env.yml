@@ -15,7 +15,7 @@ jobs:
           repo: mmtk-dev-env
           github_token: ${{ secrets.CI_ACCESS_TOKEN }}
           workflow_file_name: ci.yml
-          ref: main
+          ref: update-rust-toolchain
           wait_interval: 10
           inputs: '{}'
           propagate_failure: true
