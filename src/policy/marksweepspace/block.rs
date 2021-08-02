@@ -26,6 +26,7 @@ use super::{MarkSweepSpace, metadata::ALLOC_SIDE_METADATA_SPEC};
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
 
+
 impl Block {
     /// Align the address to a block boundary.
     pub const fn align(address: Address) -> Address {

@@ -161,11 +161,9 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
             vm_map, mmapper, options,
         )),
-        PlanSelector::FreeListMarkSweep => {
-            Box::new(crate::plan::freelistmarksweep::FreeListMarkSweep::new(
-                vm_map, mmapper, options, scheduler,
-            ))
-        }
+        PlanSelector::FreeListMarkSweep => Box::new(crate::plan::freelistmarksweep::FreeListMarkSweep::new(
+            vm_map, mmapper, options, scheduler,
+        )),
     }
 }
 
