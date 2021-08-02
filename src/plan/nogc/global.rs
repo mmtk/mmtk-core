@@ -3,9 +3,6 @@ use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::immortalspace::ImmortalSpace;
-use crate::policy::largeobjectspace::LargeObjectSpace;
-use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -15,7 +12,7 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataSanity, SideMetadataSpec};
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
@@ -60,8 +57,8 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!()
     }
 
-    fn release(&mut self, tls: VMWorkerThread) {
-        self.ms_space.eager_sweep(tls);
+    fn release(&mut self, _tls: VMWorkerThread) {
+        unreachable!()
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -80,10 +77,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
         println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
     }
-
-    fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        false
-    }
 }
 
 impl<VM: VMBinding> NoGC<VM> {
@@ -99,7 +92,6 @@ impl<VM: VMBinding> NoGC<VM> {
 
         let global_specs = SideMetadataContext::new_global_specs(&[]);
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
-
 
 
         #[cfg(feature = "nogc_lock_free")]
@@ -140,6 +132,7 @@ impl<VM: VMBinding> NoGC<VM> {
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res.nogc_space
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+
         res
     }
 }
