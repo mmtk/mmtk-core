@@ -93,7 +93,7 @@ pub fn create_plan<VM: VMBinding>(
             vm_map, mmapper, options,
         )),
         PlanSelector::FreeListMarkSweep => Box::new(crate::plan::freelistmarksweep::FreeListMarkSweep::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options,
         )),
     }
 }
