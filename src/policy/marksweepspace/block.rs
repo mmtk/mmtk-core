@@ -19,9 +19,13 @@ use crate::{
 };
 
 use super::{metadata::ALLOC_SIDE_METADATA_SPEC, MarkSweepSpace};
+use crate::{util::{Address, OpaquePointer, alloc::{free_list_allocator::{self, BYTES_IN_BLOCK, LOG_BYTES_IN_BLOCK}}, metadata::side_metadata::{self, LOCAL_SIDE_METADATA_BASE_OFFSET, SideMetadataOffset, SideMetadataSpec}}, vm::VMBinding};
+
+use super::MarkSweepSpace;
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
+
 
 impl Block {
     /// Align the address to a block boundary.
@@ -32,7 +36,7 @@ impl Block {
     /// Block mark table (side)
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
-        offset: SideMetadataOffset::layout_after(&ALLOC_SIDE_METADATA_SPEC),
+        offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
         log_num_of_bits: 3,
         log_min_obj_size: free_list_allocator::LOG_BYTES_IN_BLOCK,
     };
