@@ -1,11 +1,13 @@
 name: Check mmtk-dev-env
 
+# Triggerred when a new commit is pushed to master
 on:
-  pull_request:
+  push:
     branches:
       - master
 
 jobs:
+  # Trigger ci.yml from mmtk/mmtk-dev-env to make sure mmtk-core can build with mmtk-dev-env.
   check-mmtk-dev-env:
     runs-on: ubuntu-18.04
     steps:
