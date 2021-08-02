@@ -1,0 +1,23 @@
+name: Check mmtk-dev-env
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  check-mmtk-dev-env:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: convictional/trigger-workflow-and-wait@v1.3.0
+        with:
+          owner: mmtk
+          repo: mmtk-dev-env
+          github_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          workflow_file_name: ci.yml
+          ref: main
+          wait_interval: 10
+          inputs: '{}'
+          propagate_failure: true
+          trigger_workflow: true
+          wait_workflow: true
