@@ -27,9 +27,9 @@ use crate::{
     TransitiveClosure,
 };
 
-use crate::{TransitiveClosure, policy::marksweepspace::metadata::{ALLOC_SIDE_METADATA_SPEC, is_marked, set_mark_bit, unset_mark_bit}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, BYTES_IN_BLOCK, FreeListAllocator}, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{self, MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataOffset, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
+use crate::{TransitiveClosure, policy::marksweepspace::{block::{Block, BlockState}, metadata::{ALLOC_SIDE_METADATA_SPEC, is_marked, set_mark_bit, unset_mark_bit}}, scheduler::{MMTkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, BYTES_IN_BLOCK, FreeListAllocator}, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{self, MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataOffset, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
 
-use super::{super::space::{CommonSpace, SFT, Space, SpaceOptions}, metadata::{is_alloced, unset_alloc_bit_unsafe}};
+use super::{super::space::{CommonSpace, SFT, Space, SpaceOptions}, chunks::ChunkMap, metadata::{is_alloced, unset_alloc_bit_unsafe}};
 use crate::vm::ObjectModel;
 
 // const NATIVE_MALLOC_SPECS: Vec<SideMetadataSpec> = [
@@ -45,7 +45,11 @@ pub struct MarkSweepSpace<VM: VMBinding> {
     pub active_blocks: Mutex<HashSet<Address>>,
     pub common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
-    marked_blocks: HashMap<usize, Vec<free_list_allocator::BlockQueue>>
+    pub marked_blocks: HashMap<usize, Vec<free_list_allocator::BlockQueue>>,
+    /// Allocation status for all chunks in immix space
+    pub chunk_map: ChunkMap,
+    /// Work packet scheduler
+    scheduler: Arc<MMTkScheduler<VM>>,
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
@@ -106,6 +110,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
+        scheduler: Arc<MMTkScheduler<VM>>,
     ) -> MarkSweepSpace<VM> {
         let alloc_mark_bits = &mut metadata::extract_side_metadata(&[
             MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
@@ -113,7 +118,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         ]);
         let side_metadata_next = SideMetadataSpec {
             is_global: false,
-            offset: SideMetadataOffset::layout_after(&*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec()),
+            offset: SideMetadataOffset::layout_after(&ChunkMap::ALLOC_TABLE),
             log_num_of_bits: 6,
             log_min_obj_size: 16,
         };
@@ -148,12 +153,12 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             log_min_obj_size: 16,
         };
 
-        let side_metadata_marked = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&side_metadata_tls),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
+        // let side_metadata_marked = SideMetadataSpec {
+        //     is_global: false,
+        //     offset: SideMetadataOffset::layout_after(&side_metadata_tls),
+        //     log_num_of_bits: 6,
+        //     log_min_obj_size: 16,
+        // };
         let mut local_specs = {
             vec![
                 side_metadata_next,
@@ -162,7 +167,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 side_metadata_local_free,
                 side_metadata_thread_free,
                 side_metadata_tls,
-                side_metadata_marked,
+                // side_metadata_marked,
             ]
         };
 
@@ -193,6 +198,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             },
             common,
             marked_blocks: HashMap::default(),
+            chunk_map: ChunkMap::new(),
+            scheduler,
         }
     }
 
@@ -212,8 +219,9 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         );
         if !is_marked::<VM>(object, None) {
             set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
-            let block = FreeListAllocator::<VM>::get_block(address);
-            self.mark_block(block);
+            let block = Block::from(FreeListAllocator::<VM>::get_block(address));
+            block.set_state(BlockState::Marked);
+            // self.mark_block(block);
             trace.process_node(object);
         }
         object

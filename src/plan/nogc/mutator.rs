@@ -33,6 +33,7 @@ pub fn create_nogc_mutator<VM: VMBinding>(
         prepare_func: &nogc_mutator_noop,
         release_func: &nogc_mutator_noop,
     };
+
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
         barrier: box NoBarrier,
