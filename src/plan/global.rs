@@ -138,6 +138,7 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
+    scheduler: Arc<MMTkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
         PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
@@ -154,7 +155,7 @@ pub fn create_plan<VM: VMBinding>(
             vm_map, mmapper, options,
         )),
         PlanSelector::FreeListMarkSweep => Box::new(crate::plan::freelistmarksweep::FreeListMarkSweep::new(
-            vm_map, mmapper, options,
+            vm_map, mmapper, options, scheduler,
         )),
     }
 }
