@@ -18,7 +18,7 @@ use crate::util::ObjectReference;
 #[cfg(target_pointer_width = "32")]
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: true,
-    offset: 0,
+    offset: GLOBAL_SIDE_METADATA_BASE_OFFSET,
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
