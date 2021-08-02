@@ -12,7 +12,7 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataSanity, SideMetadataSpec};
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
@@ -57,8 +57,8 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!()
     }
 
-    fn release(&mut self, tls: VMWorkerThread) {
-        self.ms_space.eager_sweep(tls);
+    fn release(&mut self, _tls: VMWorkerThread) {
+        unreachable!()
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -70,15 +70,11 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        self.im_space.reserved_pages() + self.ms_space.reserved_pages()
+        self.nogc_space.reserved_pages()
     }
 
     fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
         println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
-    }
-
-    fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        false
     }
 }
 
@@ -96,7 +92,7 @@ impl<VM: VMBinding> NoGC<VM> {
         let global_specs = SideMetadataContext::new_global_specs(&[]);
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
 
-
+        let global_specs = SideMetadataContext::new_global_specs(&[]);
 
         #[cfg(feature = "nogc_lock_free")]
         let nogc_space = NoGCImmortalSpace::new(
@@ -109,18 +105,6 @@ impl<VM: VMBinding> NoGC<VM> {
             "nogc_space",
             true,
             VMRequest::discontiguous(),
-            // local_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
-            &NOGC_CONSTRAINTS,
-        );
-        let global_specs = SideMetadataContext::new_global_specs(&[]);
-
-        let im_space = ImmortalSpace::new(
-            "IMspace",
-            true,
-            VMRequest::discontiguous(),
             global_specs.clone(),
             vm_map,
             mmapper,
@@ -129,8 +113,7 @@ impl<VM: VMBinding> NoGC<VM> {
         );
 
         let res = NoGC {
-            im_space,
-            ms_space,
+            nogc_space,
             base: BasePlan::new(
                 vm_map,
                 mmapper,
@@ -146,10 +129,9 @@ impl<VM: VMBinding> NoGC<VM> {
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         res.base()
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.ms_space
+        res.nogc_space
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.im_space
-            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+
         res
     }
 }

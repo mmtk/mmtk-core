@@ -112,7 +112,7 @@ pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
 ];
 
 pub(crate) const BYTES_IN_BLOCK: usize = 1 << LOG_BYTES_IN_BLOCK;
-const LOG_BYTES_IN_BLOCK: usize = 16;
+pub(crate) const LOG_BYTES_IN_BLOCK: usize = 16;
 const MI_BIN_HUGE: usize = 73;
 const MI_INTPTR_SHIFT: usize = 3;
 const MI_INTPTR_SIZE: usize = 1 << MI_INTPTR_SHIFT;
