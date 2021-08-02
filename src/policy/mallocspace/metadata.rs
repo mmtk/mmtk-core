@@ -6,7 +6,6 @@ use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::side_metadata::GLOBAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
@@ -14,9 +13,6 @@ use crate::util::ObjectReference;
 use crate::util::{constants, conversions};
 use crate::vm::{ObjectModel, VMBinding};
 use crate::util::alloc_bit;
-
-use std::collections::HashSet;
-use std::sync::RwLock;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
@@ -201,6 +197,7 @@ pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ord
     );
 }
 
+#[allow(unused)]
 pub fn unset_alloc_bit(object: ObjectReference) {
     alloc_bit::unset_alloc_bit(object);
 }
@@ -222,6 +219,7 @@ pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
     alloc_bit::unset_alloc_bit_unsafe(object);
 }
 
+#[allow(unused)]
 pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
     store_metadata::<VM>(
         &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,

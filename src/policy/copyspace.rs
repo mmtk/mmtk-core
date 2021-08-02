@@ -14,6 +14,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(feature = "global_alloc_bit")]
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 
 

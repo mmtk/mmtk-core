@@ -3,6 +3,7 @@ use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
 use crate::util::{constants, Address};
+#[cfg(feature = "global_alloc_bit")]
 use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use std::fmt;
 use std::io::Result;
