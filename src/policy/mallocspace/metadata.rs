@@ -1,5 +1,4 @@
-// use atomic::Ordering;
-
+use crate::util::alloc_bit;
 use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
 use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
@@ -12,7 +11,6 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{constants, conversions};
 use crate::vm::{ObjectModel, VMBinding};
-use crate::util::alloc_bit;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 

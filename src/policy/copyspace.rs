@@ -4,6 +4,8 @@ use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
+#[cfg(feature = "global_alloc_bit")]
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
@@ -14,9 +16,6 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(feature = "global_alloc_bit")]
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -160,8 +159,10 @@ impl<VM: VMBinding> CopySpace<VM> {
     unsafe fn reset_alloc_bit(&self) {
         let current_chunk = self.pr.get_current_chunk();
         if self.common.contiguous {
-            trace!("start: 0x{:x} | current_chunk: 0x{:x}", self.common.start, current_chunk);
-            crate::util::alloc_bit::bzero_alloc_bit(self.common.start, current_chunk + BYTES_IN_CHUNK - self.common.start);
+            crate::util::alloc_bit::bzero_alloc_bit(
+                self.common.start,
+                current_chunk + BYTES_IN_CHUNK - self.common.start,
+            );
         } else {
             unimplemented!();
         }

@@ -85,11 +85,13 @@ pub(super) const LOCAL_SIDE_METADATA_PER_CHUNK: usize =
 /// The base address for the global side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal global side metadata.
 
-pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_BASE_ADDRESS.add(
-    metadata_address_range_size(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC)
-).add(
-    metadata_address_range_size(&crate::policy::mallocspace::metadata::ACTIVE_CHUNK_METADATA_SPEC)
-);
+pub const GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS: Address = GLOBAL_SIDE_METADATA_BASE_ADDRESS
+    .add(metadata_address_range_size(
+        &crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC,
+    ))
+    .add(metadata_address_range_size(
+        &crate::policy::mallocspace::metadata::ACTIVE_CHUNK_METADATA_SPEC,
+    ));
 
 pub const GLOBAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
     SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS);

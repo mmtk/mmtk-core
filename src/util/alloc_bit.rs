@@ -9,7 +9,6 @@ use crate::util::metadata::side_metadata::GLOBAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
-
 /// This is the metadata spec for the alloc-bit.
 ///
 /// An alloc-bit is required per min-object-size aligned address , rather than per object, and can only exist as side metadata.
@@ -30,7 +29,6 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
-
 pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Address) {
     let mmap_metadata_result = metadata.try_map_metadata_space(chunk_start, BYTES_IN_CHUNK);
     debug_assert!(
@@ -39,7 +37,6 @@ pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Add
         chunk_start
     );
 }
-
 
 pub fn set_alloc_bit(object: ObjectReference) {
     side_metadata::store_atomic(
@@ -51,12 +48,7 @@ pub fn set_alloc_bit(object: ObjectReference) {
 }
 
 pub fn unset_addr_alloc_bit(address: Address) {
-    side_metadata::store_atomic(
-        &ALLOC_SIDE_METADATA_SPEC,
-        address,
-        0,
-        Ordering::SeqCst,
-    );
+    side_metadata::store_atomic(&ALLOC_SIDE_METADATA_SPEC, address, 0, Ordering::SeqCst);
 }
 
 pub fn unset_alloc_bit(object: ObjectReference) {
@@ -87,6 +79,3 @@ pub unsafe fn is_alloced_object_unsafe(address: Address) -> bool {
 pub fn bzero_alloc_bit(start: Address, size: usize) {
     side_metadata::bzero_metadata(&ALLOC_SIDE_METADATA_SPEC, start, size);
 }
-
-
-
