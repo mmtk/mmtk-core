@@ -183,7 +183,7 @@ jobs:
   # OpenJDK
   openjdk-binding-test:
     runs-on: ubuntu-18.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     steps:
       - name: Checkout MMTk Core
