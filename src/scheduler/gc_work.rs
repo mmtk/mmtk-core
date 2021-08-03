@@ -139,7 +139,7 @@ impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for PrepareCollecto
 /// The global GC release Work
 /// This work packet invokes release() for the plan (which will invoke release() for each space), and
 /// pushes work packets for releasing mutators and collectors.
-/// We should only have one such work packet per GC, before any actual GC work starts.
+/// We should only have one such work packet per GC, after all actual GC work ends.
 /// We assume this work packet is the only running work packet that accesses plan, and there should
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.

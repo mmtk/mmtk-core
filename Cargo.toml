@@ -26,7 +26,6 @@ hoard-sys = {version = "0.1.1", optional = true }
 lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
-crossbeam-queue = "0.3"
 num_cpus = "1.8"
 enum-map = "0.6.2"
 downcast-rs = "1.1.1"

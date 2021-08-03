@@ -94,8 +94,8 @@ pub(crate) fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
 #[inline(always)]
 pub const fn metadata_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bits: usize) -> usize {
     1usize
-        << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) - log_min_obj_size
-            + log_num_of_bits)
+        << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) + log_num_of_bits
+            - log_min_obj_size)
 }
 
 /// Unmaps the metadata for a single chunk starting at `start`

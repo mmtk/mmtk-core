@@ -8,7 +8,7 @@ use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*};
 use spin::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-pub type MarkHistogram = [usize; Defrag::NUM_BINS];
+pub type Histogram = [usize; Defrag::NUM_BINS];
 
 #[derive(Debug, Default)]
 pub struct Defrag {
@@ -17,9 +17,8 @@ pub struct Defrag {
     /// Is defrag space exhausted?
     defrag_space_exhausted: AtomicBool,
     /// A list of completed mark histograms reported by workers
-    pub mark_histograms: Mutex<Vec<MarkHistogram>>,
-    /// Summarised histograms
-    spill_avail_histograms: Vec<AtomicUsize>,
+    pub mark_histograms: Mutex<Vec<Histogram>>,
+    /// A block with number of holes greater than this threshold will be defragmented.
     pub defrag_spill_threshold: AtomicUsize,
     /// The number of remaining clean pages in defrag space.
     available_clean_pages_for_defrag: AtomicUsize,
@@ -32,21 +31,14 @@ impl Defrag {
     const DEFRAG_STRESS: bool = false;
     const DEFRAG_HEADROOM_PERCENT: usize = 2;
 
-    pub fn new() -> Self {
-        Self {
-            spill_avail_histograms: (0..Self::NUM_BINS).map(|_| Default::default()).collect(),
-            ..Default::default()
-        }
-    }
-
     /// Allocate a new local histogram.
-    pub const fn new_mark_histogram(&self) -> MarkHistogram {
+    pub const fn new_histogram(&self) -> Histogram {
         [0; Self::NUM_BINS]
     }
 
     /// Report back a completed mark histogram
     #[inline(always)]
-    pub fn add_completed_mark_histogram(&self, histogram: MarkHistogram) {
+    pub fn add_completed_mark_histogram(&self, histogram: Histogram) {
         self.mark_histograms.lock().push(histogram)
     }
 
@@ -140,20 +132,20 @@ impl Defrag {
     }
 
     /// Get the numebr of all the recyclable lines in all the reusable blocks.
-    fn get_available_lines<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> usize {
-        for entry in &self.spill_avail_histograms {
-            entry.store(0, Ordering::Relaxed);
-        }
+    fn get_available_lines<VM: VMBinding>(
+        &self,
+        space: &ImmixSpace<VM>,
+        spill_avail_histograms: &mut Histogram,
+    ) -> usize {
         let mut total_available_lines = 0;
-        for block in space.reusable_blocks.get_blocks() {
+        for block in space.reusable_blocks.get_blocks().iter() {
             let bucket = block.get_holes();
             let unavailable_lines = match block.get_state() {
                 BlockState::Reusable { unavailable_lines } => unavailable_lines as usize,
                 s => unreachable!("{:?} {:?}", block, s),
             };
             let available_lines = Block::LINES - unavailable_lines;
-            let old = self.spill_avail_histograms[bucket].load(Ordering::Relaxed);
-            self.spill_avail_histograms[bucket].store(old + available_lines, Ordering::Relaxed);
+            spill_avail_histograms[bucket] += available_lines;
             total_available_lines += available_lines;
         }
         total_available_lines
@@ -161,27 +153,37 @@ impl Defrag {
 
     /// Calculate the defrag threshold.
     fn establish_defrag_spill_threshold<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
-        let clean_lines = self.get_available_lines(space);
+        let mut spill_avail_histograms = self.new_histogram();
+        let clean_lines = self.get_available_lines(space, &mut spill_avail_histograms);
         let available_lines = clean_lines
             + (self
                 .available_clean_pages_for_defrag
                 .load(Ordering::Acquire)
                 << (LOG_BYTES_IN_PAGE as usize - Line::LOG_BYTES));
 
+        // Number of lines we will evacuate.
         let mut required_lines = 0isize;
+        // Number of to-space free lines we can use for defragmentation.
         let mut limit = (available_lines as f32 / Self::DEFRAG_LINE_REUSE_RATIO) as isize;
         let mut threshold = Block::LINES >> 1;
         let mark_histograms = self.mark_histograms.lock();
+        // Blocks are grouped by buckets, indexed by the number of holes in the block.
+        // `mark_histograms` remembers the number of live lines for each bucket.
+        // Here, reversely iterate all the bucket to find a threshold that all buckets above this
+        // threshold can be evacuated, without causing to-space overflow.
         for index in (Self::MIN_SPILL_THRESHOLD..Self::NUM_BINS).rev() {
             threshold = index;
+            // Calculate total number of live lines in this bucket.
             let this_bucket_mark = mark_histograms
                 .iter()
                 .map(|v| v[threshold] as isize)
                 .sum::<isize>();
-            let this_bucket_avail =
-                self.spill_avail_histograms[threshold].load(Ordering::Acquire) as isize;
+            // Calculate the number of free lines in this bucket.
+            let this_bucket_avail = spill_avail_histograms[threshold] as isize;
+            // Update counters
             limit -= this_bucket_avail as isize;
             required_lines += this_bucket_mark;
+            // Stop scanning. Lines to evacuate exceeds the free to-space lines.
             if limit < required_lines {
                 break;
             }

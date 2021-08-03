@@ -4,6 +4,7 @@ use super::{
     chunk::{Chunk, ChunkMap, ChunkState},
     defrag::Defrag,
 };
+use crate::plan::ObjectsClosure;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -27,12 +28,8 @@ use crate::{
 use atomic::Ordering;
 use std::{
     iter::Step,
-    mem,
     ops::Range,
-    sync::{
-        atomic::{AtomicBool, AtomicU8},
-        Arc,
-    },
+    sync::{atomic::AtomicU8, Arc},
 };
 
 pub struct ImmixSpace<VM: VMBinding> {
@@ -44,14 +41,12 @@ pub struct ImmixSpace<VM: VMBinding> {
     pub line_mark_state: AtomicU8,
     /// Line mark state in previous GC
     line_unavail_state: AtomicU8,
-    /// Is in a GC?
-    in_collection: AtomicBool,
     /// A list of all reusable blocks
     pub reusable_blocks: BlockList,
     /// Defrag utilities
     pub(super) defrag: Defrag,
     /// Object mark state
-    mark_state: usize,
+    mark_state: u8,
     /// Work packet scheduler
     scheduler: Arc<MMTkScheduler<VM>>,
 }
@@ -98,11 +93,10 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 }
 
 impl<VM: VMBinding> ImmixSpace<VM> {
-    const UNMARKED_STATE: usize = 0;
-    const MARKED_STATE: usize = 1;
+    const UNMARKED_STATE: u8 = 0;
+    const MARKED_STATE: u8 = 1;
 
     /// Get side metadata specs
-    #[allow(clippy::assertions_on_constants)]
     fn side_metadata_specs() -> Vec<SideMetadataSpec> {
         metadata::extract_side_metadata(&if super::BLOCK_ONLY {
             vec![
@@ -139,7 +133,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 vmrequest: VMRequest::discontiguous(),
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
-                    local: Self::side_metadata_specs().to_vec(),
+                    local: Self::side_metadata_specs(),
                 },
             },
             vm_map,
@@ -156,9 +150,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
-            in_collection: AtomicBool::new(false),
             reusable_blocks: BlockList::default(),
-            defrag: Defrag::new(),
+            defrag: Defrag::default(),
             mark_state: Self::UNMARKED_STATE,
             scheduler,
         }
@@ -195,28 +188,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.defrag.in_defrag()
     }
 
-    const AVAILABLE_LOCAL_BITS: usize = 7;
-    const MARK_BASE: usize = 4;
-    const MARK_INCREMENT: u8 = 1 << Self::MARK_BASE;
-    const MAX_MARKCOUNT_BITS: usize = Self::AVAILABLE_LOCAL_BITS - Self::MARK_BASE;
-    const MARK_MASK: u8 = ((1 << Self::MAX_MARKCOUNT_BITS) - 1) << Self::MARK_BASE;
-    const MARK_BASE_VALUE: u8 = Self::MARK_INCREMENT;
-
-    /// Update mark state
-    #[allow(clippy::assertions_on_constants)]
-    fn delta_mark_state(state: u8) -> u8 {
-        debug_assert!(!VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side());
-        let mut rtn = state;
-        loop {
-            rtn = (rtn + Self::MARK_INCREMENT) & Self::MARK_MASK;
-            if rtn >= Self::MARK_BASE_VALUE {
-                break;
-            }
-        }
-        debug_assert_ne!(rtn, state);
-        rtn
-    }
-
     /// Get work packet scheduler
     fn scheduler(&self) -> &MMTkScheduler<VM> {
         &self.scheduler
@@ -225,16 +196,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     pub fn prepare(&mut self) {
         // Update mark_state
         if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
-            // For side metadata, we always use `1` as marked state.
-            // Object mark table will be cleared by `PrepareBlockState` before each GC.
-            //
-            // Note: It is incorrect to flip matk bit between 0 and 1 and remove
-            // the mark-table zeroing step. Because openjdk does not call post_alloc to set up
-            // object initial metadata.
             self.mark_state = Self::MARKED_STATE;
         } else {
             // For header metadata, we use cyclic mark bits.
-            self.mark_state = Self::delta_mark_state(self.mark_state as u8) as usize;
+            unimplemented!("cyclic mark bits is not supported at the moment");
         }
         // Prepare defrag info
         if super::DEFRAG {
@@ -264,7 +229,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     .store(Line::RESET_MARK_STATE, Ordering::Release);
             }
         }
-        self.in_collection.store(true, Ordering::Release);
     }
 
     pub fn release(&mut self) {
@@ -284,8 +248,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let space = unsafe { &*(self as *const Self) };
         let work_packets = self.chunk_map.generate_sweep_tasks(space);
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
-        // Update states
-        self.in_collection.store(false, Ordering::Release);
         if super::DEFRAG {
             self.defrag.release(self)
         }
@@ -422,14 +384,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Atomically mark an object.
     #[inline(always)]
-    fn attempt_mark(&self, object: ObjectReference, mark_state: usize) -> bool {
+    fn attempt_mark(&self, object: ObjectReference, mark_state: u8) -> bool {
         loop {
             let old_value = load_metadata::<VM>(
                 &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 object,
                 None,
                 Some(Ordering::SeqCst),
-            );
+            ) as u8;
             if old_value == mark_state {
                 return false;
             }
@@ -437,8 +399,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             if compare_exchange_metadata::<VM>(
                 &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 object,
-                old_value,
-                mark_state,
+                old_value as usize,
+                mark_state as usize,
                 None,
                 Ordering::SeqCst,
                 Ordering::SeqCst,
@@ -451,13 +413,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Check if an object is marked.
     #[inline(always)]
-    fn is_marked(&self, object: ObjectReference, mark_state: usize) -> bool {
+    fn is_marked(&self, object: ObjectReference, mark_state: u8) -> bool {
         let old_value = load_metadata::<VM>(
             &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             object,
             None,
             Some(Ordering::SeqCst),
-        );
+        ) as u8;
         old_value == mark_state
     }
 
@@ -485,7 +447,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let mut cursor = start_cursor;
         // Find start
         while cursor < mark_data.len() {
-            let mark = mark_data[cursor].load(Ordering::Relaxed);
+            let mark = mark_data.get(cursor);
             if mark != unavail_state && mark != current_state {
                 break;
             }
@@ -497,7 +459,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let start = Line::forward(search_start, cursor - start_cursor);
         // Find limit
         while cursor < mark_data.len() {
-            let mark = mark_data[cursor].load(Ordering::Relaxed);
+            let mark = mark_data.get(cursor);
             if mark == unavail_state || mark == current_state {
                 break;
             }
@@ -559,42 +521,6 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     }
 }
 
-/// A transitive closure visitor to collect all the edges of an object.
-pub struct ObjectsClosure<'a, E: ProcessEdgesWork>(
-    &'static MMTK<E::VM>,
-    Vec<Address>,
-    &'a mut GCWorker<E::VM>,
-);
-
-impl<'a, E: ProcessEdgesWork> TransitiveClosure for ObjectsClosure<'a, E> {
-    #[inline(always)]
-    fn process_edge(&mut self, slot: Address) {
-        if self.1.is_empty() {
-            self.1.reserve(E::CAPACITY);
-        }
-        self.1.push(slot);
-        if self.1.len() >= E::CAPACITY {
-            let mut new_edges = Vec::new();
-            mem::swap(&mut new_edges, &mut self.1);
-            self.2
-                .add_work(WorkBucketStage::Closure, E::new(new_edges, false, self.0));
-        }
-    }
-    fn process_node(&mut self, _object: ObjectReference) {
-        unreachable!()
-    }
-}
-
-impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
-    #[inline(always)]
-    fn drop(&mut self) {
-        let mut new_edges = Vec::new();
-        mem::swap(&mut new_edges, &mut self.1);
-        self.2
-            .add_work(WorkBucketStage::Closure, E::new(new_edges, false, self.0));
-    }
-}
-
 /// A work packet to scan the fields of each objects and mark lines.
 pub struct ScanObjectsAndMarkLines<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
@@ -620,7 +546,7 @@ impl<Edges: ProcessEdgesWork> ScanObjectsAndMarkLines<Edges> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanObjectsAndMarkLines");
-        let mut closure = ObjectsClosure::<E>(mmtk, vec![], worker);
+        let mut closure = ObjectsClosure::<E>::new(mmtk, vec![], worker);
         for object in &self.buffer {
             <E::VM as VMBinding>::VMScanning::scan_object(
                 &mut closure,

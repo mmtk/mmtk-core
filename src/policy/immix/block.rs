@@ -1,18 +1,13 @@
 use super::chunk::Chunk;
-use super::defrag::MarkHistogram;
+use super::defrag::Histogram;
 use super::line::Line;
-use super::ImmixSpace;
+use super::{ImmixSpace, IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET};
 use crate::util::constants::*;
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use crossbeam_queue::SegQueue;
-use spin::RwLock;
-use std::{
-    iter::Step,
-    ops::Range,
-    sync::atomic::{AtomicU8, Ordering},
-};
+use spin::{Mutex, MutexGuard};
+use std::{iter::Step, ops::Range, sync::atomic::Ordering};
 
 /// The block allocation state.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -91,7 +86,7 @@ impl Block {
         is_global: false,
         offset: if super::BLOCK_ONLY {
             // If BLOCK_ONLY is set, we do not use any line marktables.
-            LOCAL_SIDE_METADATA_BASE_OFFSET
+            IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET
         } else {
             SideMetadataOffset::layout_after(&Line::MARK_TABLE)
         },
@@ -146,12 +141,9 @@ impl Block {
     /// Get the address range of the block's line mark table.
     #[allow(clippy::assertions_on_constants)]
     #[inline(always)]
-    pub fn line_mark_table(&self) -> &[AtomicU8; Block::LINES] {
+    pub fn line_mark_table(&self) -> MetadataByteArrayRef<{ Block::LINES }> {
         debug_assert!(!super::BLOCK_ONLY);
-        let start = side_metadata::address_to_meta_address(&Line::MARK_TABLE, self.start());
-        // # Safety
-        // The metadata memory is assumed to be mapped when accessing.
-        unsafe { &*start.to_ptr() }
+        MetadataByteArrayRef::<{ Block::LINES }>::new(&Line::MARK_TABLE, self.start(), Self::BYTES)
     }
 
     /// Get block mark state.
@@ -246,7 +238,7 @@ impl Block {
     pub fn sweep<VM: VMBinding>(
         &self,
         space: &ImmixSpace<VM>,
-        mark_histogram: &mut MarkHistogram,
+        mark_histogram: &mut Histogram,
         line_mark_state: Option<u8>,
     ) -> bool {
         if super::BLOCK_ONLY {
@@ -350,45 +342,37 @@ unsafe impl Step for Block {
 /// A non-block single-linked list to store blocks.
 #[derive(Default)]
 pub struct BlockList {
-    queue: RwLock<SegQueue<Block>>,
+    queue: Mutex<Vec<Block>>,
 }
 
 impl BlockList {
     /// Get number of blocks in this list.
     #[inline]
     pub fn len(&self) -> usize {
-        self.queue.read().len()
+        self.queue.lock().len()
     }
 
     /// Add a block to the list.
     #[inline]
     pub fn push(&self, block: Block) {
-        self.queue.read().push(block)
+        self.queue.lock().push(block)
     }
 
     /// Pop a block out of the list.
     #[inline]
     pub fn pop(&self) -> Option<Block> {
-        self.queue.read().pop()
+        self.queue.lock().pop()
     }
 
     /// Clear the list.
     #[inline]
     pub fn reset(&self) {
-        *self.queue.write() = SegQueue::new()
+        *self.queue.lock() = Vec::new()
     }
 
     /// Get an array of all reusable blocks stored in this BlockList.
     #[inline]
-    pub fn get_blocks(&self) -> Vec<Block> {
-        let mut queue = self.queue.write();
-        let mut blocks = Vec::with_capacity(queue.len());
-        let new_queue = SegQueue::new();
-        while let Some(block) = queue.pop() {
-            new_queue.push(block);
-            blocks.push(block);
-        }
-        *queue = new_queue;
-        blocks
+    pub fn get_blocks(&self) -> MutexGuard<Vec<Block>> {
+        self.queue.lock()
     }
 }

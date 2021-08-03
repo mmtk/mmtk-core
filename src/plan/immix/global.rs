@@ -16,6 +16,7 @@ use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
+use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
@@ -174,9 +175,21 @@ impl<VM: VMBinding> Immix<VM> {
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
-        Immix {
+        let immix = Immix {
             immix_space: ImmixSpace::new("immix", vm_map, mmapper, &mut heap, scheduler, vec![]),
             common: CommonPlan::new(vm_map, mmapper, options, heap, &IMMIX_CONSTRAINTS, vec![]),
+        };
+
+        {
+            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+            immix
+                .common
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            immix
+                .immix_space
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         }
+
+        immix
     }
 }
