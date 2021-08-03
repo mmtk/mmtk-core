@@ -444,7 +444,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let mut cursor = start_cursor;
         // Find start
         while cursor < mark_data.len() {
-            let mark = mark_data[cursor].load(Ordering::Relaxed);
+            let mark = mark_data.get(cursor);
             if mark != unavail_state && mark != current_state {
                 break;
             }
@@ -456,7 +456,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let start = Line::forward(search_start, cursor - start_cursor);
         // Find limit
         while cursor < mark_data.len() {
-            let mark = mark_data[cursor].load(Ordering::Relaxed);
+            let mark = mark_data.get(cursor);
             if mark == unavail_state || mark == current_state {
                 break;
             }

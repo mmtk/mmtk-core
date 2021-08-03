@@ -7,11 +7,7 @@ use crate::util::metadata::side_metadata::{self, *};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use spin::{Mutex, MutexGuard};
-use std::{
-    iter::Step,
-    ops::Range,
-    sync::atomic::{AtomicU8, Ordering},
-};
+use std::{iter::Step, ops::Range, sync::atomic::Ordering};
 
 /// The block allocation state.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -145,12 +141,9 @@ impl Block {
     /// Get the address range of the block's line mark table.
     #[allow(clippy::assertions_on_constants)]
     #[inline(always)]
-    pub fn line_mark_table(&self) -> &[AtomicU8; Block::LINES] {
+    pub fn line_mark_table(&self) -> MetadataByteArrayRef<{ Block::LINES }> {
         debug_assert!(!super::BLOCK_ONLY);
-        let start = side_metadata::address_to_meta_address(&Line::MARK_TABLE, self.start());
-        // # Safety
-        // The metadata memory is assumed to be mapped when accessing.
-        unsafe { &*start.to_ptr() }
+        MetadataByteArrayRef::<{ Block::LINES }>::new(&Line::MARK_TABLE, self.start(), Self::BYTES)
     }
 
     /// Get block mark state.
