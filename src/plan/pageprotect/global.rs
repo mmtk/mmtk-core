@@ -170,6 +170,8 @@ impl<VM: VMBinding> PageProtect<VM> {
             ),
         };
 
+        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
         {
             use crate::util::metadata::side_metadata::SideMetadataSanity;
             let mut side_metadata_sanity_checker = SideMetadataSanity::new();

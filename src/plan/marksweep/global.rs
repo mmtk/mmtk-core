@@ -151,6 +151,8 @@ impl<VM: VMBinding> MarkSweep<VM> {
             ),
         };
 
+        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
         {
             let mut side_metadata_sanity_checker = SideMetadataSanity::new();
             res.common
