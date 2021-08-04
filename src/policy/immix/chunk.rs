@@ -69,8 +69,11 @@ impl Chunk {
             .filter(|block| block.get_state() != BlockState::Unallocated)
         {
             if !block.sweep(space, mark_histogram, line_mark_state) {
+                // println!("{:?} is live", block);
                 // Block is live. Increment the allocated block count.
                 allocated_blocks += 1;
+            } else {
+                println!("{:?} is dead", block);
             }
         }
         // Set this chunk as free if there is not live blocks.
