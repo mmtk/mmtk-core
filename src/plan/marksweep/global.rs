@@ -40,6 +40,7 @@ pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
+    may_trace_duplicate_edges: true,
     ..PlanConstraints::default()
 };
 
@@ -150,6 +151,8 @@ impl<VM: VMBinding> MarkSweep<VM> {
             ),
         };
 
+        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
         {
             let mut side_metadata_sanity_checker = SideMetadataSanity::new();
             res.common
