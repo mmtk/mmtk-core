@@ -430,6 +430,7 @@ tospace, and to the two spaces controlled by the common plan. </p>
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use super::MyGC; // Add
+use crate::Plan;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
@@ -471,10 +472,18 @@ For example, for <code>Default</code>, we allocate using the first bump pointer 
 space in <code>space_mapping</code>. Note that the space allocation is formatted as a list 
 of tuples. For example, the first bump pointer allocator (<code>BumpPointer(0)</code>) is 
 bound with <code>tospace</code>.</p>
+<p>Downcast the dynamic <code>Plan</code> type to <code>MyGC</code> so we can access specific spaces in <code>MyGC</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    let mygc = plan.downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
+<span class="boring">}
+</span></code></pre></pre>
+<p>Then, use <code>mygc</code> to access the spaces in <code>MyGC</code>.</p>
 <ol>
 <li><code>BumpPointer(0)</code> should map to the tospace.</li>
-<li><code>BumpPointer(1)</code> should map to <code>plan.common.get_immortal()</code>.</li>
-<li><code>LargeObject(0)</code> should map to <code>plan.common.get_los()</code>.</li>
+<li><code>BumpPointer(1)</code> should map to <code>mygc.common.get_immortal()</code>.</li>
+<li><code>LargeObject(0)</code> should map to <code>mygc.common.get_los()</code>.</li>
 <li>None of the above should be dereferenced (ie, they should not have 
 the <code>&amp;</code> prefix).</li>
 </ol>
@@ -482,12 +491,12 @@ the <code>&amp;</code> prefix).</li>
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>        space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), plan.tospace()),
+            (AllocatorSelector::BumpPointer(0), mygc.tospace()),
             (
                 AllocatorSelector::BumpPointer(1),
-                plan.common.get_immortal(),
+                mygc.common.get_immortal(),
             ),
-            (AllocatorSelector::LargeObject(0), plan.common.get_los()),
+            (AllocatorSelector::LargeObject(0), mygc.common.get_los()),
         ],
 <span class="boring">}
 </span></code></pre></pre>
