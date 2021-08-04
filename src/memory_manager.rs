@@ -71,6 +71,8 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
     mmtk.plan
         .gc_init(heap_size, &crate::VM_MAP, &mmtk.scheduler);
     info!("Initialized MMTk with {:?}", mmtk.options.plan);
+    #[cfg(feature = "extreme_assertions")]
+    warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
 }
 
 /// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should

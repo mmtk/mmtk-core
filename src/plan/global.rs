@@ -160,6 +160,17 @@ pub fn create_plan<VM: VMBinding>(
 ///
 /// The global instance defines and manages static resources
 /// (such as memory and virtual memory resources).
+///
+/// Constructor:
+///
+/// For the constructor of a new plan, there are a few things the constructor _must_ do
+/// (please check existing plans and see what they do in the constructor):
+/// 1. Create a HeapMeta, and use this HeapMeta to initialize all the spaces.
+/// 2. Create a vector of all the side metadata specs with `SideMetadataContext::new_global_specs()`,
+///    the parameter is a vector of global side metadata specs that are specific to the plan.
+/// 3. Initialize all the spaces the plan uses with the heap meta, and the global metadata specs vector.
+/// 4. Create a `SideMetadataSanity` object, and invoke verify_side_metadata_sanity() for each space (or
+///    invoke verify_side_metadata_sanity() in `CommonPlan`/`BasePlan` for the spaces in the common/base plan).
 pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
