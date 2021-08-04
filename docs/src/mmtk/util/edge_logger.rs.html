@@ -36,6 +36,14 @@
 <span id="33">33</span>
 <span id="34">34</span>
 <span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This is a simple module to log edges and check for duplicate edges.</span>
 <span class="doccomment">//!</span>
@@ -43,13 +51,21 @@
 <span class="doccomment">//! We currently only use this as part of the `extreme_assertions` feature.</span>
 <span class="doccomment">//!</span>
 
-<span class="kw">use</span> <span class="kw">super</span><span class="ident">::Address</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::Plan</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::Address</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">std::collections::HashSet</span>;
 <span class="kw">use</span> <span class="ident">std::sync::RwLock</span>;
 
 <span class="macro">lazy_static!</span> {
     <span class="comment">// A private hash-set to keep track of edges.</span>
     <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">EDGE_LOG</span>: <span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">RwLock::new</span>(<span class="ident">HashSet::new</span>());
+}
+
+<span class="doccomment">/// Whether we should check duplicate edges. This depends on the actual plan.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">should_check_duplicate_edges</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="comment">// If a plan allows tracing duplicate edges, we should not run this check.</span>
+    <span class="op">!</span><span class="ident">plan</span>.<span class="ident">constraints</span>().<span class="ident">may_trace_duplicate_edges</span>
 }
 
 <span class="doccomment">/// Logs an edge.</span>

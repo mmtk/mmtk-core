@@ -440,6 +440,8 @@
 <span id="437">437</span>
 <span id="438">438</span>
 <span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
 </pre><pre class="rust">
 <span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
@@ -514,6 +516,8 @@
     <span class="ident">mmtk</span>.<span class="ident">plan</span>
         .<span class="ident">gc_init</span>(<span class="ident">heap_size</span>, <span class="kw-2">&amp;</span><span class="kw">crate</span><span class="ident">::VM_MAP</span>, <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>);
     <span class="macro">info!</span>(<span class="string">&quot;Initialized MMTk with {:?}&quot;</span>, <span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">plan</span>);
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="macro">warn!</span>(<span class="string">&quot;The feature &#39;extreme_assertions&#39; is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.&quot;</span>);
 }
 
 <span class="doccomment">/// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should</span>

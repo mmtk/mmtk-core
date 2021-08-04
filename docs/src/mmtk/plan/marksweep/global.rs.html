@@ -168,6 +168,9 @@
 <span id="165">165</span>
 <span id="166">166</span>
 <span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::global::BasePlan</span>;
@@ -211,6 +214,7 @@
     <span class="ident">gc_header_bits</span>: <span class="number">2</span>,
     <span class="ident">gc_header_words</span>: <span class="number">0</span>,
     <span class="ident">num_specialized_scans</span>: <span class="number">1</span>,
+    <span class="ident">may_trace_duplicate_edges</span>: <span class="bool-val">true</span>,
     ..<span class="ident">PlanConstraints::default</span>()
 };
 
@@ -321,6 +325,8 @@
             ),
         };
 
+        <span class="comment">// Use SideMetadataSanity to check if each spec is valid. This is also needed for check</span>
+        <span class="comment">// side metadata in extreme_assertions.</span>
         {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">side_metadata_sanity_checker</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
             <span class="ident">res</span>.<span class="ident">common</span>

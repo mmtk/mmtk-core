@@ -543,6 +543,10 @@
 <span id="540">540</span>
 <span id="541">541</span>
 <span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::work_bucket::WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -785,8 +789,10 @@
         <span class="macro">info!</span>(<span class="string">&quot;End of GC&quot;</span>);
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-        <span class="comment">// reset the logging info at the end of each GC</span>
-        <span class="kw">crate</span><span class="ident">::util::edge_logger::reset</span>();
+        <span class="kw">if</span> <span class="kw">crate</span><span class="ident">::util::edge_logger::should_check_duplicate_edges</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>) {
+            <span class="comment">// reset the logging info at the end of each GC</span>
+            <span class="kw">crate</span><span class="ident">::util::edge_logger::reset</span>();
+        }
 
         <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::NotInGC</span>);
         <span class="op">&lt;</span><span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::resume_mutators</span>(<span class="ident">worker</span>.<span class="ident">tls</span>);
@@ -919,9 +925,11 @@
     <span class="comment">// at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-        <span class="kw">for</span> <span class="ident">edge</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">edges</span> {
-            <span class="comment">// log edge, panic if already logged</span>
-            <span class="kw">crate</span><span class="ident">::util::edge_logger::log_edge</span>(<span class="kw-2">*</span><span class="ident">edge</span>);
+        <span class="kw">if</span> <span class="kw">crate</span><span class="ident">::util::edge_logger::should_check_duplicate_edges</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>) {
+            <span class="kw">for</span> <span class="ident">edge</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">edges</span> {
+                <span class="comment">// log edge, panic if already logged</span>
+                <span class="kw">crate</span><span class="ident">::util::edge_logger::log_edge</span>(<span class="kw-2">*</span><span class="ident">edge</span>);
+            }
         }
         <span class="self">Self</span> {
             <span class="ident">edges</span>,
