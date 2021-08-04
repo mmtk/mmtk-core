@@ -119,8 +119,8 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
         if self.protect_memory_on_release && !new_chunk {
-            use crate::MMAPPER;
             use crate::util::heap::layout::Mmapper;
+            use crate::MMAPPER;
             // This check is necessary to prevent us from mprotecting an address that is not yet mapped by mmapper.
             // See https://github.com/mmtk/mmtk-core/issues/400.
             // It is possible that one thread gets a new chunk, and returns from this function. However, the Space.acquire()
@@ -134,7 +134,6 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
             while !MMAPPER.is_mapped_address(rtn) {}
             self.munprotect(rtn, self.free_list.size(page_offset as _) as _)
         };
-        assert_eq!(self.free_list.size(page_offset as _) as usize, required_pages);
         Result::Ok(PRAllocResult {
             start: rtn,
             pages: required_pages,
