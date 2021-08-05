@@ -189,9 +189,17 @@ space in `space_mapping`. Note that the space allocation is formatted as a list
 of tuples. For example, the first bump pointer allocator (`BumpPointer(0)`) is 
 bound with `tospace`.
 
+Downcast the dynamic `Plan` type to `MyGC` so we can access specific spaces in `MyGC`.
+
+```rust
+{{#include ../../../code/mygc_semispace/mutator.rs:plan_downcast}}
+```
+
+Then, use `mygc` to access the spaces in `MyGC`.
+
    1. `BumpPointer(0)` should map to the tospace.
-   2. `BumpPointer(1)` should map to `plan.common.get_immortal()`.
-   3. `LargeObject(0)` should map to `plan.common.get_los()`.
+   2. `BumpPointer(1)` should map to `mygc.common.get_immortal()`.
+   3. `LargeObject(0)` should map to `mygc.common.get_los()`.
    4. None of the above should be dereferenced (ie, they should not have 
    the `&` prefix).
 

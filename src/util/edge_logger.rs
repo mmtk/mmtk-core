@@ -4,13 +4,21 @@
 //! We currently only use this as part of the `extreme_assertions` feature.
 //!
 
-use super::Address;
+use crate::plan::Plan;
+use crate::util::Address;
+use crate::vm::VMBinding;
 use std::collections::HashSet;
 use std::sync::RwLock;
 
 lazy_static! {
     // A private hash-set to keep track of edges.
     static ref EDGE_LOG: RwLock<HashSet<Address>> = RwLock::new(HashSet::new());
+}
+
+/// Whether we should check duplicate edges. This depends on the actual plan.
+pub fn should_check_duplicate_edges<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> bool {
+    // If a plan allows tracing duplicate edges, we should not run this check.
+    !plan.constraints().may_trace_duplicate_edges
 }
 
 /// Logs an edge.
