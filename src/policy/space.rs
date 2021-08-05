@@ -404,8 +404,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         let pages_reserved = pr.reserve_pages(pages);
         trace!("Pages reserved");
         trace!("Polling ..");
-
-        if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
+        // eprintln!("halfway through acquire, tls={}", tls_usize);
+        let a = if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
@@ -491,7 +491,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     unsafe { Address::zero() }
                 }
             }
-        }
+        };
+        // eprintln!("done acquiring space");
+        a
     }
 
     fn address_in_space(&self, start: Address) -> bool {
