@@ -265,6 +265,8 @@ impl<VM: VMBinding> GenCopy<VM> {
             next_gc_full_heap: AtomicBool::new(false),
         };
 
+        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
         {
             let mut side_metadata_sanity_checker = SideMetadataSanity::new();
             res.common
