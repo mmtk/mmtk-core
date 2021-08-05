@@ -24,7 +24,7 @@ use crate::{util::{Address, OpaquePointer, alloc::{free_list_allocator::{self, B
 use super::{MarkSweepSpace, metadata::ALLOC_SIDE_METADATA_SPEC};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
-pub struct Block(Address);
+pub struct Block (Address);
 
 
 impl Block {

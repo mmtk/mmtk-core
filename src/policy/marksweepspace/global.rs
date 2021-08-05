@@ -27,7 +27,7 @@ use crate::{
     TransitiveClosure,
 };
 
-use crate::{TransitiveClosure, policy::marksweepspace::{block::{Block, BlockState}, metadata::{ALLOC_SIDE_METADATA_SPEC, is_marked, set_mark_bit, unset_mark_bit}}, scheduler::{MMTkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, BYTES_IN_BLOCK, FreeListAllocator}, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{self, MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataOffset, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
+use crate::{TransitiveClosure, policy::marksweepspace::{block::{Block, BlockState}, metadata::{ALLOC_SIDE_METADATA_SPEC, is_marked, set_mark_bit, unset_mark_bit}}, scheduler::{MMTkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, BLOCK_QUEUES_EMPTY, BYTES_IN_BLOCK, FreeListAllocator}, constants::LOG_BYTES_IN_PAGE, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{self, MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataOffset, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
 
 use super::{super::space::{CommonSpace, SFT, Space, SpaceOptions}, chunks::ChunkMap, metadata::{is_alloced, unset_alloc_bit_unsafe}};
 use crate::vm::ObjectModel;
@@ -42,10 +42,9 @@ use crate::vm::ObjectModel;
 // ].to_vec();
 
 pub struct MarkSweepSpace<VM: VMBinding> {
-    pub active_blocks: Mutex<HashSet<Address>>,
     pub common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
-    pub marked_blocks: HashMap<usize, Vec<free_list_allocator::BlockQueue>>,
+    pub marked_blocks: Mutex<HashMap<usize, Vec<free_list_allocator::BlockQueue>>>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Work packet scheduler
@@ -116,42 +115,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
             *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
         ]);
-        let side_metadata_next = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&ChunkMap::ALLOC_TABLE),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_free = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&side_metadata_next),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_size = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&side_metadata_free),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_local_free = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&side_metadata_size),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_thread_free = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&side_metadata_local_free),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_tls = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&side_metadata_thread_free),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
 
         // let side_metadata_marked = SideMetadataSpec {
         //     is_global: false,
@@ -161,13 +124,14 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         // };
         let mut local_specs = {
             vec![
-                side_metadata_next,
-                side_metadata_free,
-                side_metadata_size,
-                side_metadata_local_free,
-                side_metadata_thread_free,
-                side_metadata_tls,
-                // side_metadata_marked,
+                Block::NEXT_BLOCK_TABLE,
+                Block::FREE_LIST_TABLE,
+                Block::SIZE_TABLE,
+                Block::LOCAL_FREE_LIST_TABLE,
+                Block::THREAD_FREE_LIST_TABLE,
+                Block::TLS_TABLE,
+                Block::MARK_TABLE,
+                ChunkMap::ALLOC_TABLE,
             ]
         };
 
@@ -190,14 +154,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             heap,
         );
         MarkSweepSpace {
-            active_blocks: Mutex::default(),
             pr: if vmrequest.is_discontiguous() {
                 FreeListPageResource::new_discontiguous(0, vm_map)
             } else {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
-            marked_blocks: HashMap::default(),
+            marked_blocks: Mutex::default(),
             chunk_map: ChunkMap::new(),
             scheduler,
         }
