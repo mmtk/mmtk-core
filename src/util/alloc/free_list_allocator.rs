@@ -2,7 +2,7 @@ use std::{mem::size_of, ops::BitAnd};
 
 use atomic::Ordering;
 
-use crate::{Plan, policy::{marksweepspace::{MarkSweepSpace, metadata::{set_alloc_bit, unset_alloc_bit_unsafe}}, space::Space}, util::{Address, OpaquePointer, VMThread, VMWorkerThread, constants::{LOG_BYTES_IN_PAGE}, metadata::{MetadataSpec, compare_exchange_metadata, load_metadata, store_metadata}}, vm::VMBinding};
+use crate::{Plan, policy::{marksweepspace::{MarkSweepSpace, metadata::{is_alloced, is_marked, set_alloc_bit, unset_alloc_bit_unsafe, unset_mark_bit}}, space::Space}, util::{Address, OpaquePointer, VMThread, VMWorkerThread, constants::{LOG_BYTES_IN_PAGE}, metadata::{MetadataSpec, compare_exchange_metadata, load_metadata, store_metadata}}, vm::VMBinding};
 
 use super::Allocator;
 
@@ -40,7 +40,7 @@ pub struct FreeListAllocator<VM: VMBinding> {
   }
   #[derive(Clone, Copy, Debug)]
 pub struct BlockQueue {
-    first: Address,
+    pub first: Address,
     size: usize,
 }
 
@@ -77,7 +77,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
         // _mi_heap_get_free_small_page
         let bin = FreeListAllocator::<VM>::mi_bin(size);
-        // eprintln!("Free List Allocator: allocation request for {} bytes, fits in bin #{}", size, bin);
         let block_queue = &self.blocks[bin as usize];
         let block = block_queue.first;
         if unsafe { block == Address::zero() } {
@@ -366,33 +365,40 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn acquire_block_for_size(&mut self, size: usize) -> Address {
-        let block = self.acquire_block();
+        let res = self.space.acquire_block_for_size(self.tls, size);
+        let block = res.block;
+        if res.new {
+            // construct free list
+            let block_end = block + BYTES_IN_BLOCK;
+            let mut old_cell = unsafe { Address::zero() };
+            let mut new_cell = block;
+            let block_queue = self.blocks.get_mut(FreeListAllocator::<VM>::mi_bin(size) as usize).unwrap();
+            trace!("Asked for size {}, make free list with size {}", size, block_queue.size);
+            assert!(size <= block_queue.size);
+            let final_cell = loop {
+                unsafe {
+                    new_cell.store::<Address>(old_cell);
+                    // trace!("Store {} at {}", old_cell, new_cell);
+                }
+                old_cell = new_cell;
+                new_cell = old_cell + block_queue.size;
+                if new_cell + block_queue.size >= block_end {break old_cell};
+            };
+            let next = block_queue.first;
+            block_queue.first = block;
+            store_metadata::<VM>(&MetadataSpec::OnSide(self.space.get_next_metadata_spec()), unsafe{ block.to_object_reference() }, next.as_usize(), None, None);
+            store_metadata::<VM>(&MetadataSpec::OnSide(self.space.get_free_metadata_spec()), unsafe{ block.to_object_reference() }, final_cell.as_usize(), None, None);
+            store_metadata::<VM>(&MetadataSpec::OnSide(self.space.get_size_metadata_spec()), unsafe{ block.to_object_reference() }, size, None, None);
+            self.set_local_free_list(block, unsafe{Address::zero()});
+            self.store_block_tls(block);
+            trace!("Constructed free list for block starting at {}", block);
+            block
+        } else {
+            self.sweep_block(block);
+            block
+        }
 
-        // construct free list
-        let block_end = block + BYTES_IN_BLOCK;
-        let mut old_cell = unsafe { Address::zero() };
-        let mut new_cell = block;
-        let block_queue = self.blocks.get_mut(FreeListAllocator::<VM>::mi_bin(size) as usize).unwrap();
-        trace!("Asked for size {}, make free list with size {}", size, block_queue.size);
-        assert!(size <= block_queue.size);
-        let final_cell = loop {
-            unsafe {
-                new_cell.store::<Address>(old_cell);
-                // trace!("Store {} at {}", old_cell, new_cell);
-            }
-            old_cell = new_cell;
-            new_cell = old_cell + block_queue.size;
-            if new_cell + block_queue.size >= block_end {break old_cell};
-        };
-        let next = block_queue.first;
-        block_queue.first = block;
-        store_metadata::<VM>(&MetadataSpec::OnSide(self.space.get_next_metadata_spec()), unsafe{ block.to_object_reference() }, next.as_usize(), None, None);
-        store_metadata::<VM>(&MetadataSpec::OnSide(self.space.get_free_metadata_spec()), unsafe{ block.to_object_reference() }, final_cell.as_usize(), None, None);
-        store_metadata::<VM>(&MetadataSpec::OnSide(self.space.get_size_metadata_spec()), unsafe{ block.to_object_reference() }, size, None, None);
-        self.set_local_free_list(block, unsafe{Address::zero()});
-        self.store_block_tls(block);
-        trace!("Constructed free list for block starting at {}", block);
-        block
+
     }
 
     pub fn get_block(addr: Address) -> Address {
@@ -400,12 +406,99 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         block
     }
 
-    
-    fn acquire_block(&self) -> Address {
-        // acquire 64kB block
-        let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
-        self.space.active_blocks.lock().unwrap().insert(block);
-        block
+    // pub fn sweep_block(&self, block: Address) {
+    //     let cell_size = self.space.load_block_cell_size(block);
+    //     let mut cell = block;
+    //     while cell + cell_size <= block + BYTES_IN_BLOCK {
+    //         if is_alloced(unsafe { cell.to_object_reference() }) {
+    //             if is_marked::<VM>(unsafe { cell.to_object_reference() }, Some(Ordering::SeqCst)) {
+                    
+    //             } else {
+                    
+    //             }
+    //         }
+    //     }
+    // }
+    pub fn sweep_block(&self, block: Address) {
+        // eprintln!("Sweep block {}", block);
+        let cell_size = self.space.load_block_cell_size(block);
+        let mut cell = block;
+        while cell < block + BYTES_IN_BLOCK {
+            // eprintln!("look at cell {}", cell);
+            let alloced = is_alloced(unsafe { cell.to_object_reference() });
+            if alloced {
+                let marked = is_marked::<VM>(unsafe { cell.to_object_reference() }, Some(Ordering::SeqCst));
+                if !marked {
+                    self.free(cell);
+                }
+                else {
+                    unset_mark_bit::<VM>(unsafe{cell.to_object_reference()}, Some(Ordering::SeqCst));
+                }
+            }
+            cell += cell_size;
+        }
+    }
+
+    pub fn free(&self, addr: Address) {
+        eprintln!("free");
+
+        let block = FreeListAllocator::<VM>::get_block(addr);
+        let block_tls = self.space.load_block_tls(block);
+
+        if self.tls.0 == block_tls {
+            // same thread that allocated
+            let local_free = unsafe {
+                Address::from_usize(
+                    load_metadata::<VM>(
+                        &MetadataSpec::OnSide(self.space.get_local_free_metadata_spec()), 
+                        block.to_object_reference(), 
+                        None, 
+                        None,
+                    )
+                )
+            };
+            unsafe {
+                addr.store(local_free);
+            }
+            store_metadata::<VM>(
+                &MetadataSpec::OnSide(self.space.get_local_free_metadata_spec()),
+                unsafe{block.to_object_reference()}, 
+                addr.as_usize(), None, 
+                None
+            );
+        } else {
+            // different thread to allocator
+            let mut success = false;
+            while !success {
+                let thread_free = unsafe {
+                    Address::from_usize(
+                        load_metadata::<VM>(
+                            &MetadataSpec::OnSide(self.space.get_thread_free_metadata_spec()), 
+                            block.to_object_reference(), 
+                            None, 
+                            Some(Ordering::SeqCst),
+                        )
+                    )
+                };
+                unsafe {
+                    addr.store(thread_free);
+                }
+                success = compare_exchange_metadata::<VM>(
+                    &MetadataSpec::OnSide(self.space.get_thread_free_metadata_spec()),
+                    unsafe{block.to_object_reference()}, 
+                    thread_free.as_usize(), 
+                    addr.as_usize(), 
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst, //?
+                );
+            }
+        }
+        
+
+        // unset allocation bit
+        unsafe { unset_alloc_bit_unsafe(unsafe { addr.to_object_reference() }) };
+
     }
 
     pub fn store_block_tls(&self, block: Address) {
@@ -501,7 +594,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         (size + size_of::<u32>() - 1) / size_of::<u32>()
     }
 
-    fn mi_bin(size: usize) -> u8 {
+    pub fn mi_bin(size: usize) -> u8 {
         // adapted from _mi_bin in mimalloc
         let mut wsize: usize = FreeListAllocator::<VM>::mi_wsize_from_size(size);
         let bin: u8;

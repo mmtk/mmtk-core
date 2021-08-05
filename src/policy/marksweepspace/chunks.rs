@@ -55,12 +55,12 @@ impl Chunk {
         let a = Block::align(self.0);
         let b = Block::from(a);
         let start = Block::from(Block::align(self.0));
-        let end = Block::from(start.start() + (Self::BLOCKS << BYTES_IN_BLOCK));
+        let end = Block::from(start.start() + (Self::BLOCKS << LOG_BYTES_IN_BLOCK));
         start..end
     }
 
     /// Sweep this chunk.
-    pub fn sweep<VM: VMBinding>(&self, space: &mut MarkSweepSpace<VM>) {
+    pub fn sweep<VM: VMBinding>(&self, space: &MarkSweepSpace<VM>) {
         // let line_mark_state = None;
         // number of allocated blocks.
         let mut allocated_blocks = 0;
@@ -138,7 +138,7 @@ impl ChunkMap {
     pub const ALLOC_TABLE: SideMetadataSpec = 
     SideMetadataSpec {
         is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::MARK_TABLE),
+        offset: SideMetadataOffset::layout_after(&Block::TLS_TABLE),
         log_num_of_bits: 3,
         log_min_obj_size: Chunk::LOG_BYTES,
     };
