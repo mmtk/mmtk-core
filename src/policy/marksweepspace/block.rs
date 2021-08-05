@@ -21,7 +21,7 @@ use crate::{
 use super::{metadata::ALLOC_SIDE_METADATA_SPEC, MarkSweepSpace};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
-pub struct Block(Address);
+pub struct Block (Address);
 
 
 impl Block {
