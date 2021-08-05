@@ -394,6 +394,19 @@
 <span id="391">391</span>
 <span id="392">392</span>
 <span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident">std::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
@@ -516,6 +529,19 @@
         <span class="comment">// The meta-data portion of reserved Pages was committed above.</span>
         <span class="self">self</span>.<span class="ident">commit_pages</span>(<span class="ident">reserved_pages</span>, <span class="ident">required_pages</span>, <span class="ident">tls</span>);
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">protect_memory_on_release</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">new_chunk</span> {
+            <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::Mmapper</span>;
+            <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::MMAPPER</span>;
+            <span class="comment">// This check is necessary to prevent us from mprotecting an address that is not yet mapped by mmapper.</span>
+            <span class="comment">// See https://github.com/mmtk/mmtk-core/issues/400.</span>
+            <span class="comment">// It is possible that one thread gets a new chunk, and returns from this function. However, the Space.acquire()</span>
+            <span class="comment">// has not yet call ensure_mapped() for it. So the chunk is not yet mmapped. At this point, if another thread calls</span>
+            <span class="comment">// this function, and get a few more pages from the same chunk, it is no longer seen as &#39;new_chunk&#39;, and we</span>
+            <span class="comment">// will try to munprotect on it. But the chunk may not yet be mapped.</span>
+            <span class="comment">//</span>
+            <span class="comment">// If we want to improve and get rid of this loop, we need to move this munprotect to anywhere after the ensure_mapped() call</span>
+            <span class="comment">// in Space.acquire(). We can either move it the option of &#39;protect_on_release&#39; to space, or have a call to page resource</span>
+            <span class="comment">// after ensure_mapped(). However, I think this is sufficient given that this option is only used for PageProtect for debugging use.</span>
+            <span class="kw">while</span> <span class="op">!</span><span class="ident">MMAPPER</span>.<span class="ident">is_mapped_address</span>(<span class="ident">rtn</span>) {}
             <span class="self">self</span>.<span class="ident">munprotect</span>(<span class="ident">rtn</span>, <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">size</span>(<span class="ident">page_offset</span> <span class="kw">as</span> <span class="kw">_</span>) <span class="kw">as</span> <span class="kw">_</span>)
         };
         <span class="ident">Result::Ok</span>(<span class="ident">PRAllocResult</span> {
