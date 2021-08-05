@@ -256,7 +256,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn init(&mut self, vm_map: &'static VMMap);
 
     fn acquire(&self, tls: VMThread, pages: usize) -> Address {
-        trace!("Space.acquire, tls={:?}", tls);
+        let tls_usize = unsafe { std::mem::transmute::<OpaquePointer, usize>(tls.0) };
+        // eprintln!("Space.acquire, tls={:?}", tls);
         // Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.
         let should_poll = VM::VMActivePlan::is_mutator(tls);
         // Is a GC allowed here? enable_collection() has to be called so we know GC is initialized.
@@ -267,8 +268,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         let pages_reserved = pr.reserve_pages(pages);
         trace!("Pages reserved");
         trace!("Polling ..");
-
-        if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
+        // eprintln!("halfway through acquire, tls={}", tls_usize);
+        let a = if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
             debug!("Collection required");
             if !allow_poll {
                 panic!("Collection is not enabled.");
@@ -323,7 +324,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     unsafe { Address::zero() }
                 }
             }
-        }
+        };
+        // eprintln!("done acquiring space");
+        a
     }
 
     fn address_in_space(&self, start: Address) -> bool {

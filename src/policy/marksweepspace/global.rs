@@ -1,8 +1,9 @@
-use std::{collections::{HashMap, HashSet}, ops::DerefMut, sync::{Arc, Mutex}};
+use std::{borrow::BorrowMut, collections::{HashMap, HashSet}, ops::DerefMut, sync::{Arc, Mutex}};
 
 use atomic::Ordering;
+use downcast_rs::Downcast;
 
-use crate::{TransitiveClosure, policy::marksweepspace::{block::{Block, BlockState}, metadata::{ALLOC_SIDE_METADATA_SPEC, is_marked, set_mark_bit, unset_mark_bit}}, scheduler::{MMTkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, BYTES_IN_BLOCK, FreeListAllocator}, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{self, MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataOffset, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
+use crate::{TransitiveClosure, policy::marksweepspace::{block::{Block, BlockState}, metadata::{ALLOC_SIDE_METADATA_SPEC, is_marked, set_mark_bit, unset_mark_bit}}, scheduler::{MMTkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, BLOCK_QUEUES_EMPTY, BYTES_IN_BLOCK, FreeListAllocator}, constants::LOG_BYTES_IN_PAGE, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{self, MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataOffset, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
 
 use super::{super::space::{CommonSpace, SFT, Space, SpaceOptions}, chunks::ChunkMap, metadata::{is_alloced, unset_alloc_bit_unsafe}};
 use crate::vm::ObjectModel;
@@ -17,10 +18,9 @@ use crate::vm::ObjectModel;
 // ].to_vec();
 
 pub struct MarkSweepSpace<VM: VMBinding> {
-    pub active_blocks: Mutex<HashSet<Address>>,
     pub common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
-    pub marked_blocks: HashMap<usize, Vec<free_list_allocator::BlockQueue>>,
+    pub marked_blocks: Mutex<HashMap<usize, Vec<free_list_allocator::BlockQueue>>>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Work packet scheduler
@@ -96,42 +96,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
             *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
         ]);
-        let side_metadata_next = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&ChunkMap::ALLOC_TABLE),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_free = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&side_metadata_next),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_size = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&side_metadata_free),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_local_free = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&side_metadata_size),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_thread_free = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&side_metadata_local_free),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
-        let side_metadata_tls = SideMetadataSpec {
-            is_global: false,
-            offset: SideMetadataOffset::layout_after(&side_metadata_thread_free),
-            log_num_of_bits: 6,
-            log_min_obj_size: 16,
-        };
 
         // let side_metadata_marked = SideMetadataSpec {
         //     is_global: false,
@@ -141,13 +105,14 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         // };
         let mut local_specs = {
             vec![
-                side_metadata_next,
-                side_metadata_free,
-                side_metadata_size,
-                side_metadata_local_free,
-                side_metadata_thread_free,
-                side_metadata_tls,
-                // side_metadata_marked,
+                Block::NEXT_BLOCK_TABLE,
+                Block::FREE_LIST_TABLE,
+                Block::SIZE_TABLE,
+                Block::LOCAL_FREE_LIST_TABLE,
+                Block::THREAD_FREE_LIST_TABLE,
+                Block::TLS_TABLE,
+                Block::MARK_TABLE,
+                ChunkMap::ALLOC_TABLE,
             ]
         };
 
@@ -170,14 +135,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             heap,
         );
         MarkSweepSpace {
-            active_blocks: Mutex::default(),
             pr: if vmrequest.is_discontiguous() {
                 FreeListPageResource::new_discontiguous(0, vm_map)
             } else {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
-            marked_blocks: HashMap::default(),
+            marked_blocks: Mutex::default(),
             chunk_map: ChunkMap::new(),
             scheduler,
         }
@@ -209,32 +173,32 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     #[inline]
     pub fn get_next_metadata_spec(&self) -> SideMetadataSpec {
-        self.common.metadata.local[0]
+        Block::NEXT_BLOCK_TABLE
     }
 
     #[inline]
     pub fn get_free_metadata_spec(&self) -> SideMetadataSpec {
-        self.common.metadata.local[1]
+        Block::FREE_LIST_TABLE
     }
 
     #[inline]
     pub fn get_size_metadata_spec(&self) -> SideMetadataSpec {
-        self.common.metadata.local[2]
+        Block::SIZE_TABLE
     }
 
     #[inline]
     pub fn get_local_free_metadata_spec(&self) -> SideMetadataSpec {
-        self.common.metadata.local[3]
+        Block::LOCAL_FREE_LIST_TABLE
     }
 
     #[inline]
     pub fn get_thread_free_metadata_spec(&self) -> SideMetadataSpec {
-        self.common.metadata.local[4]
+        Block::THREAD_FREE_LIST_TABLE
     }
 
     #[inline]
     pub fn get_tls_metadata_spec(&self) -> SideMetadataSpec {
-        self.common.metadata.local[5]
+        Block::TLS_TABLE
     }
 
     // #[inline]
@@ -242,36 +206,51 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     //     self.common.metadata.local[6]
     // }
 
-    pub fn eager_sweep(&self, tls: VMWorkerThread) {
-        let active_blocks = &*self.active_blocks.lock().unwrap();
-        for block in active_blocks {
-            self.sweep_block(*block, tls)
-        }
-    }
+    // pub fn eager_sweep(&self, tls: VMWorkerThread) {
+    //     let active_blocks = &*self.active_blocks.lock().unwrap();
+    //     for block in active_blocks {
+    //         self.sweep_block(*block, tls)
+    //     }
+    // }
 
-    pub fn sweep_block(&self, block: Address, tls: VMWorkerThread) {
-        // eprintln!("Sweep block {}", block);
-        let cell_size = self.load_block_cell_size(block);
-        let mut cell = block;
-        while cell < block + BYTES_IN_BLOCK {
-            // eprintln!("look at cell {}", cell);
-            let alloced = is_alloced(unsafe { cell.to_object_reference() });
-            let marked = is_marked::<VM>(unsafe { cell.to_object_reference() }, Some(Ordering::SeqCst));
-            if alloced {
-                if !marked {
-                    self.free(cell, tls);
-                }
-                else {
-                    unset_mark_bit::<VM>(unsafe{cell.to_object_reference()}, Some(Ordering::SeqCst));
-                }
-            }
-            cell += cell_size;
-        }
-    }
+
 
     pub fn reset(&mut self) {
         // zero marked blocks
-        self.marked_blocks = HashMap::default();
+        self.marked_blocks = Mutex::default();
+    }
+
+    pub fn acquire_block_for_size(&self, alloc_tls: VMThread, size: usize) -> AcquireResult {
+        let tls = unsafe { std::mem::transmute::<OpaquePointer, usize>(alloc_tls.0) };
+        // eprintln!("space: acquire block for size, tls={}", tls);
+        let block = { let mut marked_blocks = self.marked_blocks.lock().unwrap();
+            // eprintln!("space: lock on marked blocks, tls={}", tls);
+            let marked_block_lists = match marked_blocks.get(&tls) {
+                Some(lists) => lists,
+                None => {
+                    marked_blocks.insert(tls, BLOCK_QUEUES_EMPTY.to_vec());
+                    marked_blocks.get(&tls).unwrap()
+                },
+            };
+            let bin = FreeListAllocator::<VM>::mi_bin(size);
+            let block_queue = marked_block_lists[bin as usize];
+            block_queue.first
+        };
+        let res = if block == unsafe { Address::zero() } {
+            // no marked blocks, get a fresh one
+            AcquireResult {
+                block: self.acquire(alloc_tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE),
+                new: true,
+            }
+        } else {
+            // I need to update the marked blocks!! This won't work
+            AcquireResult {
+                block,
+                new: false,
+            }
+        };
+        // eprintln!("space: done acquire block for size, tls={}", tls);
+        res
     }
 
     // pub fn block_level_sweep(&mut self) {
@@ -366,65 +345,69 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             Some(Ordering::SeqCst))
     }
 
-    pub fn free(&self, addr: Address, tls: VMWorkerThread) {
+//     pub fn free(&self, addr: Address, tls: VMWorkerThread) {
 
-        let block = FreeListAllocator::<VM>::get_block(addr);
-        let block_tls = self.load_block_tls(block);
+//         let block = FreeListAllocator::<VM>::get_block(addr);
+//         let block_tls = self.load_block_tls(block);
 
-        if tls.0.0 == block_tls {
-            // same thread that allocated
-            let local_free = unsafe {
-                Address::from_usize(
-                    load_metadata::<VM>(
-                        &MetadataSpec::OnSide(self.get_local_free_metadata_spec()), 
-                        block.to_object_reference(), 
-                        None, 
-                        None,
-                    )
-                )
-            };
-            unsafe {
-                addr.store(local_free);
-            }
-            store_metadata::<VM>(
-                &MetadataSpec::OnSide(self.get_free_metadata_spec()),
-                unsafe{block.to_object_reference()}, 
-                addr.as_usize(), None, 
-                None
-            );
-        } else {
-            // different thread to allocator
-            let mut success = false;
-            while !success {
-                let thread_free = unsafe {
-                    Address::from_usize(
-                        load_metadata::<VM>(
-                            &MetadataSpec::OnSide(self.get_thread_free_metadata_spec()), 
-                            block.to_object_reference(), 
-                            None, 
-                            Some(Ordering::SeqCst),
-                        )
-                    )
-                };
-                unsafe {
-                    addr.store(thread_free);
-                }
-                success = compare_exchange_metadata::<VM>(
-                    &MetadataSpec::OnSide(self.get_thread_free_metadata_spec()),
-                    unsafe{block.to_object_reference()}, 
-                    thread_free.as_usize(), 
-                    addr.as_usize(), 
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst, //?
-                );
-            }
-        }
+//         if tls.0.0 == block_tls {
+//             // same thread that allocated
+//             let local_free = unsafe {
+//                 Address::from_usize(
+//                     load_metadata::<VM>(
+//                         &MetadataSpec::OnSide(self.get_local_free_metadata_spec()), 
+//                         block.to_object_reference(), 
+//                         None, 
+//                         None,
+//                     )
+//                 )
+//             };
+//             unsafe {
+//                 addr.store(local_free);
+//             }
+//             store_metadata::<VM>(
+//                 &MetadataSpec::OnSide(self.get_free_metadata_spec()),
+//                 unsafe{block.to_object_reference()}, 
+//                 addr.as_usize(), None, 
+//                 None
+//             );
+//         } else {
+//             // different thread to allocator
+//             let mut success = false;
+//             while !success {
+//                 let thread_free = unsafe {
+//                     Address::from_usize(
+//                         load_metadata::<VM>(
+//                             &MetadataSpec::OnSide(self.get_thread_free_metadata_spec()), 
+//                             block.to_object_reference(), 
+//                             None, 
+//                             Some(Ordering::SeqCst),
+//                         )
+//                     )
+//                 };
+//                 unsafe {
+//                     addr.store(thread_free);
+//                 }
+//                 success = compare_exchange_metadata::<VM>(
+//                     &MetadataSpec::OnSide(self.get_thread_free_metadata_spec()),
+//                     unsafe{block.to_object_reference()}, 
+//                     thread_free.as_usize(), 
+//                     addr.as_usize(), 
+//                     None,
+//                     Ordering::SeqCst,
+//                     Ordering::SeqCst, //?
+//                 );
+//             }
+//         }
         
 
-        // unset allocation bit
-        unsafe { unset_alloc_bit_unsafe(unsafe { addr.to_object_reference() }) };
+//         // unset allocation bit
+//         unsafe { unset_alloc_bit_unsafe(unsafe { addr.to_object_reference() }) };
 
-    }
+//     }
 }
 
+pub struct AcquireResult {
+    pub block: Address,
+    pub new: bool,
+}
