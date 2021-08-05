@@ -20,7 +20,6 @@ lazy_static! {
     };
 }
 pub fn flms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    eprintln!("flms_mutator_prepare");
     let free_list_allocator = unsafe {
         mutator
             .allocators
