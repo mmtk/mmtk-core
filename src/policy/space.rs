@@ -491,7 +491,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     unsafe { Address::zero() }
                 }
             }
-        }
+        };
+        // eprintln!("done acquiring space");
+        a
     }
 
     fn address_in_space(&self, start: Address) -> bool {
