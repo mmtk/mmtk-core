@@ -20,8 +20,8 @@ lazy_static! {
         local: vec![],
     };
 
-    // lock to synchronize the mapping for the active chunk space
-    static ref CHUNK_MAP_LOCK: Mutex<()> = Mutex::new(());
+    // lock to synchronize the mapping of side metadata for a newly allocated chunk by malloc
+    pub(super) static ref CHUNK_MAP_LOCK: Mutex<()> = Mutex::new(());
 }
 
 /// Metadata spec for the active chunk byte
@@ -110,20 +110,14 @@ fn map_active_chunk_metadata(chunk_start: Address) {
 // We map the active chunk metadata (if not previously mapped), as well as the alloc bit metadata
 // and active page metadata here
 pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Address) {
-    {
-        // In order to prevent race conditions, we synchronize on the lock first and then
-        // check if we need to map the active chunk metadata for `chunk_start`
-        let _lock = CHUNK_MAP_LOCK.lock().unwrap();
-        if !is_chunk_mapped(chunk_start) {
-            map_active_chunk_metadata(chunk_start);
-        }
+    if !is_chunk_mapped(chunk_start) {
+        map_active_chunk_metadata(chunk_start);
     }
 
     if is_chunk_marked(chunk_start) {
         return;
     }
 
-    set_chunk_mark(chunk_start);
     let mmap_metadata_result = metadata.try_map_metadata_space(chunk_start, BYTES_IN_CHUNK);
     trace!("set chunk mark bit for {}", chunk_start);
     debug_assert!(
@@ -131,6 +125,10 @@ pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Add
         "mmap sidemetadata failed for chunk_start ({})",
         chunk_start
     );
+
+    // Set the chunk mark at the end. So if we have chunk mark set, we know we have mapped side metadata
+    // for the chunk.
+    set_chunk_mark(chunk_start);
 }
 
 // Check if a given object was allocated by malloc
