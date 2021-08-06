@@ -191,41 +191,43 @@ impl<ScanEdges: ProcessEdgesWork> StopMutators<ScanEdges> {
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        if worker.is_coordinator() {
-            trace!("stop_all_mutators start");
-            debug_assert_eq!(mmtk.plan.base().scanned_stacks.load(Ordering::SeqCst), 0);
-            <E::VM as VMBinding>::VMCollection::stop_all_mutators::<E>(worker.tls);
-            trace!("stop_all_mutators end");
-            mmtk.scheduler.notify_mutators_paused(mmtk);
-            if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
-                // Prepare mutators if necessary
-                // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
-                if !mmtk.plan.base().stacks_prepared() {
-                    for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                        <E::VM as VMBinding>::VMCollection::prepare_mutator(
-                            worker.tls,
-                            mutator.get_tls(),
-                            mutator,
-                        );
-                    }
-                }
-                // Scan mutators
-                if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
-                    mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                        .add(ScanStackRoots::<E>::new());
-                } else {
-                    for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                            .add(ScanStackRoot::<E>(mutator));
-                    }
-                }
-            }
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                .add(ScanVMSpecificRoots::<E>::new());
-        } else {
+        // If the VM requires that only the coordinator thread can stop the world,
+        // we delegate the work to the coordinator.
+        if <E::VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW && !worker.is_coordinator() {
             mmtk.scheduler
                 .add_coordinator_work(StopMutators::<E>::new(), worker);
+            return;
         }
+
+        trace!("stop_all_mutators start");
+        debug_assert_eq!(mmtk.plan.base().scanned_stacks.load(Ordering::SeqCst), 0);
+        <E::VM as VMBinding>::VMCollection::stop_all_mutators::<E>(worker.tls);
+        trace!("stop_all_mutators end");
+        mmtk.scheduler.notify_mutators_paused(mmtk);
+        if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
+            // Prepare mutators if necessary
+            // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
+            if !mmtk.plan.base().stacks_prepared() {
+                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+                    <E::VM as VMBinding>::VMCollection::prepare_mutator(
+                        worker.tls,
+                        mutator.get_tls(),
+                        mutator,
+                    );
+                }
+            }
+            // Scan mutators
+            if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
+                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                    .add(ScanStackRoots::<E>::new());
+            } else {
+                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+                    mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                        .add(ScanStackRoot::<E>(mutator));
+                }
+            }
+        }
+        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::<E>::new());
     }
 }
 
@@ -242,6 +244,11 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {
             // reset the logging info at the end of each GC
             crate::util::edge_logger::reset();
+        }
+
+        if <VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW {
+            assert!(worker.is_coordinator(),
+                    "VM only allows coordinator to resume mutators, but the current worker is not the coordinator.");
         }
 
         mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
